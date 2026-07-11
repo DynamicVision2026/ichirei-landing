@@ -31,7 +31,7 @@ export default function ConfirmationCeremony() {
           whileInView={{ opacity: 1, y: 0 }}
           viewport={{ once: true, margin: '-10%' }}
           transition={{ duration: 1.2, ease: [0.16, 1, 0.3, 1] }}
-          className={`flex aspect-[3/4] w-full max-w-sm flex-col items-center justify-center rounded-sm bg-paper ${PAPER_SHADOW}`}
+          className={`paper-texture flex aspect-[3/4] w-full max-w-sm flex-col items-center justify-center rounded-sm bg-paper ${PAPER_SHADOW}`}
         >
           <span className="font-mincho text-[11rem] leading-none text-cinnabar sm:text-[13rem]">
             礼
@@ -94,7 +94,7 @@ export default function ConfirmationCeremony() {
           {TIERS.map((tier) => (
             <div
               key={tier.name}
-              className={`flex flex-col items-center rounded-sm bg-paper px-6 py-8 text-center ${PAPER_SHADOW}`}
+              className={`paper-texture flex flex-col items-center rounded-sm bg-paper px-6 py-8 text-center ${PAPER_SHADOW}`}
             >
               <span className="font-mincho text-lg text-ivory">
                 {tier.name}

@@ -67,3 +67,19 @@ body {
   transform-origin: center;
   animation: ink-loop-rotate 4.5s linear infinite reverse;
 }
+
+/*
+ * Antique-paper grain for paper-slip cards. Two layered feTurbulence SVGs
+ * baked into background-image so they sit above the paper color but beneath
+ * card content, and are clipped by the card's border-radius automatically:
+ *  - a fine fractal grain (baseFrequency 0.85)
+ *  - a very faint horizontally-stretched fiber (baseFrequency 0.012 0.5)
+ * Both alphas are held low (slope 0.04 / 0.03) to stay restrained.
+ */
+.paper-texture {
+  background-image:
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='g'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix type='saturate' values='0'/%3E%3CfeComponentTransfer%3E%3CfeFuncA type='linear' slope='0.04'/%3E%3C/feComponentTransfer%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23g)'/%3E%3C/svg%3E"),
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='240' height='240'%3E%3Cfilter id='f'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.012 0.5' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix type='saturate' values='0'/%3E%3CfeComponentTransfer%3E%3CfeFuncA type='linear' slope='0.03'/%3E%3C/feComponentTransfer%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23f)'/%3E%3C/svg%3E");
+  background-repeat: repeat, repeat;
+  background-color: var(--color-paper);
+}

@@ -69,7 +69,7 @@ export default function CandidateShowcase() {
           whileInView={{ opacity: 1, y: 0 }}
           viewport={{ once: true, margin: '-10%' }}
           transition={{ duration: 1, ease: [0.16, 1, 0.3, 1] }}
-          className={`mx-auto mb-20 max-w-2xl rounded-sm bg-paper p-8 sm:p-10 ${PAPER_SHADOW}`}
+          className={`paper-texture mx-auto mb-20 max-w-2xl rounded-sm bg-paper p-8 sm:p-10 ${PAPER_SHADOW}`}
         >
           <p className="font-label mb-4 text-[10px] uppercase tracking-[0.3em] text-gold/70">
             Story Summary
@@ -93,7 +93,7 @@ export default function CandidateShowcase() {
                 duration: 0.8,
                 ease: [0.16, 1, 0.3, 1],
               }}
-              className={`relative flex flex-col items-center rounded-sm bg-paper px-8 py-12 text-center ${PAPER_SHADOW} ${
+              className={`paper-texture relative flex flex-col items-center rounded-sm bg-paper px-8 py-12 text-center ${PAPER_SHADOW} ${
                 c.primary ? 'ring-1 ring-cinnabar/60' : ''
               }`}
             >
