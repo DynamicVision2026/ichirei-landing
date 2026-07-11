@@ -29,3 +29,41 @@ body {
   background: var(--color-gold);
   color: var(--color-ink);
 }
+
+@keyframes marquee-scroll {
+  from {
+    transform: translateX(0);
+  }
+  to {
+    transform: translateX(-50%);
+  }
+}
+
+.marquee-track {
+  animation: marquee-scroll 60s linear infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .marquee-track {
+    animation: none;
+  }
+}
+
+@keyframes ink-loop-rotate {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.ink-loop-spin {
+  transform-origin: center;
+  animation: ink-loop-rotate 2.8s linear infinite;
+}
+
+.ink-loop-spin-reverse {
+  transform-origin: center;
+  animation: ink-loop-rotate 4.5s linear infinite reverse;
+}
