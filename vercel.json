@@ -4,6 +4,10 @@
     "api/select.ts": {
       "maxDuration": 60,
       "includeFiles": "engine/**"
+    },
+    "api/explain.ts": {
+      "maxDuration": 60,
+      "includeFiles": "engine/**"
     }
   },
   "rewrites": [
