@@ -28,7 +28,7 @@ Behavioral events accumulate in the browser (export via the ログ書き出し b
 
 Optional env overrides: `ICHIREI_MODEL` (default `claude-sonnet-5`), `ICHIREI_EFFORT` (default `high`), `ICHIREI_MAX_TOKENS` (default `20000`).
 
-Note: `api/select.ts` is configured for `maxDuration: 60`. On a Hobby plan the effective cap may be lower — if engine calls time out, set `ICHIREI_EFFORT=medium`.
+`/api/select` **streams** its response (NDJSON: `delta` progress lines, then one terminal `result`/`error` line) so the connection carries bytes throughout the model's reasoning pass, and both functions export `maxDuration = 60` (the Hobby ceiling). The client enforces a hard 90s deadline — on timeout or any server/parse error the UI shows the reason instead of spinning. If runs still hit the 60s function ceiling, set `ICHIREI_EFFORT=medium`, or enable Fluid Compute on the Vercel project and raise `maxDuration` (one number in `api/select.ts` + `vercel.json`).
 
 ## Golden fixture (spec §10)
 
@@ -44,4 +44,8 @@ npx tsc -b && npx tsc -p tsconfig.engine.json            # typecheck frontend + 
 node --experimental-strip-types scripts/test-plumbing.ts # engine plumbing, no key needed
 ANTHROPIC_API_KEY=... node --experimental-strip-types scripts/test-engine.ts   # live engine call
 node scripts/e2e-harness.mjs                             # full UI e2e vs mocked engine (needs playwright + dev server)
+node scripts/mock-api.mjs                                # keyless streaming mock of /api/* on :8787
+ICHIREI_MOCK_API=1 npm run dev                           # dev server proxies /api to the mock (run both together)
 ```
+
+Test hooks: `/demo?engine_timeout_ms=1500` shrinks the client deadline; the mock's `POST /api/select?mode=hang|error` simulates a dead or failing engine.

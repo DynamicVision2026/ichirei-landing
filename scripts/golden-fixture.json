@@ -1,0 +1,91 @@
+{
+  "status": "sufficient",
+  "follow_up_question": null,
+  "particulars": [
+    "駅までの送り迎え、二十年",
+    "「金は要るか」と封筒",
+    "ほとんど何も話さない"
+  ],
+  "fingerprint": {
+    "relationship": "子 → 父",
+    "scarce_asset": "駅での無言の送り迎え、二十年",
+    "unsaid_truth": "心配だと一度も言わないのに、一度も一人で発たせなかった。",
+    "dominant_truth_type": "Role",
+    "dignity_direction": "沈黙を冷たさではなく、行動で示す愛情として開く"
+  },
+  "candidates": [
+    {
+      "kanji": "迎",
+      "reading": "むかえ",
+      "kyujitai_form": null,
+      "truth_type": "Role",
+      "one_line_gaze": "あなたは二十年、私の帰りをいつも駅で迎えてくれた。理由は、一度も言わずに。",
+      "story_anchor": "盆に帰るたびに車で駅まで迎えに来て",
+      "unique_truth": "会いに来るという行為そのもの。還暦を迎える、の一字でもある。",
+      "eliminated": false,
+      "eliminated_reason": null,
+      "suitability_flag": "一字で刻んだときの自然さは要確認（パレット照合待ち）"
+    },
+    {
+      "kanji": "黙",
+      "reading": "もく",
+      "kyujitai_form": "默",
+      "truth_type": "Hidden Cost",
+      "one_line_gaze": "あなたは言葉の代わりに、静けさのまま、そこにいてくれた。",
+      "story_anchor": "相変わらず、ほとんど何も話さないけど",
+      "unique_truth": "語らないことで支え続けた歳月。",
+      "eliminated": false,
+      "eliminated_reason": null,
+      "suitability_flag": null
+    },
+    {
+      "kanji": "駅",
+      "reading": "えき",
+      "kyujitai_form": "驛",
+      "truth_type": "Private Symbol",
+      "one_line_gaze": "あなたの心配は、いつもあの駅の改札で待っていた。",
+      "story_anchor": "駅まで送ってくれて",
+      "unique_truth": "ふたりの物語の舞台。",
+      "eliminated": false,
+      "eliminated_reason": null,
+      "suitability_flag": "単独の刻印としては弱い（場所の名詞にとどまる）"
+    },
+    {
+      "kanji": "送",
+      "reading": "おくり",
+      "kyujitai_form": null,
+      "truth_type": "Hidden Cost",
+      "one_line_gaze": "あなたは一度も、私を一人で発たせなかった。",
+      "story_anchor": "帰りも必ず送ってくれる",
+      "unique_truth": "見送りの持続。",
+      "eliminated": true,
+      "eliminated_reason": "ゲート3（日本語の自然さ）：見送る・葬送の連想があり、存命の祝いに不向き。",
+      "suitability_flag": "葬送の連想"
+    },
+    {
+      "kanji": "厳",
+      "reading": "げん",
+      "kyujitai_form": "嚴",
+      "truth_type": "Essence",
+      "one_line_gaze": "厳しさの奥で、あなたはずっと心配していた。",
+      "story_anchor": "父は口下手で厳しくて",
+      "unique_truth": "表向きの気質。",
+      "eliminated": true,
+      "eliminated_reason": "ゲート4（尊厳の境界）：人を「厳しい」という評決に閉じ込める。",
+      "suitability_flag": null
+    },
+    {
+      "kanji": "愛",
+      "reading": "あい",
+      "kyujitai_form": null,
+      "truth_type": "Essence",
+      "one_line_gaze": "あなたはずっと家族を愛してくれた。",
+      "story_anchor": "封筒を押し付けてきた",
+      "unique_truth": "なし（汎用）。",
+      "eliminated": true,
+      "eliminated_reason": "ゲート1（置換テスト）：どの家族にも当てはまる。隔離規則違反。",
+      "suitability_flag": null
+    }
+  ],
+  "primary_kanji": "迎"
+}

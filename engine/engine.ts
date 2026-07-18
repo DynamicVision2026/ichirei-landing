@@ -84,6 +84,9 @@ export function extractJson(raw: string): EngineResult {
 export interface RunEngineOptions {
   apiKey?: string
   signal?: AbortSignal
+  /** Called with each raw text delta as the model streams — lets the API layer
+   *  keep its own response stream alive and report progress. */
+  onDelta?: (text: string) => void
 }
 
 /**
@@ -115,6 +118,7 @@ export async function runEngine(
     },
     opts.signal ? { signal: opts.signal } : undefined,
   )
+  if (opts.onDelta) stream.on('text', opts.onDelta)
   const message = await stream.finalMessage()
 
   const textOut = message.content

@@ -18,13 +18,60 @@ const CONDITIONS: { id: Condition; label: string }[] = [
 
 const MAX_FOLLOW_UPS = 2
 
+// Hard client-side deadline: if no terminal line arrives in this window, the
+// spinner is replaced by a visible error — the UI can never hang silently.
+// Overridable for tests via /demo?engine_timeout_ms=1500.
+const ENGINE_TIMEOUT_MS = (() => {
+  const p = Number(new URLSearchParams(window.location.search).get('engine_timeout_ms'))
+  return Number.isFinite(p) && p > 0 ? p : 90_000
+})()
+
+/** Consume the /api/select NDJSON stream; resolves on the terminal line. */
+async function consumeEngineStream(
+  body: ReadableStream<Uint8Array>,
+  onProgress: (chars: number) => void,
+): Promise<EngineResult> {
+  const reader = body.getReader()
+  const decoder = new TextDecoder()
+  let buffer = ''
+  const handleLine = (line: string): EngineResult | null => {
+    const trimmed = line.trim()
+    if (!trimmed) return null
+    const msg = JSON.parse(trimmed) as
+      | { type: 'delta'; chars: number }
+      | { type: 'result'; result: EngineResult }
+      | { type: 'error'; error: string }
+    if (msg.type === 'delta') {
+      onProgress(msg.chars)
+      return null
+    }
+    if (msg.type === 'error') throw new Error(msg.error)
+    return msg.result
+  }
+  for (;;) {
+    const { done, value } = await reader.read()
+    if (done) break
+    buffer += decoder.decode(value, { stream: true })
+    let nl = buffer.indexOf('\n')
+    while (nl !== -1) {
+      const result = handleLine(buffer.slice(0, nl))
+      if (result) return result
+      buffer = buffer.slice(nl + 1)
+      nl = buffer.indexOf('\n')
+    }
+  }
+  const tail = handleLine(buffer)
+  if (tail) return tail
+  throw new Error('エンジンの応答が途中で切れました（サーバー側タイムアウトの可能性）')
+}
+
 // Spec §10 golden fixture — one tap to load for acceptance runs.
 const GOLDEN_FIXTURE =
   '父は口下手で厳しくて、ほめられた記憶なんてほとんどない。進路のことでも何度もぶつかった。ただ、私が東京に出るとき駅まで送ってくれて、改札で「金は要るか」って、それだけ言って封筒を押し付けてきた。あれから二十年、盆に帰るたびに車で駅まで迎えに来て、帰りも必ず送ってくれる。相変わらず、ほとんど何も話さないけど。'
 
 type Phase = 'elicit' | 'processing' | 'followup' | 'reveal' | 'thin'
 
-function ProcessingView() {
+function ProcessingView({ receivedChars }: { receivedChars: number }) {
   const reduceMotion = useReducedMotion()
   return (
     <div className="flex flex-col items-center gap-10 py-24">
@@ -46,7 +93,9 @@ function ProcessingView() {
           言葉を読んでいます...
         </p>
         <p className="font-label mt-3 text-[11px] text-ivory/40">
-          深く読むほど時間がかかります（1〜2分ほどお待ちください）
+          {receivedChars > 0
+            ? `一字一字、書きあがっています … ${receivedChars}`
+            : '深く読むほど時間がかかります（1〜2分ほどお待ちください）'}
         </p>
       </div>
     </div>
@@ -59,6 +108,7 @@ export default function DemoApp() {
   const [condition, setConditionState] = useState<Condition>('A')
   const [result, setResult] = useState<EngineResult | null>(null)
   const [error, setError] = useState<string | null>(null)
+  const [receivedChars, setReceivedChars] = useState(0)
   const [followUpQuestion, setFollowUpQuestion] = useState<string | null>(null)
   const [followUpAnswer, setFollowUpAnswer] = useState('')
   const followUpsUsed = useRef(0)
@@ -74,20 +124,39 @@ export default function DemoApp() {
   const runEngine = async (fullStory: string) => {
     setPhase('processing')
     setError(null)
+    setReceivedChars(0)
     if (!sessionLogged.current) {
       log('session_started', {})
       sessionLogged.current = true
     }
     logSetStory(fullStory)
+    const controller = new AbortController()
+    let timedOut = false
+    const deadline = window.setTimeout(() => {
+      timedOut = true
+      controller.abort()
+    }, ENGINE_TIMEOUT_MS)
     try {
       const res = await fetch('/api/select', {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
         body: JSON.stringify({ story: fullStory, condition }),
+        signal: controller.signal,
       })
-      const data = await res.json()
-      if (!res.ok) throw new Error(data?.error ?? `HTTP ${res.status}`)
-      const engineResult = data as EngineResult
+      if (!res.ok) {
+        let message: string | null = null
+        try {
+          message = ((await res.json()) as { error?: string })?.error ?? null
+        } catch {
+          message = null
+        }
+        throw new Error(message ?? `サーバーエラー（HTTP ${res.status}）`)
+      }
+      const isStream =
+        (res.headers.get('content-type') ?? '').includes('ndjson') && res.body
+      const engineResult: EngineResult = isStream
+        ? await consumeEngineStream(res.body!, setReceivedChars)
+        : ((await res.json()) as EngineResult)
       setResult(engineResult)
       log('engine_run', {
         status: engineResult.status,
@@ -109,8 +178,15 @@ export default function DemoApp() {
         setPhase('reveal')
       }
     } catch (e) {
-      setError(e instanceof Error ? e.message : String(e))
+      const message = timedOut
+        ? `結果が届く前に時間切れになりました（${Math.round(ENGINE_TIMEOUT_MS / 1000)}秒）。もう一度お試しください。続く場合はサーバー側の制限の可能性があります（ICHIREI_EFFORT=medium で短縮できます）。`
+        : e instanceof Error
+          ? e.message
+          : String(e)
+      setError(message)
       setPhase('elicit')
+    } finally {
+      window.clearTimeout(deadline)
     }
   }
 
@@ -186,7 +262,7 @@ export default function DemoApp() {
           </>
         )}
 
-        {phase === 'processing' && <ProcessingView />}
+        {phase === 'processing' && <ProcessingView receivedChars={receivedChars} />}
 
         {phase === 'followup' && followUpQuestion && (
           <motion.div

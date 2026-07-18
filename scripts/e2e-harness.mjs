@@ -5,63 +5,13 @@
 // condition toggle (no engine re-call), kyūjitai pairing, follow-up loop, and
 // all §6 behavioral events.
 import { chromium } from 'playwright'
+import { readFileSync } from 'node:fs'
 
 const SHOTS = process.env.E2E_SHOTS_DIR ?? '.'
 const STORY =
   '父は口下手で厳しくて、ほめられた記憶なんてほとんどない。進路のことでも何度もぶつかった。ただ、私が東京に出るとき駅まで送ってくれて、改札で「金は要るか」って、それだけ言って封筒を押し付けてきた。あれから二十年、盆に帰るたびに車で駅まで迎えに来て、帰りも必ず送ってくれる。相変わらず、ほとんど何も話さないけど。'
 
-const FIXTURE = {
-  status: 'sufficient',
-  follow_up_question: null,
-  particulars: [
-    '駅までの送り迎え、二十年', '「金は要るか」と封筒', 'ほとんど何も話さない',
-  ],
-  fingerprint: {
-    relationship: '子 → 父',
-    scarce_asset: '駅での無言の送り迎え、二十年',
-    unsaid_truth: '心配だと一度も言わないのに、一度も一人で発たせなかった。',
-    dominant_truth_type: 'Role',
-    dignity_direction: '沈黙を冷たさではなく、行動で示す愛情として開く',
-  },
-  candidates: [
-    { kanji: '迎', reading: 'むかえ', kyujitai_form: null, truth_type: 'Role',
-      one_line_gaze: 'あなたは二十年、私の帰りをいつも駅で迎えてくれた。理由は、一度も言わずに。',
-      story_anchor: '盆に帰るたびに車で駅まで迎えに来て',
-      unique_truth: '会いに来るという行為そのもの。還暦を迎える、の一字でもある。',
-      eliminated: false, eliminated_reason: null,
-      suitability_flag: '一字で刻んだときの自然さは要確認（パレット照合待ち）' },
-    { kanji: '黙', reading: 'もく', kyujitai_form: '默', truth_type: 'Hidden Cost',
-      one_line_gaze: 'あなたは言葉の代わりに、静けさのまま、そこにいてくれた。',
-      story_anchor: '相変わらず、ほとんど何も話さないけど',
-      unique_truth: '語らないことで支え続けた歳月。',
-      eliminated: false, eliminated_reason: null, suitability_flag: null },
-    { kanji: '駅', reading: 'えき', kyujitai_form: '驛', truth_type: 'Private Symbol',
-      one_line_gaze: 'あなたの心配は、いつもあの駅の改札で待っていた。',
-      story_anchor: '駅まで送ってくれて',
-      unique_truth: 'ふたりの物語の舞台。', eliminated: false,
-      eliminated_reason: null,
-      suitability_flag: '単独の刻印としては弱い（場所の名詞にとどまる）' },
-    { kanji: '送', reading: 'おくり', kyujitai_form: null, truth_type: 'Hidden Cost',
-      one_line_gaze: 'あなたは一度も、私を一人で発たせなかった。',
-      story_anchor: '帰りも必ず送ってくれる', unique_truth: '見送りの持続。',
-      eliminated: true,
-      eliminated_reason: 'ゲート3（日本語の自然さ）：見送る・葬送の連想があり、存命の祝いに不向き。',
-      suitability_flag: '葬送の連想' },
-    { kanji: '厳', reading: 'げん', kyujitai_form: '嚴', truth_type: 'Essence',
-      one_line_gaze: '厳しさの奥で、あなたはずっと心配していた。',
-      story_anchor: '父は口下手で厳しくて', unique_truth: '表向きの気質。',
-      eliminated: true,
-      eliminated_reason: 'ゲート4（尊厳の境界）：人を「厳しい」という評決に閉じ込める。',
-      suitability_flag: null },
-    { kanji: '愛', reading: 'あい', kyujitai_form: null, truth_type: 'Essence',
-      one_line_gaze: 'あなたはずっと家族を愛してくれた。',
-      story_anchor: '封筒を押し付けてきた', unique_truth: 'なし（汎用）。',
-      eliminated: true,
-      eliminated_reason: 'ゲート1（置換テスト）：どの家族にも当てはまる。隔離規則違反。',
-      suitability_flag: null },
-  ],
-  primary_kanji: '迎',
-}
+const FIXTURE = JSON.parse(readFileSync(new URL('./golden-fixture.json', import.meta.url), 'utf8'))
 
 const INSUFFICIENT = {
   status: 'insufficient',
@@ -236,6 +186,80 @@ const browser = await chromium.launch({
   check('follow-up answer re-runs engine into reveal', (await page.locator('article').count()) >= 1)
   check('engine ran twice on follow-up path', call === 2)
   check('no page errors (run 2)', errors.length === 0)
+  if (errors.length) console.log('page errors:', errors)
+  await page.close()
+}
+
+
+// ---------- Run 3: true NDJSON streaming (vite proxy -> mock server) ----------
+// No route interception on /api/select: the request travels through the dev
+// server proxy to scripts/mock-api.mjs, which streams deltas over ~3s.
+{
+  const page = await browser.newPage({ viewport: { width: 1100, height: 950 } })
+  const errors = []
+  page.on('pageerror', (e) => errors.push(String(e)))
+  await page.route('**/api/log', (route) => route.fulfill({ status: 204, body: '' }))
+
+  await page.goto('http://localhost:5173/demo', { waitUntil: 'networkidle' })
+  await page.locator('textarea').first().fill(STORY)
+  await page.click('text=その一字を、探しにいく')
+  check('stream: processing view shows', await page.locator('text=言葉を読んでいます').isVisible())
+  // Progress deltas should surface as a live received-chars counter
+  await page.waitForSelector('text=一字一字、書きあがっています', { timeout: 6000 })
+  check('stream: live progress counter appears mid-stream', true)
+  // When the terminal result line lands, the reveal begins
+  await page.waitForSelector('article', { timeout: 10000 })
+  await page.waitForTimeout(2600)
+  check('stream: all survivors revealed after stream completes', (await page.locator('article').count()) === 3)
+  check('stream: primary 迎 resolves last', (await page.locator('article').last().locator('span').first().textContent()) === '迎')
+  check('no page errors (run 3)', errors.length === 0)
+  if (errors.length) console.log('page errors:', errors)
+  await page.close()
+}
+
+// ---------- Run 4: client-side hard timeout -> visible error, no hang ----------
+{
+  const page = await browser.newPage({ viewport: { width: 1100, height: 950 } })
+  const errors = []
+  page.on('pageerror', (e) => errors.push(String(e)))
+  await page.route('**/api/log', (route) => route.fulfill({ status: 204, body: '' }))
+  // Never respond — simulates Vercel killing the function with nothing sent.
+  await page.route('**/api/select', () => { /* hang forever */ })
+
+  await page.goto('http://localhost:5173/demo?engine_timeout_ms=1500', { waitUntil: 'networkidle' })
+  await page.locator('textarea').first().fill(STORY)
+  await page.click('text=その一字を、探しにいく')
+  check('timeout: spinner shows first', await page.locator('text=言葉を読んでいます').isVisible())
+  await page.waitForSelector('text=時間切れになりました', { timeout: 8000 })
+  check('timeout: visible error after deadline', true)
+  check('timeout: spinner gone', (await page.locator('text=言葉を読んでいます').count()) === 0)
+  check('timeout: back on elicitation (retry possible)', await page.locator('text=小さなことを、ひとつだけ').isVisible())
+  check('no page errors (run 4)', errors.length === 0)
+  if (errors.length) console.log('page errors:', errors)
+  await page.close()
+}
+
+// ---------- Run 5: NDJSON error line surfaces as visible error ----------
+{
+  const page = await browser.newPage({ viewport: { width: 1100, height: 950 } })
+  const errors = []
+  page.on('pageerror', (e) => errors.push(String(e)))
+  await page.route('**/api/log', (route) => route.fulfill({ status: 204, body: '' }))
+  await page.route('**/api/select', (route) =>
+    route.fulfill({
+      status: 200,
+      contentType: 'application/x-ndjson; charset=utf-8',
+      body: JSON.stringify({ type: 'delta', chars: 210 }) + '\n' +
+        JSON.stringify({ type: 'error', error: 'Engine failed: model output was not valid JSON' }) + '\n',
+    }),
+  )
+  await page.goto('http://localhost:5173/demo', { waitUntil: 'networkidle' })
+  await page.locator('textarea').first().fill(STORY)
+  await page.click('text=その一字を、探しにいく')
+  await page.waitForSelector('text=model output was not valid JSON', { timeout: 6000 })
+  check('ndjson error line: surfaced to UI', true)
+  check('ndjson error line: spinner gone', (await page.locator('text=言葉を読んでいます').count()) === 0)
+  check('no page errors (run 5)', errors.length === 0)
   if (errors.length) console.log('page errors:', errors)
   await page.close()
 }
