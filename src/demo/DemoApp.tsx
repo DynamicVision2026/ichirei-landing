@@ -20,10 +20,14 @@ const MAX_FOLLOW_UPS = 2
 
 // Hard client-side deadline: if no terminal line arrives in this window, the
 // spinner is replaced by a visible error — the UI can never hang silently.
+// 290s sits just under the 300s server/Cloud Run request timeout (server/app.ts,
+// cloudbuild.yaml) so the user sees THIS clear message rather than a cut stream.
+// (On the Vercel fallback a 60s function kill still ends the stream at once and
+// surfaces as a visible error, so the longer window costs nothing there.)
 // Overridable for tests via /demo?engine_timeout_ms=1500.
 const ENGINE_TIMEOUT_MS = (() => {
   const p = Number(new URLSearchParams(window.location.search).get('engine_timeout_ms'))
-  return Number.isFinite(p) && p > 0 ? p : 90_000
+  return Number.isFinite(p) && p > 0 ? p : 290_000
 })()
 
 /** Consume the /api/select NDJSON stream; resolves on the terminal line. */
@@ -39,8 +43,10 @@ async function consumeEngineStream(
     if (!trimmed) return null
     const msg = JSON.parse(trimmed) as
       | { type: 'delta'; chars: number }
+      | { type: 'ping' } // server heartbeat during silent reasoning — ignore
       | { type: 'result'; result: EngineResult }
       | { type: 'error'; error: string }
+    if (msg.type === 'ping') return null
     if (msg.type === 'delta') {
       onProgress(msg.chars)
       return null
@@ -48,6 +54,11 @@ async function consumeEngineStream(
     if (msg.type === 'error') throw new Error(msg.error)
     return msg.result
   }
+  // Remember the terminal result but keep reading until the server closes the
+  // stream (it does so immediately after the terminal line). Returning early
+  // would leave the response half-read, which browsers report as an aborted
+  // request (net::ERR_ABORTED) even though the result was delivered.
+  let final: EngineResult | null = null
   for (;;) {
     const { done, value } = await reader.read()
     if (done) break
@@ -55,13 +66,14 @@ async function consumeEngineStream(
     let nl = buffer.indexOf('\n')
     while (nl !== -1) {
       const result = handleLine(buffer.slice(0, nl))
-      if (result) return result
+      if (result) final = result
       buffer = buffer.slice(nl + 1)
       nl = buffer.indexOf('\n')
     }
   }
   const tail = handleLine(buffer)
-  if (tail) return tail
+  if (tail) final = tail
+  if (final) return final
   throw new Error('エンジンの応答が途中で切れました（サーバー側タイムアウトの可能性）')
 }
 

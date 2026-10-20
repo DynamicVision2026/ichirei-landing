@@ -1,0 +1,65 @@
+# Cloud Build: build the container -> push to Artifact Registry -> deploy to
+# Cloud Run service "ichirei".
+#
+# ANTHROPIC_API_KEY is NEVER baked into the image or stored in this repo. The
+# deploy step mounts the Secret Manager secret named ANTHROPIC_API_KEY as an env
+# var of the same name at runtime (--set-secrets below). Create/rotate the secret
+# in Secret Manager (Console -> Security -> Secret Manager -> ANTHROPIC_API_KEY ->
+# New version); see DEPLOY.md for the one-time IAM grant that lets Cloud Run read it.
+#
+# Used by a Cloud Build trigger (push to a branch) or a manual run:
+#   gcloud builds submit --config cloudbuild.yaml --region asia-northeast1 .
+
+substitutions:
+  _REGION: asia-northeast1          # Tokyo
+  _SERVICE: ichirei                 # Cloud Run service name
+  _REPO: ichirei                    # Artifact Registry Docker repository name
+  _TIMEOUT: '300'                   # Cloud Run request timeout (s). Keep in step with
+                                    # the server (300s) and the frontend deadline (290s).
+
+steps:
+  - id: build
+    name: gcr.io/cloud-builders/docker
+    args:
+      - build
+      - -t
+      - ${_REGION}-docker.pkg.dev/$PROJECT_ID/${_REPO}/${_SERVICE}:$BUILD_ID
+      - -t
+      - ${_REGION}-docker.pkg.dev/$PROJECT_ID/${_REPO}/${_SERVICE}:latest
+      - .
+
+  - id: push-build-tag
+    name: gcr.io/cloud-builders/docker
+    args: [push, '${_REGION}-docker.pkg.dev/$PROJECT_ID/${_REPO}/${_SERVICE}:$BUILD_ID']
+
+  - id: push-latest
+    name: gcr.io/cloud-builders/docker
+    args: [push, '${_REGION}-docker.pkg.dev/$PROJECT_ID/${_REPO}/${_SERVICE}:latest']
+
+  - id: deploy
+    name: gcr.io/google.com/cloudsdktool/cloud-sdk:slim
+    entrypoint: gcloud
+    args:
+      - run
+      - deploy
+      - ${_SERVICE}
+      - --image=${_REGION}-docker.pkg.dev/$PROJECT_ID/${_REPO}/${_SERVICE}:$BUILD_ID
+      - --region=${_REGION}
+      - --allow-unauthenticated        # public site; see the abuse note in DEPLOY.md
+      - --port=8080
+      - --timeout=${_TIMEOUT}          # the whole point of the move: far above Vercel's 60s
+      - --cpu=1
+      - --memory=512Mi
+      - --cpu-boost                    # faster cold starts
+      - --min-instances=0
+      - --max-instances=3              # caps concurrent spend; raise when needed
+      # Mount the Secret Manager secret as the ANTHROPIC_API_KEY env var.
+      - --set-secrets=ANTHROPIC_API_KEY=ANTHROPIC_API_KEY:latest
+
+images:
+  - ${_REGION}-docker.pkg.dev/$PROJECT_ID/${_REPO}/${_SERVICE}:$BUILD_ID
+  - ${_REGION}-docker.pkg.dev/$PROJECT_ID/${_REPO}/${_SERVICE}:latest
+
+options:
+  # Required when the trigger runs as a user-managed service account; harmless otherwise.
+  logging: CLOUD_LOGGING_ONLY

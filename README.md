@@ -20,6 +20,11 @@ The cardinal rule: **the engine's reasoning is a swappable text asset, never cod
 Conditions A/B/C change **presentation only** — one engine call per story, cached client-side.
 Behavioral events accumulate in the browser (export via the ログ書き出し button) and are echoed to the Vercel function logs via `/api/log`.
 
+## Hosting
+
+- **Google Cloud Run (target)** — one container serves the site and `/api/*` with a 300 s request timeout, so the full-depth reasoning pass is not cut off. See **[DEPLOY.md](DEPLOY.md)** for the exact console steps, `cloudbuild.yaml` (build → Artifact Registry → deploy, auto-deploys from GitHub) and the custom domain. Code: `server/` (a thin Hono transport that reuses `engine/` and `api/` unchanged), `Dockerfile`.
+- **Vercel (fallback, unchanged)** — see below. Subject to Vercel's 60 s Hobby function cap.
+
 ## Deploy (Vercel dashboard)
 
 1. Import this repo in Vercel (framework preset: **Vite**; root directory: repo root — `vercel.json` handles the functions and SPA rewrites).
@@ -44,6 +49,10 @@ npx tsc -b && npx tsc -p tsconfig.engine.json            # typecheck frontend + 
 node --experimental-strip-types scripts/test-plumbing.ts # engine plumbing, no key needed
 ANTHROPIC_API_KEY=... node --experimental-strip-types scripts/test-engine.ts   # live engine call
 node scripts/e2e-harness.mjs                             # full UI e2e vs mocked engine (needs playwright + dev server)
+npm run build && npm start                               # run the Cloud Run server locally (needs ANTHROPIC_API_KEY, or see test:server)
+node scripts/test-server.mjs                             # real server + real engine vs a fake Anthropic upstream (--long adds a 75s stream)
+node scripts/test-server-browser.mjs                     # same, driven through the real frontend in Chromium
+node scripts/test-container.mjs                          # run the built Docker image (needs docker build -t ichirei:local .)
 node scripts/mock-api.mjs                                # keyless streaming mock of /api/* on :8787
 ICHIREI_MOCK_API=1 npm run dev                           # dev server proxies /api to the mock (run both together)
 ```
