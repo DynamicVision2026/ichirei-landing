@@ -18,6 +18,7 @@ export type LogEventName =
   | 'final_selection'
   | 'condition_changed'
   | 'follow_up_shown'
+  | 'retry_clicked'
 
 export interface LogEvent {
   event: LogEventName

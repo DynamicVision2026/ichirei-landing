@@ -202,6 +202,19 @@ export default function DemoApp() {
     }
   }
 
+  // "もう一度試す": back to the story input with the current story text kept, so the
+  // sender can edit it and run again. Result, error and follow-up state are cleared.
+  const tryAgain = () => {
+    log('retry_clicked', { story_chars: story.length })
+    followUpsUsed.current = 0
+    setResult(null)
+    setError(null)
+    setFollowUpQuestion(null)
+    setFollowUpAnswer('')
+    setReceivedChars(0)
+    setPhase('elicit')
+  }
+
   const submitFollowUp = () => {
     const answer = followUpAnswer.trim()
     if (!answer) return
@@ -326,7 +339,18 @@ export default function DemoApp() {
         )}
 
         {phase === 'reveal' && result && (
-          <Reveal result={result} story={story} condition={condition} />
+          <>
+            <Reveal result={result} story={story} condition={condition} />
+            <div className="mt-12 text-center">
+              <button
+                type="button"
+                onClick={tryAgain}
+                className="font-label rounded-full border border-gold/40 px-6 py-2.5 text-sm text-ivory transition-colors hover:border-gold hover:bg-gold/10"
+              >
+                もう一度試す
+              </button>
+            </div>
+          </>
         )}
 
         {result && (phase === 'reveal' || phase === 'thin') && (

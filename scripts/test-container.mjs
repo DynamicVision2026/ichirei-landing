@@ -8,7 +8,7 @@
 // so no API key or network is needed — everything else is the real image.
 
 import { execFileSync } from 'node:child_process'
-import { GOLDEN, GOLDEN_CONTEXT, STORY, startFakeAnthropic, readNdjson, sleep, freePort } from './server-fixtures.mjs'
+import { GOLDEN_REFEREED, GOLDEN_CONTEXT, STORY, startFakeAnthropic, readNdjson, sleep, freePort } from './server-fixtures.mjs'
 
 const IMAGE = process.env.IMAGE ?? 'ichirei:local'
 const HOST_NET = process.env.CONTAINER_NETWORK === 'host'
@@ -55,7 +55,7 @@ try {
   check('runs as non-root user', docker('inspect', IMAGE, '--format', '{{.Config.User}}') === 'node' && docker('exec', name, 'id', '-u') !== '0')
   check('API key arrives only at runtime (health reports it configured)', health?.apiKeyConfigured === true)
   const sh = (cmd) => { try { return docker('exec', name, 'sh', '-c', cmd) } catch { return '' } }
-  check('prompt assets shipped: engine/prompt.ja.md + prompt.zh.md + explain-prompt.md', sh('test -f engine/prompt.ja.md && test -f engine/prompt.zh.md && test -f engine/explain-prompt.md && echo yes') === 'yes')
+  check('prompt assets shipped: engine/prompt.ja.md + prompt.zh.md + explain-prompt.md + palette.csv/ts', sh('test -f engine/prompt.ja.md && test -f engine/prompt.zh.md && test -f engine/explain-prompt.md && test -f engine/palette.csv && test -f engine/palette.ts && echo yes') === 'yes')
   check('production deps only (no vite / @vercel/node / typescript in runtime)', sh('ls node_modules | grep -E "^(vite|typescript)$"; ls node_modules/@vercel 2>/dev/null') === '', sh('ls node_modules | head -50'))
   check('runtime has the server deps (hono, anthropic sdk)', sh('ls node_modules/hono node_modules/@anthropic-ai >/dev/null 2>&1 && echo yes') === 'yes')
 
@@ -75,7 +75,7 @@ try {
   const lines = await readNdjson(res)
   const deltas = lines.filter((l) => l.msg.type === 'delta')
   const result = lines.find((l) => l.msg.type === 'result')
-  check('select: streams delta lines then the golden result (real engine in the image)', deltas.length >= 3 && JSON.stringify(result?.msg.result) === JSON.stringify(GOLDEN))
+  check('select: streams delta lines then the golden result (real engine in the image)', deltas.length >= 3 && JSON.stringify(result?.msg.result) === JSON.stringify(GOLDEN_REFEREED))
   check('select: true streaming (first delta well before result)', result && deltas[0] && result.at - deltas[0].at > 800)
   check('upstream saw claude-sonnet-5, prompt.ja.md injected, key from runtime env', (() => {
     const r = upstream.state.requests.at(-1)

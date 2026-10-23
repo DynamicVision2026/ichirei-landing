@@ -10,6 +10,7 @@ import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { runEngine, STORY_SLOT, CONTEXT_SLOTS } from '../engine/engine.ts'
 import { validateEngineResult } from '../engine/contract.ts'
+import { applyPalette, loadPalette } from '../engine/palette.ts'
 import { POST } from '../api/select.ts'
 
 let failures = 0
@@ -63,7 +64,10 @@ try {
     context: { language: 'ja', relationship: 'parent_father', direction: 'up', occasion: 'birthday_milestone', occasion_detail: '還暦' },
   })
   const p1 = lastPrompt()
-  check('golden: result equals the golden fixture', JSON.stringify(golden) === JSON.stringify(GOLDEN))
+  // The engine returns the model's answer after the palette referee; for the golden fixture
+  // that adds the referee block and the palette's verdicts, nothing else.
+  check('golden: result equals the golden fixture run through the palette referee', JSON.stringify(golden) === JSON.stringify(applyPalette(GOLDEN, loadPalette(), GOLDEN_STORY)))
+  check('golden: referee ran, kept 迎 as primary (verbatim anchor), changed no candidate set', golden.referee?.palette_rows === 18 && golden.referee.primary_changed === false && golden.candidates.map((c) => c.kanji).join('') === GOLDEN.candidates.map((c: { kanji: string }) => c.kanji).join(''))
   check('golden: result conforms to the v5 contract', validateEngineResult(golden).length === 0, validateEngineResult(golden).join('; '))
   check('golden: primary is 迎 and the four context fields are echoed', golden.primary_kanji === '迎' && golden.language === 'ja' && golden.relationship === 'parent_father' && golden.direction === 'up' && golden.occasion === 'birthday_milestone' && golden.occasion_detail === '還暦')
   check('golden→model: prompt is prompt.ja.md (Japanese output rules)', p1.includes('Selection Prompt (v5, Japanese / ja)') && p1.includes('hiragana'))
@@ -94,7 +98,22 @@ try {
   reply = { ...GOLDEN, language: 'zh', relationship: 'spouse', direction: 'down', occasion: 'new_baby', occasion_detail: '滿月' }
   const stamped = await runEngine(GOLDEN_STORY, 'A', { context: { language: 'ja', relationship: 'parent_father', direction: 'up', occasion: 'birthday_milestone', occasion_detail: '還暦' } })
   check('stamping: a wrong model echo is overwritten with what the caller sent', stamped.language === 'ja' && stamped.relationship === 'parent_father' && stamped.direction === 'up' && stamped.occasion === 'birthday_milestone' && stamped.occasion_detail === '還暦')
-  check('stamping: nothing else about the result is touched', stamped.primary_kanji === '迎' && JSON.stringify(stamped.candidates) === JSON.stringify(GOLDEN.candidates))
+  check('stamping: nothing else about the result is touched', stamped.primary_kanji === '迎' && JSON.stringify(stamped.candidates.map((c) => c.kanji)) === JSON.stringify(GOLDEN.candidates.map((c: { kanji: string }) => c.kanji)))
+  reply = GOLDEN
+
+  // ---- 4b. The palette referee, end to end (the first real golden run's failure) ----
+  // Raw model answer: 送 survived as a candidate, and 餞 — a context_required kanji — is the
+  // primary with an anchor line that is not in the story. The engine must return 送 eliminated and a different primary.
+  const cands = GOLDEN.candidates as Record<string, unknown>[]
+  const base = (k: string, over: Record<string, unknown> = {}) => ({ ...cands[1], kanji: k, eliminated: false, eliminated_reason: null, palette_status: 'ok', flags: [], ...over })
+  reply = { ...GOLDEN, candidates: [base('黙'), base('送', { story_anchor: '帰りも必ず送ってくれる' }), base('餞', { story_anchor: '毎朝お弁当を作ってくれた' }), base('灯'), base('駅'), base('愛', { eliminated: true, eliminated_reason: 'ゲート1' })], primary_kanji: '餞' }
+  const refereed = await runEngine(GOLDEN_STORY, 'A', { context: { language: 'ja', relationship: 'parent_father', direction: 'up', occasion: 'birthday_milestone', occasion_detail: '還暦' } })
+  const sou = refereed.candidates.find((c) => c.kanji === '送')!
+  check('referee (engine): 送 comes back eliminated with reason "palette: hard_block"', sou.eliminated === true && sou.eliminated_reason === 'palette: hard_block' && sou.palette_status === 'off_palette')
+  check('referee (engine): anchorless 餞 is refused as primary; the next survivor (灯) is promoted', refereed.primary_kanji === '灯' && refereed.referee?.original_primary === '餞' && refereed.referee.primary_changed === true && refereed.candidates.find((c) => c.kanji === '餞')!.eliminated === false)
+  check('referee (engine): the refereed result still conforms to the contract', validateEngineResult(refereed).length === 0, validateEngineResult(refereed).join('; '))
+  const viaApi = (await ndjson(await post({ story: GOLDEN_STORY, condition: 'A', language: 'ja', relationship: 'parent_father', direction: 'up', occasion: 'birthday_milestone' }))).at(-1)
+  check('referee (api): the NDJSON result line carries the refereed result', viaApi?.type === 'result' && viaApi.result.primary_kanji === '灯' && viaApi.result.referee?.actions.length >= 2)
   reply = GOLDEN
 
   // ---- 5. Insufficient (STEP 0 or heart-anchor) still carries the context -----

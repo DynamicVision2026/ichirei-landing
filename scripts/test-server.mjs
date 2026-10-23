@@ -8,7 +8,7 @@
 // static-serving checks run against the same kind of bundle that ships.
 
 import { execSync } from 'node:child_process'
-import { GOLDEN, GOLDEN_CONTEXT, STORY, EXPLAIN_TEXT, sleep, startFakeAnthropic, startServer, readNdjson } from './server-fixtures.mjs'
+import { GOLDEN_REFEREED, GOLDEN_CONTEXT, STORY, EXPLAIN_TEXT, sleep, startFakeAnthropic, startServer, readNdjson } from './server-fixtures.mjs'
 
 const LONG = process.argv.includes('--long')
 let failures = 0
@@ -69,7 +69,7 @@ try {
   const result = lines.find((l) => l.msg.type === 'result')
   check('select: progress delta lines streamed', deltas.length >= 3, `deltas=${deltas.length}`)
   check('select: first delta arrives well before the result (true streaming, not buffered)', result && deltas[0] && result.at - deltas[0].at > 800, `first=${deltas[0]?.at} result=${result?.at}`)
-  check('select: terminal result line equals the golden contract', JSON.stringify(result?.msg.result) === JSON.stringify(GOLDEN))
+  check('select: terminal result line equals the golden contract (after the palette referee)', JSON.stringify(result?.msg.result) === JSON.stringify(GOLDEN_REFEREED))
   check('select: primary is 迎 with 6 candidates', result?.msg.result.primary_kanji === '迎' && result?.msg.result.candidates.length === 6)
   check('select: result is the last line', lines.at(-1)?.msg.type === 'result')
 

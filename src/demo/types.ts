@@ -47,6 +47,13 @@ export interface EngineResult {
   fingerprint: Fingerprint
   candidates: Candidate[]
   primary_kanji: string | null
+  referee?: {
+    palette_rows: number
+    original_primary: string | null
+    primary_changed: boolean
+    no_eligible_primary: boolean
+    actions: { kanji: string; action: string; detail: string }[]
+  }
 }
 
 export type Condition = 'A' | 'B' | 'C'

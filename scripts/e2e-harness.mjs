@@ -185,6 +185,19 @@ const browser = await chromium.launch({
   await page.waitForSelector('article', { timeout: 10000 })
   check('follow-up answer re-runs engine into reveal', (await page.locator('article').count()) >= 1)
   check('engine ran twice on follow-up path', call === 2)
+
+  // もう一度試す: back to the story input, current story text kept, result gone.
+  const storyBefore = '父は働き者で、感謝しています。\n\n新聞を読み終わると、必ず四つ折りにして私の席に置いてくれた。'
+  await page.waitForSelector('text=もう一度試す', { timeout: 5000 })
+  await page.screenshot({ path: `${SHOTS}/e2e-retry-button.png` })
+  await page.click('text=もう一度試す')
+  await page.waitForSelector('text=その一字を、探しにいく', { timeout: 5000 })
+  check('retry: returns to the story input (no result on screen)', (await page.locator('article').count()) === 0)
+  check('retry: the current story text is kept in the textarea', (await page.locator('textarea').first().inputValue()) === storyBefore)
+  await page.locator('textarea').first().fill(storyBefore + '\nそして、いつも黙って頷いた。')
+  await page.click('text=その一字を、探しにいく')
+  await page.waitForSelector('article', { timeout: 10000 })
+  check('retry: edited story can be run again (engine called a third time)', call === 3)
   check('no page errors (run 2)', errors.length === 0)
   if (errors.length) console.log('page errors:', errors)
   await page.close()

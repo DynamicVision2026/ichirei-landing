@@ -49,11 +49,11 @@ check('direction codes = up | down | across', JSON.stringify([...DIRECTIONS]) ==
 check('languages = ja | zh', JSON.stringify([...LANGUAGES]) === JSON.stringify(['ja', 'zh']))
 
 // ---------------------------------------------------------------------------
-// 2. palette.csv: header only, exactly the 17 columns in the spec order.
+// 2. palette.csv: exactly the 17 columns in the spec order (+ interim rows).
 // ---------------------------------------------------------------------------
 const SPEC_COLUMNS = ['language', 'kanji', 'inscription_form', 'readings', 'core_meanings', 'auspicious_compounds', 'status', 'taboo_flags', 'blocked_occasions', 'register_flags', 'anchor_required', 'cross_language_note', 'relationship_fit', 'inscription_fitness', 'classical_echo', 'reviewed_by', 'reviewed_on']
 const csvLines = read('engine/palette.csv').split('\n').filter((l) => l.trim() !== '')
-check('palette.csv has exactly one non-empty line (header only)', csvLines.length === 1, `lines=${csvLines.length}`)
+check('palette.csv: header + the 18 interim rows (scripts/test-palette.ts checks their content)', csvLines.length === 19, `lines=${csvLines.length}`)
 check('palette.csv header = the 17 spec columns, in order', csvLines[0] === SPEC_COLUMNS.join(','), csvLines[0])
 check('contract PALETTE_COLUMNS matches the CSV header', csvLines[0] === PALETTE_COLUMNS.join(','))
 

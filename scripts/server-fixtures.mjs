@@ -8,6 +8,7 @@ import http from 'node:http'
 import net from 'node:net'
 import { spawn } from 'node:child_process'
 import { readFileSync } from 'node:fs'
+import { applyPalette, loadPalette } from '../engine/palette.ts'
 
 export const GOLDEN = JSON.parse(
   readFileSync(new URL('./golden-fixture.json', import.meta.url), 'utf8'),
@@ -25,6 +26,9 @@ export const GOLDEN_CONTEXT = {
 
 export const STORY =
   '父は口下手で厳しくて、ほめられた記憶なんてほとんどない。進路のことでも何度もぶつかった。ただ、私が東京に出るとき駅まで送ってくれて、改札で「金は要るか」って、それだけ言って封筒を押し付けてきた。あれから二十年、盆に帰るたびに車で駅まで迎えに来て、帰りも必ず送ってくれる。相変わらず、ほとんど何も話さないけど。'
+
+// What the engine returns for the golden model answer: the same JSON after the palette referee.
+export const GOLDEN_REFEREED = applyPalette(GOLDEN, loadPalette(), STORY)
 
 export const EXPLAIN_TEXT =
   '折り目正しくというより、行き先のあるやさしさだった。「金は要るか」とだけ言って封筒を押し付けたあの改札から二十年、あなたは一度も迎えを欠かさなかった。還暦を迎えるいま、こんどは私があなたを迎えにいく番だと思う。'

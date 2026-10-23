@@ -149,9 +149,11 @@ export const TRUTH_TYPES: readonly TruthType[] = [
  *   off_palette      not in the curated palette / cannot be vouched for
  * A palette row with status `hard_block` never reaches the output (see PALETTE_ROW_STATUSES).
  *
- * STEP 1 NOTE: the curated palette (engine/palette.csv) is header-only and no
- * referee exists yet (Step 3). Until then this value is the MODEL'S OWN
- * provisional judgement, not a palette lookup — do not gate on it.
+ * INTERIM NOTE: engine/palette.csv holds only a few interim JA rows and the
+ * referee (engine/palette.ts) is the first piece of Step 3. For a kanji that HAS a
+ * row, the referee overwrites this with the palette's verdict (hard_block →
+ * off_palette). For a kanji with no row it is still the MODEL'S OWN provisional
+ * judgement — do not treat "not blocked" as "vouched for".
  */
 export type PaletteStatus = 'ok' | 'context_required' | 'off_palette'
 export const PALETTE_STATUSES: readonly PaletteStatus[] = ['ok', 'context_required', 'off_palette']
@@ -179,6 +181,40 @@ export const PALETTE_COLUMNS = [
   'reviewed_by',
   'reviewed_on',
 ] as const
+
+/** One parsed row of engine/palette.csv (multi-value cells are split on "|"). */
+export interface PaletteRow {
+  language: Language
+  kanji: string
+  status: (typeof PALETTE_ROW_STATUSES)[number]
+  readings: string[]
+  taboo_flags: string[]
+  register_flags: string[]
+  blocked_occasions: string[]
+  anchor_required: boolean
+  /** The raw cells, keyed by PALETTE_COLUMNS, for columns the referee does not interpret yet. */
+  raw: Record<(typeof PALETTE_COLUMNS)[number], string>
+}
+
+/** What the palette referee did to one candidate. */
+export interface RefereeAction {
+  kanji: string
+  action:
+    | 'hard_block_eliminated' // removed: moved to eliminated, reason "palette: hard_block"
+    | 'hard_block_already_eliminated' // the model had already eliminated it; its reason is kept
+    | 'primary_refused_no_anchor' // context_required + anchor_required, no usable story anchor
+  detail: string
+}
+
+/** Added to the result by the palette referee (engine/palette.ts). */
+export interface RefereeReport {
+  palette_rows: number
+  original_primary: string | null
+  primary_changed: boolean
+  /** True when no candidate could be primary after the referee ran (primary_kanji is then null). */
+  no_eligible_primary: boolean
+  actions: RefereeAction[]
+}
 
 export interface Candidate {
   /** ja: modern Japanese form. zh: SIMPLIFIED form (the display form). */
@@ -227,6 +263,8 @@ export interface EngineResult {
   fingerprint: Fingerprint
   candidates: Candidate[]
   primary_kanji: string | null
+  /** Set by the palette referee on every sufficient result; absent on insufficient ones. */
+  referee?: RefereeReport
 }
 
 export type Condition = 'A' | 'B' | 'C'
@@ -291,6 +329,7 @@ export function validateEngineResult(raw: unknown): string[] {
     if (!Array.isArray(c?.flags) || c.flags.some((f) => typeof f !== 'string')) problems.push(`${at}.flags must be string[]`)
   })
   const primary = cands.find((c) => c.kanji === r.primary_kanji)
+  if (r.primary_kanji === null && r.referee?.no_eligible_primary === true) return problems
   if (!primary) problems.push('primary_kanji is not among the candidates')
   else if (primary.eliminated) problems.push('primary_kanji points at an eliminated candidate')
   return problems

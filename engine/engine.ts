@@ -7,13 +7,15 @@
 //   2. injects the context (language, relationship, direction, occasion, occasion_detail) and the
 //      story at their marked slots — the MEANING of each code lives in the prompt,
 //   3. calls the model,
-//   4. parses the model's JSON, stamps the request's context onto it, and returns it.
+//   4. parses the model's JSON, stamps the request's context onto it,
+//   5. hands it to the palette referee (engine/palette.ts) and returns the refereed result.
 // Editing a prompt file changes the engine's behavior with no change to this code.
 
 import Anthropic from '@anthropic-ai/sdk'
 import { readFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
+import { applyPalette, loadPalette } from './palette.ts'
 import {
   DEFAULT_CONTEXT,
   parseContext,
@@ -152,6 +154,8 @@ export async function runEngine(
   const context = parsed.context
 
   const prompt = fillPrompt(loadPrompt(context.language), trimmed, context)
+  // Load the palette BEFORE spending a reasoning pass: no palette, no blocklist, no run.
+  const palette = loadPalette()
 
   const client = new Anthropic(opts.apiKey ? { apiKey: opts.apiKey } : {})
 
@@ -181,7 +185,7 @@ export async function runEngine(
   // The prompt asks the model to echo the context; stamp the request's own values
   // so the echo can never disagree with what the caller actually sent. (Plumbing,
   // not selection: nothing about the candidates is touched.)
-  return {
+  const stamped: EngineResult = {
     ...extractJson(textOut),
     language: context.language,
     relationship: context.relationship,
@@ -189,6 +193,11 @@ export async function runEngine(
     occasion: context.occasion,
     occasion_detail: context.occasion_detail,
   }
+
+  // Palette referee (engine/palette.ts, data in engine/palette.csv): removes hard_block
+  // candidates and refuses an anchorless context_required kanji as primary. A missing or
+  // malformed palette fails the request loudly (above), never silently skips the blocklist.
+  return applyPalette(stamped, palette, trimmed)
 }
 
 export const ENGINE_CONFIG = { MODEL, EFFORT, MAX_TOKENS }
