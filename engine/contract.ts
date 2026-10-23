@@ -244,6 +244,8 @@ export interface RefereeAction {
   action:
     | 'hard_block_eliminated' // removed: moved to eliminated, reason "palette: hard_block"
     | 'hard_block_already_eliminated' // the model had already eliminated it; its reason is kept
+    | 'blocked_occasion_eliminated' // the row lists this order's occasion in blocked_occasions: moved to eliminated
+    | 'blocked_occasion_already_eliminated' // as above, but the model had already eliminated it
     | 'primary_refused_no_anchor' // context_required + anchor_required, no usable story anchor
   detail: string
 }
@@ -267,10 +269,10 @@ export interface Candidate {
   reading: string
   /**
    * The inscription form when it differs from `kanji`: ja = kyūjitai (旧字体);
-   * zh = TRADITIONAL form. null when identical. (Legacy name kept for contract
-   * stability; the palette column for this is `inscription_form`.)
+   * zh = TRADITIONAL form. null when identical. Same name and meaning as the
+   * `inscription_form` column of engine/palette.csv.
    */
-  kyujitai_form: string | null
+  inscription_form: string | null
   truth_type: TruthType
   one_line_gaze: string
   story_anchor: string
@@ -378,7 +380,7 @@ export function validateEngineResult(raw: unknown): string[] {
     for (const k of ['kanji', 'reading', 'one_line_gaze', 'story_anchor', 'unique_truth'] as const) {
       if (typeof c?.[k] !== 'string' || !c[k]) problems.push(`${at}.${k} missing`)
     }
-    if (c?.kyujitai_form !== null && typeof c?.kyujitai_form !== 'string') problems.push(`${at}.kyujitai_form must be string|null`)
+    if (c?.inscription_form !== null && typeof c?.inscription_form !== 'string') problems.push(`${at}.inscription_form must be string|null`)
     if (!TRUTH_TYPES.includes(c?.truth_type as TruthType)) problems.push(`${at}.truth_type invalid`)
     if (typeof c?.eliminated !== 'boolean') problems.push(`${at}.eliminated not boolean`)
     if (c?.eliminated && !c?.eliminated_reason) problems.push(`${at} eliminated without reason`)

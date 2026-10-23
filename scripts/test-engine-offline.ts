@@ -127,6 +127,15 @@ try {
   check('referee (api): the NDJSON result line carries the refereed result', viaApi?.type === 'result' && viaApi.result.primary_kanji === '駅' && viaApi.result.referee?.actions.length >= 2)
   reply = GOLDEN
 
+  // ---- 4c. blocked_occasions, end to end: the order's occasion removes a candidate ----------
+  const blockCands = [base('黙'), base('灯'), base('寿', { story_anchor: '盆に帰るたびに車で駅まで迎えに来て' }), base('駅'), base('愛', { eliminated: true, eliminated_reason: 'ゲート1' }), base('迎', { story_anchor: '盆に帰るたびに車で駅まで迎えに来て' })]
+  reply = { ...GOLDEN, candidates: blockCands, primary_kanji: '寿', runner_up_kanji: '灯' }
+  const babyOrder = await runEngine(GOLDEN_STORY, 'A', { context: { language: 'ja', relationship: 'child', direction: 'down', occasion: 'new_baby' } })
+  check('blocked_occasion (engine): 寿 is blocked for a new_baby order — eliminated "palette: blocked_occasion", runner-up 灯 promoted', babyOrder.candidates.find((c) => c.kanji === '寿')?.eliminated_reason === 'palette: blocked_occasion' && babyOrder.primary_kanji === '灯' && babyOrder.referee?.promoted_from === 'runner_up')
+  const bdayOrder = await runEngine(GOLDEN_STORY, 'A', { context: { language: 'ja', relationship: 'grandparent', direction: 'up', occasion: 'birthday_milestone' } })
+  check('blocked_occasion (engine): the same answer for a birthday order keeps 寿 as primary', bdayOrder.primary_kanji === '寿' && bdayOrder.candidates.every((c) => !c.eliminated || c.kanji === '愛'))
+  reply = GOLDEN
+
   // ---- 5. Insufficient (STEP 0 or heart-anchor) still carries the context -----
   reply = { status: 'insufficient', follow_up_question: 'お父さまと一緒に過ごした中で、忘れられない小さな仕草はありますか？', particulars: [], fingerprint: { relationship_note: null, scarce_asset: null, unsaid_truth: null, dominant_truth_type: null, dignity_direction: null }, candidates: [], primary_kanji: null }
   const thin = await runEngine('父は働き者で、感謝しています。', 'A', { context: { language: 'ja', relationship: 'parent_father', direction: 'up', occasion: 'parent_day' } })

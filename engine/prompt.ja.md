@@ -202,7 +202,7 @@ the JSON to exactly the values supplied in CONTEXT (JSON null where a value was
 
 Kyūjitai (古体字) inscription rule — brand standard, not a per-story choice:
 ICHIREI's physical inscriptions use the ancient kyūjitai form of a character whenever
-one exists. For every candidate, set `kyujitai_form` to the character's kyūjitai
+one exists. For every candidate, set `inscription_form` to the character's kyūjitai
 (traditional/old-form) variant if one exists (e.g. 恵→惠, 桜→櫻, 学→學, 徳→德); set it
 to null when the character has no distinct kyūjitai form (its modern and old forms are
 identical, e.g. 迎, 送, 山). Judge STEP 4 gate 3 (naturalness/readability) on the modern
@@ -234,7 +234,7 @@ Return this exact shape:
     {
       "kanji": string,                    // modern Japanese form
       "reading": string,                  // hiragana
-      "kyujitai_form": string | null,     // old-form variant, or null if none exists
+      "inscription_form": string | null,     // old-form variant, or null if none exists
       "truth_type": "Essence" | "Turning Point" | "Role" | "Hidden Cost" | "Private Symbol" | "Forward Blessing",
       "one_line_gaze": string,            // Japanese, ONE sentence; only details stated in the story
       "story_anchor": string,             // verbatim fragment from the story

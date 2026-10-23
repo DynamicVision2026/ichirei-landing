@@ -55,7 +55,7 @@ try {
   check('runs as non-root user', docker('inspect', IMAGE, '--format', '{{.Config.User}}') === 'node' && docker('exec', name, 'id', '-u') !== '0')
   check('API key arrives only at runtime (health reports it configured)', health?.apiKeyConfigured === true)
   const sh = (cmd) => { try { return docker('exec', name, 'sh', '-c', cmd) } catch { return '' } }
-  check('prompt assets shipped: engine/prompt.ja.md + prompt.zh.md + explain-prompt.md + palette.csv/ts', sh('test -f engine/prompt.ja.md && test -f engine/prompt.zh.md && test -f engine/explain-prompt.md && test -f engine/palette.csv && test -f engine/palette.ts && echo yes') === 'yes')
+  check('prompt assets shipped: engine/prompt.ja.md + prompt.zh.md + explain-prompt.ja/zh.md + palette.csv/ts', sh('test -f engine/prompt.ja.md && test -f engine/prompt.zh.md && test -f engine/explain-prompt.ja.md && test -f engine/explain-prompt.zh.md && test -f engine/palette.csv && test -f engine/palette.ts && echo yes') === 'yes')
   check('production deps only (no vite / @vercel/node / typescript in runtime)', sh('ls node_modules | grep -E "^(vite|typescript)$"; ls node_modules/@vercel 2>/dev/null') === '', sh('ls node_modules | head -50'))
   check('runtime has the server deps (hono, anthropic sdk)', sh('ls node_modules/hono node_modules/@anthropic-ai >/dev/null 2>&1 && echo yes') === 'yes')
 

@@ -1,0 +1,103 @@
+// Front-end copy tests (src/demo/i18n.ts): the three launch languages have the same shape,
+// cover every contract code, are occasion-neutral, and use the right Chinese script.
+// No browser, no key.
+//
+//   node --experimental-strip-types scripts/test-copy.ts
+
+import {
+  COPY,
+  DEFAULT_GIFT_CONTEXT,
+  DIRECTION_CODES,
+  EXAMPLE_KEYS,
+  OCCASION_CODES,
+  OCCASION_DETAIL_MAX,
+  RELATIONSHIP_CODES,
+  UI_LANGUAGES,
+  carvedGlyph,
+  contextComplete,
+  contextToPayload,
+  type Copy,
+} from '../src/demo/i18n.ts'
+import { DIRECTIONS, LANGUAGES, OCCASIONS, OCCASION_DETAIL_MAX as ENGINE_DETAIL_MAX, RELATIONSHIPS, parseContext } from '../engine/contract.ts'
+
+let failures = 0
+function check(name: string, cond: boolean, detail?: string) {
+  console.log(`${cond ? 'PASS' : 'FAIL'}  ${name}${!cond && detail ? `  -> ${detail.slice(0, 400)}` : ''}`)
+  if (!cond) failures++
+}
+
+// Every string a Copy can show, with sample arguments for the function-valued entries.
+function strings(c: Copy): [string, string][] {
+  const out: [string, string][] = []
+  const sample = { kanji: '灯', inscription_form: '燈', reading: 'dēng' }
+  for (const [k, v] of Object.entries(c)) {
+    if (typeof v === 'string') out.push([k, v])
+    else if (Array.isArray(v)) v.forEach((x, i) => out.push([`${k}[${i}]`, x]))
+    else if (typeof v === 'function') {
+      const fn = v as (...a: never[]) => string | null
+      const calls: Record<string, unknown[]> = {
+        processingProgress: [123], serverError: [500], timeout: [290], eliminatedSummary: [3], finalized: ['灯'],
+        glyphReading: [sample, '燈'], inscriptionNote: [sample, 'traditional'], previewNote: [sample, 'traditional'],
+      }
+      const r = (fn as (...a: unknown[]) => string | null)(...(calls[k] ?? []))
+      if (typeof r === 'string') out.push([`${k}()`, r])
+    } else if (v && typeof v === 'object') for (const [kk, vv] of Object.entries(v as Record<string, string>)) out.push([`${k}.${kk}`, vv])
+  }
+  return out
+}
+
+// ---- code lists mirror the engine contract -----------------------------------------------
+check('i18n: language codes = contract LANGUAGES', JSON.stringify([...UI_LANGUAGES]) === JSON.stringify([...LANGUAGES]))
+check('i18n: relationship / direction / occasion codes = contract lists', JSON.stringify([...RELATIONSHIP_CODES]) === JSON.stringify([...RELATIONSHIPS]) && JSON.stringify([...DIRECTION_CODES]) === JSON.stringify([...DIRECTIONS]) && JSON.stringify([...OCCASION_CODES]) === JSON.stringify([...OCCASIONS]))
+check('i18n: occasion_detail length cap = engine cap', OCCASION_DETAIL_MAX === ENGINE_DETAIL_MAX)
+
+// ---- same shape in all three languages ---------------------------------------------------
+const shape = (c: Copy) => strings(c).map(([k]) => k).join('|')
+check('copy: ja, zh-Hans and zh-Hant define exactly the same keys', UI_LANGUAGES.every((l) => shape(COPY[l]) === shape(COPY.ja)))
+check('copy: no string is empty or a placeholder', UI_LANGUAGES.every((l) => strings(COPY[l]).every(([, s]) => s.trim().length > 0 && !/TODO|FIXME|undefined/.test(s))))
+for (const l of UI_LANGUAGES) {
+  const c = COPY[l]
+  check(`copy ${l}: a label for every relationship, direction and occasion code, all distinct`,
+    RELATIONSHIPS.every((k) => c.relationships[k]) && DIRECTIONS.every((k) => c.directions[k]) && OCCASIONS.every((k) => c.occasions[k]) &&
+    new Set(RELATIONSHIPS.map((k) => c.relationships[k])).size === RELATIONSHIPS.length && new Set(OCCASIONS.map((k) => c.occasions[k])).size === OCCASIONS.length)
+  check(`copy ${l}: five memory angles`, c.angles.length === 5 && new Set(c.angles).size === 5)
+}
+check('copy: the three languages really differ (no untranslated copy-paste)', COPY.ja.openingAsk !== COPY['zh-Hans'].openingAsk && COPY['zh-Hans'].openingAsk !== COPY['zh-Hant'].openingAsk && COPY['zh-Hans'].submit !== COPY['zh-Hant'].submit)
+
+// ---- occasion-neutral --------------------------------------------------------------------
+const KANREKI = /還暦|还历|六十|60\s*年|60\s*歲|60\s*岁|kanreki|Kanreki/
+const leaks: string[] = []
+for (const l of UI_LANGUAGES) for (const [k, s] of strings(COPY[l])) if (KANREKI.test(s) && !EXAMPLE_KEYS.some((e) => k === e)) leaks.push(`${l}:${k}=${s}`)
+check('neutral: no 還暦 / 六十年 / 60th-birthday wording anywhere in the copy (an example in the occasion_detail placeholder aside)', leaks.length === 0, leaks.join(' | '))
+check('neutral: the old lines are gone ("六十年を、全部書かなくていい", "この一字で、還暦を祝う")', !strings(COPY.ja).some(([, s]) => s.includes('六十年を、全部書かなくていい') || s.includes('還暦を祝う')))
+check('neutral: the occasion_detail examples show several milestones, not just one', ['還暦', '30歳', '結婚10年'].every((x) => COPY.ja.occasionDetailPlaceholder.includes(x)) && /60.*30.*10/.test(COPY['zh-Hans'].occasionDetailPlaceholder) && /60.*30.*10/.test(COPY['zh-Hant'].occasionDetailPlaceholder))
+check('neutral: the finalize button names no occasion', UI_LANGUAGES.every((l) => !Object.values(COPY[l].occasions).some((o) => COPY[l].finalizeButton.includes(o))))
+
+// ---- the right Chinese script ------------------------------------------------------------
+const TRAD_ONLY = /[這個說開從點選擇裡過後來為與時對會發經間讓請寵團體歲場禮語學讀書觸關設錄氣帶實質線術際項類戶樣機]/
+const SIMP_ONLY = /[这个说开从点选择里过后来为与时对会发经间让请宠团体岁场礼语学读书触关设录气带实质线术际项类户样机]/
+check('script: zh-Hans copy contains no traditional-only characters', strings(COPY['zh-Hans']).every(([, s]) => !TRAD_ONLY.test(s.replace('繁體字', '').replace('繁體：', '').replace('繁體', ''))), strings(COPY['zh-Hans']).filter(([, s]) => TRAD_ONLY.test(s.replace('繁體字', '').replace('繁體：', '').replace('繁體', ''))).join(' | '))
+check('script: zh-Hant copy contains no simplified-only characters', strings(COPY['zh-Hant']).every(([, s]) => !SIMP_ONLY.test(s.replace('简体字', '').replace('简体：', '').replace('简体', '').replace('簡體', ''))), strings(COPY['zh-Hant']).filter(([, s]) => SIMP_ONLY.test(s.replace('简体字', '').replace('简体：', '').replace('简体', ''))).join(' | '))
+check('script: zh copy contains no kana', ['zh-Hans', 'zh-Hant'].every((l) => strings(COPY[l as 'zh-Hans']).every(([, s]) => !/[ぁ-んァ-ヶ]/.test(s))))
+check('script: ja copy uses speech lang ja-JP; zh-Hans zh-CN; zh-Hant zh-TW', COPY.ja.speechLang === 'ja-JP' && COPY['zh-Hans'].speechLang === 'zh-CN' && COPY['zh-Hant'].speechLang === 'zh-TW')
+
+// ---- glyph and notes ---------------------------------------------------------------------
+const lamp = { kanji: '灯', inscription_form: '燈' }
+const plain = { kanji: '迎', inscription_form: null }
+check('carvedGlyph: zh defaults to the traditional form, simplified inscription carves the simplified one', carvedGlyph(lamp, 'zh-Hans', 'traditional') === '燈' && carvedGlyph(lamp, 'zh-Hant', null) === '燈' && carvedGlyph(lamp, 'zh-Hans', 'simplified') === '灯' && carvedGlyph(plain, 'zh-Hant', 'traditional') === '迎')
+check('carvedGlyph: ja carves the kyūjitai whatever the script field says', carvedGlyph({ kanji: '黙', inscription_form: '默' }, 'ja', 'simplified') === '默' && carvedGlyph(plain, 'ja', null) === '迎')
+check('notes: zh names what is carved and shows the other form', COPY['zh-Hans'].inscriptionNote(lamp, 'traditional') === '刻字：繁體（简体：灯）' && COPY['zh-Hans'].inscriptionNote(lamp, 'simplified') === '刻字：简体（繁體：燈）' && COPY['zh-Hant'].inscriptionNote(lamp, 'traditional') === '刻字：繁體（簡體：灯）')
+check('notes: ja shows the kyūjitai pairing only when a distinct form exists', COPY.ja.inscriptionNote({ kanji: '黙', inscription_form: '默' }, null) === '古体字（現代字：黙）' && COPY.ja.inscriptionNote(plain, null) === null)
+check('reading line pairs the carved form with the other form and the reading', COPY['zh-Hans'].glyphReading({ ...lamp, reading: 'dēng' }, '燈') === '灯 ・ dēng' && COPY['zh-Hans'].glyphReading({ ...lamp, reading: 'dēng' }, '灯') === '燈 ・ dēng' && COPY.ja.glyphReading({ kanji: '黙', inscription_form: '默', reading: 'もく' }, '默') === '黙 ・ もく')
+
+// ---- payload -----------------------------------------------------------------------------
+const full = { ...DEFAULT_GIFT_CONTEXT, language: 'zh-Hans' as const, relationship: 'friend' as const, direction: 'across' as const, occasion: 'wedding' as const, occasionDetail: '  結婚10年 \n', inscriptionScript: 'simplified' as const }
+const payload = contextToPayload(full)
+check('payload: language, relationship, direction, occasion, trimmed occasion_detail and inscription_script (zh)', JSON.stringify(payload) === JSON.stringify({ language: 'zh-Hans', relationship: 'friend', direction: 'across', occasion: 'wedding', occasion_detail: '結婚10年', inscription_script: 'simplified' }), JSON.stringify(payload))
+check('payload: ja sends no inscription_script; blank detail and unchosen fields are omitted', JSON.stringify(contextToPayload({ ...DEFAULT_GIFT_CONTEXT, occasionDetail: '   ' })) === JSON.stringify({ language: 'ja' }))
+check('payload: whatever the UI sends the engine accepts (parseContext round-trip)', (() => { const r = parseContext(payload); return r.ok && r.context.language === 'zh-Hans' && r.context.inscription_script === 'simplified' && r.context.occasion_detail === '結婚10年' })())
+check('payload: every code the selectors offer is accepted by the engine', RELATIONSHIP_CODES.every((x) => parseContext({ relationship: x }).ok) && DIRECTION_CODES.every((x) => parseContext({ direction: x }).ok) && OCCASION_CODES.every((x) => parseContext({ occasion: x }).ok))
+check('contextComplete: needs relationship, direction and occasion (language always set, detail optional)', !contextComplete(DEFAULT_GIFT_CONTEXT) && !contextComplete({ ...full, occasion: '' }) && contextComplete(full) && contextComplete({ ...full, occasionDetail: '' }))
+
+console.log(failures === 0 ? '\nAll copy checks passed.' : `\n${failures} FAILED`)
+process.exit(failures === 0 ? 0 : 1)

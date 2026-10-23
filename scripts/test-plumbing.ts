@@ -13,6 +13,12 @@ import {
   loadPrompt,
 } from '../engine/engine.ts'
 import {
+  EXPLAIN_SLOTS,
+  EXPLAIN_ZH_SLOTS,
+  fillExplainPrompt,
+  loadExplainPrompt,
+} from '../engine/explain.ts'
+import {
   DIRECTIONS,
   FAMILIES,
   INSCRIPTION_SCRIPTS,
@@ -90,13 +96,13 @@ for (const lang of FAMILIES) {
   check(`${tag}: STEP 1 asks for the LIVED/TOLD mark the gate depends on`, p.includes('LIVED') && p.includes('TOLD'))
   const missingCodes = [...RELATIONSHIPS, ...DIRECTIONS, ...OCCASIONS].filter((c) => !p.includes(`* ${c} —`))
   check(`${tag}: glossary defines every relationship/direction/occasion code`, missingCodes.length === 0, missingCodes.join(','))
-  check(`${tag}: output contract has the 4 context echo fields + palette_status + flags`, ['"language"', '"relationship"', '"direction"', '"occasion"', '"occasion_detail"', '"palette_status"', '"flags"', '"kyujitai_form"'].every((k) => p.includes(k)))
+  check(`${tag}: output contract has the 4 context echo fields + palette_status + flags`, ['"language"', '"relationship"', '"direction"', '"occasion"', '"occasion_detail"', '"palette_status"', '"flags"', '"inscription_form"'].every((k) => p.includes(k)))
   check(`${tag}: palette_status values ok | context_required | off_palette`, p.includes('"ok" | "context_required" | "off_palette"'))
 }
 check('prompt.ja.md: Japanese output (hiragana readings, kyūjitai rule)', prompts.ja.includes('hiragana') && prompts.ja.includes('Kyūjitai') && !prompts.ja.includes('pinyin'))
 check('prompt.ja.md has no Chinese script slots', !prompts.ja.includes('{{ DISPLAY_SCRIPT }}') && !prompts.ja.includes('{{ INSCRIPTION_SCRIPT }}'))
 check('prompt.zh.md: one prompt for both scripts — display_script and inscription_script are defined in the CONTEXT block', prompts.zh.includes('display_script: {{ DISPLAY_SCRIPT }}') && prompts.zh.includes('inscription_script: {{ INSCRIPTION_SCRIPT }}') && prompts.zh.includes('zh-Hans') && prompts.zh.includes('zh-Hant'))
-check('prompt.zh.md: customer-facing text follows display_script; `kanji` is always simplified, kyujitai_form traditional', prompts.zh.includes('written in the display_script') && prompts.zh.includes('ALWAYS the SIMPLIFIED form') && prompts.zh.includes('"inscription_script": "traditional" | "simplified"'))
+check('prompt.zh.md: customer-facing text follows display_script; `kanji` is always simplified, inscription_form traditional', prompts.zh.includes('written in the display_script') && prompts.zh.includes('ALWAYS the SIMPLIFIED form') && prompts.zh.includes('"inscription_script": "traditional" | "simplified"'))
 check('prompt.zh.md: Chinese output (traditional inscription + simplified form + pinyin)', prompts.zh.includes('TRADITIONAL') && prompts.zh.includes('SIMPLIFIED') && prompts.zh.includes('pinyin') && prompts.zh.includes('繁體中文'))
 check('prompt.zh.md: no Japanese-only machinery (hiragana / kyūjitai rule)', !prompts.zh.includes('hiragana') && !prompts.zh.includes('Kyūjitai'))
 check('prompt.zh.md: reasons about Mandarin homophones, never Japanese meanings', prompts.zh.includes('homophone') && prompts.zh.includes('never Japanese meanings'))
@@ -138,6 +144,30 @@ writeFileSync(join(dir, 'prompt.ja.md'), prompts.ja)
 process.env.ICHIREI_PROMPT_PATH = join(dir, 'prompt.{lang}.md')
 check('loadPrompt: ICHIREI_PROMPT_PATH with {lang} resolves per language', loadPrompt('zh-Hant').includes('Chinese / zh') && loadPrompt('zh-Hans').includes('Chinese / zh') && loadPrompt('ja').includes('Japanese / ja'))
 delete process.env.ICHIREI_PROMPT_PATH
+
+// ---------------------------------------------------------------------------
+// 4b. Stage-B explain prompts: ja + zh, occasion-neutral, zh follows the display script.
+// ---------------------------------------------------------------------------
+const explainPrompts: Record<Family, string> = { ja: read('engine/explain-prompt.ja.md'), zh: read('engine/explain-prompt.zh.md') }
+const EX_ALL = Object.values(EXPLAIN_SLOTS)
+for (const fam of FAMILIES) {
+  const ep = explainPrompts[fam]
+  const need = fam === 'zh' ? [...EX_ALL, ...Object.values(EXPLAIN_ZH_SLOTS)] : EX_ALL
+  check(`explain-prompt.${fam}.md: every slot appears exactly once`, need.every((x) => count(ep, x) === 1), need.map((x) => `${x}×${count(ep, x)}`).join(' '))
+  check(`explain-prompt.${fam}.md: occasion-neutral — no 還暦 / Kanreki / sixty / rebirth / 60th wording`, !/還暦|Kanreki|kanreki|sixty|rebirth|60th|六十|60歳/.test(ep))
+  check(`explain-prompt.${fam}.md: takes relationship / direction / occasion / occasion_detail and says not to assume an occasion`, ['{{ RELATIONSHIP }}', '{{ DIRECTION }}', '{{ OCCASION }}', '{{ OCCASION_DETAIL }}'].every((x) => ep.includes(x)) && ep.includes('Do not assume any particular occasion'))
+  check(`explain-prompt.${fam}.md: keeps the living-receiver, sender-as-subject and no-invention rules`, ep.includes('The SENDER remains the grammatical subject') && ep.includes('never mourning, never decline') && ep.includes('Do not invent'))
+}
+check('explain-prompt.zh.md: output script follows display_script (simplified / traditional), both forms of the character supplied', explainPrompts.zh.includes('{{ DISPLAY_SCRIPT }}') && explainPrompts.zh.includes('Chinese only, in the display_script') && explainPrompts.zh.includes('TRADITIONAL_FORM: {{ INSCRIPTION_FORM }}') && explainPrompts.zh.includes('SIMPLIFIED_FORM: {{ KANJI }}'))
+check('explain-prompt.ja.md: Japanese only, no Chinese script slots', explainPrompts.ja.includes('Japanese only') && !explainPrompts.ja.includes('{{ DISPLAY_SCRIPT }}'))
+const exCand = { kanji: '灯', inscription_form: '燈', reading: 'dēng', one_line_gaze: '你把燈留著。', story_anchor: '玄關的燈' }
+const exZhT = fillExplainPrompt(loadExplainPrompt('zh-Hant'), '故事{{ STORY }}$&', exCand, { language: 'zh-Hant', relationship: 'friend', direction: 'across', occasion: 'wedding', occasion_detail: null, inscription_script: 'traditional' })
+const exZhS = fillExplainPrompt(loadExplainPrompt('zh-Hans'), '故事', exCand, { language: 'zh-Hans', relationship: null, direction: null, occasion: null, occasion_detail: null, inscription_script: 'traditional' })
+check('explain fill: zh-Hant → display_script traditional; zh-Hans → simplified; both forms present', exZhT.includes('display_script: traditional') && exZhS.includes('display_script: simplified') && exZhT.includes('SIMPLIFIED_FORM: 灯') && exZhT.includes('TRADITIONAL_FORM: 燈'))
+check('explain fill: context reaches the prompt; missing values are "unspecified"', exZhT.includes('relationship: friend') && exZhT.includes('occasion: wedding') && exZhT.includes('occasion_detail: unspecified') && exZhS.includes('occasion: unspecified'))
+check('explain fill: slot-like text in the story is not re-substituted; no slot left behind', exZhT.includes('故事{{ STORY }}$&') && !/\{\{ [A-Z_]+ \}\}/.test(exZhT.replace('故事{{ STORY }}$&', '')))
+check('explain fill: ja default context fills cleanly', !/\{\{ [A-Z_]+ \}\}/.test(fillExplainPrompt(loadExplainPrompt('ja'), 'x', { kanji: '迎', reading: 'むかえ', one_line_gaze: 'g', story_anchor: 'a' })))
+check('explain: zh-Hans and zh-Hant load the same file', loadExplainPrompt('zh-Hans') === loadExplainPrompt('zh-Hant') && loadExplainPrompt('zh-Hant') === explainPrompts.zh)
 
 // ---------------------------------------------------------------------------
 // 5. parseContext.

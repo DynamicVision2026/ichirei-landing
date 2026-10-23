@@ -80,7 +80,8 @@ check('hard_block: fits no relationship (relationship_fit = none), needs no anch
 check('anchors: a row demands an anchor only if it is context_required', bad(all.filter((r) => r.anchor_required), (r) => r.status === 'context_required').length === 0)
 check('anchors: every context_required row states anchor_required (yes or no)', bad(all.filter((r) => r.status === 'context_required'), (r) => ['yes', 'no'].includes(r.raw.anchor_required)).length === 0)
 check('enums: inscription_fitness, relationship_fit and blocked_occasions use only the allowed codes', all.every((r) => (INSCRIPTION_FITNESS as readonly string[]).includes(r.raw.inscription_fitness) && r.raw.relationship_fit.split('|').every((c) => c === 'all' || c === 'none' || (RELATIONSHIPS as readonly string[]).includes(c)) && r.raw.blocked_occasions.split('|').every((c) => c === 'none' || (OCCASIONS as readonly string[]).includes(c))))
-check('blocked_occasions: never blocks an occasion the row is otherwise recommended for', true)
+check('blocked_occasions: hard_block rows carry none (they are blocked everywhere already); the referee ENFORCES the column on every other row', bad(all.filter((r) => r.status === 'hard_block'), (r) => r.blocked_occasions.length === 0).length === 0, list(bad(all.filter((r) => r.status === 'hard_block'), (r) => r.blocked_occasions.length === 0)))
+check('blocked_occasions: the farewell character 餞/饯 is not blocked at retirement_farewell, and 娃 not at new_baby', !palette.lookup('ja', '餞')?.blocked_occasions.includes('retirement_farewell') && !palette.lookup('zh', '饯')?.blocked_occasions.includes('retirement_farewell') && !palette.lookup('zh', '娃')?.blocked_occasions.includes('new_baby'))
 
 // ---- coverage ----------------------------------------------------------------------------
 const GOLDEN_JA = ['迎', '黙', '駅', '送', '厳', '愛']

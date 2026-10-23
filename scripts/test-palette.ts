@@ -92,7 +92,7 @@ delete process.env.ICHIREI_PALETTE_PATH
 const clone = <T,>(x: T): T => JSON.parse(JSON.stringify(x))
 function cand(kanji: string, over: Partial<Candidate> = {}): Candidate {
   return {
-    kanji, reading: 'よみ', kyujitai_form: null, truth_type: 'Essence', one_line_gaze: 'g', story_anchor: '駅まで迎えに来て',
+    kanji, reading: 'よみ', inscription_form: null, truth_type: 'Essence', one_line_gaze: 'g', story_anchor: '駅まで迎えに来て',
     unique_truth: 'u', eliminated: false, eliminated_reason: null, suitability_flag: null, palette_status: 'ok', flags: [], ...over,
   } as Candidate
 }
@@ -125,8 +125,8 @@ check('hard_block: the action is recorded in referee.actions', survivor.referee?
 const already = run(raw([cand('黙'), cand('送', { eliminated: true, eliminated_reason: 'ゲート3：葬送の連想' })], '黙'))
 check('hard_block: a candidate the model already eliminated keeps the model\'s reason (still recorded)', get(already, '送').eliminated_reason === 'ゲート3：葬送の連想' && already.referee?.actions[0]?.action === 'hard_block_already_eliminated')
 
-const viaOldForm = run(raw([cand('黙'), cand('X', { kyujitai_form: '送' })], '黙'))
-check('hard_block: matches on the inscription form (kyujitai_form) too', get(viaOldForm, 'X').eliminated === true)
+const viaOldForm = run(raw([cand('黙'), cand('X', { inscription_form: '送' })], '黙'))
+check('hard_block: matches on the inscription form (inscription_form) too', get(viaOldForm, 'X').eliminated === true)
 
 const zh = run(raw([cand('送'), cand('灯')], '灯', { language: 'zh-Hant' }))
 check('hard_block: language-scoped — the ja hard_block on 送 does not eliminate it in a zh result (the zh row is context_required)', get(zh, '送').eliminated === false && get(zh, '送').palette_status === 'context_required' && zh.referee?.actions.length === 0)
@@ -187,6 +187,40 @@ const ru9 = run(raw([cand('黙'), cand('病'), cand('灯')], '黙', { runner_up_
 check('runner-up: a runner-up the palette blocks is cleared even when the primary stands', ru9.primary_kanji === '黙' && ru9.runner_up_kanji === null)
 
 // ---------------------------------------------------------------------------
+// 5b2. blocked_occasions: a row listing THIS order's occasion is removed from the candidates.
+// ---------------------------------------------------------------------------
+import { BLOCKED_OCCASION_REASON } from '../engine/palette.ts'
+const blockPal = parsePalette(`${HEADER}\n${rowCsv({ language: 'ja', kanji: '寿', status: 'ok', blocked_occasions: 'new_baby|school_career' })}\n${rowCsv({ language: 'ja', kanji: '冬', status: 'context_required', anchor_required: 'no', blocked_occasions: 'birthday_milestone' })}\n${rowCsv({ language: 'ja', kanji: '送', status: 'hard_block', blocked_occasions: 'wedding' })}\n`)
+const at = (occasion: EngineResult['occasion'], cands: Candidate[], primary: string | null, over: Partial<EngineResult> = {}) =>
+  applyPalette(raw(cands, primary, { occasion, ...over }), blockPal, STORY)
+const nb = at('new_baby', [cand('黙'), cand('寿'), cand('灯')], '黙')
+check('blocked_occasion: a row listing the order\'s occasion is eliminated with reason "palette: blocked_occasion"', get(nb, '寿').eliminated === true && get(nb, '寿').eliminated_reason === BLOCKED_OCCASION_REASON && BLOCKED_OCCASION_REASON === 'palette: blocked_occasion')
+check('blocked_occasion: marked off_palette + palette_blocked_occasion flag; recorded in referee.actions; stays in the array', get(nb, '寿').palette_status === 'off_palette' && get(nb, '寿').flags.includes('palette_blocked_occasion') && nb.referee?.actions.some((a) => a.kanji === '寿' && a.action === 'blocked_occasion_eliminated') === true && nb.candidates.length === 3)
+check('blocked_occasion: the same row is untouched at an occasion it does not list', at('birthday_milestone', [cand('黙'), cand('寿')], '黙').candidates.every((c) => !c.eliminated))
+check('blocked_occasion: an order with NO occasion blocks nothing', at(null, [cand('黙'), cand('寿'), cand('冬')], '黙').candidates.every((c) => !c.eliminated))
+check('blocked_occasion: applies to an unreviewed ok row too (blocking is the cautious direction)', get(at('school_career', [cand('黙'), cand('寿', { palette_status: 'ok' })], '黙'), '寿').eliminated === true)
+check('blocked_occasion: applies to a context_required row as well', get(at('birthday_milestone', [cand('黙'), cand('冬')], '黙'), '冬').eliminated === true)
+check('blocked_occasion: each listed occasion is honoured (new_baby and school_career for 寿)', ['new_baby', 'school_career'].every((o) => get(at(o as EngineResult['occasion'], [cand('黙'), cand('寿')], '黙'), '寿').eliminated))
+const mdl = at('new_baby', [cand('黙'), cand('寿', { eliminated: true, eliminated_reason: 'ゲート1' })], '黙')
+check('blocked_occasion: a candidate the model already eliminated keeps the model\'s reason (still recorded)', get(mdl, '寿').eliminated_reason === 'ゲート1' && mdl.referee?.actions[0]?.action === 'blocked_occasion_already_eliminated')
+const hbo = at('wedding', [cand('黙'), cand('送')], '黙')
+check('blocked_occasion: a hard_block row stays a plain hard_block (reason palette: hard_block)', get(hbo, '送').eliminated_reason === 'palette: hard_block' && hbo.referee?.actions.length === 1 && hbo.referee.actions[0].action === 'hard_block_eliminated')
+const bp = at('new_baby', [cand('寿'), cand('黙'), cand('灯')], '寿', { runner_up_kanji: '灯' })
+check('blocked_occasion: a blocked PRIMARY is replaced by the model\'s runner-up', bp.primary_kanji === '灯' && bp.referee?.original_primary === '寿' && bp.referee.promoted_from === 'runner_up')
+const bp2 = at('new_baby', [cand('寿'), cand('黙'), cand('灯')], '寿')
+check('blocked_occasion: …or by array order when there is no usable runner-up', bp2.primary_kanji === '黙' && bp2.referee?.promoted_from === 'array_order')
+const br = at('new_baby', [cand('黙'), cand('寿'), cand('灯')], '黙', { runner_up_kanji: '寿' })
+check('blocked_occasion: a runner-up blocked at this occasion is cleared even though the primary stands', br.primary_kanji === '黙' && br.runner_up_kanji === null)
+const bn = at('new_baby', [cand('寿')], '寿')
+check('blocked_occasion: if the blocked one was the only candidate, no eligible primary remains', bn.primary_kanji === null && bn.referee?.no_eligible_primary === true)
+const shippedNb = applyPalette(raw([cand('黙'), cand('寿'), cand('娃'), cand('饯')], '黙', { occasion: 'new_baby', language: 'zh-Hant' }), palette, STORY)
+check('blocked_occasion (shipped palette, zh new_baby): 寿 is removed; 娃 (baby) is kept', get(shippedNb, '寿').eliminated === true && get(shippedNb, '娃').eliminated === false)
+const shippedRf = applyPalette(raw([cand('黙'), cand('餞', { story_anchor: '駅まで送ってくれて' }), cand('夕')], '餞', { occasion: 'retirement_farewell' }), palette, STORY)
+check('blocked_occasion (shipped palette, ja retirement_farewell): 餞 is NOT blocked (it is the farewell character); 夕 is', get(shippedRf, '餞').eliminated === false && shippedRf.primary_kanji === '餞' && get(shippedRf, '夕').eliminated === true)
+const wed = (lang: 'ja' | 'zh-Hant', k: string) => applyPalette(raw([cand('黙'), cand(k)], '黙', { occasion: 'wedding', language: lang }), palette, STORY)
+check('blocked_occasion (shipped palette, wedding): ja 蓮 is blocked, zh 莲 is not', get(wed('ja', '蓮'), '蓮').eliminated === true && get(wed('zh-Hant', '莲'), '莲').eliminated === false)
+
+// ---------------------------------------------------------------------------
 // 5c. zh rows: traditional (inscription) forms, with simplified display forms.
 // ---------------------------------------------------------------------------
 const zhRaw = (cs: Candidate[], primary: string | null, over: Partial<EngineResult> = {}) => raw(cs, primary, { language: 'zh-Hant', ...over })
@@ -195,12 +229,12 @@ for (const k of ZH_TRAD) {
   if (!(get(out, k).eliminated && get(out, k).eliminated_reason === HARD_BLOCK_REASON && get(out, k).palette_status === 'off_palette')) check(`zh hard_block ${k}`, false, JSON.stringify(get(out, k)))
 }
 check('zh hard_block: 死 終 喪 散 離 斷 病 苦 四 are each eliminated with "palette: hard_block"', ZH_TRAD.every((k) => { const c = get(run(zhRaw([cand('燈'), cand(k)], '燈')), k); return c.eliminated && c.eliminated_reason === 'palette: hard_block' }))
-const zhSimp = run(zhRaw([cand('灯'), cand('终', { kyujitai_form: '終' }), cand('离', { kyujitai_form: '離' })], '灯'))
+const zhSimp = run(zhRaw([cand('灯'), cand('终', { inscription_form: '終' }), cand('离', { inscription_form: '離' })], '灯'))
 check('zh hard_block: display form 终 with traditional form 終 is caught', get(zhSimp, '终').eliminated && get(zhSimp, '离').eliminated)
-const zhNullTrad = run(zhRaw([cand('灯'), cand('断', { kyujitai_form: null }), cand('丧', { kyujitai_form: null })], '灯'))
+const zhNullTrad = run(zhRaw([cand('灯'), cand('断', { inscription_form: null }), cand('丧', { inscription_form: null })], '灯'))
 check('zh hard_block: a simplified form whose traditional form was left null is still caught', get(zhNullTrad, '断').eliminated && get(zhNullTrad, '丧').eliminated)
-const zhViaTrad = run(zhRaw([cand('灯'), cand('X', { kyujitai_form: '斷' })], '灯'))
-check('zh hard_block: matched through kyujitai_form (the traditional form) alone', get(zhViaTrad, 'X').eliminated)
+const zhViaTrad = run(zhRaw([cand('灯'), cand('X', { inscription_form: '斷' })], '灯'))
+check('zh hard_block: matched through inscription_form (the traditional form) alone', get(zhViaTrad, 'X').eliminated)
 const zhPrimary = run(zhRaw([cand('灯'), cand('四'), cand('暖')], '四', { runner_up_kanji: '暖' }))
 check('zh hard_block: a blocked primary (四) is replaced by the runner-up', zhPrimary.primary_kanji === '暖' && get(zhPrimary, '四').eliminated)
 const jaVsZh = run(raw([cand('黙'), cand('终'), cand('灯')], '黙'))

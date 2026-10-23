@@ -9,7 +9,7 @@ dist
 *.log
 
 # Not needed in the image. NOTE: do NOT add a blanket "*.md" here —
-# engine/prompt.ja.md, engine/prompt.zh.md and engine/explain-prompt.md are runtime assets.
+# engine/prompt.*.md, engine/explain-prompt.*.md and engine/palette.csv are runtime assets.
 scripts
 README.md
 DEPLOY.md

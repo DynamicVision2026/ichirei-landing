@@ -1,8 +1,9 @@
 // On-demand Stage-B explanation for the chosen candidate (build spec §5,
 // Condition B/C). Thin relay — no selection logic; wording lives in
-// engine/explain-prompt.md.
+// engine/explain-prompt.ja.md and engine/explain-prompt.zh.md.
 
 import type { VercelRequest, VercelResponse } from '@vercel/node'
+import { parseContext } from '../engine/contract.ts'
 import { runExplain, type ExplainCandidate } from '../engine/explain.ts'
 
 // Full Hobby-plan ceiling (also mirrored in vercel.json).
@@ -23,9 +24,15 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     }
   }
 
-  const { story, candidate } = (body ?? {}) as {
+  const { story, candidate, language, relationship, direction, occasion, occasion_detail, inscription_script } = (body ?? {}) as {
     story?: unknown
     candidate?: Partial<ExplainCandidate>
+    language?: unknown
+    relationship?: unknown
+    direction?: unknown
+    occasion?: unknown
+    occasion_detail?: unknown
+    inscription_script?: unknown
   }
 
   if (typeof story !== 'string' || !story.trim()) {
@@ -42,12 +49,15 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       error: 'Missing "candidate" {kanji, reading, one_line_gaze, story_anchor}',
     })
   }
+  // v5 context, same codes and validation as /api/select. All optional; language defaults to ja.
+  const parsed = parseContext({ language, relationship, direction, occasion, occasion_detail, inscription_script })
+  if (!parsed.ok) return res.status(400).json({ error: parsed.error })
   if (!process.env.ANTHROPIC_API_KEY) {
     return res.status(500).json({ error: 'ANTHROPIC_API_KEY is not set on the server.' })
   }
 
   try {
-    const explanation = await runExplain(story, candidate as ExplainCandidate)
+    const explanation = await runExplain(story, candidate as ExplainCandidate, { context: parsed.context })
     return res.status(200).json({ explanation })
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err)

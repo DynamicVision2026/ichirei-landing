@@ -4,6 +4,9 @@
 // engine/palette.csv and enforces the two interim rules:
 //
 //   1. status=hard_block   → the candidate is eliminated, reason "palette: hard_block".
+//      A row whose blocked_occasions lists THIS order's occasion → eliminated too, reason
+//      "palette: blocked_occasion" (whatever the row's status, reviewed or not: blocking is
+//      the cautious direction).
 //   2. status=context_required + anchor_required=yes → the kanji may be the primary
 //      only if the candidate carries a usable story anchor (see anchorPresent).
 //
@@ -32,6 +35,7 @@ import {
 } from './contract.ts'
 
 export const HARD_BLOCK_REASON = 'palette: hard_block'
+export const BLOCKED_OCCASION_REASON = 'palette: blocked_occasion'
 
 /**
  * The parsed palette. A row is found by its `kanji` OR its `inscription_form`, so one
@@ -205,9 +209,9 @@ export function anchorPresent(candidate: Pick<Candidate, 'story_anchor'>, story:
   return pieces.length > 0 && pieces.every((p) => haystack.includes(p))
 }
 
-/** Find a candidate's row by either of its forms (zh: simplified `kanji` or traditional `kyujitai_form`). */
+/** Find a candidate's row by either of its forms (zh: simplified `kanji` or traditional `inscription_form`). */
 function rowFor(palette: Palette, family: Family, c: Candidate): PaletteRow | undefined {
-  return palette.lookup(family, c.kanji) ?? (c.kyujitai_form ? palette.lookup(family, c.kyujitai_form) : undefined)
+  return palette.lookup(family, c.kanji) ?? (c.inscription_form ? palette.lookup(family, c.inscription_form) : undefined)
 }
 
 const unique = (xs: string[]) => [...new Set(xs)]
@@ -227,6 +231,19 @@ export function applyPalette(result: EngineResult, palette: Palette, story: stri
     const c: Candidate = { ...orig, flags: [...(orig.flags ?? [])] }
     const row = rowFor(palette, language, c)
     if (!row) return c
+    // Blocked for THIS occasion → removed, like a hard_block (an order with no occasion blocks nothing).
+    if (row.status !== 'hard_block' && result.occasion !== null && row.blocked_occasions.includes(result.occasion)) {
+      c.palette_status = 'off_palette'
+      c.flags = unique([...c.flags, 'palette_blocked_occasion'])
+      if (c.eliminated) {
+        actions.push({ kanji: c.kanji, action: 'blocked_occasion_already_eliminated', detail: `kept the model's reason: ${c.eliminated_reason ?? '(none)'}` })
+      } else {
+        c.eliminated = true
+        c.eliminated_reason = BLOCKED_OCCASION_REASON
+        actions.push({ kanji: c.kanji, action: 'blocked_occasion_eliminated', detail: `${BLOCKED_OCCASION_REASON} (${result.occasion})` })
+      }
+      return c
+    }
     // An `ok` row nobody has reviewed yet does not vouch for the character: the model's own
     // judgement stands until a named reviewer signs the row. context_required / hard_block
     // rows are conservative, so they apply even while unreviewed.
@@ -270,7 +287,11 @@ export function applyPalette(result: EngineResult, palette: Palette, story: stri
   // Act only when the referee itself disqualifies the primary: it is hard-blocked, or it
   // is a context_required kanji with no anchor. (A primary the MODEL eliminated is the
   // model's own inconsistency; validateEngineResult reports it, the referee does not mask it.)
-  const primaryHardBlocked = primaryCand ? rowFor(palette, language, primaryCand)?.status === 'hard_block' : false
+  const removedByPalette = (c: Candidate) => {
+    const row = rowFor(palette, language, c)
+    return row?.status === 'hard_block' || (row !== undefined && result.occasion !== null && row.blocked_occasions.includes(result.occasion))
+  }
+  const primaryHardBlocked = primaryCand ? removedByPalette(primaryCand) : false
   const primaryNoAnchor = primaryCand ? !primaryHardBlocked && !primaryCand.eliminated && anchorMissing(primaryCand) : false
   if (primaryCand && (primaryHardBlocked || primaryNoAnchor)) {
     if (primaryNoAnchor) refuse(primaryCand, 'context_required kanji needs a usable story anchor to be primary')

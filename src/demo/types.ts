@@ -15,7 +15,7 @@ export type TruthType =
 export interface Candidate {
   kanji: string
   reading: string
-  kyujitai_form: string | null
+  inscription_form: string | null
   truth_type: TruthType
   one_line_gaze: string
   story_anchor: string

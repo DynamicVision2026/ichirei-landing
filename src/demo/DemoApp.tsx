@@ -4,6 +4,7 @@ import type { Condition, EngineResult } from './types'
 import Elicitation from './Elicitation'
 import Reveal from './Reveal'
 import { exportEvents, log, setCondition as logSetCondition, setStory as logSetStory } from './logging'
+import { COPY, DEFAULT_GIFT_CONTEXT, contextToPayload, type Copy, type GiftContext } from './i18n'
 
 // Validation-harness orchestrator: elicitation (§7) → engine call (§4) →
 // adaptive follow-up (§7.4, at most twice) → progressive reveal (§8), with the
@@ -29,6 +30,9 @@ const ENGINE_TIMEOUT_MS = (() => {
   const p = Number(new URLSearchParams(window.location.search).get('engine_timeout_ms'))
   return Number.isFinite(p) && p > 0 ? p : 290_000
 })()
+
+/** The engine stream ended without a terminal line (shown with the sender's UI language). */
+class StreamCutError extends Error {}
 
 /** Consume the /api/select NDJSON stream; resolves on the terminal line. */
 async function consumeEngineStream(
@@ -74,16 +78,24 @@ async function consumeEngineStream(
   const tail = handleLine(buffer)
   if (tail) final = tail
   if (final) return final
-  throw new Error('エンジンの応答が途中で切れました（サーバー側タイムアウトの可能性）')
+  throw new StreamCutError('stream cut')
 }
 
-// Spec §10 golden fixture — one tap to load for acceptance runs.
+// Spec §10 golden fixture — one tap to load for acceptance runs (story + its context).
+const GOLDEN_CONTEXT: GiftContext = {
+  ...DEFAULT_GIFT_CONTEXT,
+  language: 'ja',
+  relationship: 'parent_father',
+  direction: 'up',
+  occasion: 'birthday_milestone',
+  occasionDetail: '還暦',
+}
 const GOLDEN_FIXTURE =
   '父は口下手で厳しくて、ほめられた記憶なんてほとんどない。進路のことでも何度もぶつかった。ただ、私が東京に出るとき駅まで送ってくれて、改札で「金は要るか」って、それだけ言って封筒を押し付けてきた。あれから二十年、盆に帰るたびに車で駅まで迎えに来て、帰りも必ず送ってくれる。相変わらず、ほとんど何も話さないけど。'
 
 type Phase = 'elicit' | 'processing' | 'followup' | 'reveal' | 'thin'
 
-function ProcessingView({ receivedChars }: { receivedChars: number }) {
+function ProcessingView({ receivedChars, copy }: { receivedChars: number; copy: Copy }) {
   const reduceMotion = useReducedMotion()
   return (
     <div className="flex flex-col items-center gap-10 py-24">
@@ -102,21 +114,59 @@ function ProcessingView({ receivedChars }: { receivedChars: number }) {
       </svg>
       <div className="text-center">
         <p className="font-serif-jp text-lg tracking-wider text-ivory/80">
-          言葉を読んでいます...
+          {copy.processingTitle}
         </p>
         <p className="font-label mt-3 text-[11px] text-ivory/40">
-          {receivedChars > 0
-            ? `一字一字、書きあがっています … ${receivedChars}`
-            : '深く読むほど時間がかかります（1〜2分ほどお待ちください）'}
+          {receivedChars > 0 ? copy.processingProgress(receivedChars) : copy.processingWait}
         </p>
       </div>
     </div>
   )
 }
 
+/**
+ * Shown when the palette referee removed every candidate that could be the primary
+ * (primary_kanji is null): says so plainly, lists what was removed and why, and points
+ * back to the story. Candidates that survived (if any) are still revealed beneath it.
+ */
+function NoPrimaryNotice({ result, copy }: { result: EngineResult; copy: Copy }) {
+  const removed = result.candidates.filter((c) => c.eliminated)
+  const kept = result.candidates.filter((c) => !c.eliminated)
+  return (
+    <section
+      role="alert"
+      data-testid="no-primary"
+      className="mb-10 rounded-sm border border-gold/40 bg-paper/50 p-6"
+    >
+      <p className="font-mincho text-xl leading-relaxed text-ivory">{copy.noPrimaryTitle}</p>
+      <p className="font-serif-jp mt-3 text-sm leading-loose text-ivory/70">{copy.noPrimaryBody}</p>
+      {removed.length > 0 && (
+        <div className="mt-5">
+          <p className="font-label mb-2 text-[11px] tracking-[0.15em] text-gold/70">{copy.noPrimaryRemoved}</p>
+          <ul className="flex flex-col gap-1.5">
+            {removed.map((c) => (
+              <li key={c.kanji} className="font-serif-jp text-xs leading-relaxed text-ivory/60">
+                <span className="font-mincho mr-2 text-lg text-ivory/80">{c.kanji}</span>
+                {c.eliminated_reason}
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+      {kept.length > 0 && (
+        <p className="font-label mt-4 text-[11px] text-ivory/45">
+          {copy.noPrimaryKept}：{kept.map((c) => c.kanji).join(' ')}
+        </p>
+      )}
+    </section>
+  )
+}
+
 export default function DemoApp() {
   const [phase, setPhase] = useState<Phase>('elicit')
   const [story, setStory] = useState('')
+  const [context, setContext] = useState<GiftContext>(DEFAULT_GIFT_CONTEXT)
+  const copy = COPY[context.language]
   const [condition, setConditionState] = useState<Condition>('A')
   const [result, setResult] = useState<EngineResult | null>(null)
   const [error, setError] = useState<string | null>(null)
@@ -152,7 +202,7 @@ export default function DemoApp() {
       const res = await fetch('/api/select', {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ story: fullStory, condition }),
+        body: JSON.stringify({ story: fullStory, condition, ...contextToPayload(context) }),
         signal: controller.signal,
       })
       if (!res.ok) {
@@ -162,7 +212,7 @@ export default function DemoApp() {
         } catch {
           message = null
         }
-        throw new Error(message ?? `サーバーエラー（HTTP ${res.status}）`)
+        throw new Error(message ?? copy.serverError(res.status))
       }
       const isStream =
         (res.headers.get('content-type') ?? '').includes('ndjson') && res.body
@@ -174,6 +224,12 @@ export default function DemoApp() {
         status: engineResult.status,
         primary: engineResult.primary_kanji,
         candidates: engineResult.candidates.length,
+        no_eligible_primary: engineResult.referee?.no_eligible_primary ?? false,
+        language: context.language,
+        relationship: context.relationship,
+        direction: context.direction,
+        occasion: context.occasion,
+        has_occasion_detail: context.occasionDetail.trim() !== '',
         follow_ups_used: followUpsUsed.current,
       })
       if (engineResult.status === 'insufficient') {
@@ -191,10 +247,12 @@ export default function DemoApp() {
       }
     } catch (e) {
       const message = timedOut
-        ? `結果が届く前に時間切れになりました（${Math.round(ENGINE_TIMEOUT_MS / 1000)}秒）。もう一度お試しください。続く場合はサーバー側の制限の可能性があります（ICHIREI_EFFORT=medium で短縮できます）。`
-        : e instanceof Error
-          ? e.message
-          : String(e)
+        ? copy.timeout(Math.round(ENGINE_TIMEOUT_MS / 1000))
+        : e instanceof StreamCutError
+          ? copy.streamCut
+          : e instanceof Error
+            ? e.message
+            : String(e)
       setError(message)
       setPhase('elicit')
     } finally {
@@ -258,7 +316,7 @@ export default function DemoApp() {
               onClick={exportEvents}
               className="font-label rounded-full border border-ivory/20 px-3 py-1.5 text-[11px] text-ivory/60 transition-colors hover:border-ivory/50"
             >
-              ログ書き出し
+              {copy.exportLog}
             </button>
           </div>
         </header>
@@ -276,18 +334,24 @@ export default function DemoApp() {
               onStoryChange={setStory}
               onSubmit={() => void runEngine(story)}
               submitting={false}
+              copy={copy}
+              context={context}
+              onContextChange={setContext}
             />
             <button
               type="button"
-              onClick={() => setStory(GOLDEN_FIXTURE)}
+              onClick={() => {
+                setStory(GOLDEN_FIXTURE)
+                setContext(GOLDEN_CONTEXT)
+              }}
               className="font-label mt-8 text-[11px] tracking-wide text-ivory/30 underline-offset-4 transition-colors hover:text-ivory/60 hover:underline"
             >
-              golden fixture を入れる（§10 受け入れテスト用）
+              load golden fixture (§10 acceptance test)
             </button>
           </>
         )}
 
-        {phase === 'processing' && <ProcessingView receivedChars={receivedChars} />}
+        {phase === 'processing' && <ProcessingView receivedChars={receivedChars} copy={copy} />}
 
         {phase === 'followup' && followUpQuestion && (
           <motion.div
@@ -296,7 +360,7 @@ export default function DemoApp() {
             transition={{ duration: 0.7, ease: [0.16, 1, 0.3, 1] }}
           >
             <p className="font-label mb-4 text-[11px] tracking-[0.2em] text-gold/70">
-              もうすこしだけ、聞かせてください
+              {copy.followUpHeading}
             </p>
             <p className="font-mincho mb-8 text-xl leading-relaxed text-ivory">
               {followUpQuestion}
@@ -305,7 +369,7 @@ export default function DemoApp() {
               value={followUpAnswer}
               onChange={(e) => setFollowUpAnswer(e.target.value)}
               rows={5}
-              placeholder="思い出したことを、そのまま。"
+              placeholder={copy.followUpPlaceholder}
               className="font-serif-jp w-full resize-none rounded-sm border border-gold/25 bg-paper/60 p-4 text-base leading-loose text-ivory outline-none transition-colors placeholder:text-ivory/25 focus:border-gold"
             />
             <button
@@ -314,7 +378,7 @@ export default function DemoApp() {
               disabled={!followUpAnswer.trim()}
               className="font-label mt-6 rounded-full bg-gold px-8 py-3.5 text-sm tracking-[0.1em] text-ink transition-all hover:shadow-[0_8px_30px_rgba(201,169,110,0.3)] disabled:cursor-not-allowed disabled:opacity-40"
             >
-              つづきを探しにいく
+              {copy.followUpSubmit}
             </button>
           </motion.div>
         )}
@@ -322,32 +386,32 @@ export default function DemoApp() {
         {phase === 'thin' && (
           <div className="py-12 text-center">
             <p className="font-mincho text-xl leading-relaxed text-ivory">
-              いただいた言葉だけでは、その人だけの一字にまだ届きませんでした。
+              {copy.thinTitle}
             </p>
-            <p className="font-serif-jp mt-4 text-sm leading-loose text-ivory/60">
-              ありふれた一字をお渡しするより、もう一度、小さな仕草や口ぐせを思い出してから
-              お越しください。それがこの記念式の誠実さです。
-            </p>
+            <p className="font-serif-jp mt-4 text-sm leading-loose text-ivory/60">{copy.thinBody}</p>
             <button
               type="button"
               onClick={() => setPhase('elicit')}
               className="font-label mt-8 rounded-full border border-gold/40 px-6 py-2.5 text-sm text-ivory transition-colors hover:border-gold hover:bg-gold/10"
             >
-              物語に戻る
+              {copy.thinBack}
             </button>
           </div>
         )}
 
         {phase === 'reveal' && result && (
           <>
-            <Reveal result={result} story={story} condition={condition} />
+            {result.primary_kanji === null && <NoPrimaryNotice result={result} copy={copy} />}
+            {result.candidates.some((c) => !c.eliminated) && (
+              <Reveal result={result} story={story} condition={condition} copy={copy} context={context} />
+            )}
             <div className="mt-12 text-center">
               <button
                 type="button"
                 onClick={tryAgain}
                 className="font-label rounded-full border border-gold/40 px-6 py-2.5 text-sm text-ivory transition-colors hover:border-gold hover:bg-gold/10"
               >
-                もう一度試す
+                {copy.tryAgain}
               </button>
             </div>
           </>
@@ -356,7 +420,7 @@ export default function DemoApp() {
         {result && (phase === 'reveal' || phase === 'thin') && (
           <details className="mt-14 opacity-60">
             <summary className="font-label cursor-pointer text-[11px] tracking-[0.15em] text-ivory/40">
-              raw contract（診断用）
+              {copy.rawContract}
             </summary>
             <pre className="mt-3 max-h-[50vh] overflow-auto rounded-sm border border-gold/15 bg-paper/40 p-4 text-[11px] leading-relaxed text-ivory/70">
               {JSON.stringify(result, null, 2)}

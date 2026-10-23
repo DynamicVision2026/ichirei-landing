@@ -2,14 +2,16 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { AnimatePresence, motion, useReducedMotion } from 'framer-motion'
 import type { Candidate, Condition, EngineResult } from './types'
 import { log } from './logging'
+import { carvedGlyph, contextToPayload, type Copy, type GiftContext, type InscriptionScript, type UiLanguage } from './i18n'
 
 // Progressive reveal (build spec §8) + condition presentation (§5) + the
 // behavioral instrumentation that makes this an experiment (§6).
 //
 // - Candidates surface one at a time (discovery, not menu); the cinnabar
 //   primary resolves last.
-// - Kyūjitai rule: the inscription glyph is the kyūjitai form when one exists,
-//   ALWAYS paired with the modern form and hiragana reading — never alone.
+// - Inscription rule: the carved glyph is `inscription_form` when one exists (ja: kyūjitai;
+//   zh: traditional — unless the sender chose a simplified inscription), ALWAYS paired
+//   with the other form and the reading — never alone.
 // - Condition A shows kanji + one-line gaze + one anchor, nothing else.
 //   B adds an on-demand deep explanation; C adds the physical-gift preview.
 
@@ -20,35 +22,43 @@ type Props = {
   result: EngineResult
   story: string
   condition: Condition
+  copy: Copy
+  context: GiftContext
 }
 
 function InscriptionGlyph({
   candidate,
+  copy,
+  language,
+  script,
   size = 'text-7xl',
   color = 'text-ivory',
 }: {
   candidate: Candidate
+  copy: Copy
+  language: UiLanguage
+  script: InscriptionScript | null
   size?: string
   color?: string
 }) {
-  const glyph = candidate.kyujitai_form ?? candidate.kanji
+  const glyph = carvedGlyph(candidate, language, script)
+  const note = copy.inscriptionNote(candidate, script)
   return (
     <div className="flex flex-col items-center">
-      <span className={`font-mincho leading-none ${size} ${color}`}>{glyph}</span>
+      <span className={`font-mincho leading-none ${size} ${color}`} data-glyph>{glyph}</span>
       <span className="font-label mt-3 text-xs tracking-[0.25em] text-gold">
-        {candidate.kyujitai_form ? `${candidate.kanji} ・ ` : ''}
-        {candidate.reading}
+        {copy.glyphReading(candidate, glyph)}
       </span>
-      {candidate.kyujitai_form && (
-        <span className="font-serif-jp mt-1 text-[10px] text-ivory/40">
-          古体字（現代字：{candidate.kanji}）
-        </span>
-      )}
+      {note && <span className="font-serif-jp mt-1 text-[10px] text-ivory/40">{note}</span>}
     </div>
   )
 }
 
-export default function Reveal({ result, story, condition }: Props) {
+export default function Reveal({ result, story, condition, copy, context }: Props) {
+  // The engine's echo is authoritative for what was actually run; fall back to the form state.
+  const language: UiLanguage = result.language ?? context.language
+  const script: InscriptionScript | null =
+    language === 'ja' ? null : (result.inscription_script ?? context.inscriptionScript)
   const reduceMotion = useReducedMotion()
 
   const { revealOrder, eliminated } = useMemo(() => {
@@ -153,10 +163,13 @@ export default function Reveal({ result, story, condition }: Props) {
           story,
           candidate: {
             kanji: c.kanji,
+            inscription_form: c.inscription_form,
             reading: c.reading,
             one_line_gaze: c.one_line_gaze,
             story_anchor: c.story_anchor,
           },
+          // v5: the same context the engine ran with, so the explanation matches language and occasion.
+          ...contextToPayload({ ...context, language }),
         }),
       })
       const data = await res.json()
@@ -173,9 +186,7 @@ export default function Reveal({ result, story, condition }: Props) {
 
   return (
     <div>
-      <p className="font-serif-jp mb-8 text-sm text-ivory/60">
-        あなたの言葉から、一字ずつ浮かびあがります。気になった字に触れてください。
-      </p>
+      <p className="font-serif-jp mb-8 text-sm text-ivory/60">{copy.revealIntro}</p>
 
       <div className="flex flex-col gap-6">
         {revealOrder.slice(0, revealedCount).map((c) => {
@@ -200,6 +211,9 @@ export default function Reveal({ result, story, condition }: Props) {
               <div className="flex items-center gap-6">
                 <InscriptionGlyph
                   candidate={c}
+                  copy={copy}
+                  language={language}
+                  script={script}
                   size="text-6xl sm:text-7xl"
                   color={isPrimary ? 'text-cinnabar' : 'text-ivory'}
                 />
@@ -237,9 +251,7 @@ export default function Reveal({ result, story, condition }: Props) {
                               disabled={explainLoading !== null}
                               className="font-label rounded-full border border-gold/40 px-4 py-1.5 text-xs text-ivory transition-colors hover:border-gold hover:bg-gold/10 disabled:opacity-40"
                             >
-                              {explainLoading === c.kanji
-                                ? '読み解いています…'
-                                : 'この一字を、深く読む'}
+                              {explainLoading === c.kanji ? copy.explainLoading : copy.explainButton}
                             </button>
                           )}
                           {explainError && explainLoading === null && !explanations[c.kanji] && (
@@ -256,7 +268,7 @@ export default function Reveal({ result, story, condition }: Props) {
                           onClick={() => openPreview(c)}
                           className="font-label mr-3 mb-4 rounded-full border border-gold/40 px-4 py-1.5 text-xs text-ivory transition-colors hover:border-gold hover:bg-gold/10"
                         >
-                          かたちを見る（現物プレビュー）
+                          {copy.previewButton}
                         </button>
                       )}
 
@@ -275,7 +287,7 @@ export default function Reveal({ result, story, condition }: Props) {
                             : 'border border-gold/50 text-ivory hover:bg-gold/10'
                         }`}
                       >
-                        {isSelected ? 'この一字を選んでいます' : 'この一字を選ぶ'}
+                        {isSelected ? copy.selectedThis : copy.selectThis}
                       </button>
                     </div>
                   </motion.div>
@@ -297,7 +309,7 @@ export default function Reveal({ result, story, condition }: Props) {
           {eliminated.length > 0 && (
             <details className="mt-10 opacity-70">
               <summary className="font-label cursor-pointer text-xs tracking-[0.15em] text-ivory/50">
-                見送った字（{eliminated.length}） — 診断用
+                {copy.eliminatedSummary(eliminated.length)}
               </summary>
               <div className="mt-4 flex flex-col gap-3">
                 {eliminated.map((c) => (
@@ -307,11 +319,10 @@ export default function Reveal({ result, story, condition }: Props) {
                   >
                     <div className="flex items-baseline gap-3">
                       <span className="font-mincho text-2xl text-ivory/60">
-                        {c.kyujitai_form ?? c.kanji}
+                        {carvedGlyph(c, language, script)}
                       </span>
                       <span className="font-label text-[11px] text-ivory/40">
-                        {c.kyujitai_form ? `${c.kanji}・` : ''}
-                        {c.reading}
+                        {copy.glyphReading(c, carvedGlyph(c, language, script))}
                       </span>
                     </div>
                     <p className="font-serif-jp mt-1 text-xs leading-relaxed text-ivory/45">
@@ -330,11 +341,11 @@ export default function Reveal({ result, story, condition }: Props) {
               disabled={!selected || finalized}
               className="font-label rounded-full bg-cinnabar px-10 py-4 text-sm tracking-[0.15em] text-ivory shadow-[0_8px_30px_rgba(192,57,43,0.35)] transition-all hover:shadow-[0_8px_44px_rgba(192,57,43,0.5)] disabled:cursor-not-allowed disabled:opacity-40"
             >
-              {finalized ? `「${selected}」に決めました` : 'この一字で、還暦を祝う'}
+              {finalized ? copy.finalized(selected ?? '') : copy.finalizeButton}
             </button>
             {!selected && (
               <p className="font-label text-[11px] text-ivory/40">
-                字を開いて「この一字を選ぶ」を押すと決定できます
+                {copy.chooseHint}
               </p>
             )}
           </div>
@@ -362,15 +373,14 @@ export default function Reveal({ result, story, condition }: Props) {
                 className={`paper-texture flex aspect-[3/4] w-full flex-col items-center justify-center rounded-sm bg-paper ${PAPER_SHADOW}`}
               >
                 <span className="font-mincho text-[9rem] leading-none text-cinnabar">
-                  {previewFor.kyujitai_form ?? previewFor.kanji}
+                  {carvedGlyph(previewFor, language, script)}
                 </span>
                 <span className="font-label mt-6 text-xs tracking-[0.35em] text-gold">
-                  {previewFor.kyujitai_form ? `${previewFor.kanji} ・ ` : ''}
-                  {previewFor.reading}
+                  {copy.glyphReading(previewFor, carvedGlyph(previewFor, language, script))}
                 </span>
-                {previewFor.kyujitai_form && (
+                {copy.previewNote(previewFor, script) && (
                   <span className="font-serif-jp mt-2 text-[10px] text-ivory/40">
-                    刻印は古体字を用います
+                    {copy.previewNote(previewFor, script)}
                   </span>
                 )}
               </div>
@@ -384,7 +394,7 @@ export default function Reveal({ result, story, condition }: Props) {
                 onClick={() => setPreviewFor(null)}
                 className="font-label mt-4 rounded-full border border-ivory/30 px-5 py-2 text-xs text-ivory/70 hover:border-ivory"
               >
-                閉じる
+                {copy.close}
               </button>
             </motion.div>
           </motion.div>

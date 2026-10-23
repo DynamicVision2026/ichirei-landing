@@ -78,7 +78,7 @@ try {
   const prompt = sent?.body.messages?.[0]?.content ?? ''
   check('engine→model: model is claude-sonnet-5, streaming, effort high', sent?.body.model === 'claude-sonnet-5' && sent?.body.stream === true && sent?.body.output_config?.effort === 'high', JSON.stringify({ m: sent?.body.model, s: sent?.body.stream, e: sent?.body.output_config }))
   check('engine→model: max_tokens 20000 (full depth, unchanged)', sent?.body.max_tokens === 20000)
-  check('engine→model: prompt.ja.md loaded (skeleton + runtime contract + golden context)', prompt.includes('YOUR ROLE') && prompt.includes('OUTPUT CONTRACT (runtime)') && prompt.includes('kyujitai_form') && ['language: ja', 'relationship: parent_father', 'direction: up', 'occasion: birthday_milestone', 'occasion_detail: 還暦'].every((l) => prompt.includes(l)))
+  check('engine→model: prompt.ja.md loaded (skeleton + runtime contract + golden context)', prompt.includes('YOUR ROLE') && prompt.includes('OUTPUT CONTRACT (runtime)') && prompt.includes('inscription_form') && ['language: ja', 'relationship: parent_father', 'direction: up', 'occasion: birthday_milestone', 'occasion_detail: 還暦'].every((l) => prompt.includes(l)))
   check('engine→model: story injected at the slot, slot removed', prompt.includes(STORY) && !prompt.includes('{{ Paste the story here }}'))
   check('engine→model: API key comes from env (x-api-key header)', sent?.headers['x-api-key'] === 'test-key-not-real')
 
@@ -112,7 +112,12 @@ try {
   const exBody = await ex.json()
   check('explain: 200 {explanation}', ex.status === 200 && exBody.explanation === EXPLAIN_TEXT, JSON.stringify(exBody))
   const exPrompt = upstream.state.requests.at(-1)?.body.messages?.[0]?.content ?? ''
-  check('explain: explain-prompt.md loaded + candidate/story injected', exPrompt.includes('Stage-B Deep Explanation Prompt') && exPrompt.includes('迎') && exPrompt.includes(STORY) && !exPrompt.includes('{{KANJI}}'))
+  check('explain: explain-prompt.ja.md loaded (default language) + candidate/story injected', exPrompt.includes('Stage-B Deep Explanation Prompt') && exPrompt.includes('Japanese / ja') && exPrompt.includes('迎') && exPrompt.includes(STORY) && !/\{\{ [A-Z_]+ \}\}/.test(exPrompt))
+  const exZh = await post(base, '/api/explain', { story: '他總是把玄關的燈留著。', candidate: { kanji: '灯', inscription_form: '燈', reading: 'dēng', one_line_gaze: '你把燈留著。', story_anchor: '把玄關的燈留著' }, language: 'zh-Hant', relationship: 'parent_father', direction: 'up', occasion: 'seasonal_thanks' })
+  const exZhPrompt = upstream.state.requests.at(-1)?.body.messages?.[0]?.content ?? ''
+  check('explain: zh-Hant → explain-prompt.zh.md, display_script traditional, context + both forms injected', exZh.status === 200 && exZhPrompt.includes('Chinese / zh') && exZhPrompt.includes('display_script: traditional') && exZhPrompt.includes('occasion: seasonal_thanks') && exZhPrompt.includes('TRADITIONAL_FORM: 燈') && exZhPrompt.includes('SIMPLIFIED_FORM: 灯') && !/\{\{ [A-Z_]+ \}\}/.test(exZhPrompt))
+  const exBadCtx = await post(base, '/api/explain', { story: STORY, candidate: cand, occasion: 'kanreki' })
+  check('explain: an invalid context code → 400', exBadCtx.status === 400 && /occasion/.test((await exBadCtx.json()).error))
   const exMissing = await post(base, '/api/explain', { story: STORY })
   check('explain: missing candidate → 400 (shim passes handler error through)', exMissing.status === 400 && /candidate/.test((await exMissing.json()).error))
   const exBadBody = await post(base, '/api/explain', '{broken')

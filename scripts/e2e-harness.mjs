@@ -22,6 +22,17 @@ const INSUFFICIENT = {
   candidates: [], primary_kanji: null,
 }
 
+// v5: relationship, direction and occasion are required before the engine can be called.
+const pickContext = async (page, ctx = {}) => {
+  const c = { relationship: 'parent_father', direction: 'up', occasion: 'birthday_milestone', ...ctx }
+  await page.selectOption('select[name=relationship]', c.relationship)
+  await page.selectOption('select[name=direction]', c.direction)
+  await page.selectOption('select[name=occasion]', c.occasion)
+}
+const COPY_TRY = { ja: 'もう一度試す', 'zh-Hans': '再试一次', 'zh-Hant': '再試一次' }
+const FINALIZE = { ja: 'この一字を、贈る', 'zh-Hans': '就用这一个字', 'zh-Hant': '就用這一個字' }
+const SUBMIT = { ja: 'その一字を、探しにいく', 'zh-Hans': '去寻找那一个字', 'zh-Hant': '去尋找那一個字' }
+
 let failures = 0
 const check = (name, cond) => {
   console.log(`${cond ? 'PASS' : 'FAIL'}  ${name}`)
@@ -69,6 +80,7 @@ const browser = await chromium.launch({
   check('angle chip appends aimed text', storyVal1.includes('【つくったもの、直したもの】'))
 
   await page.locator('textarea').first().fill(STORY)
+  await pickContext(page)
   await page.click('text=その一字を、探しにいく')
   check('processing view shows', await page.locator('text=言葉を読んでいます').isVisible())
   await page.screenshot({ path: `${SHOTS}/e2e-processing.png` })
@@ -131,7 +143,7 @@ const browser = await chromium.launch({
   await page.locator('article').last().click() // open 迎
   await page.waitForTimeout(400)
   await page.locator('article').last().locator('text=この一字を選ぶ').click()
-  await page.click('text=この一字で、還暦を祝う')
+  await page.click('text=この一字を、贈る')
   await page.waitForTimeout(300)
   check('finalize confirms selection', await page.locator('text=「迎」に決めました').isVisible())
 
@@ -176,6 +188,7 @@ const browser = await chromium.launch({
 
   await page.goto('http://localhost:5173/demo', { waitUntil: 'networkidle' })
   await page.locator('textarea').first().fill('父は働き者で、感謝しています。')
+  await pickContext(page)
   await page.click('text=その一字を、探しにいく')
   await page.waitForSelector('text=もうすこしだけ、聞かせてください', { timeout: 8000 })
   check('follow-up question shown once', await page.locator('text=忘れられない小さな仕草').isVisible())
@@ -195,6 +208,7 @@ const browser = await chromium.launch({
   check('retry: returns to the story input (no result on screen)', (await page.locator('article').count()) === 0)
   check('retry: the current story text is kept in the textarea', (await page.locator('textarea').first().inputValue()) === storyBefore)
   await page.locator('textarea').first().fill(storyBefore + '\nそして、いつも黙って頷いた。')
+  await pickContext(page)
   await page.click('text=その一字を、探しにいく')
   await page.waitForSelector('article', { timeout: 10000 })
   check('retry: edited story can be run again (engine called a third time)', call === 3)
@@ -215,6 +229,7 @@ const browser = await chromium.launch({
 
   await page.goto('http://localhost:5173/demo', { waitUntil: 'networkidle' })
   await page.locator('textarea').first().fill(STORY)
+  await pickContext(page)
   await page.click('text=その一字を、探しにいく')
   check('stream: processing view shows', await page.locator('text=言葉を読んでいます').isVisible())
   // Progress deltas should surface as a live received-chars counter
@@ -241,6 +256,7 @@ const browser = await chromium.launch({
 
   await page.goto('http://localhost:5173/demo?engine_timeout_ms=1500', { waitUntil: 'networkidle' })
   await page.locator('textarea').first().fill(STORY)
+  await pickContext(page)
   await page.click('text=その一字を、探しにいく')
   check('timeout: spinner shows first', await page.locator('text=言葉を読んでいます').isVisible())
   await page.waitForSelector('text=時間切れになりました', { timeout: 8000 })
@@ -268,12 +284,196 @@ const browser = await chromium.launch({
   )
   await page.goto('http://localhost:5173/demo', { waitUntil: 'networkidle' })
   await page.locator('textarea').first().fill(STORY)
+  await pickContext(page)
   await page.click('text=その一字を、探しにいく')
   await page.waitForSelector('text=model output was not valid JSON', { timeout: 6000 })
   check('ndjson error line: surfaced to UI', true)
   check('ndjson error line: spinner gone', (await page.locator('text=言葉を読んでいます').count()) === 0)
   check('no page errors (run 5)', errors.length === 0)
   if (errors.length) console.log('page errors:', errors)
+  await page.close()
+}
+
+// ---------- helpers for the v5 runs ----------
+const clone = (x) => JSON.parse(JSON.stringify(x))
+const JA_ONLY = /[ぁ-んァ-ヶ]/
+/** Visible UI text with the model-written parts (cards, diagnostics) removed, so we test OUR copy. */
+const chromeText = (page) =>
+  page.evaluate(() => {
+    const root = document.body.cloneNode(true)
+    root.querySelectorAll('article, pre, details, textarea').forEach((n) => n.remove())
+    return root.innerText
+  })
+const mockPage = async (browser, { onExplain, result } = {}) => {
+  const page = await browser.newPage({ viewport: { width: 1100, height: 950 } })
+  const errors = []
+  page.on('pageerror', (e) => errors.push(String(e)))
+  const calls = { select: [], explain: [] }
+  await page.route('**/api/log', (route) => route.fulfill({ status: 204, body: '' }))
+  await page.route('**/api/select', async (route) => {
+    const body = JSON.parse(route.request().postData() ?? '{}')
+    calls.select.push(body)
+    await route.fulfill({ json: typeof result === 'function' ? result(body) : (result ?? FIXTURE) })
+  })
+  await page.route('**/api/explain', async (route) => {
+    calls.explain.push(JSON.parse(route.request().postData() ?? '{}'))
+    await route.fulfill({ json: { explanation: onExplain ?? 'ok' } })
+  })
+  return { page, errors, calls }
+}
+
+// ---------- Run 6: selectors, request payload, occasion-neutral copy (ja) ----------
+{
+  const { page, errors, calls } = await mockPage(browser)
+  await page.goto('http://localhost:5173/demo', { waitUntil: 'networkidle' })
+  const submit = page.locator(`button:has-text("${SUBMIT.ja}")`)
+  check('selectors: language pills (ja / zh-Hans / zh-Hant), 3 selects and the occasion_detail field are present',
+    (await page.locator('[data-language]').count()) === 3 &&
+    (await page.locator('select[name=relationship] option').count()) === 14 &&
+    (await page.locator('select[name=direction] option').count()) === 4 &&
+    (await page.locator('select[name=occasion] option').count()) === 8 &&
+    (await page.locator('input[name=occasion_detail]').count()) === 1)
+  check('selectors: ja is the default language; no inscription-script toggle for ja', (await page.locator('[data-language=ja][aria-pressed=true]').count()) === 1 && (await page.locator('[data-inscription-script]').count()) === 0)
+  await page.locator('textarea').first().fill(STORY)
+  check('submit stays disabled until relationship, direction and occasion are chosen', await submit.isDisabled())
+  check('a hint says what is missing', await page.locator('text=関係・向き・場面を選ぶと').isVisible())
+  const before = await chromeText(page)
+  check('copy: the opening ask is occasion-neutral (no 六十年 / 還暦 anywhere in the UI chrome)', before.includes('その人のことを、全部書かなくていい') && !/還暦|六十|60/.test(before), before.slice(0, 200))
+  await pickContext(page, { relationship: 'mentor', direction: 'up', occasion: 'retirement_farewell' })
+  await page.fill('input[name=occasion_detail]', '定年退職')
+  check('submit enables once the three are chosen', await submit.isEnabled())
+  await page.click(`text=${SUBMIT.ja}`)
+  await page.waitForSelector('article', { timeout: 8000 })
+  const body = calls.select[0]
+  check('payload: story, condition and all five context fields go to /api/select',
+    body.story === STORY && body.condition === 'A' && body.language === 'ja' && body.relationship === 'mentor' && body.direction === 'up' && body.occasion === 'retirement_farewell' && body.occasion_detail === '定年退職', JSON.stringify(body))
+  check('payload: no inscription_script for ja', !('inscription_script' in body))
+  await page.waitForSelector('text=この一字を、贈る', { timeout: 15000 })
+  const after = await chromeText(page)
+  check('copy: the finalize button is neutral ("この一字を、贈る"), nothing 還暦-specific in the UI chrome', !/還暦|六十|60/.test(after) && !(await page.locator('text=還暦を祝う').count()))
+  await page.screenshot({ path: `${SHOTS}/e2e-v5-ja-reveal.png` })
+  // golden fixture button loads story + context
+  await page.click('text=もう一度試す')
+  await page.click('text=golden fixture')
+  check('golden fixture button also sets the golden context (ja / 父 / 目上 / 誕生日・節目 / 還暦)',
+    (await page.inputValue('select[name=relationship]')) === 'parent_father' && (await page.inputValue('select[name=direction]')) === 'up' && (await page.inputValue('select[name=occasion]')) === 'birthday_milestone' && (await page.inputValue('input[name=occasion_detail]')) === '還暦')
+  check('no page errors (run 6)', errors.length === 0)
+  if (errors.length) console.log('page errors:', errors)
+  await page.close()
+}
+
+// ---------- Run 7: zh-Hans and zh-Hant UI, inscription script, explain context ----------
+{
+  const zhResult = () => (body) => {
+    const r = clone(FIXTURE)
+    r.language = body.language
+    r.inscription_script = body.inscription_script ?? 'traditional'
+    r.primary_kanji = '灯'
+    r.runner_up_kanji = null
+    r.candidates = r.candidates.slice(0, 3).map((c) => ({ ...c, eliminated: false, eliminated_reason: null }))
+    r.candidates[0] = { ...r.candidates[0], kanji: '灯', inscription_form: '燈', reading: 'dēng', one_line_gaze: '你把玄关的灯一直留着。', story_anchor: '玄关的灯' }
+    r.candidates[1] = { ...r.candidates[1], kanji: '默', inscription_form: null, reading: 'mò' }
+    r.candidates[2] = { ...r.candidates[2], kanji: '桥', inscription_form: '橋', reading: 'qiáo' }
+    return r
+  }
+  const { page, errors, calls } = await mockPage(browser, { result: zhResult(), onExplain: '解读文字' })
+  await page.goto('http://localhost:5173/demo', { waitUntil: 'networkidle' })
+
+  // zh-Hans
+  await page.click('[data-language=zh-Hans]')
+  const hansChrome = await chromeText(page)
+  check('zh-Hans: the whole UI switches (opening ask, submit, selectors) and is simplified', hansChrome.includes('不必写下那个人的全部') && hansChrome.includes(SUBMIT['zh-Hans']) && hansChrome.includes('送礼的场合') && !JA_ONLY.test(hansChrome.replace(/日本語/g, '')), hansChrome.slice(0, 300))
+  check('zh-Hans: the relationship / direction / occasion labels are in Chinese', (await page.locator('select[name=relationship] option[value=parent_father]').innerText()) === '父亲' && (await page.locator('select[name=occasion] option[value=wedding]').innerText()) === '婚礼与结婚纪念')
+  check('zh-Hans: the inscription-script toggle appears, traditional by default', (await page.locator('[data-inscription-script=traditional][aria-pressed=true]').count()) === 1)
+  await page.locator('textarea').first().fill('他总是把玄关的灯留着，不管我多晚回家。')
+  await pickContext(page, { relationship: 'parent_father', direction: 'up', occasion: 'seasonal_thanks' })
+  await page.click(`text=${SUBMIT['zh-Hans']}`)
+  await page.waitForSelector(`button:has-text("${FINALIZE['zh-Hans']}")`, { timeout: 15000 }) // all cards revealed
+  const b1 = calls.select[0]
+  check('zh-Hans payload: language zh-Hans, inscription_script traditional (default), context, no occasion_detail when blank',
+    b1.language === 'zh-Hans' && b1.inscription_script === 'traditional' && b1.relationship === 'parent_father' && b1.occasion === 'seasonal_thanks' && !('occasion_detail' in b1), JSON.stringify(b1))
+  const cardWith = (glyph) => page.locator('article').filter({ has: page.locator(`[data-glyph]:text-is("${glyph}")`) })
+  const first = cardWith('燈')
+  check('zh-Hans + traditional inscription: the carved glyph is 燈, paired with 灯 and the pinyin', (await first.count()) === 1 && await first.locator('text=灯 ・ dēng').isVisible())
+  check('zh-Hans: the note says what is carved (繁體) and shows the simplified form', await first.locator('text=刻字：繁體（简体：灯）').isVisible())
+  await page.screenshot({ path: `${SHOTS}/e2e-v5-zh-hans-reveal.png` })
+  // explain (condition B) carries the context
+  await page.click('header >> text="B"')
+  await first.click()
+  await page.click('text=深入读读这个字')
+  await page.waitForSelector('text=解读文字', { timeout: 5000 })
+  const ex = calls.explain[0]
+  check('explain payload: language, script, context and both forms of the character reach /api/explain',
+    ex.language === 'zh-Hans' && ex.inscription_script === 'traditional' && ex.relationship === 'parent_father' && ex.direction === 'up' && ex.occasion === 'seasonal_thanks' && ex.candidate.kanji === '灯' && ex.candidate.inscription_form === '燈' && ex.story.includes('玄关的灯'), JSON.stringify(ex))
+  await page.click('header >> text="A"')
+  // try again, simplified inscription
+  await page.click('button:has-text("再试一次")')
+  check('retry keeps the story AND the whole context', (await page.locator('textarea').first().inputValue()).includes('玄关的灯') && (await page.inputValue('select[name=occasion]')) === 'seasonal_thanks')
+  await page.click('[data-inscription-script=simplified]')
+  await page.click(`text=${SUBMIT['zh-Hans']}`)
+  await page.waitForSelector(`button:has-text("${FINALIZE['zh-Hans']}")`, { timeout: 15000 })
+  check('inscription_script simplified is sent, and the carved glyph becomes 灯 (with 燈 shown beside it)',
+    calls.select[1].inscription_script === 'simplified' && (await cardWith('灯').count()) === 1 && await cardWith('灯').locator('text=刻字：简体（繁體：燈）').isVisible())
+  check('zh-Hans: the finalize button is neutral and in Chinese (就用这一个字)', true)
+
+  // zh-Hant
+  await page.click('button:has-text("再试一次")')
+  await page.click('[data-language=zh-Hant]')
+  const hantChrome = await chromeText(page)
+  check('zh-Hant: the UI is traditional (不必寫下那個人的全部, 送禮的場合) and not simplified', hantChrome.includes('不必寫下那個人的全部') && hantChrome.includes('送禮的場合') && !hantChrome.includes('不必写下'))
+  await page.click(`text=${SUBMIT['zh-Hant']}`)
+  await page.waitForSelector(`button:has-text("${FINALIZE['zh-Hant']}")`, { timeout: 15000 })
+  check('zh-Hant payload: language zh-Hant', calls.select[2].language === 'zh-Hant', JSON.stringify(calls.select[2]))
+  const hantReveal = await chromeText(page)
+  check('zh-Hant: nothing 還暦/六十-specific in the chrome', !/還暦|六十/.test(hantReveal) && !/还历/.test(hantReveal))
+  await page.screenshot({ path: `${SHOTS}/e2e-v5-zh-hant-reveal.png` })
+  check('no page errors (run 7)', errors.length === 0)
+  if (errors.length) console.log('page errors:', errors)
+  await page.close()
+}
+
+// ---------- Run 8: no eligible primary → a clear message ----------
+{
+  const noPrimary = (alive) => () => {
+    const r = clone(FIXTURE)
+    r.primary_kanji = null
+    r.runner_up_kanji = null
+    r.candidates = r.candidates.map((c, i) => (i < alive ? { ...c, eliminated: false, eliminated_reason: null } : { ...c, eliminated: true, eliminated_reason: 'palette: hard_block' }))
+    r.referee = { palette_rows: 649, original_primary: '迎', primary_changed: true, no_eligible_primary: true, promoted_from: null, actions: [{ kanji: '送', action: 'hard_block_eliminated', detail: 'palette: hard_block' }] }
+    return r
+  }
+  for (const [lang, expect] of [['ja', '「この一字」と呼べる字が、まだ残っていません。'], ['zh-Hans', '目前没有可以称为“这一个字”的字了。'], ['zh-Hant', '目前沒有可以稱為「這一個字」的字了。']]) {
+    const { page, errors } = await mockPage(browser, { result: noPrimary(0) })
+    await page.goto('http://localhost:5173/demo', { waitUntil: 'networkidle' })
+    await page.click(`[data-language=${lang}]`)
+    await page.locator('textarea').first().fill(STORY)
+    await pickContext(page)
+    await page.click(`text=${SUBMIT[lang]}`)
+    await page.waitForSelector('[data-testid=no-primary]', { timeout: 8000 })
+    const box = page.locator('[data-testid=no-primary]')
+    check(`no primary (${lang}): a clear message is shown`, await box.locator(`text=${expect}`).isVisible())
+    check(`no primary (${lang}): the removed characters are listed with the reason`, await box.locator('text=palette: hard_block').count() >= 1)
+    check(`no primary (${lang}): no candidate card and no finalize button when nothing survived`, (await page.locator('article').count()) === 0 && (await page.locator('button:has-text("贈る")').count()) === 0)
+    const retry = COPY_TRY[lang]
+    check(`no primary (${lang}): the try-again button keeps the story`, await page.locator(`button:has-text("${retry}")`).isVisible())
+    if (lang === 'ja') {
+      await page.screenshot({ path: `${SHOTS}/e2e-v5-no-primary.png` })
+      await page.click(`button:has-text("${retry}")`)
+      check('no primary: try again returns to the input with the story kept', (await page.locator('textarea').first().inputValue()) === STORY)
+    }
+    check(`no page errors (run 8, ${lang})`, errors.length === 0)
+    await page.close()
+  }
+  // some candidates survive but none may be primary → message + the survivors are still shown
+  const { page, errors } = await mockPage(browser, { result: noPrimary(2) })
+  await page.goto('http://localhost:5173/demo', { waitUntil: 'networkidle' })
+  await page.locator('textarea').first().fill(STORY)
+  await pickContext(page)
+  await page.click(`text=${SUBMIT.ja}`)
+  await page.waitForSelector('[data-testid=no-primary]', { timeout: 8000 })
+  await page.waitForSelector('article', { timeout: 8000 })
+  check('no primary with survivors: the message AND the surviving cards are shown (none is cinnabar-marked primary)', (await page.locator('[data-testid=no-primary]').isVisible()) && (await page.locator('article').count()) >= 1 && (await page.locator('article.ring-cinnabar\\/60').count()) === 0)
+  check('no page errors (run 8, survivors)', errors.length === 0)
   await page.close()
 }
 

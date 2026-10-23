@@ -113,7 +113,7 @@ Span several types; do not mechanically force exactly one per type. For each can
 
 ```
 kanji:            (the character in SIMPLIFIED form)
-traditional_form: (the TRADITIONAL form, or "same" if identical — returned as `kyujitai_form`)
+traditional_form: (the TRADITIONAL form, or "same" if identical — returned as `inscription_form`)
 reading:          (pinyin with tone marks — the natural Mandarin reading)
 truth_type:       
 scarce_asset_it_preserves:
@@ -181,7 +181,7 @@ The very first character of your output must be `{` and the very last must be `}
 All customer-facing string values (kanji, reading, one_line_gaze, story_anchor,
 follow_up_question) are Chinese, written in the display_script (simplified → 简体中文,
 traditional → 繁體中文) — except `kanji`, which is ALWAYS the SIMPLIFIED form (it is the
-palette key), and `kyujitai_form`, which is the TRADITIONAL form. reading is pinyin with tone marks. story_anchor must
+palette key), and `inscription_form`, which is the TRADITIONAL form. reading is pinyin with tone marks. story_anchor must
 be a verbatim fragment quoted from the story exactly as the sender wrote it — do not
 convert it between simplified and traditional. Field values map to the skeleton like this:
 particulars ← STEP 1, fingerprint ← STEP 2, candidates ← STEP 3 + STEP 4 outcomes,
@@ -212,10 +212,10 @@ Inscription rule — brand standard, not a per-story choice:
 ICHIREI's Chinese inscriptions are carved in the inscription_script (default: TRADITIONAL,
 繁體字), always shown together with the other form and pinyin — never the carved form
 alone. Supply BOTH forms for every candidate whatever the scripts, because the
-inscription_script decides which one is carved. For every candidate, `kanji` is the simplified form and `kyujitai_form` is its traditional form
-(e.g. 灯→燈, 爱→愛, 乐→樂). Set `kyujitai_form` to null when the traditional and simplified
-forms are identical (e.g. 恩, 迎). (`kyujitai_form` is a legacy field name kept for
-contract stability; in Chinese it holds the TRADITIONAL inscription form.) Judge STEP 4
+inscription_script decides which one is carved. For every candidate, `kanji` is the simplified form and `inscription_form` is its traditional form
+(e.g. 灯→燈, 爱→愛, 乐→樂). Set `inscription_form` to null when the traditional and simplified
+forms are identical (e.g. 恩, 迎). (`inscription_form` always holds the TRADITIONAL form
+in Chinese, whichever inscription_script is chosen.) Judge STEP 4
 gate 3 (naturalness/readability) on the form that will be inscribed (inscription_script)
 PAIRED WITH the other form and its pinyin — a character passes if it reads naturally
 alongside them, even if the carved form alone would be unfamiliar to some readers. You have no
@@ -246,7 +246,7 @@ Return this exact shape:
     {
       "kanji": string,                    // SIMPLIFIED form
       "reading": string,                  // pinyin with tone marks
-      "kyujitai_form": string | null,     // TRADITIONAL form, or null if identical to `kanji`
+      "inscription_form": string | null,     // TRADITIONAL form, or null if identical to `kanji`
       "truth_type": "Essence" | "Turning Point" | "Role" | "Hidden Cost" | "Private Symbol" | "Forward Blessing",
       "one_line_gaze": string,            // Chinese in the display_script, ONE sentence; only details stated in the story
       "story_anchor": string,             // verbatim fragment from the story
