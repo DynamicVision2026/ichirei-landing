@@ -1,4 +1,8 @@
 {
+  "language": "ja",
+  "relationship": "parent_father",
+  "direction": "up",
+  "occasion": "birthday_milestone",
   "status": "sufficient",
   "follow_up_question": null,
   "particulars": [
@@ -24,7 +28,11 @@
       "unique_truth": "会いに来るという行為そのもの。還暦を迎える、の一字でもある。",
       "eliminated": false,
       "eliminated_reason": null,
-      "suitability_flag": "一字で刻んだときの自然さは要確認（パレット照合待ち）"
+      "suitability_flag": "一字で刻んだときの自然さは要確認（パレット照合待ち）",
+      "palette_status": "context_required",
+      "flags": [
+        "standalone_inscription_check"
+      ]
     },
     {
       "kanji": "黙",
@@ -36,7 +44,9 @@
       "unique_truth": "語らないことで支え続けた歳月。",
       "eliminated": false,
       "eliminated_reason": null,
-      "suitability_flag": null
+      "suitability_flag": null,
+      "palette_status": "ok",
+      "flags": []
     },
     {
       "kanji": "駅",
@@ -48,7 +58,11 @@
       "unique_truth": "ふたりの物語の舞台。",
       "eliminated": false,
       "eliminated_reason": null,
-      "suitability_flag": "単独の刻印としては弱い（場所の名詞にとどまる）"
+      "suitability_flag": "単独の刻印としては弱い（場所の名詞にとどまる）",
+      "palette_status": "off_palette",
+      "flags": [
+        "weak_standalone_inscription"
+      ]
     },
     {
       "kanji": "送",
@@ -60,7 +74,11 @@
       "unique_truth": "見送りの持続。",
       "eliminated": true,
       "eliminated_reason": "ゲート3（日本語の自然さ）：見送る・葬送の連想があり、存命の祝いに不向き。",
-      "suitability_flag": "葬送の連想"
+      "suitability_flag": "葬送の連想",
+      "palette_status": "context_required",
+      "flags": [
+        "funeral_connotation"
+      ]
     },
     {
       "kanji": "厳",
@@ -72,7 +90,11 @@
       "unique_truth": "表向きの気質。",
       "eliminated": true,
       "eliminated_reason": "ゲート4（尊厳の境界）：人を「厳しい」という評決に閉じ込める。",
-      "suitability_flag": null
+      "suitability_flag": null,
+      "palette_status": "context_required",
+      "flags": [
+        "verdict_risk"
+      ]
     },
     {
       "kanji": "愛",
@@ -84,7 +106,11 @@
       "unique_truth": "なし（汎用）。",
       "eliminated": true,
       "eliminated_reason": "ゲート1（置換テスト）：どの家族にも当てはまる。隔離規則違反。",
-      "suitability_flag": null
+      "suitability_flag": null,
+      "palette_status": "ok",
+      "flags": [
+        "generic_virtue"
+      ]
     }
   ],
   "primary_kanji": "迎"
