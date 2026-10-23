@@ -13,6 +13,7 @@ import {
   loadPrompt,
 } from '../engine/engine.ts'
 import {
+  EXPLAIN_EN_SLOTS,
   EXPLAIN_SLOTS,
   EXPLAIN_ZH_SLOTS,
   fillExplainPrompt,
@@ -20,6 +21,7 @@ import {
 } from '../engine/explain.ts'
 import {
   DIRECTIONS,
+  PROMPT_FAMILIES,
   FAMILIES,
   INSCRIPTION_SCRIPTS,
   LANGUAGES,
@@ -30,7 +32,9 @@ import {
   parseContext,
   validateEngineResult,
   type EngineContext,
-  type Family,
+  familyOf,
+  promptFamilyOf,
+  type PromptFamily,
 } from '../engine/contract.ts'
 
 let failures = 0
@@ -55,7 +59,9 @@ check(
     JSON.stringify(['birthday_milestone', 'wedding', 'new_baby', 'school_career', 'retirement_farewell', 'parent_day', 'seasonal_thanks']),
 )
 check('direction codes = up | down | across', JSON.stringify([...DIRECTIONS]) === JSON.stringify(['up', 'down', 'across']))
-check('languages = ja | zh-Hans | zh-Hant (no bare zh)', JSON.stringify([...LANGUAGES]) === JSON.stringify(['ja', 'zh-Hans', 'zh-Hant']))
+check('languages = ja | zh-Hans | zh-Hant | en (no bare zh)', JSON.stringify([...LANGUAGES]) === JSON.stringify(['ja', 'zh-Hans', 'zh-Hant', 'en']))
+check('palette family: ja and en → ja rows; zh-Hans and zh-Hant → zh rows', LANGUAGES.map(familyOf).join() === 'ja,zh,zh,ja' && JSON.stringify([...FAMILIES]) === JSON.stringify(['ja', 'zh']))
+check('prompt family: one file each for ja, zh (both scripts) and en', LANGUAGES.map(promptFamilyOf).join() === 'ja,zh,zh,en' && JSON.stringify([...PROMPT_FAMILIES]) === JSON.stringify(['ja', 'zh', 'en']))
 check('inscription scripts = traditional (default) | simplified', JSON.stringify([...INSCRIPTION_SCRIPTS]) === JSON.stringify(['traditional', 'simplified']))
 
 // ---------------------------------------------------------------------------
@@ -70,10 +76,10 @@ check('contract PALETTE_COLUMNS matches the CSV header', csvLines[0] === PALETTE
 // ---------------------------------------------------------------------------
 // 3. Both prompt files: skeleton, slots, v5 requirements, no 還暦-only wording.
 // ---------------------------------------------------------------------------
-const prompts: Record<Family, string> = { ja: read('engine/prompt.ja.md'), zh: read('engine/prompt.zh.md') }
+const prompts: Record<PromptFamily, string> = { ja: read('engine/prompt.ja.md'), zh: read('engine/prompt.zh.md'), en: read('engine/prompt.en.md') }
 const ALL_SLOTS = [STORY_SLOT, ...Object.values(CONTEXT_SLOTS)]
 
-for (const lang of FAMILIES) {
+for (const lang of PROMPT_FAMILIES) {
   const p = prompts[lang]
   const tag = `prompt.${lang}.md`
   const slots = lang === 'zh' ? [...ALL_SLOTS, ...Object.values(SCRIPT_SLOTS)] : ALL_SLOTS
@@ -105,6 +111,11 @@ check('prompt.zh.md: one prompt for both scripts — display_script and inscript
 check('prompt.zh.md: customer-facing text follows display_script; `kanji` is always simplified, inscription_form traditional', prompts.zh.includes('written in the display_script') && prompts.zh.includes('ALWAYS the SIMPLIFIED form') && prompts.zh.includes('"inscription_script": "traditional" | "simplified"'))
 check('prompt.zh.md: Chinese output (traditional inscription + simplified form + pinyin)', prompts.zh.includes('TRADITIONAL') && prompts.zh.includes('SIMPLIFIED') && prompts.zh.includes('pinyin') && prompts.zh.includes('繁體中文'))
 check('prompt.zh.md: no Japanese-only machinery (hiragana / kyūjitai rule)', !prompts.zh.includes('hiragana') && !prompts.zh.includes('Kyūjitai'))
+check('prompt.en.md: English story in, English gaze + follow-up out; the kanji stays Japanese and the reading is romaji (on/kun) with an English meaning', prompts.en.includes('The sender writes in English') && prompts.en.includes('"language": "en"') && prompts.en.includes('romaji') && prompts.en.includes('"meaning": string') && prompts.en.includes('on: tō') && prompts.en.includes('one_line_gaze":') && !prompts.en.includes('hiragana') && !prompts.en.includes('pinyin'))
+check('prompt.en.md: reasons about Japanese connotations, never Chinese meanings; kyūjitai rule kept; no Chinese script slots', prompts.en.includes('Reason about Japanese readings and connotations — never Chinese meanings') && prompts.en.includes('Kyūjitai') && prompts.en.includes('inscription_form') && !prompts.en.includes('{{ DISPLAY_SCRIPT }}'))
+check('prompt.en.md: tattoo-kanji guard — generic-virtue quarantine kept and the tattoo set added (勇 夢 命 魂 力 龍 …)', ['愛', '優', '健', '強', '光', '絆', '感', '守'].every((k) => prompts.en.includes(k)) && ['勇', '夢', '命', '魂', '力', '龍', '武'].every((k) => /Quarantine rule:[^\n]*/.test(prompts.en) && prompts.en.split('Quarantine rule:')[1].split('\n')[0].includes(k)) && prompts.en.includes('tattoo kanji'))
+check('prompt.en.md: every gaze must reference the sender\'s story (HARD PROCESS RULE 6, repeated at the template line and in the output shape)', prompts.en.includes('6. Every `one_line_gaze` must visibly reference the sender\'s story') && prompts.en.indexOf('6. Every `one_line_gaze`') < prompts.en.indexOf('STEP 0 —') && prompts.en.includes('referencing at least one of them') && prompts.en.includes('referencing at least one'))
+check('prompt.en.md: Japanese suitability is the model\'s job because the sender cannot judge it', prompts.en.includes('The sender will not be able to judge the character\'s connotations'))
 check('prompt.zh.md: reasons about Mandarin homophones, never Japanese meanings', prompts.zh.includes('homophone') && prompts.zh.includes('never Japanese meanings'))
 
 // ---------------------------------------------------------------------------
@@ -116,6 +127,11 @@ const injected = fillPrompt(loadPrompt('ja'), story, golden)
 check('fill: story injected', injected.includes(story))
 check('fill: context injected (language/relationship/direction/occasion)', ['language: ja', 'relationship: parent_father', 'direction: up', 'occasion: birthday_milestone', 'occasion_detail: 還暦'].every((l) => injected.includes(l)))
 check('fill: no slot left behind', !ALL_SLOTS.some((s) => injected.includes(s)))
+const enGolden: EngineContext = { language: 'en', relationship: 'parent_mother', direction: 'up', occasion: 'birthday_milestone', occasion_detail: '70th birthday', inscription_script: null }
+const enStory = 'Mum always left the porch light on until I got home.'
+const enFilled = fillPrompt(loadPrompt('en'), enStory, enGolden)
+check('fill: en → story and context injected, no slot left behind (display/inscription script are "unspecified")', enFilled.includes(enStory) && ['language: en', 'relationship: parent_mother', 'direction: up', 'occasion: birthday_milestone', 'occasion_detail: 70th birthday'].every((l) => enFilled.includes(l)) && !ALL_SLOTS.some((x) => enFilled.includes(x)))
+check('fill: en loads its own prompt file', loadPrompt('en') === prompts.en && loadPrompt('en') !== prompts.ja)
 const unspec = fillPrompt(loadPrompt('zh-Hant'), story, { language: 'zh-Hant', relationship: null, direction: null, occasion: null, occasion_detail: null, inscription_script: 'traditional' })
 check('fill: missing context reaches the prompt as "unspecified" (never guessed)', ['language: zh-Hant', 'relationship: unspecified', 'direction: unspecified', 'occasion: unspecified', 'occasion_detail: unspecified'].every((l) => unspec.includes(l)))
 const zhHans = fillPrompt(loadPrompt('zh-Hans'), story, { language: 'zh-Hans', relationship: null, direction: null, occasion: null, occasion_detail: null, inscription_script: 'simplified' })
@@ -141,24 +157,26 @@ check('loadPrompt: a prompt missing a slot throws, naming the slot', Boolean(thr
 // {lang} placeholder in the override resolves per language
 writeFileSync(join(dir, 'prompt.zh.md'), prompts.zh)
 writeFileSync(join(dir, 'prompt.ja.md'), prompts.ja)
+writeFileSync(join(dir, 'prompt.en.md'), prompts.en)
 process.env.ICHIREI_PROMPT_PATH = join(dir, 'prompt.{lang}.md')
-check('loadPrompt: ICHIREI_PROMPT_PATH with {lang} resolves per language', loadPrompt('zh-Hant').includes('Chinese / zh') && loadPrompt('zh-Hans').includes('Chinese / zh') && loadPrompt('ja').includes('Japanese / ja'))
+check('loadPrompt: ICHIREI_PROMPT_PATH with {lang} resolves per language', loadPrompt('zh-Hant').includes('Chinese / zh') && loadPrompt('zh-Hans').includes('Chinese / zh') && loadPrompt('ja').includes('Japanese / ja') && loadPrompt('en').includes('English / en'))
 delete process.env.ICHIREI_PROMPT_PATH
 
 // ---------------------------------------------------------------------------
 // 4b. Stage-B explain prompts: ja + zh, occasion-neutral, zh follows the display script.
 // ---------------------------------------------------------------------------
-const explainPrompts: Record<Family, string> = { ja: read('engine/explain-prompt.ja.md'), zh: read('engine/explain-prompt.zh.md') }
+const explainPrompts: Record<PromptFamily, string> = { ja: read('engine/explain-prompt.ja.md'), zh: read('engine/explain-prompt.zh.md'), en: read('engine/explain-prompt.en.md') }
 const EX_ALL = Object.values(EXPLAIN_SLOTS)
-for (const fam of FAMILIES) {
+for (const fam of PROMPT_FAMILIES) {
   const ep = explainPrompts[fam]
-  const need = fam === 'zh' ? [...EX_ALL, ...Object.values(EXPLAIN_ZH_SLOTS)] : EX_ALL
+  const need = fam === 'zh' ? [...EX_ALL, ...Object.values(EXPLAIN_ZH_SLOTS)] : fam === 'en' ? [...EX_ALL, ...Object.values(EXPLAIN_EN_SLOTS)] : EX_ALL
   check(`explain-prompt.${fam}.md: every slot appears exactly once`, need.every((x) => count(ep, x) === 1), need.map((x) => `${x}×${count(ep, x)}`).join(' '))
   check(`explain-prompt.${fam}.md: occasion-neutral — no 還暦 / Kanreki / sixty / rebirth / 60th wording`, !/還暦|Kanreki|kanreki|sixty|rebirth|60th|六十|60歳/.test(ep))
   check(`explain-prompt.${fam}.md: takes relationship / direction / occasion / occasion_detail and says not to assume an occasion`, ['{{ RELATIONSHIP }}', '{{ DIRECTION }}', '{{ OCCASION }}', '{{ OCCASION_DETAIL }}'].every((x) => ep.includes(x)) && ep.includes('Do not assume any particular occasion'))
   check(`explain-prompt.${fam}.md: keeps the living-receiver, sender-as-subject and no-invention rules`, ep.includes('The SENDER remains the grammatical subject') && ep.includes('never mourning, never decline') && ep.includes('Do not invent'))
 }
 check('explain-prompt.zh.md: output script follows display_script (simplified / traditional), both forms of the character supplied', explainPrompts.zh.includes('{{ DISPLAY_SCRIPT }}') && explainPrompts.zh.includes('Chinese only, in the display_script') && explainPrompts.zh.includes('TRADITIONAL_FORM: {{ INSCRIPTION_FORM }}') && explainPrompts.zh.includes('SIMPLIFIED_FORM: {{ KANJI }}'))
+check('explain-prompt.en.md: English only (kanji aside), Japanese reading/meaning, no generic virtue, every claim grounded in the story', explainPrompts.en.includes('English only, apart from the kanji itself') && explainPrompts.en.includes('romaji') && explainPrompts.en.includes('never explain it as a Chinese character') && explainPrompts.en.includes('Do not turn the character into a generic virtue') && explainPrompts.en.includes('if you could swap the names and keep it, rewrite it') && !explainPrompts.en.includes('{{ DISPLAY_SCRIPT }}'))
 check('explain-prompt.ja.md: Japanese only, no Chinese script slots', explainPrompts.ja.includes('Japanese only') && !explainPrompts.ja.includes('{{ DISPLAY_SCRIPT }}'))
 const exCand = { kanji: '灯', inscription_form: '燈', reading: 'dēng', one_line_gaze: '你把燈留著。', story_anchor: '玄關的燈' }
 const exZhT = fillExplainPrompt(loadExplainPrompt('zh-Hant'), '故事{{ STORY }}$&', exCand, { language: 'zh-Hant', relationship: 'friend', direction: 'across', occasion: 'wedding', occasion_detail: null, inscription_script: 'traditional' })
@@ -167,6 +185,8 @@ check('explain fill: zh-Hant → display_script traditional; zh-Hans → simplif
 check('explain fill: context reaches the prompt; missing values are "unspecified"', exZhT.includes('relationship: friend') && exZhT.includes('occasion: wedding') && exZhT.includes('occasion_detail: unspecified') && exZhS.includes('occasion: unspecified'))
 check('explain fill: slot-like text in the story is not re-substituted; no slot left behind', exZhT.includes('故事{{ STORY }}$&') && !/\{\{ [A-Z_]+ \}\}/.test(exZhT.replace('故事{{ STORY }}$&', '')))
 check('explain fill: ja default context fills cleanly', !/\{\{ [A-Z_]+ \}\}/.test(fillExplainPrompt(loadExplainPrompt('ja'), 'x', { kanji: '迎', reading: 'むかえ', one_line_gaze: 'g', story_anchor: 'a' })))
+const exEn = fillExplainPrompt(loadExplainPrompt('en'), 'Mum left the porch light on.{{ MEANING }}', { kanji: '灯', inscription_form: '燈', reading: 'on: tō · kun: akari', meaning: 'lamp; a light kept lit', one_line_gaze: 'You left the porch light on.', story_anchor: 'porch light' }, { language: 'en', relationship: 'parent_mother', direction: 'up', occasion: 'birthday_milestone', occasion_detail: null, inscription_script: null })
+check('explain fill: en → romaji reading, English meaning, carved form and context reach the prompt; slot-like story text is not re-substituted', exEn.includes('reading: on: tō · kun: akari') && exEn.includes('meaning: lamp; a light kept lit') && exEn.includes('carved old form 燈') && exEn.includes('language: en') && exEn.includes('relationship: parent_mother') && exEn.includes('Mum left the porch light on.{{ MEANING }}') && !/\{\{ [A-Z_]+ \}\}/.test(exEn.replace('{{ MEANING }}', '')))
 check('explain: zh-Hans and zh-Hant load the same file', loadExplainPrompt('zh-Hans') === loadExplainPrompt('zh-Hant') && loadExplainPrompt('zh-Hant') === explainPrompts.zh)
 
 // ---------------------------------------------------------------------------
@@ -193,7 +213,9 @@ const multiline = parseContext({ occasion_detail: '30歳\noccasion: wedding' })
 check('parseContext: newlines in occasion_detail cannot start a new CONTEXT line', multiline.ok && multiline.context.occasion_detail === '30歳 occasion: wedding')
 check('parseContext: occasion_detail over the length cap is rejected', !parseContext({ occasion_detail: 'あ'.repeat(OCCASION_DETAIL_MAX + 1) }).ok && parseContext({ occasion_detail: 'あ'.repeat(OCCASION_DETAIL_MAX) }).ok)
 check('parseContext: non-string occasion_detail is rejected', !parseContext({ occasion_detail: 30 }).ok)
-for (const bad of [{ language: 'en' }, { relationship: 'father' }, { direction: 'sideways' }, { occasion: 'kanreki' }, { relationship: 7 }] as const) {
+const enCtx = parseContext({ language: 'en', inscription_script: 'simplified' })
+check('parseContext: en accepted; inscription_script is ignored (null) for en, like ja', enCtx.ok && enCtx.context.language === 'en' && enCtx.context.inscription_script === null)
+for (const bad of [{ language: 'english' }, { language: 'EN' }, { relationship: 'father' }, { direction: 'sideways' }, { occasion: 'kanreki' }, { relationship: 7 }] as const) {
   const r = parseContext(bad)
   check(`parseContext: rejects ${JSON.stringify(bad)} with a message listing the allowed codes`, !r.ok && r.error.includes('expected one of'))
 }
@@ -215,6 +237,10 @@ check('extractJson: throws on non-JSON', threwJson)
 // ---------------------------------------------------------------------------
 const fixture = JSON.parse(read('scripts/golden-fixture.json'))
 check('contract: golden fixture conforms', validateEngineResult(fixture).length === 0, validateEngineResult(fixture).join('; '))
+const enFixture = (() => { const r = JSON.parse(JSON.stringify(fixture)); r.language = 'en'; r.inscription_script = null; for (const c of r.candidates) { c.reading = 'on: x · kun: y'; c.meaning = 'a meaning' } return r })()
+check('contract: an en result conforms when every candidate has reading + meaning and inscription_script is null', validateEngineResult(enFixture).length === 0, validateEngineResult(enFixture).join('; '))
+check('contract: an en candidate without a meaning is caught; ja does not need one', (() => { const r = JSON.parse(JSON.stringify(enFixture)); delete r.candidates[2].meaning; return validateEngineResult(r).some((p) => p.includes('meaning missing')) })() && validateEngineResult(fixture).length === 0)
+check('contract: an en result must have inscription_script null', (() => { const r = JSON.parse(JSON.stringify(enFixture)); r.inscription_script = 'traditional'; return validateEngineResult(r).some((p) => p.includes('null for ja and en')) })())
 check('contract: golden fixture carries ja / parent_father / up / birthday_milestone', fixture.language === 'ja' && fixture.relationship === 'parent_father' && fixture.direction === 'up' && fixture.occasion === 'birthday_milestone' && fixture.occasion_detail === '還暦')
 check('contract: golden fingerprint uses relationship_note', fixture.fingerprint.relationship_note === '子 → 父' && !('relationship' in fixture.fingerprint))
 const clone = () => JSON.parse(JSON.stringify(fixture))

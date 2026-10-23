@@ -29,9 +29,9 @@ const pickContext = async (page, ctx = {}) => {
   await page.selectOption('select[name=direction]', c.direction)
   await page.selectOption('select[name=occasion]', c.occasion)
 }
-const COPY_TRY = { ja: 'もう一度試す', 'zh-Hans': '再试一次', 'zh-Hant': '再試一次' }
-const FINALIZE = { ja: 'この一字を、贈る', 'zh-Hans': '就用这一个字', 'zh-Hant': '就用這一個字' }
-const SUBMIT = { ja: 'その一字を、探しにいく', 'zh-Hans': '去寻找那一个字', 'zh-Hant': '去尋找那一個字' }
+const COPY_TRY = { ja: 'もう一度試す', 'zh-Hans': '再试一次', 'zh-Hant': '再試一次', en: 'Try again' }
+const FINALIZE = { ja: 'この一字を、贈る', 'zh-Hans': '就用这一个字', 'zh-Hant': '就用這一個字', en: 'Give this character' }
+const SUBMIT = { ja: 'その一字を、探しにいく', 'zh-Hans': '去寻找那一个字', 'zh-Hant': '去尋找那一個字', en: 'Find the one character' }
 
 let failures = 0
 const check = (name, cond) => {
@@ -336,8 +336,8 @@ const mockPage = async (browser, { onExplain, result, order } = {}) => {
   const { page, errors, calls } = await mockPage(browser)
   await page.goto('http://localhost:5173/demo', { waitUntil: 'networkidle' })
   const submit = page.locator(`button:has-text("${SUBMIT.ja}")`)
-  check('selectors: language pills (ja / zh-Hans / zh-Hant), 3 selects and the occasion_detail field are present',
-    (await page.locator('[data-language]').count()) === 3 &&
+  check('selectors: language pills (ja / zh-Hans / zh-Hant / en), 3 selects and the occasion_detail field are present',
+    (await page.locator('[data-language]').count()) === 4 &&
     (await page.locator('select[name=relationship] option').count()) === 14 &&
     (await page.locator('select[name=direction] option').count()) === 4 &&
     (await page.locator('select[name=occasion] option').count()) === 8 &&
@@ -523,7 +523,7 @@ const mockPage = async (browser, { onExplain, result, order } = {}) => {
   await page.goto('http://localhost:5173/', { waitUntil: 'networkidle' })
   await page.evaluate(() => localStorage.clear())
   await page.reload({ waitUntil: 'networkidle' })
-  check('landing: three language buttons in the nav, ja pressed by default', (await page.locator('nav [data-language]').count()) === 3 && (await page.locator('nav [data-language=ja][aria-pressed=true]').count()) === 1)
+  check('landing: four language buttons in the nav, ja pressed by default', (await page.locator('nav [data-language]').count()) === 4 && (await page.locator('nav [data-language=ja][aria-pressed=true]').count()) === 1)
   await page.click('nav [data-language=zh-Hans]')
   check('zh-Hans: <html lang>, title, hero, thesis, brand', (await page.getAttribute('html', 'lang')) === 'zh-Hans' && (await page.title()) === 'ICHIREI 一字礼 — 一个字的礼物' && (await page.locator('h1').innerText()) === '一个字的礼物' && (await page.locator('[data-thesis]').innerText()) === '心意，不必说出口也可以。一个字，映出你看着对方的方式。')
   const hans = await page.evaluate(() => document.body.innerText)
@@ -689,6 +689,133 @@ const mockPage = async (browser, { onExplain, result, order } = {}) => {
   check('…and the browser is at the checkout URL', page.url().includes('cart=zh'))
   check('no page errors (run 12)', errors.length === 0)
   if (errors.length) console.log('page errors:', errors)
+  await page.close()
+}
+
+// ---------- Run 13: English — landing, customer flow, order form, /demo ----------
+{
+  let mode = 'ok'
+  const order = (_body) =>
+    mode === 'field' ? { status: 400, json: { error: 'x', field: 'delivery_date' } }
+    : mode === 'cart_failed' ? { status: 502, json: { error: 'x', code: 'cart_failed', order_ref: 'IC-X' } }
+    : { json: { order_ref: 'IC-20261023-ENREF222', checkout_url: 'http://localhost:5173/__checkout?cart=en', glyph: '燈', certificate_text: 'x' } }
+  const enResult = (body) => {
+    const r = clone(FIXTURE)
+    r.language = body.language
+    r.inscription_script = null
+    r.primary_kanji = '灯'
+    r.runner_up_kanji = null
+    r.candidates = r.candidates.slice(0, 3).map((c, i) => ({ ...c, eliminated: false, eliminated_reason: null, meaning: ['lamp; a light kept lit', 'to wait', 'to welcome'][i] }))
+    r.candidates[0] = { ...r.candidates[0], kanji: '灯', inscription_form: '燈', reading: 'on: tō · kun: hi, akari', one_line_gaze: 'You left the porch light on every night.', story_anchor: 'left the porch light on' }
+    r.candidates[1] = { ...r.candidates[1], kanji: '待', inscription_form: null, reading: 'on: tai · kun: ma(tsu)' }
+    r.candidates[2] = { ...r.candidates[2], kanji: '迎', inscription_form: null, reading: 'on: gei · kun: mukae(ru)' }
+    return r
+  }
+  const { page, errors, calls } = await mockPage(browser, { result: enResult, order, onExplain: 'She kept the porch light on, and that was all she said.' })
+
+  // -- the landing page, in English
+  await page.goto('http://localhost:5173/?lang=en', { waitUntil: 'networkidle' })
+  check('en landing: <html lang="en">, title, hero, brand', (await page.getAttribute('html', 'lang')) === 'en' && (await page.title()) === 'ICHIREI 一字礼 — A Gift of One Character' && (await page.locator('h1').innerText()) === 'One character, as a gift' && (await page.locator('header').innerText()).includes('一字礼'))
+  check('en landing: four language buttons in the nav, English pressed (labelled "English")', (await page.locator('nav [data-language]').count()) === 4 && (await page.locator('nav [data-language=en][aria-pressed=true]').count()) === 1 && (await page.locator('nav [data-language=en]').innerText()) === 'English')
+  const enBody = await page.locator('body').innerText()
+  check('en landing: the thesis, the six steps and the CTA are English; no Japanese kana and no AI on the page (brand, marquee and nav names aside)', enBody.includes("Your feeling doesn't have to be put into words") && enBody.includes('The character becomes a gift') && enBody.includes('You choose') && !/[ぁ-んァ-ヶ]/.test(enBody.replace('日本語', '')) && !/\bAI\b|artificial|algorithm/i.test(enBody))
+  check('en landing: Latin serif (EB Garamond) for the prose; the hero keeps the mincho', (await page.evaluate(() => getComputedStyle(document.querySelector('p.font-serif-jp')).fontFamily)).includes('EB Garamond'))
+  await page.screenshot({ path: `${SHOTS}/e2e-landing-en.png`, fullPage: false })
+  await page.click('nav [data-language=ja]')
+  check('en → ja through the nav switch, and back to en', (await page.locator('h1').innerText()) === '一字の贈りもの' && (await page.getAttribute('html', 'lang')) === 'ja')
+  await page.click('nav [data-language=en]')
+  check('…and the choice is remembered across a reload', (await page.locator('h1').innerText()) === 'One character, as a gift' && (await page.getAttribute('html', 'lang')) === 'en')
+
+  // -- the customer flow
+  check('en customer page: the flow is English, no language pills inside it, no test controls', (await page.locator('#story-input').innerText()).includes("You don't have to write everything about them") && (await page.locator('#story-input [data-language]').count()) === 0 && (await page.locator('text=VALIDATION HARNESS').count()) === 0 && (await page.locator('[data-inscription-script]').count()) === 0)
+  check('en: selectors are English (labels for relationship, direction, occasion)', (await page.locator('select[name=relationship] option[value=parent_mother]').innerText()) === 'Mother' && (await page.locator('select[name=occasion] option[value=wedding]').innerText()) === 'Wedding or anniversary')
+  await page.locator('#story-input textarea').first().fill('My mum left the porch light on every night until I got home.')
+  await pickContext(page, { relationship: 'parent_mother', direction: 'up', occasion: 'birthday_milestone' })
+  await page.fill('input[name=occasion_detail]', '70th birthday')
+  await page.click(`#story-input >> text=${SUBMIT.en}`)
+  await page.waitForSelector(`button:has-text("${FINALIZE.en}")`, { timeout: 15000 })
+  const sel = calls.select[0]
+  check('en payload: language en, the context and occasion_detail, and NO inscription_script', sel.language === 'en' && sel.relationship === 'parent_mother' && sel.direction === 'up' && sel.occasion === 'birthday_milestone' && sel.occasion_detail === '70th birthday' && !('inscription_script' in sel), JSON.stringify(sel))
+  const lamp = page.locator('article').filter({ has: page.locator('[data-glyph]:text-is("燈")') })
+  check('en reveal: the carved glyph is the Japanese kyūjitai 燈, shown with the modern 灯, the romaji on/kun reading and the English meaning', (await lamp.count()) === 1 && await lamp.locator('text=灯 · on: tō · kun: hi, akari — lamp; a light kept lit').isVisible())
+  check('en reveal: the note says what is carved (kyūjitai) and shows the modern form', await lamp.locator('text=Carved in the old form, kyūjitai (modern form: 灯)').isVisible())
+  const plainCard = page.locator('article').filter({ has: page.locator('[data-glyph]:text-is("待")') })
+  check('en reveal: a character with no distinct old form shows romaji and meaning only', await plainCard.locator('text=on: tai · kun: ma(tsu) — to wait').isVisible())
+  await lamp.click()
+  await lamp.locator('text=Choose this character').click()
+  await page.screenshot({ path: `${SHOTS}/e2e-reveal-en.png`, fullPage: true })
+  await page.click(`button:has-text("${FINALIZE.en}")`)
+
+  // -- the order form
+  const form = page.locator('[data-testid=order-form]')
+  await form.waitFor()
+  check('en order form: kyūjitai (燈) pre-selected, modern (灯) offered; never traditional/simplified', (await page.locator('input[name=inscription_style][value=kyujitai]').isChecked()) && (await page.locator('input[name=inscription_style][value=modern]').count()) === 1 && (await page.locator('input[name=inscription_style][value=traditional]').count()) === 0 && (await page.locator('[data-order-glyph]').innerText()) === '燈')
+  check('en order form: English labels, packages and the romaji + meaning line under the glyph', (await form.innerText()).includes('Your order') && (await form.innerText()).includes('Requested delivery date') && (await form.innerText()).includes('Old form (kyūjitai)') && (await form.innerText()).includes('on: tō · kun: hi, akari — lamp; a light kept lit') && (await form.innerText()).includes('¥15,800'))
+  check('en certificate: placeholder 〇〇 before a name is typed', (await page.locator('[data-certificate]').innerText()) === 'This character is you, as 〇〇 sees you.')
+  await page.fill('input[name=sender_name]', 'Emily Carter')
+  check('en certificate: "This character is you, as Emily Carter sees you."', (await page.locator('[data-certificate]').innerText()) === 'This character is you, as Emily Carter sees you.')
+  await page.fill('input[name=receiver_name]', 'Margaret Carter')
+  const d = new Date(); d.setDate(d.getDate() + 20)
+  const iso = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+  await page.fill('input[name=delivery_date]', iso)
+  check('en: the delivery notice is English ("20 days until your requested delivery date.")', await page.locator('text=20 days until your requested delivery date.').isVisible())
+  await page.click('label:has(input[value=modern])')
+  check('en: choosing the modern form changes the slip to 灯, and back to 燈', (await page.locator('[data-order-glyph]').innerText()) === '灯')
+  await page.click('label:has(input[value=kyujitai])')
+  await page.click('label:has(input[name=package][value=simple])')
+  await page.screenshot({ path: `${SHOTS}/e2e-order-form-en.png`, fullPage: true })
+  const submit = page.locator('[data-testid=order-submit]')
+  mode = 'cart_failed'
+  await submit.click()
+  await page.locator('[data-testid=order-error]').waitFor()
+  check('en: a failed order shows a plain English message and the form stays usable', (await page.locator('[data-testid=order-error]').innerText()).includes('We could not take your order') && await submit.isEnabled())
+  mode = 'field'
+  await submit.click()
+  await page.locator('text=Please check “Requested delivery date”.').waitFor()
+  check('en: a 400 with a field names the field to fix, in English', true)
+  mode = 'ok'
+  await submit.click()
+  await page.waitForSelector('#co', { timeout: 8000 })
+  const b = calls.order.at(-1)
+  check('en order payload: language en, kyūjitai, Simple package, the names; no price, no glyph', b.language === 'en' && b.inscription_style === 'kyujitai' && b.package === 'simple' && b.sender_name === 'Emily Carter' && b.receiver_name === 'Margaret Carter' && b.selected_kanji === '灯' && b.engine_result.language === 'en' && !('price' in b) && !('glyph' in b))
+  check('…and the browser is at the checkout URL', page.url().includes('cart=en'))
+  check('no page errors (run 13, customer flow)', errors.length === 0)
+  if (errors.length) console.log('page errors:', errors)
+  await page.close()
+}
+{
+  // -- the internal harness at /demo in English
+  const enResultDemo = (body) => {
+    const r = clone(FIXTURE)
+    r.language = body.language
+    r.inscription_script = null
+    r.primary_kanji = '灯'
+    r.runner_up_kanji = null
+    r.candidates = r.candidates.slice(0, 3).map((c, i) => ({ ...c, eliminated: false, eliminated_reason: null, meaning: ['lamp; a light kept lit', 'to wait', 'to welcome'][i] }))
+    r.candidates[0] = { ...r.candidates[0], kanji: '灯', inscription_form: '燈', reading: 'on: tō · kun: hi, akari', one_line_gaze: 'You left the porch light on every night.', story_anchor: 'left the porch light on' }
+    return r
+  }
+  const { page, errors, calls } = await mockPage(browser, { result: enResultDemo, onExplain: 'She kept the porch light on, and that was all she said.' })
+  await page.goto('http://localhost:5173/demo?lang=en', { waitUntil: 'networkidle' })
+  check('en /demo: the English pill is pressed, the harness chrome is there, no inscription-script toggle', (await page.locator('[data-language=en][aria-pressed=true]').count()) === 1 && (await page.locator('[data-language]').count()) === 4 && (await page.locator('text=VALIDATION HARNESS').count()) === 1 && (await page.locator('[data-inscription-script]').count()) === 0)
+  await page.click('[data-language=zh-Hans]')
+  check('en /demo: the pill switches to zh-Hans (and the zh toggle appears), then back to English (and it disappears)', (await page.locator('[data-inscription-script]').count()) === 2)
+  await page.click('[data-language=en]')
+  check('…English again: no toggle, English UI', (await page.locator('[data-inscription-script]').count()) === 0 && (await page.locator(`button:has-text("${SUBMIT.en}")`).count()) === 1)
+  await page.locator('textarea').first().fill('My mum left the porch light on every night until I got home.')
+  await pickContext(page, { relationship: 'parent_mother', direction: 'up', occasion: 'seasonal_thanks' })
+  await page.click(`text=${SUBMIT.en}`)
+  await page.waitForSelector(`button:has-text("${FINALIZE.en}")`, { timeout: 15000 })
+  check('en /demo payload: language en, no inscription_script', calls.select[0].language === 'en' && !('inscription_script' in calls.select[0]))
+  // explain (condition B) carries the context, the romaji reading and the English meaning
+  await page.click('header >> text="B"')
+  const lampD = page.locator('article').filter({ has: page.locator('[data-glyph]:text-is("燈")') })
+  await lampD.click()
+  await lampD.locator('text=Read this character more deeply').click()
+  await page.waitForSelector('text=She kept the porch light on', { timeout: 5000 })
+  const ex = calls.explain[0]
+  check('en explain call: language en with the context, the romaji reading AND the English meaning, no inscription_script', ex.language === 'en' && ex.relationship === 'parent_mother' && ex.occasion === 'seasonal_thanks' && ex.candidate.kanji === '灯' && ex.candidate.inscription_form === '燈' && ex.candidate.reading === 'on: tō · kun: hi, akari' && ex.candidate.meaning === 'lamp; a light kept lit' && !('inscription_script' in ex), JSON.stringify(ex))
+  check('no page errors (run 13, /demo)', errors.length === 0)
   await page.close()
 }
 

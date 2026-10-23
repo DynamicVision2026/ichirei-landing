@@ -26,6 +26,14 @@
   --font-serif-jp: 'Noto Serif TC', 'Songti TC', 'PMingLiU', serif;
 }
 
+/*
+ * English: Latin text in a Latin serif. The kanji itself keeps the Japanese mincho (--font-mincho is
+ * left alone), and any kanji in a --font-serif-jp run falls back to Noto Serif JP.
+ */
+:root:lang(en) {
+  --font-serif-jp: 'EB Garamond', 'Noto Serif JP', serif;
+}
+
 html {
   background: var(--color-ink);
 }

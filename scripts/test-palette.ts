@@ -13,7 +13,7 @@ import {
   parseCsv,
   parsePalette,
 } from '../engine/palette.ts'
-import { PALETTE_COLUMNS, validateEngineResult, type Candidate, type EngineResult } from '../engine/contract.ts'
+import { PALETTE_COLUMNS, familyOf, validateEngineResult, type Candidate, type EngineResult } from '../engine/contract.ts'
 
 let failures = 0
 function check(name: string, cond: boolean, detail?: string) {
@@ -291,6 +291,23 @@ check('golden: the refereed fixture still conforms to the contract', validateEng
 // The reported first real run: 送 alive, 餞 primary.
 const live = run(raw([cand('黙'), cand('駅'), cand('送'), cand('餞', { story_anchor: '' }), cand('灯')], '餞', { runner_up_kanji: '灯' }))
 check('regression (first live run): 送 is now eliminated by the palette, and an anchorless 餞 cannot be primary — the runner-up takes over', get(live, '送').eliminated && get(live, '送').eliminated_reason === 'palette: hard_block' && live.primary_kanji === '灯')
+
+// ---------------------------------------------------------------------------
+// 9. en uses the JA palette rows and taboo rules (the character is Japanese, carved in Japan).
+// ---------------------------------------------------------------------------
+const enRaw = (candidates: Candidate[], primary: string | null, over: Partial<EngineResult> = {}) => raw(candidates, primary, { language: 'en', inscription_script: null, ...over })
+const enHard = run(enRaw([cand('黙'), cand('送'), cand('灯')], '送'))
+check('en: every ja hard_block kanji is eliminated for an English result too (same rows, same reason)', HARD.every((k) => { const c = get(run(enRaw([cand('黙'), cand(k)], '黙')), k); return c.eliminated === true && c.eliminated_reason === HARD_BLOCK_REASON && c.palette_status === 'off_palette' }))
+check('en: a removed primary is promoted exactly as for ja', enHard.primary_kanji === '灯' && enHard.referee?.primary_changed === true && enHard.referee.promoted_from === 'array_order')
+const enZhRow = run(enRaw([cand('送'), cand('灯')], '灯'))
+check('en: 送 is hard_block (the ja row), not context_required (the zh row)', get(enZhRow, '送').eliminated === true && get(enZhRow, '送').eliminated_reason === HARD_BLOCK_REASON)
+const enAnchor = run(enRaw([cand('黙'), cand('餞', { story_anchor: 'a fragment not in the story' }), cand('灯')], '餞', { runner_up_kanji: '黙' }))
+check('en: a context_required + anchor_required kanji is refused as primary when its anchor is not verbatim in the story', enAnchor.primary_kanji === '黙' && enAnchor.referee?.actions.some((a) => a.kanji === '餞' && a.action === 'primary_refused_no_anchor') === true)
+const enAnchorOk = run(enRaw([cand('黙'), cand('餞', { story_anchor: 'my mum left the porch light on' }), cand('灯')], '餞'), 'Well, my mum left the porch light on every night.')
+check('en: …and kept when the English anchor IS verbatim in the English story', enAnchorOk.primary_kanji === '餞')
+const enOcc = run(enRaw([cand('黙'), cand('寿'), cand('灯')], '寿', { occasion: 'new_baby', runner_up_kanji: '灯' }))
+check('en: blocked_occasions apply (寿 is blocked for a new_baby order)', get(enOcc, '寿').eliminated_reason === 'palette: blocked_occasion' && enOcc.primary_kanji === '灯')
+check('en: the palette lookup is by the Japanese row, found by kanji and by kyūjitai', palette.lookup(familyOf('en'), '灯') === palette.lookup('ja', '灯') && palette.lookup(familyOf('en'), '燈') === palette.lookup('ja', '灯') && palette.lookup('ja', '灯') !== undefined)
 
 console.log(failures === 0 ? '\nAll palette referee checks passed.' : `\n${failures} FAILED`)
 process.exit(failures === 0 ? 0 : 1)

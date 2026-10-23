@@ -98,6 +98,54 @@ try {
   const jaScript = await runEngine(GOLDEN_STORY, 'A', { context: { language: 'ja', inscription_script: 'simplified' } })
   check('ja: an inscription_script is ignored — echoed null', jaScript.inscription_script === null)
 
+  // ---- 2b. English: its own prompt, the ja palette rows, romaji + meaning, no script slots ----
+  const EN_STORY = 'My mum left the porch light on every night until I got home, even when I was thirty-eight. She never once said she was waiting. She would put the kettle on the moment she heard the gate.'
+  const enCand = (kanji: string, form: string | null, reading: string, meaning: string, anchor: string, gaze: string, over: Record<string, unknown> = {}) => ({
+    kanji, reading, meaning, inscription_form: form, truth_type: 'Private Symbol', one_line_gaze: gaze, story_anchor: anchor, unique_truth: 'u',
+    eliminated: false, eliminated_reason: null, suitability_flag: null, palette_status: 'ok', flags: [], ...over,
+  })
+  const EN_GAZE = {
+    灯: 'You left the porch light on every night, even when I was thirty-eight.',
+    待: 'You never once said you were waiting, and the kettle was already on.',
+    送: 'You saw to it that I got home.',
+    茶: 'The kettle went on the moment you heard the gate.',
+    帰: 'Every night I got home, the light was already on for me.',
+    愛: 'You love me.',
+  }
+  const enReply = {
+    ...GOLDEN, language: 'en', relationship: 'parent_mother', direction: 'up', occasion: 'birthday_milestone', occasion_detail: '70th birthday', inscription_script: null,
+    candidates: [
+      enCand('送', '送', 'on: sō · kun: oku(ru)', 'to send; to see off', 'until I got home', EN_GAZE.送),
+      enCand('灯', '燈', 'on: tō · kun: hi, akari', 'lamp; a light kept lit', 'left the porch light on every night', EN_GAZE.灯),
+      enCand('待', '待', 'on: tai · kun: ma(tsu)', 'to wait', 'She never once said she was waiting', EN_GAZE.待),
+      enCand('茶', '茶', 'on: cha, sa', 'tea', 'put the kettle on', EN_GAZE.茶),
+      enCand('帰', '歸', 'on: ki · kun: kae(ru)', 'to return home', 'until I got home', EN_GAZE.帰),
+      enCand('愛', '愛', 'on: ai', 'love', 'even when I was thirty-eight', EN_GAZE.愛, { eliminated: true, eliminated_reason: 'Quarantine: generic virtue, gate 1' }),
+    ],
+    primary_kanji: '送',
+    runner_up_kanji: '灯',
+  }
+  reply = enReply
+  const en = await runEngine(EN_STORY, 'A', { context: { language: 'en', relationship: 'parent_mother', direction: 'up', occasion: 'birthday_milestone', occasion_detail: '70th birthday', inscription_script: 'simplified' } })
+  const pEn = lastPrompt()
+  check('en→model: prompt is prompt.en.md (English output, romaji reading, English meaning, tattoo-kanji guard) — not the ja or zh file', pEn.includes('Selection Prompt (v5, English / en)') && pEn.includes('romaji') && pEn.includes('tattoo kanji') && !pEn.includes('Selection Prompt (v5, Japanese') && !pEn.includes('Selection Prompt (v5, Chinese'))
+  check('en→model: the English story and all five context values reached the prompt; no slot left behind', pEn.includes(EN_STORY) && ['language: en', 'relationship: parent_mother', 'direction: up', 'occasion: birthday_milestone', 'occasion_detail: 70th birthday'].every((l) => pEn.includes(l)) && !allSlots.some((x) => pEn.includes(x)))
+  check('en→model: HARD PROCESS RULE 6 (every gaze references the story) and the quarantine are in what the model sees', pEn.includes('6. Every `one_line_gaze` must visibly reference the sender\'s story') && /Quarantine rule:[^\n]*愛[^\n]*勇[^\n]*龍/.test(pEn))
+  check('en: echo stamped (language en, inscription_script null even when the caller sent "simplified")', en.language === 'en' && en.inscription_script === null && en.relationship === 'parent_mother' && en.occasion_detail === '70th birthday')
+  check('en referee uses the JA palette rows: 送 is hard_block-eliminated and the runner-up 灯 is promoted', en.candidates.find((c) => c.kanji === '送')?.eliminated_reason === 'palette: hard_block' && en.primary_kanji === '灯' && en.referee?.promoted_from === 'runner_up' && en.referee.palette_rows === loadPalette().size)
+  check('en: the refereed result conforms to the contract (romaji reading + meaning on every candidate)', validateEngineResult(en).length === 0, validateEngineResult(en).join('; '))
+  check('en: reading and meaning pass through unchanged; the kanji stays Japanese with its kyūjitai', en.candidates.find((c) => c.kanji === '灯')?.reading === 'on: tō · kun: hi, akari' && en.candidates.find((c) => c.kanji === '灯')?.meaning === 'lamp; a light kept lit' && en.candidates.find((c) => c.kanji === '灯')?.inscription_form === '燈')
+  // The prompt asks for it (rule 6); this fixture check keeps the example answers honest: every
+  // surviving gaze shares a content word with the story, and the generic 愛 line does not.
+  const words = (t: string) => new Set((t.toLowerCase().match(/[a-z]{4,}/g) ?? []).filter((w) => !['that', 'this', 'with', 'were', 'your', 'have', 'been', 'they', 'when', 'even'].includes(w)))
+  const cites = (g: string, st: string) => [...words(g)].some((w) => words(st).has(w))
+  check('en fixture: every surviving candidate\'s gaze cites a detail of the story; the generic "You love me." does not', en.candidates.filter((c) => !c.eliminated).every((c) => cites(c.one_line_gaze, EN_STORY)) && !cites(EN_GAZE.愛, EN_STORY))
+  check('en fixture: each story_anchor is a verbatim fragment of the English story', en.candidates.every((c) => EN_STORY.includes(c.story_anchor)))
+  const enApi = (await ndjson(await post({ story: EN_STORY, condition: 'A', language: 'en', relationship: 'parent_mother', direction: 'up', occasion: 'birthday_milestone' }))).at(-1)
+  check('api: language "en" is accepted and the NDJSON result is the refereed English result', enApi?.type === 'result' && enApi.result.language === 'en' && enApi.result.primary_kanji === '灯' && lastPrompt().includes('Selection Prompt (v5, English / en)'))
+  check('api: "english" and "EN" are rejected — the code is exactly "en"', (await post({ story: EN_STORY, language: 'english' })).status === 400 && (await post({ story: EN_STORY, language: 'EN' })).status === 400)
+  reply = GOLDEN
+
   // ---- 3. Nothing supplied: backward compatible with the current /demo UI -----
   reply = GOLDEN
   const bare = await runEngine(GOLDEN_STORY, 'A')
@@ -154,7 +202,7 @@ try {
   const bad = await post({ story: GOLDEN_STORY, relationship: 'father' })
   const badBody = (await bad.json()) as { error: string }
   check('api: unknown relationship → 400 listing the allowed codes', bad.status === 400 && badBody.error.includes('relationship') && badBody.error.includes('parent_father'), JSON.stringify(badBody))
-  check('api: unknown language → 400', (await post({ story: GOLDEN_STORY, language: 'en' })).status === 400)
+  check('api: unknown language → 400', (await post({ story: GOLDEN_STORY, language: 'fr' })).status === 400)
   check('api: bare "zh" is rejected — use zh-Hans or zh-Hant', (await post({ story: GOLDEN_STORY, language: 'zh' })).status === 400)
   check('api: unknown inscription_script → 400', (await post({ story: GOLDEN_STORY, language: 'zh-Hans', inscription_script: 'hant' })).status === 400)
   const nZh = seen.length

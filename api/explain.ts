@@ -1,6 +1,6 @@
 // On-demand Stage-B explanation for the chosen candidate (build spec §5,
 // Condition B/C). Thin relay — no selection logic; wording lives in
-// engine/explain-prompt.ja.md and engine/explain-prompt.zh.md.
+// engine/explain-prompt.{ja,zh,en}.md.
 
 import type { VercelRequest, VercelResponse } from '@vercel/node'
 import { parseContext } from '../engine/contract.ts'

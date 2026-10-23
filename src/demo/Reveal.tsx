@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { AnimatePresence, motion, useReducedMotion } from 'framer-motion'
 import type { Candidate, Condition, EngineResult } from './types'
 import { log } from './logging'
-import { carvedGlyph, contextToPayload, type Copy, type GiftContext, type InscriptionScript, type UiLanguage } from './i18n'
+import { carvedGlyph, contextToPayload, isChineseUi, type Copy, type GiftContext, type InscriptionScript, type UiLanguage } from './i18n'
 
 // Progressive reveal (build spec §8) + condition presentation (§5) + the
 // behavioral instrumentation that makes this an experiment (§6).
@@ -62,7 +62,7 @@ export default function Reveal({ result, story, condition, copy, context, diagno
   // The engine's echo is authoritative for what was actually run; fall back to the form state.
   const language: UiLanguage = result.language ?? context.language
   const script: InscriptionScript | null =
-    language === 'ja' ? null : (result.inscription_script ?? context.inscriptionScript)
+    isChineseUi(language) ? (result.inscription_script ?? context.inscriptionScript) : null
   const reduceMotion = useReducedMotion()
 
   const { revealOrder, eliminated } = useMemo(() => {
@@ -174,6 +174,7 @@ export default function Reveal({ result, story, condition, copy, context, diagno
             kanji: c.kanji,
             inscription_form: c.inscription_form,
             reading: c.reading,
+            meaning: c.meaning ?? null,
             one_line_gaze: c.one_line_gaze,
             story_anchor: c.story_anchor,
           },

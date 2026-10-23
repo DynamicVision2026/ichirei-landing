@@ -8,6 +8,7 @@ import {
   RELATIONSHIP_CODES,
   UI_LANGUAGES,
   contextComplete,
+  isChineseUi,
   type Copy,
   type GiftContext,
 } from './i18n'
@@ -244,7 +245,7 @@ export default function Elicitation({
             />
           </label>
         </div>
-        {showInscriptionScript && context.language !== 'ja' && (
+        {showInscriptionScript && isChineseUi(context.language) && (
           <div className="mt-4 flex flex-wrap items-center gap-2" role="group" aria-label={copy.inscriptionScriptLabel}>
             <span className="font-label mr-1 text-[11px] text-ivory/60">{copy.inscriptionScriptLabel}</span>
             {(['traditional', 'simplified'] as const).map((sc) => (

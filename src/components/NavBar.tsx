@@ -25,21 +25,21 @@ export default function NavBar() {
           : 'border-b border-transparent bg-transparent'
       }`}
     >
-      <div className="mx-auto flex max-w-6xl items-center justify-between px-6 py-4 sm:px-10">
-        <div className="flex items-baseline gap-2">
+      <div className="mx-auto flex max-w-6xl items-center justify-between gap-3 px-6 py-4 sm:px-10">
+        <div className="flex shrink-0 items-baseline gap-2 whitespace-nowrap">
           <span className="font-mincho text-lg tracking-wide text-ivory">{copy.brand}</span>
           <span className="font-label text-xs tracking-[0.25em] text-gold">
             ICHIREI
           </span>
         </div>
 
-        <div className="flex items-center gap-6">
+        <div className="flex items-center gap-3 sm:gap-6">
           <nav
             aria-label={copy.nav.languageLabel}
-            className="font-label flex items-center gap-2 text-xs tracking-[0.15em] text-ivory/70"
+            className="font-label flex items-center gap-1.5 text-xs tracking-[0.05em] whitespace-nowrap text-ivory/70 sm:gap-2 sm:tracking-[0.15em]"
           >
             {UI_LANGUAGES.map((l, k) => (
-              <span key={l} className="flex items-center gap-2">
+              <span key={l} className="flex items-center gap-1.5 sm:gap-2">
                 {k > 0 && <span className="text-ivory/30">/</span>}
                 <button
                   type="button"
@@ -57,7 +57,7 @@ export default function NavBar() {
           <button
             type="button"
             onClick={() => document.getElementById('story-input')?.scrollIntoView({ behavior: 'smooth' })}
-            className="font-label rounded-full border border-gold/40 px-4 py-1.5 text-xs tracking-[0.1em] text-ivory transition-colors hover:border-gold hover:bg-gold/10"
+            className="font-label hidden rounded-full border border-gold/40 px-4 py-1.5 sm:inline-block text-xs tracking-[0.1em] text-ivory transition-colors hover:border-gold hover:bg-gold/10"
           >
             {copy.nav.cta}
           </button>

@@ -1,4 +1,4 @@
-// Landing-page copy (v5): all occasions, any relationship, in ja / zh-Hans / zh-Hant.
+// Landing-page copy (v5): all occasions, any relationship, in ja / zh-Hans / zh-Hant / en.
 // Same setup as /demo (src/demo/i18n.ts): plain TS with no imports beyond a type, one Copy per
 // language, shape-checked by scripts/test-landing-copy.ts.
 //
@@ -8,18 +8,20 @@
 //  - the AI stays invisible: no mention of AI, models, algorithms or "reading by a machine";
 //  - the SENDER chooses and the character mirrors the SENDER's gaze — never "the receiver
 //    picks their own kanji", never "they will love it";
-//  - the thesis line is kept verbatim in Japanese.
+//  - the thesis line is kept verbatim in Japanese (the English line is its own rendering);
+//  - en: the character is Japanese and carved in Japan; the English page never promises a
+//    translation of a word, only one character that is yours.
 //
 // The write → choose → order flow (src/demo/*) has its own copy in src/demo/i18n.ts.
 //
-// The zh-Hans / zh-Hant text is a first draft for native-speaker review (see the report).
+// The zh-Hans / zh-Hant / en text is a first draft for native-speaker review (see the report).
 
 import type { UiLanguage } from '../demo/i18n.ts'
 
 export interface LandingCopy {
   documentTitle: string
   documentDescription: string
-  /** The brand in the language's own script (一字礼 / 一字禮). */
+  /** The brand in the language's own script (一字礼 / 一字禮; en keeps 一字礼). */
   brand: string
   nav: { languageLabel: string; languages: Record<UiLanguage, string>; cta: string }
   hero: { eyebrow: string; title: string; subtitle: string; cta: string }
@@ -34,7 +36,7 @@ const ja: LandingCopy = {
   brand: '一字礼',
   nav: {
     languageLabel: '言語',
-    languages: { ja: '日本語', 'zh-Hans': '简体', 'zh-Hant': '繁體' },
+    languages: { ja: '日本語', 'zh-Hans': '简体', 'zh-Hant': '繁體', en: 'English' },
     cta: 'はじめる',
   },
   hero: {
@@ -73,7 +75,7 @@ const zhHans: LandingCopy = {
   brand: '一字礼',
   nav: {
     languageLabel: '语言',
-    languages: { ja: '日本語', 'zh-Hans': '简体', 'zh-Hant': '繁體' },
+    languages: { ja: '日本語', 'zh-Hans': '简体', 'zh-Hant': '繁體', en: 'English' },
     cta: '开始',
   },
   hero: {
@@ -105,7 +107,7 @@ const zhHant: LandingCopy = {
   brand: '一字禮',
   nav: {
     languageLabel: '語言',
-    languages: { ja: '日本語', 'zh-Hans': '简体', 'zh-Hant': '繁體' },
+    languages: { ja: '日本語', 'zh-Hans': '简体', 'zh-Hant': '繁體', en: 'English' },
     cta: '開始',
   },
   hero: {
@@ -131,4 +133,44 @@ const zhHant: LandingCopy = {
   },
 }
 
-export const LANDING_COPY: Record<UiLanguage, LandingCopy> = { ja, 'zh-Hans': zhHans, 'zh-Hant': zhHant }
+const en: LandingCopy = {
+  documentTitle: 'ICHIREI 一字礼 — A Gift of One Character',
+  documentDescription:
+    'ICHIREI (一字礼) — the person you see, in a single Japanese character. A gift of one kanji for someone who matters, carved in Japan.',
+  brand: '一字礼',
+  nav: {
+    languageLabel: 'Language',
+    languages: { ja: '日本語', 'zh-Hans': '简体', 'zh-Hant': '繁體', en: 'English' },
+    cta: 'Begin',
+  },
+  hero: {
+    eyebrow: 'A Gift of One Character',
+    title: 'One character, as a gift',
+    subtitle: 'The person you see, in a single Japanese character, carved in Japan.',
+    cta: 'Find the character',
+  },
+  marquee: { phrase: '一字礼 ・ ICHIREI ・ A Gift of One Character ・ ', label: '一字礼 ICHIREI A Gift of One Character' },
+  resonance: {
+    lines: [
+      "You've watched them for years.",
+      'Words always fall short.',
+      "A line in a card can't hold it.",
+      'What if you could say them in a single character?',
+      'It could only be the one you choose.',
+    ],
+    thesis: "Your feeling doesn't have to be put into words. One character can show how you see them.",
+  },
+  process: {
+    label: 'The Process',
+    steps: [
+      'Write about them',
+      'Your words, read closely',
+      'A character appears',
+      'Six candidates',
+      'You choose',
+      'The character becomes a gift',
+    ],
+  },
+}
+
+export const LANDING_COPY: Record<UiLanguage, LandingCopy> = { ja, 'zh-Hans': zhHans, 'zh-Hant': zhHant, en }

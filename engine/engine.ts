@@ -2,7 +2,7 @@
 //
 // Cardinal rule (build spec §2): this file contains ZERO selection logic. All of
 // the reasoning lives in the prompt files (engine/prompt.ja.md; engine/prompt.zh.md for
-// both zh-Hans and zh-Hant),
+// both zh-Hans and zh-Hant; engine/prompt.en.md),
 // loaded at request time. This module only:
 //   1. loads the prompt file for the requested language,
 //   2. injects the context (language, relationship, direction, occasion, occasion_detail) and the
@@ -20,11 +20,11 @@ import { applyPalette, loadPalette } from './palette.ts'
 import {
   DEFAULT_CONTEXT,
   displayScriptOf,
-  familyOf,
+  promptFamilyOf,
   parseContext,
   type EngineContext,
   type EngineResult,
-  type Family,
+  type PromptFamily,
   type Language,
 } from './contract.ts'
 
@@ -58,19 +58,19 @@ export const SCRIPT_SLOTS = {
 /** What the prompt sees when a context value was not supplied. */
 const UNSPECIFIED = 'unspecified'
 
-const cachedPrompts = new Map<Family, string>()
+const cachedPrompts = new Map<PromptFamily, string>()
 
 /** One prompt file per FAMILY: zh-Hans and zh-Hant both use prompt.zh.md. */
 export function promptFileName(language: Language): string {
-  return `prompt.${familyOf(language)}.md`
+  return `prompt.${promptFamilyOf(language)}.md`
 }
 
 function resolvePromptPath(language: Language): string {
-  // ICHIREI_PROMPT_PATH overrides the location; "{lang}" in it is replaced by ja/zh,
+  // ICHIREI_PROMPT_PATH overrides the location; "{lang}" in it is replaced by ja/zh/en,
   // e.g. /prompts/experiment/prompt.{lang}.md. Without "{lang}" the same file is used
   // for every language (an explicit A/B override — mind the language).
   const override = process.env.ICHIREI_PROMPT_PATH
-  if (override) return override.split('{lang}').join(familyOf(language))
+  if (override) return override.split('{lang}').join(promptFamilyOf(language))
 
   // Try, in order: next to this file (bundled), and cwd-relative (vercel dev / local).
   const file = promptFileName(language)
@@ -92,7 +92,7 @@ function resolvePromptPath(language: Language): string {
 export function loadPrompt(language: Language): string {
   // Read fresh unless explicitly caching, so prompt edits take effect without
   // touching code. Set ICHIREI_CACHE_PROMPT=1 to read once per process per language.
-  const family = familyOf(language)
+  const family = promptFamilyOf(language)
   const cached = cachedPrompts.get(family)
   if (process.env.ICHIREI_CACHE_PROMPT === '1' && cached) return cached
   const path = resolvePromptPath(language)

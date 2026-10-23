@@ -1,13 +1,14 @@
 /// <reference lib="dom" />
-// The sender's language (ja | zh-Hans | zh-Hant), shared by the landing page and /demo.
+// The sender's language (ja | zh-Hans | zh-Hant | en), shared by the landing page and /demo.
 // A tiny external store (no React import, so Node tests can load it): the choice is kept in
-// localStorage, can be forced with ?lang=, and otherwise follows the browser for Chinese and
-// falls back to Japanese. React reads it through src/useLanguage.ts.
+// localStorage, can be forced with ?lang=, and otherwise follows the browser for Chinese only and
+// falls back to Japanese (Japan first: an English browser is NOT switched to English automatically —
+// English is reached with ?lang=en or the nav switch). React reads it through src/useLanguage.ts.
 
 import type { UiLanguage } from './demo/i18n.ts'
 
 const KEY = 'ichirei.lang'
-const VALID: readonly UiLanguage[] = ['ja', 'zh-Hans', 'zh-Hant']
+const VALID: readonly UiLanguage[] = ['ja', 'zh-Hans', 'zh-Hant', 'en']
 
 const isLang = (v: unknown): v is UiLanguage => typeof v === 'string' && (VALID as readonly string[]).includes(v)
 

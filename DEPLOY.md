@@ -171,7 +171,7 @@ Orders contain **personal data** (names, the sender's story): keep the bucket pr
 
 ## Editing the engine prompt
 
-`engine/prompt.ja.md` and `engine/prompt.zh.md` (and `engine/explain-prompt.ja.md` / `engine/explain-prompt.zh.md`) are plain text read at request time. Edit → commit → push to the trigger's branch → Cloud Build rebuilds and redeploys automatically (~4–6 min). No code changes. (Editing on github.com in the browser works fine.)
+`engine/prompt.ja.md`, `engine/prompt.zh.md` and `engine/prompt.en.md` (and `engine/explain-prompt.ja.md` / `.zh.md` / `.en.md`) are plain text read at request time. Edit → commit → push to the trigger's branch → Cloud Build rebuilds and redeploys automatically (~4–6 min). No code changes. (Editing on github.com in the browser works fine.)
 
 ## Changing the timeout
 

@@ -1,6 +1,6 @@
-// Front-end copy for /demo in the three launch languages (v5, Step 3).
+// Front-end copy for /demo in the four languages (ja, zh-Hans, zh-Hant, en).
 //
-// The language the sender picks (ja | zh-Hans | zh-Hant) is both the engine language and the
+// The language the sender picks (ja | zh-Hans | zh-Hant | en) is both the engine language and the
 // language of this UI. Copy is occasion-neutral: nothing here assumes a 60th birthday — the
 // occasion comes from the selector (and the optional occasion_detail field). The one place
 // 還暦 may appear is as an EXAMPLE value in the occasion_detail placeholder (EXAMPLE_KEYS).
@@ -8,14 +8,17 @@
 // Plain TS with no imports, so the Node tests can load it. The code lists below mirror
 // engine/contract.ts (src/ and engine/ compile separately); scripts/test-copy.ts keeps them in sync.
 
-export type UiLanguage = 'ja' | 'zh-Hans' | 'zh-Hant'
+export type UiLanguage = 'ja' | 'zh-Hans' | 'zh-Hant' | 'en'
 export type InscriptionScript = 'traditional' | 'simplified'
 export type Condition = 'A' | 'B' | 'C'
 export type PackageId = 'simple' | 'standard'
 export type InscriptionStyle = 'kyujitai' | 'modern' | 'traditional' | 'simplified'
 export type OrderField = 'sender_name' | 'receiver_name' | 'delivery_date' | 'inscription_style' | 'package'
 
-export const UI_LANGUAGES: readonly UiLanguage[] = ['ja', 'zh-Hans', 'zh-Hant']
+export const UI_LANGUAGES: readonly UiLanguage[] = ['ja', 'zh-Hans', 'zh-Hant', 'en']
+
+/** zh-Hans / zh-Hant: the only languages with a choice of inscription script. */
+export const isChineseUi = (l: UiLanguage | undefined): boolean => l === 'zh-Hans' || l === 'zh-Hant'
 export const RELATIONSHIP_CODES = [
   'parent_mother', 'parent_father', 'child', 'grandparent', 'spouse', 'romance', 'sibling',
   'friend', 'work', 'pet', 'in_law', 'mentor', 'community',
@@ -110,7 +113,7 @@ export interface Copy {
   finalized: (kanji: string) => string
   chooseHint: string
   /** The line under the carved glyph: the other form (+ reading). */
-  glyphReading: (c: { kanji: string; inscription_form: string | null; reading: string }, carved: string) => string
+  glyphReading: (c: { kanji: string; inscription_form: string | null; reading: string; meaning?: string | null }, carved: string) => string
   /** Small note under the glyph about which form is carved. */
   inscriptionNote: (c: { kanji: string; inscription_form: string | null }, script: InscriptionScript | null) => string | null
   previewNote: (c: { inscription_form: string | null }, script: InscriptionScript | null) => string | null
@@ -522,21 +525,154 @@ const zhHant: Copy = {
   },
 }
 
-export const COPY: Record<UiLanguage, Copy> = { ja, 'zh-Hans': zhHans, 'zh-Hant': zhHant }
+// English. The sender writes in English; the character is Japanese and carved in Japan, so the UI
+// shows the Japanese form (kyūjitai where one exists), romaji readings and an English core meaning.
+// Draft for native-speaker review.
+const en: Copy = {
+  languageName: 'English',
+  languageLabel: 'Language',
+  contextHeading: 'The gift',
+  relationshipLabel: 'This person is your',
+  directionLabel: 'Direction of the gift',
+  occasionLabel: 'Occasion',
+  occasionDetailLabel: 'Which milestone? (optional)',
+  occasionDetailPlaceholder: 'e.g. 60th birthday, turning 30, 10 years married',
+  inscriptionScriptLabel: 'Carved form',
+  inscriptionScripts: { traditional: 'Traditional', simplified: 'Simplified' },
+  choose: 'Please choose',
+  contextMissing: 'Choose the relationship, direction and occasion to begin.',
+  relationships: {
+    parent_mother: 'Mother',
+    parent_father: 'Father',
+    child: 'Son or daughter',
+    grandparent: 'Grandparent',
+    spouse: 'Husband or wife',
+    romance: 'Partner',
+    sibling: 'Brother or sister',
+    friend: 'Friend',
+    work: 'Colleague, boss or teammate',
+    pet: 'Companion animal',
+    in_law: 'In-law',
+    mentor: 'Teacher or mentor',
+    community: 'Neighbour or community member',
+  },
+  directions: {
+    up: 'To someone older or senior (parent, mentor, boss)',
+    down: 'To someone younger or in your care (child, junior)',
+    across: 'Between equals (partner, friend, sibling)',
+  },
+  occasions: {
+    birthday_milestone: 'Birthday or milestone age',
+    wedding: 'Wedding or anniversary',
+    new_baby: 'New baby',
+    school_career: 'School, graduation or career step',
+    retirement_farewell: 'Retirement or farewell',
+    parent_day: "Mother's Day, Father's Day and the like",
+    seasonal_thanks: 'Seasonal or year-end thanks',
+  },
+  openingAsk: "You don't have to write everything about them. Just one small thing that is so like them.",
+  voiceStart: 'Speak instead',
+  voiceListening: 'Listening… tap to stop',
+  voiceUnsupported: 'This browser does not support voice input — please write below',
+  storyPlaceholder: 'For example — they always sat in the same spot and drank tea from the same cup…',
+  anglesHeading: 'Ways in',
+  angles: [
+    'A habit or a phrase they always use',
+    'The time they helped you',
+    'Something they made or mended',
+    'A place that is always theirs',
+    'Something they did without ever saying so',
+  ],
+  anglePlaceholder: 'Whatever comes to mind, just as it comes.',
+  angleAdd: 'Add to the story',
+  submit: 'Find the one character',
+  speechLang: 'en-US',
+  processingTitle: 'Reading your words…',
+  processingWait: 'The deeper the reading, the longer it takes (about one to two minutes).',
+  processingProgress: (n) => `The characters are taking shape … ${n}`,
+  followUpHeading: 'Tell us a little more',
+  followUpPlaceholder: 'Whatever you remember, just as it comes.',
+  followUpSubmit: 'Keep looking',
+  thinTitle: "What you've written isn't yet enough to find a character that belongs to this person alone.",
+  thinBody:
+    'Rather than hand you a character that could fit anyone, we would ask you to remember one more small gesture or habit of theirs and come back. That honesty is part of the ritual.',
+  thinBack: 'Back to the story',
+  tryAgain: 'Try again',
+  exportLog: 'Export log',
+  rawContract: 'raw contract (diagnostics)',
+  serverError: (s) => `Server error (HTTP ${s})`,
+  streamCut: 'The engine’s reply was cut off (possibly a server-side timeout).',
+  timeout: (s) =>
+    `The result did not arrive in time (${s} seconds). Please try again; if it keeps happening it may be a server-side limit.`,
+  revealIntro: 'One character at a time, they rise out of your words. Touch the one that draws you.',
+  selectThis: 'Choose this character',
+  selectedThis: 'This character is chosen',
+  explainButton: 'Read this character more deeply',
+  explainLoading: 'Reading…',
+  previewButton: 'See it as an object (preview)',
+  close: 'Close',
+  eliminatedSummary: (n) => `Characters set aside (${n}) — diagnostics`,
+  finalizeButton: 'Give this character',
+  finalized: (k) => `“${k}” is chosen`,
+  chooseHint: 'Open a character and press “Choose this character” to decide',
+  glyphReading: (c, carved) =>
+    `${c.inscription_form && carved !== c.kanji ? `${c.kanji} · ` : ''}${c.reading}${c.meaning ? ` — ${c.meaning}` : ''}`,
+  inscriptionNote: (c) => (c.inscription_form ? `Carved in the old form, kyūjitai (modern form: ${c.kanji})` : null),
+  previewNote: (c) => (c.inscription_form ? 'Carved in the old form, kyūjitai' : null),
+  noPrimaryTitle: 'No character is left that can stand as “the one”.',
+  noPrimaryBody:
+    'Of the characters found, those unsuited to this occasion (for instance with an unlucky meaning or sound in Japanese) were set aside, and none that could be the centre remained. Add one more small moment you shared with them and try again.',
+  noPrimaryRemoved: 'Set aside',
+  noPrimaryKept: 'Remaining (cannot be the centre)',
+  order: {
+    heading: 'Your order',
+    chosenLabel: 'The character you chose',
+    senderLabel: 'Your name (the sender)',
+    senderPlaceholder: 'e.g. Emily Carter',
+    receiverLabel: 'Name of the person receiving it',
+    receiverPlaceholder: 'e.g. Margaret Carter',
+    dateLabel: 'Requested delivery date',
+    dateNotice: (n) => `${n} ${n === 1 ? 'day' : 'days'} until your requested delivery date.`,
+    inscriptionLabel: 'Carved form',
+    inscriptionStyles: {
+      kyujitai: 'Old form (kyūjitai)',
+      modern: 'Modern form',
+      traditional: 'Traditional',
+      simplified: 'Simplified',
+    },
+    inscriptionSame: 'This character is written the same in its old and modern forms.',
+    packageLabel: 'Package',
+    packages: { simple: 'Simple', standard: 'Standard' },
+    certificateLabel: 'The line that comes with it',
+    privacy: 'When you order, we keep the names, the story and the character you chose, so that your piece can be made.',
+    submit: 'Continue to payment',
+    submitting: 'Preparing…',
+    redirecting: 'Taking you to payment…',
+    back: 'Choose a different character',
+    errors: {
+      generic: 'We could not take your order. Please try again.',
+      network: 'The connection failed. Please try again.',
+      notConfigured: 'Orders are not available right now. Please try again a little later.',
+      field: (f) => `Please check “${{ sender_name: 'Your name', receiver_name: 'Name of the person receiving it', delivery_date: 'Requested delivery date', inscription_style: 'Carved form', package: 'Package' }[f]}”.`,
+    },
+  },
+}
+
+export const COPY: Record<UiLanguage, Copy> = { ja, 'zh-Hans': zhHans, 'zh-Hant': zhHant, en }
 
 /** Copy keys whose text may mention 還暦: an EXAMPLE value, never a premise. */
 export const EXAMPLE_KEYS: readonly (keyof Copy)[] = ['occasionDetailPlaceholder']
 
 /**
  * The glyph to carve for a candidate, given the language and the chosen inscription script.
- * ja: the kyūjitai form when one exists. zh: `inscription_form` is TRADITIONAL, `kanji` SIMPLIFIED.
+ * ja and en: the kyūjitai form when one exists. zh: `inscription_form` is TRADITIONAL, `kanji` SIMPLIFIED.
  */
 export function carvedGlyph(
   c: { kanji: string; inscription_form: string | null },
   language: UiLanguage | undefined,
   script: InscriptionScript | null | undefined,
 ): string {
-  if (language && language !== 'ja' && script === 'simplified') return c.kanji
+  if (isChineseUi(language) && script === 'simplified') return c.kanji
   return c.inscription_form ?? c.kanji
 }
 
@@ -548,7 +684,7 @@ export function contextToPayload(ctx: GiftContext): Record<string, string> {
   if (ctx.occasion) out.occasion = ctx.occasion
   const detail = ctx.occasionDetail.replace(/\s+/g, ' ').trim()
   if (detail) out.occasion_detail = detail
-  if (ctx.language !== 'ja') out.inscription_script = ctx.inscriptionScript
+  if (isChineseUi(ctx.language)) out.inscription_script = ctx.inscriptionScript
   return out
 }
 

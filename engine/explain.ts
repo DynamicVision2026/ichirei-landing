@@ -1,6 +1,6 @@
 // Stage-B explanation plumbing (Condition B/C, build spec §5).
 // Same cardinal rule as engine.ts: the wording lives in the explain-prompt files
-// (engine/explain-prompt.ja.md, engine/explain-prompt.zh.md — swappable text assets; zh-Hans
+// (engine/explain-prompt.ja.md, engine/explain-prompt.zh.md, engine/explain-prompt.en.md — swappable text assets; zh-Hans
 // and zh-Hant share the zh file and differ only by the display_script slot). This module
 // only loads, injects, calls, returns.
 
@@ -11,7 +11,7 @@ import { fileURLToPath } from 'node:url'
 import {
   DEFAULT_CONTEXT,
   displayScriptOf,
-  familyOf,
+  promptFamilyOf,
   parseContext,
   type EngineContext,
   type Language,
@@ -27,9 +27,11 @@ export interface ExplainCandidate {
   story_anchor: string
   /** zh only: the TRADITIONAL form (null/absent = same as `kanji`). */
   inscription_form?: string | null
+  /** en only: the character's core meaning in English (null/absent for ja and zh). */
+  meaning?: string | null
 }
 
-/** Slots every explain prompt must contain; the zh prompt additionally needs the script slots. */
+/** Slots every explain prompt must contain; the zh prompt additionally needs the script slots and the en prompt the meaning slots. */
 export const EXPLAIN_SLOTS = {
   story: '{{ STORY }}',
   kanji: '{{ KANJI }}',
@@ -47,15 +49,22 @@ export const EXPLAIN_ZH_SLOTS = {
   inscription_form: '{{ INSCRIPTION_FORM }}',
 } as const
 
+/** Extra slots the English explain prompt must contain: the English meaning, the language and the carved form. */
+export const EXPLAIN_EN_SLOTS = {
+  language: '{{ LANGUAGE }}',
+  meaning: '{{ MEANING }}',
+  inscription_form: '{{ INSCRIPTION_FORM }}',
+} as const
+
 const UNSPECIFIED = 'unspecified'
 
 export function explainPromptFileName(language: Language): string {
-  return `explain-prompt.${familyOf(language)}.md`
+  return `explain-prompt.${promptFamilyOf(language)}.md`
 }
 
-/** Load the explain prompt for a language (ICHIREI_EXPLAIN_PROMPT_PATH may override; "{lang}" → ja/zh). */
+/** Load the explain prompt for a language (ICHIREI_EXPLAIN_PROMPT_PATH may override; "{lang}" → ja/zh/en). */
 export function loadExplainPrompt(language: Language = 'ja'): string {
-  const family = familyOf(language)
+  const family = promptFamilyOf(language)
   const file = explainPromptFileName(language)
   const override = process.env.ICHIREI_EXPLAIN_PROMPT_PATH
   const here = dirname(fileURLToPath(import.meta.url))
@@ -74,7 +83,10 @@ export function loadExplainPrompt(language: Language = 'ja'): string {
     }
   }
   if (text === null) throw new Error(`engine/${file} not found`)
-  const required = [...Object.values(EXPLAIN_SLOTS), ...(family === 'zh' ? Object.values(EXPLAIN_ZH_SLOTS) : [])]
+  const required = [
+    ...Object.values(EXPLAIN_SLOTS),
+    ...(family === 'zh' ? Object.values(EXPLAIN_ZH_SLOTS) : family === 'en' ? Object.values(EXPLAIN_EN_SLOTS) : []),
+  ]
   const missing = required.filter((slot) => !text.includes(slot))
   if (missing.length > 0) throw new Error(`${file} is missing slot(s) ${missing.join(', ')} (looked at ${path})`)
   return text
@@ -100,6 +112,7 @@ export function fillExplainPrompt(
     [EXPLAIN_ZH_SLOTS.language, context.language],
     [EXPLAIN_ZH_SLOTS.display_script, displayScriptOf(context.language) ?? UNSPECIFIED],
     [EXPLAIN_ZH_SLOTS.inscription_form, candidate.inscription_form || candidate.kanji],
+    [EXPLAIN_EN_SLOTS.meaning, candidate.meaning || UNSPECIFIED],
   ])
   const pattern = new RegExp([...values.keys()].map((s) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')).join('|'), 'g')
   return template.replace(pattern, (slot) => values.get(slot) as string)

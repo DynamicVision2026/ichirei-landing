@@ -15,6 +15,8 @@ export type TruthType =
 export interface Candidate {
   kanji: string
   reading: string
+  /** en only: the character's core meaning in English. */
+  meaning?: string | null
   inscription_form: string | null
   truth_type: TruthType
   one_line_gaze: string
@@ -36,7 +38,7 @@ export interface Fingerprint {
 }
 
 export interface EngineResult {
-  language?: 'ja' | 'zh-Hans' | 'zh-Hant'
+  language?: 'ja' | 'zh-Hans' | 'zh-Hant' | 'en'
   inscription_script?: 'traditional' | 'simplified' | null
   relationship?: string | null
   direction?: 'up' | 'down' | 'across' | null

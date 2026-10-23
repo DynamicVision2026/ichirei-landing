@@ -1,8 +1,8 @@
 // The JSON contract the engine returns and the frontend consumes.
-// Kept in sync with the OUTPUT CONTRACT appendix in engine/prompt.ja.md and
-// engine/prompt.zh.md, and with src/demo/types.ts (the frontend copy).
+// Kept in sync with the OUTPUT CONTRACT appendix in engine/prompt.ja.md,
+// engine/prompt.zh.md and engine/prompt.en.md, and with src/demo/types.ts (the frontend copy).
 //
-// v5: ICHIREI covers all relationships and occasions, in Japanese and Chinese.
+// v5: ICHIREI covers all relationships and occasions, in Japanese, Chinese and English.
 // The code lists below are the ONLY place the allowed values are enumerated in
 // code; what each code MEANS lives in the prompt files (cardinal rule).
 
@@ -12,14 +12,25 @@
  * ja = Japanese. zh-Hans / zh-Hant = Mandarin Chinese with SIMPLIFIED / TRADITIONAL
  * display text. Both Chinese codes share one prompt file (prompt.zh.md) and one set
  * of palette rows ("zh") — only the script of the output text differs.
+ * en = English-speaking sender: the story and all explanatory text are English, but the
+ * character is still Japanese (carved in Japan), so en uses the ja palette rows.
  */
-export const LANGUAGES = ['ja', 'zh-Hans', 'zh-Hant'] as const
+export const LANGUAGES = ['ja', 'zh-Hans', 'zh-Hant', 'en'] as const
 export type Language = (typeof LANGUAGES)[number]
 
-/** Which prompt file / which palette rows serve a language: ja → "ja"; zh-Hans and zh-Hant → "zh". */
+/** Which palette rows serve a language: ja and en → "ja"; zh-Hans and zh-Hant → "zh". */
 export const FAMILIES = ['ja', 'zh'] as const
 export type Family = (typeof FAMILIES)[number]
-export const familyOf = (language: Language): Family => (language === 'ja' ? 'ja' : 'zh')
+export const familyOf = (language: Language): Family => (language === 'zh-Hans' || language === 'zh-Hant' ? 'zh' : 'ja')
+
+/** Which prompt files serve a language: one per language family (zh-Hans and zh-Hant share "zh"; en has its own). */
+export const PROMPT_FAMILIES = ['ja', 'zh', 'en'] as const
+export type PromptFamily = (typeof PROMPT_FAMILIES)[number]
+export const promptFamilyOf = (language: Language): PromptFamily =>
+  language === 'en' ? 'en' : language === 'ja' ? 'ja' : 'zh'
+
+/** True for zh-Hans / zh-Hant — the only languages with an inscription_script. */
+export const isChinese = (language: Language): boolean => familyOf(language) === 'zh'
 
 /** Script of the customer-facing text. null for ja (not applicable). */
 export type Script = 'simplified' | 'traditional'
@@ -70,7 +81,7 @@ export interface EngineContext {
   occasion: Occasion | null
   /** Optional free text refining the occasion, e.g. "還暦", "30歳", "結婚10年". Never validated against a list. */
   occasion_detail: string | null
-  /** Chinese only: traditional (default) or simplified. Always null for ja — not applicable there. */
+  /** Chinese only: traditional (default) or simplified. Always null for ja and en — not applicable there. */
   inscription_script: InscriptionScript | null
 }
 
@@ -147,8 +158,8 @@ export function parseContext(input: {
       direction: direction.value,
       occasion: occasion.value,
       occasion_detail: occasionDetail,
-      // Chinese: the supplied script, else traditional. ja: not applicable, so a supplied value is ignored.
-      inscription_script: resolvedLanguage === 'ja' ? null : (script.value ?? DEFAULT_INSCRIPTION_SCRIPT),
+      // Chinese: the supplied script, else traditional. ja and en: not applicable, so a supplied value is ignored.
+      inscription_script: isChinese(resolvedLanguage) ? (script.value ?? DEFAULT_INSCRIPTION_SCRIPT) : null,
     },
   }
 }
@@ -265,8 +276,13 @@ export interface RefereeReport {
 export interface Candidate {
   /** ja: modern Japanese form. zh (both scripts): the SIMPLIFIED form — the palette key. */
   kanji: string
-  /** ja: hiragana. zh: pinyin with tone marks. */
+  /** ja: hiragana. zh: pinyin with tone marks. en: romaji, on and kun labelled (e.g. "on: tō · kun: akari"). */
   reading: string
+  /**
+   * en only: the core meaning of the character in English (a short phrase), shown beside the
+   * romaji reading. Absent/null for ja and zh. Required (non-empty) on en results.
+   */
+  meaning?: string | null
   /**
    * The inscription form when it differs from `kanji`: ja = kyūjitai (旧字体);
    * zh = TRADITIONAL form. null when identical. Same name and meaning as the
@@ -352,8 +368,8 @@ export function validateEngineResult(raw: unknown): string[] {
 
   const script = (r as Record<string, unknown>).inscription_script
   if (script === undefined) problems.push('inscription_script missing')
-  else if (r.language === 'ja' && script !== null) problems.push('inscription_script must be null for ja')
-  else if (r.language !== 'ja' && !(INSCRIPTION_SCRIPTS as readonly string[]).includes(script as string)) problems.push('inscription_script must be traditional|simplified for Chinese')
+  else if (r.language && !isChinese(r.language) && script !== null) problems.push('inscription_script must be null for ja and en')
+  else if (r.language && isChinese(r.language) && !(INSCRIPTION_SCRIPTS as readonly string[]).includes(script as string)) problems.push('inscription_script must be traditional|simplified for Chinese')
 
   const detail = (r as Record<string, unknown>).occasion_detail
   if (detail === undefined) problems.push('occasion_detail missing')
@@ -381,6 +397,8 @@ export function validateEngineResult(raw: unknown): string[] {
       if (typeof c?.[k] !== 'string' || !c[k]) problems.push(`${at}.${k} missing`)
     }
     if (c?.inscription_form !== null && typeof c?.inscription_form !== 'string') problems.push(`${at}.inscription_form must be string|null`)
+    if (r.language === 'en' && (typeof c?.meaning !== 'string' || !c.meaning.trim())) problems.push(`${at}.meaning missing (required for en)`)
+    if (c?.meaning !== undefined && c.meaning !== null && typeof c.meaning !== 'string') problems.push(`${at}.meaning must be string|null`)
     if (!TRUTH_TYPES.includes(c?.truth_type as TruthType)) problems.push(`${at}.truth_type invalid`)
     if (typeof c?.eliminated !== 'boolean') problems.push(`${at}.eliminated not boolean`)
     if (c?.eliminated && !c?.eliminated_reason) problems.push(`${at} eliminated without reason`)

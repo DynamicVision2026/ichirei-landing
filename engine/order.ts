@@ -182,6 +182,8 @@ export interface OrderRecord {
     glyph_to_carve: string
     inscription_style: InscriptionStyle
     reading: string
+    /** en orders: the character's English core meaning; null for ja and zh. */
+    meaning: string | null
     gaze_line: string
     story_anchor: string
     unique_truth: string
@@ -214,6 +216,7 @@ export function buildRecord(order: ValidOrder, orderRef: string, now: Date = new
       glyph_to_carve: order.glyph,
       inscription_style: order.inscription_style,
       reading: order.candidate.reading,
+      meaning: order.candidate.meaning ?? null,
       gaze_line: order.candidate.one_line_gaze,
       story_anchor: order.candidate.story_anchor,
       unique_truth: order.candidate.unique_truth ?? '',
