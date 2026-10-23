@@ -1,24 +1,12 @@
 import { motion, useReducedMotion } from 'framer-motion'
+import { useLanding } from '../landing/useLanding'
 
 const PAPER_SHADOW = 'shadow-[6px_10px_28px_rgba(0,0,0,0.45)]'
 
-const TIERS = [
-  {
-    name: '通常仕上げ',
-    lead: '10営業日',
-    price: '¥38,000',
-    note: '税込・送料込（価格は仮）',
-  },
-  {
-    name: '特急仕上げ',
-    lead: '3営業日',
-    price: '¥52,000',
-    note: '税込・送料込（価格は仮）',
-  },
-]
-
 export default function ConfirmationCeremony() {
   const reduceMotion = useReducedMotion()
+  const { copy } = useLanding()
+  const c = copy.confirmation
 
   return (
     <section
@@ -34,11 +22,17 @@ export default function ConfirmationCeremony() {
           className={`paper-texture flex aspect-[3/4] w-full max-w-sm flex-col items-center justify-center rounded-sm bg-paper ${PAPER_SHADOW}`}
         >
           <span className="font-mincho text-[11rem] leading-none text-cinnabar sm:text-[13rem]">
-            礼
+            {c.glyph}
           </span>
           <span className="font-label mt-8 text-xs tracking-[0.35em] text-gold">
-            れい — REI
+            {c.pair}
           </span>
+          <p
+            data-certificate
+            className="font-serif-jp mt-10 max-w-[19rem] px-4 text-center text-xs leading-relaxed text-balance text-ivory/60"
+          >
+            {c.certificate}
+          </p>
         </motion.div>
 
         <motion.div
@@ -54,7 +48,7 @@ export default function ConfirmationCeremony() {
             </span>
           </div>
           <p className="font-serif-jp text-xs text-ivory/40">
-            拓本の儀の映像を、後日ここに公開します。
+            {c.ceremonyCaption}
           </p>
         </motion.div>
 
@@ -66,21 +60,21 @@ export default function ConfirmationCeremony() {
           className="mt-20 flex flex-col items-center text-center"
         >
           <p className="font-mincho text-2xl leading-relaxed text-ivory sm:text-3xl">
-            この一字で、還暦を祝う。
+            {c.headline}
           </p>
           <p className="font-serif-jp mt-3 text-base text-ivory/70">
-            還暦の赤に、想いをのせて。
+            {c.subline}
           </p>
 
           <button
             type="button"
             className="font-label mt-12 rounded-full bg-cinnabar px-10 py-4 text-sm tracking-[0.15em] text-ivory shadow-[0_8px_30px_rgba(192,57,43,0.35)] transition-all hover:shadow-[0_8px_44px_rgba(192,57,43,0.5)] active:scale-[0.98]"
           >
-            この一字で、還暦を祝う
+            {c.cta}
           </button>
 
           <p className="font-serif-jp mt-8 text-sm leading-relaxed text-ivory/60">
-            還暦の日までにお届けします。制作には10営業日をいただいております。
+            {c.delivery}
           </p>
         </motion.div>
 
@@ -91,7 +85,7 @@ export default function ConfirmationCeremony() {
           transition={{ delay: 0.35, duration: 1 }}
           className="mt-16 grid w-full max-w-xl grid-cols-1 gap-6 sm:grid-cols-2"
         >
-          {TIERS.map((tier) => (
+          {c.tiers.map((tier) => (
             <div
               key={tier.name}
               className={`paper-texture flex flex-col items-center rounded-sm bg-paper px-6 py-8 text-center ${PAPER_SHADOW}`}

@@ -19,6 +19,7 @@ The cardinal rule: **the engine's reasoning is a swappable text asset, never cod
 | `engine/contract.ts` | The JSON contract, the allowed context codes, and `validateEngineResult` (used by tests/CLI, not in the runtime path). |
 | `engine/engine.ts`, `engine/explain.ts` | Pure plumbing: load the language's prompt → inject context + story → call model → parse JSON → stamp the request's context. Zero selection logic. |
 | `api/select.ts`, `api/explain.ts`, `api/log.ts` | Thin Vercel functions. The Anthropic key lives server-side only. |
+| `src/components/`, `src/landing/copy.ts`, `src/lang-store.ts` | The landing page, occasion-neutral and in ja / zh-Hans / zh-Hant (language switch in the nav, remembered, shared with `/demo`; `?lang=` overrides). All copy lives in `src/landing/copy.ts`; the zh text is a first draft awaiting native review. |
 | `src/demo/` | Harness UI: elicitation (§7) with language (ja / zh-Hans / zh-Hant), relationship, direction, occasion and optional occasion_detail selectors; progressive reveal (§8); condition toggle (§5); event logging (§6); a clear message when no eligible primary remains. All copy lives in `src/demo/i18n.ts` (occasion-neutral, three languages). |
 
 Conditions A/B/C change **presentation only** — one engine call per story, cached client-side.
@@ -52,6 +53,7 @@ npm run dev                                              # landing on /, harness
 npx tsc -b && npx tsc -p tsconfig.engine.json            # typecheck frontend + engine/api
 node --experimental-strip-types scripts/test-plumbing.ts # prompts, slots, palette header, contract validator — no key needed
 node --experimental-strip-types scripts/test-palette.ts  # referee rules (hard_block, anchor, promotion, zh scripts) — no key needed
+node --experimental-strip-types scripts/test-landing-copy.ts  # landing copy: three languages, neutral, AI invisible, sender chooses, exact brief lines
 node --experimental-strip-types scripts/test-copy.ts     # front-end copy: three languages, code coverage, occasion-neutral, right script
 node --experimental-strip-types scripts/test-palette-data.ts  # shape and completeness of the ~650 draft rows + review exports in sync
 node --experimental-strip-types scripts/test-engine-offline.ts   # real engine + API handler vs a fake model upstream — no key needed

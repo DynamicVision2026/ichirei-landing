@@ -1,11 +1,13 @@
 import { motion, useReducedMotion } from 'framer-motion'
 import InkParticleField from './InkParticleField'
 import InkWipeTitle from './InkWipeTitle'
+import { useLanding } from '../landing/useLanding'
 
 const EASE = [0.16, 1, 0.3, 1] as const
 
 export default function Hero() {
   const reduceMotion = useReducedMotion()
+  const { copy } = useLanding()
   const t = (delay: number, duration: number) =>
     reduceMotion ? { duration: 0 } : { delay, duration, ease: EASE }
 
@@ -25,7 +27,7 @@ export default function Hero() {
           transition={t(0.4, 1.4)}
           className="font-label text-[11px] uppercase text-gold/80"
         >
-          Kanreki — 60th Anniversary Commission
+          {copy.hero.eyebrow}
         </motion.p>
 
         <InkWipeTitle />
@@ -36,7 +38,7 @@ export default function Hero() {
           transition={t(3.7, 1)}
           className="font-serif-jp max-w-xl text-base leading-loose text-ivory/80 sm:text-lg"
         >
-          あなたの目に映る、その人の六十年を、一文字に。
+          {copy.hero.subtitle}
         </motion.p>
 
         <motion.div
@@ -48,7 +50,7 @@ export default function Hero() {
           <span className="font-label text-sm tracking-[0.4em] text-ivory/60">
             ICHIREI
           </span>
-          <span className="font-mincho text-xl text-gold">一字礼</span>
+          <span className="font-mincho text-xl text-gold">{copy.brand}</span>
         </motion.div>
 
         <motion.button
@@ -58,9 +60,10 @@ export default function Hero() {
           transition={t(4.4, 0.9)}
           whileHover={{ scale: 1.03 }}
           whileTap={{ scale: 0.98 }}
+          onClick={() => document.getElementById('story-input')?.scrollIntoView({ behavior: 'smooth' })}
           className="font-label mt-4 rounded-full bg-gold px-8 py-3.5 text-sm tracking-[0.15em] text-ink shadow-[0_8px_30px_rgba(201,169,110,0.25)] transition-shadow hover:shadow-[0_8px_40px_rgba(201,169,110,0.4)]"
         >
-          その一字を、探しにいく
+          {copy.hero.cta}
         </motion.button>
       </div>
 

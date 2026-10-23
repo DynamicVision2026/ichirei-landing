@@ -46,7 +46,7 @@ try {
   // Landing page paints from the served root-base bundle.
   await page.goto(server.url + '/', { waitUntil: 'networkidle' })
   await page.waitForTimeout(4500)
-  check('landing paints (hero title visible)', await page.locator('text=一文字の記念式').isVisible())
+  check('landing paints (hero title visible)', await page.locator('h1:has-text("一字の贈りもの")').isVisible())
 
   // /demo via SPA fallback, then the full flow through the real streaming API.
   await page.goto(server.url + '/demo', { waitUntil: 'networkidle' })

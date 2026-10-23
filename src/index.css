@@ -12,6 +12,20 @@
   --font-label: 'Inter', sans-serif;
 }
 
+/*
+ * Chinese text needs Chinese glyph shapes: the Japanese faces draw some hanzi (直, 骨, 角 …)
+ * in Japanese forms. The language store sets <html lang>; these override the two serif
+ * families for zh-Hans / zh-Hant only. Ja, colours and layout are unchanged.
+ */
+:root:lang(zh-Hans) {
+  --font-mincho: 'Noto Serif SC', 'Songti SC', 'SimSun', serif;
+  --font-serif-jp: 'Noto Serif SC', 'Songti SC', 'SimSun', serif;
+}
+:root:lang(zh-Hant) {
+  --font-mincho: 'Noto Serif TC', 'Songti TC', 'PMingLiU', serif;
+  --font-serif-jp: 'Noto Serif TC', 'Songti TC', 'PMingLiU', serif;
+}
+
 html {
   background: var(--color-ink);
 }

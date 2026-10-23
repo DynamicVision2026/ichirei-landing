@@ -1,11 +1,13 @@
 import { useReducedMotion } from 'framer-motion'
+import { useLanding } from '../landing/useLanding'
 
-export default function AIProcessing() {
+export default function Processing() {
   const reduceMotion = useReducedMotion()
+  const { copy } = useLanding()
 
   return (
     <section
-      id="ai-processing"
+      id="processing"
       className="relative flex min-h-screen w-full flex-col items-center justify-center gap-12 bg-[#120D09] px-6"
     >
       <svg
@@ -48,7 +50,7 @@ export default function AIProcessing() {
       </svg>
 
       <p className="font-serif-jp text-lg tracking-wider text-ivory/80">
-        言葉を読んでいます...
+        {copy.processing.text}
       </p>
     </section>
   )

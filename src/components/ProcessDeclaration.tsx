@@ -1,16 +1,10 @@
 import { motion, useReducedMotion } from 'framer-motion'
-
-const STEPS = [
-  'その人の人生を書く',
-  'AIが読み解く',
-  '一字が浮かぶ',
-  '六つの候補',
-  'あなたが選ぶ',
-  '還暦の記念になる',
-]
+import { useLanding } from '../landing/useLanding'
 
 export default function ProcessDeclaration() {
   const reduceMotion = useReducedMotion()
+  const { copy } = useLanding()
+  const STEPS = copy.process.steps
 
   return (
     <section className="relative w-full bg-[#120D09] px-6 py-32 sm:py-44">
@@ -22,7 +16,7 @@ export default function ProcessDeclaration() {
           transition={{ duration: 1 }}
           className="font-label mb-20 text-[11px] uppercase tracking-[0.35em] text-gold/70"
         >
-          The Process
+          {copy.process.label}
         </motion.p>
 
         <div className="flex flex-col gap-16 sm:gap-20">

@@ -1,8 +1,11 @@
 import { useEffect, useState } from 'react'
 import { motion } from 'framer-motion'
+import { useLanding } from '../landing/useLanding'
+import { UI_LANGUAGES } from '../demo/i18n'
 
 export default function NavBar() {
   const [scrolled, setScrolled] = useState(false)
+  const { copy, language, setLanguage } = useLanding()
 
   useEffect(() => {
     const onScroll = () => setScrolled(window.scrollY > 24)
@@ -24,32 +27,39 @@ export default function NavBar() {
     >
       <div className="mx-auto flex max-w-6xl items-center justify-between px-6 py-4 sm:px-10">
         <div className="flex items-baseline gap-2">
-          <span className="font-mincho text-lg tracking-wide text-ivory">一字礼</span>
+          <span className="font-mincho text-lg tracking-wide text-ivory">{copy.brand}</span>
           <span className="font-label text-xs tracking-[0.25em] text-gold">
             ICHIREI
           </span>
         </div>
 
         <div className="flex items-center gap-6">
-          <nav className="font-label hidden text-xs tracking-[0.15em] text-ivory/70 sm:flex sm:items-center sm:gap-2">
-            <button type="button" className="transition-colors hover:text-ivory">
-              日本語
-            </button>
-            <span className="text-ivory/30">/</span>
-            <button type="button" className="transition-colors hover:text-ivory">
-              EN
-            </button>
-            <span className="text-ivory/30">/</span>
-            <button type="button" className="transition-colors hover:text-ivory">
-              繁中
-            </button>
+          <nav
+            aria-label={copy.nav.languageLabel}
+            className="font-label flex items-center gap-2 text-xs tracking-[0.15em] text-ivory/70"
+          >
+            {UI_LANGUAGES.map((l, k) => (
+              <span key={l} className="flex items-center gap-2">
+                {k > 0 && <span className="text-ivory/30">/</span>}
+                <button
+                  type="button"
+                  data-language={l}
+                  aria-pressed={language === l}
+                  onClick={() => setLanguage(l)}
+                  className={`transition-colors hover:text-ivory ${language === l ? 'text-gold' : ''}`}
+                >
+                  {copy.nav.languages[l]}
+                </button>
+              </span>
+            ))}
           </nav>
 
           <button
             type="button"
+            onClick={() => document.getElementById('story-input')?.scrollIntoView({ behavior: 'smooth' })}
             className="font-label rounded-full border border-gold/40 px-4 py-1.5 text-xs tracking-[0.1em] text-ivory transition-colors hover:border-gold hover:bg-gold/10"
           >
-            はじめる
+            {copy.nav.cta}
           </button>
         </div>
       </div>

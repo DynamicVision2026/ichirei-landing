@@ -5,6 +5,7 @@ import Elicitation from './Elicitation'
 import Reveal from './Reveal'
 import { exportEvents, log, setCondition as logSetCondition, setStory as logSetStory } from './logging'
 import { COPY, DEFAULT_GIFT_CONTEXT, contextToPayload, type Copy, type GiftContext } from './i18n'
+import { getLanguage, setLanguage } from '../lang-store'
 
 // Validation-harness orchestrator: elicitation (§7) → engine call (§4) →
 // adaptive follow-up (§7.4, at most twice) → progressive reveal (§8), with the
@@ -165,7 +166,12 @@ function NoPrimaryNotice({ result, copy }: { result: EngineResult; copy: Copy })
 export default function DemoApp() {
   const [phase, setPhase] = useState<Phase>('elicit')
   const [story, setStory] = useState('')
-  const [context, setContext] = useState<GiftContext>(DEFAULT_GIFT_CONTEXT)
+  // The language is shared with the landing page: starts from the sender's stored choice and writes it back.
+  const [context, setContextState] = useState<GiftContext>(() => ({ ...DEFAULT_GIFT_CONTEXT, language: getLanguage() }))
+  const setContext = (next: GiftContext) => {
+    if (next.language !== context.language) setLanguage(next.language)
+    setContextState(next)
+  }
   const copy = COPY[context.language]
   const [condition, setConditionState] = useState<Condition>('A')
   const [result, setResult] = useState<EngineResult | null>(null)

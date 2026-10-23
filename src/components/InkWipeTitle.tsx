@@ -1,4 +1,5 @@
 import { motion, useReducedMotion } from 'framer-motion'
+import { useLanding } from '../landing/useLanding'
 
 const WIPE_DELAY = 1.5
 const WIPE_DURATION = 2.3
@@ -6,11 +7,13 @@ const EASE = [0.16, 1, 0.3, 1] as const
 
 export default function InkWipeTitle() {
   const reduceMotion = useReducedMotion()
+  const { copy } = useLanding()
+  const title = copy.hero.title
 
   if (reduceMotion) {
     return (
       <h1 className="font-mincho text-[clamp(2rem,6vw,4.25rem)] leading-[1.35] tracking-[0.02em] text-ivory">
-        還暦 — 一文字の記念式
+        {title}
       </h1>
     )
   }
@@ -23,7 +26,7 @@ export default function InkWipeTitle() {
         transition={{ delay: WIPE_DELAY, duration: WIPE_DURATION, ease: EASE }}
         className="font-mincho text-[clamp(2rem,6vw,4.25rem)] leading-[1.35] tracking-[0.02em] text-ivory"
       >
-        還暦 — 一文字の記念式
+        {title}
       </motion.h1>
 
       <motion.span
