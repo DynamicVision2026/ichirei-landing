@@ -7,11 +7,15 @@
     "dev": "vite",
     "build": "tsc -b && vite build",
     "lint": "oxlint",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "start": "node --experimental-strip-types --disable-warning=ExperimentalWarning server/index.ts",
+    "test:server": "node scripts/test-server.mjs"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.111.0",
+    "@hono/node-server": "^2.1.5",
     "framer-motion": "^12.42.2",
+    "hono": "^4.13.13",
     "react": "^19.2.7",
     "react-dom": "^19.2.7"
   },
