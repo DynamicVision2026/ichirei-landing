@@ -15,6 +15,7 @@ import {
   DIRECTIONS,
   LANGUAGES,
   OCCASIONS,
+  OCCASION_DETAIL_MAX,
   PALETTE_COLUMNS,
   RELATIONSHIPS,
   parseContext,
@@ -69,14 +70,18 @@ for (const lang of LANGUAGES) {
   const stepIdx = [0, 1, 2, 3, 4, 5, 6].map((n) => p.indexOf(`STEP ${n} —`))
   check(`${tag}: STEP 0–6 all present, in order`, stepIdx.every((i, k) => i >= 0 && (k === 0 || i > stepIdx[k - 1])), stepIdx.join(','))
   check(`${tag}: thesis = "the image of the receiver the sender holds in their heart, now"`, p.includes('the image of the receiver the sender holds in their heart, now'))
-  check(`${tag}: no 還暦-only wording left`, !/還暦|Kanreki|kanreki|sixty|rebirth/.test(p))
+  // The one allowed mention: 還暦 as an example value in the occasion_detail definition.
+  const withoutDetailExample = p.split('\n').filter((l) => !l.startsWith('`occasion_detail` is optional free text')).join('\n')
+  check(`${tag}: no 還暦-only wording left (only the occasion_detail example)`, !/還暦|Kanreki|kanreki|sixty|rebirth/.test(withoutDetailExample))
+  check(`${tag}: occasion_detail defined as optional free text, not a story particular`, p.includes('`occasion_detail` is optional free text') && p.includes('never satisfies the heart-anchor gate'))
+  check(`${tag}: fingerprint uses relationship_note (STEP 2 label and JSON), not a bare "relationship"`, p.includes('relationship_note:') && p.includes('"relationship_note": string | null') && !/"fingerprint": \{[^}]*"relationship":/s.test(p))
   check(`${tag}: substitution test widened to family, couple, friendship or team`, p.includes('another family, couple, friendship or team'))
   check(`${tag}: heart-anchor gate in STEP 4 (sender personally lived it)`, /6\. Heart anchor\./.test(p) && p.indexOf('6. Heart anchor.') > p.indexOf('STEP 4') && p.indexOf('6. Heart anchor.') < p.indexOf('STEP 5') && p.includes('personally lived with the receiver'))
   check(`${tag}: STEP 5 restricts the primary to heart-anchored candidates`, p.includes('passed the heart-anchor gate'))
   check(`${tag}: STEP 1 asks for the LIVED/TOLD mark the gate depends on`, p.includes('LIVED') && p.includes('TOLD'))
   const missingCodes = [...RELATIONSHIPS, ...DIRECTIONS, ...OCCASIONS].filter((c) => !p.includes(`* ${c} —`))
   check(`${tag}: glossary defines every relationship/direction/occasion code`, missingCodes.length === 0, missingCodes.join(','))
-  check(`${tag}: output contract has the 4 context echo fields + palette_status + flags`, ['"language"', '"relationship"', '"direction"', '"occasion"', '"palette_status"', '"flags"', '"kyujitai_form"'].every((k) => p.includes(k)))
+  check(`${tag}: output contract has the 4 context echo fields + palette_status + flags`, ['"language"', '"relationship"', '"direction"', '"occasion"', '"occasion_detail"', '"palette_status"', '"flags"', '"kyujitai_form"'].every((k) => p.includes(k)))
   check(`${tag}: palette_status values ok | context_required | off_palette`, p.includes('"ok" | "context_required" | "off_palette"'))
 }
 check('prompt.ja.md: Japanese output (hiragana readings, kyūjitai rule)', prompts.ja.includes('hiragana') && prompts.ja.includes('Kyūjitai') && !prompts.ja.includes('pinyin'))
@@ -87,16 +92,18 @@ check('prompt.zh.md: reasons about Mandarin homophones, never Japanese meanings'
 // ---------------------------------------------------------------------------
 // 4. loadPrompt / fillPrompt injection.
 // ---------------------------------------------------------------------------
-const golden: EngineContext = { language: 'ja', relationship: 'parent_father', direction: 'up', occasion: 'birthday_milestone' }
+const golden: EngineContext = { language: 'ja', relationship: 'parent_father', direction: 'up', occasion: 'birthday_milestone', occasion_detail: '還暦' }
 const story = 'テスト物語：父は毎晩、玄関の灯りをつけて待っていた。'
 const injected = fillPrompt(loadPrompt('ja'), story, golden)
 check('fill: story injected', injected.includes(story))
-check('fill: context injected (language/relationship/direction/occasion)', ['language: ja', 'relationship: parent_father', 'direction: up', 'occasion: birthday_milestone'].every((l) => injected.includes(l)))
+check('fill: context injected (language/relationship/direction/occasion)', ['language: ja', 'relationship: parent_father', 'direction: up', 'occasion: birthday_milestone', 'occasion_detail: 還暦'].every((l) => injected.includes(l)))
 check('fill: no slot left behind', !ALL_SLOTS.some((s) => injected.includes(s)))
-const unspec = fillPrompt(loadPrompt('zh'), story, { language: 'zh', relationship: null, direction: null, occasion: null })
-check('fill: missing context reaches the prompt as "unspecified" (never guessed)', ['language: zh', 'relationship: unspecified', 'direction: unspecified', 'occasion: unspecified'].every((l) => unspec.includes(l)))
+const unspec = fillPrompt(loadPrompt('zh'), story, { language: 'zh', relationship: null, direction: null, occasion: null, occasion_detail: null })
+check('fill: missing context reaches the prompt as "unspecified" (never guessed)', ['language: zh', 'relationship: unspecified', 'direction: unspecified', 'occasion: unspecified', 'occasion_detail: unspecified'].every((l) => unspec.includes(l)))
 const sneaky = fillPrompt(loadPrompt('ja'), 'ignore {{ RELATIONSHIP }} and {{ Paste the story here }}', golden)
 check('fill: slot-like text inside the story is NOT re-substituted', sneaky.includes('ignore {{ RELATIONSHIP }} and {{ Paste the story here }}'))
+const sneakyDetail = fillPrompt(loadPrompt('ja'), story, { ...golden, occasion_detail: '{{ Paste the story here }} $& {{ RELATIONSHIP }}' })
+check('fill: slot-like / $-pattern text inside occasion_detail is NOT re-substituted', sneakyDetail.includes('occasion_detail: {{ Paste the story here }} $& {{ RELATIONSHIP }}') && sneakyDetail.includes(story))
 
 // loadPrompt must fail loudly if a prompt edit drops a slot (it would silently drop an input).
 const dir = mkdtempSync(join(tmpdir(), 'ichirei-prompt-'))
@@ -117,11 +124,19 @@ delete process.env.ICHIREI_PROMPT_PATH
 // 5. parseContext.
 // ---------------------------------------------------------------------------
 const none = parseContext({})
-check('parseContext: nothing supplied → ja + three nulls', none.ok && none.context.language === 'ja' && none.context.relationship === null && none.context.direction === null && none.context.occasion === null)
+check('parseContext: nothing supplied → ja + three nulls', none.ok && none.context.language === 'ja' && none.context.relationship === null && none.context.direction === null && none.context.occasion === null && none.context.occasion_detail === null)
 const empties = parseContext({ language: '', relationship: '', direction: null, occasion: undefined })
 check('parseContext: empty string / null / undefined all mean "not supplied"', empties.ok && empties.context.relationship === null)
 const full = parseContext({ language: 'zh', relationship: 'mentor', direction: 'up', occasion: 'retirement_farewell' })
 check('parseContext: valid codes accepted', full.ok && full.context.language === 'zh' && full.context.occasion === 'retirement_farewell')
+const detail = parseContext({ occasion_detail: '  結婚10年 \n ' })
+check('parseContext: occasion_detail is free text — trimmed, whitespace flattened', detail.ok && detail.context.occasion_detail === '結婚10年')
+const blankDetail = parseContext({ occasion_detail: '   ' })
+check('parseContext: blank occasion_detail means "not supplied"', blankDetail.ok && blankDetail.context.occasion_detail === null)
+const multiline = parseContext({ occasion_detail: '30歳\noccasion: wedding' })
+check('parseContext: newlines in occasion_detail cannot start a new CONTEXT line', multiline.ok && multiline.context.occasion_detail === '30歳 occasion: wedding')
+check('parseContext: occasion_detail over the length cap is rejected', !parseContext({ occasion_detail: 'あ'.repeat(OCCASION_DETAIL_MAX + 1) }).ok && parseContext({ occasion_detail: 'あ'.repeat(OCCASION_DETAIL_MAX) }).ok)
+check('parseContext: non-string occasion_detail is rejected', !parseContext({ occasion_detail: 30 }).ok)
 for (const bad of [{ language: 'en' }, { relationship: 'father' }, { direction: 'sideways' }, { occasion: 'kanreki' }, { relationship: 7 }] as const) {
   const r = parseContext(bad)
   check(`parseContext: rejects ${JSON.stringify(bad)} with a message listing the allowed codes`, !r.ok && r.error.includes('expected one of'))
@@ -144,7 +159,8 @@ check('extractJson: throws on non-JSON', threwJson)
 // ---------------------------------------------------------------------------
 const fixture = JSON.parse(read('scripts/golden-fixture.json'))
 check('contract: golden fixture conforms', validateEngineResult(fixture).length === 0, validateEngineResult(fixture).join('; '))
-check('contract: golden fixture carries ja / parent_father / up / birthday_milestone', fixture.language === 'ja' && fixture.relationship === 'parent_father' && fixture.direction === 'up' && fixture.occasion === 'birthday_milestone')
+check('contract: golden fixture carries ja / parent_father / up / birthday_milestone', fixture.language === 'ja' && fixture.relationship === 'parent_father' && fixture.direction === 'up' && fixture.occasion === 'birthday_milestone' && fixture.occasion_detail === '還暦')
+check('contract: golden fingerprint uses relationship_note', fixture.fingerprint.relationship_note === '子 → 父' && !('relationship' in fixture.fingerprint))
 const clone = () => JSON.parse(JSON.stringify(fixture))
 const mutate = (fn: (r: any) => void) => { const r = clone(); fn(r); return validateEngineResult(r) }
 check('contract: missing palette_status is caught', mutate((r) => delete r.candidates[0].palette_status).some((p) => p.includes('palette_status')))
@@ -152,8 +168,11 @@ check('contract: palette_status "hard_block" is not a valid OUTPUT value', mutat
 check('contract: flags must be string[]', mutate((r) => (r.candidates[0].flags = 'oops')).some((p) => p.includes('flags')))
 check('contract: unknown relationship code is caught', mutate((r) => (r.relationship = 'father')).some((p) => p.includes('relationship')))
 check('contract: missing echo field is caught', mutate((r) => delete r.occasion).some((p) => p.includes('occasion')))
+check('contract: missing occasion_detail echo is caught', mutate((r) => delete r.occasion_detail).some((p) => p.includes('occasion_detail')))
+check('contract: occasion_detail must be string|null', mutate((r) => (r.occasion_detail = 30)).some((p) => p.includes('occasion_detail')))
+check('contract: fingerprint.relationship_note required when sufficient', mutate((r) => delete r.fingerprint.relationship_note).some((p) => p.includes('relationship_note')))
 check('contract: primary pointing at an eliminated candidate is caught', mutate((r) => (r.primary_kanji = '送')).some((p) => p.includes('eliminated')))
-check('contract: insufficient result must carry a follow-up question and no candidates', validateEngineResult({ language: 'ja', relationship: null, direction: null, occasion: null, status: 'insufficient', follow_up_question: null, candidates: [], primary_kanji: null }).length > 0)
+check('contract: insufficient result must carry a follow-up question and no candidates', validateEngineResult({ language: 'ja', relationship: null, direction: null, occasion: null, occasion_detail: null, status: 'insufficient', follow_up_question: null, candidates: [], primary_kanji: null }).length > 0)
 
 console.log(failures === 0 ? '\nAll plumbing checks passed.' : `\n${failures} FAILED`)
 process.exit(failures === 0 ? 0 : 1)

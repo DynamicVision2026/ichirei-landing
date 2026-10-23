@@ -16,6 +16,9 @@ language: {{ LANGUAGE }}
 relationship: {{ RELATIONSHIP }}
 direction: {{ DIRECTION }}
 occasion: {{ OCCASION }}
+occasion_detail: {{ OCCASION_DETAIL }}
+
+`occasion_detail` is optional free text from the sender that says which occasion this is within the code (e.g. 還暦, 30歳, 結婚10年). Treat it as part of the occasion: it can sharpen what a fitting character is, but it is not a story particular, never counts toward STEP 0 sufficiency, and never satisfies the heart-anchor gate.
 
 If a value is `unspecified`, do not guess it — reason from the story alone and say so in your honesty flags. If the story plainly contradicts a supplied value, still honour the supplied value and say so in your honesty flags.
 
@@ -81,7 +84,7 @@ STEP 2 — Lean relational structure
 Compress STEP 1 into this small structure. Its only job is to capture why this particular instance is non-transferable — never to stereotype the relationship type.
 
 ```
-relationship:        (free text in your own words, e.g. "wife → husband, 40-year marriage" — separate from the supplied relationship code)
+relationship_note:   (free text in your own words, e.g. "wife → husband, 40-year marriage" — separate from the supplied relationship code)
 central_change:      (what shifted in the sender's understanding)
 private_particulars: [ ... concrete, from Step 1 ... ]
 hidden_cost:         (what the receiver carried, unspoken)
@@ -194,7 +197,7 @@ vocabulary is open for now; reuse a tag rather than inventing a synonym.
 `suitability_flag` stays as the one-sentence human-readable doubt; `flags` are the
 machine-readable tags.
 
-Context echo: set `language`, `relationship`, `direction` and `occasion` at the top of
+Context echo: set `language`, `relationship`, `direction`, `occasion` and `occasion_detail` at the top of
 the JSON to exactly the values supplied in CONTEXT (JSON null where a value was
 `unspecified`).
 
@@ -219,11 +222,12 @@ Return this exact shape:
   "relationship": string | null,         // echo of CONTEXT.relationship (the code), null if unspecified
   "direction": "up" | "down" | "across" | null,  // echo of CONTEXT.direction
   "occasion": string | null,             // echo of CONTEXT.occasion (the code)
+  "occasion_detail": string | null,      // echo of CONTEXT.occasion_detail verbatim, null if unspecified
   "status": "sufficient" | "insufficient",
   "follow_up_question": string | null,   // Traditional Chinese; non-null ONLY when status is "insufficient"; otherwise null
   "particulars": string[],               // concrete particulars from STEP 1; [] when insufficient
   "fingerprint": {                        // from STEP 2; all null when insufficient
-    "relationship": string | null,
+    "relationship_note": string | null,
     "scarce_asset": string | null,
     "unsaid_truth": string | null,
     "dominant_truth_type": string | null,

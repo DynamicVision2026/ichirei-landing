@@ -3,6 +3,7 @@
   "relationship": "parent_father",
   "direction": "up",
   "occasion": "birthday_milestone",
+  "occasion_detail": "還暦",
   "status": "sufficient",
   "follow_up_question": null,
   "particulars": [
@@ -11,7 +12,7 @@
     "ほとんど何も話さない"
   ],
   "fingerprint": {
-    "relationship": "子 → 父",
+    "relationship_note": "子 → 父",
     "scarce_asset": "駅での無言の送り迎え、二十年",
     "unsaid_truth": "心配だと一度も言わないのに、一度も一人で発たせなかった。",
     "dominant_truth_type": "Role",

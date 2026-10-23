@@ -3,7 +3,7 @@
 // This file is deliberately thin. The engine (engine/*.ts) and the HTTP
 // handlers (api/*.ts) are reused UNCHANGED — this just mounts them on a plain
 // Node server and serves the built frontend. Reasoning still lives only in
-// engine/prompt.md (cardinal rule); nothing here selects or interprets anything.
+// engine/prompt.<lang>.md (cardinal rule); nothing here selects or interprets anything.
 
 import type { Server } from 'node:http'
 import { Hono, type Context, type MiddlewareHandler } from 'hono'

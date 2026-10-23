@@ -48,13 +48,19 @@ export interface EngineContext {
   relationship: Relationship | null
   direction: Direction | null
   occasion: Occasion | null
+  /** Optional free text refining the occasion, e.g. "還暦", "30歳", "結婚10年". Never validated against a list. */
+  occasion_detail: string | null
 }
+
+/** Longest occasion_detail accepted — it is a short label, not a second story. */
+export const OCCASION_DETAIL_MAX = 60
 
 export const DEFAULT_CONTEXT: EngineContext = {
   language: 'ja',
   relationship: null,
   direction: null,
   occasion: null,
+  occasion_detail: null,
 }
 
 type Parsed = { ok: true; context: EngineContext } | { ok: false; error: string }
@@ -69,6 +75,7 @@ export function parseContext(input: {
   relationship?: unknown
   direction?: unknown
   occasion?: unknown
+  occasion_detail?: unknown
 }): Parsed {
   const pick = <T extends string>(
     name: string,
@@ -91,6 +98,19 @@ export function parseContext(input: {
   const occasion = pick('occasion', input.occasion, OCCASIONS)
   if ('error' in occasion) return { ok: false, error: occasion.error }
 
+  // occasion_detail is free text: trim, flatten whitespace to single spaces (it sits on one
+  // line of the prompt's CONTEXT block), blank = not supplied, over the cap = rejected.
+  let occasionDetail: string | null = null
+  const rawDetail = input.occasion_detail
+  if (rawDetail !== undefined && rawDetail !== null) {
+    if (typeof rawDetail !== 'string') return { ok: false, error: 'Invalid "occasion_detail": expected a string' }
+    const flat = rawDetail.replace(/\s+/g, ' ').trim()
+    if (flat.length > OCCASION_DETAIL_MAX) {
+      return { ok: false, error: `Invalid "occasion_detail": at most ${OCCASION_DETAIL_MAX} characters` }
+    }
+    occasionDetail = flat || null
+  }
+
   return {
     ok: true,
     context: {
@@ -98,6 +118,7 @@ export function parseContext(input: {
       relationship: relationship.value,
       direction: direction.value,
       occasion: occasion.value,
+      occasion_detail: occasionDetail,
     },
   }
 }
@@ -185,7 +206,7 @@ export interface Candidate {
 
 export interface Fingerprint {
   /** Free-text description of the bond, in the model's words (NOT the relationship code). */
-  relationship: string | null
+  relationship_note: string | null
   scarce_asset: string | null
   unsaid_truth: string | null
   dominant_truth_type: string | null
@@ -198,6 +219,8 @@ export interface EngineResult {
   relationship: Relationship | null
   direction: Direction | null
   occasion: Occasion | null
+  /** v5: echo of the optional free-text occasion detail, null when not supplied. */
+  occasion_detail: string | null
   status: 'sufficient' | 'insufficient'
   follow_up_question: string | null
   particulars: string[]
@@ -235,6 +258,13 @@ export function validateEngineResult(raw: unknown): string[] {
     if (v === undefined) problems.push(`${key} missing`)
     else if (v !== null && !(allowed as readonly string[]).includes(v as string)) problems.push(`${key} invalid: ${String(v)}`)
   }
+
+  const detail = (r as Record<string, unknown>).occasion_detail
+  if (detail === undefined) problems.push('occasion_detail missing')
+  else if (detail !== null && typeof detail !== 'string') problems.push('occasion_detail must be string|null')
+
+  const note = (r.fingerprint as Record<string, unknown> | undefined)?.relationship_note
+  if (note === undefined && r.status === 'sufficient') problems.push('fingerprint.relationship_note missing')
 
   if (r.status !== 'sufficient' && r.status !== 'insufficient') problems.push('status invalid')
   if (r.status === 'insufficient') {

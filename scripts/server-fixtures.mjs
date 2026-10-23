@@ -13,6 +13,16 @@ export const GOLDEN = JSON.parse(
   readFileSync(new URL('./golden-fixture.json', import.meta.url), 'utf8'),
 )
 
+// The context the golden fixture is run with (spec: ja / parent_father / up / birthday_milestone,
+// plus the optional occasion_detail that says which birthday).
+export const GOLDEN_CONTEXT = {
+  language: GOLDEN.language,
+  relationship: GOLDEN.relationship,
+  direction: GOLDEN.direction,
+  occasion: GOLDEN.occasion,
+  occasion_detail: GOLDEN.occasion_detail,
+}
+
 export const STORY =
   '父は口下手で厳しくて、ほめられた記憶なんてほとんどない。進路のことでも何度もぶつかった。ただ、私が東京に出るとき駅まで送ってくれて、改札で「金は要るか」って、それだけ言って封筒を押し付けてきた。あれから二十年、盆に帰るたびに車で駅まで迎えに来て、帰りも必ず送ってくれる。相変わらず、ほとんど何も話さないけど。'
 

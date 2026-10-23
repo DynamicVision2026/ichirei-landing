@@ -1,12 +1,13 @@
 // Live engine test — the "run with a pasted story before any UI" check (build spec §9.2).
 // Needs ANTHROPIC_API_KEY in the environment.
 //
-//   # The golden fixture (spec §10), context ja / parent_father / up / birthday_milestone:
+//   # The golden fixture (spec §10), context ja / parent_father / up / birthday_milestone + 還暦:
 //   ANTHROPIC_API_KEY=sk-ant-... node --experimental-strip-types scripts/test-engine.ts
 //
 //   # Your own story, with whichever context you want to set (the rest is "unspecified"):
 //   ANTHROPIC_API_KEY=sk-ant-... node --experimental-strip-types scripts/test-engine.ts \
-//     "その人の物語…" --language ja --relationship mentor --direction up --occasion retirement_farewell
+//     "その人の物語…" --language ja --relationship mentor --direction up --occasion retirement_farewell \
+//     --occasion_detail "定年退職"
 //
 //   # Chinese:
 //   ANTHROPIC_API_KEY=sk-ant-... node --experimental-strip-types scripts/test-engine.ts \
@@ -25,6 +26,7 @@ const GOLDEN_CONTEXT = {
   relationship: 'parent_father',
   direction: 'up',
   occasion: 'birthday_milestone',
+  occasion_detail: '還暦',
 }
 
 const flags: Record<string, string> = {}
@@ -51,7 +53,7 @@ if (!process.env.ANTHROPIC_API_KEY) {
 
 const c = parsed.context
 console.error(
-  `[engine] model=${ENGINE_CONFIG.MODEL} effort=${ENGINE_CONFIG.EFFORT} language=${c.language} relationship=${c.relationship ?? 'unspecified'} direction=${c.direction ?? 'unspecified'} occasion=${c.occasion ?? 'unspecified'} — reasoning…`,
+  `[engine] model=${ENGINE_CONFIG.MODEL} effort=${ENGINE_CONFIG.EFFORT} language=${c.language} relationship=${c.relationship ?? 'unspecified'} direction=${c.direction ?? 'unspecified'} occasion=${c.occasion ?? 'unspecified'} occasion_detail=${c.occasion_detail ?? 'unspecified'} — reasoning…`,
 )
 const started = Date.now()
 const result = await runEngine(story, 'A', { context: c })

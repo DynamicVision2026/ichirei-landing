@@ -17,7 +17,7 @@ const INSUFFICIENT = {
   status: 'insufficient',
   follow_up_question:
     'お父さまの、他の人には何でもないようなことなのに、あなたには忘れられない小さな仕草はありますか？',
-  particulars: [], fingerprint: { relationship: null, scarce_asset: null,
+  particulars: [], fingerprint: { relationship_note: null, scarce_asset: null,
     unsaid_truth: null, dominant_truth_type: null, dignity_direction: null },
   candidates: [], primary_kanji: null,
 }

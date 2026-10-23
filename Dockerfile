@@ -27,7 +27,7 @@ WORKDIR /app
 COPY package.json package-lock.json ./
 RUN npm ci --omit=dev && npm cache clean --force
 
-# Reasoning stays in engine/prompt.md and engine/explain-prompt.md — plain text
+# Reasoning stays in engine/prompt.ja.md, prompt.zh.md and explain-prompt.md — plain text
 # files, read at request time. Editing them = a normal commit; Cloud Build
 # rebuilds and redeploys. No code changes.
 COPY engine ./engine

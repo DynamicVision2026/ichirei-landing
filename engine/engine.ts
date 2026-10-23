@@ -4,7 +4,7 @@
 // the reasoning lives in the prompt files (engine/prompt.ja.md, engine/prompt.zh.md),
 // loaded at request time. This module only:
 //   1. loads the prompt file for the requested language,
-//   2. injects the context (language, relationship, direction, occasion) and the
+//   2. injects the context (language, relationship, direction, occasion, occasion_detail) and the
 //      story at their marked slots — the MEANING of each code lives in the prompt,
 //   3. calls the model,
 //   4. parses the model's JSON, stamps the request's context onto it, and returns it.
@@ -40,6 +40,7 @@ export const CONTEXT_SLOTS = {
   relationship: '{{ RELATIONSHIP }}',
   direction: '{{ DIRECTION }}',
   occasion: '{{ OCCASION }}',
+  occasion_detail: '{{ OCCASION_DETAIL }}',
 } as const
 
 /** What the prompt sees when a context value was not supplied. */
@@ -92,15 +93,17 @@ export function loadPrompt(language: Language): string {
 }
 
 /**
- * Fill a prompt template. Context first, story LAST, so text inside the story
- * that happens to look like a slot is never re-scanned or substituted.
+ * Fill a prompt template in ONE pass over the template's own slots, so text inside
+ * the story or the free-text occasion_detail that happens to look like a slot is
+ * never re-scanned or substituted.
  */
 export function fillPrompt(template: string, story: string, context: EngineContext): string {
-  let out = template
+  const values = new Map<string, string>([[STORY_SLOT, story]])
   for (const key of Object.keys(CONTEXT_SLOTS) as (keyof typeof CONTEXT_SLOTS)[]) {
-    out = out.split(CONTEXT_SLOTS[key]).join(context[key] ?? UNSPECIFIED)
+    values.set(CONTEXT_SLOTS[key], context[key] ?? UNSPECIFIED)
   }
-  return out.split(STORY_SLOT).join(story)
+  const pattern = new RegExp([...values.keys()].map((s) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')).join('|'), 'g')
+  return template.replace(pattern, (slot) => values.get(slot) as string)
 }
 
 /** Pull a single JSON object out of the model's reply, tolerating stray fences/prose. */
@@ -125,7 +128,7 @@ export interface RunEngineOptions {
   /** Called with each raw text delta as the model streams — lets the API layer
    *  keep its own response stream alive and report progress. */
   onDelta?: (text: string) => void
-  /** language / relationship / direction / occasion. Omitted fields: language 'ja',
+  /** language / relationship / direction / occasion / occasion_detail. Omitted fields: language 'ja',
    *  the rest unspecified. Validated against the code lists in contract.ts. */
   context?: Partial<EngineContext>
 }
@@ -184,6 +187,7 @@ export async function runEngine(
     relationship: context.relationship,
     direction: context.direction,
     occasion: context.occasion,
+    occasion_detail: context.occasion_detail,
   }
 }
 

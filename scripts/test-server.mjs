@@ -1,4 +1,4 @@
-// Cloud Run server test: the REAL server + REAL engine/prompt.md/SDK against a
+// Cloud Run server test: the REAL server + REAL engine/prompt.<lang>.md/SDK against a
 // fake Anthropic upstream. No API key, no network, no token spend.
 //
 //   node scripts/test-server.mjs           # ~20s
@@ -8,7 +8,7 @@
 // static-serving checks run against the same kind of bundle that ships.
 
 import { execSync } from 'node:child_process'
-import { GOLDEN, STORY, EXPLAIN_TEXT, sleep, startFakeAnthropic, startServer, readNdjson } from './server-fixtures.mjs'
+import { GOLDEN, GOLDEN_CONTEXT, STORY, EXPLAIN_TEXT, sleep, startFakeAnthropic, startServer, readNdjson } from './server-fixtures.mjs'
 
 const LONG = process.argv.includes('--long')
 let failures = 0
@@ -62,7 +62,7 @@ try {
   // ---- C. /api/select streams through the REAL engine ------------------
   upstream.state.requests.length = 0
   upstream.state.mode = { kind: 'stream', gapMs: 0, totalMs: 2500 }
-  const res = await post(base, '/api/select', { story: STORY, condition: 'A' })
+  const res = await post(base, '/api/select', { story: STORY, condition: 'A', ...GOLDEN_CONTEXT })
   check('select: 200 + ndjson content-type', res.status === 200 && (res.headers.get('content-type') ?? '').includes('ndjson'))
   const lines = await readNdjson(res)
   const deltas = lines.filter((l) => l.msg.type === 'delta')
@@ -78,7 +78,7 @@ try {
   const prompt = sent?.body.messages?.[0]?.content ?? ''
   check('engine→model: model is claude-sonnet-5, streaming, effort high', sent?.body.model === 'claude-sonnet-5' && sent?.body.stream === true && sent?.body.output_config?.effort === 'high', JSON.stringify({ m: sent?.body.model, s: sent?.body.stream, e: sent?.body.output_config }))
   check('engine→model: max_tokens 20000 (full depth, unchanged)', sent?.body.max_tokens === 20000)
-  check('engine→model: prompt.md loaded verbatim (skeleton + runtime contract)', prompt.includes('YOUR ROLE') && prompt.includes('OUTPUT CONTRACT (runtime)') && prompt.includes('kyujitai_form'))
+  check('engine→model: prompt.ja.md loaded (skeleton + runtime contract + golden context)', prompt.includes('YOUR ROLE') && prompt.includes('OUTPUT CONTRACT (runtime)') && prompt.includes('kyujitai_form') && ['language: ja', 'relationship: parent_father', 'direction: up', 'occasion: birthday_milestone', 'occasion_detail: 還暦'].every((l) => prompt.includes(l)))
   check('engine→model: story injected at the slot, slot removed', prompt.includes(STORY) && !prompt.includes('{{ Paste the story here }}'))
   check('engine→model: API key comes from env (x-api-key header)', sent?.headers['x-api-key'] === 'test-key-not-real')
 

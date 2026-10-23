@@ -13,7 +13,6 @@ The cardinal rule: **the engine's reasoning is a swappable text asset, never cod
 |---|---|
 | `engine/prompt.ja.md`, `engine/prompt.zh.md` | **v5 reasoning, one file per language** (same Steps 0–5), with the context glossary (relationship / direction / occasion), the heart-anchor gate, and the runtime OUTPUT CONTRACT appendix. Edit these to change engine behavior — no code changes needed. |
 | `engine/palette.csv` | The curated character palette — **header only** until Step 3 (referee). Not read by the engine yet. |
-| `engine/prompt.md` | The frozen Phase 0 original (reference only). **Not loaded** by the engine since v5 — edit the `.ja`/`.zh` files. |
 | `engine/explain-prompt.md` | Stage-B deep-explanation wording (Condition B/C, on demand). |
 | `engine/contract.ts` | The JSON contract, the allowed context codes, and `validateEngineResult` (used by tests/CLI, not in the runtime path). |
 | `engine/engine.ts`, `engine/explain.ts` | Pure plumbing: load the language's prompt → inject context + story → call model → parse JSON → stamp the request's context. Zero selection logic. |
@@ -51,8 +50,8 @@ npm run dev                                              # landing on /, harness
 npx tsc -b && npx tsc -p tsconfig.engine.json            # typecheck frontend + engine/api
 node --experimental-strip-types scripts/test-plumbing.ts # prompts, slots, palette header, contract validator — no key needed
 node --experimental-strip-types scripts/test-engine-offline.ts   # real engine + API handler vs a fake model upstream — no key needed
-ANTHROPIC_API_KEY=... node --experimental-strip-types scripts/test-engine.ts   # live golden fixture (ja / parent_father / up / birthday_milestone)
-ANTHROPIC_API_KEY=... node --experimental-strip-types scripts/test-engine.ts "story…" --language zh --relationship friend --direction across --occasion wedding
+ANTHROPIC_API_KEY=... node --experimental-strip-types scripts/test-engine.ts   # live golden fixture (ja / parent_father / up / birthday_milestone, occasion_detail 還暦)
+ANTHROPIC_API_KEY=... node --experimental-strip-types scripts/test-engine.ts "story…" --language zh --relationship friend --direction across --occasion wedding --occasion_detail 結婚10年
 node scripts/e2e-harness.mjs                             # full UI e2e vs mocked engine (needs playwright + dev server)
 npm run build && npm start                               # run the Cloud Run server locally (needs ANTHROPIC_API_KEY, or see test:server)
 node scripts/test-server.mjs                             # real server + real engine vs a fake Anthropic upstream (--long adds a 75s stream)

@@ -28,7 +28,7 @@ export interface Candidate {
 }
 
 export interface Fingerprint {
-  relationship: string | null
+  relationship_note: string | null
   scarce_asset: string | null
   unsaid_truth: string | null
   dominant_truth_type: string | null
@@ -40,6 +40,7 @@ export interface EngineResult {
   relationship?: string | null
   direction?: 'up' | 'down' | 'across' | null
   occasion?: string | null
+  occasion_detail?: string | null
   status: 'sufficient' | 'insufficient'
   follow_up_question: string | null
   particulars: string[]
