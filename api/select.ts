@@ -1,7 +1,7 @@
 // Serverless entry point for the ICHIREI engine (build spec §4).
 //
-// Its only job: receive { story, condition }, hand the story to the engine, and
-// return the engine's JSON. It holds the Anthropic API key (server-side only,
+// Its only job: receive { story, condition, language?, relationship?, direction?,
+// occasion? }, hand them to the engine, and return the engine's JSON. It holds the Anthropic API key (server-side only,
 // never sent to the browser) and contains no selection logic of its own.
 //
 // The response is STREAMED as NDJSON so the connection carries bytes from the
@@ -12,7 +12,7 @@
 //   {"type":"error","error":"<message>"}                       ...terminal
 
 import { runEngine } from '../engine/engine.ts'
-import type { Condition } from '../engine/contract.ts'
+import { parseContext, type Condition } from '../engine/contract.ts'
 
 // Full Hobby-plan ceiling (also mirrored in vercel.json).
 export const maxDuration = 60
@@ -34,7 +34,14 @@ export async function POST(req: Request): Promise<Response> {
     return jsonResponse(400, { error: 'Body is not valid JSON' })
   }
 
-  const { story, condition } = (body ?? {}) as { story?: unknown; condition?: unknown }
+  const { story, condition, language, relationship, direction, occasion } = (body ?? {}) as {
+    story?: unknown
+    condition?: unknown
+    language?: unknown
+    relationship?: unknown
+    direction?: unknown
+    occasion?: unknown
+  }
 
   if (typeof story !== 'string' || !story.trim()) {
     return jsonResponse(400, { error: 'Missing "story" (non-empty string)' })
@@ -42,6 +49,12 @@ export async function POST(req: Request): Promise<Response> {
   const cond: Condition = VALID_CONDITIONS.includes(condition as Condition)
     ? (condition as Condition)
     : 'A'
+
+  // v5 context. All four are optional (the current /demo UI sends none): language
+  // defaults to 'ja', the rest reach the prompt as "unspecified". A value that IS
+  // sent must be one of the codes in engine/contract.ts.
+  const parsed = parseContext({ language, relationship, direction, occasion })
+  if (!parsed.ok) return jsonResponse(400, { error: parsed.error })
 
   if (!process.env.ANTHROPIC_API_KEY) {
     return jsonResponse(500, {
@@ -59,6 +72,7 @@ export async function POST(req: Request): Promise<Response> {
       let lastSent = 0
       try {
         const result = await runEngine(story, cond, {
+          context: parsed.context,
           onDelta: (text) => {
             received += text.length
             // Throttle progress lines: one per ~200 chars of model output.

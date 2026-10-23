@@ -1,4 +1,6 @@
 // Frontend copy of the engine's JSON contract (mirrors engine/contract.ts).
+// v5 fields (language/relationship/direction/occasion, palette_status, flags) are
+// optional here until the Step 3 UI consumes them.
 // Kept as a separate copy because api/ + engine/ compile under a different
 // tsconfig than src/.
 
@@ -21,6 +23,8 @@ export interface Candidate {
   eliminated: boolean
   eliminated_reason: string | null
   suitability_flag: string | null
+  palette_status?: 'ok' | 'context_required' | 'off_palette'
+  flags?: string[]
 }
 
 export interface Fingerprint {
@@ -32,6 +36,10 @@ export interface Fingerprint {
 }
 
 export interface EngineResult {
+  language?: 'ja' | 'zh'
+  relationship?: string | null
+  direction?: 'up' | 'down' | 'across' | null
+  occasion?: string | null
   status: 'sufficient' | 'insufficient'
   follow_up_question: string | null
   particulars: string[]
