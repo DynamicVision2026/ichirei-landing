@@ -11,7 +11,8 @@
 //
 //   # Chinese:
 //   ANTHROPIC_API_KEY=sk-ant-... node --experimental-strip-types scripts/test-engine.ts \
-//     "他總是把玄關的燈留著…" --language zh --relationship friend --direction across --occasion wedding
+//     "他總是把玄關的燈留著…" --language zh-Hant --relationship friend --direction across --occasion wedding \
+//     --inscription_script traditional
 //
 // Prints the engine JSON on stdout, then checks it against the v5 contract
 // (engine/contract.ts validateEngineResult) and exits 1 if it does not conform.

@@ -11,8 +11,9 @@ The cardinal rule: **the engine's reasoning is a swappable text asset, never cod
 
 | Piece | Role |
 |---|---|
-| `engine/prompt.ja.md`, `engine/prompt.zh.md` | **v5 reasoning, one file per language** (same Steps 0–5), with the context glossary (relationship / direction / occasion), the heart-anchor gate, and the runtime OUTPUT CONTRACT appendix. Edit these to change engine behavior — no code changes needed. |
-| `engine/palette.csv` | The curated character palette — **header only** until Step 3 (referee). Not read by the engine yet. |
+| `engine/prompt.ja.md`, `engine/prompt.zh.md` | **v5 reasoning, one file per language family** — `prompt.zh.md` serves both `zh-Hans` and `zh-Hant` through the `{{ DISPLAY_SCRIPT }}` / `{{ INSCRIPTION_SCRIPT }}` slots (same Steps 0–5), with the context glossary (relationship / direction / occasion), the heart-anchor gate, and the runtime OUTPUT CONTRACT appendix. Edit these to change engine behavior — no code changes needed. |
+| `engine/palette.csv`, `engine/palette.ts` | **The palette and its referee.** The CSV is the draft palette: ~320 ja rows and ~330 zh rows (`draft-unreviewed`, plus 27 `interim-unreviewed` rows kept from the first referee). For zh, `kanji` is the SIMPLIFIED form and `inscription_form` the TRADITIONAL one, so one row serves both scripts. After the model answers, `palette.ts` eliminates `hard_block` candidates (reason `palette: hard_block`), refuses an anchorless `context_required` + `anchor_required` kanji as primary and promotes the model's `runner_up_kanji`. An unreviewed `ok` row never overwrites the model's own `palette_status`. Uncertain facts carry `verify:` in `taboo_flags`. |
+| `review/palette_ja.csv`, `review/palette_zh.csv` | The palette as sent to reviewers: the same columns plus an empty `reviewer_comment`. Regenerate with `node scripts/export-review.mjs` after any palette edit; `--check` fails if they are stale. |
 | `engine/palette.csv`, `engine/palette.ts` | **Interim palette referee** (first piece of Step 3). The CSV holds the interim JA rows (16 `hard_block` kanji; 迎/餞 `context_required` + `anchor_required`); after the model answers, `palette.ts` eliminates hard_block candidates (reason `palette: hard_block`) and refuses an anchorless context_required kanji as primary, promoting the next survivor. Data lives in the CSV; the result gains a `referee` audit block. |
 | `engine/explain-prompt.md` | Stage-B deep-explanation wording (Condition B/C, on demand). |
 | `engine/contract.ts` | The JSON contract, the allowed context codes, and `validateEngineResult` (used by tests/CLI, not in the runtime path). |
@@ -50,10 +51,11 @@ Expected: `status: sufficient`, primary **迎（むかえ）**, generics (愛/�
 npm run dev                                              # landing on /, harness on /demo
 npx tsc -b && npx tsc -p tsconfig.engine.json            # typecheck frontend + engine/api
 node --experimental-strip-types scripts/test-plumbing.ts # prompts, slots, palette header, contract validator — no key needed
-node --experimental-strip-types scripts/test-palette.ts  # palette CSV + referee rules (hard_block, anchor, promotion) — no key needed
+node --experimental-strip-types scripts/test-palette.ts  # referee rules (hard_block, anchor, promotion, zh scripts) — no key needed
+node --experimental-strip-types scripts/test-palette-data.ts  # shape and completeness of the ~650 draft rows + review exports in sync
 node --experimental-strip-types scripts/test-engine-offline.ts   # real engine + API handler vs a fake model upstream — no key needed
 ANTHROPIC_API_KEY=... node --experimental-strip-types scripts/test-engine.ts   # live golden fixture (ja / parent_father / up / birthday_milestone, occasion_detail 還暦)
-ANTHROPIC_API_KEY=... node --experimental-strip-types scripts/test-engine.ts "story…" --language zh --relationship friend --direction across --occasion wedding --occasion_detail 結婚10年
+ANTHROPIC_API_KEY=... node --experimental-strip-types scripts/test-engine.ts "story…" --language zh-Hant --relationship friend --direction across --occasion wedding --occasion_detail 結婚10年 --inscription_script traditional
 node scripts/e2e-harness.mjs                             # full UI e2e vs mocked engine (needs playwright + dev server)
 npm run build && npm start                               # run the Cloud Run server locally (needs ANTHROPIC_API_KEY, or see test:server)
 node scripts/test-server.mjs                             # real server + real engine vs a fake Anthropic upstream (--long adds a 75s stream)

@@ -30,21 +30,21 @@ const STORY =
 // ---------------------------------------------------------------------------
 const palette = loadPalette()
 const HARD = ['送', '終', '別', '離', '切', '去', '散', '衰', '老', '死', '苦', '錆', '消', '弱', '病', '無']
-const rowsOf = (status: string) => jaRows.filter((r) => r.status === status)
+const jaRows = palette.values().filter((r) => r.language === 'ja')
+const zhRows = palette.values().filter((r) => r.language === 'zh')
+const interim = (rows: typeof jaRows) => rows.filter((r) => r.raw.reviewed_by === 'interim-unreviewed')
 
-const jaRows = [...palette.values()].filter((r) => r.language === 'ja')
-const zhRows = [...palette.values()].filter((r) => r.language === 'zh')
-check('palette: 31 rows = 18 ja + 13 zh', palette.size === 31 && jaRows.length === 18 && zhRows.length === 13, `${palette.size} ja=${jaRows.length} zh=${zhRows.length}`)
-check('palette: hard_block rows are exactly 送 終 別 離 切 去 散 衰 老 死 苦 錆 消 弱 病 無', rowsOf('hard_block').map((r) => r.kanji).join('') === HARD.join(''), rowsOf('hard_block').map((r) => r.kanji).join(''))
-check('palette: 迎 and 餞 are context_required with anchor_required=yes', ['迎', '餞'].every((k) => { const r = palette.get(`ja:${k}`); return r?.status === 'context_required' && r.anchor_required === true }))
-check('palette: only 迎 and 餞 require an anchor', [...palette.values()].filter((r) => r.anchor_required).map((r) => r.kanji).join('') === '迎餞')
-check('palette: every row says it is interim/unreviewed (no human sign-off claimed)', [...palette.values()].every((r) => r.raw.reviewed_by === 'interim-unreviewed' && r.raw.reviewed_on === ''))
-check('palette: every hard_block row names at least one taboo flag', [...palette.values()].filter((r) => r.status === 'hard_block').every((r) => r.taboo_flags.length > 0))
+// The interim rows from the first referee version are kept exactly: same status, flags, anchors.
+check('interim ja rows kept: the 16 hard_block kanji are still hard_block', HARD.every((k) => palette.lookup('ja', k)?.status === 'hard_block'))
+check('interim ja rows kept: 迎 and 餞 are context_required with anchor_required=yes', ['迎', '餞'].every((k) => { const r = palette.lookup('ja', k); return r?.status === 'context_required' && r.anchor_required === true }))
+check('interim ja rows kept: exactly those 18 rows are still marked interim-unreviewed', interim(jaRows).map((r) => r.kanji).sort().join('') === [...HARD, '迎', '餞'].sort().join(''))
+check('interim ja rows kept: 送 still carries funeral_connotation + parting', ['funeral_connotation', 'parting'].every((f) => palette.lookup('ja', '送')?.taboo_flags.includes(f)))
 const ZH_TRAD = ['死', '終', '喪', '散', '離', '斷', '病', '苦', '四']
-check('palette zh: all 9 requested kanji are hard_block rows in their TRADITIONAL form', ZH_TRAD.every((k) => palette.get(`zh:${k}`)?.status === 'hard_block'))
-check('palette zh: simplified display forms 终 丧 离 断 are listed too (so a null traditional form is still caught)', ['终', '丧', '离', '断'].every((k) => palette.get(`zh:${k}`)?.status === 'hard_block' && palette.get(`zh:${k}`)?.raw.inscription_form !== k))
-check('palette zh: every zh row is hard_block, interim-unreviewed, with pinyin tone marks', zhRows.every((r) => r.status === 'hard_block' && r.raw.reviewed_by === 'interim-unreviewed' && /[āáǎàēéěèīíǐìōóǒòūúǔùǖǘǚǜ]/.test(r.readings.join())))
-check('palette zh: 四 is flagged as a 死 homophone', palette.get('zh:四')?.taboo_flags.includes('homophone_death') === true)
+const ZH_SIMP = ['死', '终', '丧', '散', '离', '断', '病', '苦', '四']
+check('interim zh rows kept: the 9 requested kanji are hard_block, found by TRADITIONAL form', ZH_TRAD.every((k) => palette.lookup('zh', k)?.status === 'hard_block'))
+check('interim zh rows kept: …and by SIMPLIFIED form — one row serves both scripts', ZH_SIMP.every((k) => palette.lookup('zh', k)?.status === 'hard_block') && palette.lookup('zh', '终') === palette.lookup('zh', '終'))
+check('interim zh rows kept: exactly 9 rows (no duplicate simplified rows any more) are interim-unreviewed', interim(zhRows).length === 9 && interim(zhRows).map((r) => r.kanji).sort().join('') === [...ZH_SIMP].sort().join(''))
+check('interim zh rows kept: 四 is still flagged as a 死 homophone', palette.lookup('zh', '四')?.taboo_flags.includes('homophone_death') === true)
 check('palette: 17 columns in the spec order', readFileSync('engine/palette.csv', 'utf8').split('\n')[0] === PALETTE_COLUMNS.join(','))
 
 // ---------------------------------------------------------------------------
@@ -59,7 +59,7 @@ const q = parseCsv('a,"b,c","d ""e""",f\r\n\r\n1,2,3,4\n')
 check('csv: quoted commas, "" escapes, CRLF, blank lines', JSON.stringify(q) === JSON.stringify([['a', 'b,c', 'd "e"', 'f'], ['1', '2', '3', '4']]), JSON.stringify(q))
 check('csv: unterminated quote throws', throws(() => parseCsv('a,"b')).includes('unterminated'))
 const quoted = parsePalette(`${HEADER}\n${rowCsv({ language: 'ja', kanji: '禍', status: 'hard_block', taboo_flags: '"x|y"', core_meanings: '"misfortune, calamity"' })}\n`)
-check('csv: a row with a comma inside a quoted cell parses to one palette row', quoted.size === 1 && quoted.get('ja:禍')?.raw.core_meanings === 'misfortune, calamity' && quoted.get('ja:禍')?.taboo_flags.join() === 'x,y')
+check('csv: a row with a comma inside a quoted cell parses to one palette row', quoted.size === 1 && quoted.lookup('ja', '禍')?.raw.core_meanings === 'misfortune, calamity' && quoted.lookup('ja', '禍')?.taboo_flags.join() === 'x,y')
 check('csv: wrong header throws', throws(() => parsePalette('language,kanji\n')).includes('header'))
 check('csv: wrong column count throws', throws(() => parsePalette(`${HEADER}\nja,送,hard_block\n`)).includes('columns'))
 check('csv: unknown status throws', throws(() => parsePalette(`${HEADER}\n${rowCsv({ language: 'ja', kanji: '送', status: 'blocked' })}\n`)).includes('invalid status'))
@@ -67,6 +67,16 @@ check('csv: unknown language throws', throws(() => parsePalette(`${HEADER}\n${ro
 check('csv: bad anchor_required throws', throws(() => parsePalette(`${HEADER}\n${rowCsv({ language: 'ja', kanji: '迎', status: 'ok', anchor_required: 'maybe' })}\n`)).includes('anchor_required'))
 check('csv: duplicate (language, kanji) throws', throws(() => parsePalette(`${HEADER}\n${rowCsv({ language: 'ja', kanji: '送', status: 'ok' })}\n${rowCsv({ language: 'ja', kanji: '送', status: 'hard_block' })}\n`)).includes('duplicate'))
 check('csv: header-only palette is valid and empty', parsePalette(`${HEADER}\n`).size === 0)
+
+check('csv: "none" is the explicit empty marker in list columns (not a flag called none)', (() => { const r = parsePalette(`${HEADER}\n${rowCsv({ language: 'ja', kanji: '花', status: 'ok', taboo_flags: 'none', blocked_occasions: 'none', register_flags: 'none' })}\n`).lookup('ja', '花'); return r !== undefined && r.taboo_flags.length === 0 && r.blocked_occasions.length === 0 && r.register_flags.length === 0 })())
+check('csv: unknown occasion code in blocked_occasions throws', throws(() => parsePalette(`${HEADER}\n${rowCsv({ language: 'ja', kanji: '花', status: 'ok', blocked_occasions: 'birthday' })}\n`)).includes('blocked_occasions'))
+check('csv: unknown relationship code in relationship_fit throws', throws(() => parsePalette(`${HEADER}\n${rowCsv({ language: 'ja', kanji: '花', status: 'ok', relationship_fit: 'father' })}\n`)).includes('relationship_fit'))
+check('csv: inscription_fitness must be high | medium | low', throws(() => parsePalette(`${HEADER}\n${rowCsv({ language: 'ja', kanji: '花', status: 'ok', inscription_fitness: 'great' })}\n`)).includes('inscription_fitness'))
+check('csv: a bare "zh" language row is valid; zh-Hans / zh-Hant are NOT palette languages (one row serves both scripts)', parsePalette(`${HEADER}\n${rowCsv({ language: 'zh', kanji: '灯', inscription_form: '燈', status: 'ok' })}\n`).size === 1 && throws(() => parsePalette(`${HEADER}\n${rowCsv({ language: 'zh-Hans', kanji: '灯', status: 'ok' })}\n`)).includes('invalid language'))
+const alias = parsePalette(`${HEADER}\n${rowCsv({ language: 'zh', kanji: '灯', inscription_form: '燈', status: 'ok' })}\n`)
+check('palette: a zh row is found by its simplified `kanji` AND its traditional `inscription_form`', alias.lookup('zh', '灯') === alias.lookup('zh', '燈') && alias.lookup('zh', '灯') !== undefined && alias.size === 1)
+check('palette: a form belonging to another row is rejected (ambiguous alias)', throws(() => parsePalette(`${HEADER}\n${rowCsv({ language: 'zh', kanji: '灯', inscription_form: '燈', status: 'ok' })}\n${rowCsv({ language: 'zh', kanji: '燈', status: 'ok' })}\n`)).includes('already belongs'))
+check('palette: lookups are family-scoped (a zh row is not found as ja)', alias.lookup('ja', '灯') === undefined)
 
 process.env.ICHIREI_PALETTE_PATH = join(tmpdir(), 'ichirei-no-such-palette.csv')
 check('loadPalette: a missing file throws (the blocklist is never silently skipped)', throws(() => loadPalette()).includes('not found'))
@@ -118,8 +128,8 @@ check('hard_block: a candidate the model already eliminated keeps the model\'s r
 const viaOldForm = run(raw([cand('黙'), cand('X', { kyujitai_form: '送' })], '黙'))
 check('hard_block: matches on the inscription form (kyujitai_form) too', get(viaOldForm, 'X').eliminated === true)
 
-const zh = run(raw([cand('送'), cand('灯')], '灯', { language: 'zh' }))
-check('hard_block: language-scoped — the ja blocklist does not touch a zh result', get(zh, '送').eliminated === false && zh.referee?.actions.length === 0)
+const zh = run(raw([cand('送'), cand('灯')], '灯', { language: 'zh-Hant' }))
+check('hard_block: language-scoped — the ja hard_block on 送 does not eliminate it in a zh result (the zh row is context_required)', get(zh, '送').eliminated === false && get(zh, '送').palette_status === 'context_required' && zh.referee?.actions.length === 0)
 
 // ---------------------------------------------------------------------------
 // 5. Promotion when the primary is removed.
@@ -138,6 +148,18 @@ check('promote: an anchorless context_required kanji skipped as a target is flag
 const none = run(raw([cand('送'), cand('終'), cand('迎', { story_anchor: '' })], '送', { runner_up_kanji: '迎' }))
 check('promote: nothing eligible → primary_kanji null + referee.no_eligible_primary', none.primary_kanji === null && none.referee?.no_eligible_primary === true)
 check('promote: a result with no eligible primary is accepted by the contract validator', validateEngineResult(none).filter((p) => p.includes('primary')).length === 0, validateEngineResult(none).join('; '))
+
+// ---------------------------------------------------------------------------
+// 4b. Draft (unreviewed) `ok` rows do not vouch; reviewed ones do. Cautious rows always apply.
+// ---------------------------------------------------------------------------
+const mini = (reviewedBy: string) => parsePalette(`${HEADER}\n${rowCsv({ language: 'ja', kanji: '灯', inscription_form: '燈', status: 'ok', taboo_flags: 'verify:x', reviewed_by: reviewedBy })}\n${rowCsv({ language: 'ja', kanji: '冬', status: 'context_required', taboo_flags: 'cold', reviewed_by: 'draft-unreviewed' })}\n`)
+const drafted = applyPalette(raw([cand('灯', { palette_status: 'off_palette', flags: ['model_doubt'] }), cand('冬', { palette_status: 'ok' })], '灯'), mini('draft-unreviewed'), STORY)
+check('draft ok row: the model\'s own palette_status and flags are left alone (an unreviewed draft does not vouch)', get(drafted, '灯').palette_status === 'off_palette' && get(drafted, '灯').flags.join() === 'model_doubt')
+check('draft context_required row: still applied (cautious rows apply even unreviewed)', get(drafted, '冬').palette_status === 'context_required' && get(drafted, '冬').flags.includes('cold'))
+const signed = applyPalette(raw([cand('灯', { palette_status: 'off_palette' })], '灯'), mini('Reviewer Name'), STORY)
+check('reviewed ok row: overwrites the model\'s palette_status with ok and merges the flags', get(signed, '灯').palette_status === 'ok' && get(signed, '灯').flags.includes('verify:x'))
+const shipped = applyPalette(raw([cand('愛', { palette_status: 'off_palette' }), cand('黙')], '黙'), palette, STORY)
+check('shipped draft palette: no draft ok row overwrites the model (nothing is reviewed yet)', get(shipped, '愛').palette_status === 'off_palette' && shipped.referee?.actions.length === 0)
 
 // ---------------------------------------------------------------------------
 // 5b. runner_up_kanji drives promotion; array order is only the fallback.
@@ -167,7 +189,7 @@ check('runner-up: a runner-up the palette blocks is cleared even when the primar
 // ---------------------------------------------------------------------------
 // 5c. zh rows: traditional (inscription) forms, with simplified display forms.
 // ---------------------------------------------------------------------------
-const zhRaw = (cs: Candidate[], primary: string | null, over: Partial<EngineResult> = {}) => raw(cs, primary, { language: 'zh', ...over })
+const zhRaw = (cs: Candidate[], primary: string | null, over: Partial<EngineResult> = {}) => raw(cs, primary, { language: 'zh-Hant', ...over })
 for (const k of ZH_TRAD) {
   const out = run(zhRaw([cand('燈'), cand(k)], '燈'))
   if (!(get(out, k).eliminated && get(out, k).eliminated_reason === HARD_BLOCK_REASON && get(out, k).palette_status === 'off_palette')) check(`zh hard_block ${k}`, false, JSON.stringify(get(out, k)))

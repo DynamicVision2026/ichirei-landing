@@ -67,7 +67,7 @@ try {
   // The engine returns the model's answer after the palette referee; for the golden fixture
   // that adds the referee block and the palette's verdicts, nothing else.
   check('golden: result equals the golden fixture run through the palette referee', JSON.stringify(golden) === JSON.stringify(applyPalette(GOLDEN, loadPalette(), GOLDEN_STORY)))
-  check('golden: referee ran, kept 迎 as primary (verbatim anchor), changed no candidate set', golden.referee?.palette_rows === 31 && golden.referee.primary_changed === false && golden.candidates.map((c) => c.kanji).join('') === GOLDEN.candidates.map((c: { kanji: string }) => c.kanji).join(''))
+  check('golden: referee ran, kept 迎 as primary (verbatim anchor), changed no candidate set', golden.referee?.palette_rows === loadPalette().size && golden.referee.primary_changed === false && golden.candidates.map((c) => c.kanji).join('') === GOLDEN.candidates.map((c: { kanji: string }) => c.kanji).join(''))
   check('golden: result conforms to the v5 contract', validateEngineResult(golden).length === 0, validateEngineResult(golden).join('; '))
   check('golden: primary is 迎 and the four context fields are echoed', golden.primary_kanji === '迎' && golden.language === 'ja' && golden.relationship === 'parent_father' && golden.direction === 'up' && golden.occasion === 'birthday_milestone' && golden.occasion_detail === '還暦')
   check('golden→model: prompt is prompt.ja.md (Japanese output rules)', p1.includes('Selection Prompt (v5, Japanese / ja)') && p1.includes('hiragana'))
@@ -79,13 +79,24 @@ try {
   check('golden→model: model claude-sonnet-5, streaming, effort high, max_tokens 20000 (depth unchanged)', seen.at(-1)!.body.model === 'claude-sonnet-5' && seen.at(-1)!.body.stream === true && seen.at(-1)!.body.output_config?.effort === 'high' && seen.at(-1)!.body.max_tokens === 20000)
 
   // ---- 2. Chinese ------------------------------------------------------------
-  const zhReply = { ...GOLDEN, language: 'zh', relationship: 'friend', direction: 'across', occasion: 'wedding', occasion_detail: '結婚10年' }
+  const zhReply = { ...GOLDEN, language: 'zh-Hant', relationship: 'friend', direction: 'across', occasion: 'wedding', occasion_detail: '結婚10年' }
   reply = zhReply
-  const zh = await runEngine(ZH_STORY, 'A', { context: { language: 'zh', relationship: 'friend', direction: 'across', occasion: 'wedding', occasion_detail: '結婚10年' } })
+  const zh = await runEngine(ZH_STORY, 'A', { context: { language: 'zh-Hant', relationship: 'friend', direction: 'across', occasion: 'wedding', occasion_detail: '結婚10年' } })
   const p2 = lastPrompt()
   check('zh→model: prompt is prompt.zh.md (traditional inscription, simplified form, pinyin)', p2.includes('Selection Prompt (v5, Chinese / zh)') && p2.includes('pinyin') && p2.includes('TRADITIONAL') && !p2.includes('hiragana'))
-  check('zh→model: zh context values + story injected', ['language: zh', 'relationship: friend', 'direction: across', 'occasion: wedding', 'occasion_detail: 結婚10年'].every((l) => p2.includes(l)) && p2.includes(ZH_STORY) && !allSlots.some((s) => p2.includes(s)))
-  check('zh: result echoes the zh context', zh.language === 'zh' && zh.relationship === 'friend' && zh.direction === 'across' && zh.occasion === 'wedding' && zh.occasion_detail === '結婚10年')
+  check('zh→model: zh context values + story injected', ['language: zh-Hant', 'relationship: friend', 'direction: across', 'occasion: wedding', 'occasion_detail: 結婚10年', 'display_script: traditional', 'inscription_script: traditional'].every((l) => p2.includes(l)) && p2.includes(ZH_STORY) && !allSlots.some((s) => p2.includes(s)))
+  check('zh-Hant: result echoes the context and the default inscription script (traditional)', zh.language === 'zh-Hant' && zh.inscription_script === 'traditional' && zh.relationship === 'friend' && zh.direction === 'across' && zh.occasion === 'wedding' && zh.occasion_detail === '結婚10年')
+
+  // zh-Hans: one prompt.zh.md, the script slots flip; inscription_script is its own input.
+  const hans = await runEngine(ZH_STORY, 'A', { context: { language: 'zh-Hans', relationship: 'friend', direction: 'across', occasion: 'wedding', inscription_script: 'simplified' } })
+  const p2b = lastPrompt()
+  check('zh-Hans→model: same prompt file, display_script simplified, inscription_script simplified', p2b.includes('Selection Prompt (v5, Chinese / zh)') && p2b.includes('language: zh-Hans') && p2b.includes('display_script: simplified') && p2b.includes('inscription_script: simplified') && !allSlots.some((s) => p2b.includes(s)) && !p2b.includes('{{ DISPLAY_SCRIPT }}'))
+  check('zh-Hans: result echoes language and inscription_script', hans.language === 'zh-Hans' && hans.inscription_script === 'simplified')
+  const hansDefault = await runEngine(ZH_STORY, 'A', { context: { language: 'zh-Hans' } })
+  check('zh-Hans with no inscription_script → traditional (the brand default) reaches the model', lastPrompt().includes('display_script: simplified') && lastPrompt().includes('inscription_script: traditional') && hansDefault.inscription_script === 'traditional')
+  reply = GOLDEN
+  const jaScript = await runEngine(GOLDEN_STORY, 'A', { context: { language: 'ja', inscription_script: 'simplified' } })
+  check('ja: an inscription_script is ignored — echoed null', jaScript.inscription_script === null)
 
   // ---- 3. Nothing supplied: backward compatible with the current /demo UI -----
   reply = GOLDEN
@@ -95,9 +106,9 @@ try {
   check('defaults: result echoes ja + nulls', bare.language === 'ja' && bare.relationship === null && bare.direction === null && bare.occasion === null && bare.occasion_detail === null)
 
   // ---- 4. The echo cannot disagree with the request ---------------------------
-  reply = { ...GOLDEN, language: 'zh', relationship: 'spouse', direction: 'down', occasion: 'new_baby', occasion_detail: '滿月' }
+  reply = { ...GOLDEN, language: 'zh-Hant', inscription_script: 'simplified', relationship: 'spouse', direction: 'down', occasion: 'new_baby', occasion_detail: '滿月' }
   const stamped = await runEngine(GOLDEN_STORY, 'A', { context: { language: 'ja', relationship: 'parent_father', direction: 'up', occasion: 'birthday_milestone', occasion_detail: '還暦' } })
-  check('stamping: a wrong model echo is overwritten with what the caller sent', stamped.language === 'ja' && stamped.relationship === 'parent_father' && stamped.direction === 'up' && stamped.occasion === 'birthday_milestone' && stamped.occasion_detail === '還暦')
+  check('stamping: a wrong model echo is overwritten with what the caller sent', stamped.language === 'ja' && stamped.inscription_script === null && stamped.relationship === 'parent_father' && stamped.direction === 'up' && stamped.occasion === 'birthday_milestone' && stamped.occasion_detail === '還暦')
   check('stamping: nothing else about the result is touched', stamped.primary_kanji === '迎' && JSON.stringify(stamped.candidates.map((c) => c.kanji)) === JSON.stringify(GOLDEN.candidates.map((c: { kanji: string }) => c.kanji)))
   reply = GOLDEN
 
@@ -135,6 +146,11 @@ try {
   const badBody = (await bad.json()) as { error: string }
   check('api: unknown relationship → 400 listing the allowed codes', bad.status === 400 && badBody.error.includes('relationship') && badBody.error.includes('parent_father'), JSON.stringify(badBody))
   check('api: unknown language → 400', (await post({ story: GOLDEN_STORY, language: 'en' })).status === 400)
+  check('api: bare "zh" is rejected — use zh-Hans or zh-Hant', (await post({ story: GOLDEN_STORY, language: 'zh' })).status === 400)
+  check('api: unknown inscription_script → 400', (await post({ story: GOLDEN_STORY, language: 'zh-Hans', inscription_script: 'hant' })).status === 400)
+  const nZh = seen.length
+  const zhApi = await ndjson(await post({ story: ZH_STORY, language: 'zh-Hans', inscription_script: 'simplified' }))
+  check('api: zh-Hans + inscription_script reach the engine and come back echoed', zhApi.at(-1)?.type === 'result' && zhApi.at(-1).result.language === 'zh-Hans' && zhApi.at(-1).result.inscription_script === 'simplified' && seen.length === nZh + 1 && lastPrompt().includes('display_script: simplified'))
   check('api: unknown occasion → 400', (await post({ story: GOLDEN_STORY, occasion: 'kanreki' })).status === 400)
   check('api: unknown direction → 400', (await post({ story: GOLDEN_STORY, direction: 'sideways' })).status === 400)
   const n = seen.length

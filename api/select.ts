@@ -1,7 +1,7 @@
 // Serverless entry point for the ICHIREI engine (build spec §4).
 //
 // Its only job: receive { story, condition, language?, relationship?, direction?,
-// occasion?, occasion_detail? }, hand them to the engine, and return the engine's JSON. It holds the Anthropic API key (server-side only,
+// occasion?, occasion_detail?, inscription_script? }, hand them to the engine, and return the engine's JSON. It holds the Anthropic API key (server-side only,
 // never sent to the browser) and contains no selection logic of its own.
 //
 // The response is STREAMED as NDJSON so the connection carries bytes from the
@@ -34,7 +34,7 @@ export async function POST(req: Request): Promise<Response> {
     return jsonResponse(400, { error: 'Body is not valid JSON' })
   }
 
-  const { story, condition, language, relationship, direction, occasion, occasion_detail } = (body ?? {}) as {
+  const { story, condition, language, relationship, direction, occasion, occasion_detail, inscription_script } = (body ?? {}) as {
     story?: unknown
     condition?: unknown
     language?: unknown
@@ -42,6 +42,7 @@ export async function POST(req: Request): Promise<Response> {
     direction?: unknown
     occasion?: unknown
     occasion_detail?: unknown
+    inscription_script?: unknown
   }
 
   if (typeof story !== 'string' || !story.trim()) {
@@ -55,7 +56,7 @@ export async function POST(req: Request): Promise<Response> {
   // defaults to 'ja', the rest reach the prompt as "unspecified". A value that IS
   // sent must be one of the codes in engine/contract.ts (occasion_detail is free text,
   // length-capped).
-  const parsed = parseContext({ language, relationship, direction, occasion, occasion_detail })
+  const parsed = parseContext({ language, relationship, direction, occasion, occasion_detail, inscription_script })
   if (!parsed.ok) return jsonResponse(400, { error: parsed.error })
 
   if (!process.env.ANTHROPIC_API_KEY) {

@@ -17,8 +17,12 @@ relationship: {{ RELATIONSHIP }}
 direction: {{ DIRECTION }}
 occasion: {{ OCCASION }}
 occasion_detail: {{ OCCASION_DETAIL }}
+inscription_script: {{ INSCRIPTION_SCRIPT }}
+display_script: {{ DISPLAY_SCRIPT }}
 
 `occasion_detail` is optional free text from the sender that says which occasion this is within the code (e.g. 還暦, 30歳, 結婚10年). Treat it as part of the occasion: it can sharpen what a fitting character is, but it is not a story particular, never counts toward STEP 0 sufficiency, and never satisfies the heart-anchor gate.
+
+`language` is zh-Hans (the sender reads Simplified Chinese, 简体中文) or zh-Hant (the sender reads Traditional Chinese, 繁體中文). `display_script` follows from it: it is the script of EVERY customer-facing text value you write (one_line_gaze, follow_up_question, suitability_flag) — `simplified` = 简体中文, `traditional` = 繁體中文. `inscription_script` is the script the chosen character will be CARVED in: `traditional` (the brand default) or `simplified`. The two are independent: a zh-Hans sender can still choose a traditional inscription. Your reasoning about a character covers BOTH of its forms, whichever script is displayed or inscribed.
 
 If a value is `unspecified`, do not guess it — reason from the story alone and say so in your honesty flags. If the story plainly contradicts a supplied value, still honour the supplied value and say so in your honesty flags.
 
@@ -69,7 +73,7 @@ Before anything else, check: does the story contain at least one concrete partic
 
 * If NO (the story is only abstract praise, e.g. "he worked hard, I'm grateful"): stop here. Do not fabricate specifics. Output:
    * `status: insufficient`
-   * one warm, specific follow-up question most likely to surface a private particular. Model it on: "有沒有某個小動作或小習慣——在別人眼裡不算什麼，在你心裡卻就是那個人本身？" — but tailored to this story. One question only.
+   * one warm, specific follow-up question most likely to surface a private particular. Model it on: "有沒有某個小動作或小習慣——在別人眼裡不算什麼，在你心裡卻就是那個人本身？" — but tailored to this story, and written in the display_script. One question only.
 * If YES: proceed to STEP 1.
 STEP 1 — Extract the particulars (no emotions, no characters)
 Walk the shared reasoning skeleton. Answer plainly, quoting the story:
@@ -114,7 +118,7 @@ reading:          (pinyin with tone marks — the natural Mandarin reading)
 truth_type:       
 scarce_asset_it_preserves:
 story_anchor:     (verbatim fragment — the evidence)
-one_line_gaze:    (Traditional Chinese — how the sender sees them, in ONE sentence; built ONLY from details stated in the story — see HARD PROCESS RULE 5)
+one_line_gaze:    (Chinese in the display_script — how the sender sees them, in ONE sentence; built ONLY from details stated in the story — see HARD PROCESS RULE 5)
 why_not_generic:  (what binds this to THIS story specifically)
 
 ```
@@ -124,7 +128,7 @@ STEP 4 — Gates (apply to every candidate; eliminate any that fail gates 1–5;
 
 1. Substitution Test. Mentally swap the names and surface details for another family, couple, friendship or team. Does the `one_line_gaze` still fit? If yes → generic → eliminate.
 2. Scarcity / counterfactual. Remove the central event from the story. Does the character still fit perfectly? If yes → it wasn't holding the scarce asset → eliminate.
-3. Chinese naturalness & dignity of form. Is it a dignified, readable character, fit to be carved and read by this receiver and the people around them, on this occasion, with no unlucky Mandarin homophone or awkward reading — nothing that sounds like or evokes death, ending, scattering, parting or severing (死, 終, 散, 離, 斷)? If you are not sure, say so honestly — do not fake confidence. (This is exactly the check the curated palette will enforce later; for now, flag doubt.)
+3. Chinese naturalness & dignity of form. Is it a dignified, readable character, fit to be carved and read by this receiver and the people around them, on this occasion — judged on the form that will be inscribed (inscription_script), paired with its display form and pinyin — with no unlucky Mandarin homophone or awkward reading — nothing that sounds like or evokes death, ending, scattering, parting or severing (死, 終, 散, 離, 斷)? If you are not sure, say so honestly — do not fake confidence. (This is exactly the check the curated palette will enforce later; for now, flag doubt.)
 4. Dignity boundary. Does the character open into a fuller person, or close them into a verdict? 默 as "you were present in your silence" opens. 頑 as "you were stubborn" closes. Reject verdicts. But never sanitize a true hard character into a pleasant generic virtue just to pass — a sanitized generic is a failure, not a safe answer.
 5. Stage-A defense. Does `kanji + one_line_gaze + one anchor` already create recognition, with no long explanation? If the character only works once you've written a paragraph around it, the paragraph is doing rescuework → eliminate or mark weak. A strong character deepens with explanation but never depends on it.
 6. Heart anchor. The primary must come from something the sender personally lived with the receiver — an event, habit, place, object, silence or exchange the sender themselves witnessed, shared or received (a LIVED finding from STEP 1). A character resting only on what the sender was told, on the receiver's reputation, titles or achievements, or on admiration without a shared moment, fails this gate: it may not be the primary. If it still holds a real truth you may keep it among the six with the flag `no_heart_anchor`; otherwise eliminate it. If NO candidate passes this gate, the story does not yet hold what this process needs: do not name a primary — return status insufficient with one follow-up question (same form as STEP 0) that asks for a moment the sender actually lived with the receiver.
@@ -145,7 +149,7 @@ Produce, in this order:
 4. Six candidates with their fields, and for any eliminated ones, the gate they failed
 5. PRIMARY — the chosen character, marked (this is the cinnabar one), with:
    * its pinyin reading
-   * its one-line gaze (Traditional Chinese)
+   * its one-line gaze (Chinese, in the display_script)
    * its single strongest story anchor
    * the unique truth it owns (from Step 5)
 6. Honesty flags — anywhere you were unsure of Chinese suitability, anywhere you inferred beyond the text, and (if relevant) whether the honest best answer was limited by thin input.
@@ -175,8 +179,9 @@ else: no prose preamble, no explanation, no markdown code fences, no trailing te
 The very first character of your output must be `{` and the very last must be `}`.
 
 All customer-facing string values (kanji, reading, one_line_gaze, story_anchor,
-follow_up_question) are Chinese, written in Traditional characters (繁體中文) — except
-`kanji`, which is the SIMPLIFIED form. reading is pinyin with tone marks. story_anchor must
+follow_up_question) are Chinese, written in the display_script (simplified → 简体中文,
+traditional → 繁體中文) — except `kanji`, which is ALWAYS the SIMPLIFIED form (it is the
+palette key), and `kyujitai_form`, which is the TRADITIONAL form. reading is pinyin with tone marks. story_anchor must
 be a verbatim fragment quoted from the story exactly as the sender wrote it — do not
 convert it between simplified and traditional. Field values map to the skeleton like this:
 particulars ← STEP 1, fingerprint ← STEP 2, candidates ← STEP 3 + STEP 4 outcomes,
@@ -199,20 +204,21 @@ vocabulary is open for now; reuse a tag rather than inventing a synonym.
 `suitability_flag` stays as the one-sentence human-readable doubt; `flags` are the
 machine-readable tags.
 
-Context echo: set `language`, `relationship`, `direction`, `occasion` and `occasion_detail` at the top of
+Context echo: set `language`, `relationship`, `direction`, `occasion`, `occasion_detail` and `inscription_script` at the top of
 the JSON to exactly the values supplied in CONTEXT (JSON null where a value was
 `unspecified`).
 
-Traditional-form inscription rule — brand standard, not a per-story choice:
-ICHIREI's Chinese inscriptions are carved in TRADITIONAL characters (繁體字), always shown
-together with the SIMPLIFIED form and pinyin — never traditional alone. For every
-candidate, `kanji` is the simplified form and `kyujitai_form` is its traditional form
+Inscription rule — brand standard, not a per-story choice:
+ICHIREI's Chinese inscriptions are carved in the inscription_script (default: TRADITIONAL,
+繁體字), always shown together with the other form and pinyin — never the carved form
+alone. Supply BOTH forms for every candidate whatever the scripts, because the
+inscription_script decides which one is carved. For every candidate, `kanji` is the simplified form and `kyujitai_form` is its traditional form
 (e.g. 灯→燈, 爱→愛, 乐→樂). Set `kyujitai_form` to null when the traditional and simplified
 forms are identical (e.g. 恩, 迎). (`kyujitai_form` is a legacy field name kept for
 contract stability; in Chinese it holds the TRADITIONAL inscription form.) Judge STEP 4
-gate 3 (naturalness/readability) on the simplified form PAIRED WITH its pinyin — a
-character passes if it reads naturally alongside its simplified form and pinyin, even if
-the traditional form alone would be unfamiliar to some readers. You have no
+gate 3 (naturalness/readability) on the form that will be inscribed (inscription_script)
+PAIRED WITH the other form and its pinyin — a character passes if it reads naturally
+alongside them, even if the carved form alone would be unfamiliar to some readers. You have no
 simplified/traditional lookup table; supply the traditional form from your own knowledge
 and, whenever you are not confident it is correct, say so in that candidate's
 `suitability_flag`. Never guess silently.
@@ -220,13 +226,14 @@ and, whenever you are not confident it is correct, say so in that candidate's
 Return this exact shape:
 
 {
-  "language": "ja" | "zh",              // echo of CONTEXT.language
+  "language": "zh-Hans" | "zh-Hant",    // echo of CONTEXT.language
   "relationship": string | null,         // echo of CONTEXT.relationship (the code), null if unspecified
   "direction": "up" | "down" | "across" | null,  // echo of CONTEXT.direction
   "occasion": string | null,             // echo of CONTEXT.occasion (the code)
   "occasion_detail": string | null,      // echo of CONTEXT.occasion_detail verbatim, null if unspecified
+  "inscription_script": "traditional" | "simplified",  // echo of CONTEXT.inscription_script
   "status": "sufficient" | "insufficient",
-  "follow_up_question": string | null,   // Traditional Chinese; non-null ONLY when status is "insufficient"; otherwise null
+  "follow_up_question": string | null,   // Chinese in the display_script; non-null ONLY when status is "insufficient"; otherwise null
   "particulars": string[],               // concrete particulars from STEP 1; [] when insufficient
   "fingerprint": {                        // from STEP 2; all null when insufficient
     "relationship_note": string | null,
@@ -241,7 +248,7 @@ Return this exact shape:
       "reading": string,                  // pinyin with tone marks
       "kyujitai_form": string | null,     // TRADITIONAL form, or null if identical to `kanji`
       "truth_type": "Essence" | "Turning Point" | "Role" | "Hidden Cost" | "Private Symbol" | "Forward Blessing",
-      "one_line_gaze": string,            // Traditional Chinese, ONE sentence; only details stated in the story
+      "one_line_gaze": string,            // Chinese in the display_script, ONE sentence; only details stated in the story
       "story_anchor": string,             // verbatim fragment from the story
       "unique_truth": string,             // the non-substitutable truth it preserves
       "eliminated": boolean,              // true if it failed a STEP 4 gate
@@ -256,7 +263,7 @@ Return this exact shape:
 }
 
 When status is "insufficient" (STEP 0, or no candidate passed the STEP 4 heart-anchor
-gate): set follow_up_question to the single tailored Chinese question, particulars to [], every fingerprint field to null, candidates to
+gate): set follow_up_question to the single tailored Chinese question (in the display_script), particulars to [], every fingerprint field to null, candidates to
 [], and primary_kanji and runner_up_kanji to null. Do not fabricate particulars or candidates to fill the
 shape.
 

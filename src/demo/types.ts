@@ -36,7 +36,8 @@ export interface Fingerprint {
 }
 
 export interface EngineResult {
-  language?: 'ja' | 'zh'
+  language?: 'ja' | 'zh-Hans' | 'zh-Hant'
+  inscription_script?: 'traditional' | 'simplified' | null
   relationship?: string | null
   direction?: 'up' | 'down' | 'across' | null
   occasion?: string | null

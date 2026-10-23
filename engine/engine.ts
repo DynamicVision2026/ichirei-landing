@@ -1,7 +1,8 @@
 // The ICHIREI engine — pure plumbing.
 //
 // Cardinal rule (build spec §2): this file contains ZERO selection logic. All of
-// the reasoning lives in the prompt files (engine/prompt.ja.md, engine/prompt.zh.md),
+// the reasoning lives in the prompt files (engine/prompt.ja.md; engine/prompt.zh.md for
+// both zh-Hans and zh-Hant),
 // loaded at request time. This module only:
 //   1. loads the prompt file for the requested language,
 //   2. injects the context (language, relationship, direction, occasion, occasion_detail) and the
@@ -18,9 +19,12 @@ import { fileURLToPath } from 'node:url'
 import { applyPalette, loadPalette } from './palette.ts'
 import {
   DEFAULT_CONTEXT,
+  displayScriptOf,
+  familyOf,
   parseContext,
   type EngineContext,
   type EngineResult,
+  type Family,
   type Language,
 } from './contract.ts'
 
@@ -45,13 +49,20 @@ export const CONTEXT_SLOTS = {
   occasion_detail: '{{ OCCASION_DETAIL }}',
 } as const
 
+/** Extra slots the Chinese prompt must contain (its script rules read them). */
+export const SCRIPT_SLOTS = {
+  display_script: '{{ DISPLAY_SCRIPT }}',
+  inscription_script: '{{ INSCRIPTION_SCRIPT }}',
+} as const
+
 /** What the prompt sees when a context value was not supplied. */
 const UNSPECIFIED = 'unspecified'
 
-const cachedPrompts = new Map<Language, string>()
+const cachedPrompts = new Map<Family, string>()
 
+/** One prompt file per FAMILY: zh-Hans and zh-Hant both use prompt.zh.md. */
 export function promptFileName(language: Language): string {
-  return `prompt.${language}.md`
+  return `prompt.${familyOf(language)}.md`
 }
 
 function resolvePromptPath(language: Language): string {
@@ -59,7 +70,7 @@ function resolvePromptPath(language: Language): string {
   // e.g. /prompts/experiment/prompt.{lang}.md. Without "{lang}" the same file is used
   // for every language (an explicit A/B override — mind the language).
   const override = process.env.ICHIREI_PROMPT_PATH
-  if (override) return override.split('{lang}').join(language)
+  if (override) return override.split('{lang}').join(familyOf(language))
 
   // Try, in order: next to this file (bundled), and cwd-relative (vercel dev / local).
   const file = promptFileName(language)
@@ -81,16 +92,18 @@ function resolvePromptPath(language: Language): string {
 export function loadPrompt(language: Language): string {
   // Read fresh unless explicitly caching, so prompt edits take effect without
   // touching code. Set ICHIREI_CACHE_PROMPT=1 to read once per process per language.
-  const cached = cachedPrompts.get(language)
+  const family = familyOf(language)
+  const cached = cachedPrompts.get(family)
   if (process.env.ICHIREI_CACHE_PROMPT === '1' && cached) return cached
   const path = resolvePromptPath(language)
   const text = readFileSync(path, 'utf8')
   // A prompt that silently dropped a slot would silently drop an input — fail loudly.
-  const missing = [STORY_SLOT, ...Object.values(CONTEXT_SLOTS)].filter((slot) => !text.includes(slot))
+  const required = [STORY_SLOT, ...Object.values(CONTEXT_SLOTS), ...(family === 'zh' ? Object.values(SCRIPT_SLOTS) : [])]
+  const missing = required.filter((slot) => !text.includes(slot))
   if (missing.length > 0) {
     throw new Error(`${promptFileName(language)} is missing slot(s) ${missing.join(', ')} (looked at ${path})`)
   }
-  cachedPrompts.set(language, text)
+  cachedPrompts.set(family, text)
   return text
 }
 
@@ -104,6 +117,9 @@ export function fillPrompt(template: string, story: string, context: EngineConte
   for (const key of Object.keys(CONTEXT_SLOTS) as (keyof typeof CONTEXT_SLOTS)[]) {
     values.set(CONTEXT_SLOTS[key], context[key] ?? UNSPECIFIED)
   }
+  // Script slots (Chinese prompt only; harmless if a template lacks them). The prompt defines what each value means.
+  values.set(SCRIPT_SLOTS.display_script, displayScriptOf(context.language) ?? UNSPECIFIED)
+  values.set(SCRIPT_SLOTS.inscription_script, context.inscription_script ?? UNSPECIFIED)
   const pattern = new RegExp([...values.keys()].map((s) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')).join('|'), 'g')
   return template.replace(pattern, (slot) => values.get(slot) as string)
 }
@@ -130,7 +146,7 @@ export interface RunEngineOptions {
   /** Called with each raw text delta as the model streams — lets the API layer
    *  keep its own response stream alive and report progress. */
   onDelta?: (text: string) => void
-  /** language / relationship / direction / occasion / occasion_detail. Omitted fields: language 'ja',
+  /** language / relationship / direction / occasion / occasion_detail / inscription_script. Omitted fields: language 'ja',
    *  the rest unspecified. Validated against the code lists in contract.ts. */
   context?: Partial<EngineContext>
 }
@@ -192,6 +208,7 @@ export async function runEngine(
     direction: context.direction,
     occasion: context.occasion,
     occasion_detail: context.occasion_detail,
+    inscription_script: context.inscription_script,
   }
 
   // Palette referee (engine/palette.ts, data in engine/palette.csv): removes hard_block

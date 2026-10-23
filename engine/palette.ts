@@ -16,21 +16,60 @@ import { readFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import {
-  LANGUAGES,
+  FAMILIES,
+  INSCRIPTION_FITNESS,
+  OCCASIONS,
   PALETTE_COLUMNS,
+  PALETTE_NONE,
   PALETTE_ROW_STATUSES,
+  RELATIONSHIPS,
+  familyOf,
   type Candidate,
   type EngineResult,
-  type Language,
+  type Family,
   type PaletteRow,
   type RefereeAction,
 } from './contract.ts'
 
 export const HARD_BLOCK_REASON = 'palette: hard_block'
 
-export type Palette = Map<string, PaletteRow>
+/**
+ * The parsed palette. A row is found by its `kanji` OR its `inscription_form`, so one
+ * zh row (simplified `kanji`, traditional `inscription_form`) serves both scripts.
+ */
+export class Palette {
+  readonly rows: PaletteRow[]
+  private readonly index = new Map<string, PaletteRow>()
 
-const keyOf = (language: Language, kanji: string) => `${language}:${kanji}`
+  constructor(rows: PaletteRow[]) {
+    this.rows = rows
+    const put = (row: PaletteRow, form: string, role: string) => {
+      const key = keyOf(row.language, form)
+      const other = this.index.get(key)
+      if (other && other !== row) {
+        throw new Error(`palette.csv: ${row.language} ${form} (${role} of ${row.kanji}) already belongs to the row for ${other.kanji}`)
+      }
+      this.index.set(key, row)
+    }
+    for (const row of rows) put(row, row.kanji, 'kanji')
+    for (const row of rows) if (row.inscription_form && row.inscription_form !== row.kanji) put(row, row.inscription_form, 'inscription_form')
+  }
+
+  get size(): number {
+    return this.rows.length
+  }
+
+  /** Find the row for a character in either of its forms. */
+  lookup(family: Family, form: string): PaletteRow | undefined {
+    return this.index.get(keyOf(family, form))
+  }
+
+  values(): PaletteRow[] {
+    return this.rows
+  }
+}
+
+const keyOf = (family: Family, kanji: string) => `${family}:${kanji}`
 
 // ---- CSV ------------------------------------------------------------------
 
@@ -67,7 +106,12 @@ export function parseCsv(text: string): string[][] {
   return rows
 }
 
-const split = (cell: string) => cell.split('|').map((s) => s.trim()).filter(Boolean)
+/** Split a "|"-separated cell. Empty and the explicit "none" placeholder both mean "nothing recorded". */
+const split = (cell: string) =>
+  cell.split('|').map((x) => x.trim()).filter((x) => x && x !== PALETTE_NONE)
+
+/** Who counts as a reviewer? Anyone but the machine placeholders. */
+const isReviewed = (reviewedBy: string) => reviewedBy !== '' && !/^(draft|interim)-/.test(reviewedBy)
 
 /** Parse and validate palette.csv text. Throws on anything malformed — a silently skipped row would be a silently missing block. */
 export function parsePalette(text: string): Palette {
@@ -75,33 +119,45 @@ export function parsePalette(text: string): Palette {
   if (!header || header.join(',') !== PALETTE_COLUMNS.join(',')) {
     throw new Error(`palette.csv: header must be exactly ${PALETTE_COLUMNS.join(',')}`)
   }
-  const palette: Palette = new Map()
+  const rows: PaletteRow[] = []
+  const seen = new Set<string>()
   body.forEach((cells, i) => {
     const at = `palette.csv row ${i + 2}`
     if (cells.length !== PALETTE_COLUMNS.length) {
       throw new Error(`${at}: expected ${PALETTE_COLUMNS.length} columns, got ${cells.length}`)
     }
     const raw = Object.fromEntries(PALETTE_COLUMNS.map((c, k) => [c, cells[k]])) as PaletteRow['raw']
-    if (!(LANGUAGES as readonly string[]).includes(raw.language)) throw new Error(`${at}: invalid language "${raw.language}"`)
+    if (!(FAMILIES as readonly string[]).includes(raw.language)) throw new Error(`${at}: invalid language "${raw.language}" (expected ${FAMILIES.join(' | ')})`)
     if (!raw.kanji) throw new Error(`${at}: kanji is empty`)
     if (!(PALETTE_ROW_STATUSES as readonly string[]).includes(raw.status)) throw new Error(`${at}: invalid status "${raw.status}"`)
     if (!['', 'yes', 'no'].includes(raw.anchor_required)) throw new Error(`${at}: anchor_required must be yes, no or empty`)
-    const language = raw.language as Language
-    const key = keyOf(language, raw.kanji)
-    if (palette.has(key)) throw new Error(`${at}: duplicate row for ${language} ${raw.kanji}`)
-    palette.set(key, {
+    if (raw.inscription_fitness !== '' && !(INSCRIPTION_FITNESS as readonly string[]).includes(raw.inscription_fitness)) {
+      throw new Error(`${at}: inscription_fitness must be ${INSCRIPTION_FITNESS.join(' | ')} or empty`)
+    }
+    const blocked = split(raw.blocked_occasions)
+    for (const o of blocked) if (!(OCCASIONS as readonly string[]).includes(o)) throw new Error(`${at}: unknown occasion code "${o}" in blocked_occasions`)
+    for (const r of split(raw.relationship_fit)) {
+      if (r !== 'all' && !(RELATIONSHIPS as readonly string[]).includes(r)) throw new Error(`${at}: unknown relationship code "${r}" in relationship_fit`)
+    }
+    const language = raw.language as Family
+    const key = `${language}:${raw.kanji}`
+    if (seen.has(key)) throw new Error(`${at}: duplicate row for ${language} ${raw.kanji}`)
+    seen.add(key)
+    rows.push({
       language,
       kanji: raw.kanji,
+      inscription_form: raw.inscription_form,
+      reviewed: isReviewed(raw.reviewed_by),
       status: raw.status as PaletteRow['status'],
       readings: split(raw.readings),
       taboo_flags: split(raw.taboo_flags),
       register_flags: split(raw.register_flags),
-      blocked_occasions: split(raw.blocked_occasions),
+      blocked_occasions: blocked,
       anchor_required: raw.anchor_required === 'yes',
       raw,
     })
   })
-  return palette
+  return new Palette(rows)
 }
 
 function resolvePalettePath(): string {
@@ -149,8 +205,9 @@ export function anchorPresent(candidate: Pick<Candidate, 'story_anchor'>, story:
   return pieces.length > 0 && pieces.every((p) => haystack.includes(p))
 }
 
-function rowFor(palette: Palette, language: Language, c: Candidate): PaletteRow | undefined {
-  return palette.get(keyOf(language, c.kanji)) ?? (c.kyujitai_form ? palette.get(keyOf(language, c.kyujitai_form)) : undefined)
+/** Find a candidate's row by either of its forms (zh: simplified `kanji` or traditional `kyujitai_form`). */
+function rowFor(palette: Palette, family: Family, c: Candidate): PaletteRow | undefined {
+  return palette.lookup(family, c.kanji) ?? (c.kyujitai_form ? palette.lookup(family, c.kyujitai_form) : undefined)
 }
 
 const unique = (xs: string[]) => [...new Set(xs)]
@@ -162,7 +219,7 @@ const unique = (xs: string[]) => [...new Set(xs)]
 export function applyPalette(result: EngineResult, palette: Palette, story: string): EngineResult {
   if (result.status !== 'sufficient' || !Array.isArray(result.candidates) || result.candidates.length === 0) return result
 
-  const language = result.language
+  const language = familyOf(result.language)
   const actions: RefereeAction[] = []
 
   // 1. Per-candidate: overwrite palette_status/flags from the row; enforce hard_block.
@@ -170,6 +227,10 @@ export function applyPalette(result: EngineResult, palette: Palette, story: stri
     const c: Candidate = { ...orig, flags: [...(orig.flags ?? [])] }
     const row = rowFor(palette, language, c)
     if (!row) return c
+    // An `ok` row nobody has reviewed yet does not vouch for the character: the model's own
+    // judgement stands until a named reviewer signs the row. context_required / hard_block
+    // rows are conservative, so they apply even while unreviewed.
+    if (row.status === 'ok' && !row.reviewed) return c
     c.flags = unique([...c.flags, ...row.taboo_flags, ...row.register_flags])
     if (row.status === 'ok') c.palette_status = 'ok'
     else if (row.status === 'context_required') c.palette_status = 'context_required'

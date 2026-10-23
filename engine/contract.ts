@@ -8,8 +8,28 @@
 
 // ---- Inputs ---------------------------------------------------------------
 
-export const LANGUAGES = ['ja', 'zh'] as const
+/**
+ * ja = Japanese. zh-Hans / zh-Hant = Mandarin Chinese with SIMPLIFIED / TRADITIONAL
+ * display text. Both Chinese codes share one prompt file (prompt.zh.md) and one set
+ * of palette rows ("zh") — only the script of the output text differs.
+ */
+export const LANGUAGES = ['ja', 'zh-Hans', 'zh-Hant'] as const
 export type Language = (typeof LANGUAGES)[number]
+
+/** Which prompt file / which palette rows serve a language: ja → "ja"; zh-Hans and zh-Hant → "zh". */
+export const FAMILIES = ['ja', 'zh'] as const
+export type Family = (typeof FAMILIES)[number]
+export const familyOf = (language: Language): Family => (language === 'ja' ? 'ja' : 'zh')
+
+/** Script of the customer-facing text. null for ja (not applicable). */
+export type Script = 'simplified' | 'traditional'
+export const displayScriptOf = (language: Language): Script | null =>
+  language === 'zh-Hans' ? 'simplified' : language === 'zh-Hant' ? 'traditional' : null
+
+/** Script the character is carved in (Chinese only). Defaults to traditional. */
+export const INSCRIPTION_SCRIPTS = ['traditional', 'simplified'] as const
+export type InscriptionScript = (typeof INSCRIPTION_SCRIPTS)[number]
+export const DEFAULT_INSCRIPTION_SCRIPT: InscriptionScript = 'traditional'
 
 export const RELATIONSHIPS = [
   'parent_mother',
@@ -50,6 +70,8 @@ export interface EngineContext {
   occasion: Occasion | null
   /** Optional free text refining the occasion, e.g. "還暦", "30歳", "結婚10年". Never validated against a list. */
   occasion_detail: string | null
+  /** Chinese only: traditional (default) or simplified. Always null for ja — not applicable there. */
+  inscription_script: InscriptionScript | null
 }
 
 /** Longest occasion_detail accepted — it is a short label, not a second story. */
@@ -61,6 +83,7 @@ export const DEFAULT_CONTEXT: EngineContext = {
   direction: null,
   occasion: null,
   occasion_detail: null,
+  inscription_script: null,
 }
 
 type Parsed = { ok: true; context: EngineContext } | { ok: false; error: string }
@@ -76,6 +99,7 @@ export function parseContext(input: {
   direction?: unknown
   occasion?: unknown
   occasion_detail?: unknown
+  inscription_script?: unknown
 }): Parsed {
   const pick = <T extends string>(
     name: string,
@@ -98,6 +122,9 @@ export function parseContext(input: {
   const occasion = pick('occasion', input.occasion, OCCASIONS)
   if ('error' in occasion) return { ok: false, error: occasion.error }
 
+  const script = pick('inscription_script', input.inscription_script, INSCRIPTION_SCRIPTS)
+  if ('error' in script) return { ok: false, error: script.error }
+
   // occasion_detail is free text: trim, flatten whitespace to single spaces (it sits on one
   // line of the prompt's CONTEXT block), blank = not supplied, over the cap = rejected.
   let occasionDetail: string | null = null
@@ -111,14 +138,17 @@ export function parseContext(input: {
     occasionDetail = flat || null
   }
 
+  const resolvedLanguage = language.value ?? DEFAULT_CONTEXT.language
   return {
     ok: true,
     context: {
-      language: language.value ?? DEFAULT_CONTEXT.language,
+      language: resolvedLanguage,
       relationship: relationship.value,
       direction: direction.value,
       occasion: occasion.value,
       occasion_detail: occasionDetail,
+      // Chinese: the supplied script, else traditional. ja: not applicable, so a supplied value is ignored.
+      inscription_script: resolvedLanguage === 'ja' ? null : (script.value ?? DEFAULT_INSCRIPTION_SCRIPT),
     },
   }
 }
@@ -159,6 +189,12 @@ export type PaletteStatus = 'ok' | 'context_required' | 'off_palette'
 export const PALETTE_STATUSES: readonly PaletteStatus[] = ['ok', 'context_required', 'off_palette']
 
 /** Values of the `status` column in engine/palette.csv. */
+/** Allowed values of the palette's inscription_fitness column (how well the character stands alone, carved). */
+export const INSCRIPTION_FITNESS = ['high', 'medium', 'low'] as const
+
+/** Placeholder for "considered, nothing to record" in the palette's list columns. */
+export const PALETTE_NONE = 'none'
+
 export const PALETTE_ROW_STATUSES = ['ok', 'context_required', 'hard_block'] as const
 
 /** Column order of engine/palette.csv (header only until the palette is curated). */
@@ -184,8 +220,14 @@ export const PALETTE_COLUMNS = [
 
 /** One parsed row of engine/palette.csv (multi-value cells are split on "|"). */
 export interface PaletteRow {
-  language: Language
+  /** Palette family: "ja", or "zh" — one zh row serves both zh-Hans and zh-Hant. */
+  language: Family
+  /** ja: the modern form. zh: the SIMPLIFIED form. */
   kanji: string
+  /** ja: the kyūjitai (or the same character). zh: the TRADITIONAL form (or the same character). May be empty on interim rows. */
+  inscription_form: string
+  /** True once a named human reviewer has signed off (reviewed_by is not empty and does not start with draft- or interim-). Only reviewed `ok` rows overwrite the model's palette_status. */
+  reviewed: boolean
   status: (typeof PALETTE_ROW_STATUSES)[number]
   readings: string[]
   taboo_flags: string[]
@@ -219,7 +261,7 @@ export interface RefereeReport {
 }
 
 export interface Candidate {
-  /** ja: modern Japanese form. zh: SIMPLIFIED form (the display form). */
+  /** ja: modern Japanese form. zh (both scripts): the SIMPLIFIED form — the palette key. */
   kanji: string
   /** ja: hiragana. zh: pinyin with tone marks. */
   reading: string
@@ -259,6 +301,8 @@ export interface EngineResult {
   occasion: Occasion | null
   /** v5: echo of the optional free-text occasion detail, null when not supplied. */
   occasion_detail: string | null
+  /** v5: echo of the inscription script (Chinese: traditional | simplified; ja: null). */
+  inscription_script: InscriptionScript | null
   status: 'sufficient' | 'insufficient'
   follow_up_question: string | null
   particulars: string[]
@@ -303,6 +347,11 @@ export function validateEngineResult(raw: unknown): string[] {
     if (v === undefined) problems.push(`${key} missing`)
     else if (v !== null && !(allowed as readonly string[]).includes(v as string)) problems.push(`${key} invalid: ${String(v)}`)
   }
+
+  const script = (r as Record<string, unknown>).inscription_script
+  if (script === undefined) problems.push('inscription_script missing')
+  else if (r.language === 'ja' && script !== null) problems.push('inscription_script must be null for ja')
+  else if (r.language !== 'ja' && !(INSCRIPTION_SCRIPTS as readonly string[]).includes(script as string)) problems.push('inscription_script must be traditional|simplified for Chinese')
 
   const detail = (r as Record<string, unknown>).occasion_detail
   if (detail === undefined) problems.push('occasion_detail missing')

@@ -6,6 +6,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import {
   CONTEXT_SLOTS,
+  SCRIPT_SLOTS,
   STORY_SLOT,
   extractJson,
   fillPrompt,
@@ -13,6 +14,8 @@ import {
 } from '../engine/engine.ts'
 import {
   DIRECTIONS,
+  FAMILIES,
+  INSCRIPTION_SCRIPTS,
   LANGUAGES,
   OCCASIONS,
   OCCASION_DETAIL_MAX,
@@ -21,7 +24,7 @@ import {
   parseContext,
   validateEngineResult,
   type EngineContext,
-  type Language,
+  type Family,
 } from '../engine/contract.ts'
 
 let failures = 0
@@ -46,27 +49,29 @@ check(
     JSON.stringify(['birthday_milestone', 'wedding', 'new_baby', 'school_career', 'retirement_farewell', 'parent_day', 'seasonal_thanks']),
 )
 check('direction codes = up | down | across', JSON.stringify([...DIRECTIONS]) === JSON.stringify(['up', 'down', 'across']))
-check('languages = ja | zh', JSON.stringify([...LANGUAGES]) === JSON.stringify(['ja', 'zh']))
+check('languages = ja | zh-Hans | zh-Hant (no bare zh)', JSON.stringify([...LANGUAGES]) === JSON.stringify(['ja', 'zh-Hans', 'zh-Hant']))
+check('inscription scripts = traditional (default) | simplified', JSON.stringify([...INSCRIPTION_SCRIPTS]) === JSON.stringify(['traditional', 'simplified']))
 
 // ---------------------------------------------------------------------------
 // 2. palette.csv: exactly the 17 columns in the spec order (+ interim rows).
 // ---------------------------------------------------------------------------
 const SPEC_COLUMNS = ['language', 'kanji', 'inscription_form', 'readings', 'core_meanings', 'auspicious_compounds', 'status', 'taboo_flags', 'blocked_occasions', 'register_flags', 'anchor_required', 'cross_language_note', 'relationship_fit', 'inscription_fitness', 'classical_echo', 'reviewed_by', 'reviewed_on']
 const csvLines = read('engine/palette.csv').split('\n').filter((l) => l.trim() !== '')
-check('palette.csv: header + the 31 interim rows (18 ja + 13 zh; scripts/test-palette.ts checks their content)', csvLines.length === 32, `lines=${csvLines.length}`)
+check('palette.csv: header + the draft rows (scripts/test-palette-data.ts checks their content)', csvLines.length > 500, `lines=${csvLines.length}`)
 check('palette.csv header = the 17 spec columns, in order', csvLines[0] === SPEC_COLUMNS.join(','), csvLines[0])
 check('contract PALETTE_COLUMNS matches the CSV header', csvLines[0] === PALETTE_COLUMNS.join(','))
 
 // ---------------------------------------------------------------------------
 // 3. Both prompt files: skeleton, slots, v5 requirements, no 還暦-only wording.
 // ---------------------------------------------------------------------------
-const prompts: Record<Language, string> = { ja: read('engine/prompt.ja.md'), zh: read('engine/prompt.zh.md') }
+const prompts: Record<Family, string> = { ja: read('engine/prompt.ja.md'), zh: read('engine/prompt.zh.md') }
 const ALL_SLOTS = [STORY_SLOT, ...Object.values(CONTEXT_SLOTS)]
 
-for (const lang of LANGUAGES) {
+for (const lang of FAMILIES) {
   const p = prompts[lang]
   const tag = `prompt.${lang}.md`
-  check(`${tag}: every slot appears exactly once`, ALL_SLOTS.every((s) => count(p, s) === 1), ALL_SLOTS.map((s) => `${s}×${count(p, s)}`).join(' '))
+  const slots = lang === 'zh' ? [...ALL_SLOTS, ...Object.values(SCRIPT_SLOTS)] : ALL_SLOTS
+  check(`${tag}: every slot appears exactly once`, slots.every((s) => count(p, s) === 1), slots.map((s) => `${s}×${count(p, s)}`).join(' '))
   const stepIdx = [0, 1, 2, 3, 4, 5, 6].map((n) => p.indexOf(`STEP ${n} —`))
   check(`${tag}: STEP 0–6 all present, in order`, stepIdx.every((i, k) => i >= 0 && (k === 0 || i > stepIdx[k - 1])), stepIdx.join(','))
   check(`${tag}: thesis = "the image of the receiver the sender holds in their heart, now"`, p.includes('the image of the receiver the sender holds in their heart, now'))
@@ -89,6 +94,9 @@ for (const lang of LANGUAGES) {
   check(`${tag}: palette_status values ok | context_required | off_palette`, p.includes('"ok" | "context_required" | "off_palette"'))
 }
 check('prompt.ja.md: Japanese output (hiragana readings, kyūjitai rule)', prompts.ja.includes('hiragana') && prompts.ja.includes('Kyūjitai') && !prompts.ja.includes('pinyin'))
+check('prompt.ja.md has no Chinese script slots', !prompts.ja.includes('{{ DISPLAY_SCRIPT }}') && !prompts.ja.includes('{{ INSCRIPTION_SCRIPT }}'))
+check('prompt.zh.md: one prompt for both scripts — display_script and inscription_script are defined in the CONTEXT block', prompts.zh.includes('display_script: {{ DISPLAY_SCRIPT }}') && prompts.zh.includes('inscription_script: {{ INSCRIPTION_SCRIPT }}') && prompts.zh.includes('zh-Hans') && prompts.zh.includes('zh-Hant'))
+check('prompt.zh.md: customer-facing text follows display_script; `kanji` is always simplified, kyujitai_form traditional', prompts.zh.includes('written in the display_script') && prompts.zh.includes('ALWAYS the SIMPLIFIED form') && prompts.zh.includes('"inscription_script": "traditional" | "simplified"'))
 check('prompt.zh.md: Chinese output (traditional inscription + simplified form + pinyin)', prompts.zh.includes('TRADITIONAL') && prompts.zh.includes('SIMPLIFIED') && prompts.zh.includes('pinyin') && prompts.zh.includes('繁體中文'))
 check('prompt.zh.md: no Japanese-only machinery (hiragana / kyūjitai rule)', !prompts.zh.includes('hiragana') && !prompts.zh.includes('Kyūjitai'))
 check('prompt.zh.md: reasons about Mandarin homophones, never Japanese meanings', prompts.zh.includes('homophone') && prompts.zh.includes('never Japanese meanings'))
@@ -96,14 +104,21 @@ check('prompt.zh.md: reasons about Mandarin homophones, never Japanese meanings'
 // ---------------------------------------------------------------------------
 // 4. loadPrompt / fillPrompt injection.
 // ---------------------------------------------------------------------------
-const golden: EngineContext = { language: 'ja', relationship: 'parent_father', direction: 'up', occasion: 'birthday_milestone', occasion_detail: '還暦' }
+const golden: EngineContext = { language: 'ja', relationship: 'parent_father', direction: 'up', occasion: 'birthday_milestone', occasion_detail: '還暦', inscription_script: null }
 const story = 'テスト物語：父は毎晩、玄関の灯りをつけて待っていた。'
 const injected = fillPrompt(loadPrompt('ja'), story, golden)
 check('fill: story injected', injected.includes(story))
 check('fill: context injected (language/relationship/direction/occasion)', ['language: ja', 'relationship: parent_father', 'direction: up', 'occasion: birthday_milestone', 'occasion_detail: 還暦'].every((l) => injected.includes(l)))
 check('fill: no slot left behind', !ALL_SLOTS.some((s) => injected.includes(s)))
-const unspec = fillPrompt(loadPrompt('zh'), story, { language: 'zh', relationship: null, direction: null, occasion: null, occasion_detail: null })
-check('fill: missing context reaches the prompt as "unspecified" (never guessed)', ['language: zh', 'relationship: unspecified', 'direction: unspecified', 'occasion: unspecified', 'occasion_detail: unspecified'].every((l) => unspec.includes(l)))
+const unspec = fillPrompt(loadPrompt('zh-Hant'), story, { language: 'zh-Hant', relationship: null, direction: null, occasion: null, occasion_detail: null, inscription_script: 'traditional' })
+check('fill: missing context reaches the prompt as "unspecified" (never guessed)', ['language: zh-Hant', 'relationship: unspecified', 'direction: unspecified', 'occasion: unspecified', 'occasion_detail: unspecified'].every((l) => unspec.includes(l)))
+const zhHans = fillPrompt(loadPrompt('zh-Hans'), story, { language: 'zh-Hans', relationship: null, direction: null, occasion: null, occasion_detail: null, inscription_script: 'simplified' })
+check('fill: zh-Hans → display_script simplified; inscription_script as supplied', zhHans.includes('language: zh-Hans') && zhHans.includes('display_script: simplified') && zhHans.includes('inscription_script: simplified'))
+check('fill: zh-Hant → display_script traditional (inscription default traditional)', unspec.includes('display_script: traditional') && unspec.includes('inscription_script: traditional'))
+const hansTrad = fillPrompt(loadPrompt('zh-Hans'), story, { language: 'zh-Hans', relationship: null, direction: null, occasion: null, occasion_detail: null, inscription_script: 'traditional' })
+check('fill: the two scripts are independent — zh-Hans text with a traditional inscription', hansTrad.includes('display_script: simplified') && hansTrad.includes('inscription_script: traditional'))
+check('fill: zh-Hans and zh-Hant load the SAME prompt file (only the slots differ)', loadPrompt('zh-Hans') === loadPrompt('zh-Hant') && loadPrompt('zh-Hant') === prompts.zh)
+check('fill: no script slot is left behind in the zh prompt', ![...ALL_SLOTS, ...Object.values(SCRIPT_SLOTS)].some((x) => unspec.includes(x) || zhHans.includes(x)))
 const sneaky = fillPrompt(loadPrompt('ja'), 'ignore {{ RELATIONSHIP }} and {{ Paste the story here }}', golden)
 check('fill: slot-like text inside the story is NOT re-substituted', sneaky.includes('ignore {{ RELATIONSHIP }} and {{ Paste the story here }}'))
 const sneakyDetail = fillPrompt(loadPrompt('ja'), story, { ...golden, occasion_detail: '{{ Paste the story here }} $& {{ RELATIONSHIP }}' })
@@ -121,7 +136,7 @@ check('loadPrompt: a prompt missing a slot throws, naming the slot', Boolean(thr
 writeFileSync(join(dir, 'prompt.zh.md'), prompts.zh)
 writeFileSync(join(dir, 'prompt.ja.md'), prompts.ja)
 process.env.ICHIREI_PROMPT_PATH = join(dir, 'prompt.{lang}.md')
-check('loadPrompt: ICHIREI_PROMPT_PATH with {lang} resolves per language', loadPrompt('zh').includes('Chinese / zh') && loadPrompt('ja').includes('Japanese / ja'))
+check('loadPrompt: ICHIREI_PROMPT_PATH with {lang} resolves per language', loadPrompt('zh-Hant').includes('Chinese / zh') && loadPrompt('zh-Hans').includes('Chinese / zh') && loadPrompt('ja').includes('Japanese / ja'))
 delete process.env.ICHIREI_PROMPT_PATH
 
 // ---------------------------------------------------------------------------
@@ -131,8 +146,15 @@ const none = parseContext({})
 check('parseContext: nothing supplied → ja + three nulls', none.ok && none.context.language === 'ja' && none.context.relationship === null && none.context.direction === null && none.context.occasion === null && none.context.occasion_detail === null)
 const empties = parseContext({ language: '', relationship: '', direction: null, occasion: undefined })
 check('parseContext: empty string / null / undefined all mean "not supplied"', empties.ok && empties.context.relationship === null)
-const full = parseContext({ language: 'zh', relationship: 'mentor', direction: 'up', occasion: 'retirement_farewell' })
-check('parseContext: valid codes accepted', full.ok && full.context.language === 'zh' && full.context.occasion === 'retirement_farewell')
+const full = parseContext({ language: 'zh-Hant', relationship: 'mentor', direction: 'up', occasion: 'retirement_farewell' })
+check('parseContext: valid codes accepted', full.ok && full.context.language === 'zh-Hant' && full.context.occasion === 'retirement_farewell')
+check('parseContext: bare "zh" is no longer a language', !parseContext({ language: 'zh' }).ok)
+check('parseContext: Chinese defaults the inscription script to traditional', full.ok && full.context.inscription_script === 'traditional' && parseContext({ language: 'zh-Hans' }).ok)
+const hansSimp = parseContext({ language: 'zh-Hans', inscription_script: 'simplified' })
+check('parseContext: inscription_script simplified accepted for Chinese', hansSimp.ok && hansSimp.context.inscription_script === 'simplified')
+check('parseContext: inscription_script is ignored (null) for ja', (() => { const r = parseContext({ language: 'ja', inscription_script: 'simplified' }); return r.ok && r.context.inscription_script === null })())
+check('parseContext: ja with no script → inscription_script null', none.ok && none.context.inscription_script === null)
+check('parseContext: an unknown inscription_script is rejected', !parseContext({ language: 'zh-Hans', inscription_script: 'hant' }).ok)
 const detail = parseContext({ occasion_detail: '  結婚10年 \n ' })
 check('parseContext: occasion_detail is free text — trimmed, whitespace flattened', detail.ok && detail.context.occasion_detail === '結婚10年')
 const blankDetail = parseContext({ occasion_detail: '   ' })
@@ -174,13 +196,16 @@ check('contract: unknown relationship code is caught', mutate((r) => (r.relation
 check('contract: missing runner_up_kanji is caught (sufficient result)', mutate((r) => delete r.runner_up_kanji).some((p) => p.includes('runner_up_kanji missing')))
 check('contract: runner_up_kanji must be a candidate, not eliminated, not the primary', mutate((r) => (r.runner_up_kanji = '山')).some((p) => p.includes('not among')) && mutate((r) => (r.runner_up_kanji = '送')).some((p) => p.includes('eliminated')) && mutate((r) => (r.runner_up_kanji = '迎')).some((p) => p.includes('equals primary')))
 check('contract: runner_up_kanji null is valid', mutate((r) => (r.runner_up_kanji = null)).length === 0)
-check('contract: insufficient result must have a null runner_up_kanji', validateEngineResult({ language: 'ja', relationship: null, direction: null, occasion: null, occasion_detail: null, status: 'insufficient', follow_up_question: 'q', candidates: [], primary_kanji: null, runner_up_kanji: '迎' }).some((p) => p.includes('runner_up_kanji')))
+check('contract: insufficient result must have a null runner_up_kanji', validateEngineResult({ language: 'ja', relationship: null, direction: null, occasion: null, occasion_detail: null, inscription_script: null, status: 'insufficient', follow_up_question: 'q', candidates: [], primary_kanji: null, runner_up_kanji: '迎' }).some((p) => p.includes('runner_up_kanji')))
+check('contract: missing inscription_script echo is caught', mutate((r) => delete r.inscription_script).some((p) => p.includes('inscription_script missing')))
+check('contract: ja result must have inscription_script null', mutate((r) => (r.inscription_script = 'traditional')).some((p) => p.includes('null for ja')))
+check('contract: a Chinese result needs inscription_script traditional|simplified', mutate((r) => { r.language = 'zh-Hant'; r.inscription_script = null }).some((p) => p.includes('traditional|simplified')) && mutate((r) => { r.language = 'zh-Hans'; r.inscription_script = 'simplified' }).every((p) => !p.includes('inscription_script')))
 check('contract: missing echo field is caught', mutate((r) => delete r.occasion).some((p) => p.includes('occasion')))
 check('contract: missing occasion_detail echo is caught', mutate((r) => delete r.occasion_detail).some((p) => p.includes('occasion_detail')))
 check('contract: occasion_detail must be string|null', mutate((r) => (r.occasion_detail = 30)).some((p) => p.includes('occasion_detail')))
 check('contract: fingerprint.relationship_note required when sufficient', mutate((r) => delete r.fingerprint.relationship_note).some((p) => p.includes('relationship_note')))
 check('contract: primary pointing at an eliminated candidate is caught', mutate((r) => (r.primary_kanji = '送')).some((p) => p.includes('eliminated')))
-check('contract: insufficient result must carry a follow-up question and no candidates', validateEngineResult({ language: 'ja', relationship: null, direction: null, occasion: null, occasion_detail: null, status: 'insufficient', follow_up_question: null, candidates: [], primary_kanji: null }).length > 0)
+check('contract: insufficient result must carry a follow-up question and no candidates', validateEngineResult({ language: 'ja', relationship: null, direction: null, occasion: null, occasion_detail: null, inscription_script: null, status: 'insufficient', follow_up_question: null, candidates: [], primary_kanji: null }).length > 0)
 
 console.log(failures === 0 ? '\nAll plumbing checks passed.' : `\n${failures} FAILED`)
 process.exit(failures === 0 ? 0 : 1)
