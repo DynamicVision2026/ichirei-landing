@@ -63,6 +63,7 @@ HARD PROCESS RULES (do not reorder, do not skip)
 2. In STEP 1–2 you may not collapse particulars into generic emotions (love, gratitude, strength, bond). Keep meaning as concrete as the object it came from.
 3. Every candidate in STEP 3 must cite verbatim story evidence (a short quoted fragment). No evidence, no candidate.
 4. Show your work at every step. Legibility matters more than brevity here.
+5. The `one_line_gaze` may use ONLY details that are present in the story. Never invent objects, places, times or actions — no light, car, room, season, habit or gesture the story does not state, even if it would be plausible for this kind of person. If you cannot write the gaze from the story's own details, the candidate has no evidence: replace or drop it.
 STEP 0 — Input sufficiency
 Before anything else, check: does the story contain at least one concrete particular — a specific object, gesture, place, repeated action, habitual phrase, physical act of waiting, silence, or contradiction?
 
@@ -112,12 +113,12 @@ reading:          (hiragana — the natural Japanese reading)
 truth_type:       
 scarce_asset_it_preserves:
 story_anchor:     (verbatim fragment — the evidence)
-one_line_gaze:    (Japanese — how the sender sees them, in ONE sentence)
+one_line_gaze:    (Japanese — how the sender sees them, in ONE sentence; built ONLY from details stated in the story — see HARD PROCESS RULE 5)
 why_not_generic:  (what binds this to THIS story specifically)
 
 ```
 
-Quarantine rule: the generic virtue characters — 愛, 優, 強, 光, 絆, 感, 守 and their kin — are forbidden unless re-bound to a specific particular from the story. 灯 as "warmth" is banned; 灯 as "the light you left on every night I came home late" is allowed and may even be the strongest answer. If the only character you can reach is an un-bound generic, that is a signal the extraction was too shallow — go back, don't ship the generic.
+Quarantine rule: the generic virtue characters — 愛, 優, 健, 強, 光, 絆, 感, 守 and their kin — are forbidden unless re-bound to a specific particular from the story. 灯 as "warmth" is banned; 灯 as "the light you left on every night I came home late" is allowed and may even be the strongest answer. If the only character you can reach is an un-bound generic, that is a signal the extraction was too shallow — go back, don't ship the generic.
 STEP 4 — Gates (apply to every candidate; eliminate any that fail gates 1–5; gate 6 decides who may be the primary)
 
 1. Substitution Test. Mentally swap the names and surface details for another family, couple, friendship or team. Does the `one_line_gaze` still fit? If yes → generic → eliminate.
@@ -133,6 +134,7 @@ Do not pick the highest average score. Among the candidates that survived the ga
 * is least substitutable by the other five,
 * and would keep pulling at the sender after they'd chosen a different one.
 State explicitly: what unique truth does this character own that no other candidate recovers?
+Then name the RUNNER-UP: the next-best candidate that is also non-eliminated and passed the heart-anchor gate — the one you would make primary if your first choice turned out to be unavailable. Choose it by the same Abandonment Resistance reasoning, not by list order. If no other candidate qualifies, there is no runner-up (null).
 STEP 6 — Output
 Produce, in this order:
 
@@ -234,7 +236,7 @@ Return this exact shape:
       "reading": string,                  // hiragana
       "kyujitai_form": string | null,     // old-form variant, or null if none exists
       "truth_type": "Essence" | "Turning Point" | "Role" | "Hidden Cost" | "Private Symbol" | "Forward Blessing",
-      "one_line_gaze": string,            // Japanese, ONE sentence
+      "one_line_gaze": string,            // Japanese, ONE sentence; only details stated in the story
       "story_anchor": string,             // verbatim fragment from the story
       "unique_truth": string,             // the non-substitutable truth it preserves
       "eliminated": boolean,              // true if it failed a STEP 4 gate
@@ -244,15 +246,17 @@ Return this exact shape:
       "flags": string[]                   // snake_case tags, 0–6; [] if none
     }
   ],
-  "primary_kanji": string | null          // the STEP 5 primary's `kanji` (the cinnabar one); null when insufficient
+  "primary_kanji": string | null,         // the STEP 5 primary's `kanji` (the cinnabar one); null when insufficient
+  "runner_up_kanji": string | null        // the STEP 5 runner-up's `kanji`; null when there is none or when insufficient
 }
 
 When status is "insufficient" (STEP 0, or no candidate passed the STEP 4 heart-anchor
 gate): set follow_up_question to the single tailored Japanese question, particulars to [], every fingerprint field to null, candidates to
-[], and primary_kanji to null. Do not fabricate particulars or candidates to fill the
+[], and primary_kanji and runner_up_kanji to null. Do not fabricate particulars or candidates to fill the
 shape.
 
 When status is "sufficient": return all six candidates (including eliminated ones, each
 with eliminated=true and its eliminated_reason), and set primary_kanji to the kanji of
 the surviving candidate chosen by Abandonment Resistance. The primary must be one of the
-non-eliminated candidates.
+non-eliminated candidates. Set runner_up_kanji to the kanji of the STEP 5 runner-up — a
+different non-eliminated candidate that passed the heart-anchor gate — or null if there is none.

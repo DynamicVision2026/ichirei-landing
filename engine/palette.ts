@@ -204,6 +204,7 @@ export function applyPalette(result: EngineResult, palette: Palette, story: stri
   const primaryIdx = candidates.findIndex((c) => c.kanji === originalPrimary)
   const primaryCand = primaryIdx >= 0 ? candidates[primaryIdx] : undefined
   let primary: string | null = originalPrimary
+  let promotedFrom: 'runner_up' | 'array_order' | null = null
 
   // Act only when the referee itself disqualifies the primary: it is hard-blocked, or it
   // is a context_required kanji with no anchor. (A primary the MODEL eliminated is the
@@ -212,28 +213,48 @@ export function applyPalette(result: EngineResult, palette: Palette, story: stri
   const primaryNoAnchor = primaryCand ? !primaryHardBlocked && !primaryCand.eliminated && anchorMissing(primaryCand) : false
   if (primaryCand && (primaryHardBlocked || primaryNoAnchor)) {
     if (primaryNoAnchor) refuse(primaryCand, 'context_required kanji needs a usable story anchor to be primary')
-    // Promote the next surviving candidate: array order, starting after the removed
-    // primary and wrapping round (the contract has no rank field).
+    // Promote the model's own runner-up (STEP 5) when it is still eligible; otherwise fall
+    // back to array order, starting after the removed primary and wrapping round.
     primary = null
-    for (let step = 1; step < candidates.length; step++) {
-      const next = candidates[(primaryIdx + step) % candidates.length]
-      if (eligible(next)) {
-        primary = next.kanji
-        break
+    const runnerUp = candidates.find((c) => c.kanji === result.runner_up_kanji && c.kanji !== originalPrimary)
+    if (runnerUp && eligible(runnerUp)) {
+      primary = runnerUp.kanji
+      promotedFrom = 'runner_up'
+    } else {
+      if (runnerUp && !runnerUp.eliminated && anchorMissing(runnerUp)) refuse(runnerUp, 'runner-up skipped as promotion target: no usable story anchor')
+      for (let step = 1; step < candidates.length; step++) {
+        const next = candidates[(primaryIdx + step) % candidates.length]
+        if (next === runnerUp) continue
+        if (eligible(next)) {
+          primary = next.kanji
+          promotedFrom = 'array_order'
+          break
+        }
+        if (!next.eliminated && anchorMissing(next)) refuse(next, 'skipped as promotion target: no usable story anchor')
       }
-      if (!next.eliminated && anchorMissing(next)) refuse(next, 'skipped as promotion target: no usable story anchor')
     }
+  }
+
+  // The runner-up that ships must still be a valid backup: a different, still-eligible
+  // candidate. Consumed by a promotion, or disqualified by the palette → null.
+  // (If the model omitted the field it stays omitted, so a live run shows the gap.)
+  let runnerUpOut = result.runner_up_kanji
+  if (typeof runnerUpOut === 'string') {
+    const r = candidates.find((c) => c.kanji === runnerUpOut)
+    if (!r || r.kanji === primary || !eligible(r)) runnerUpOut = null
   }
 
   return {
     ...result,
     candidates,
     primary_kanji: primary,
+    ...(runnerUpOut !== undefined ? { runner_up_kanji: runnerUpOut } : {}),
     referee: {
       palette_rows: palette.size,
       original_primary: originalPrimary,
       primary_changed: primary !== originalPrimary,
       no_eligible_primary: primary === null,
+      promoted_from: promotedFrom,
       actions,
     },
   }

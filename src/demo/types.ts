@@ -47,11 +47,13 @@ export interface EngineResult {
   fingerprint: Fingerprint
   candidates: Candidate[]
   primary_kanji: string | null
+  runner_up_kanji?: string | null
   referee?: {
     palette_rows: number
     original_primary: string | null
     primary_changed: boolean
     no_eligible_primary: boolean
+    promoted_from: 'runner_up' | 'array_order' | null
     actions: { kanji: string; action: string; detail: string }[]
   }
 }

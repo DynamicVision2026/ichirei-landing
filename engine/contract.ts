@@ -213,6 +213,8 @@ export interface RefereeReport {
   primary_changed: boolean
   /** True when no candidate could be primary after the referee ran (primary_kanji is then null). */
   no_eligible_primary: boolean
+  /** How a replacement primary was chosen: the model's runner-up, or array order as the fallback. null = no promotion. */
+  promoted_from: 'runner_up' | 'array_order' | null
   actions: RefereeAction[]
 }
 
@@ -263,6 +265,11 @@ export interface EngineResult {
   fingerprint: Fingerprint
   candidates: Candidate[]
   primary_kanji: string | null
+  /**
+   * v5: the model's STEP 5 runner-up — the candidate to promote if the primary is removed
+   * or refused by the palette referee. null = none (or insufficient).
+   */
+  runner_up_kanji: string | null
   /** Set by the palette referee on every sufficient result; absent on insufficient ones. */
   referee?: RefereeReport
 }
@@ -309,6 +316,7 @@ export function validateEngineResult(raw: unknown): string[] {
     if (typeof r.follow_up_question !== 'string' || !r.follow_up_question) problems.push('insufficient but no follow_up_question')
     if ((r.candidates ?? []).length !== 0) problems.push('insufficient but candidates not empty')
     if (r.primary_kanji !== null) problems.push('insufficient but primary_kanji not null')
+    if (r.runner_up_kanji !== undefined && r.runner_up_kanji !== null) problems.push('insufficient but runner_up_kanji not null')
     return problems
   }
 
@@ -329,6 +337,13 @@ export function validateEngineResult(raw: unknown): string[] {
     if (!Array.isArray(c?.flags) || c.flags.some((f) => typeof f !== 'string')) problems.push(`${at}.flags must be string[]`)
   })
   const primary = cands.find((c) => c.kanji === r.primary_kanji)
+  if (r.runner_up_kanji === undefined) problems.push('runner_up_kanji missing')
+  else if (r.runner_up_kanji !== null) {
+    const ru = cands.find((c) => c.kanji === r.runner_up_kanji)
+    if (!ru) problems.push('runner_up_kanji is not among the candidates')
+    else if (ru.eliminated) problems.push('runner_up_kanji points at an eliminated candidate')
+    else if (r.runner_up_kanji === r.primary_kanji) problems.push('runner_up_kanji equals primary_kanji')
+  }
   if (r.primary_kanji === null && r.referee?.no_eligible_primary === true) return problems
   if (!primary) problems.push('primary_kanji is not among the candidates')
   else if (primary.eliminated) problems.push('primary_kanji points at an eliminated candidate')

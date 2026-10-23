@@ -67,7 +67,7 @@ try {
   // The engine returns the model's answer after the palette referee; for the golden fixture
   // that adds the referee block and the palette's verdicts, nothing else.
   check('golden: result equals the golden fixture run through the palette referee', JSON.stringify(golden) === JSON.stringify(applyPalette(GOLDEN, loadPalette(), GOLDEN_STORY)))
-  check('golden: referee ran, kept 迎 as primary (verbatim anchor), changed no candidate set', golden.referee?.palette_rows === 18 && golden.referee.primary_changed === false && golden.candidates.map((c) => c.kanji).join('') === GOLDEN.candidates.map((c: { kanji: string }) => c.kanji).join(''))
+  check('golden: referee ran, kept 迎 as primary (verbatim anchor), changed no candidate set', golden.referee?.palette_rows === 31 && golden.referee.primary_changed === false && golden.candidates.map((c) => c.kanji).join('') === GOLDEN.candidates.map((c: { kanji: string }) => c.kanji).join(''))
   check('golden: result conforms to the v5 contract', validateEngineResult(golden).length === 0, validateEngineResult(golden).join('; '))
   check('golden: primary is 迎 and the four context fields are echoed', golden.primary_kanji === '迎' && golden.language === 'ja' && golden.relationship === 'parent_father' && golden.direction === 'up' && golden.occasion === 'birthday_milestone' && golden.occasion_detail === '還暦')
   check('golden→model: prompt is prompt.ja.md (Japanese output rules)', p1.includes('Selection Prompt (v5, Japanese / ja)') && p1.includes('hiragana'))
@@ -106,14 +106,14 @@ try {
   // primary with an anchor line that is not in the story. The engine must return 送 eliminated and a different primary.
   const cands = GOLDEN.candidates as Record<string, unknown>[]
   const base = (k: string, over: Record<string, unknown> = {}) => ({ ...cands[1], kanji: k, eliminated: false, eliminated_reason: null, palette_status: 'ok', flags: [], ...over })
-  reply = { ...GOLDEN, candidates: [base('黙'), base('送', { story_anchor: '帰りも必ず送ってくれる' }), base('餞', { story_anchor: '毎朝お弁当を作ってくれた' }), base('灯'), base('駅'), base('愛', { eliminated: true, eliminated_reason: 'ゲート1' })], primary_kanji: '餞' }
+  reply = { ...GOLDEN, candidates: [base('黙'), base('送', { story_anchor: '帰りも必ず送ってくれる' }), base('餞', { story_anchor: '毎朝お弁当を作ってくれた' }), base('灯'), base('駅'), base('愛', { eliminated: true, eliminated_reason: 'ゲート1' })], primary_kanji: '餞', runner_up_kanji: '駅' }
   const refereed = await runEngine(GOLDEN_STORY, 'A', { context: { language: 'ja', relationship: 'parent_father', direction: 'up', occasion: 'birthday_milestone', occasion_detail: '還暦' } })
   const sou = refereed.candidates.find((c) => c.kanji === '送')!
   check('referee (engine): 送 comes back eliminated with reason "palette: hard_block"', sou.eliminated === true && sou.eliminated_reason === 'palette: hard_block' && sou.palette_status === 'off_palette')
-  check('referee (engine): anchorless 餞 is refused as primary; the next survivor (灯) is promoted', refereed.primary_kanji === '灯' && refereed.referee?.original_primary === '餞' && refereed.referee.primary_changed === true && refereed.candidates.find((c) => c.kanji === '餞')!.eliminated === false)
+  check('referee (engine): anchorless 餞 is refused as primary; the model\'s runner-up (駅) is promoted', refereed.primary_kanji === '駅' && refereed.referee?.promoted_from === 'runner_up' && refereed.referee?.original_primary === '餞' && refereed.referee.primary_changed === true && refereed.candidates.find((c) => c.kanji === '餞')!.eliminated === false)
   check('referee (engine): the refereed result still conforms to the contract', validateEngineResult(refereed).length === 0, validateEngineResult(refereed).join('; '))
   const viaApi = (await ndjson(await post({ story: GOLDEN_STORY, condition: 'A', language: 'ja', relationship: 'parent_father', direction: 'up', occasion: 'birthday_milestone' }))).at(-1)
-  check('referee (api): the NDJSON result line carries the refereed result', viaApi?.type === 'result' && viaApi.result.primary_kanji === '灯' && viaApi.result.referee?.actions.length >= 2)
+  check('referee (api): the NDJSON result line carries the refereed result', viaApi?.type === 'result' && viaApi.result.primary_kanji === '駅' && viaApi.result.referee?.actions.length >= 2)
   reply = GOLDEN
 
   // ---- 5. Insufficient (STEP 0 or heart-anchor) still carries the context -----

@@ -53,7 +53,7 @@ check('languages = ja | zh', JSON.stringify([...LANGUAGES]) === JSON.stringify([
 // ---------------------------------------------------------------------------
 const SPEC_COLUMNS = ['language', 'kanji', 'inscription_form', 'readings', 'core_meanings', 'auspicious_compounds', 'status', 'taboo_flags', 'blocked_occasions', 'register_flags', 'anchor_required', 'cross_language_note', 'relationship_fit', 'inscription_fitness', 'classical_echo', 'reviewed_by', 'reviewed_on']
 const csvLines = read('engine/palette.csv').split('\n').filter((l) => l.trim() !== '')
-check('palette.csv: header + the 18 interim rows (scripts/test-palette.ts checks their content)', csvLines.length === 19, `lines=${csvLines.length}`)
+check('palette.csv: header + the 31 interim rows (18 ja + 13 zh; scripts/test-palette.ts checks their content)', csvLines.length === 32, `lines=${csvLines.length}`)
 check('palette.csv header = the 17 spec columns, in order', csvLines[0] === SPEC_COLUMNS.join(','), csvLines[0])
 check('contract PALETTE_COLUMNS matches the CSV header', csvLines[0] === PALETTE_COLUMNS.join(','))
 
@@ -78,6 +78,10 @@ for (const lang of LANGUAGES) {
   check(`${tag}: substitution test widened to family, couple, friendship or team`, p.includes('another family, couple, friendship or team'))
   check(`${tag}: heart-anchor gate in STEP 4 (sender personally lived it)`, /6\. Heart anchor\./.test(p) && p.indexOf('6. Heart anchor.') > p.indexOf('STEP 4') && p.indexOf('6. Heart anchor.') < p.indexOf('STEP 5') && p.includes('personally lived with the receiver'))
   check(`${tag}: STEP 5 restricts the primary to heart-anchored candidates`, p.includes('passed the heart-anchor gate'))
+  check(`${tag}: HARD RULE 5 — one_line_gaze uses only details present in the story (no invented objects, places, times, actions)`, p.includes('5. The `one_line_gaze` may use ONLY details that are present in the story.') && p.includes('Never invent objects, places, times or actions') && p.indexOf('5. The `one_line_gaze`') < p.indexOf('STEP 0 —'))
+  check(`${tag}: the gaze rule is repeated at the template line and the output shape`, p.includes('built ONLY from details stated in the story') && p.includes('only details stated in the story'))
+  check(`${tag}: 健 is in the generic-virtue quarantine list`, /Quarantine rule:[^\n]*健[^\n]*are forbidden unless re-bound/.test(p))
+  check(`${tag}: STEP 5 asks for a runner-up; output shape has runner_up_kanji (nullable) and insufficient nulls it`, p.includes('RUNNER-UP') && p.includes('"runner_up_kanji": string | null') && p.includes('primary_kanji and runner_up_kanji to null'))
   check(`${tag}: STEP 1 asks for the LIVED/TOLD mark the gate depends on`, p.includes('LIVED') && p.includes('TOLD'))
   const missingCodes = [...RELATIONSHIPS, ...DIRECTIONS, ...OCCASIONS].filter((c) => !p.includes(`* ${c} —`))
   check(`${tag}: glossary defines every relationship/direction/occasion code`, missingCodes.length === 0, missingCodes.join(','))
@@ -167,6 +171,10 @@ check('contract: missing palette_status is caught', mutate((r) => delete r.candi
 check('contract: palette_status "hard_block" is not a valid OUTPUT value', mutate((r) => (r.candidates[1].palette_status = 'hard_block')).some((p) => p.includes('palette_status')))
 check('contract: flags must be string[]', mutate((r) => (r.candidates[0].flags = 'oops')).some((p) => p.includes('flags')))
 check('contract: unknown relationship code is caught', mutate((r) => (r.relationship = 'father')).some((p) => p.includes('relationship')))
+check('contract: missing runner_up_kanji is caught (sufficient result)', mutate((r) => delete r.runner_up_kanji).some((p) => p.includes('runner_up_kanji missing')))
+check('contract: runner_up_kanji must be a candidate, not eliminated, not the primary', mutate((r) => (r.runner_up_kanji = '山')).some((p) => p.includes('not among')) && mutate((r) => (r.runner_up_kanji = '送')).some((p) => p.includes('eliminated')) && mutate((r) => (r.runner_up_kanji = '迎')).some((p) => p.includes('equals primary')))
+check('contract: runner_up_kanji null is valid', mutate((r) => (r.runner_up_kanji = null)).length === 0)
+check('contract: insufficient result must have a null runner_up_kanji', validateEngineResult({ language: 'ja', relationship: null, direction: null, occasion: null, occasion_detail: null, status: 'insufficient', follow_up_question: 'q', candidates: [], primary_kanji: null, runner_up_kanji: '迎' }).some((p) => p.includes('runner_up_kanji')))
 check('contract: missing echo field is caught', mutate((r) => delete r.occasion).some((p) => p.includes('occasion')))
 check('contract: missing occasion_detail echo is caught', mutate((r) => delete r.occasion_detail).some((p) => p.includes('occasion_detail')))
 check('contract: occasion_detail must be string|null', mutate((r) => (r.occasion_detail = 30)).some((p) => p.includes('occasion_detail')))
