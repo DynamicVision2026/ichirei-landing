@@ -24,6 +24,10 @@ type Props = {
   condition: Condition
   copy: Copy
   context: GiftContext
+  /** Harness-only extras: the "set aside" diagnostics and the honesty flags. Off for customers. */
+  diagnostics?: boolean
+  /** Customer flow: called with the chosen candidate instead of the harness "decided" state. */
+  onFinalize?: (candidate: Candidate) => void
 }
 
 function InscriptionGlyph({
@@ -54,7 +58,7 @@ function InscriptionGlyph({
   )
 }
 
-export default function Reveal({ result, story, condition, copy, context }: Props) {
+export default function Reveal({ result, story, condition, copy, context, diagnostics = true, onFinalize }: Props) {
   // The engine's echo is authoritative for what was actually run; fall back to the form state.
   const language: UiLanguage = result.language ?? context.language
   const script: InscriptionScript | null =
@@ -142,6 +146,11 @@ export default function Reveal({ result, story, condition, copy, context }: Prop
     if (!selected || finalized) return
     flushDwell()
     log('final_selection', { kanji: selected })
+    const chosen = result.candidates.find((c) => c.kanji === selected)
+    if (onFinalize && chosen) {
+      onFinalize(chosen) // the customer flow moves on to the order form; selection stays so "back" works
+      return
+    }
     setFinalized(true)
   }
 
@@ -272,7 +281,7 @@ export default function Reveal({ result, story, condition, copy, context }: Prop
                         </button>
                       )}
 
-                      {c.suitability_flag && (
+                      {diagnostics && c.suitability_flag && (
                         <p className="font-label mb-4 text-[11px] leading-relaxed text-gold/70">
                           ⚑ {c.suitability_flag}
                         </p>
@@ -306,7 +315,7 @@ export default function Reveal({ result, story, condition, copy, context }: Prop
 
       {allRevealed && (
         <>
-          {eliminated.length > 0 && (
+          {diagnostics && eliminated.length > 0 && (
             <details className="mt-10 opacity-70">
               <summary className="font-label cursor-pointer text-xs tracking-[0.15em] text-ivory/50">
                 {copy.eliminatedSummary(eliminated.length)}

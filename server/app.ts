@@ -9,6 +9,9 @@ import type { Server } from 'node:http'
 import { Hono, type Context, type MiddlewareHandler } from 'hono'
 import { serveStatic } from '@hono/node-server/serve-static'
 import { POST as selectPost } from '../api/select.ts'
+import { POST as orderPost } from '../api/order.ts'
+import { createOrderStore } from '../engine/order-store.ts'
+import { loadShopifyConfig } from '../engine/shopify.ts'
 import explainHandler from '../api/explain.ts'
 import logHandler from '../api/log.ts'
 import { ENGINE_CONFIG } from '../engine/engine.ts'
@@ -44,6 +47,19 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): ServerConfig {
   }
 }
 
+/** What /api/health reports about the purchase flow: configured or not, and what is missing. */
+export function orderReadiness(env: NodeJS.ProcessEnv = process.env) {
+  const shopify = loadShopifyConfig(env)
+  const store = createOrderStore(env)
+  const missing = [...(store ? [] : ['ORDER_BUCKET']), ...shopify.missing]
+  return {
+    ready: missing.length === 0,
+    store: store?.kind ?? null,
+    shopifyStore: (env.SHOPIFY_STORE_DOMAIN || 'soul-id-2.myshopify.com').trim(),
+    missing,
+  }
+}
+
 export function createApp(config: ServerConfig): Hono {
   const app = new Hono()
 
@@ -67,6 +83,8 @@ export function createApp(config: ServerConfig): Hono {
     c.json({
       ok: true,
       apiKeyConfigured: Boolean(process.env.ANTHROPIC_API_KEY),
+      // Purchase flow readiness — which settings are still missing, never their values.
+      orders: orderReadiness(),
       model: ENGINE_CONFIG.MODEL,
       effort: ENGINE_CONFIG.EFFORT,
       maxTokens: ENGINE_CONFIG.MAX_TOKENS,
@@ -88,12 +106,15 @@ export function createApp(config: ServerConfig): Hono {
   )
   app.post('/api/explain', requireApiKey, adaptVercelHandler(explainHandler))
   app.post('/api/log', adaptVercelHandler(logHandler))
+  // Purchase hand-off: stores the story + result under order_ref, creates the Shopify cart.
+  app.post('/api/order', (c) => orderPost(c.req.raw))
 
   const methodNotAllowed = (c: Context) =>
     c.json({ error: 'Method not allowed' }, 405, { Allow: 'POST' })
   app.all('/api/select', methodNotAllowed)
   app.all('/api/explain', methodNotAllowed)
   app.all('/api/log', methodNotAllowed)
+  app.all('/api/order', methodNotAllowed)
   app.all('/api/*', (c) => c.json({ error: 'Not found' }, 404))
 
   // ---- Frontend (built Vite output) ------------------------------------

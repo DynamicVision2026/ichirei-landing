@@ -1,11 +1,13 @@
-import { useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { motion, useReducedMotion } from 'framer-motion'
-import type { Condition, EngineResult } from './types'
+import type { Candidate, Condition, EngineResult } from './types'
 import Elicitation from './Elicitation'
 import Reveal from './Reveal'
+import OrderForm from './OrderForm'
 import { exportEvents, log, setCondition as logSetCondition, setStory as logSetStory } from './logging'
 import { COPY, DEFAULT_GIFT_CONTEXT, contextToPayload, type Copy, type GiftContext } from './i18n'
 import { getLanguage, setLanguage } from '../lang-store'
+import { useLanguage } from '../useLanguage'
 
 // Validation-harness orchestrator: elicitation (§7) → engine call (§4) →
 // adaptive follow-up (§7.4, at most twice) → progressive reveal (§8), with the
@@ -94,7 +96,14 @@ const GOLDEN_CONTEXT: GiftContext = {
 const GOLDEN_FIXTURE =
   '父は口下手で厳しくて、ほめられた記憶なんてほとんどない。進路のことでも何度もぶつかった。ただ、私が東京に出るとき駅まで送ってくれて、改札で「金は要るか」って、それだけ言って封筒を押し付けてきた。あれから二十年、盆に帰るたびに車で駅まで迎えに来て、帰りも必ず送ってくれる。相変わらず、ほとんど何も話さないけど。'
 
-type Phase = 'elicit' | 'processing' | 'followup' | 'reveal' | 'thin'
+type Phase = 'elicit' | 'processing' | 'followup' | 'reveal' | 'order' | 'thin'
+
+/**
+ * harness  — /demo: the internal validation harness (A/B/C conditions, log export, golden fixture,
+ *            diagnostics).
+ * customer — / : the same engine with none of the test controls; ends in the order form.
+ */
+export type Mode = 'harness' | 'customer'
 
 function ProcessingView({ receivedChars, copy }: { receivedChars: number; copy: Copy }) {
   const reduceMotion = useReducedMotion()
@@ -125,12 +134,26 @@ function ProcessingView({ receivedChars, copy }: { receivedChars: number; copy: 
   )
 }
 
+/** /demo: a full page. */
+function HarnessShell({ children }: { children: React.ReactNode }) {
+  return <div className="min-h-screen bg-ink px-6 py-10 text-ivory">{children}</div>
+}
+
+/** /: the section of the landing page where the sender writes, chooses and orders. */
+function CustomerShell({ children }: { children: React.ReactNode }) {
+  return (
+    <section id="story-input" className="relative w-full bg-ink px-6 py-24 text-ivory sm:py-32">
+      {children}
+    </section>
+  )
+}
+
 /**
  * Shown when the palette referee removed every candidate that could be the primary
  * (primary_kanji is null): says so plainly, lists what was removed and why, and points
  * back to the story. Candidates that survived (if any) are still revealed beneath it.
  */
-function NoPrimaryNotice({ result, copy }: { result: EngineResult; copy: Copy }) {
+function NoPrimaryNotice({ result, copy, showRemoved }: { result: EngineResult; copy: Copy; showRemoved: boolean }) {
   const removed = result.candidates.filter((c) => c.eliminated)
   const kept = result.candidates.filter((c) => !c.eliminated)
   return (
@@ -141,7 +164,7 @@ function NoPrimaryNotice({ result, copy }: { result: EngineResult; copy: Copy })
     >
       <p className="font-mincho text-xl leading-relaxed text-ivory">{copy.noPrimaryTitle}</p>
       <p className="font-serif-jp mt-3 text-sm leading-loose text-ivory/70">{copy.noPrimaryBody}</p>
-      {removed.length > 0 && (
+      {showRemoved && removed.length > 0 && (
         <div className="mt-5">
           <p className="font-label mb-2 text-[11px] tracking-[0.15em] text-gold/70">{copy.noPrimaryRemoved}</p>
           <ul className="flex flex-col gap-1.5">
@@ -154,7 +177,7 @@ function NoPrimaryNotice({ result, copy }: { result: EngineResult; copy: Copy })
           </ul>
         </div>
       )}
-      {kept.length > 0 && (
+      {showRemoved && kept.length > 0 && (
         <p className="font-label mt-4 text-[11px] text-ivory/45">
           {copy.noPrimaryKept}：{kept.map((c) => c.kanji).join(' ')}
         </p>
@@ -163,7 +186,8 @@ function NoPrimaryNotice({ result, copy }: { result: EngineResult; copy: Copy })
   )
 }
 
-export default function DemoApp() {
+export default function DemoApp({ mode = 'harness' }: { mode?: Mode } = {}) {
+  const customer = mode === 'customer'
   const [phase, setPhase] = useState<Phase>('elicit')
   const [story, setStory] = useState('')
   // The language is shared with the landing page: starts from the sender's stored choice and writes it back.
@@ -173,6 +197,13 @@ export default function DemoApp() {
     setContextState(next)
   }
   const copy = COPY[context.language]
+  const [chosen, setChosen] = useState<Candidate | null>(null)
+
+  // The nav switch on the landing page changes the shared language; follow it.
+  const [storeLanguage] = useLanguage()
+  useEffect(() => {
+    setContextState((c) => (c.language === storeLanguage ? c : { ...c, language: storeLanguage }))
+  }, [storeLanguage])
   const [condition, setConditionState] = useState<Condition>('A')
   const [result, setResult] = useState<EngineResult | null>(null)
   const [error, setError] = useState<string | null>(null)
@@ -276,6 +307,7 @@ export default function DemoApp() {
     setFollowUpQuestion(null)
     setFollowUpAnswer('')
     setReceivedChars(0)
+    setChosen(null)
     setPhase('elicit')
   }
 
@@ -287,9 +319,11 @@ export default function DemoApp() {
     void runEngine(merged)
   }
 
+  const Wrapper = customer ? CustomerShell : HarnessShell
   return (
-    <div className="min-h-screen bg-ink px-6 py-10 text-ivory">
+    <Wrapper>
       <div className="mx-auto max-w-3xl">
+        {!customer && (
         <header className="mb-10 flex flex-wrap items-center justify-between gap-4">
           <div className="flex items-baseline gap-2">
             <span className="font-mincho text-lg text-ivory">一字礼</span>
@@ -326,6 +360,7 @@ export default function DemoApp() {
             </button>
           </div>
         </header>
+        )}
 
         {error && (
           <p className="font-label mb-6 rounded-sm border border-cinnabar/50 bg-cinnabar/10 p-4 text-sm text-cinnabar">
@@ -343,17 +378,21 @@ export default function DemoApp() {
               copy={copy}
               context={context}
               onContextChange={setContext}
+              showLanguage={!customer}
+              showInscriptionScript={!customer}
             />
-            <button
-              type="button"
-              onClick={() => {
-                setStory(GOLDEN_FIXTURE)
-                setContext(GOLDEN_CONTEXT)
-              }}
-              className="font-label mt-8 text-[11px] tracking-wide text-ivory/30 underline-offset-4 transition-colors hover:text-ivory/60 hover:underline"
-            >
-              load golden fixture (§10 acceptance test)
-            </button>
+            {!customer && (
+              <button
+                type="button"
+                onClick={() => {
+                  setStory(GOLDEN_FIXTURE)
+                  setContext(GOLDEN_CONTEXT)
+                }}
+                className="font-label mt-8 text-[11px] tracking-wide text-ivory/30 underline-offset-4 transition-colors hover:text-ivory/60 hover:underline"
+              >
+                load golden fixture (§10 acceptance test)
+              </button>
+            )}
           </>
         )}
 
@@ -405,11 +444,26 @@ export default function DemoApp() {
           </div>
         )}
 
-        {phase === 'reveal' && result && (
-          <>
-            {result.primary_kanji === null && <NoPrimaryNotice result={result} copy={copy} />}
+        {(phase === 'reveal' || phase === 'order') && result && (
+          <div hidden={phase === 'order'}>
+            {result.primary_kanji === null && <NoPrimaryNotice result={result} copy={copy} showRemoved={!customer} />}
             {result.candidates.some((c) => !c.eliminated) && (
-              <Reveal result={result} story={story} condition={condition} copy={copy} context={context} />
+              <Reveal
+                result={result}
+                story={story}
+                condition={customer ? 'A' : condition}
+                copy={copy}
+                context={context}
+                diagnostics={!customer}
+                onFinalize={
+                  customer
+                    ? (c) => {
+                        setChosen(c)
+                        setPhase('order')
+                      }
+                    : undefined
+                }
+              />
             )}
             <div className="mt-12 text-center">
               <button
@@ -420,10 +474,14 @@ export default function DemoApp() {
                 {copy.tryAgain}
               </button>
             </div>
-          </>
+          </div>
         )}
 
-        {result && (phase === 'reveal' || phase === 'thin') && (
+        {customer && phase === 'order' && result && chosen && (
+          <OrderForm result={result} story={story} candidate={chosen} copy={copy} onBack={() => setPhase('reveal')} />
+        )}
+
+        {!customer && result && (phase === 'reveal' || phase === 'thin') && (
           <details className="mt-14 opacity-60">
             <summary className="font-label cursor-pointer text-[11px] tracking-[0.15em] text-ivory/40">
               {copy.rawContract}
@@ -434,6 +492,6 @@ export default function DemoApp() {
           </details>
         )}
       </div>
-    </div>
+    </Wrapper>
   )
 }

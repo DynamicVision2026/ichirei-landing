@@ -5,6 +5,10 @@
       "maxDuration": 60,
       "includeFiles": "engine/**"
     },
+    "api/order.ts": {
+      "maxDuration": 30,
+      "includeFiles": "{engine/**,src/order/**}"
+    },
     "api/explain.ts": {
       "maxDuration": 60,
       "includeFiles": "engine/**"

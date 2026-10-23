@@ -1,7 +1,7 @@
 # Cloud Build: build the container -> push to Artifact Registry -> deploy to
 # Cloud Run service "ichirei".
 #
-# ANTHROPIC_API_KEY is NEVER baked into the image or stored in this repo. The
+# ANTHROPIC_API_KEY and SHOPIFY_STOREFRONT_TOKEN are NEVER baked into the image or stored in this repo. The
 # deploy step mounts the Secret Manager secret named ANTHROPIC_API_KEY as an env
 # var of the same name at runtime (--set-secrets below). Create/rotate the secret
 # in Secret Manager (Console -> Security -> Secret Manager -> ANTHROPIC_API_KEY ->
@@ -14,6 +14,11 @@ substitutions:
   _REGION: asia-northeast1          # Tokyo
   _SERVICE: ichirei                 # Cloud Run service name
   _REPO: ichirei                    # Artifact Registry Docker repository name
+  # Purchase flow (Step 4). Not secrets: the Shopify variant ids of the two packages and the
+  # Cloud Storage bucket that holds the orders. Set them on the trigger (DEPLOY.md, Step 7).
+  _SHOPIFY_VARIANT_SIMPLE: ''       # ¥9,800 package  (numeric id or gid://shopify/ProductVariant/…)
+  _SHOPIFY_VARIANT_STANDARD: ''     # ¥15,800 package
+  _ORDER_BUCKET: ''                 # e.g. ichirei-orders
   _TIMEOUT: '300'                   # Cloud Run request timeout (s). Keep in step with
                                     # the server (300s) and the frontend deadline (290s).
 
@@ -53,8 +58,10 @@ steps:
       - --cpu-boost                    # faster cold starts
       - --min-instances=0
       - --max-instances=3              # caps concurrent spend; raise when needed
-      # Mount the Secret Manager secret as the ANTHROPIC_API_KEY env var.
-      - --set-secrets=ANTHROPIC_API_KEY=ANTHROPIC_API_KEY:latest
+      # Mount the Secret Manager secrets as env vars of the same name.
+      - --set-secrets=ANTHROPIC_API_KEY=ANTHROPIC_API_KEY:latest,SHOPIFY_STOREFRONT_TOKEN=SHOPIFY_STOREFRONT_TOKEN:latest
+      # Non-secret purchase settings. --update-env-vars leaves any other variables (ICHIREI_EFFORT …) alone.
+      - --update-env-vars=SHOPIFY_VARIANT_SIMPLE=${_SHOPIFY_VARIANT_SIMPLE},SHOPIFY_VARIANT_STANDARD=${_SHOPIFY_VARIANT_STANDARD},ORDER_BUCKET=${_ORDER_BUCKET}
 
 images:
   - ${_REGION}-docker.pkg.dev/$PROJECT_ID/${_REPO}/${_SERVICE}:$BUILD_ID

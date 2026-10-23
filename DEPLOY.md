@@ -121,6 +121,54 @@ Once the golden fixture works on Cloud Run: merge `claude/cloud-run-migration` i
 
 ---
 
+## Step 7 — Purchase flow: Shopify checkout + order storage
+
+The site at `/` now ends in a purchase: the sender picks a character, fills in names, delivery date, inscription form and package (Simple ¥9,800 / Standard ¥15,800), and is sent to **Shopify checkout** (store `soul-id-2.myshopify.com`). The **story and the engine result are never sent to Shopify** — they are saved in a private Cloud Storage bucket as `orders/<order_ref>.json`, and the same `order_ref` rides on the Shopify line item so production can look the order up.
+
+What the server needs (check `<URL>/api/health` → `"orders"`; it lists what is still missing, never the values):
+
+| Setting | Where | What |
+|---|---|---|
+| `SHOPIFY_STOREFRONT_TOKEN` | **Secret Manager** secret (mounted by `cloudbuild.yaml`) | Storefront API access token |
+| `SHOPIFY_VARIANT_SIMPLE`, `SHOPIFY_VARIANT_STANDARD` | Cloud Build trigger **substitutions** `_SHOPIFY_VARIANT_SIMPLE`, `_SHOPIFY_VARIANT_STANDARD` | the Shopify variant ids of the two packages |
+| `ORDER_BUCKET` | substitution `_ORDER_BUCKET` | the Cloud Storage bucket for orders |
+
+**7a — Shopify admin (browser).**
+1. **Products:** create the two packages so their **prices are the source of truth** (the site never sends a price): one product with two variants, or two products — *Simple* **¥9,800** and *Standard* **¥15,800** (tax-included, matching how the store prices). Make both **available to the sales channel / app that owns the Storefront token** (step 2) — a product that is not published to it cannot be put in a cart.
+2. **Storefront token:** *Settings → Apps and sales channels → Develop apps → Create an app* → *Configure Storefront API scopes*: **`unauthenticated_read_product_listings`** and **`unauthenticated_write_checkouts`** (plus `unauthenticated_read_checkouts`) → *Install app* → copy the **Storefront API access token**. (You already created the Secret Manager secret `SHOPIFY_STOREFRONT_TOKEN`; if you rotate the token, add a new version there.)
+3. **Variant ids:** open each product → the variant → the number at the end of the URL (`…/products/123/variants/`**`45678901234567`**) is the id. Either the number or the full `gid://shopify/ProductVariant/45678901234567` works.
+4. The eight line-item attributes (`kanji`, `inscription_form`, `reading`, `sender_name`, `receiver_name`, `delivery_date`, `language`, `order_ref`) show on each order as **line-item properties**; `order_ref` is also on the order itself. `inscription_form` is the **glyph to carve** (after the sender's choice of old/modern or traditional/simplified).
+
+**7b — Cloud Storage bucket + permissions (Cloud Shell).**
+```bash
+PROJECT_ID=ichirei
+PROJECT_NUMBER=$(gcloud projects describe $PROJECT_ID --format='value(projectNumber)')
+RUN_SA="${PROJECT_NUMBER}-compute@developer.gserviceaccount.com"
+
+# Private bucket in Tokyo (no public access, uniform access control)
+gcloud storage buckets create gs://ichirei-orders --location=asia-northeast1 \
+  --uniform-bucket-level-access --public-access-prevention
+
+# The Cloud Run runtime identity may create / overwrite / read the order objects
+gcloud storage buckets add-iam-policy-binding gs://ichirei-orders \
+  --member="serviceAccount:${RUN_SA}" --role=roles/storage.objectUser
+
+# …and read the Shopify token secret
+gcloud secrets add-iam-policy-binding SHOPIFY_STOREFRONT_TOKEN \
+  --member="serviceAccount:${RUN_SA}" --role=roles/secretmanager.secretAccessor
+```
+Orders contain **personal data** (names, the sender's story): keep the bucket private, decide a retention period (a bucket *lifecycle rule* can delete objects after N days), and mention it in your privacy policy.
+
+**7c — Trigger substitutions.** Cloud Build → Triggers → `ichirei-deploy` → Edit → *Substitution variables*: `_ORDER_BUCKET` = `ichirei-orders`, `_SHOPIFY_VARIANT_SIMPLE` = `<id>`, `_SHOPIFY_VARIANT_STANDARD` = `<id>`. Save and run the trigger (the deploy now also mounts the new secret).
+
+**7d — Verify.** `<URL>/api/health` → `"orders": { "ready": true, "store": "gcs", … "missing": [] }`. Then on `<URL>/` choose a character, fill the form and press the order button: you land on a Shopify checkout with the package, and the line shows the eight properties. Do **not** complete a real payment while testing (or use Shopify's *Bogus Gateway* / a test order you cancel).
+
+**Looking an order up (production).** Console → **Cloud Storage → `ichirei-orders` → `orders/` → `IC-YYYYMMDD-XXXXXXXX.json`** → *Preview*. The top block **`production`** has everything at a glance — the character and the glyph to carve, reading, **gaze line**, **story anchor**, sender/receiver names, delivery date, package and the **certificate text**; below it are the full `story` and `engine_result`. `status` is `cart_created` once Shopify accepted the cart (`cart_failed` / `pending` orders were never checked out).
+
+**If the order button shows an error:** `503 … not configured` → the health page says which setting is missing; `502 cart_failed` → Shopify refused the cart (most often a variant id that is wrong or not published to the Storefront app; the reason is in the order's `error` field).
+
+---
+
 ## Editing the engine prompt
 
 `engine/prompt.ja.md` and `engine/prompt.zh.md` (and `engine/explain-prompt.ja.md` / `engine/explain-prompt.zh.md`) are plain text read at request time. Edit → commit → push to the trigger's branch → Cloud Build rebuilds and redeploys automatically (~4–6 min). No code changes. (Editing on github.com in the browser works fine.)

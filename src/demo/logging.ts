@@ -19,6 +19,8 @@ export type LogEventName =
   | 'condition_changed'
   | 'follow_up_shown'
   | 'retry_clicked'
+  | 'order_submitted'
+  | 'order_failed'
 
 export interface LogEvent {
   event: LogEventName

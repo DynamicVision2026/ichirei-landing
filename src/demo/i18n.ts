@@ -11,6 +11,9 @@
 export type UiLanguage = 'ja' | 'zh-Hans' | 'zh-Hant'
 export type InscriptionScript = 'traditional' | 'simplified'
 export type Condition = 'A' | 'B' | 'C'
+export type PackageId = 'simple' | 'standard'
+export type InscriptionStyle = 'kyujitai' | 'modern' | 'traditional' | 'simplified'
+export type OrderField = 'sender_name' | 'receiver_name' | 'delivery_date' | 'inscription_style' | 'package'
 
 export const UI_LANGUAGES: readonly UiLanguage[] = ['ja', 'zh-Hans', 'zh-Hant']
 export const RELATIONSHIP_CODES = [
@@ -116,6 +119,29 @@ export interface Copy {
   noPrimaryBody: string
   noPrimaryRemoved: string
   noPrimaryKept: string
+  // purchase (customer flow, after a character is chosen)
+  order: {
+    heading: string
+    chosenLabel: string
+    senderLabel: string
+    senderPlaceholder: string
+    receiverLabel: string
+    receiverPlaceholder: string
+    dateLabel: string
+    dateNotice: (days: number) => string
+    inscriptionLabel: string
+    inscriptionStyles: Record<InscriptionStyle, string>
+    inscriptionSame: string
+    packageLabel: string
+    packages: Record<PackageId, string>
+    certificateLabel: string
+    privacy: string
+    submit: string
+    submitting: string
+    redirecting: string
+    back: string
+    errors: { generic: string; network: string; notConfigured: string; field: (field: OrderField) => string }
+  }
 }
 
 const ja: Copy = {
@@ -213,6 +239,33 @@ const ja: Copy = {
     '見つかった字のうち、贈る場面にふさわしくない字（避けたほうがよい意味や響きを持つ字など）が取り除かれ、中心にできる字が残りませんでした。その人と過ごした小さな場面をもうひとつ書き足して、もう一度お試しください。',
   noPrimaryRemoved: '取り除かれた字',
   noPrimaryKept: '残った字（中心にはできません）',
+  order: {
+    heading: 'ご注文',
+    chosenLabel: 'あなたが選んだ一字',
+    senderLabel: 'あなたのお名前（差出人）',
+    senderPlaceholder: '例：山田 太郎',
+    receiverLabel: '贈る方のお名前',
+    receiverPlaceholder: '例：山田 一郎',
+    dateLabel: 'お届け希望日',
+    dateNotice: (n) => `お届け希望日まで${n}日です。`,
+    inscriptionLabel: '刻印の字体',
+    inscriptionStyles: { kyujitai: '古体字（旧字体）', modern: '現代字', traditional: '繁体字', simplified: '簡体字' },
+    inscriptionSame: 'この字は、古体字と現代字で同じ形です。',
+    packageLabel: 'パッケージ',
+    packages: { simple: 'シンプル', standard: 'スタンダード' },
+    certificateLabel: '添える一文',
+    privacy: 'ご注文の際に、入力いただいたお名前・物語・選ばれた一字を、制作のために保存します。',
+    submit: 'お支払いへ進む',
+    submitting: '準備しています…',
+    redirecting: 'お支払いページへ移動します…',
+    back: '字を選びなおす',
+    errors: {
+      generic: 'ご注文を受け付けられませんでした。お手数ですが、もう一度お試しください。',
+      network: '通信に失敗しました。もう一度お試しください。',
+      notConfigured: 'ただいまご注文を受け付けられません。時間をおいて、もう一度お試しください。',
+      field: (f) => `「${{ sender_name: 'あなたのお名前', receiver_name: '贈る方のお名前', delivery_date: 'お届け希望日', inscription_style: '刻印の字体', package: 'パッケージ' }[f]}」をご確認ください。`,
+    },
+  },
 }
 
 const zhHans: Copy = {
@@ -313,6 +366,33 @@ const zhHans: Copy = {
     '找到的字当中，不适合这个场合的字（带有应避讳的含义或谐音等）已被排除，剩下的字里没有可以作为中心的。请再补充一个和那个人一起度过的小场景，然后再试一次。',
   noPrimaryRemoved: '被排除的字',
   noPrimaryKept: '留下的字（不能作为中心）',
+  order: {
+    heading: '下单',
+    chosenLabel: '你选定的这个字',
+    senderLabel: '你的姓名（送礼人）',
+    senderPlaceholder: '例如：李明',
+    receiverLabel: '收礼人的姓名',
+    receiverPlaceholder: '例如：李华',
+    dateLabel: '期望送达日',
+    dateNotice: (n) => `距离期望送达日还有 ${n} 天。`,
+    inscriptionLabel: '刻字字体',
+    inscriptionStyles: { kyujitai: '古体字', modern: '现代字', traditional: '繁體字', simplified: '简体字' },
+    inscriptionSame: '这个字的繁体与简体写法相同。',
+    packageLabel: '套餐',
+    packages: { simple: '简约款', standard: '标准款' },
+    certificateLabel: '随礼附上的一句话',
+    privacy: '下单时，我们会保存你填写的姓名、故事和选定的字，用于制作。',
+    submit: '前往付款',
+    submitting: '正在准备…',
+    redirecting: '正在前往付款页面…',
+    back: '重新选字',
+    errors: {
+      generic: '未能受理订单，请再试一次。',
+      network: '网络连接失败，请再试一次。',
+      notConfigured: '目前暂时无法下单，请稍后再试。',
+      field: (f) => `请检查「${{ sender_name: '你的姓名', receiver_name: '收礼人的姓名', delivery_date: '期望送达日', inscription_style: '刻字字体', package: '套餐' }[f]}」。`,
+    },
+  },
 }
 
 const zhHant: Copy = {
@@ -413,6 +493,33 @@ const zhHant: Copy = {
     '找到的字當中，不適合這個場合的字（帶有應避諱的含義或諧音等）已被排除，剩下的字裡沒有可以作為中心的。請再補充一個和那個人一起度過的小場景，然後再試一次。',
   noPrimaryRemoved: '被排除的字',
   noPrimaryKept: '留下的字（不能作為中心）',
+  order: {
+    heading: '下單',
+    chosenLabel: '你選定的這個字',
+    senderLabel: '你的姓名（送禮人）',
+    senderPlaceholder: '例如：李明',
+    receiverLabel: '收禮人的姓名',
+    receiverPlaceholder: '例如：李華',
+    dateLabel: '期望送達日',
+    dateNotice: (n) => `距離期望送達日還有 ${n} 天。`,
+    inscriptionLabel: '刻字字體',
+    inscriptionStyles: { kyujitai: '古體字', modern: '現代字', traditional: '繁體字', simplified: '簡體字' },
+    inscriptionSame: '這個字的繁體與簡體寫法相同。',
+    packageLabel: '方案',
+    packages: { simple: '簡約款', standard: '標準款' },
+    certificateLabel: '隨禮附上的一句話',
+    privacy: '下單時，我們會保存你填寫的姓名、故事和選定的字，用於製作。',
+    submit: '前往付款',
+    submitting: '正在準備…',
+    redirecting: '正在前往付款頁面…',
+    back: '重新選字',
+    errors: {
+      generic: '未能受理訂單，請再試一次。',
+      network: '網路連線失敗，請再試一次。',
+      notConfigured: '目前暫時無法下單，請稍後再試。',
+      field: (f) => `請檢查「${{ sender_name: '你的姓名', receiver_name: '收禮人的姓名', delivery_date: '期望送達日', inscription_style: '刻字字體', package: '方案' }[f]}」。`,
+    },
+  },
 }
 
 export const COPY: Record<UiLanguage, Copy> = { ja, 'zh-Hans': zhHans, 'zh-Hant': zhHant }

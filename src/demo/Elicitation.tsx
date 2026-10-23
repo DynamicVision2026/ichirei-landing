@@ -61,6 +61,10 @@ type Props = {
   copy: Copy
   context: GiftContext
   onContextChange: (next: GiftContext) => void
+  /** The language pills (the landing page has its own switch in the nav). */
+  showLanguage?: boolean
+  /** The traditional/simplified inscription toggle (customers choose on the order form instead). */
+  showInscriptionScript?: boolean
 }
 
 export default function Elicitation({
@@ -71,6 +75,8 @@ export default function Elicitation({
   copy,
   context,
   onContextChange,
+  showLanguage = true,
+  showInscriptionScript = true,
 }: Props) {
   const setCtx = (patch: Partial<GiftContext>) => onContextChange({ ...context, ...patch })
   const ready = contextComplete(context) && story.trim() !== ''
@@ -140,6 +146,7 @@ export default function Elicitation({
   return (
     <div>
       {/* Language: also the language of this UI and of the engine's output text */}
+      {showLanguage && (
       <div className="mb-6 flex flex-wrap items-center gap-2" role="group" aria-label={copy.languageLabel}>
         <span className="font-label mr-1 text-[10px] tracking-wide text-ivory/40">{copy.languageLabel}</span>
         {UI_LANGUAGES.map((l) => (
@@ -159,6 +166,7 @@ export default function Elicitation({
           </button>
         ))}
       </div>
+      )}
 
       <motion.p
         initial={{ opacity: 0, y: 12 }}
@@ -236,7 +244,7 @@ export default function Elicitation({
             />
           </label>
         </div>
-        {context.language !== 'ja' && (
+        {showInscriptionScript && context.language !== 'ja' && (
           <div className="mt-4 flex flex-wrap items-center gap-2" role="group" aria-label={copy.inscriptionScriptLabel}>
             <span className="font-label mr-1 text-[11px] text-ivory/60">{copy.inscriptionScriptLabel}</span>
             {(['traditional', 'simplified'] as const).map((sc) => (

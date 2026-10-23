@@ -304,11 +304,20 @@ const chromeText = (page) =>
     root.querySelectorAll('article, pre, details, textarea').forEach((n) => n.remove())
     return root.innerText
   })
-const mockPage = async (browser, { onExplain, result } = {}) => {
+const mockPage = async (browser, { onExplain, result, order } = {}) => {
   const page = await browser.newPage({ viewport: { width: 1100, height: 950 } })
   const errors = []
   page.on('pageerror', (e) => errors.push(String(e)))
-  const calls = { select: [], explain: [] }
+  const calls = { select: [], explain: [], order: [] }
+  if (order) {
+    await page.route('**/api/order', async (route) => {
+      const body = JSON.parse(route.request().postData() ?? '{}')
+      calls.order.push(body)
+      const r = order(body)
+      await route.fulfill({ status: r.status ?? 200, contentType: 'application/json', body: JSON.stringify(r.json) })
+    })
+    await page.route('**/__checkout*', (route) => route.fulfill({ status: 200, contentType: 'text/html', body: '<h1 id=co>Shopify checkout (fake)</h1>' }))
+  }
   await page.route('**/api/log', (route) => route.fulfill({ status: 204, body: '' }))
   await page.route('**/api/select', async (route) => {
     const body = JSON.parse(route.request().postData() ?? '{}')
@@ -490,21 +499,13 @@ const mockPage = async (browser, { onExplain, result } = {}) => {
   check('landing ja: the thesis line is on the page, verbatim', (await page.locator('[data-thesis]').innerText()) === '想いは、言葉にできなくてもいい。一文字が、あなたの見つめ方を映す。')
   check('landing ja: marquee reads 一字礼 · ICHIREI · 一字の贈りもの', (await page.getAttribute('section[aria-label]', 'aria-label')) === '一字礼 ICHIREI 一字の贈りもの' && (await page.locator('.marquee-track').first().innerText()).includes('一字礼 ・ ICHIREI ・ 一字の贈りもの'))
   const t = await text()
-  check('landing ja: no 還暦 / 六十年 / 誕生日 anywhere on the page', !/還暦|六十|60歳|誕生日/.test(t), t.slice(0, 200))
+  check('landing ja: no 還暦 / 六十年 / 60歳 anywhere on the page (「誕生日・節目の年齢」 is one option among seven in the occasion selector)', !/還暦|六十|60歳/.test(t), t.slice(0, 200))
   check('landing ja: the AI is invisible (no "AI" in any visible text)', !/\bAI\b|人工知能|アルゴリズム/.test(t))
   check('landing ja: process steps are neutral and the SENDER chooses', t.includes('言葉を、深く読む') && t.includes('あなたが選ぶ') && t.includes('一字が、贈りものになる') && !t.includes('還暦の記念'))
-  const today = new Date()
-  const target = new Date(today.getFullYear(), today.getMonth(), today.getDate() + 4)
-  const iso = `${target.getFullYear()}-${String(target.getMonth() + 1).padStart(2, '0')}-${String(target.getDate()).padStart(2, '0')}`
-  await page.fill('input[type=date]', iso)
-  check('landing ja: delivery notice reads 「お届け希望日まで4日です…」 (not 還暦まで)', await page.locator('text=お届け希望日まで4日です。特急仕上げ（3営業日）もご用意しています。').isVisible() && (await page.locator('text=お届け希望日').count()) >= 1)
-  check('landing ja: the date field is labelled お届け希望日', (await page.locator('label:has-text("お届け希望日")').count()) === 1)
-  await page.locator('#confirmation').scrollIntoViewIfNeeded()
-  await page.waitForTimeout(1600)
-  check('landing ja: confirmation CTA 「この一字を、贈る」 and the certificate line', (await page.locator('button:has-text("この一字を、贈る")').count()) === 1 && (await page.locator('[data-certificate]').innerText()) === 'この字は、〇〇様の目に映る、あなたです。')
-  check('landing ja: the sample glyph is carved in the old form, paired with the modern form and reading', (await page.locator('#confirmation .text-cinnabar').first().innerText()) === '燈' && (await page.locator('#confirmation').innerText()).includes('灯 ・ あかり'))
-  check('landing ja: primary-only cinnabar — exactly one cinnabar candidate card in the showcase', (await page.locator('#candidate-showcase article.ring-cinnabar\\/60').count()) === 1)
-  await page.screenshot({ path: `${SHOTS}/e2e-landing-ja-confirmation.png` })
+  check('landing ja: no test controls on the customer page (no A/B/C, no log export, no golden fixture, no harness label)', !/condition|ログ書き出し|golden fixture|VALIDATION HARNESS|raw contract/.test(t))
+  check('landing ja: the real flow is on the page — the opening ask and the three selectors', t.includes('その人のことを、全部書かなくていい') && (await page.locator('select[name=relationship]').count()) === 1 && (await page.locator('select[name=occasion]').count()) === 1)
+  check('landing ja: the customer page has no language pills inside the flow (the nav switch is the one control) and no inscription-script toggle', (await page.locator('#story-input [data-language]').count()) === 0 && (await page.locator('[data-inscription-script]').count()) === 0)
+  await page.screenshot({ path: `${SHOTS}/e2e-landing-ja-flow.png` })
   await page.evaluate(() => window.scrollTo(0, 0))
   await page.waitForTimeout(4800)
   await page.screenshot({ path: `${SHOTS}/e2e-landing-ja-hero.png` })
@@ -527,16 +528,12 @@ const mockPage = async (browser, { onExplain, result } = {}) => {
   check('zh-Hans: <html lang>, title, hero, thesis, brand', (await page.getAttribute('html', 'lang')) === 'zh-Hans' && (await page.title()) === 'ICHIREI 一字礼 — 一个字的礼物' && (await page.locator('h1').innerText()) === '一个字的礼物' && (await page.locator('[data-thesis]').innerText()) === '心意，不必说出口也可以。一个字，映出你看着对方的方式。')
   const hans = await page.evaluate(() => document.body.innerText)
   check('zh-Hans: no Japanese kana, no 还历/六十, no AI on the page (the 日本語 switch aside)', !/[ぁ-んァ-ヶ]/.test(hans.replace('日本語', '')) && !/还历|六十|\bAI\b/.test(hans))
-  check('zh-Hans: marquee, steps, delivery label and CTA are Chinese', hans.includes('一字礼 ・ ICHIREI ・ 一个字的礼物') && hans.includes('由你来选') && hans.includes('期望送达日') && hans.includes('去寻找那一个字'))
+  check('zh-Hans: marquee, steps and the flow\'s CTA are Chinese', hans.includes('一字礼 ・ ICHIREI ・ 一个字的礼物') && hans.includes('由你来选') && hans.includes('去寻找那一个字'))
   const font = await page.evaluate(() => getComputedStyle(document.querySelector('h1')).fontFamily)
   check('zh-Hans: the serif stack switches to Noto Serif SC (Chinese glyph shapes)', font.includes('Noto Serif SC'), font)
   await page.click('nav [data-language=zh-Hant]')
   check('zh-Hant: <html lang>, title, hero and brand (一字禮)', (await page.getAttribute('html', 'lang')) === 'zh-Hant' && (await page.title()) === 'ICHIREI 一字禮 — 一個字的禮物' && (await page.locator('h1').innerText()) === '一個字的禮物' && (await page.evaluate(() => document.body.innerText)).includes('一字禮 ・ ICHIREI ・ 一個字的禮物'))
   check('zh-Hant: the serif stack switches to Noto Serif TC', (await page.evaluate(() => getComputedStyle(document.querySelector('h1')).fontFamily)).includes('Noto Serif TC'))
-  await page.locator('#confirmation').scrollIntoViewIfNeeded()
-  await page.waitForTimeout(1600)
-  check('zh-Hant: confirmation CTA, certificate line and the carved 燈 with 灯 ・ dēng', (await page.locator('#confirmation button:has-text("就用這一個字")').count()) === 1 && (await page.locator('[data-certificate]').innerText()) === '這個字，是〇〇眼中的你。' && (await page.locator('#confirmation').innerText()).includes('灯 ・ dēng'))
-  await page.screenshot({ path: `${SHOTS}/e2e-landing-zh-hant-confirmation.png` })
   // remembered across a reload, and shared with /demo
   await page.reload({ waitUntil: 'networkidle' })
   check('the choice is remembered across a reload', (await page.getAttribute('html', 'lang')) === 'zh-Hant' && (await page.locator('h1').innerText()) === '一個字的禮物')
@@ -563,6 +560,136 @@ const mockPage = async (browser, { onExplain, result } = {}) => {
   await p3.goto('http://localhost:5173/', { waitUntil: 'networkidle' })
   check('en-US browser → ja (the default)', (await p3.locator('h1').innerText()) === '一字の贈りもの')
   await ctx2.close()
+}
+
+// ---------- Run 11: the customer flow at / — choose, order, redirect to Shopify checkout (ja) ----------
+{
+  const orderOk = () => ({ json: { order_ref: 'IC-20261023-TESTREF2', checkout_url: 'http://localhost:5173/__checkout?cart=fake', glyph: '默', certificate_text: 'x' } })
+  const { page, errors, calls } = await mockPage(browser, { order: orderOk })
+  await page.goto('http://localhost:5173/', { waitUntil: 'networkidle' })
+  await page.locator('#story-input textarea').first().fill(STORY)
+  await pickContext(page)
+  await page.click(`#story-input >> text=${SUBMIT.ja}`)
+  await page.waitForSelector(`button:has-text("${FINALIZE.ja}")`, { timeout: 15000 })
+  check('customer: no condition toggle, no diagnostics ("見送った字"), no raw contract, no honesty flags in the reveal', (await page.locator('text=見送った字').count()) === 0 && (await page.locator('text=raw contract').count()) === 0 && (await page.locator('text=⚑').count()) === 0 && (await page.locator('details').count()) === 0)
+  check('customer: the "try again" button is there; the harness controls are not', (await page.locator('button:has-text("もう一度試す")').count()) === 1 && (await page.locator('text=ログ書き出し').count()) === 0)
+  check('customer: the select call is plain condition A with the context (same engine as /demo)', calls.select[0].condition === 'A' && calls.select[0].language === 'ja' && calls.select[0].relationship === 'parent_father' && !('inscription_script' in calls.select[0]))
+  // choose 黙 (it has a distinct old form 默)
+  await page.locator('article', { hasText: '静けさのまま' }).click()
+  await page.locator('article', { hasText: '静けさのまま' }).locator('text=この一字を選ぶ').click()
+  await page.click(`button:has-text("${FINALIZE.ja}")`)
+  const form = page.locator('[data-testid=order-form]')
+  await form.waitFor({ timeout: 5000 })
+  check('order form appears after the character is chosen (the reveal stays mounted but hidden)', await form.isVisible() && (await page.locator('article').first().isHidden()))
+  check('order form: sender, receiver, delivery date, inscription form, package', (await page.locator('input[name=sender_name]').count()) === 1 && (await page.locator('input[name=receiver_name]').count()) === 1 && (await page.locator('input[name=delivery_date]').count()) === 1 && (await page.locator('input[name=inscription_style]').count()) === 2 && (await page.locator('input[name=package]').count()) === 2)
+  check('order form: Simple ¥9,800 and Standard ¥15,800', (await page.locator('[data-price=simple]').innerText()) === '¥9,800' && (await page.locator('[data-price=standard]').innerText()) === '¥15,800' && (await form.innerText()).includes('シンプル') && (await form.innerText()).includes('スタンダード'))
+  check('order form: the kyūjitai form (默) is pre-selected and shown on the slip; modern is 黙', (await page.locator('input[name=inscription_style][value=kyujitai]').isChecked()) && (await page.locator('[data-order-glyph]').innerText()) === '默' && (await form.locator('label:has(input[value=modern]) .font-mincho').innerText()) === '黙')
+  check('certificate: the 〇〇 placeholder until the sender types a name', (await page.locator('[data-certificate]').innerText()) === 'この字は、〇〇様の目に映る、あなたです。')
+  await page.fill('input[name=sender_name]', '山田 太郎')
+  check('certificate: 「この字は、<sender_name>様の目に映る、あなたです。」 follows the name live', (await page.locator('[data-certificate]').innerText()) === 'この字は、山田 太郎様の目に映る、あなたです。')
+  const submit = page.locator('[data-testid=order-submit]')
+  check('submit is disabled until names, date and package are set', await submit.isDisabled())
+  await page.fill('input[name=receiver_name]', '山田 一郎')
+  const d = new Date(); d.setDate(d.getDate() + 30)
+  const iso = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+  await page.fill('input[name=delivery_date]', iso)
+  check('the delivery-date notice counts the days (お届け希望日まで30日です。)', await page.locator('text=お届け希望日まで30日です。').isVisible())
+  check('still disabled without a package (nothing is pre-selected: no default upsell)', await submit.isDisabled())
+  await page.click('label:has(input[name=package][value=standard])')
+  check('enabled once everything is filled', await submit.isEnabled())
+  await page.click('label:has(input[value=modern])')
+  check('choosing the modern form changes the slip to 黙', (await page.locator('[data-order-glyph]').innerText()) === '黙')
+  await page.click('label:has(input[value=kyujitai])')
+  await page.screenshot({ path: `${SHOTS}/e2e-order-form-ja.png`, fullPage: true })
+  // back keeps the selection
+  await page.click('text=字を選びなおす')
+  check('"字を選びなおす" returns to the reveal with the selection kept', (await page.locator('text=この一字を選んでいます').count()) === 1 && (await form.count()) === 0)
+  await page.click(`button:has-text("${FINALIZE.ja}")`)
+  await form.waitFor()
+  // submit
+  check('the form is empty again after going back and forth? (no — it is re-created, so refill)', (await page.inputValue('input[name=sender_name]')) === '')
+  await page.fill('input[name=sender_name]', '山田 太郎')
+  await page.fill('input[name=receiver_name]', '山田 一郎')
+  await page.fill('input[name=delivery_date]', iso)
+  await page.click('label:has(input[name=package][value=standard])')
+  await submit.click()
+  await page.waitForSelector('#co', { timeout: 8000 })
+  check('submit → redirected to the Shopify checkout URL the server returned', page.url().includes('/__checkout?cart=fake'))
+  const body = calls.order[0]
+  check('POST /api/order: story, the engine result, the chosen kanji, language, names, date, inscription style and package', body.story === STORY && body.engine_result.candidates.length === 6 && body.selected_kanji === '黙' && body.language === 'ja' && body.sender_name === '山田 太郎' && body.receiver_name === '山田 一郎' && body.delivery_date === iso && body.inscription_style === 'kyujitai' && body.package === 'standard', JSON.stringify({ ...body, engine_result: '…', story: body.story?.slice(0, 10) }))
+  check('POST /api/order carries no price and no glyph (the server derives both)', !('price' in body) && !('glyph' in body) && !('amount' in body))
+  check('no page errors (run 11)', errors.length === 0)
+  if (errors.length) console.log('page errors:', errors)
+  await page.close()
+}
+
+// ---------- Run 12: order errors, and the Chinese customer flow ----------
+{
+  let mode = 'cart_failed'
+  const order = (body) =>
+    mode === 'cart_failed' ? { status: 502, json: { error: 'x', code: 'cart_failed', order_ref: 'IC-X' } }
+    : mode === 'not_configured' ? { status: 503, json: { error: 'x', code: 'shopify_not_configured', missing: ['SHOPIFY_STOREFRONT_TOKEN'] } }
+    : mode === 'field' ? { status: 400, json: { error: 'x', field: 'delivery_date' } }
+    : { json: { order_ref: 'IC-20261023-ZHREF222', checkout_url: 'http://localhost:5173/__checkout?cart=zh', glyph: body.inscription_style === 'simplified' ? '灯' : '燈', certificate_text: 'x' } }
+  const zhResult = (body) => {
+    const r = clone(FIXTURE)
+    r.language = body.language
+    r.inscription_script = body.inscription_script ?? 'traditional'
+    r.primary_kanji = '灯'
+    r.runner_up_kanji = null
+    r.candidates = r.candidates.slice(0, 3).map((c) => ({ ...c, eliminated: false, eliminated_reason: null }))
+    r.candidates[0] = { ...r.candidates[0], kanji: '灯', inscription_form: '燈', reading: 'dēng', one_line_gaze: '你把玄关的灯一直留着。', story_anchor: '玄关的灯' }
+    r.candidates[1] = { ...r.candidates[1], kanji: '默', inscription_form: null, reading: 'mò' }
+    r.candidates[2] = { ...r.candidates[2], kanji: '桥', inscription_form: '橋', reading: 'qiáo' }
+    return r
+  }
+  const { page, errors, calls } = await mockPage(browser, { result: zhResult, order })
+  await page.goto('http://localhost:5173/?lang=zh-Hant', { waitUntil: 'networkidle' })
+  check('zh-Hant customer page: the flow is in traditional Chinese, no test controls', (await page.locator('#story-input').innerText()).includes('不必寫下那個人的全部') && (await page.locator('text=VALIDATION HARNESS').count()) === 0)
+  await page.locator('#story-input textarea').first().fill('他總是把玄關的燈留著，不管我多晚回家。')
+  await pickContext(page, { relationship: 'parent_father', direction: 'up', occasion: 'seasonal_thanks' })
+  await page.click(`#story-input >> text=${SUBMIT['zh-Hant']}`)
+  await page.waitForSelector(`button:has-text("${FINALIZE['zh-Hant']}")`, { timeout: 15000 })
+  check('zh-Hant: the select call is zh-Hant with the default (traditional) inscription script', calls.select[0].language === 'zh-Hant' && calls.select[0].inscription_script === 'traditional')
+  const lamp = page.locator('article').filter({ has: page.locator('[data-glyph]:text-is("燈")') })
+  await lamp.click()
+  await lamp.locator('text=選擇這個字').click()
+  await page.click(`button:has-text("${FINALIZE['zh-Hant']}")`)
+  const form = page.locator('[data-testid=order-form]')
+  await form.waitFor()
+  check('zh-Hant order form: traditional (燈) pre-selected, simplified (灯) offered, in Chinese', (await page.locator('input[name=inscription_style][value=traditional]').isChecked()) && (await page.locator('[data-order-glyph]').innerText()) === '燈' && (await form.locator('label:has(input[value=simplified]) .font-mincho').innerText()) === '灯' && (await form.innerText()).includes('你的姓名（送禮人）') && (await form.innerText()).includes('簡約款'))
+  await page.fill('input[name=sender_name]', '李明')
+  check('zh-Hant certificate: 「這個字，是李明眼中的你。」', (await page.locator('[data-certificate]').innerText()) === '這個字，是李明眼中的你。')
+  await page.fill('input[name=receiver_name]', '李華')
+  const d = new Date(); d.setDate(d.getDate() + 20)
+  const iso = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+  await page.fill('input[name=delivery_date]', iso)
+  await page.click('label:has(input[name=package][value=simple])')
+  await page.click('label:has(input[value=simplified])')
+  check('simplified chosen → the slip shows 灯', (await page.locator('[data-order-glyph]').innerText()) === '灯')
+  await page.screenshot({ path: `${SHOTS}/e2e-order-form-zh-hant.png`, fullPage: true })
+  // error handling
+  const submit = page.locator('[data-testid=order-submit]')
+  await submit.click()
+  await page.locator('[data-testid=order-error]').waitFor()
+  check('502 cart_failed → a plain message, the form stays usable', (await page.locator('[data-testid=order-error]').innerText()).includes('未能受理訂單') && await submit.isEnabled())
+  mode = 'not_configured'
+  await submit.click()
+  await page.locator('text=目前暫時無法下單').waitFor()
+  check('503 not configured → "cannot take orders right now"', true)
+  mode = 'field'
+  await submit.click()
+  await page.locator('text=請檢查「期望送達日」').waitFor()
+  check('400 with a field → names the field to fix', true)
+  mode = 'ok'
+  await submit.click()
+  await page.waitForSelector('#co', { timeout: 8000 })
+  const b = calls.order.at(-1)
+  check('zh order payload: language zh-Hant, simplified inscription, Simple package, the Chinese names', b.language === 'zh-Hant' && b.inscription_style === 'simplified' && b.package === 'simple' && b.sender_name === '李明' && b.receiver_name === '李華' && b.selected_kanji === '灯' && b.engine_result.language === 'zh-Hant')
+  check('…and the browser is at the checkout URL', page.url().includes('cart=zh'))
+  check('no page errors (run 12)', errors.length === 0)
+  if (errors.length) console.log('page errors:', errors)
+  await page.close()
 }
 
 await browser.close()

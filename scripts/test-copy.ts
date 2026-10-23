@@ -27,22 +27,26 @@ function check(name: string, cond: boolean, detail?: string) {
 }
 
 // Every string a Copy can show, with sample arguments for the function-valued entries.
+const SAMPLE = { kanji: '灯', inscription_form: '燈', reading: 'dēng' }
+const CALLS: Record<string, unknown[]> = {
+  processingProgress: [123], serverError: [500], timeout: [290], eliminatedSummary: [3], finalized: ['灯'],
+  glyphReading: [SAMPLE, '燈'], inscriptionNote: [SAMPLE, 'traditional'], previewNote: [SAMPLE, 'traditional'], dateNotice: [7],
+}
 function strings(c: Copy): [string, string][] {
   const out: [string, string][] = []
-  const sample = { kanji: '灯', inscription_form: '燈', reading: 'dēng' }
-  for (const [k, v] of Object.entries(c)) {
-    if (typeof v === 'string') out.push([k, v])
-    else if (Array.isArray(v)) v.forEach((x, i) => out.push([`${k}[${i}]`, x]))
+  const walk = (v: unknown, path: string) => {
+    if (typeof v === 'string') out.push([path, v])
+    else if (Array.isArray(v)) v.forEach((x, i) => walk(x, `${path}[${i}]`))
     else if (typeof v === 'function') {
-      const fn = v as (...a: never[]) => string | null
-      const calls: Record<string, unknown[]> = {
-        processingProgress: [123], serverError: [500], timeout: [290], eliminatedSummary: [3], finalized: ['灯'],
-        glyphReading: [sample, '燈'], inscriptionNote: [sample, 'traditional'], previewNote: [sample, 'traditional'],
+      const key = path.split('.').at(-1)!
+      if (key === 'field') for (const f of ['sender_name', 'receiver_name', 'delivery_date', 'inscription_style', 'package']) out.push([`${path}(${f})`, (v as (x: string) => string)(f)])
+      else {
+        const r = (v as (...a: unknown[]) => string | null)(...(CALLS[key] ?? []))
+        if (typeof r === 'string') out.push([`${path}()`, r])
       }
-      const r = (fn as (...a: unknown[]) => string | null)(...(calls[k] ?? []))
-      if (typeof r === 'string') out.push([`${k}()`, r])
-    } else if (v && typeof v === 'object') for (const [kk, vv] of Object.entries(v as Record<string, string>)) out.push([`${k}.${kk}`, vv])
+    } else if (v && typeof v === 'object') for (const [k, x] of Object.entries(v)) walk(x, path ? `${path}.${k}` : k)
   }
+  walk(c, '')
   return out
 }
 
@@ -62,6 +66,13 @@ for (const l of UI_LANGUAGES) {
     new Set(RELATIONSHIPS.map((k) => c.relationships[k])).size === RELATIONSHIPS.length && new Set(OCCASIONS.map((k) => c.occasions[k])).size === OCCASIONS.length)
   check(`copy ${l}: five memory angles`, c.angles.length === 5 && new Set(c.angles).size === 5)
 }
+// ---- purchase (order form) copy -----------------------------------------------------------
+check('order copy: ja — 「お届け希望日」, 「お届け希望日まで○日です。」', COPY.ja.order.dateLabel === 'お届け希望日' && COPY.ja.order.dateNotice(12) === 'お届け希望日まで12日です。')
+check('order copy: the customer CTA is 「この一字を、贈る」 (ja) and neutral in zh', COPY.ja.finalizeButton === 'この一字を、贈る' && COPY['zh-Hans'].finalizeButton === '就用这一个字' && COPY['zh-Hant'].finalizeButton === '就用這一個字')
+check('order copy: every language names both packages and every inscription style, all distinct', UI_LANGUAGES.every((l) => COPY[l].order.packages.simple !== COPY[l].order.packages.standard && new Set(Object.values(COPY[l].order.inscriptionStyles)).size === 4))
+check('order copy: the ja form says kyūjitai / modern, the zh forms traditional / simplified', COPY.ja.order.inscriptionStyles.kyujitai.includes('古体字') && COPY.ja.order.inscriptionStyles.modern === '現代字' && COPY['zh-Hans'].order.inscriptionStyles.traditional === '繁體字' && COPY['zh-Hans'].order.inscriptionStyles.simplified === '简体字' && COPY['zh-Hant'].order.inscriptionStyles.traditional === '繁體字' && COPY['zh-Hant'].order.inscriptionStyles.simplified === '簡體字')
+check('order copy: a message for each invalid field, in every language', UI_LANGUAGES.every((l) => (['sender_name', 'receiver_name', 'delivery_date', 'inscription_style', 'package'] as const).every((f) => COPY[l].order.errors.field(f).length > 6)))
+check('order copy: the privacy line says what is kept (names, story, chosen character)', COPY.ja.order.privacy.includes('お名前') && COPY.ja.order.privacy.includes('物語') && COPY['zh-Hans'].order.privacy.includes('姓名') && COPY['zh-Hant'].order.privacy.includes('姓名'))
 check('copy: the three languages really differ (no untranslated copy-paste)', COPY.ja.openingAsk !== COPY['zh-Hans'].openingAsk && COPY['zh-Hans'].openingAsk !== COPY['zh-Hant'].openingAsk && COPY['zh-Hans'].submit !== COPY['zh-Hant'].submit)
 
 // ---- occasion-neutral --------------------------------------------------------------------

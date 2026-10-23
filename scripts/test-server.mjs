@@ -8,7 +8,11 @@
 // static-serving checks run against the same kind of bundle that ships.
 
 import { execSync } from 'node:child_process'
-import { GOLDEN_REFEREED, GOLDEN_CONTEXT, STORY, EXPLAIN_TEXT, sleep, startFakeAnthropic, startServer, readNdjson } from './server-fixtures.mjs'
+import http from 'node:http'
+import { mkdtempSync, readFileSync } from 'node:fs'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
+import { GOLDEN, GOLDEN_REFEREED, GOLDEN_CONTEXT, STORY, EXPLAIN_TEXT, sleep, startFakeAnthropic, startServer, readNdjson } from './server-fixtures.mjs'
 
 const LONG = process.argv.includes('--long')
 let failures = 0
@@ -154,6 +158,49 @@ try {
     check('no key: 500 with Secret Manager guidance (not the Vercel message)', r.status === 500 && /Secret Manager/.test(body.error) && !/Vercel/.test(body.error), JSON.stringify(body))
   } finally {
     await keyless.stop()
+  }
+
+  // ---- I2. Purchase flow through the real server (fake Shopify, file store) -------
+  {
+    const orderBody = {
+      story: STORY, engine_result: GOLDEN_REFEREED, selected_kanji: '迎', language: 'ja', sender_name: '山田 太郎',
+      receiver_name: '山田 一郎', delivery_date: new Date(Date.now() + 30 * 86_400_000).toISOString().slice(0, 10), inscription_style: 'kyujitai', package: 'simple',
+    }
+    const noOrders = await post(base, '/api/order', orderBody)
+    const noOrdersJ = await noOrders.json()
+    check('orders: an unconfigured server answers 503 (store_not_configured) and /api/health lists what is missing', noOrders.status === 503 && noOrdersJ.code === 'store_not_configured' && health.orders?.ready === false && health.orders.missing.includes('ORDER_BUCKET') && health.orders.missing.includes('SHOPIFY_STOREFRONT_TOKEN'), JSON.stringify(health.orders))
+    check('orders: /api/order GET → 405 with Allow: POST', (await fetch(base + '/api/order')).status === 405)
+
+    const dir = mkdtempSync(join(tmpdir(), 'ichirei-order-'))
+    const seen = []
+    const shop = http.createServer(async (req, res) => {
+      let raw = ''
+      for await (const c of req) raw += c
+      seen.push({ url: req.url, token: req.headers['x-shopify-storefront-access-token'], body: JSON.parse(raw) })
+      res.writeHead(200, { 'content-type': 'application/json' })
+      res.end(JSON.stringify({ data: { cartCreate: { cart: { id: 'gid://shopify/Cart/k', checkoutUrl: 'https://soul-id-2.myshopify.com/cart/c/k' }, userErrors: [] } } }))
+    })
+    await new Promise((r) => shop.listen(0, '127.0.0.1', r))
+    const orders = await startServer({
+      upstreamUrl: upstream.url,
+      env: { ORDER_STORE_DIR: dir, SHOPIFY_STOREFRONT_TOKEN: 'shpat_server_test', SHOPIFY_VARIANT_SIMPLE: '1111', SHOPIFY_VARIANT_STANDARD: '2222', SHOPIFY_API_BASE: `http://127.0.0.1:${shop.address().port}` },
+    })
+    try {
+      const h2 = await (await fetch(orders.url + '/api/health')).json()
+      check('orders: configured server → health.orders.ready, store "file", no secret values in the health output', h2.orders.ready === true && h2.orders.store === 'file' && h2.orders.missing.length === 0 && !JSON.stringify(h2).includes('shpat_server_test'), JSON.stringify(h2.orders))
+      const ok = await post(orders.url, '/api/order', orderBody)
+      const okJ = await ok.json()
+      check('orders: POST /api/order → 200 {order_ref, checkout_url, glyph, certificate_text}', ok.status === 200 && /^IC-\d{8}-[2-9A-Z]{8}$/.test(okJ.order_ref) && okJ.checkout_url === 'https://soul-id-2.myshopify.com/cart/c/k' && okJ.glyph === '迎' && okJ.certificate_text === 'この字は、山田 太郎様の目に映る、あなたです。', JSON.stringify(okJ))
+      const file = JSON.parse(readFileSync(join(dir, `${okJ.order_ref}.json`), 'utf8'))
+      check('orders: the story and the engine result are stored server-side under that order_ref (gaze line and anchor included)', file.story === STORY && file.engine_result.candidates.length === 6 && file.production.gaze_line === GOLDEN.candidates[0].one_line_gaze && file.production.story_anchor === GOLDEN.candidates[0].story_anchor && file.status === 'cart_created')
+      const line = seen[0].body.variables.input.lines[0]
+      check('orders: Shopify got the Simple variant, the token header, and the eight attributes — without the story', seen[0].url === '/api/2025-01/graphql.json' && seen[0].token === 'shpat_server_test' && line.merchandiseId.endsWith('/1111') && line.attributes.map((a) => a.key).join() === 'kanji,inscription_form,reading,sender_name,receiver_name,delivery_date,language,order_ref' && line.attributes.at(-1).value === okJ.order_ref && !JSON.stringify(seen[0].body).includes('口下手'))
+      const invalid = await post(orders.url, '/api/order', { ...orderBody, package: 'gold' })
+      check('orders: invalid package → 400 and nothing more reaches Shopify', invalid.status === 400 && (await invalid.json()).field === 'package' && seen.length === 1)
+    } finally {
+      await orders.stop()
+      shop.close()
+    }
   }
 
   // ---- J. (opt-in) one stream longer than Vercel's 60s cap --------------
