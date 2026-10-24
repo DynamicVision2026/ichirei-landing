@@ -226,7 +226,7 @@ export function buildRecord(order: ValidOrder, orderRef: string, now: Date = new
       delivery_date: order.delivery_date,
       package: order.package,
       price_jpy: PACKAGE_PRICE_JPY[order.package],
-      certificate_text: certificateText(order.language, order.sender_name),
+      certificate_text: certificateText(order.language),
     },
     story: order.story,
     engine_result: order.engine_result,

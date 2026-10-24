@@ -1,22 +1,18 @@
-// The certificate line that goes with the gift. It is addressed to the RECEIVER ("you") and
-// names the SENDER: the character mirrors the sender's gaze. 〇〇 is the sender's name.
+// The certificate line that goes with the gift. It says what the character is: the person,
+// as seen through the SENDER's eyes ("you" = the sender). It names nobody, so it needs no input.
 // Plain TS, no imports: shared by the browser (preview) and the server (the stored record).
 
 export type CertificateLanguage = 'ja' | 'zh-Hans' | 'zh-Hant' | 'en'
 
-/** Placeholder shown before the sender has typed a name. */
-export const CERTIFICATE_PLACEHOLDER = '〇〇'
-
-export function certificateText(language: CertificateLanguage, senderName: string): string {
-  const name = senderName.trim() || CERTIFICATE_PLACEHOLDER
+export function certificateText(language: CertificateLanguage): string {
   switch (language) {
     case 'zh-Hans':
-      return `这个字，是${name}眼中的你。`
+      return '这个字，是你眼中的那个人。'
     case 'zh-Hant':
-      return `這個字，是${name}眼中的你。`
+      return '這個字，是你眼中的那個人。'
     case 'en':
-      return `This character is you, as ${name} sees you.`
+      return 'This character is the person, as seen through your eyes.'
     default:
-      return `この字は、${name}様の目に映る、あなたです。`
+      return 'この字は、あなたの目に映る、その人です。'
   }
 }

@@ -137,6 +137,7 @@ export interface Copy {
     inscriptionSame: string
     packageLabel: string
     packages: Record<PackageId, string>
+    shippingNote: string
     certificateLabel: string
     privacy: string
     submit: string
@@ -256,6 +257,7 @@ const ja: Copy = {
     inscriptionSame: 'この字は、古体字と現代字で同じ形です。',
     packageLabel: 'パッケージ',
     packages: { simple: 'シンプル', standard: 'スタンダード' },
+    shippingNote: '国内送料無料・海外送料 ¥6,000',
     certificateLabel: '添える一文',
     privacy: 'ご注文の際に、入力いただいたお名前・物語・選ばれた一字を、制作のために保存します。',
     submit: 'お支払いへ進む',
@@ -383,6 +385,7 @@ const zhHans: Copy = {
     inscriptionSame: '这个字的繁体与简体写法相同。',
     packageLabel: '套餐',
     packages: { simple: '简约款', standard: '标准款' },
+    shippingNote: '日本国内免运费・海外运费 ¥6,000',
     certificateLabel: '随礼附上的一句话',
     privacy: '下单时，我们会保存你填写的姓名、故事和选定的字，用于制作。',
     submit: '前往付款',
@@ -510,6 +513,7 @@ const zhHant: Copy = {
     inscriptionSame: '這個字的繁體與簡體寫法相同。',
     packageLabel: '方案',
     packages: { simple: '簡約款', standard: '標準款' },
+    shippingNote: '日本國內免運費・海外運費 ¥6,000',
     certificateLabel: '隨禮附上的一句話',
     privacy: '下單時，我們會保存你填寫的姓名、故事和選定的字，用於製作。',
     submit: '前往付款',
@@ -643,6 +647,7 @@ const en: Copy = {
     inscriptionSame: 'This character is written the same in its old and modern forms.',
     packageLabel: 'Package',
     packages: { simple: 'Simple', standard: 'Standard' },
+    shippingNote: 'Free shipping in Japan · ¥6,000 international shipping',
     certificateLabel: 'The line that comes with it',
     privacy: 'When you order, we keep the names, the story and the character you chose, so that your piece can be made.',
     submit: 'Continue to payment',

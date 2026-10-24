@@ -2,9 +2,11 @@
 // line-item attributes, and hand back the checkout URL the browser is sent to.
 //
 // Config (all from the environment; the token comes from Secret Manager, never the repo):
-//   SHOPIFY_STOREFRONT_TOKEN   Storefront API access token (needs unauthenticated_write_checkouts)
+//   SHOPIFY_STOREFRONT_TOKEN_PUBLIC  Storefront API PUBLIC token (public by design; Cloud Build substitution) — wins if set
+//   SHOPIFY_STOREFRONT_TOKEN   same token from the Secret Manager mount (the original route; used when the above is empty)
+//                              (needs unauthenticated_write_checkouts)
 //   SHOPIFY_VARIANT_SIMPLE     variant of the ¥9,800 package   (gid://shopify/ProductVariant/… or the number)
-//   SHOPIFY_VARIANT_STANDARD   variant of the ¥15,800 package
+//   SHOPIFY_VARIANT_STANDARD   variant of the ¥18,850 package
 //   SHOPIFY_STORE_DOMAIN       default soul-id-2.myshopify.com
 //   SHOPIFY_API_VERSION        default 2025-01
 //   SHOPIFY_API_BASE           tests only: replaces https://<domain>
@@ -36,7 +38,11 @@ const toGid = (v: string) => (/^\d+$/.test(v) ? `gid://shopify/ProductVariant/${
 
 /** Read the config; `missing` lists the env vars still to set (empty when ready). */
 export function loadShopifyConfig(env: NodeJS.ProcessEnv = process.env): { config: ShopifyConfig | null; missing: string[] } {
-  const missing = ['SHOPIFY_STOREFRONT_TOKEN', 'SHOPIFY_VARIANT_SIMPLE', 'SHOPIFY_VARIANT_STANDARD'].filter((k) => !env[k]?.trim())
+  const token = env.SHOPIFY_STOREFRONT_TOKEN_PUBLIC?.trim() || env.SHOPIFY_STOREFRONT_TOKEN?.trim() || ''
+  const missing = [
+    ...(token ? [] : ['SHOPIFY_STOREFRONT_TOKEN']),
+    ...['SHOPIFY_VARIANT_SIMPLE', 'SHOPIFY_VARIANT_STANDARD'].filter((k) => !env[k]?.trim()),
+  ]
   if (missing.length > 0) return { config: null, missing }
   const storeDomain = (env.SHOPIFY_STORE_DOMAIN || DEFAULT_STORE_DOMAIN).trim()
   return {
@@ -44,7 +50,7 @@ export function loadShopifyConfig(env: NodeJS.ProcessEnv = process.env): { confi
     config: {
       storeDomain,
       apiVersion: (env.SHOPIFY_API_VERSION || DEFAULT_API_VERSION).trim(),
-      token: env.SHOPIFY_STOREFRONT_TOKEN!.trim(),
+      token,
       apiBase: (env.SHOPIFY_API_BASE || `https://${storeDomain}`).replace(/\/$/, ''),
       variants: { simple: toGid(env.SHOPIFY_VARIANT_SIMPLE!.trim()), standard: toGid(env.SHOPIFY_VARIANT_STANDARD!.trim()) },
     },

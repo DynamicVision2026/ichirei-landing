@@ -304,11 +304,19 @@ const chromeText = (page) =>
     root.querySelectorAll('article, pre, details, textarea').forEach((n) => n.remove())
     return root.innerText
   })
-const mockPage = async (browser, { onExplain, result, order } = {}) => {
+const mockPage = async (browser, { onExplain, result, order, track } = {}) => {
   const page = await browser.newPage({ viewport: { width: 1100, height: 950 } })
   const errors = []
   page.on('pageerror', (e) => errors.push(String(e)))
-  const calls = { select: [], explain: [], order: [] }
+  const calls = { select: [], explain: [], order: [], track: [] }
+  if (track) {
+    await page.route('**/api/track', async (route) => {
+      const body = JSON.parse(route.request().postData() ?? '{}')
+      calls.track.push(body)
+      const r = track(body)
+      await route.fulfill({ status: r.status ?? 200, contentType: 'application/json', body: JSON.stringify(r.json) })
+    })
+  }
   if (order) {
     await page.route('**/api/order', async (route) => {
       const body = JSON.parse(route.request().postData() ?? '{}')
@@ -582,11 +590,11 @@ const mockPage = async (browser, { onExplain, result, order } = {}) => {
   await form.waitFor({ timeout: 5000 })
   check('order form appears after the character is chosen (the reveal stays mounted but hidden)', await form.isVisible() && (await page.locator('article').first().isHidden()))
   check('order form: sender, receiver, delivery date, inscription form, package', (await page.locator('input[name=sender_name]').count()) === 1 && (await page.locator('input[name=receiver_name]').count()) === 1 && (await page.locator('input[name=delivery_date]').count()) === 1 && (await page.locator('input[name=inscription_style]').count()) === 2 && (await page.locator('input[name=package]').count()) === 2)
-  check('order form: Simple ¥9,800 and Standard ¥15,800', (await page.locator('[data-price=simple]').innerText()) === '¥9,800' && (await page.locator('[data-price=standard]').innerText()) === '¥15,800' && (await form.innerText()).includes('シンプル') && (await form.innerText()).includes('スタンダード'))
+  check('order form: Simple ¥9,800 and Standard ¥18,850, and the shipping line 「国内送料無料・海外送料 ¥6,000」', (await page.locator('[data-price=simple]').innerText()) === '¥9,800' && (await page.locator('[data-price=standard]').innerText()) === '¥18,850' && (await page.locator('[data-shipping]').innerText()) === '国内送料無料・海外送料 ¥6,000' && !(await form.innerText()).includes('送料別') && (await form.innerText()).includes('シンプル') && (await form.innerText()).includes('スタンダード'))
   check('order form: the kyūjitai form (默) is pre-selected and shown on the slip; modern is 黙', (await page.locator('input[name=inscription_style][value=kyujitai]').isChecked()) && (await page.locator('[data-order-glyph]').innerText()) === '默' && (await form.locator('label:has(input[value=modern]) .font-mincho').innerText()) === '黙')
-  check('certificate: the 〇〇 placeholder until the sender types a name', (await page.locator('[data-certificate]').innerText()) === 'この字は、〇〇様の目に映る、あなたです。')
+  check('certificate: 「この字は、あなたの目に映る、その人です。」 from the start', (await page.locator('[data-certificate]').innerText()) === 'この字は、あなたの目に映る、その人です。')
   await page.fill('input[name=sender_name]', '山田 太郎')
-  check('certificate: 「この字は、<sender_name>様の目に映る、あなたです。」 follows the name live', (await page.locator('[data-certificate]').innerText()) === 'この字は、山田 太郎様の目に映る、あなたです。')
+  check('certificate: typing a name does not change it (no name in the line any more)', (await page.locator('[data-certificate]').innerText()) === 'この字は、あなたの目に映る、その人です。')
   const submit = page.locator('[data-testid=order-submit]')
   check('submit is disabled until names, date and package are set', await submit.isDisabled())
   await page.fill('input[name=receiver_name]', '山田 一郎')
@@ -659,7 +667,7 @@ const mockPage = async (browser, { onExplain, result, order } = {}) => {
   await form.waitFor()
   check('zh-Hant order form: traditional (燈) pre-selected, simplified (灯) offered, in Chinese', (await page.locator('input[name=inscription_style][value=traditional]').isChecked()) && (await page.locator('[data-order-glyph]').innerText()) === '燈' && (await form.locator('label:has(input[value=simplified]) .font-mincho').innerText()) === '灯' && (await form.innerText()).includes('你的姓名（送禮人）') && (await form.innerText()).includes('簡約款'))
   await page.fill('input[name=sender_name]', '李明')
-  check('zh-Hant certificate: 「這個字，是李明眼中的你。」', (await page.locator('[data-certificate]').innerText()) === '這個字，是李明眼中的你。')
+  check('zh-Hant certificate: 「這個字，是你眼中的那個人。」 and the shipping line', (await page.locator('[data-certificate]').innerText()) === '這個字，是你眼中的那個人。' && (await page.locator('[data-shipping]').innerText()) === '日本國內免運費・海外運費 ¥6,000')
   await page.fill('input[name=receiver_name]', '李華')
   const d = new Date(); d.setDate(d.getDate() + 20)
   const iso = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
@@ -750,10 +758,9 @@ const mockPage = async (browser, { onExplain, result, order } = {}) => {
   const form = page.locator('[data-testid=order-form]')
   await form.waitFor()
   check('en order form: kyūjitai (燈) pre-selected, modern (灯) offered; never traditional/simplified', (await page.locator('input[name=inscription_style][value=kyujitai]').isChecked()) && (await page.locator('input[name=inscription_style][value=modern]').count()) === 1 && (await page.locator('input[name=inscription_style][value=traditional]').count()) === 0 && (await page.locator('[data-order-glyph]').innerText()) === '燈')
-  check('en order form: English labels, packages and the romaji + meaning line under the glyph', (await form.innerText()).includes('Your order') && (await form.innerText()).includes('Requested delivery date') && (await form.innerText()).includes('Old form (kyūjitai)') && (await form.innerText()).includes('on: tō · kun: hi, akari — lamp; a light kept lit') && (await form.innerText()).includes('¥15,800'))
-  check('en certificate: placeholder 〇〇 before a name is typed', (await page.locator('[data-certificate]').innerText()) === 'This character is you, as 〇〇 sees you.')
+  check('en order form: English labels, packages and the romaji + meaning line under the glyph', (await form.innerText()).includes('Your order') && (await form.innerText()).includes('Requested delivery date') && (await form.innerText()).includes('Old form (kyūjitai)') && (await form.innerText()).includes('on: tō · kun: hi, akari — lamp; a light kept lit') && (await form.innerText()).includes('¥18,850'))
+  check('en certificate: "This character is the person, as seen through your eyes." and the shipping line', (await page.locator('[data-certificate]').innerText()) === 'This character is the person, as seen through your eyes.' && (await page.locator('[data-shipping]').innerText()) === 'Free shipping in Japan · ¥6,000 international shipping' && (await page.locator('[data-price=standard]').innerText()) === '¥18,850')
   await page.fill('input[name=sender_name]', 'Emily Carter')
-  check('en certificate: "This character is you, as Emily Carter sees you."', (await page.locator('[data-certificate]').innerText()) === 'This character is you, as Emily Carter sees you.')
   await page.fill('input[name=receiver_name]', 'Margaret Carter')
   const d = new Date(); d.setDate(d.getDate() + 20)
   const iso = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
@@ -817,6 +824,73 @@ const mockPage = async (browser, { onExplain, result, order } = {}) => {
   check('en explain call: language en with the context, the romaji reading AND the English meaning, no inscription_script', ex.language === 'en' && ex.relationship === 'parent_mother' && ex.occasion === 'seasonal_thanks' && ex.candidate.kanji === '灯' && ex.candidate.inscription_form === '燈' && ex.candidate.reading === 'on: tō · kun: hi, akari' && ex.candidate.meaning === 'lamp; a light kept lit' && !('inscription_script' in ex), JSON.stringify(ex))
   check('no page errors (run 13, /demo)', errors.length === 0)
   await page.close()
+}
+
+// ---------- Run 14: /track — order status, four languages ----------
+{
+  let reply = { json: { ordered_on: '2026-10-20', status: 'processing', sku: ['ICHIREI-STANDARD'], carrier: null, tracking_number: null, tracking_url: null, estimated_by: '2026-11-03' } }
+  const { page, errors, calls } = await mockPage(browser, { track: () => reply })
+  await page.goto('http://localhost:5173/track?order=%231016', { waitUntil: 'networkidle' })
+  check('track: the page opens in the dark ink style, in Japanese, with the order number prefilled from ?order=%231016', (await page.locator('h1').innerText()) === 'ご注文の状況' && (await page.inputValue('input[name=order]')) === '#1016' && (await page.getAttribute('html', 'lang')) === 'ja' && (await page.title()).includes('ご注文の状況'))
+  check('track: four language buttons; the submit stays disabled until an email is typed; the contact line is shown even before a lookup', (await page.locator('[data-language]').count()) === 4 && await page.locator('[data-testid=track-submit]').isDisabled() && (await page.locator('[data-track-contact]').innerText()) === 'ご不明な点は、ご注文確認メールにご返信ください。')
+  await page.fill('input[name=email]', 'hanako@example.com')
+  await page.click('[data-testid=track-submit]')
+  await page.waitForSelector('[data-testid=track-result]')
+  check('track: request carries the number and the email — and nothing else', JSON.stringify(calls.track[0]) === JSON.stringify({ order: '#1016', email: 'hanako@example.com' }))
+  check('track ja processing: 制作中, 「お届け予定：11月3日ごろまで」, the order date, the product and the contact line', (await page.locator('[data-track-status]').innerText()) === '制作中' && (await page.locator('[data-track-eta]').innerText()) === 'お届け予定：11月3日ごろまで' && (await page.locator('[data-testid=track-result]').innerText()).includes('2026年10月20日') && (await page.locator('[data-testid=track-result]').innerText()).includes('一字礼 スタンダード') && (await page.locator('[data-track-contact]').innerText()) === 'ご不明な点は、ご注文確認メールにご返信ください。' && (await page.locator('[data-track-link]').count()) === 0)
+  await page.screenshot({ path: `${SHOTS}/e2e-track-ja.png`, fullPage: true })
+  // shipped
+  reply = { json: { ordered_on: '2026-10-20', status: 'shipped', sku: ['ICHIREI-SIMPLE'], carrier: 'Japan Post', tracking_number: 'EE123456789JP', tracking_url: 'https://trackings.post.japanpost.jp/?x=1', estimated_by: '2026-11-03' } }
+  await page.click('text=別のご注文を調べる')
+  check('track: "別のご注文を調べる" returns to the form (the order number stays, the email is cleared)', (await page.inputValue('input[name=order]')) === '#1016' && (await page.inputValue('input[name=email]')) === '')
+  await page.fill('input[name=email]', 'hanako@example.com')
+  await page.click('[data-testid=track-submit]')
+  await page.waitForSelector('[data-testid=track-result][data-status=shipped]')
+  check('track ja shipped: 発送済み + carrier, tracking number and a link that opens the carrier page in a new tab', (await page.locator('[data-track-status]').innerText()) === '発送済み' && (await page.locator('[data-testid=track-result]').innerText()).includes('Japan Post') && (await page.locator('[data-testid=track-number]').innerText()) === 'EE123456789JP' && (await page.getAttribute('[data-track-link]', 'href')) === 'https://trackings.post.japanpost.jp/?x=1' && (await page.getAttribute('[data-track-link]', 'target')) === '_blank' && (await page.getAttribute('[data-track-link]', 'rel')).includes('noopener'))
+  // delivered
+  reply = { json: { ordered_on: '2026-10-20', status: 'delivered', sku: ['ICHIREI-SIMPLE'], carrier: 'Japan Post', tracking_number: 'EE123456789JP', tracking_url: null, estimated_by: null } }
+  await page.click('text=別のご注文を調べる'); await page.fill('input[name=email]', 'hanako@example.com'); await page.click('[data-testid=track-submit]')
+  await page.waitForSelector('[data-testid=track-result][data-status=delivered]')
+  check('track ja delivered: お届け完了, no estimate line, still the contact line', (await page.locator('[data-track-status]').innerText()) === 'お届け完了' && (await page.locator('[data-track-eta]').count()) === 0 && (await page.locator('[data-track-contact]').count()) === 1)
+  // cancelled
+  reply = { json: { ordered_on: '2026-10-20', status: 'cancelled', sku: ['ICHIREI-SIMPLE'], carrier: null, tracking_number: null, tracking_url: null, estimated_by: null } }
+  await page.click('text=別のご注文を調べる'); await page.fill('input[name=email]', 'hanako@example.com'); await page.click('[data-testid=track-submit]')
+  await page.waitForSelector('[data-testid=track-result][data-status=cancelled]')
+  check('track ja cancelled: a short notice, no estimate, the contact line', (await page.locator('[data-track-status]').innerText()) === 'キャンセル済み' && (await page.locator('[data-testid=track-result]').innerText()).includes('キャンセル（または返金）') && (await page.locator('[data-track-eta]').count()) === 0 && (await page.locator('[data-track-contact]').innerText()).includes('ご注文確認メールにご返信ください'))
+  // errors
+  await page.click('text=別のご注文を調べる'); await page.fill('input[name=email]', 'x@example.com')
+  for (const [status, json, text] of [[404, { error: 'not_found' }, 'ご注文が見つかりませんでした'], [429, { error: 'rate_limited' }, '短時間に何度も照会'], [503, { error: 'unavailable' }, 'ただいま状況を確認できません'], [400, { error: 'bad_request' }, '正しく入力してください']]) {
+    reply = { status, json }
+    await page.click('[data-testid=track-submit]')
+    await page.locator('[data-testid=track-error]').waitFor()
+    check(`track ja error ${status}: a plain message, the form stays usable`, (await page.locator('[data-testid=track-error]').innerText()).includes(text) && await page.locator('[data-testid=track-submit]').isEnabled())
+  }
+  // other languages, same flow
+  reply = { json: { ordered_on: '2026-10-20', status: 'shipped', sku: ['ICHIREI-STANDARD'], carrier: 'DHL', tracking_number: '123', tracking_url: 'https://example.com/t', estimated_by: '2026-11-20' } }
+  for (const [lang, h1, label, eta, contact, other] of [
+    ['en', 'Order status', 'Shipped', 'Estimated arrival: by around Nov 20', 'If you have any questions, just reply to your order confirmation email.', 'Look up another order'],
+    ['zh-Hans', '订单状态', '已发货', '预计送达：11月20日左右前', '如有疑问，请直接回复订单确认邮件。', '查询其他订单'],
+    ['zh-Hant', '訂單狀態', '已出貨', '預計送達：11月20日左右前', '如有疑問，請直接回覆訂單確認郵件。', '查詢其他訂單'],
+  ]) {
+    await page.click(`[data-language=${lang}]`)
+    check(`track ${lang}: heading and html lang switch`, (await page.locator('h1').innerText()) === h1 && (await page.getAttribute('html', 'lang')) === lang)
+    await page.fill('input[name=email]', 'x@example.com')
+    await page.click('[data-testid=track-submit]')
+    await page.waitForSelector('[data-testid=track-result][data-status=shipped]')
+    check(`track ${lang} shipped: status, estimate line and the contact line`, (await page.locator('[data-track-status]').innerText()) === label && (await page.locator('[data-track-eta]').innerText()) === eta && (await page.locator('[data-track-contact]').innerText()) === contact && (await page.locator('[data-testid=track-result]').innerText()).includes('DHL'))
+    await page.screenshot({ path: `${SHOTS}/e2e-track-${lang}.png`, fullPage: true })
+    await page.click(`text=${other}`)
+  }
+  check('track: no page errors', errors.length === 0)
+  if (errors.length) console.log('page errors:', errors)
+  await page.close()
+  // bare number in ?order= and the form is usable without it
+  const m2 = await mockPage(browser, { track: () => reply })
+  await m2.page.goto('http://localhost:5173/track?order=1016&lang=en', { waitUntil: 'networkidle' })
+  check('track: ?order=1016 (no #) is prefilled as #1016; ?lang=en opens it in English', (await m2.page.inputValue('input[name=order]')) === '#1016' && (await m2.page.locator('h1').innerText()) === 'Order status')
+  await m2.page.goto('http://localhost:5173/track', { waitUntil: 'networkidle' })
+  check('track: without ?order= the number field is empty', (await m2.page.inputValue('input[name=order]')) === '')
+  await m2.page.close()
 }
 
 await browser.close()

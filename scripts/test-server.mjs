@@ -193,7 +193,7 @@ try {
       check('orders: configured server → health.orders.ready, store "file", no secret values in the health output', h2.orders.ready === true && h2.orders.store === 'file' && h2.orders.missing.length === 0 && !JSON.stringify(h2).includes('shpat_server_test'), JSON.stringify(h2.orders))
       const ok = await post(orders.url, '/api/order', orderBody)
       const okJ = await ok.json()
-      check('orders: POST /api/order → 200 {order_ref, checkout_url, glyph, certificate_text}', ok.status === 200 && /^IC-\d{8}-[2-9A-Z]{8}$/.test(okJ.order_ref) && okJ.checkout_url === 'https://soul-id-2.myshopify.com/cart/c/k' && okJ.glyph === '迎' && okJ.certificate_text === 'この字は、山田 太郎様の目に映る、あなたです。', JSON.stringify(okJ))
+      check('orders: POST /api/order → 200 {order_ref, checkout_url, glyph, certificate_text}', ok.status === 200 && /^IC-\d{8}-[2-9A-Z]{8}$/.test(okJ.order_ref) && okJ.checkout_url === 'https://soul-id-2.myshopify.com/cart/c/k' && okJ.glyph === '迎' && okJ.certificate_text === 'この字は、あなたの目に映る、その人です。', JSON.stringify(okJ))
       const file = JSON.parse(readFileSync(join(dir, `${okJ.order_ref}.json`), 'utf8'))
       check('orders: the story and the engine result are stored server-side under that order_ref (gaze line and anchor included)', file.story === STORY && file.engine_result.candidates.length === 6 && file.production.gaze_line === GOLDEN.candidates[0].one_line_gaze && file.production.story_anchor === GOLDEN.candidates[0].story_anchor && file.status === 'cart_created')
       const line = seen[0].body.variables.input.lines[0]
@@ -203,6 +203,35 @@ try {
     } finally {
       await orders.stop()
       shop.close()
+    }
+  }
+
+  // ---- I3. /track through the real server (fake Shopify Admin API) -------------------
+  {
+    const noTrack = await post(base, '/api/track', { order: '#1016', email: 'a@b.co' })
+    check('track: an unconfigured server answers 503 not_configured, and /api/health lists the missing id', noTrack.status === 503 && (await noTrack.json()).code === 'not_configured' && health.track?.ready === false && health.track.missing.join() === 'SHOPIFY_ADMIN_CLIENT_ID')
+    check('track: GET /api/track → 405; the /track page itself is served (SPA) with HTML 200', (await fetch(base + '/api/track')).status === 405 && (await fetch(base + '/track?order=%231016')).status === 200 && (await (await fetch(base + '/track')).text()).includes('<div id="root">'))
+    const admin = http.createServer(async (req, res) => {
+      let raw = ''
+      for await (const c of req) raw += c
+      res.writeHead(200, { 'content-type': 'application/json' })
+      if (req.url === '/admin/oauth/access_token') return res.end(JSON.stringify({ access_token: 'tok', expires_in: 86399, _secret_ok: JSON.parse(raw).client_secret === 'srv-secret' }))
+      res.end(JSON.stringify({ data: { orders: { nodes: [{ name: '#1016', createdAt: '2026-10-20T03:00:00Z', email: 'hanako@example.com', cancelledAt: null, displayFinancialStatus: 'PAID', displayFulfillmentStatus: 'UNFULFILLED', shippingAddress: { countryCodeV2: 'JP', address1: 'SECRET-STREET' }, lineItems: { nodes: [{ sku: 'ICHIREI-STANDARD' }] }, fulfillments: [] }] } } }))
+    })
+    await new Promise((r) => admin.listen(0, '127.0.0.1', r))
+    const tracked = await startServer({
+      upstreamUrl: upstream.url,
+      env: { SHOPIFY_ADMIN_CLIENT_ID: 'cid', SHOPIFY_ADMIN_CLIENT_SECRET: 'srv-secret', SHOPIFY_ADMIN_API_BASE: `http://127.0.0.1:${admin.address().port}` },
+    })
+    try {
+      const h3 = await (await fetch(tracked.url + '/api/health')).json()
+      const ok = await post(tracked.url, '/api/track', { order: '#1016', email: 'Hanako@example.com' })
+      const okT = await ok.text()
+      const miss = await post(tracked.url, '/api/track', { order: '#1016', email: 'other@example.com' })
+      check('track: configured server → health.track.ready; matching email → 200 processing; wrong email → 404; no address, email or secret in any body', h3.track.ready === true && ok.status === 200 && JSON.parse(okT).status === 'processing' && JSON.parse(okT).sku[0] === 'ICHIREI-STANDARD' && miss.status === 404 && !okT.includes('SECRET-STREET') && !okT.includes('hanako') && !JSON.stringify(h3).includes('srv-secret'), okT)
+    } finally {
+      await tracked.stop()
+      admin.close()
     }
   }
 

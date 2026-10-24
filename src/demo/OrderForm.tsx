@@ -9,7 +9,7 @@ import { DEFAULT_STYLE, STYLES_BY_LANGUAGE, glyphFor, hasDistinctForm } from '..
 
 // The purchase step of the customer flow: after the sender has chosen a character, collect
 // sender name, receiver name, delivery date, inscription form and package, show the paper slip
-// with the certificate line (using the sender's name), then POST /api/order and go to Shopify
+// with the certificate line, then POST /api/order and go to Shopify
 // checkout. The browser sends choices, never a price: the charge is the Shopify variant's price.
 
 const FIELD =
@@ -56,7 +56,7 @@ export default function OrderForm({ result, story, candidate, copy, onBack }: Pr
 
   const today = useMemo(localToday, [])
   const glyph = glyphFor(candidate, style)
-  const cert = certificateText(language, sender)
+  const cert = certificateText(language)
   const senderOk = sender.trim() !== '' && [...sender.trim()].length <= NAME_MAX
   const receiverOk = receiver.trim() !== '' && [...receiver.trim()].length <= NAME_MAX
   const dateOk = /^\d{4}-\d{2}-\d{2}$/.test(date) && date >= today
@@ -238,6 +238,9 @@ export default function OrderForm({ result, story, candidate, copy, onBack }: Pr
             </label>
           ))}
         </div>
+        <p data-shipping className="font-serif-jp mt-4 text-xs leading-relaxed text-ivory/60">
+          {o.shippingNote}
+        </p>
       </fieldset>
 
       {error && (

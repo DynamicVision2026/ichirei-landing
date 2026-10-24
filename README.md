@@ -20,6 +20,7 @@ The cardinal rule: **the engine's reasoning is a swappable text asset, never cod
 | `engine/contract.ts` | The JSON contract, the allowed context codes, and `validateEngineResult` (used by tests/CLI, not in the runtime path). |
 | `engine/engine.ts`, `engine/explain.ts` | Pure plumbing: load the language's prompt → inject context + story → call model → parse JSON → stamp the request's context. Zero selection logic. |
 | `api/select.ts`, `api/explain.ts`, `api/log.ts` | Thin Vercel functions. The Anthropic key lives server-side only. |
+| `src/track/`, `engine/track.ts`, `api/track.ts`, `engine/rate-limit.ts` | **`/track`** — order status by order number + email (read-only Shopify Admin app “ICHIREI Tracking”, ICHIREI SKUs only, rate-limited, four languages). See DEPLOY.md Step 8. |
 | `src/components/`, `src/landing/copy.ts`, `src/lang-store.ts` | The customer site at `/`: the landing story (hero, marquee, emotional lines, process) followed by the real flow — write, choose a character, order (`DemoApp` in `customer` mode). Occasion-neutral, ja / zh-Hans / zh-Hant / en (language switch in the nav, remembered, shared with `/demo`; `?lang=` overrides; only a Chinese browser is switched automatically — English is opt-in via the switch or `?lang=en`). Landing copy: `src/landing/copy.ts`; the zh and en text are first drafts awaiting native review. |
 | `src/demo/` | The flow itself. `/demo` = the internal **harness** (A/B/C conditions, log export, golden fixture, diagnostics); `/` = the **customer** version of the same engine with none of those controls, ending in `OrderForm` (names, delivery date, inscription form, package → Shopify checkout). Elicitation with language / relationship / direction / occasion / occasion_detail selectors; progressive reveal; a clear message when no eligible primary remains. All copy in `src/demo/i18n.ts`. |
 
@@ -54,6 +55,7 @@ npm run dev                                              # landing on /, harness
 npx tsc -b && npx tsc -p tsconfig.engine.json            # typecheck frontend + engine/api
 node --experimental-strip-types scripts/test-plumbing.ts # prompts, slots, palette header, contract validator — no key needed
 node --experimental-strip-types scripts/test-palette.ts  # referee rules (hard_block, anchor, promotion, zh scripts) — no key needed
+node --experimental-strip-types scripts/test-track.ts      # /track: status rules, arrival dates, fake Shopify Admin, privacy + rate limits, 4-language copy
 node --experimental-strip-types scripts/test-order.ts      # purchase flow: validation, Shopify cart (fake), stores, /api/order end to end
 node --experimental-strip-types scripts/test-landing-copy.ts  # landing copy: four languages, neutral, AI invisible, sender chooses, exact brief lines
 node --experimental-strip-types scripts/test-copy.ts     # front-end copy: four languages, code coverage, occasion-neutral, right script

@@ -7,6 +7,6 @@ export const PACKAGES = ['simple', 'standard'] as const
 export type PackageId = (typeof PACKAGES)[number]
 
 /** Tax-included JPY price shown to the customer. Keep in step with the two Shopify variants. */
-export const PACKAGE_PRICE_JPY: Record<PackageId, number> = { simple: 9800, standard: 15800 }
+export const PACKAGE_PRICE_JPY: Record<PackageId, number> = { simple: 9800, standard: 18850 }
 
 export const formatYen = (n: number): string => `¥${n.toLocaleString('en-US')}`

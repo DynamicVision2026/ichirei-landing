@@ -9,6 +9,10 @@
       "maxDuration": 30,
       "includeFiles": "{engine/**,src/order/**}"
     },
+    "api/track.ts": {
+      "maxDuration": 15,
+      "includeFiles": "engine/**"
+    },
     "api/explain.ts": {
       "maxDuration": 60,
       "includeFiles": "engine/**"

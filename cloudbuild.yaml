@@ -1,7 +1,7 @@
 # Cloud Build: build the container -> push to Artifact Registry -> deploy to
 # Cloud Run service "ichirei".
 #
-# ANTHROPIC_API_KEY and SHOPIFY_STOREFRONT_TOKEN are NEVER baked into the image or stored in this repo. The
+# ANTHROPIC_API_KEY and the SHOPIFY_ADMIN client secret are NEVER baked into the image or stored in this repo. The
 # deploy step mounts the Secret Manager secret named ANTHROPIC_API_KEY as an env
 # var of the same name at runtime (--set-secrets below). Create/rotate the secret
 # in Secret Manager (Console -> Security -> Secret Manager -> ANTHROPIC_API_KEY ->
@@ -16,8 +16,16 @@ substitutions:
   _REPO: ichirei                    # Artifact Registry Docker repository name
   # Purchase flow (Step 4). Not secrets: the Shopify variant ids of the two packages and the
   # Cloud Storage bucket that holds the orders. Set them on the trigger (DEPLOY.md, Step 7).
-  _SHOPIFY_VARIANT_SIMPLE: ''       # ¥9,800 package  (numeric id or gid://shopify/ProductVariant/…)
-  _SHOPIFY_VARIANT_STANDARD: ''     # ¥15,800 package
+  # Variant ids are identifiers, not secrets (product 一字礼 ICHIREI, option セット).
+  _SHOPIFY_VARIANT_SIMPLE: '67789502447864'    # シンプル ¥9,800  — SKU ICHIREI-SIMPLE
+  _SHOPIFY_VARIANT_STANDARD: '67789502480632'  # スタンダード ¥18,850 — SKU ICHIREI-STANDARD
+  # The Storefront token is PUBLIC by design (it ships in every storefront). Set it on the trigger;
+  # when empty the server falls back to the SHOPIFY_STOREFRONT_TOKEN secret mounted below.
+  _SHOPIFY_STOREFRONT_TOKEN: ''
+  # /track (order status): the read-only "ICHIREI Tracking" app. The client ID is an identifier; the
+  # client SECRET is never a substitution — the server reads it from Secret Manager at request time
+  # (secret SHOPIFY_ADMIN_CLIENT_SECRET), so a missing secret can never break a deploy.
+  _SHOPIFY_ADMIN_CLIENT_ID: '394a8e955f7e28104f3e2089630bb3a5'
   _ORDER_BUCKET: ''                 # e.g. ichirei-orders
   _TIMEOUT: '300'                   # Cloud Run request timeout (s). Keep in step with
                                     # the server (300s) and the frontend deadline (290s).
@@ -61,7 +69,7 @@ steps:
       # Mount the Secret Manager secrets as env vars of the same name.
       - --set-secrets=ANTHROPIC_API_KEY=ANTHROPIC_API_KEY:latest,SHOPIFY_STOREFRONT_TOKEN=SHOPIFY_STOREFRONT_TOKEN:latest
       # Non-secret purchase settings. --update-env-vars leaves any other variables (ICHIREI_EFFORT …) alone.
-      - --update-env-vars=SHOPIFY_VARIANT_SIMPLE=${_SHOPIFY_VARIANT_SIMPLE},SHOPIFY_VARIANT_STANDARD=${_SHOPIFY_VARIANT_STANDARD},ORDER_BUCKET=${_ORDER_BUCKET}
+      - --update-env-vars=SHOPIFY_VARIANT_SIMPLE=${_SHOPIFY_VARIANT_SIMPLE},SHOPIFY_VARIANT_STANDARD=${_SHOPIFY_VARIANT_STANDARD},SHOPIFY_STOREFRONT_TOKEN_PUBLIC=${_SHOPIFY_STOREFRONT_TOKEN},SHOPIFY_ADMIN_CLIENT_ID=${_SHOPIFY_ADMIN_CLIENT_ID},ORDER_BUCKET=${_ORDER_BUCKET}
 
 images:
   - ${_REGION}-docker.pkg.dev/$PROJECT_ID/${_REPO}/${_SERVICE}:$BUILD_ID

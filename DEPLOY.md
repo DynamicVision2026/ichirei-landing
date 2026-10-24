@@ -123,18 +123,18 @@ Once the golden fixture works on Cloud Run: merge `claude/cloud-run-migration` i
 
 ## Step 7 — Purchase flow: Shopify checkout + order storage
 
-The site at `/` now ends in a purchase: the sender picks a character, fills in names, delivery date, inscription form and package (Simple ¥9,800 / Standard ¥15,800), and is sent to **Shopify checkout** (store `soul-id-2.myshopify.com`). The **story and the engine result are never sent to Shopify** — they are saved in a private Cloud Storage bucket as `orders/<order_ref>.json`, and the same `order_ref` rides on the Shopify line item so production can look the order up.
+The site at `/` now ends in a purchase: the sender picks a character, fills in names, delivery date, inscription form and package (Simple ¥9,800 / Standard ¥18,850), and is sent to **Shopify checkout** (store `soul-id-2.myshopify.com`). The **story and the engine result are never sent to Shopify** — they are saved in a private Cloud Storage bucket as `orders/<order_ref>.json`, and the same `order_ref` rides on the Shopify line item so production can look the order up.
 
 What the server needs (check `<URL>/api/health` → `"orders"`; it lists what is still missing, never the values):
 
 | Setting | Where | What |
 |---|---|---|
-| `SHOPIFY_STOREFRONT_TOKEN` | **Secret Manager** secret (mounted by `cloudbuild.yaml`) | Storefront API access token |
-| `SHOPIFY_VARIANT_SIMPLE`, `SHOPIFY_VARIANT_STANDARD` | Cloud Build trigger **substitutions** `_SHOPIFY_VARIANT_SIMPLE`, `_SHOPIFY_VARIANT_STANDARD` | the Shopify variant ids of the two packages |
+| Storefront token | trigger substitution `_SHOPIFY_STOREFRONT_TOKEN` (**public by design**), or the Secret Manager secret `SHOPIFY_STOREFRONT_TOKEN` that `cloudbuild.yaml` mounts — the substitution wins when both are set | Storefront API access token |
+| `SHOPIFY_VARIANT_SIMPLE`, `SHOPIFY_VARIANT_STANDARD` | Cloud Build **substitutions** `_SHOPIFY_VARIANT_SIMPLE`, `_SHOPIFY_VARIANT_STANDARD` (defaults in `cloudbuild.yaml`: `67789502447864` = シンプル `ICHIREI-SIMPLE`, `67789502480632` = スタンダード `ICHIREI-STANDARD`) | the Shopify variant ids of the two packages |
 | `ORDER_BUCKET` | substitution `_ORDER_BUCKET` | the Cloud Storage bucket for orders |
 
 **7a — Shopify admin (browser).**
-1. **Products:** create the two packages so their **prices are the source of truth** (the site never sends a price): one product with two variants, or two products — *Simple* **¥9,800** and *Standard* **¥15,800** (tax-included, matching how the store prices). Make both **available to the sales channel / app that owns the Storefront token** (step 2) — a product that is not published to it cannot be put in a cart.
+1. **Products:** create the two packages so their **prices are the source of truth** (the site never sends a price): one product with two variants, or two products — *Simple* **¥9,800** and *Standard* **¥18,850** (tax-included, matching how the store prices). Make both **available to the sales channel / app that owns the Storefront token** (step 2) — a product that is not published to it cannot be put in a cart.
 2. **Storefront token:** *Settings → Apps and sales channels → Develop apps → Create an app* → *Configure Storefront API scopes*: **`unauthenticated_read_product_listings`** and **`unauthenticated_write_checkouts`** (plus `unauthenticated_read_checkouts`) → *Install app* → copy the **Storefront API access token**. (You already created the Secret Manager secret `SHOPIFY_STOREFRONT_TOKEN`; if you rotate the token, add a new version there.)
 3. **Variant ids:** open each product → the variant → the number at the end of the URL (`…/products/123/variants/`**`45678901234567`**) is the id. Either the number or the full `gid://shopify/ProductVariant/45678901234567` works.
 4. The eight line-item attributes (`kanji`, `inscription_form`, `reading`, `sender_name`, `receiver_name`, `delivery_date`, `language`, `order_ref`) show on each order as **line-item properties**; `order_ref` is also on the order itself. `inscription_form` is the **glyph to carve** (after the sender's choice of old/modern or traditional/simplified).
@@ -166,6 +166,41 @@ Orders contain **personal data** (names, the sender's story): keep the bucket pr
 **Looking an order up (production).** Console → **Cloud Storage → `ichirei-orders` → `orders/` → `IC-YYYYMMDD-XXXXXXXX.json`** → *Preview*. The top block **`production`** has everything at a glance — the character and the glyph to carve, reading, **gaze line**, **story anchor**, sender/receiver names, delivery date, package and the **certificate text**; below it are the full `story` and `engine_result`. `status` is `cart_created` once Shopify accepted the cart (`cart_failed` / `pending` orders were never checked out).
 
 **If the order button shows an error:** `503 … not configured` → the health page says which setting is missing; `502 cart_failed` → Shopify refused the cart (most often a variant id that is wrong or not published to the Storefront app; the reason is in the order's `error` field).
+
+---
+
+## Step 8 — `/track`: order status (read-only)
+
+`https://ichirei.soul-id.jp/track` (the order confirmation email links to `/track?order=%231016`) takes an **order number + email** and shows 制作中 / 発送済み (+ carrier, tracking number, link) / お届け完了, or a short cancellation notice, with an estimated arrival (Japan: within 10 business days, weekends skipped; elsewhere: within one month) and the line 「ご不明な点は、ご注文確認メールにご返信ください。」 in ja / zh-Hans / zh-Hant / en. No new database: the status is derived from Shopify.
+
+**What it can see and say.** The **read-only** Dev Dashboard app **ICHIREI Tracking** (client id `394a8e955f7e28104f3e2089630bb3a5`, scope `read_orders` only). The server asks Shopify for the **one** order named, answers **only if the email on the order matches** and the order has an `ICHIREI…` SKU, and returns **only** order date, status, SKU(s), carrier, tracking number, tracking URL and the estimated date. Never a name, an address or an email. A wrong number, a wrong email, an order without an email and an order without an ICHIREI SKU all give the same “not found”. It never writes anything to Shopify and registers no webhook.
+
+**Limits.** Per IP: 10 requests / 10 minutes; per order number: 5 *wrong* guesses / hour (then that order is locked for the hour); per instance: 300 / hour. These counters live in each Cloud Run instance's memory (max 3 instances), so they are a brake on guessing, not an exact global quota.
+
+**One-time setup (yours — Cloud Shell):**
+```bash
+PROJECT_ID=ichirei
+PROJECT_NUMBER=$(gcloud projects describe $PROJECT_ID --format='value(projectNumber)')
+RUN_SA="${PROJECT_NUMBER}-compute@developer.gserviceaccount.com"
+
+# 1. The client secret of ICHIREI Tracking (Dev Dashboard → the app → Settings). Paste it when asked;
+#    it never goes into code, the trigger, a log or a chat.
+read -rs -p "ICHIREI Tracking client secret: " SECRET; echo
+printf '%s' "$SECRET" | gcloud secrets create SHOPIFY_ADMIN_CLIENT_SECRET --data-file=- --replication-policy=automatic --project=$PROJECT_ID
+unset SECRET
+
+# 2. Let the Cloud Run service account read that one secret
+gcloud secrets add-iam-policy-binding SHOPIFY_ADMIN_CLIENT_SECRET \
+  --member="serviceAccount:${RUN_SA}" --role=roles/secretmanager.secretAccessor --project=$PROJECT_ID
+```
+The server reads the secret **at request time** through the Secret Manager API (not as a mounted variable), so a missing or not-yet-granted secret can never break a deploy — `/track` just answers “can't check right now” until step 1–2 are done. The client id is the substitution `_SHOPIFY_ADMIN_CLIENT_ID` (already the default in `cloudbuild.yaml`). Check `<URL>/api/health` → `"track": { "ready": true }`.
+
+**Shopify-side things that decide whether it works** (check these first if `/track` says “can't check right now” — the log line `[ichirei-track] unavailable: …` names the reason):
+- the app must be **installed on `soul-id-2`** and allowed to read **customer data** (order **email** and **shipping country** are *protected customer data*: Dev Dashboard → the app → *API access* → *Protected customer data access*, level 2);
+- with only `read_orders`, Shopify returns orders from the **last 60 days** — an older order will show “not found” (that needs `read_all_orders`, which is a different scope and a different approval);
+- the Admin API version is `2025-01` (`SHOPIFY_API_VERSION` to change).
+
+**Overseas shipping.** The market “海外 ICHIREI” (JPY, EMS ¥6,000) is configured in Shopify; which market a checkout falls into is decided by Shopify from the buyer's country at checkout. The site does not pass a country — test one overseas order end to end before announcing.
 
 ---
 
