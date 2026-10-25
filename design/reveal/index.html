@@ -1,0 +1,724 @@
+<title>ICHIREI Reveal</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,400;12..96,600;12..96,700&family=Zen+Kaku+Gothic+New:wght@400;500;700&family=Zen+Old+Mincho:wght@700;900&family=Noto+Sans+TC:wght@400;500;700&family=Noto+Serif+TC:wght@700;900&display=swap">
+<style>
+  /* Layout: a warm, conversion-led gift page (story → reveal → steps → proof → gifts → FAQ), indigo ink on blush paper, one vermilion seal. */
+  :root{
+    --paper:#FBF4F0;      /* blush paper */
+    --card:#FFFFFF;
+    --tint:#F4E7E1;       /* soft band */
+    --ink:#1F2A44;        /* ai-zome indigo */
+    --mute:#6B7186;
+    --line:#E6D8D1;
+    --seal:#C8402D;       /* vermilion: main kanji + seal + primary button */
+    --seal-ink:#FFFFFF;
+    --gold:#B08D57;
+    --star:#D9A441;
+    --c-parents:#B5533C;--c-partner:#A2456B;--c-friends:#2E7A74;--c-children:#A8721C;--c-mentor:#3C5A98;--c-work:#5B7436;
+    --display:"Bricolage Grotesque","Zen Kaku Gothic New",system-ui,sans-serif;
+    --body:"Zen Kaku Gothic New","Bricolage Grotesque",system-ui,sans-serif;
+    --kanji:"Zen Old Mincho","Hiragino Mincho ProN",serif;
+    --r:14px;
+    color-scheme:light;
+  }
+  @media (prefers-color-scheme: dark){:root:not([data-theme="light"]){--paper:#141A2B;--card:#1C2438;--tint:#1A2133;--ink:#F3ECE6;--mute:#A6ABBC;--line:#2C3550;--seal:#E0563F;--seal-ink:#FFFFFF;--gold:#CFAE74;--star:#E6B85A;--c-parents:#DE8A70;--c-partner:#D987A6;--c-friends:#6CC0B8;--c-children:#E2B260;--c-mentor:#8FA9E0;--c-work:#A5C27A;color-scheme:dark}}
+  :root[data-theme="dark"]{--paper:#141A2B;--card:#1C2438;--tint:#1A2133;--ink:#F3ECE6;--mute:#A6ABBC;--line:#2C3550;--seal:#E0563F;--seal-ink:#FFFFFF;--gold:#CFAE74;--star:#E6B85A;--c-parents:#DE8A70;--c-partner:#D987A6;--c-friends:#6CC0B8;--c-children:#E2B260;--c-mentor:#8FA9E0;--c-work:#A5C27A;color-scheme:dark}
+  html[lang="zh-Hant"]{--body:"Noto Sans TC","Bricolage Grotesque",system-ui,sans-serif;--display:"Bricolage Grotesque","Noto Sans TC",system-ui,sans-serif;--kanji:"Noto Serif TC","Zen Old Mincho",serif}
+  *{box-sizing:border-box}
+  body{background:var(--paper);color:var(--ink);font-family:var(--body);font-size:16px;line-height:1.65;-webkit-font-smoothing:antialiased;overflow-x:hidden}
+  a{color:inherit}
+  .wrap{max-width:1120px;margin:0 auto;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+  section{padding-block:clamp(4rem,9vw,7rem)}
+  h1,h2,h3{font-family:var(--display);line-height:1.12;margin:0;text-wrap:balance}
+  h2{font-size:clamp(1.9rem,4.4vw,3rem);font-weight:700;letter-spacing:-.01em}
+  .eyebrow{font-family:var(--display);font-weight:600;font-size:.8rem;letter-spacing:.14em;text-transform:uppercase;color:var(--seal)}
+  .lead{font-size:clamp(1.02rem,1.8vw,1.18rem);color:var(--mute);max-width:36em;margin:0}
+  .center{text-align:center}.center .lead{margin-inline:auto}
+  .btn{display:inline-flex;align-items:center;justify-content:center;gap:.6rem;font-family:var(--display);font-weight:600;font-size:1.02rem;border-radius:999px;padding:.95rem 1.7rem;text-decoration:none;border:0;cursor:pointer;transition:transform .2s ease,box-shadow .2s ease}
+  .btn.primary{background:var(--seal);color:var(--seal-ink);box-shadow:0 10px 24px -10px var(--seal)}
+  .btn.primary:hover{transform:translateY(-2px)}
+  .btn.ghost{background:transparent;color:var(--ink);border:1.5px solid var(--line)}
+  .btn:focus-visible,button:focus-visible,select:focus-visible,summary:focus-visible{outline:2px solid var(--gold);outline-offset:3px}
+  .k{font-family:var(--kanji);font-weight:900;line-height:1}
+
+  /* top bar */
+  .top{position:sticky;top:env(safe-area-inset-top,0px);z-index:20;background:color-mix(in srgb,var(--paper) 92%,transparent);border-bottom:1px solid var(--line)}
+  body::before{content:"";position:fixed;inset:0 0 auto;height:env(safe-area-inset-top,0px);z-index:21;background:var(--paper)}
+  .top .wrap{display:flex;align-items:center;justify-content:space-between;gap:1rem;padding-block:.75rem}
+  .brand{display:flex;align-items:center;gap:.6rem;text-decoration:none}
+  .brand .ji{width:2.1rem;height:2.1rem;border-radius:50%;border:1.5px solid var(--seal);color:var(--seal);display:grid;place-items:center;font-family:var(--kanji);font-weight:700}
+  .brand b{font-family:var(--display);font-weight:700;letter-spacing:.18em;font-size:.95rem}
+  .topR{display:flex;align-items:center;gap:.8rem}
+  .lang{display:flex;border:1px solid var(--line);border-radius:999px;padding:3px}
+  .lang button{background:none;border:0;border-radius:999px;padding:.35rem .75rem;font:500 .82rem var(--body);color:var(--mute);cursor:pointer}
+  .lang button[aria-pressed="true"]{background:var(--ink);color:var(--paper)}
+  .top .btn{padding:.6rem 1.1rem;font-size:.9rem}
+
+  /* hero */
+  .hero{padding-top:clamp(2.6rem,6vw,4.6rem)}
+  .heroGrid{display:grid;grid-template-columns:minmax(0,1.05fr) minmax(0,.95fr);gap:clamp(2rem,5vw,4rem);align-items:center}
+  .hero h1{font-size:clamp(2.4rem,6vw,4.4rem);font-weight:700;letter-spacing:-.02em}
+  .hero h1 em{font-style:normal;color:var(--seal)}
+  .heroCopy{display:flex;flex-direction:column;gap:1.4rem;min-width:0}
+  .ctaRow{display:flex;flex-wrap:wrap;align-items:center;gap:1rem}
+  .from{font-size:.92rem;color:var(--mute)}
+  .from b{color:var(--ink);font-family:var(--display)}
+  .chips{display:flex;flex-wrap:wrap;gap:.5rem;margin:0;padding:0;list-style:none}
+  .chips li{font-size:.84rem;border:1px solid var(--line);background:var(--card);border-radius:999px;padding:.35rem .8rem;color:var(--ink)}
+
+  .reveal{background:var(--card);border:1px solid var(--line);border-radius:22px;padding:clamp(1.4rem,3vw,2rem);box-shadow:0 30px 60px -34px rgba(31,42,68,.35);display:flex;flex-direction:column;gap:1.1rem;min-width:0}
+  .reveal .tag{display:flex;gap:.5rem;flex-wrap:wrap;font-size:.78rem;color:var(--mute)}
+  .reveal .tag span{background:var(--tint);border-radius:999px;padding:.2rem .65rem}
+  .reveal .story{font-size:1.02rem;line-height:1.8;margin:0;min-height:3.6em}
+  .reveal .story::before{content:"“";color:var(--seal);font-family:var(--display);font-size:1.4rem;margin-right:.15rem}
+  .reveal .arrow{height:1px;background:var(--line);position:relative}
+  .reveal .arrow::after{content:"▾";position:absolute;left:50%;top:-.75rem;transform:translateX(-50%);background:var(--card);color:var(--gold);padding:0 .4rem;font-size:.9rem}
+  .reveal .out{display:grid;grid-template-columns:auto minmax(0,1fr);gap:1.2rem;align-items:center}
+  .reveal{--cat:var(--c-parents);border-top:4px solid var(--cat);transition:border-color .6s ease}
+  .reveal .out .k{font-size:clamp(4.6rem,10vw,6.4rem);color:var(--cat);transition:opacity .6s ease,transform .6s ease,color .6s ease}
+  .reveal .tag .cat{background:var(--cat);color:#fff;font-weight:500}
+  .reveal .story::before{color:var(--cat)!important}
+  .reveal .bar{height:2px;background:var(--line);border-radius:2px;overflow:hidden}
+  .reveal .bar i{display:block;height:100%;width:0;background:var(--cat)}
+  .reveal.run .bar i{animation:fill 6s linear forwards}
+  @keyframes fill{to{width:100%}}
+  .reveal .meta{display:flex;flex-direction:column;gap:.25rem;min-width:0}
+  .reveal .rd{font-family:var(--display);font-weight:600;font-size:1.05rem}
+  .reveal .rd small{font-weight:400;color:var(--mute);font-size:.9rem}
+  .reveal .gz{margin:0;color:var(--mute);font-size:.95rem}
+  .reveal .dots{display:flex;gap:.4rem;justify-content:center}
+  .reveal .dots button{width:9px;height:9px;border-radius:50%;border:0;background:var(--line);padding:0;cursor:pointer}
+  .reveal .dots button[aria-current="true"]{background:var(--cat);transform:scale(1.25)}
+  .reveal.swap .out .k{opacity:0;transform:translateY(8px)}
+
+  /* trust strip */
+  .strip{border-block:1px solid var(--line);background:var(--card)}
+  .strip ul{list-style:none;margin:0;padding:1.1rem 0;display:flex;flex-wrap:wrap;justify-content:center;gap:.8rem 2.4rem}
+  .strip li{display:flex;align-items:center;gap:.55rem;font-size:.92rem}
+  .strip .k{font-size:1.15rem;color:var(--gold);font-weight:700}
+
+  /* samples */
+  .samples{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:1.2rem;margin-top:2.6rem}
+  .sample{background:var(--card);border:1px solid var(--line);border-radius:var(--r);padding:1.4rem;display:flex;flex-direction:column;gap:.9rem;min-width:0}
+  .sample .head{display:flex;justify-content:space-between;align-items:center;gap:.6rem;flex-wrap:wrap}
+  .pill{font-family:var(--display);font-weight:600;font-size:.74rem;letter-spacing:.06em;text-transform:uppercase;border-radius:999px;padding:.25rem .65rem;background:var(--tint)}
+  .pill.free{background:transparent;border:1.5px dashed var(--gold);color:var(--gold)}
+  .sample .who{font-size:.85rem;color:var(--mute)}
+  .sample q{display:block;font-size:.98rem;line-height:1.75;quotes:"“" "”"}
+  .sample .res{display:flex;align-items:center;gap:1rem;border-top:1px solid var(--line);padding-top:.9rem}
+  .sample .res .k{font-size:3.4rem;color:var(--ink)}
+  .sample.main .res .k{color:var(--seal)}
+  .sample .res p{margin:0;font-size:.92rem;color:var(--mute)}
+  .sample .res p b{display:block;color:var(--ink);font-family:var(--display);font-weight:600;font-size:1rem}
+
+  /* steps */
+  .tintBand{background:var(--tint)}
+  .steps{list-style:none;padding:0;margin:2.6rem 0 0;display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:1.2rem;counter-reset:s}
+  .steps li{background:var(--card);border-radius:var(--r);padding:1.6rem;display:flex;flex-direction:column;gap:.6rem;min-width:0}
+  .steps .n{width:2.3rem;height:2.3rem;border-radius:50%;background:var(--ink);color:var(--paper);display:grid;place-items:center;font-family:var(--display);font-weight:700}
+  .steps h3{font-size:1.25rem}
+  .steps p{margin:0;color:var(--mute);font-size:.95rem}
+  .steps .time{font-size:.82rem;color:var(--gold);font-weight:500}
+
+  /* people */
+  .people{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:clamp(2rem,5vw,4rem);align-items:center}
+  .people .big{font-size:clamp(2.2rem,5.2vw,3.6rem)}
+  .facts{list-style:none;margin:0;padding:0;display:grid;gap:1rem}
+  .facts li{display:grid;grid-template-columns:auto minmax(0,1fr);gap:1rem;align-items:start;background:var(--card);border:1px solid var(--line);border-radius:var(--r);padding:1.1rem 1.2rem}
+  .facts .k{font-size:1.9rem;color:var(--seal)}
+  .facts b{font-family:var(--display);font-weight:600;display:block}
+  .facts span{color:var(--mute);font-size:.93rem}
+
+  /* reviews: honest empty state until real reviews exist */
+  .reviewsEmpty{margin-top:2.4rem;border:1.5px dashed var(--line);border-radius:var(--r);padding:clamp(1.6rem,4vw,2.6rem);display:grid;grid-template-columns:auto minmax(0,1fr) auto;gap:1.6rem;align-items:center;background:var(--card)}
+  .stars{color:var(--star);letter-spacing:.15em;font-size:1.3rem}
+  .reviewsEmpty p{margin:0;color:var(--mute)}
+  .reviewsEmpty b{color:var(--ink);font-family:var(--display);font-size:1.15rem;display:block;margin-bottom:.2rem}
+
+  /* occasions */
+  .occ{display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:.8rem;margin-top:2.4rem}
+  .occ a{display:flex;align-items:center;gap:.8rem;background:var(--card);border:1px solid var(--line);border-radius:var(--r);padding:1rem;text-decoration:none;transition:border-color .2s}
+  .occ a:hover{border-color:var(--seal)}
+  .occ .k{font-size:1.7rem;color:var(--ink)}
+  .occ span{font-family:var(--display);font-weight:600;font-size:.95rem;line-height:1.25}
+
+  /* gifts */
+  .gifts{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:1.4rem;margin-top:2.6rem}
+  .gift{background:var(--card);border:1px solid var(--line);border-radius:18px;overflow:hidden;display:flex;flex-direction:column;min-width:0}
+  .gift img{display:block;width:100%;aspect-ratio:4/3;object-fit:cover;max-width:100%}
+  .gift .body{padding:1.5rem;display:flex;flex-direction:column;gap:.9rem;flex:1}
+  .gift .row{display:flex;justify-content:space-between;align-items:baseline;gap:1rem;flex-wrap:wrap}
+  .gift h3{font-size:1.5rem}
+  .gift .price{font-family:var(--display);font-weight:700;font-size:1.6rem;font-variant-numeric:tabular-nums}
+  .gift .approx{font-size:.85rem;color:var(--mute);font-variant-numeric:tabular-nums}
+  .gift ul{margin:0;padding-left:1.1rem;color:var(--mute);font-size:.94rem}
+  .gift .btn{margin-top:auto;align-self:flex-start}
+  .badge{font-family:var(--display);font-weight:600;font-size:.72rem;letter-spacing:.06em;text-transform:uppercase;background:var(--seal);color:var(--seal-ink);border-radius:999px;padding:.25rem .7rem}
+  .shipNote{margin-top:1.4rem;display:flex;flex-wrap:wrap;justify-content:center;gap:.6rem 1.6rem;font-size:.9rem;color:var(--mute)}
+  .shipNote select{font:inherit;color:var(--ink);background:var(--card);border:1px solid var(--line);border-radius:8px;padding:.15rem .4rem}
+
+  /* promise */
+  .promise{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:1.2rem;margin-top:2.4rem}
+  .promise div{border-top:3px solid var(--seal);padding-top:1rem}
+  .promise b{font-family:var(--display);font-size:1.1rem;display:block;margin-bottom:.3rem}
+  .promise p{margin:0;color:var(--mute);font-size:.95rem}
+
+  /* faq */
+  .faq{max-width:760px;margin:2.4rem auto 0}
+  .faq details{border-bottom:1px solid var(--line);padding:1.1rem 0}
+  .faq summary{cursor:pointer;list-style:none;display:flex;justify-content:space-between;gap:1rem;font-family:var(--display);font-weight:600;font-size:1.06rem}
+  .faq summary::-webkit-details-marker{display:none}
+  .faq summary::after{content:"+";color:var(--seal);font-size:1.3rem;line-height:1}
+  .faq details[open] summary::after{content:"–"}
+  .faq p{margin:.6rem 0 0;color:var(--mute)}
+
+  /* closing */
+  .closing{background:var(--ink);color:var(--paper);text-align:center}
+  .closing .k{font-size:clamp(4rem,10vw,6rem);color:var(--seal)}
+  .closing h2{color:var(--paper);margin-top:1rem}
+  .closing p{color:color-mix(in srgb,var(--paper) 70%,transparent);margin:1rem auto 2rem;max-width:32em}
+  footer{padding-block:2rem 6rem;font-size:.85rem;color:var(--mute)}
+  footer .wrap{display:flex;flex-wrap:wrap;justify-content:space-between;gap:1rem}
+
+
+
+  /* photo frames: show the real photo when present, a soft art-directed frame until then */
+  .ph{position:relative;margin:0;overflow:hidden;border-radius:18px;background:linear-gradient(150deg,color-mix(in srgb,var(--cat,var(--gold)) 22%,var(--paper)),color-mix(in srgb,var(--cat,var(--gold)) 8%,var(--paper)));isolation:isolate}
+  .ph img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;max-width:100%;z-index:1;transition:opacity .8s ease}
+  .ph .phk{position:absolute;right:-.06em;bottom:-.18em;font-family:var(--kanji);font-weight:900;font-size:clamp(7rem,16vw,12rem);line-height:1;color:var(--cat,var(--gold));opacity:.16;z-index:0}
+  .ph .phc{position:absolute;left:1rem;top:1rem;z-index:0;font-size:.72rem;letter-spacing:.08em;color:color-mix(in srgb,var(--cat,var(--gold)) 80%,var(--ink));opacity:.8;max-width:70%}
+  /* hero: photo behind the live reveal card */
+  .heroArt{position:relative;min-width:0;padding-bottom:3rem}
+  .heroArt .ph{aspect-ratio:4/5;width:86%;margin-left:auto;max-width:100%}
+  .heroArt .reveal{position:relative;margin-top:-42%;width:82%;max-width:100%}
+  .heroArt .ph.swap img{opacity:0}
+  /* everyday moments mosaic */
+  .mosaic{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));grid-auto-rows:clamp(150px,18vw,230px);gap:1rem;margin-top:2.8rem}
+  .mosaic .ph{border-radius:16px}
+  .mosaic .m1{grid-column:span 2;grid-row:span 2}
+  .mosaic .m4,.mosaic .m6{grid-column:span 2}
+  .mosaic figcaption.cap{position:absolute;left:0;right:0;bottom:0;z-index:2;padding:2.2rem 1rem .95rem;display:flex;align-items:flex-end;gap:.8rem;
+    background:linear-gradient(transparent,rgba(20,22,32,.62));color:#fff}
+  .mosaic .cap .k{font-size:2.2rem;color:#fff;text-shadow:0 2px 10px rgba(0,0,0,.3)}
+  .mosaic .m1 .cap .k{font-size:3.4rem}
+  .mosaic .cap span{font-size:.88rem;line-height:1.45;min-width:0}
+  .mosaic .cap small{display:block;opacity:.8;font-size:.74rem;letter-spacing:.06em;margin-bottom:.15rem}
+  .free{display:inline-flex;align-items:center;gap:.5rem;font-size:.92rem;color:var(--mute)}
+  .free b{color:var(--ink);font-family:var(--display)}
+  /* quieter gifts */
+  #gifts .gift h3{font-size:1.3rem}
+  #gifts .price{font-size:1.15rem;font-weight:600;color:var(--mute)}
+  #gifts .gift img{aspect-ratio:16/10}
+  @media (max-width:860px){
+    .heroArt .ph{width:100%;aspect-ratio:4/3}
+    .heroArt .reveal{margin-top:-18%;width:94%;margin-left:3%}
+    .mosaic{grid-template-columns:repeat(2,minmax(0,1fr));grid-auto-rows:170px}
+    .mosaic .m1{grid-column:span 2;grid-row:span 2}.mosaic .m4{grid-column:span 2}.mosaic .m6{grid-column:span 1}
+  }
+
+
+  /* story-first sections */
+  .philo{padding-block:clamp(4.5rem,10vw,7.5rem)}
+  .phH{font-size:clamp(2.2rem,5.4vw,3.8rem);margin-top:.8rem;max-width:16em}
+  .phGrid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:clamp(1.4rem,4vw,3rem);margin-top:clamp(2.4rem,5vw,3.6rem)}
+  .phGrid div{border-top:1px solid var(--line);padding-top:1.2rem;display:flex;flex-direction:column;gap:.8rem}
+  .phN{font-family:var(--kanji);font-weight:900;font-size:2rem;color:var(--gold);line-height:1}
+  .phGrid p{margin:0;font-size:1.05rem;line-height:1.8}
+  .pairs{display:grid;gap:1.4rem;margin-top:2.6rem}
+  .pair{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.25fr);gap:1rem;align-items:stretch}
+  .vs{border-radius:var(--r);padding:1.4rem 1.5rem;display:flex;flex-direction:column;gap:.8rem;min-width:0}
+  .vs.weak{background:transparent;border:1.5px dashed var(--line);color:var(--mute)}
+  .vs.strong{background:var(--card);border:1px solid var(--line);box-shadow:0 18px 40px -28px rgba(31,42,68,.35)}
+  .vs .lbl,.anglePanel .lbl{font-family:var(--display);font-weight:600;font-size:.74rem;letter-spacing:.12em;text-transform:uppercase;color:var(--gold)}
+  .vs.weak .lbl{color:var(--mute)}
+  .vs q{font-size:1.08rem;line-height:1.75;quotes:"“" "”"}
+  .vs.strong q{color:var(--ink)}
+  .vs .res{font-size:.92rem;display:flex;align-items:center;gap:.9rem}
+  .vs.strong .res .k{font-size:2.8rem;color:var(--seal)}
+  .angleBox{display:grid;grid-template-columns:minmax(0,.85fr) minmax(0,1.15fr);gap:1.4rem;margin-top:2.6rem;align-items:start}
+  .angleTabs{display:flex;flex-direction:column;gap:.6rem}
+  .angleTabs button{display:flex;align-items:center;gap:1rem;text-align:left;background:var(--card);border:1px solid var(--line);border-radius:var(--r);padding:.9rem 1.1rem;cursor:pointer;font:500 1rem var(--body);color:var(--ink);transition:border-color .2s,transform .2s}
+  .angleTabs button .k{font-size:1.7rem;color:var(--mute)}
+  .angleTabs button[aria-selected="true"]{border-color:var(--ink);transform:translateX(4px)}
+  .angleTabs button[aria-selected="true"] .k{color:var(--seal)}
+  .anglePanel{background:var(--card);border:1px solid var(--line);border-radius:18px;padding:clamp(1.4rem,3vw,2.2rem);display:flex;flex-direction:column;gap:.7rem;min-width:0;box-shadow:0 26px 50px -34px rgba(31,42,68,.35)}
+  .anglePanel .ask{margin:0 0 .8rem;font-family:var(--display);font-weight:600;font-size:clamp(1.25rem,2.4vw,1.6rem);line-height:1.35}
+  .anglePanel .ex{font-size:1.05rem;line-height:1.8;quotes:"“" "”";margin-bottom:.6rem}
+  .agRes{display:flex;align-items:center;gap:1rem;border-top:1px solid var(--line);padding-top:1rem;color:var(--mute)}
+  .agRes .k{font-size:3rem;color:var(--seal)}
+  .writeGrid{display:grid;grid-template-columns:minmax(0,.9fr) minmax(0,1.1fr);gap:clamp(2rem,5vw,4rem);align-items:start}
+  .tips{list-style:none;padding:0;margin:1.6rem 0 0;display:grid;gap:.9rem}
+  .tips li{display:grid;grid-template-columns:auto minmax(0,1fr);gap:.8rem;font-size:1.02rem}
+  .tips li::before{content:"";width:.55rem;height:.55rem;border-radius:50%;background:var(--gold);margin-top:.6rem}
+  .composer{background:var(--card);border:1px solid var(--line);border-radius:18px;padding:clamp(1.4rem,3vw,2rem);display:flex;flex-direction:column;gap:.7rem;min-width:0}
+  .clab{font-family:var(--display);font-weight:600;font-size:.92rem}
+  .composer input,.composer textarea{width:100%;font:400 1rem var(--body);color:var(--ink);background:var(--paper);border:1px solid var(--line);border-radius:10px;padding:.75rem .9rem;line-height:1.7;resize:vertical}
+  .composer input:focus-visible,.composer textarea:focus-visible{outline:2px solid var(--gold);outline-offset:1px}
+  .cmeta{display:flex;justify-content:space-between;gap:1rem;flex-wrap:wrap;font-size:.84rem;color:var(--mute)}
+  .cnt{font-variant-numeric:tabular-nums}
+  .composer .btn{align-self:flex-start;margin-top:.4rem}
+  .sent{margin:0;font-size:.9rem;color:var(--mute)}
+  @media (max-width:860px){
+    .phGrid,.pair,.angleBox,.writeGrid{grid-template-columns:1fr}
+    .angleTabs button[aria-selected="true"]{transform:none}
+  }
+
+  /* sticky phone CTA */
+  .dock{position:fixed;left:0;right:0;bottom:0;z-index:30;display:none;background:var(--card);border-top:1px solid var(--line);
+    padding:.7rem max(16px,env(safe-area-inset-right,0px)) calc(.7rem + env(safe-area-inset-bottom,0px)) max(16px,env(safe-area-inset-left,0px))}
+  .dock .btn{width:100%}
+
+  @media (max-width:860px){
+    .heroGrid,.people{grid-template-columns:1fr}
+    .samples,.steps,.promise,.gifts{grid-template-columns:1fr}
+    .reviewsEmpty{grid-template-columns:1fr;text-align:center}
+    .top .btn{display:none}
+    .dock{display:block}
+  }
+  @media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
+</style>
+
+<header class="top">
+  <div class="wrap">
+    <a class="brand" href="#top" aria-label="ICHIREI"><span class="ji">字</span><b>ICHIREI</b></a>
+    <div class="topR">
+      <div class="lang" role="group" aria-label="Language"><button type="button" data-lang="en" aria-pressed="true">EN</button><button type="button" data-lang="ja" aria-pressed="false">日本語</button><button type="button" data-lang="zh-Hant" aria-pressed="false">繁中</button></div>
+      <a class="btn primary" href="#write" data-i="ctaTop">Tell your story</a>
+    </div>
+  </div>
+</header>
+
+<main id="top">
+  <!-- HERO -->
+  <section class="hero">
+    <div class="wrap heroGrid">
+      <div class="heroCopy">
+        <span class="eyebrow" data-i="eyebrow">A story-driven gift</span>
+        <h1 data-i="h1">Between you and me, <em>one character.</em></h1>
+        <p class="lead" data-i="sub">It all starts with your story. Tell us one true moment with someone, and we find the single character that holds how you see them. Then we carve it by hand in Japan.</p>
+        <div class="ctaRow">
+          <a class="btn primary" href="#write" data-i="ctaHero">Tell your story</a>
+          <span class="free" data-i="freeLine"><b>Free to try.</b> You only pay if you decide to give it.</span><span class="approxHero" hidden></span>
+        </div>
+        <ul class="chips"><li data-i="c1">Birthdays</li><li data-i="c2">Weddings</li><li data-i="c3">Parents</li><li data-i="c4">Best friends</li><li data-i="c5">Thank you</li></ul>
+      </div>
+      <div class="heroArt">
+      <figure class="ph" id="rvPh" style="--cat:var(--c-parents)"><span class="phk" id="rvPhK">燈</span><span class="phc" id="rvPhC">Photo · a mother in the kitchen at dawn</span><img id="rvImg" src="img/scenes/parents.jpg" alt="" onerror="this.hidden=true"></figure>
+      <div class="reveal" id="reveal" aria-live="polite">
+        <div class="tag"><span class="cat" id="rvCat">Parents</span><span id="rvWho">Daughter → Mother</span><span id="rvOcc">Birthday</span></div>
+        <p class="story" id="rvStory">She got up at five every morning to make lunch for all of us. I never once heard her complain.</p>
+        <div class="arrow" aria-hidden="true"></div>
+        <div class="out">
+          <span class="k" id="rvK">燈</span>
+          <div class="meta"><span class="rd" id="rvRd">tomoshibi <small>· lamplight</small></span><p class="gz" id="rvGz">The first light the family woke to.</p></div>
+        </div>
+        <div class="bar" aria-hidden="true"><i id="rvBar"></i></div>
+        <div class="dots" id="rvDots"><button type="button" aria-label="Example 1" aria-current="true"></button><button type="button" aria-label="Example 2"></button><button type="button" aria-label="Example 3"></button><button type="button" aria-label="Example 4"></button><button type="button" aria-label="Example 5"></button><button type="button" aria-label="Example 6"></button></div>
+      </div>
+      </div>
+    </div>
+  </section>
+
+  <div class="strip">
+    <ul class="wrap">
+      <li><span class="k">刻</span><span data-i="s1">Carved by hand in Japan</span></li>
+      <li><span class="k">確</span><span data-i="s2">Checked by native speakers</span></li>
+      <li><span class="k">届</span><span data-i="s3">Ships worldwide</span></li>
+      <li><span class="k">選</span><span data-i="s4">You choose the final character</span></li>
+    </ul>
+  </div>
+
+  <!-- PHILOSOPHY -->
+  <section class="philo">
+    <div class="wrap">
+      <span class="eyebrow" data-i="phEye">Why we start with your story</span>
+      <h2 class="phH" data-i="phH">We don't sell characters.<br>We keep relationships.</h2>
+      <div class="phGrid">
+        <div><span class="phN">一</span><p data-i="ph1">Every relationship holds something never quite said. "Thank you" and "I love you" are true, but they are everyone's words.</p></div>
+        <div><span class="phN">二</span><p data-i="ph2">What belongs only to the two of you lives in a small, real moment: a habit, a sentence, a light left on.</p></div>
+        <div><span class="phN">三</span><p data-i="ph3">Your story is the material. The truer the moment, the truer the character. We only find what is already there.</p></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- STORY SHAPE -->
+  <section class="tintBand" id="shape">
+    <div class="wrap center">
+      <span class="eyebrow" data-i="shEye">What a story looks like</span>
+      <h2 data-i="shH">Not beautiful writing. One true moment.</h2>
+      <p class="lead" data-i="shP" style="margin-top:1rem">Praise could describe anyone. A small, real detail can only describe them.</p>
+    </div>
+    <div class="wrap pairs">
+      <div class="pair">
+        <div class="vs weak"><span class="lbl" data-i="weakL">Could be anyone</span><q data-i="w1s">My mother is kind and always supports me.</q><span class="res" data-i="w1r">Leads to a common word like 愛 (love). True, but not hers.</span></div>
+        <div class="vs strong"><span class="lbl" data-i="strongL">Only them</span><q data-i="s1s">She left the porch light on every night until I got home. Even when I was thirty.</q><span class="res"><b class="k">燈</b><span data-i="s1r">Lamplight. The person who waited with the light on.</span></span></div>
+      </div>
+      <div class="pair">
+        <div class="vs weak"><span class="lbl" data-i="weakL2">Could be anyone</span><q data-i="w2s">He is my best friend and we have been through a lot.</q><span class="res" data-i="w2r">Leads to 友 (friend). Every friendship fits.</span></div>
+        <div class="vs strong"><span class="lbl" data-i="strongL2">Only them</span><q data-i="s2s">After my divorce he drove four hours with a frozen pizza and said nothing. We just watched football.</q><span class="res"><b class="k">隣</b><span data-i="s2r">Beside. The one who simply stayed next to me.</span></span></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ANGLES -->
+  <section id="angles">
+    <div class="wrap center">
+      <span class="eyebrow" data-i="anEye">Where to look</span>
+      <h2 data-i="anH">Five ways into your story</h2>
+      <p class="lead" data-i="anP" style="margin-top:1rem">Not sure what to write? Pick a door. Each one asks a small question that opens a big memory.</p>
+    </div>
+    <div class="wrap angleBox">
+      <div class="angleTabs" role="tablist" aria-label="Story angles">
+        <button type="button" role="tab" data-a="0" aria-selected="true"><b class="k">癖</b><span data-i="a0">A habit or a phrase</span></button>
+        <button type="button" role="tab" data-a="1" aria-selected="false"><b class="k">助</b><span data-i="a1">A time they showed up</span></button>
+        <button type="button" role="tab" data-a="2" aria-selected="false"><b class="k">物</b><span data-i="a2">Something they made or fixed</span></button>
+        <button type="button" role="tab" data-a="3" aria-selected="false"><b class="k">場</b><span data-i="a3">A place that is them</span></button>
+        <button type="button" role="tab" data-a="4" aria-selected="false"><b class="k">黙</b><span data-i="a4">What they never said</span></button>
+      </div>
+      <div class="anglePanel" role="tabpanel" aria-live="polite">
+        <span class="lbl" data-i="askL">The question</span>
+        <p class="ask" id="agQ">What does this person always do or say, that would mean nothing to anyone else?</p>
+        <span class="lbl" data-i="exL">A story it opened</span>
+        <q class="ex" id="agEx">Every phone call ends with ‘Did you eat?’ Twenty years, never once ‘I love you.’</q>
+        <div class="agRes"><b class="k" id="agK">食</b><span id="agR">The one who loves by asking if you ate.</span></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- WRITE -->
+  <section class="tintBand" id="write">
+    <div class="wrap writeGrid">
+      <div>
+        <span class="eyebrow" data-i="wrEye">Your turn</span>
+        <h2 data-i="wrH">Tell us one moment</h2>
+        <ul class="tips">
+          <li data-i="tp1">One real moment beats a whole biography.</li>
+          <li data-i="tp2">Honest is better than beautiful. Plain words are perfect.</li>
+          <li data-i="tp3">Funny is welcome. Inside jokes often hold the most truth.</li>
+          <li data-i="tp4">Write or speak, in English, Japanese or Chinese. 50 to 300 characters is plenty.</li>
+          <li data-i="tp5">Your story is used only to find the character.</li>
+        </ul>
+      </div>
+      <form class="composer" id="composer" autocomplete="off">
+        <label class="clab" for="who" data-i="cWho">Who is it for?</label>
+        <input id="who" type="text" maxlength="40" data-ph="cWhoPh" placeholder="My mother, my best friend, my old teacher…">
+        <label class="clab" for="moment" data-i="cMom">One moment with them</label>
+        <textarea id="moment" rows="5" maxlength="600" data-ph="cMomPh" placeholder="Start with a small detail: something they always did, said, made or never said."></textarea>
+        <div class="cmeta"><span id="cHint" data-i="cHint">Tip: add one detail only you would know.</span><span class="cnt"><span id="cnt">0</span> / 600</span></div>
+        <button type="submit" class="btn primary" data-i="cGo">Find the character in my story</button>
+        <p class="sent" id="sent" hidden data-i="cSent">This is a design preview, so it stops here. On the live site, your three characters appear in about a minute, free.</p>
+      </form>
+    </div>
+  </section>
+
+  <!-- STEPS -->
+  <section class="tintBand" id="how">
+    <div class="wrap center">
+      <span class="eyebrow" data-i="stEye">How it works</span>
+      <h2 data-i="stH">Three simple steps to one character</h2>
+    </div>
+    <ol class="wrap steps">
+      <li><span class="n">1</span><h3 data-i="st1">Tell one moment</h3><p data-i="st1p">Write or speak a few lines about a moment you shared. No fine writing needed.</p><span class="time" data-i="st1t">About 2 minutes</span></li>
+      <li><span class="n">2</span><h3 data-i="st2">Meet three characters</h3><p data-i="st2p">Two main characters and one freestyle, each with its reading, its meaning and why it fits. You choose.</p><span class="time" data-i="st2t">Right away · free</span></li>
+      <li><span class="n">3</span><h3 data-i="st3">Carved and delivered</h3><p data-i="st3p">We carve your character by hand in Japan and send it gift-ready, with a certificate card in Japanese and English.</p><span class="time" data-i="st3t">Japan ~10 working days · Overseas within a month</span></li>
+    </ol>
+    <div class="wrap center" style="margin-top:2.4rem"><a class="btn primary" href="#write" data-i="ctaSteps">Try it free</a></div>
+  </section>
+
+
+  <!-- MOMENTS -->
+  <section id="moments">
+    <div class="wrap center">
+      <span class="eyebrow" data-i="mmEye">Stories become characters</span>
+      <h2 data-i="mmH">The biggest feelings live in the smallest moments</h2>
+      <p class="lead" data-i="mmP" style="margin-top:1rem">Not only birthdays and weddings. A packed lunch, an umbrella at the station, a coffee left on a desk. That is where your character is hiding.</p>
+    </div>
+    <div class="wrap mosaic">
+      <figure class="ph m1" style="--cat:var(--c-children)"><span class="phk">結</span><span class="phc">Photo · grandmother braiding a girl's hair</span><img src="img/scenes/m1.jpg" alt="" onerror="this.hidden=true"><figcaption class="cap"><span class="k">結</span><span><small data-i="m1w">Granddaughter → Grandmother</small><span data-i="m1t">Every school morning, she braided my hair and tied in a little wish.</span></span></figcaption></figure>
+      <figure class="ph m2" style="--cat:var(--c-partner)"><span class="phk">待</span><span class="phc">Photo · husband waiting with an umbrella</span><img src="img/scenes/m2.jpg" alt="" onerror="this.hidden=true"><figcaption class="cap"><span class="k">待</span><span><small data-i="m2w">Wife → Husband</small><span data-i="m2t">Ten years of rainy days, always at the station.</span></span></figcaption></figure>
+      <figure class="ph m3" style="--cat:var(--c-friends)"><span class="phk">笑</span><span class="phc">Photo · two friends laughing on a bus</span><img src="img/scenes/m3.jpg" alt="" onerror="this.hidden=true"><figcaption class="cap"><span class="k">笑</span><span><small data-i="m3w">Friend → Friend</small><span data-i="m3t">We still can't sit together without laughing.</span></span></figcaption></figure>
+      <figure class="ph m4" style="--cat:var(--c-work)"><span class="phk">温</span><span class="phc">Photo · a coffee left on a desk at night</span><img src="img/scenes/m4.jpg" style="object-position:center 80%" alt="" onerror="this.hidden=true"><figcaption class="cap"><span class="k">温</span><span><small data-i="m4w">Colleague → Colleague</small><span data-i="m4t">The night before the deadline, a warm coffee appeared on my desk.</span></span></figcaption></figure>
+      <figure class="ph m5" style="--cat:var(--c-parents)"><span class="phk">直</span><span class="phc">Photo · father fixing a bicycle</span><img src="img/scenes/m5.jpg" alt="" onerror="this.hidden=true"><figcaption class="cap"><span class="k">直</span><span><small data-i="m5w">Son → Father</small><span data-i="m5t">He fixed my bike, my desk and my confidence.</span></span></figcaption></figure>
+      <figure class="ph m6" style="--cat:var(--c-mentor)"><span class="phk">導</span><span class="phc">Photo · teacher and student after class</span><img src="img/scenes/m6.jpg" alt="" onerror="this.hidden=true"><figcaption class="cap"><span class="k">導</span><span><small data-i="m6w">Student → Teacher</small><span data-i="m6t">She stayed after class until I understood.</span></span></figcaption></figure>
+    </div>
+    <p class="wrap center from" data-i="mmNote" style="margin-top:1.4rem">Examples for illustration. Your story gets three characters of its own: two main ones and one freestyle.</p>
+  </section>
+
+  <!-- REVIEWS: honest empty state -->
+  <section class="tintBand">
+    <div class="wrap center">
+      <span class="eyebrow" data-i="rvEye">Reviews</span>
+      <h2 data-i="rvH">Be one of our first givers</h2>
+    </div>
+    <div class="wrap">
+      <div class="reviewsEmpty">
+        <span class="stars" aria-hidden="true">☆☆☆☆☆</span>
+        <p><b data-i="rvB">Real reviews will appear here</b><span data-i="rvP">ICHIREI is new. As our first givers send their characters, their words and reveal moments will be shown here, unedited.</span></p>
+        <a class="btn ghost" href="#write" data-i="rvCta">Give the first one</a>
+      </div>
+    </div>
+  </section>
+
+  <!-- GIFTS -->
+  <section class="tintBand" id="gifts">
+    <div class="wrap center">
+      <span class="eyebrow" data-i="gfEye">When you are ready</span>
+      <h2 data-i="gfH">Two ways to hand it over</h2>
+      <p class="lead" data-i="gfP" style="margin-top:1rem">Find your character first. Choose how to give it only when it feels right.</p>
+    </div>
+    <div class="wrap gifts">
+      <article class="gift">
+        <img src="img/simple-hero.jpg" alt="Walnut tag with a gold-leaf character, red-and-white mizuhiki cord, certificate card and gift box">
+        <div class="body">
+          <div class="row"><h3>Simple</h3><span class="price">¥9,800</span></div>
+          <span class="approx" data-fx="9800"></span>
+          <ul><li data-i="sp1">Walnut tag, character carved and finished in gold leaf</li><li data-i="sp2">Red-and-white mizuhiki cord</li><li data-i="sp3">Bilingual certificate card</li><li data-i="sp4">Gift box, ready to give</li></ul>
+          <a class="btn primary" href="#top" data-i="buy1">Start with Simple</a>
+        </div>
+      </article>
+      <article class="gift">
+        <img src="img/standard-hero.jpg" alt="Carved wooden block, rubbing ink, tampo, washi paper, certificate card and pouch">
+        <div class="body">
+          <div class="row"><h3>Standard <span class="badge" data-i="pop">Make it together</span></h3><span class="price">¥18,850</span></div>
+          <span class="approx" data-fx="18850"></span>
+          <ul><li data-i="dp1">Character carved into a wooden block</li><li data-i="dp2">Rubbing ink, tampo and washi: print the character together</li><li data-i="dp3">Bilingual certificate card</li><li data-i="dp4">Pouch and gift box</li></ul>
+          <a class="btn primary" href="#top" data-i="buy2">Start with Standard</a>
+        </div>
+      </article>
+    </div>
+    <div class="wrap shipNote">
+      <span data-i="ship1">Tax included · Free shipping in Japan</span>
+      <span data-i="ship2">Worldwide: flat ¥6,000 by EMS</span>
+      <label><span data-i="cur">Show prices in</span> <select id="cur"><option>JPY</option><option>USD</option><option>EUR</option><option>GBP</option><option>AUD</option><option>TWD</option><option>HKD</option><option>SGD</option><option>KRW</option></select></label>
+    </div>
+  </section>
+
+  <!-- FAQ -->
+  <section class="tintBand">
+    <div class="wrap center"><span class="eyebrow">FAQ</span><h2 data-i="fqH">Questions givers ask</h2></div>
+    <div class="wrap faq">
+      <details><summary data-i="fq1">I can’t read kanji. Will I understand it?</summary><p data-i="fa1">Yes. Every character comes with its reading, its meaning in plain words and the reason it fits, and the certificate card is in Japanese and English.</p></details>
+      <details><summary data-i="fq2">What should I write?</summary><p data-i="fa2">One real moment is enough: a habit, a place, something they always say or do. About 50 to 300 characters is plenty.</p></details>
+      <details><summary data-i="fq3">Can it be funny?</summary><p data-i="fa3">Yes. Alongside two main characters, you always see one freestyle character for inside jokes and playful truths. It teases, never insults.</p></details>
+      <details><summary data-i="fq4">When will it arrive?</summary><p data-i="fa4">About 10 working days in Japan and within a month overseas. For a fixed date, order early.</p></details>
+      <details><summary data-i="fq5">Do you ship to my country?</summary><p data-i="fa5">We ship worldwide from Japan by EMS for a flat ¥6,000.</p></details>
+    </div>
+  </section>
+
+  <!-- CLOSING -->
+  <section class="closing">
+    <div class="wrap">
+      <span class="k">字</span>
+      <h2 data-i="clH">Some things are hard to say. One character can hold them.</h2>
+      <p data-i="clP">Start with one moment. We will find the character and carve it for you.</p>
+      <a class="btn primary" href="#write" data-i="ctaClose">Tell your story</a>
+    </div>
+  </section>
+</main>
+
+<footer><div class="wrap"><span>ICHIREI 一字礼 · Beyond Culture 獨歩文化株式会社</span><span data-i="foot">Order status: /track · Questions: reply to your order email</span></div></footer>
+<div class="dock"><a class="btn primary" href="#write" data-i="dock">Tell your story · free to try</a></div>
+
+<script>
+(function(){
+  var reduce=window.matchMedia&&matchMedia('(prefers-reduced-motion: reduce)').matches;
+  var JA={
+    ctaTop:'一字を見つける',
+    eyebrow:'物語からはじまる贈りもの',sub:'すべては、あなたの物語から。その人との本当の場面をひとつ教えてください。あなたの目に映るその人を一字にして、日本で手で刻みます。',ctaHero:'物語を書く',ctaClose:'物語を書く',dock:'物語を書く・無料で試せます',
+    phEye:'物語からはじめる理由',phH:'売っているのは、漢字ではありません。<br>ふたりの関係を、残すことです。',
+    ph1:'どんな関係にも、言い切れなかった何かがあります。「ありがとう」も「大好き」も本当。でもそれは、誰もが使う言葉です。',
+    ph2:'ふたりだけのものは、小さな本当の場面に宿ります。いつものクセ、ひとこと、つけたままの灯り。',
+    ph3:'あなたの物語が、素材です。場面が本当であるほど、字も本当になる。わたしたちは、そこにあるものを見つけるだけ。',
+    shEye:'物語とは、こういうもの',shH:'上手な文章ではなく、本当の場面をひとつ。',shP:'ほめ言葉は誰にでも当てはまる。小さな本当の細部は、その人にしか当てはまらない。',
+    weakL:'誰にでも当てはまる',weakL2:'誰にでも当てはまる',strongL:'その人だけ',strongL2:'その人だけ',
+    w1s:'母はやさしくて、いつも支えてくれる。',w1r:'「愛」のような、よくある字になる。本当だけれど、母だけの字ではない。',
+    s1s:'わたしが帰るまで、毎晩玄関の灯りをつけていた。三十歳になっても。',s1r:'ともしび。灯りをつけて待っていた人。',
+    w2s:'あいつは親友で、いろいろ乗り越えてきた。',w2r:'「友」になる。どんな友情にも当てはまる。',
+    s2s:'離婚した夜、あいつは冷凍ピザを持って四時間運転してきて、何も言わずにサッカーを観ていた。',s2r:'となり。ただ隣にいてくれた人。',
+    anEye:'どこを見ればいい？',anH:'物語への、五つの入り口',anP:'何を書けばいいか迷ったら、扉をひとつ選んで。小さな問いが、大きな記憶をひらきます。',
+    a0:'クセ・口ぐせ',a1:'駆けつけてくれた時',a2:'つくったもの・直したもの',a3:'その人らしい場所',a4:'言わなかったこと',askL:'問い',exL:'ひらいた物語',
+    wrEye:'あなたの番',wrH:'ひとつの場面を、教えてください',tp1:'人生のすべてより、本当の場面ひとつ。',tp2:'うまさより、正直さ。ふだんの言葉でいい。',tp3:'おもしろい話も歓迎。内輪の冗談にこそ、本当がある。',
+    tp4:'書いても、話しても。日本語・英語・中国語で。50〜300字で十分です。',tp5:'物語は、字を見つけるためだけに使います。',
+    cWho:'誰へ？',cMom:'その人との、ひとつの場面',cHint:'ヒント：あなたしか知らない細部をひとつ。',cGo:'わたしの物語から字を見つける',cSent:'これはデザインの見本のため、ここで止まります。本番では、約1分で三つの字が無料で届きます。',
+    mmEye:'物語が、字になる',
+    freeLine:'<b>無料で試せます。</b>贈ると決めたときだけ、お支払い。',
+    mmH:'いちばん大きな気持ちは、いちばん小さな場面にある',mmP:'誕生日や結婚式だけではありません。お弁当、駅の傘、机に置かれたコーヒー。あなたの一字は、そこに隠れています。',
+    m1w:'孫 → 祖母',m1t:'登校の朝はいつも、髪を編みながら小さな願いを結んでくれた。',m2w:'妻 → 夫',m2t:'十年、雨の日はいつも駅にいた。',m3w:'友 → 友',m3t:'いまでも、並んで座ると笑ってしまう。',
+    m4w:'同僚 → 同僚',m4t:'締め切り前の夜、机にあたたかいコーヒーがあった。',m5w:'息子 → 父',m5t:'自転車も、机も、わたしの自信も、直してくれた。',m6w:'教え子 → 先生',m6t:'わかるまで、放課後も残ってくれた。',
+    mmNote:'見本です。あなたの物語には、本命の二字と遊び字の一字が届きます。',ctaSteps:'無料で試す',gfP:'まず一字を見つけて。贈り方を決めるのは、そのあとで。',
+h1:'あなたとわたし、<em>一字の距離。</em>',
+    
+    from:'',c1:'誕生日',c2:'結婚',c3:'両親へ',c4:'親友へ',c5:'ありがとう',
+    s1:'日本で手彫り',s2:'ネイティブが確認した字',s3:'世界へお届け',s4:'最後の一字はあなたが選ぶ',
+    smEye:'見本',smH:'物語ごとに、その人の一字がある',smP:'感謝、誇らしさ、そして遊び心。字は、あなたの物語の気持ちに寄りそいます。',
+    tg1:'あたたかい',w1:'娘 → 母 ・ 誕生日',q1:'毎朝五時に起きて、家族のお弁当を作っていた。文句を言うのを、一度も聞いたことがない。',g1:'家族を、いちばん先に照らす人。',
+    tg2:'感謝',w2:'教え子 → 恩師 ・ 感謝',q2:'「答えより、問いを大事にしなさい」。いまも、迷うたびに思い出す。',g2:'問い続けることを教えてくれた人。',
+    tg3:'遊び字',w3:'友 → 友 ・ 特別な日ではなく',q3:'待ち合わせに、二十年いちども時間通りに来たことがない。それでも、いちばん会いたい人。',g3:'二十年待たされて、それでも会いたい人。',
+    smNote:'見本です。あなたの物語には、本命の二字と遊び字の一字が届きます。',
+    stEye:'つくり方',stH:'三つのステップで、一字へ',st1:'ひとつの場面を伝える',st1p:'その人との場面を、数行書くか話すだけ。上手な文章はいりません。',st1t:'約2分',
+    st2:'三つの字に出会う',st2p:'本命の二字と遊び字の一字。読み方、意味、選ばれた理由とともに。選ぶのはあなたです。',st2t:'すぐに・無料',
+    st3:'刻んで、届ける',st3p:'日本で一字を手で刻み、日英二言語の証書カードとともに、贈れる形でお届けします。',st3t:'国内 約10営業日 ・ 海外 1か月以内',
+    ppEye:'ていねいに',ppH:'ていねいに読み、人が確かめ、手で刻む。',ppP:'一字は、長く残るもの。だから、すべての工程に人がいます。',
+    f1:'あなたの物語が主役',f1p:'物語を読み、そこから生まれる字を提案します。名前や辞書の一覧からは選びません。',
+    f2:'すべての字をネイティブが確認',f2p:'日本語と中国語のネイティブが確認した字だけを使います。どちらの文化でも失礼な意味はありません。',
+    f3:'日本で、手で刻む',f3p:'天然木に金箔、または拓本の字版。日本で仕上げ、梱包します。',
+    rvEye:'レビュー',rvH:'最初の贈り主に、なってください',rvB:'本物のレビューが、ここに並びます',rvP:'一字礼は始まったばかりです。最初の贈り主の言葉と、受け取った瞬間を、手を加えずにここで紹介していきます。',rvCta:'最初の一字を贈る',
+    ocEye:'贈る場面',ocH:'一字にしたい、すべての日に',o1:'誕生日',o2:'結婚・記念日',o3:'母の日・父の日',o4:'クリスマス',o5:'旧正月',o6:'卒業・就職',o7:'退職・感謝',o8:'還暦',o9:'特別な日ではなく',
+    gfEye:'贈ると決めたら',gfH:'手渡し方は、ふたつ',sp1:'ウォールナットの木札に一字を刻み、金箔で仕上げ',sp2:'紅白の水引',sp3:'日英二言語の証書カード',sp4:'そのまま贈れる化粧箱',buy1:'シンプルではじめる',
+    pop:'ふたりで写しとる',dp1:'木の字版に一字を刻む',dp2:'拓墨・拓包・和紙で、一緒に字を写しとる',dp3:'日英二言語の証書カード',dp4:'巾着袋と化粧箱',buy2:'スタンダードではじめる',
+    ship1:'税込・国内送料無料',ship2:'海外へは EMS 一律 ¥6,000',cur:'通貨で表示',
+    prEye:'お約束',prH:'決めるのは、あなた',pr1:'刻む前に、あなたが決める',pr1p:'あなたが字を選ぶまで、刻みません。',pr2:'説明できる意味',pr2p:'どの字にも、読み方と意味、もとになった物語の一節が添えられます。',pr3:'最後まで追える',pr3p:'制作からお届けまで、注文状況ページで確認できます。',
+    fqH:'よくあるご質問',fq1:'漢字が読めない人に贈っても大丈夫？',fa1:'はい。どの字にも読み方とやさしい言葉の意味、選ばれた理由が添えられ、証書カードは日本語と英語の二言語です。',
+    fq2:'何を書けばいい？',fa2:'本当にあった場面がひとつあれば十分です。いつものクセ、場所、口ぐせ。50〜300字くらいが目安です。',
+    fq3:'おもしろい字でもいい？',fa3:'はい。本命の二字とともに、ふたりだけに通じる遊び字がひとつ届きます。からかっても、傷つけない字です。',
+    fq4:'いつ届く？',fa4:'国内は約10営業日、海外は1か月以内が目安です。日付が決まっている場合は、お早めに。',fq5:'海外へ送れる？',fa5:'日本から世界へ、EMS 一律 ¥6,000 でお届けします。',
+    clH:'言葉にしにくいことも、一字なら持てる。',clP:'ひとつの場面からはじめましょう。字を見つけ、刻んでお届けします。',
+    foot:'注文状況：/track ・ お問い合わせ：ご注文確認メールへご返信',
+  };
+  var ZH={
+    ctaTop:'找到那一個字',
+    eyebrow:'從故事開始的禮物',sub:'一切從你的故事開始。告訴我們你和某人之間一個真實的場景，我們找出那個代表你眼中的他的字，再在日本親手雕刻。',ctaHero:'寫下故事',ctaClose:'寫下故事',dock:'寫下故事・免費試試看',
+    phEye:'為什麼從故事開始',phH:'我們賣的不是漢字，<br>而是留住一段關係。',
+    ph1:'每段關係裡，都有一些沒說盡的話。「謝謝」「我愛你」都是真的，但那是每個人都用的話。',
+    ph2:'只屬於你們兩個的，藏在一個小小的真實場景裡：一個習慣、一句話、一盞沒關的燈。',
+    ph3:'你的故事就是素材。場景越真實，字就越真實。我們只是找出本來就在那裡的東西。',
+    shEye:'故事長什麼樣子',shH:'不需要好文筆，只要一個真實的場景。',shP:'讚美適用於任何人。一個小小的真實細節，只屬於那個人。',
+    weakL:'誰都適用',weakL2:'誰都適用',strongL:'只屬於他',strongL2:'只屬於他',
+    w1s:'我媽媽很溫柔，總是支持我。',w1r:'會得到像「愛」這樣常見的字。是真的，但不只屬於她。',
+    s1s:'我回家之前，她每晚都開著門口的燈。我三十歲了也一樣。',s1r:'燈火。開著燈等我的人。',
+    w2s:'他是我最好的朋友，我們一起經歷了很多。',w2r:'會得到「友」。每段友情都適用。',
+    s2s:'我離婚那晚，他帶著冷凍披薩開了四小時車過來，什麼也沒說，就陪我看足球。',s2r:'鄰。只是一直待在我身邊的人。',
+    anEye:'從哪裡找起',anH:'走進故事的五扇門',anP:'不知道寫什麼？選一扇門。一個小問題，會打開一段大記憶。',
+    a0:'習慣・口頭禪',a1:'他趕來的時候',a2:'他做的・修好的東西',a3:'像他的地方',a4:'沒說出口的事',askL:'問題',exL:'打開的故事',
+    wrEye:'換你了',wrH:'告訴我們一個場景',tp1:'一個真實場景，勝過整個人生傳記。',tp2:'誠實比優美重要。平常的話就好。',tp3:'有趣也歡迎。只有你們懂的玩笑，往往最真實。',
+    tp4:'用寫的或用說的，中文、日文、英文都可以。50到300字就足夠。',tp5:'你的故事只用來找出那個字。',
+    cWho:'送給誰？',cMom:'和他之間的一個場景',cHint:'小提示：加一個只有你知道的細節。',cGo:'從我的故事裡找出那個字',cSent:'這是設計範例，到此為止。正式版會在約一分鐘內免費送上三個字。',
+    mmEye:'故事化成字',
+    freeLine:'<b>免費試試看。</b>決定送出時才需付款。',
+    mmH:'最大的心意，藏在最小的場景裡',mmP:'不只是生日和婚禮。一個便當、車站的一把傘、桌上的一杯咖啡。你的那個字，就藏在那裡。',
+    m1w:'孫女 → 奶奶',m1t:'每個上學的早晨，她一邊幫我編辮子，一邊繫上一個小小的願望。',m2w:'妻子 → 丈夫',m2t:'十年來的每個雨天，他總在車站等我。',m3w:'朋友 → 朋友',m3t:'到現在，我們坐在一起還是會笑出來。',
+    m4w:'同事 → 同事',m4t:'截稿前一晚，桌上出現一杯熱咖啡。',m5w:'兒子 → 父親',m5t:'他修好了我的腳踏車、我的書桌，還有我的自信。',m6w:'學生 → 老師',m6t:'直到我聽懂為止，她放學後都留下來陪我。',
+    mmNote:'以上為範例。你的故事會得到屬於自己的三個字：兩個本命字，加上一個玩心字。',ctaSteps:'免費試試看',gfP:'先找到那個字，再決定怎麼送出。',
+h1:'你和我之間，<em>只隔一個字。</em>',
+    
+    from:'',c1:'生日',c2:'婚禮',c3:'給父母',c4:'給摯友',c5:'謝謝你',
+    s1:'日本手工雕刻',s2:'母語者確認過的字',s3:'寄往世界各地',s4:'最後由你選定',
+    smEye:'範例',smH:'每個故事，都有屬於那個人的字',smP:'溫暖、感謝，或是玩心。字會跟著你故事裡的心情走。以下是三個例子。',
+    tg1:'溫暖',w1:'女兒 → 母親 · 生日',q1:'每天早上五點起床，為全家做便當。從來沒聽她抱怨過一句。',g1:'最先照亮全家的人。',
+    tg2:'感謝',w2:'學生 → 恩師 · 感謝',q2:'「比起答案，更要珍惜問題。」至今迷惘時，我都會想起這句話。',g2:'教會我一直發問的人。',
+    tg3:'玩心字',w3:'朋友 → 朋友 · 不為特別的日子',q3:'約好見面，二十年來沒有一次準時。可還是最想見的人。',g3:'讓我等了二十年，還是想見的人。',
+    smNote:'以上為範例。你的故事會得到屬於自己的三個字：兩個本命字，加上一個玩心字。',
+    stEye:'怎麼做',stH:'三個步驟，找到那一個字',st1:'說一個場景',st1p:'寫下或說出你們之間的一個場景，幾行就好。不需要好文筆。',st1t:'約2分鐘',
+    st2:'遇見三個字',st2p:'兩個本命字和一個玩心字，各附讀音、意思和選擇的理由。由你來選。',st2t:'馬上・免費',
+    st3:'雕刻並寄出',st3p:'在日本親手刻下你的字，附日英雙語證書卡，包裝好直接送禮。',st3t:'日本國內約10個工作日 · 海外1個月以內',
+    ppEye:'用心製作',ppH:'用心讀，由人確認，親手雕刻。',ppP:'一個字會留很久，所以每個步驟背後都有人。',
+    f1:'你的故事是主角',f1p:'我們讀你的故事，從中提出字，絕不從名字或字典清單裡挑。',
+    f2:'每個字都經母語者確認',f2p:'字庫裡只有日語和中文母語者核可過的字，在兩種文化裡都沒有失禮的意思。',
+    f3:'在日本親手雕刻',f3p:'天然木加金箔，或拓印字版，在日本完成並包裝。',
+    rvEye:'評價',rvH:'成為我們最早的送禮人',rvB:'真實的評價會出現在這裡',rvP:'一字礼剛剛開始。最早的送禮人寫下的話與收到禮物的那一刻，會原封不動地在這裡分享。',rvCta:'送出第一個字',
+    ocEye:'送禮時刻',ocH:'值得用一個字紀念的每一天',o1:'生日',o2:'婚禮・紀念日',o3:'母親節・父親節',o4:'聖誕節',o5:'農曆新年',o6:'畢業・新工作',o7:'退休・感謝',o8:'六十大壽',o9:'不為特別的日子',
+    gfEye:'準備好了再說',gfH:'兩種交到對方手上的方式',sp1:'胡桃木牌刻字，金箔完成',sp2:'紅白水引繩',sp3:'日英雙語證書卡',sp4:'可直接送禮的禮盒',buy1:'選擇簡約款',
+    pop:'一起拓印',dp1:'將字刻在木字版上',dp2:'拓墨、拓包與和紙：一起把字拓印出來',dp3:'日英雙語證書卡',dp4:'束口袋與禮盒',buy2:'選擇標準款',
+    ship1:'含稅・日本國內免運',ship2:'海外：EMS 統一 ¥6,000',cur:'以此貨幣顯示',
+    prEye:'我們的承諾',prH:'決定權在你',pr1:'雕刻前由你決定',pr1p:'在你選定字之前，我們不會動刀。',pr2:'說得出意思',pr2p:'每個字都附讀音、意思，以及它來自故事裡的哪一句。',pr3:'全程可追蹤',pr3p:'從雕刻到送達，都能在訂單查詢頁確認。',
+    fqH:'常見問題',fq1:'看不懂漢字的人也能明白嗎？',fa1:'可以。每個字都附讀音、淺白的意思和選擇理由，證書卡為日英雙語。',
+    fq2:'要寫什麼？',fa2:'一個真實的場景就夠了：一個習慣、一個地方、一句口頭禪。50到300字左右就足夠。',
+    fq3:'可以是有趣的字嗎？',fa3:'可以。除了兩個本命字，你還會看到一個玩心字，留給只有你們懂的玩笑。是調侃，不是傷人。',
+    fq4:'什麼時候送到？',fa4:'日本國內約10個工作日，海外1個月以內。如有指定日期，請提早下單。',fq5:'可以寄到我的國家嗎？',fa5:'我們從日本寄往世界各地，EMS 統一 ¥6,000。',
+    clH:'有些話很難說出口，一個字卻能裝得下。',clP:'從一個場景開始。我們找出那個字，為你刻好送達。',
+    foot:'訂單查詢：/track · 諮詢：請回覆訂單確認郵件',
+  };
+  var CATS={parents:{en:'Parents',ja:'親へ','zh-Hant':'給父母'},partner:{en:'Partner',ja:'パートナーへ','zh-Hant':'給伴侶'},friends:{en:'Friends',ja:'友へ','zh-Hant':'給朋友'},
+    children:{en:'Children',ja:'子へ','zh-Hant':'給孩子'},mentor:{en:'Mentor',ja:'恩師へ','zh-Hant':'給恩師'},work:{en:'Work',ja:'職場へ','zh-Hant':'給職場'}};
+  var SCENE={parents:{en:'Photo · a mother in the kitchen at dawn',ja:'写真・夜明けの台所に立つ母','zh-Hant':'照片・清晨廚房裡的母親'},
+    partner:{en:'Photo · flowers on a kitchen table',ja:'写真・食卓の季節の花','zh-Hant':'照片・餐桌上的當季花'},
+    friends:{en:'Photo · a friend arriving late, both laughing',ja:'写真・遅れて来た友と笑い合う','zh-Hant':'照片・遲到的朋友，兩人相視而笑'},
+    children:{en:'Photo · a child getting back up on a bike',ja:'写真・自転車から立ち上がる子','zh-Hant':'照片・從腳踏車上站起來的孩子'},
+    mentor:{en:'Photo · a teacher and student at a desk',ja:'写真・机をはさむ先生と生徒','zh-Hant':'照片・書桌兩側的老師與學生'},
+    work:{en:'Photo · a manager standing beside her team',ja:'写真・チームの前に立つ上司','zh-Hant':'照片・站在團隊前的上司'}};
+  var EXAMPLES={
+    en:[{c:'parents',who:'Daughter → Mother',occ:'Birthday',story:'She got up at five every morning to make lunch for all of us. I never once heard her complain.',k:'燈',rd:'tomoshibi',m:'lamplight',gz:'The first light the family woke to.'},
+        {c:'partner',who:'Husband → Wife',occ:'Anniversary',story:'However busy the week, there are always seasonal flowers on our table.',k:'彩',rd:'irodori',m:'colour',gz:'The one who keeps colour in our days.'},
+        {c:'friends',who:'Friend → Friend',occ:'Just because',story:'In twenty years, they have never once been on time. Still the person I most want to see.',k:'遅',rd:'osoi',m:'late',gz:'Twenty years of waiting, and worth every minute.'},
+        {c:'children',who:'Father → Son',occ:'Graduation',story:'Whenever he fell, he got back up on his own, still crying. So I feel more excitement than worry.',k:'立',rd:'tatsu',m:'to stand',gz:'The one who always gets back up.'},
+        {c:'mentor',who:'Student → Teacher',occ:'Thank you',story:'“Value the question more than the answer.” I still remember it whenever I feel lost.',k:'問',rd:'toi',m:'the question',gz:'The one who taught me to keep asking.'},
+        {c:'work',who:'Team → Manager',occ:'Retirement',story:'The day I made a big mistake, she said, “I will take responsibility for this.”',k:'盾',rd:'tate',m:'shield',gz:'The one who stood in front of us.'}],
+    ja:[{c:'parents',who:'娘 → 母',occ:'誕生日',story:'毎朝五時に起きて、家族のお弁当を作っていた。文句を言うのを、一度も聞いたことがない。',k:'燈',rd:'ともしび',m:'あかり',gz:'家族を、いちばん先に照らす人。'},
+        {c:'partner',who:'夫 → 妻',occ:'結婚記念日',story:'どんなに忙しい週でも、テーブルには季節の花がある。',k:'彩',rd:'いろどり',m:'いろどり',gz:'毎日に、色を絶やさない人。'},
+        {c:'friends',who:'友 → 友',occ:'特別な日ではなく',story:'待ち合わせに、二十年いちども時間通りに来たことがない。それでも、いちばん会いたい人。',k:'遅',rd:'おそい',m:'遅刻',gz:'二十年待たされて、それでも会いたい人。'},
+        {c:'children',who:'父 → 息子',occ:'卒業',story:'転んでも、泣きながら自分で立ち上がる子だった。だから心配より、楽しみのほうが大きい。',k:'立',rd:'たつ',m:'立ち上がる',gz:'何度でも、自分で立ち上がる人。'},
+        {c:'mentor',who:'教え子 → 恩師',occ:'感謝',story:'「答えより、問いを大事にしなさい」。いまも、迷うたびに思い出す。',k:'問',rd:'とい',m:'問い',gz:'問い続けることを教えてくれた人。'},
+        {c:'work',who:'部下 → 上司',occ:'退職',story:'わたしが大きな失敗をした日、「責任はこっちで持つ」と言ってくれた。',k:'盾',rd:'たて',m:'守るもの',gz:'いつも、わたしたちの前に立ってくれた人。'}],
+    'zh-Hant':[{c:'parents',who:'女兒 → 母親',occ:'生日',story:'每天早上五點起床，為全家做便當。從來沒聽她抱怨過一句。',k:'燈',rd:'dēng',m:'燈火',gz:'最先照亮全家的人。'},
+        {c:'partner',who:'丈夫 → 妻子',occ:'結婚紀念日',story:'再忙的一週，餐桌上也總有當季的花。',k:'彩',rd:'cǎi',m:'色彩',gz:'讓我們每天都有顏色的人。'},
+        {c:'friends',who:'朋友 → 朋友',occ:'不為特別的日子',story:'約好見面，二十年來沒有一次準時。可還是最想見的人。',k:'遲',rd:'chí',m:'遲到',gz:'讓我等了二十年，還是想見的人。'},
+        {c:'children',who:'父親 → 兒子',occ:'畢業',story:'跌倒了，總是哭著自己站起來。所以比起擔心，更多的是期待。',k:'立',rd:'lì',m:'站起來',gz:'一次又一次，自己站起來的人。'},
+        {c:'mentor',who:'學生 → 恩師',occ:'感謝',story:'「比起答案，更要珍惜問題。」至今迷惘時，我都會想起這句話。',k:'問',rd:'wèn',m:'提問',gz:'教會我一直發問的人。'},
+        {c:'work',who:'部屬 → 上司',occ:'退休',story:'我犯下大錯的那天，她說：「責任我來扛。」',k:'盾',rd:'dùn',m:'守護',gz:'總是站在我們前面的人。'}]
+  };
+  /* approximate rates: placeholders, the live site should use a daily rate */
+  var RATE={JPY:1,USD:0.0066,EUR:0.0061,GBP:0.0052,AUD:0.010,TWD:0.21,HKD:0.052,SGD:0.0088,KRW:9.2};
+  var SYM={JPY:'¥',USD:'US$',EUR:'€',GBP:'£',AUD:'A$',TWD:'NT$',HKD:'HK$',SGD:'S$',KRW:'₩'};
+  var lang='en',ex=0,timer=0;
+  var ANG={
+    en:[{q:'What does this person always do or say, that would mean nothing to anyone else?',ex:'Every phone call ends with ‘Did you eat?’ Twenty years, never once ‘I love you.’',k:'食',r:'The one who loves by asking if you ate.'},
+        {q:'When did they show up for you, without being asked?',ex:'The night I failed my exam, my brother drove two hours just to sit in the car with me.',k:'駆',r:'The one who comes running.'},
+        {q:'What did they make, keep or fix with their hands?',ex:'My father still keeps the wooden spoon I carved at nine. It has been in his kitchen for thirty years.',k:'守',r:'The one who keeps what matters.'},
+        {q:'Is there a place that feels like them?',ex:'Her balcony full of tomatoes. Every summer she sends me a photo of the first one.',k:'実',r:'The one whose care grows fruit.'},
+        {q:'What did they never say, but always do?',ex:'He never said he was proud. He just kept every school certificate in a folder in his drawer.',k:'黙',r:'The one who said it in silence.'}],
+    ja:[{q:'その人が、いつもすること・言うことは？ ほかの人には何でもないこと。',ex:'電話の最後はいつも「ごはん食べた？」。二十年、「好き」とは一度も言わない。',k:'食',r:'「食べた？」で愛を伝える人。'},
+        {q:'頼んでもいないのに、駆けつけてくれた時は？',ex:'試験に落ちた夜、兄は二時間運転してきて、車の中でただ隣に座っていた。',k:'駆',r:'迷わず駆けつけてくれる人。'},
+        {q:'その人が、手でつくった・残した・直したものは？',ex:'九歳のわたしが彫った木のスプーンを、父は三十年、台所に置いている。',k:'守',r:'大切なものを守りつづける人。'},
+        {q:'その人らしい場所は？',ex:'トマトでいっぱいのベランダ。毎年夏、最初の一個の写真を送ってくる。',k:'実',r:'手をかけて、実らせる人。'},
+        {q:'言わなかったけれど、いつもしてくれたことは？',ex:'誇らしいとは一度も言わなかった。でも引き出しには、わたしの賞状が全部とってあった。',k:'黙',r:'黙って伝える人。'}],
+    'zh-Hant':[{q:'這個人總是做什麼、說什麼，對別人來說卻毫無意義？',ex:'每次電話最後都是「吃飯了沒？」。二十年，一次也沒說過「我愛你」。',k:'食',r:'用「吃了沒」來愛人的人。'},
+        {q:'什麼時候，他沒被拜託就出現了？',ex:'考試落榜那晚，哥哥開了兩小時車過來，只是在車裡陪我坐著。',k:'駆',r:'總會趕來的人。'},
+        {q:'他親手做過、留著、修好的東西是什麼？',ex:'我九歲刻的木湯匙，爸爸在廚房放了三十年。',k:'守',r:'守著重要東西的人。'},
+        {q:'有沒有一個地方，就像這個人？',ex:'她種滿番茄的陽台。每年夏天，她都會傳第一顆番茄的照片給我。',k:'実',r:'用心讓一切結果的人。'},
+        {q:'他從沒說出口，卻一直在做的事？',ex:'他從沒說過以我為榮，卻把我的每張獎狀都收在抽屜的資料夾裡。',k:'黙',r:'用沉默說話的人。'}]
+  };
+  var ag=0;
+  function renderAg(){var a=ANG[lang][ag];document.getElementById('agQ').textContent=a.q;document.getElementById('agEx').textContent=a.ex;
+    document.getElementById('agK').textContent=a.k;document.getElementById('agR').textContent=a.r;
+    document.querySelectorAll('.angleTabs button').forEach(function(b){b.setAttribute('aria-selected',+b.dataset.a===ag?'true':'false');});}
+  document.querySelectorAll('.angleTabs button').forEach(function(b){b.addEventListener('click',function(){ag=+b.dataset.a;renderAg();});});
+  var PH={en:{cWhoPh:'My mother, my best friend, my old teacher…',cMomPh:'Start with a small detail: something they always did, said, made or never said.'},
+    ja:{cWhoPh:'母、親友、恩師…',cMomPh:'小さなことから。いつもしていたこと、言っていたこと、つくったもの、言わなかったこと。'},
+    'zh-Hant':{cWhoPh:'媽媽、摯友、恩師…',cMomPh:'從一個小細節開始：他總是做的事、說的話、做的東西，或從沒說出口的事。'}};
+  var mom=document.getElementById('moment');
+  mom.addEventListener('input',function(){document.getElementById('cnt').textContent=mom.value.length;});
+  document.getElementById('composer').addEventListener('submit',function(e){e.preventDefault();if(!mom.value.trim()){mom.focus();return;}document.getElementById('sent').hidden=false;});
+  function applyPh(){document.querySelectorAll('[data-ph]').forEach(function(el){el.placeholder=PH[lang][el.dataset.ph];});}
+
+  var els=[].slice.call(document.querySelectorAll('[data-i]'));els.forEach(function(e){e._en=e.innerHTML;});
+  var cur=document.getElementById('cur');
+  function money(y,c){var v=y*RATE[c],st=c==='KRW'?1000:(c==='TWD'?10:1);return SYM[c]+(Math.round(v/st)*st).toLocaleString('en-US');}
+  function showFx(){var c=cur.value;
+    document.querySelectorAll('[data-fx]').forEach(function(e){e.textContent=c==='JPY'?'':(lang==='ja'?'目安 ':(lang==='zh-Hant'?'約 ':'≈ '))+money(+e.dataset.fx,c)+(lang==='en'?' approx.':'');});
+    document.querySelector('.approxHero').textContent=c==='JPY'?'':'(≈ '+money(9800,c)+')';}
+  function renderEx(){var e=EXAMPLES[lang][ex],rv=document.getElementById('reveal');
+    rv.style.setProperty('--cat','var(--c-'+e.c+')');
+    var ph=document.getElementById('rvPh'),im=document.getElementById('rvImg');ph.style.setProperty('--cat','var(--c-'+e.c+')');
+    document.getElementById('rvPhK').textContent=e.k;document.getElementById('rvPhC').textContent=SCENE[e.c][lang]||SCENE[e.c].en;
+    im.hidden=false;im.src='img/scenes/'+e.c+'.jpg';document.getElementById('rvCat').textContent=CATS[e.c][lang];
+    document.getElementById('rvWho').textContent=e.who;document.getElementById('rvOcc').textContent=e.occ;
+    document.getElementById('rvStory').textContent=e.story;document.getElementById('rvK').textContent=e.k;
+    document.getElementById('rvRd').innerHTML=e.rd+' <small>· '+e.m+'</small>';document.getElementById('rvGz').textContent=e.gz;
+    document.querySelectorAll('#rvDots button').forEach(function(b,i){b.setAttribute('aria-current',i===ex?'true':'false');});}
+  function go(i){var rv=document.getElementById('reveal');rv.classList.add('swap');rv.classList.remove('run');setTimeout(function(){ex=i;renderEx();rv.classList.remove('swap');void rv.offsetWidth;if(!reduce)rv.classList.add('run');},reduce?0:350);}
+  function auto(){clearInterval(timer);if(!reduce)timer=setInterval(function(){go((ex+1)%6);},6000);if(!reduce)document.getElementById('reveal').classList.add('run');}
+  document.querySelectorAll('#rvDots button').forEach(function(b,i){b.addEventListener('click',function(){go(i);auto();});});
+  function apply(l){lang=l;document.documentElement.lang=l;
+    var D=l==='ja'?JA:(l==='zh-Hant'?ZH:null);
+    els.forEach(function(e){var k=e.dataset.i;e.innerHTML=(D&&D[k]!==undefined)?D[k]:e._en;});
+    document.querySelectorAll('.lang button').forEach(function(b){b.setAttribute('aria-pressed',b.dataset.lang===l?'true':'false');});
+    cur.value=l==='ja'?'JPY':(l==='zh-Hant'?'TWD':'USD');showFx();renderEx();renderAg();applyPh();
+    try{localStorage.setItem('ichirei-reveal-lang',l);}catch(e){}}
+  document.querySelectorAll('.lang button').forEach(function(b){b.addEventListener('click',function(){apply(b.dataset.lang);});});
+  cur.addEventListener('change',showFx);
+  var saved=null;try{saved=localStorage.getItem('ichirei-reveal-lang');}catch(e){}
+  apply(saved==='ja'||saved==='zh-Hant'?saved:'en');auto();
+})();
+</script>

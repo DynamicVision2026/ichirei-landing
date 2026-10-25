@@ -1,9 +1,11 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useRef, useState, type ReactNode } from 'react'
 import { motion, useReducedMotion } from 'framer-motion'
 import type { Candidate, Condition, EngineResult } from './types'
 import Elicitation from './Elicitation'
 import Reveal from './Reveal'
 import OrderForm from './OrderForm'
+import Composer from '../reveal/Composer'
+import { toRevealLang } from '../reveal/lang'
 import { sessionId } from './analytics'
 import { exportEvents, log, setCondition as logSetCondition, setStory as logSetStory } from './logging'
 import { COPY, DEFAULT_GIFT_CONTEXT, FOLLOW_UP_MAX, STORY_COUNTER_FROM, clipStory, contextToPayload, storyLength, type Copy, type GiftContext } from './i18n'
@@ -109,25 +111,25 @@ export type Mode = 'harness' | 'customer'
 function ProcessingView({ receivedChars, copy }: { receivedChars: number; copy: Copy }) {
   const reduceMotion = useReducedMotion()
   return (
-    <div className="flex flex-col items-center gap-10 py-24">
+    <div className="flex flex-col items-center gap-10 py-24 text-accent" role="status">
       <svg width="120" height="120" viewBox="0 0 140 140" fill="none" aria-hidden="true">
-        <circle cx="70" cy="70" r="54" stroke="#C9A96E" strokeOpacity="0.15" strokeWidth="1.5" />
+        <circle cx="70" cy="70" r="54" stroke="currentColor" strokeOpacity="0.15" strokeWidth="1.5" />
         <circle
-          cx="70" cy="70" r="54" stroke="#C9A96E" strokeWidth="2" strokeLinecap="round"
+          cx="70" cy="70" r="54" stroke="currentColor" strokeWidth="2" strokeLinecap="round"
           strokeDasharray="90 250" className={reduceMotion ? undefined : 'ink-loop-spin'}
         />
         <circle
-          cx="70" cy="70" r="38" stroke="#C9A96E" strokeOpacity="0.35" strokeWidth="1"
+          cx="70" cy="70" r="38" stroke="currentColor" strokeOpacity="0.35" strokeWidth="1"
           strokeLinecap="round" strokeDasharray="40 200"
           className={reduceMotion ? undefined : 'ink-loop-spin-reverse'}
         />
-        <circle cx="70" cy="70" r="3" fill="#C9A96E" fillOpacity="0.8" />
+        <circle cx="70" cy="70" r="3" fill="currentColor" fillOpacity="0.8" />
       </svg>
       <div className="text-center">
-        <p className="font-serif-jp text-lg tracking-wider text-ivory/80">
+        <p className="font-serif-jp text-lg tracking-wider text-fg">
           {copy.processingTitle}
         </p>
-        <p className="font-label mt-3 text-[11px] text-ivory/40">
+        <p className="font-label mt-3 text-[12px] text-mute">
           {receivedChars > 0 ? copy.processingProgress(receivedChars) : copy.processingWait}
         </p>
       </div>
@@ -137,19 +139,26 @@ function ProcessingView({ receivedChars, copy }: { receivedChars: number; copy: 
 
 /** /demo: a full page. */
 function HarnessShell({ children }: { children: React.ReactNode }) {
-  return <div className="min-h-screen bg-ink px-6 py-10 text-ivory">{children}</div>
+  return <div className="min-h-screen bg-page px-6 py-10 text-fg">{children}</div>
 }
 
-/** /: the section of the landing page where the sender writes, chooses and orders. */
-function CustomerShell({ children }: { children: React.ReactNode }) {
+/**
+ * /: the WRITE section of the landing page, where the sender writes, chooses and orders. While the story is
+ * being written it is two columns (the page's tips beside the composer); once the engine runs, the flow takes
+ * the whole width of a single column.
+ */
+function CustomerShell({ children, aside, phase }: { children: React.ReactNode; aside?: ReactNode; phase: Phase }) {
   return (
-    <section id="story-input" className="relative w-full bg-ink px-6 py-24 text-ivory sm:py-32">
-      {children}
+    <section className="tintBand" id="write" data-phase={phase}>
+      <div className={phase === 'elicit' ? 'wrap writeGrid' : 'wrap flowWrap'}>
+        {phase === 'elicit' && <div>{aside}</div>}
+        <div className="flowMain">{children}</div>
+      </div>
     </section>
   )
 }
 
-export default function DemoApp({ mode = 'harness' }: { mode?: Mode } = {}) {
+export default function DemoApp({ mode = 'harness', aside }: { mode?: Mode; aside?: ReactNode } = {}) {
   const customer = mode === 'customer'
   const [phase, setPhase] = useState<Phase>('elicit')
   const [story, setStory] = useState('')
@@ -177,6 +186,18 @@ export default function DemoApp({ mode = 'harness' }: { mode?: Mode } = {}) {
   const [followUps, setFollowUps] = useState<string[]>([])
   const followUpsUsed = useRef(0)
   const sessionLogged = useRef(false)
+
+  // Customer site: when the flow moves on (processing → follow-up → cards → order form) bring the start of the
+  // WRITE section back into view, so a long form never leaves the visitor in the middle of the next step.
+  const reduceMotion = useReducedMotion()
+  const firstPhase = useRef(true)
+  useEffect(() => {
+    if (firstPhase.current) {
+      firstPhase.current = false
+      return
+    }
+    if (customer) document.getElementById('write')?.scrollIntoView({ block: 'start', behavior: reduceMotion ? 'auto' : 'smooth' })
+  }, [phase, customer, reduceMotion])
 
   const changeCondition = (c: Condition) => {
     if (c === condition) return
@@ -289,57 +310,31 @@ export default function DemoApp({ mode = 'harness' }: { mode?: Mode } = {}) {
     void runEngine(story, next)
   }
 
-  const Wrapper = customer ? CustomerShell : HarnessShell
-  return (
-    <Wrapper>
-      <div className="mx-auto max-w-3xl">
-        {!customer && (
-        <header className="mb-10 flex flex-wrap items-center justify-between gap-4">
-          <div className="flex items-baseline gap-2">
-            <span className="font-mincho text-lg text-ivory">一字礼</span>
-            <span className="font-label text-xs tracking-[0.25em] text-gold">
-              ICHIREI · VALIDATION HARNESS
-            </span>
-          </div>
-          <div className="flex items-center gap-4">
-            <div className="flex items-center gap-1">
-              <span className="font-label mr-1 text-[10px] tracking-wide text-ivory/40">
-                condition
-              </span>
-              {CONDITIONS.map((c) => (
-                <button
-                  key={c.id}
-                  type="button"
-                  onClick={() => changeCondition(c.id)}
-                  className={`font-label h-7 w-7 rounded-full text-xs transition-colors ${
-                    condition === c.id
-                      ? 'bg-gold text-ink'
-                      : 'border border-gold/30 text-ivory/60 hover:border-gold'
-                  }`}
-                >
-                  {c.label}
-                </button>
-              ))}
-            </div>
-            <button
-              type="button"
-              onClick={exportEvents}
-              className="font-label rounded-full border border-ivory/20 px-3 py-1.5 text-[11px] text-ivory/60 transition-colors hover:border-ivory/50"
-            >
-              {copy.exportLog}
-            </button>
-          </div>
-        </header>
-        )}
+  const revealLang = toRevealLang(context.language)
+  const body = (
+    <>
+      {error && (
+        <p role="alert" className="font-label mb-6 rounded-sm border border-seal/60 bg-seal/10 p-4 text-sm text-fg">
+          {error}
+        </p>
+      )}
 
-        {error && (
-          <p className="font-label mb-6 rounded-sm border border-cinnabar/50 bg-cinnabar/10 p-4 text-sm text-cinnabar">
-            {error}
-          </p>
-        )}
-
-        {phase === 'elicit' && (
-          <>
+      {phase === 'elicit' && (
+        <>
+          {customer ? (
+            <Composer
+              story={story}
+              onStoryChange={setStory}
+              onSubmit={() => {
+                setFollowUps([])
+                void runEngine(story)
+              }}
+              copy={copy}
+              lang={revealLang}
+              context={context}
+              onContextChange={setContext}
+            />
+          ) : (
             <Elicitation
               story={story}
               onStoryChange={setStory}
@@ -351,127 +346,173 @@ export default function DemoApp({ mode = 'harness' }: { mode?: Mode } = {}) {
               copy={copy}
               context={context}
               onContextChange={setContext}
-              showLanguage={!customer}
-              showInscriptionScript={!customer}
+              showLanguage
+              showInscriptionScript
             />
-            {!customer && (
-              <button
-                type="button"
-                onClick={() => {
-                  setStory(GOLDEN_FIXTURE)
-                  setContext(GOLDEN_CONTEXT)
-                }}
-                className="font-label mt-8 text-[11px] tracking-wide text-ivory/30 underline-offset-4 transition-colors hover:text-ivory/60 hover:underline"
-              >
-                load golden fixture (§10 acceptance test)
-              </button>
-            )}
-          </>
-        )}
+          )}
+          {!customer && (
+            <button
+              type="button"
+              onClick={() => {
+                setStory(GOLDEN_FIXTURE)
+                setContext(GOLDEN_CONTEXT)
+              }}
+              className="font-label mt-8 text-[11px] tracking-wide text-mute underline-offset-4 transition-colors hover:text-fg hover:underline"
+            >
+              load golden fixture (§10 acceptance test)
+            </button>
+          )}
+        </>
+      )}
 
-        {phase === 'processing' && <ProcessingView receivedChars={receivedChars} copy={copy} />}
+      {phase === 'processing' && <ProcessingView receivedChars={receivedChars} copy={copy} />}
 
-        {phase === 'followup' && followUpQuestion && (
-          <motion.div
-            initial={{ opacity: 0, y: 16 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.7, ease: [0.16, 1, 0.3, 1] }}
+      {phase === 'followup' && followUpQuestion && (
+        <motion.div
+          className={customer ? 'composer' : undefined}
+          initial={{ opacity: 0, y: 16 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.7, ease: [0.16, 1, 0.3, 1] }}
+        >
+          <p className="font-label mb-4 text-[12px] tracking-[0.2em] text-accent">{copy.followUpHeading}</p>
+          <p className="font-mincho mb-8 text-xl leading-relaxed text-fg" data-testid="followup-question">
+            {followUpQuestion}
+          </p>
+          <textarea
+            value={followUpAnswer}
+            onChange={(e) => setFollowUpAnswer(clipStory(e.target.value, FOLLOW_UP_MAX))}
+            maxLength={FOLLOW_UP_MAX}
+            data-testid="followup-input"
+            aria-label={followUpQuestion}
+            rows={5}
+            placeholder={copy.followUpPlaceholder}
+            className="font-serif-jp w-full resize-none rounded-sm border border-line bg-page p-4 text-base leading-loose text-fg outline-none transition-colors placeholder:text-mute focus:border-accent"
+          />
+          {(customer || storyLength(followUpAnswer) >= STORY_COUNTER_FROM) && (
+            <p data-testid="story-counter" className="font-label mt-2 text-right text-[12px] text-mute">
+              {copy.storyCounter(storyLength(followUpAnswer), FOLLOW_UP_MAX)}
+            </p>
+          )}
+          <button
+            type="button"
+            onClick={submitFollowUp}
+            disabled={!followUpAnswer.trim()}
+            className={
+              customer
+                ? 'btn primary mt-6'
+                : 'font-label mt-6 rounded-full bg-accent px-8 py-3.5 text-sm tracking-[0.1em] text-page transition-all disabled:cursor-not-allowed disabled:opacity-40'
+            }
           >
-            <p className="font-label mb-4 text-[11px] tracking-[0.2em] text-gold/70">
-              {copy.followUpHeading}
-            </p>
-            <p className="font-mincho mb-8 text-xl leading-relaxed text-ivory">
-              {followUpQuestion}
-            </p>
-            <textarea
-              value={followUpAnswer}
-              onChange={(e) => setFollowUpAnswer(clipStory(e.target.value, FOLLOW_UP_MAX))}
-              maxLength={FOLLOW_UP_MAX}
-              data-testid="followup-input"
-              rows={5}
-              placeholder={copy.followUpPlaceholder}
-              className="font-serif-jp w-full resize-none rounded-sm border border-gold/25 bg-paper/60 p-4 text-base leading-loose text-ivory outline-none transition-colors placeholder:text-ivory/25 focus:border-gold"
+            {copy.followUpSubmit}
+          </button>
+        </motion.div>
+      )}
+
+      {phase === 'thin' && (
+        <div className="py-12 text-center">
+          <p className="font-mincho text-xl leading-relaxed text-fg">{copy.thinTitle}</p>
+          <p className="font-serif-jp mt-4 text-sm leading-loose text-mute">{copy.thinBody}</p>
+          <button
+            type="button"
+            onClick={() => setPhase('elicit')}
+            className={customer ? 'btn ghost mt-8' : 'font-label mt-8 rounded-full border border-accent/40 px-6 py-2.5 text-sm text-fg transition-colors hover:border-accent hover:bg-accent/10'}
+          >
+            {copy.thinBack}
+          </button>
+        </div>
+      )}
+
+      {(phase === 'reveal' || phase === 'order') && result && (
+        <div hidden={phase === 'order'}>
+          {result.primary_kanji !== null && result.candidates.some((c) => !c.eliminated) && (
+            <Reveal
+              result={result}
+              story={story}
+              followUps={followUps}
+              condition={customer ? 'A' : condition}
+              copy={copy}
+              context={context}
+              diagnostics={!customer}
+              onFinalize={
+                customer
+                  ? (c) => {
+                      setChosen(c)
+                      setPhase('order')
+                    }
+                  : undefined
+              }
             />
-            {storyLength(followUpAnswer) >= STORY_COUNTER_FROM && (
-              <p data-testid="story-counter" className="font-label mt-2 text-right text-[11px] text-ivory/50">
-                {copy.storyCounter(storyLength(followUpAnswer), FOLLOW_UP_MAX)}
-              </p>
-            )}
+          )}
+          <div className="mt-12 text-center">
             <button
               type="button"
-              onClick={submitFollowUp}
-              disabled={!followUpAnswer.trim()}
-              className="font-label mt-6 rounded-full bg-gold px-8 py-3.5 text-sm tracking-[0.1em] text-ink transition-all hover:shadow-[0_8px_30px_rgba(201,169,110,0.3)] disabled:cursor-not-allowed disabled:opacity-40"
+              onClick={tryAgain}
+              className={customer ? 'btn ghost' : 'font-label rounded-full border border-accent/40 px-6 py-2.5 text-sm text-fg transition-colors hover:border-accent hover:bg-accent/10'}
             >
-              {copy.followUpSubmit}
-            </button>
-          </motion.div>
-        )}
-
-        {phase === 'thin' && (
-          <div className="py-12 text-center">
-            <p className="font-mincho text-xl leading-relaxed text-ivory">
-              {copy.thinTitle}
-            </p>
-            <p className="font-serif-jp mt-4 text-sm leading-loose text-ivory/60">{copy.thinBody}</p>
-            <button
-              type="button"
-              onClick={() => setPhase('elicit')}
-              className="font-label mt-8 rounded-full border border-gold/40 px-6 py-2.5 text-sm text-ivory transition-colors hover:border-gold hover:bg-gold/10"
-            >
-              {copy.thinBack}
+              {copy.tryAgain}
             </button>
           </div>
-        )}
+        </div>
+      )}
 
-        {(phase === 'reveal' || phase === 'order') && result && (
-          <div hidden={phase === 'order'}>
-            {result.primary_kanji !== null && result.candidates.some((c) => !c.eliminated) && (
-              <Reveal
-                result={result}
-                story={story}
-                followUps={followUps}
-                condition={customer ? 'A' : condition}
-                copy={copy}
-                context={context}
-                diagnostics={!customer}
-                onFinalize={
-                  customer
-                    ? (c) => {
-                        setChosen(c)
-                        setPhase('order')
-                      }
-                    : undefined
-                }
-              />
-            )}
-            <div className="mt-12 text-center">
-              <button
-                type="button"
-                onClick={tryAgain}
-                className="font-label rounded-full border border-gold/40 px-6 py-2.5 text-sm text-ivory transition-colors hover:border-gold hover:bg-gold/10"
-              >
-                {copy.tryAgain}
-              </button>
+      {customer && phase === 'order' && result && chosen && (
+        <OrderForm result={result} story={story} followUps={followUps} candidate={chosen} copy={copy} onBack={() => setPhase('reveal')} />
+      )}
+
+      {!customer && result && (phase === 'reveal' || phase === 'thin') && (
+        <details className="mt-14 opacity-60">
+          <summary className="font-label cursor-pointer text-[11px] tracking-[0.15em] text-mute">{copy.rawContract}</summary>
+          <pre className="mt-3 max-h-[50vh] overflow-auto rounded-sm border border-line bg-surface p-4 text-[11px] leading-relaxed text-mute">
+            {JSON.stringify(result, null, 2)}
+          </pre>
+        </details>
+      )}
+    </>
+  )
+
+  if (customer) {
+    return (
+      <CustomerShell aside={aside} phase={phase}>
+        {body}
+      </CustomerShell>
+    )
+  }
+
+  return (
+    <HarnessShell>
+      <div className="mx-auto max-w-3xl">
+        <header className="mb-10 flex flex-wrap items-center justify-between gap-4">
+          <div className="flex items-baseline gap-2">
+            <span className="font-mincho text-lg text-fg">一字礼</span>
+            <span className="font-label text-xs tracking-[0.25em] text-accent">ICHIREI · VALIDATION HARNESS</span>
+          </div>
+          <div className="flex items-center gap-4">
+            <div className="flex items-center gap-1">
+              <span className="font-label mr-1 text-[10px] tracking-wide text-mute">condition</span>
+              {CONDITIONS.map((c) => (
+                <button
+                  key={c.id}
+                  type="button"
+                  onClick={() => changeCondition(c.id)}
+                  className={`font-label h-7 w-7 rounded-full text-xs transition-colors ${
+                    condition === c.id ? 'bg-accent text-page' : 'border border-accent/30 text-mute hover:border-accent'
+                  }`}
+                >
+                  {c.label}
+                </button>
+              ))}
             </div>
+            <button
+              type="button"
+              onClick={exportEvents}
+              className="font-label rounded-full border border-fg/20 px-3 py-1.5 text-[11px] text-mute transition-colors hover:border-fg/50"
+            >
+              {copy.exportLog}
+            </button>
           </div>
-        )}
-
-        {customer && phase === 'order' && result && chosen && (
-          <OrderForm result={result} story={story} followUps={followUps} candidate={chosen} copy={copy} onBack={() => setPhase('reveal')} />
-        )}
-
-        {!customer && result && (phase === 'reveal' || phase === 'thin') && (
-          <details className="mt-14 opacity-60">
-            <summary className="font-label cursor-pointer text-[11px] tracking-[0.15em] text-ivory/40">
-              {copy.rawContract}
-            </summary>
-            <pre className="mt-3 max-h-[50vh] overflow-auto rounded-sm border border-gold/15 bg-paper/40 p-4 text-[11px] leading-relaxed text-ivory/70">
-              {JSON.stringify(result, null, 2)}
-            </pre>
-          </details>
-        )}
+        </header>
+        {body}
       </div>
-    </Wrapper>
+    </HarnessShell>
   )
 }

@@ -24,7 +24,7 @@ execSync('npm run build', { stdio: 'ignore', env: { ...process.env, ICHIREI_BASE
 const upstream = await startFakeAnthropic()
 // Silent 3s "thinking" gap, then ~3s of streamed output; 1s heartbeat.
 upstream.state.mode = { kind: 'stream', gapMs: 3000, totalMs: 3000 }
-const server = await startServer({ upstreamUrl: upstream.url, env: { ICHIREI_HEARTBEAT_MS: '1000' } })
+const server = await startServer({ upstreamUrl: upstream.url, env: { ICHIREI_HEARTBEAT_MS: '1000', ICHIREI_RATES: 'off' } })
 
 const browser = await chromium.launch({
   ...(process.env.CHROMIUM_PATH ? { executablePath: process.env.CHROMIUM_PATH } : {}),
@@ -46,7 +46,18 @@ try {
   // Landing page paints from the served root-base bundle.
   await page.goto(server.url + '/', { waitUntil: 'networkidle' })
   await page.waitForTimeout(4500)
-  check('landing paints (hero title visible)', await page.locator('h1:has-text("一字の贈りもの")').isVisible())
+  check('landing paints (the Reveal hero title visible)', await page.locator('h1:has-text("一字の距離")').isVisible())
+  // the photos are served from the build (WebP and JPG), and /api/rates answers (no table in this test → null → no price lines)
+  const [jpg, webp, rates] = await Promise.all([page.request.get(server.url + '/img/scenes/parents.jpg'), page.request.get(server.url + '/img/scenes/parents-640.webp'), page.request.get(server.url + '/api/rates')])
+  check('photos are served (JPG and 640w WebP), and /api/rates answers { rates: null } when no rate is known', jpg.status() === 200 && (jpg.headers()['content-type'] ?? '').includes('image/jpeg') && webp.status() === 200 && (webp.headers()['content-type'] ?? '').includes('image/webp') && rates.status() === 200 && (await rates.json()).rates === null)
+  // the real composer on the served page posts to the real /api/select (streaming through the engine to the fake model)
+  const posted = []
+  page.on('request', (r) => { if (r.url().endsWith('/api/select') && r.method() === 'POST') posted.push(r.postDataJSON()) })
+  for (const c of ['relationship:parent_father', 'direction:up', 'occasion:birthday_milestone']) await page.click(`[data-chip="${c}"]`)
+  await page.locator('#moment').fill(STORY.slice(0, 200))
+  await page.click('#write button[type=submit]')
+  await page.waitForSelector('[data-testid=finalize]', { timeout: 30_000 })
+  check('the landing composer posted to /api/select (ja, the chips\' context) and three cards came back through the real server', posted.length === 1 && posted[0].language === 'ja' && posted[0].relationship === 'parent_father' && (await page.locator('#write article[data-slot]').count()) === 3)
 
   // /demo via SPA fallback, then the full flow through the real streaming API.
   await page.goto(server.url + '/demo', { waitUntil: 'networkidle' })

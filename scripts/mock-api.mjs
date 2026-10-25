@@ -57,6 +57,16 @@ const server = createServer(async (req, res) => {
     }))
   }
 
+  if (url.pathname === '/api/rates' && req.method === 'GET') {
+    res.writeHead(200, { 'content-type': 'application/json' })
+    return res.end(JSON.stringify({ date: '2026-10-25', base: 'JPY', rates: { USD: 0.0066, EUR: 0.0061, GBP: 0.0052, AUD: 0.010, TWD: 0.21, HKD: 0.052, SGD: 0.0088, KRW: 9.2 } }))
+  }
+
+  if (url.pathname === '/api/analytics' && req.method === 'POST') {
+    res.writeHead(204)
+    return res.end()
+  }
+
   if (url.pathname === '/api/log' && req.method === 'POST') {
     res.writeHead(204)
     return res.end()

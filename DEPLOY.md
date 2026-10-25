@@ -246,6 +246,14 @@ Recorded from the owner's report; nothing here is a secret value. Re-check with 
 
 Three numbers must stay in step: Cloud Run `--timeout` (`_TIMEOUT` in `cloudbuild.yaml`, 300 s), the server (`ICHIREI_REQUEST_TIMEOUT_MS` / `ICHIREI_SOCKET_TIMEOUT_MS`, default 300 000 ms), and the frontend deadline (`ENGINE_TIMEOUT_MS` in `src/demo/DemoApp.tsx`, 290 s — keep it just under the server's). Cloud Run's maximum is 3600 s.
 
+## The Reveal landing (what changed for deployment)
+
+- The customer site at `/` is the Reveal design (`src/reveal/`; the approved prototype is kept in `design/reveal/`). Nothing new to configure: same service, same secrets.
+- **Photos** live in `public/img/` (JPG = the source; `npm run build` makes the WebP files next to them with `sharp`, a build-time tool only). To swap a photo, commit a new JPG of the same name.
+- **`GET /api/rates`** serves one daily JPY rate table for the "≈ US$65" lines. The server fetches it from a free keyless source (jsDelivr's currency-api, with a Cloudflare Pages mirror), caches it for 24 hours and never blocks a page on it; if the source is down the lines simply disappear. Checkout is always JPY. `ICHIREI_RATES=off` turns the fetch off. No secret is involved.
+- The server now gzips the page, scripts and styles (never `/api/*`, so the streaming heartbeat is untouched) and lets `/img/*` be cached for an hour.
+- Fonts come from Google Fonts: the landing loads five families (Bricolage Grotesque, Zen Kaku Gothic New, Zen Old Mincho, Noto Sans TC, Noto Serif TC); `/demo` and `/track` keep the earlier set.
+
 ## Rollback
 
 Cloud Run → `ichirei` → **Revisions** → pick the previous revision → **Manage traffic → 100%**. Or point users back at the Vercel deployment.

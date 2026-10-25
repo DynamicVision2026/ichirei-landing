@@ -4,16 +4,65 @@
     <meta charset="UTF-8" />
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="theme-color" content="#FBF4F0" />
     <meta
       name="description"
       content="ICHIREI（一字礼）— あなたの目に映る、その人を、一文字に。大切な人への、一字の贈りもの。"
     />
+    <!-- Share tags (the page itself updates title/description/locale per language; crawlers read these). -->
+    <meta property="og:type" content="website" />
+    <meta property="og:site_name" content="ICHIREI 一字礼" />
+    <meta property="og:title" content="ICHIREI 一字礼 — 一字の贈りもの" />
+    <meta
+      property="og:description"
+      content="ICHIREI（一字礼）— あなたの目に映る、その人を、一文字に。大切な人への、一字の贈りもの。"
+    />
+    <meta property="og:locale" content="ja_JP" />
+    <meta property="og:url" content="https://ichirei.soul-id.jp/" />
+    <!-- Temporary share image until the final photography is in (public/img/scenes/parents.jpg). -->
+    <meta property="og:image" content="https://ichirei.soul-id.jp/img/scenes/parents.jpg" />
+    <meta property="og:image:width" content="362" />
+    <meta property="og:image:height" content="395" />
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:image" content="https://ichirei.soul-id.jp/img/scenes/parents.jpg" />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link
-      href="https://fonts.googleapis.com/css2?family=Zen+Old+Mincho:wght@400;500;600;700&family=Noto+Serif+JP:wght@300;400;500;600&family=Noto+Serif+SC:wght@300;400;500;600&family=Noto+Serif+TC:wght@300;400;500;600&family=EB+Garamond:wght@400;500;600&family=Inter:wght@300;400;500&display=swap"
-      rel="stylesheet"
-    />
+    <!--
+      Fonts and the hero photo, chosen by page and loaded without blocking the first paint (display=swap):
+      the customer site (/) needs only the Reveal design's five families; /demo and /track keep the earlier set.
+    -->
+    <script>
+      (function () {
+        var base = '%BASE_URL%'
+        var tools = location.pathname.indexOf('/demo') >= 0 || location.pathname.indexOf('/track') >= 0
+        var css = 'https://fonts.googleapis.com/css2?family='
+        var href = tools
+          ? css + 'Zen+Old+Mincho:wght@400;500;600;700;900&family=Noto+Serif+JP:wght@300;400;500;600&family=Noto+Serif+SC:wght@300;400;500;600&family=Noto+Serif+TC:wght@300;400;500;600;700;900&family=EB+Garamond:wght@400;500;600&family=Inter:wght@300;400;500&display=swap'
+          : css + 'Bricolage+Grotesque:opsz,wght@12..96,400;12..96,600;12..96,700&family=Zen+Kaku+Gothic+New:wght@400;500;700&family=Zen+Old+Mincho:wght@700;900&family=Noto+Sans+TC:wght@400;500;700&family=Noto+Serif+TC:wght@700;900&display=swap'
+        var font = document.createElement('link')
+        font.rel = 'stylesheet'
+        font.href = href
+        font.media = 'print'
+        font.onload = function () { font.media = 'all' }
+        document.head.appendChild(font)
+        if (!tools) {
+          var img = document.createElement('link')
+          img.rel = 'preload'
+          img.as = 'image'
+          img.type = 'image/webp'
+          img.setAttribute('imagesrcset', base + 'img/scenes/parents-640.webp 640w, ' + base + 'img/scenes/parents-1280.webp 1280w')
+          img.setAttribute('imagesizes', '(max-width: 860px) 100vw, 480px')
+          img.setAttribute('fetchpriority', 'high')
+          document.head.appendChild(img)
+        }
+      })()
+    </script>
+    <noscript>
+      <link
+        rel="stylesheet"
+        href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,400;12..96,600;12..96,700&family=Zen+Kaku+Gothic+New:wght@400;500;700&family=Zen+Old+Mincho:wght@700;900&family=Noto+Sans+TC:wght@400;500;700&family=Noto+Serif+TC:wght@700;900&display=swap"
+      />
+    </noscript>
     <title>ICHIREI 一字礼 — 一字の贈りもの</title>
   </head>
   <body>

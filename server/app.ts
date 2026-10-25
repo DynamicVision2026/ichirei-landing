@@ -8,10 +8,12 @@
 import type { Server } from 'node:http'
 import { Hono, type Context, type MiddlewareHandler } from 'hono'
 import { serveStatic } from '@hono/node-server/serve-static'
+import { compress } from 'hono/compress'
 import { POST as selectPost } from '../api/select.ts'
 import { POST as orderPost } from '../api/order.ts'
 import { POST as trackPost } from '../api/track.ts'
 import { POST as analyticsPost } from '../api/analytics.ts'
+import { GET as ratesGet } from '../api/rates.ts'
 import { loadTrackConfig } from '../engine/track.ts'
 import { createOrderStore } from '../engine/order-store.ts'
 import { loadShopifyConfig } from '../engine/shopify.ts'
@@ -118,6 +120,9 @@ export function createApp(config: ServerConfig): Hono {
   // Learning loop: two browser events (chosen, explain_opened) → analytics/YYYY-MM-DD.jsonl. Always 204.
   app.post('/api/analytics', (c) => analyticsPost(c.req.raw))
 
+  // Approximate JPY rates for the "≈ US$65" lines (display only; null → the page hides them).
+  app.get('/api/rates', () => ratesGet())
+
   const methodNotAllowed = (c: Context) =>
     c.json({ error: 'Method not allowed' }, 405, { Allow: 'POST' })
   app.all('/api/select', methodNotAllowed)
@@ -128,9 +133,14 @@ export function createApp(config: ServerConfig): Hono {
   app.all('/api/analytics', methodNotAllowed)
   app.all('/api/*', (c) => c.json({ error: 'Not found' }, 404))
 
+  // The built bundle, stylesheet and pages are text: gzip them (Cloud Run does not). Never the API — the NDJSON
+  // stream and its heartbeat must reach the browser byte by byte, so /api/* is left exactly as it was.
+  const gzip = compress()
+  app.use('/*', (c, next) => (c.req.path.startsWith('/api/') ? next() : gzip(c, next)))
+
   // ---- Frontend (built Vite output) ------------------------------------
-  // Hashed bundles under /assets are immutable; everything else revalidates so
-  // a redeploy is picked up immediately.
+  // Hashed bundles under /assets are immutable; the photos under /img keep for an hour (a swapped photo
+  // shows up within the hour); everything else revalidates so a redeploy is picked up immediately.
   app.use(
     '/*',
     serveStatic({
@@ -138,7 +148,7 @@ export function createApp(config: ServerConfig): Hono {
       onFound: (path, c) => {
         c.header(
           'Cache-Control',
-          path.includes('/assets/') ? 'public, max-age=31536000, immutable' : 'no-cache',
+          path.includes('/assets/') ? 'public, max-age=31536000, immutable' : path.includes('/img/') ? 'public, max-age=3600' : 'no-cache',
         )
       },
     }),

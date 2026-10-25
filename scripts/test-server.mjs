@@ -34,7 +34,7 @@ execSync('npm run build', { stdio: 'ignore', env: { ...process.env, ICHIREI_BASE
 const upstream = await startFakeAnthropic()
 const server = await startServer({
   upstreamUrl: upstream.url,
-  env: { ICHIREI_HEARTBEAT_MS: '1000' },
+  env: { ICHIREI_HEARTBEAT_MS: '1000', ICHIREI_RATES: 'off' },
 })
 const base = server.url
 

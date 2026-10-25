@@ -127,6 +127,8 @@ export interface Copy {
   finalizeButton: string
   finalized: (kanji: string) => string
   chooseHint: string
+  /** The customer site shows every card open with its own choose button, so the hint just says to pick one. */
+  chooseHintCustomer: string
   /** The line under the carved glyph: the other form (+ reading). */
   glyphReading: (c: { kanji: string; inscription_form: string | null; reading: string; meaning?: string | null; reading_zh?: string | null }, carved: string) => string
   /** Small note under the glyph about which form is carved. */
@@ -250,6 +252,7 @@ const ja: Copy = {
   finalizeButton: 'この一字を、贈る',
   finalized: (k) => `「${k}」に決めました`,
   chooseHint: '字を開いて「この一字を選ぶ」を押すと決定できます',
+  chooseHintCustomer: 'ひとつ選ぶと、先へ進めます。',
   glyphReading: (c) => `${c.inscription_form ? `${c.kanji} ・ ` : ''}${c.reading}`,
   inscriptionNote: (c) => (c.inscription_form ? `古体字（現代字：${c.kanji}）` : null),
   previewNote: (c) => (c.inscription_form ? '刻印は古体字を用います' : null),
@@ -372,6 +375,7 @@ const zhHans: Copy = {
   finalizeButton: '就用这一个字',
   finalized: (k) => `「${k}」已选定`,
   chooseHint: '打开一个字并点“选择这个字”即可决定',
+  chooseHintCustomer: '请先选择其中一个字，再继续。',
   glyphReading: (c, carved) => `${c.inscription_form ? `${carved === c.kanji ? c.inscription_form : c.kanji} ・ ` : ''}${c.reading}`,
   inscriptionNote: (c, script) =>
     c.inscription_form
@@ -499,6 +503,7 @@ const zhHant: Copy = {
   finalizeButton: '就用這一個字',
   finalized: (k) => `「${k}」已選定`,
   chooseHint: '打開一個字並點「選擇這個字」即可決定',
+  chooseHintCustomer: '請先選擇其中一個字，再繼續。',
   glyphReading: (c, carved) => `${c.inscription_form ? `${carved === c.kanji ? c.inscription_form : c.kanji} ・ ` : ''}${c.reading}`,
   inscriptionNote: (c, script) =>
     c.inscription_form
@@ -631,6 +636,7 @@ const en: Copy = {
   finalizeButton: 'Give this character',
   finalized: (k) => `“${k}” is chosen`,
   chooseHint: 'Open a character and press “Choose this character” to decide',
+  chooseHintCustomer: 'Choose one of the characters to continue.',
   glyphReading: (c, carved) =>
     `${c.inscription_form && carved !== c.kanji ? `${c.kanji} · ` : ''}${c.reading}${c.reading_zh ? ` · pinyin ${c.reading_zh}` : ''}${c.meaning ? ` — ${c.meaning}` : ''}`,
   inscriptionNote: (c) => (c.inscription_form ? `Carved in the old form, kyūjitai (modern form: ${c.kanji})` : null),

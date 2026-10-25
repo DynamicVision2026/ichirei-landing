@@ -8,6 +8,7 @@ import { dirname, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { serve } from '@hono/node-server'
 import { createApp, loadConfig, serverRef } from './app.ts'
+import { sharedRates } from '../engine/rates.ts'
 
 // Run from the project root so ./dist and the engine's cwd-relative prompt
 // lookups resolve regardless of where the process was started.
@@ -44,6 +45,8 @@ const server = serve(
   },
 ) as Server
 server.timeout = config.socketTimeoutMs
+// First fetch of the daily JPY rates (display only); failure just hides the approximate-price lines.
+sharedRates.warm()
 serverRef.current = server
 
 // Cloud Run sends SIGTERM before stopping an instance (10s grace).

@@ -5,7 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "tsc -b && vite build",
+    "build": "node scripts/make-images.mjs && tsc -b && vite build",
     "lint": "oxlint",
     "preview": "vite preview",
     "start": "node --experimental-strip-types --disable-warning=ExperimentalWarning server/index.ts",
@@ -29,6 +29,7 @@
     "autoprefixer": "^10.5.2",
     "oxlint": "^1.71.0",
     "postcss": "^8.5.16",
+    "sharp": "^0.35.5",
     "tailwindcss": "^4.3.2",
     "typescript": "~6.0.2",
     "vite": "^8.1.1"

@@ -1,0 +1,784 @@
+// The Reveal landing page's copy — taken word for word from design/reveal/index.html (EN, 日本語, 繁中).
+// Generated once from the reference and then maintained here by hand. English is the base; a key missing in
+// another language falls back to English (as in the reference).
+//
+// Honesty rules (scripts/test-reveal.ts checks them): no reviews, counts, ratings or testimonials, no
+// "checked by native speakers" claim, no "no AI" claim, no list of payment methods. The reference's
+// trust-strip item "Checked by native speakers" is therefore NOT here.
+
+export type RevealLang = 'en' | 'ja' | 'zh-Hant'
+export const REVEAL_LANGS: readonly RevealLang[] = ['en', 'ja', 'zh-Hant']
+
+export type Category = 'parents' | 'partner' | 'friends' | 'children' | 'mentor' | 'work'
+export const CATEGORIES: readonly Category[] = ['parents', 'partner', 'friends', 'children', 'mentor', 'work']
+
+const EN = {
+  ctaTop: "Tell your story",
+  eyebrow: "A story-driven gift",
+  h1: "Between you and me, <em>one character.</em>",
+  sub: "It all starts with your story. Tell us one true moment with someone, and we find the single character that holds how you see them. Then we carve it by hand in Japan.",
+  ctaHero: "Tell your story",
+  freeLine: "<b>Free to try.</b> You only pay if you decide to give it.",
+  c1: "Birthdays",
+  c2: "Weddings",
+  c3: "Parents",
+  c4: "Best friends",
+  c5: "Thank you",
+  s1: "Carved by hand in Japan",
+  s3: "Ships worldwide",
+  s4: "You choose the final character",
+  phEye: "Why we start with your story",
+  phH: "We don't sell characters.<br>We keep relationships.",
+  ph1: "Every relationship holds something never quite said. \"Thank you\" and \"I love you\" are true, but they are everyone's words.",
+  ph2: "What belongs only to the two of you lives in a small, real moment: a habit, a sentence, a light left on.",
+  ph3: "Your story is the material. The truer the moment, the truer the character. We only find what is already there.",
+  shEye: "What a story looks like",
+  shH: "Not beautiful writing. One true moment.",
+  shP: "Praise could describe anyone. A small, real detail can only describe them.",
+  weakL: "Could be anyone",
+  w1s: "My mother is kind and always supports me.",
+  w1r: "Leads to a common word like 愛 (love). True, but not hers.",
+  strongL: "Only them",
+  s1s: "She left the porch light on every night until I got home. Even when I was thirty.",
+  s1r: "Lamplight. The person who waited with the light on.",
+  weakL2: "Could be anyone",
+  w2s: "He is my best friend and we have been through a lot.",
+  w2r: "Leads to 友 (friend). Every friendship fits.",
+  strongL2: "Only them",
+  s2s: "After my divorce he drove four hours with a frozen pizza and said nothing. We just watched football.",
+  s2r: "Beside. The one who simply stayed next to me.",
+  anEye: "Where to look",
+  anH: "Five ways into your story",
+  anP: "Not sure what to write? Pick a door. Each one asks a small question that opens a big memory.",
+  a0: "A habit or a phrase",
+  a1: "A time they showed up",
+  a2: "Something they made or fixed",
+  a3: "A place that is them",
+  a4: "What they never said",
+  askL: "The question",
+  exL: "A story it opened",
+  wrEye: "Your turn",
+  wrH: "Tell us one moment",
+  tp1: "One real moment beats a whole biography.",
+  tp2: "Honest is better than beautiful. Plain words are perfect.",
+  tp3: "Funny is welcome. Inside jokes often hold the most truth.",
+  tp4: "Write or speak, in English, Japanese or Chinese. 50 to 300 characters is plenty.",
+  tp5: "Your story is used only to find the character.",
+  cWho: "Who is it for?",
+  cMom: "One moment with them",
+  cHint: "Tip: add one detail only you would know.",
+  cGo: "Find the character in my story",
+  cSent: "This is a design preview, so it stops here. On the live site, your three characters appear in about a minute, free.",
+  stEye: "How it works",
+  stH: "Three simple steps to one character",
+  st1: "Tell one moment",
+  st1p: "Write or speak a few lines about a moment you shared. No fine writing needed.",
+  st1t: "About 2 minutes",
+  st2: "Meet three characters",
+  st2p: "Two main characters and one freestyle, each with its reading, its meaning and why it fits. You choose.",
+  st2t: "Right away · free",
+  st3: "Carved and delivered",
+  st3p: "We carve your character by hand in Japan and send it gift-ready, with a certificate card in Japanese and English.",
+  st3t: "Japan ~10 working days · Overseas within a month",
+  ctaSteps: "Try it free",
+  mmEye: "Stories become characters",
+  mmH: "The biggest feelings live in the smallest moments",
+  mmP: "Not only birthdays and weddings. A packed lunch, an umbrella at the station, a coffee left on a desk. That is where your character is hiding.",
+  m1w: "Granddaughter → Grandmother",
+  m1t: "Every school morning, she braided my hair and tied in a little wish.",
+  m2w: "Wife → Husband",
+  m2t: "Ten years of rainy days, always at the station.",
+  m3w: "Friend → Friend",
+  m3t: "We still can't sit together without laughing.",
+  m4w: "Colleague → Colleague",
+  m4t: "The night before the deadline, a warm coffee appeared on my desk.",
+  m5w: "Son → Father",
+  m5t: "He fixed my bike, my desk and my confidence.",
+  m6w: "Student → Teacher",
+  m6t: "She stayed after class until I understood.",
+  mmNote: "Examples for illustration. Your story gets three characters of its own: two main ones and one freestyle.",
+  rvEye: "Reviews",
+  rvH: "Be one of our first givers",
+  rvB: "Real reviews will appear here",
+  rvP: "ICHIREI is new. As our first givers send their characters, their words and reveal moments will be shown here, unedited.",
+  rvCta: "Give the first one",
+  gfEye: "When you are ready",
+  gfH: "Two ways to hand it over",
+  gfP: "Find your character first. Choose how to give it only when it feels right.",
+  sp1: "Walnut tag, character carved and finished in gold leaf",
+  sp2: "Red-and-white mizuhiki cord",
+  sp3: "Bilingual certificate card",
+  sp4: "Gift box, ready to give",
+  buy1: "Start with Simple",
+  pop: "Make it together",
+  dp1: "Character carved into a wooden block",
+  dp2: "Rubbing ink, tampo and washi: print the character together",
+  dp3: "Bilingual certificate card",
+  dp4: "Pouch and gift box",
+  buy2: "Start with Standard",
+  ship1: "Tax included · Free shipping in Japan",
+  ship2: "Worldwide: flat ¥6,000 by EMS",
+  cur: "Show prices in",
+  fqH: "Questions givers ask",
+  fq1: "I can’t read kanji. Will I understand it?",
+  fa1: "Yes. Every character comes with its reading, its meaning in plain words and the reason it fits, and the certificate card is in Japanese and English.",
+  fq2: "What should I write?",
+  fa2: "One real moment is enough: a habit, a place, something they always say or do. About 50 to 300 characters is plenty.",
+  fq3: "Can it be funny?",
+  fa3: "Yes. Alongside two main characters, you always see one freestyle character for inside jokes and playful truths. It teases, never insults.",
+  fq4: "When will it arrive?",
+  fa4: "About 10 working days in Japan and within a month overseas. For a fixed date, order early.",
+  fq5: "Do you ship to my country?",
+  fa5: "We ship worldwide from Japan by EMS for a flat ¥6,000.",
+  clH: "Some things are hard to say. One character can hold them.",
+  clP: "Start with one moment. We will find the character and carve it for you.",
+  ctaClose: "Tell your story",
+  foot: "Order status: /track · Questions: reply to your order email",
+  dock: "Tell your story · free to try",
+} as const
+
+export type CopyKey = keyof typeof EN
+
+const JA: Partial<Record<CopyKey, string>> = {
+  ctaTop: "一字を見つける",
+  eyebrow: "物語からはじまる贈りもの",
+  sub: "すべては、あなたの物語から。その人との本当の場面をひとつ教えてください。あなたの目に映るその人を一字にして、日本で手で刻みます。",
+  ctaHero: "物語を書く",
+  ctaClose: "物語を書く",
+  dock: "物語を書く・無料で試せます",
+  phEye: "物語からはじめる理由",
+  phH: "売っているのは、漢字ではありません。<br>ふたりの関係を、残すことです。",
+  ph1: "どんな関係にも、言い切れなかった何かがあります。「ありがとう」も「大好き」も本当。でもそれは、誰もが使う言葉です。",
+  ph2: "ふたりだけのものは、小さな本当の場面に宿ります。いつものクセ、ひとこと、つけたままの灯り。",
+  ph3: "あなたの物語が、素材です。場面が本当であるほど、字も本当になる。わたしたちは、そこにあるものを見つけるだけ。",
+  shEye: "物語とは、こういうもの",
+  shH: "上手な文章ではなく、本当の場面をひとつ。",
+  shP: "ほめ言葉は誰にでも当てはまる。小さな本当の細部は、その人にしか当てはまらない。",
+  weakL: "誰にでも当てはまる",
+  weakL2: "誰にでも当てはまる",
+  strongL: "その人だけ",
+  strongL2: "その人だけ",
+  w1s: "母はやさしくて、いつも支えてくれる。",
+  w1r: "「愛」のような、よくある字になる。本当だけれど、母だけの字ではない。",
+  s1s: "わたしが帰るまで、毎晩玄関の灯りをつけていた。三十歳になっても。",
+  s1r: "ともしび。灯りをつけて待っていた人。",
+  w2s: "あいつは親友で、いろいろ乗り越えてきた。",
+  w2r: "「友」になる。どんな友情にも当てはまる。",
+  s2s: "離婚した夜、あいつは冷凍ピザを持って四時間運転してきて、何も言わずにサッカーを観ていた。",
+  s2r: "となり。ただ隣にいてくれた人。",
+  anEye: "どこを見ればいい？",
+  anH: "物語への、五つの入り口",
+  anP: "何を書けばいいか迷ったら、扉をひとつ選んで。小さな問いが、大きな記憶をひらきます。",
+  a0: "クセ・口ぐせ",
+  a1: "駆けつけてくれた時",
+  a2: "つくったもの・直したもの",
+  a3: "その人らしい場所",
+  a4: "言わなかったこと",
+  askL: "問い",
+  exL: "ひらいた物語",
+  wrEye: "あなたの番",
+  wrH: "ひとつの場面を、教えてください",
+  tp1: "人生のすべてより、本当の場面ひとつ。",
+  tp2: "うまさより、正直さ。ふだんの言葉でいい。",
+  tp3: "おもしろい話も歓迎。内輪の冗談にこそ、本当がある。",
+  tp4: "書いても、話しても。日本語・英語・中国語で。50〜300字で十分です。",
+  tp5: "物語は、字を見つけるためだけに使います。",
+  cWho: "誰へ？",
+  cMom: "その人との、ひとつの場面",
+  cHint: "ヒント：あなたしか知らない細部をひとつ。",
+  cGo: "わたしの物語から字を見つける",
+  cSent: "これはデザインの見本のため、ここで止まります。本番では、約1分で三つの字が無料で届きます。",
+  mmEye: "物語が、字になる",
+  freeLine: "<b>無料で試せます。</b>贈ると決めたときだけ、お支払い。",
+  mmH: "いちばん大きな気持ちは、いちばん小さな場面にある",
+  mmP: "誕生日や結婚式だけではありません。お弁当、駅の傘、机に置かれたコーヒー。あなたの一字は、そこに隠れています。",
+  m1w: "孫 → 祖母",
+  m1t: "登校の朝はいつも、髪を編みながら小さな願いを結んでくれた。",
+  m2w: "妻 → 夫",
+  m2t: "十年、雨の日はいつも駅にいた。",
+  m3w: "友 → 友",
+  m3t: "いまでも、並んで座ると笑ってしまう。",
+  m4w: "同僚 → 同僚",
+  m4t: "締め切り前の夜、机にあたたかいコーヒーがあった。",
+  m5w: "息子 → 父",
+  m5t: "自転車も、机も、わたしの自信も、直してくれた。",
+  m6w: "教え子 → 先生",
+  m6t: "わかるまで、放課後も残ってくれた。",
+  mmNote: "見本です。あなたの物語には、本命の二字と遊び字の一字が届きます。",
+  ctaSteps: "無料で試す",
+  gfP: "まず一字を見つけて。贈り方を決めるのは、そのあとで。",
+  h1: "あなたとわたし、<em>一字の距離。</em>",
+  c1: "誕生日",
+  c2: "結婚",
+  c3: "両親へ",
+  c4: "親友へ",
+  c5: "ありがとう",
+  s1: "日本で手彫り",
+  s3: "世界へお届け",
+  s4: "最後の一字はあなたが選ぶ",
+  stEye: "つくり方",
+  stH: "三つのステップで、一字へ",
+  st1: "ひとつの場面を伝える",
+  st1p: "その人との場面を、数行書くか話すだけ。上手な文章はいりません。",
+  st1t: "約2分",
+  st2: "三つの字に出会う",
+  st2p: "本命の二字と遊び字の一字。読み方、意味、選ばれた理由とともに。選ぶのはあなたです。",
+  st2t: "すぐに・無料",
+  st3: "刻んで、届ける",
+  st3p: "日本で一字を手で刻み、日英二言語の証書カードとともに、贈れる形でお届けします。",
+  st3t: "国内 約10営業日 ・ 海外 1か月以内",
+  rvEye: "レビュー",
+  rvH: "最初の贈り主に、なってください",
+  rvB: "本物のレビューが、ここに並びます",
+  rvP: "一字礼は始まったばかりです。最初の贈り主の言葉と、受け取った瞬間を、手を加えずにここで紹介していきます。",
+  rvCta: "最初の一字を贈る",
+  gfEye: "贈ると決めたら",
+  gfH: "手渡し方は、ふたつ",
+  sp1: "ウォールナットの木札に一字を刻み、金箔で仕上げ",
+  sp2: "紅白の水引",
+  sp3: "日英二言語の証書カード",
+  sp4: "そのまま贈れる化粧箱",
+  buy1: "シンプルではじめる",
+  pop: "ふたりで写しとる",
+  dp1: "木の字版に一字を刻む",
+  dp2: "拓墨・拓包・和紙で、一緒に字を写しとる",
+  dp3: "日英二言語の証書カード",
+  dp4: "巾着袋と化粧箱",
+  buy2: "スタンダードではじめる",
+  ship1: "税込・国内送料無料",
+  ship2: "海外へは EMS 一律 ¥6,000",
+  cur: "通貨で表示",
+  fqH: "よくあるご質問",
+  fq1: "漢字が読めない人に贈っても大丈夫？",
+  fa1: "はい。どの字にも読み方とやさしい言葉の意味、選ばれた理由が添えられ、証書カードは日本語と英語の二言語です。",
+  fq2: "何を書けばいい？",
+  fa2: "本当にあった場面がひとつあれば十分です。いつものクセ、場所、口ぐせ。50〜300字くらいが目安です。",
+  fq3: "おもしろい字でもいい？",
+  fa3: "はい。本命の二字とともに、ふたりだけに通じる遊び字がひとつ届きます。からかっても、傷つけない字です。",
+  fq4: "いつ届く？",
+  fa4: "国内は約10営業日、海外は1か月以内が目安です。日付が決まっている場合は、お早めに。",
+  fq5: "海外へ送れる？",
+  fa5: "日本から世界へ、EMS 一律 ¥6,000 でお届けします。",
+  clH: "言葉にしにくいことも、一字なら持てる。",
+  clP: "ひとつの場面からはじめましょう。字を見つけ、刻んでお届けします。",
+  foot: "注文状況：/track ・ お問い合わせ：ご注文確認メールへご返信",
+}
+
+const ZH: Partial<Record<CopyKey, string>> = {
+  ctaTop: "找到那一個字",
+  eyebrow: "從故事開始的禮物",
+  sub: "一切從你的故事開始。告訴我們你和某人之間一個真實的場景，我們找出那個代表你眼中的他的字，再在日本親手雕刻。",
+  ctaHero: "寫下故事",
+  ctaClose: "寫下故事",
+  dock: "寫下故事・免費試試看",
+  phEye: "為什麼從故事開始",
+  phH: "我們賣的不是漢字，<br>而是留住一段關係。",
+  ph1: "每段關係裡，都有一些沒說盡的話。「謝謝」「我愛你」都是真的，但那是每個人都用的話。",
+  ph2: "只屬於你們兩個的，藏在一個小小的真實場景裡：一個習慣、一句話、一盞沒關的燈。",
+  ph3: "你的故事就是素材。場景越真實，字就越真實。我們只是找出本來就在那裡的東西。",
+  shEye: "故事長什麼樣子",
+  shH: "不需要好文筆，只要一個真實的場景。",
+  shP: "讚美適用於任何人。一個小小的真實細節，只屬於那個人。",
+  weakL: "誰都適用",
+  weakL2: "誰都適用",
+  strongL: "只屬於他",
+  strongL2: "只屬於他",
+  w1s: "我媽媽很溫柔，總是支持我。",
+  w1r: "會得到像「愛」這樣常見的字。是真的，但不只屬於她。",
+  s1s: "我回家之前，她每晚都開著門口的燈。我三十歲了也一樣。",
+  s1r: "燈火。開著燈等我的人。",
+  w2s: "他是我最好的朋友，我們一起經歷了很多。",
+  w2r: "會得到「友」。每段友情都適用。",
+  s2s: "我離婚那晚，他帶著冷凍披薩開了四小時車過來，什麼也沒說，就陪我看足球。",
+  s2r: "鄰。只是一直待在我身邊的人。",
+  anEye: "從哪裡找起",
+  anH: "走進故事的五扇門",
+  anP: "不知道寫什麼？選一扇門。一個小問題，會打開一段大記憶。",
+  a0: "習慣・口頭禪",
+  a1: "他趕來的時候",
+  a2: "他做的・修好的東西",
+  a3: "像他的地方",
+  a4: "沒說出口的事",
+  askL: "問題",
+  exL: "打開的故事",
+  wrEye: "換你了",
+  wrH: "告訴我們一個場景",
+  tp1: "一個真實場景，勝過整個人生傳記。",
+  tp2: "誠實比優美重要。平常的話就好。",
+  tp3: "有趣也歡迎。只有你們懂的玩笑，往往最真實。",
+  tp4: "用寫的或用說的，中文、日文、英文都可以。50到300字就足夠。",
+  tp5: "你的故事只用來找出那個字。",
+  cWho: "送給誰？",
+  cMom: "和他之間的一個場景",
+  cHint: "小提示：加一個只有你知道的細節。",
+  cGo: "從我的故事裡找出那個字",
+  cSent: "這是設計範例，到此為止。正式版會在約一分鐘內免費送上三個字。",
+  mmEye: "故事化成字",
+  freeLine: "<b>免費試試看。</b>決定送出時才需付款。",
+  mmH: "最大的心意，藏在最小的場景裡",
+  mmP: "不只是生日和婚禮。一個便當、車站的一把傘、桌上的一杯咖啡。你的那個字，就藏在那裡。",
+  m1w: "孫女 → 奶奶",
+  m1t: "每個上學的早晨，她一邊幫我編辮子，一邊繫上一個小小的願望。",
+  m2w: "妻子 → 丈夫",
+  m2t: "十年來的每個雨天，他總在車站等我。",
+  m3w: "朋友 → 朋友",
+  m3t: "到現在，我們坐在一起還是會笑出來。",
+  m4w: "同事 → 同事",
+  m4t: "截稿前一晚，桌上出現一杯熱咖啡。",
+  m5w: "兒子 → 父親",
+  m5t: "他修好了我的腳踏車、我的書桌，還有我的自信。",
+  m6w: "學生 → 老師",
+  m6t: "直到我聽懂為止，她放學後都留下來陪我。",
+  mmNote: "以上為範例。你的故事會得到屬於自己的三個字：兩個本命字，加上一個玩心字。",
+  ctaSteps: "免費試試看",
+  gfP: "先找到那個字，再決定怎麼送出。",
+  h1: "你和我之間，<em>只隔一個字。</em>",
+  c1: "生日",
+  c2: "婚禮",
+  c3: "給父母",
+  c4: "給摯友",
+  c5: "謝謝你",
+  s1: "日本手工雕刻",
+  s3: "寄往世界各地",
+  s4: "最後由你選定",
+  stEye: "怎麼做",
+  stH: "三個步驟，找到那一個字",
+  st1: "說一個場景",
+  st1p: "寫下或說出你們之間的一個場景，幾行就好。不需要好文筆。",
+  st1t: "約2分鐘",
+  st2: "遇見三個字",
+  st2p: "兩個本命字和一個玩心字，各附讀音、意思和選擇的理由。由你來選。",
+  st2t: "馬上・免費",
+  st3: "雕刻並寄出",
+  st3p: "在日本親手刻下你的字，附日英雙語證書卡，包裝好直接送禮。",
+  st3t: "日本國內約10個工作日 · 海外1個月以內",
+  rvEye: "評價",
+  rvH: "成為我們最早的送禮人",
+  rvB: "真實的評價會出現在這裡",
+  rvP: "一字礼剛剛開始。最早的送禮人寫下的話與收到禮物的那一刻，會原封不動地在這裡分享。",
+  rvCta: "送出第一個字",
+  gfEye: "準備好了再說",
+  gfH: "兩種交到對方手上的方式",
+  sp1: "胡桃木牌刻字，金箔完成",
+  sp2: "紅白水引繩",
+  sp3: "日英雙語證書卡",
+  sp4: "可直接送禮的禮盒",
+  buy1: "選擇簡約款",
+  pop: "一起拓印",
+  dp1: "將字刻在木字版上",
+  dp2: "拓墨、拓包與和紙：一起把字拓印出來",
+  dp3: "日英雙語證書卡",
+  dp4: "束口袋與禮盒",
+  buy2: "選擇標準款",
+  ship1: "含稅・日本國內免運",
+  ship2: "海外：EMS 統一 ¥6,000",
+  cur: "以此貨幣顯示",
+  fqH: "常見問題",
+  fq1: "看不懂漢字的人也能明白嗎？",
+  fa1: "可以。每個字都附讀音、淺白的意思和選擇理由，證書卡為日英雙語。",
+  fq2: "要寫什麼？",
+  fa2: "一個真實的場景就夠了：一個習慣、一個地方、一句口頭禪。50到300字左右就足夠。",
+  fq3: "可以是有趣的字嗎？",
+  fa3: "可以。除了兩個本命字，你還會看到一個玩心字，留給只有你們懂的玩笑。是調侃，不是傷人。",
+  fq4: "什麼時候送到？",
+  fa4: "日本國內約10個工作日，海外1個月以內。如有指定日期，請提早下單。",
+  fq5: "可以寄到我的國家嗎？",
+  fa5: "我們從日本寄往世界各地，EMS 統一 ¥6,000。",
+  clH: "有些話很難說出口，一個字卻能裝得下。",
+  clP: "從一個場景開始。我們找出那個字，為你刻好送達。",
+  foot: "訂單查詢：/track · 諮詢：請回覆訂單確認郵件",
+}
+
+export const TEXT: Record<RevealLang, Record<CopyKey, string>> = {
+  en: EN,
+  ja: { ...EN, ...JA },
+  'zh-Hant': { ...EN, ...ZH },
+}
+
+/** <title> and meta description, per language (unchanged from the previous landing). */
+export const DOCUMENT: Record<RevealLang, { title: string; description: string }> = {
+  en: {
+    title: 'ICHIREI 一字礼 — A Gift of One Character',
+    description: 'ICHIREI (一字礼) — the person you see, in a single Japanese character. A gift of one kanji for someone who matters, carved in Japan.',
+  },
+  ja: {
+    title: 'ICHIREI 一字礼 — 一字の贈りもの',
+    description: 'ICHIREI（一字礼）— あなたの目に映る、その人を、一文字に。大切な人への、一字の贈りもの。',
+  },
+  'zh-Hant': {
+    title: 'ICHIREI 一字禮 — 一個字的禮物',
+    description: 'ICHIREI（一字禮）— 把你眼中的那個人，凝成一個字。獻給重要的人的一個字的禮物。',
+  },
+}
+
+export const CATS: Record<Category, Record<RevealLang, string>> = {
+  "parents": {
+    "en": "Parents",
+    "ja": "親へ",
+    "zh-Hant": "給父母"
+  },
+  "partner": {
+    "en": "Partner",
+    "ja": "パートナーへ",
+    "zh-Hant": "給伴侶"
+  },
+  "friends": {
+    "en": "Friends",
+    "ja": "友へ",
+    "zh-Hant": "給朋友"
+  },
+  "children": {
+    "en": "Children",
+    "ja": "子へ",
+    "zh-Hant": "給孩子"
+  },
+  "mentor": {
+    "en": "Mentor",
+    "ja": "恩師へ",
+    "zh-Hant": "給恩師"
+  },
+  "work": {
+    "en": "Work",
+    "ja": "職場へ",
+    "zh-Hant": "給職場"
+  }
+}
+
+export const SCENE: Record<Category, Record<RevealLang, string>> = {
+  "parents": {
+    "en": "Photo · a mother in the kitchen at dawn",
+    "ja": "写真・夜明けの台所に立つ母",
+    "zh-Hant": "照片・清晨廚房裡的母親"
+  },
+  "partner": {
+    "en": "Photo · flowers on a kitchen table",
+    "ja": "写真・食卓の季節の花",
+    "zh-Hant": "照片・餐桌上的當季花"
+  },
+  "friends": {
+    "en": "Photo · a friend arriving late, both laughing",
+    "ja": "写真・遅れて来た友と笑い合う",
+    "zh-Hant": "照片・遲到的朋友，兩人相視而笑"
+  },
+  "children": {
+    "en": "Photo · a child getting back up on a bike",
+    "ja": "写真・自転車から立ち上がる子",
+    "zh-Hant": "照片・從腳踏車上站起來的孩子"
+  },
+  "mentor": {
+    "en": "Photo · a teacher and student at a desk",
+    "ja": "写真・机をはさむ先生と生徒",
+    "zh-Hant": "照片・書桌兩側的老師與學生"
+  },
+  "work": {
+    "en": "Photo · a manager standing beside her team",
+    "ja": "写真・チームの前に立つ上司",
+    "zh-Hant": "照片・站在團隊前的上司"
+  }
+}
+
+export interface Example { c: Category; who: string; occ: string; story: string; k: string; rd: string; m: string; gz: string }
+export const EXAMPLES: Record<RevealLang, Example[]> = {
+  "en": [
+    {
+      "c": "parents",
+      "who": "Daughter → Mother",
+      "occ": "Birthday",
+      "story": "She got up at five every morning to make lunch for all of us. I never once heard her complain.",
+      "k": "燈",
+      "rd": "tomoshibi",
+      "m": "lamplight",
+      "gz": "The first light the family woke to."
+    },
+    {
+      "c": "partner",
+      "who": "Husband → Wife",
+      "occ": "Anniversary",
+      "story": "However busy the week, there are always seasonal flowers on our table.",
+      "k": "彩",
+      "rd": "irodori",
+      "m": "colour",
+      "gz": "The one who keeps colour in our days."
+    },
+    {
+      "c": "friends",
+      "who": "Friend → Friend",
+      "occ": "Just because",
+      "story": "In twenty years, they have never once been on time. Still the person I most want to see.",
+      "k": "遅",
+      "rd": "osoi",
+      "m": "late",
+      "gz": "Twenty years of waiting, and worth every minute."
+    },
+    {
+      "c": "children",
+      "who": "Father → Son",
+      "occ": "Graduation",
+      "story": "Whenever he fell, he got back up on his own, still crying. So I feel more excitement than worry.",
+      "k": "立",
+      "rd": "tatsu",
+      "m": "to stand",
+      "gz": "The one who always gets back up."
+    },
+    {
+      "c": "mentor",
+      "who": "Student → Teacher",
+      "occ": "Thank you",
+      "story": "“Value the question more than the answer.” I still remember it whenever I feel lost.",
+      "k": "問",
+      "rd": "toi",
+      "m": "the question",
+      "gz": "The one who taught me to keep asking."
+    },
+    {
+      "c": "work",
+      "who": "Team → Manager",
+      "occ": "Retirement",
+      "story": "The day I made a big mistake, she said, “I will take responsibility for this.”",
+      "k": "盾",
+      "rd": "tate",
+      "m": "shield",
+      "gz": "The one who stood in front of us."
+    }
+  ],
+  "ja": [
+    {
+      "c": "parents",
+      "who": "娘 → 母",
+      "occ": "誕生日",
+      "story": "毎朝五時に起きて、家族のお弁当を作っていた。文句を言うのを、一度も聞いたことがない。",
+      "k": "燈",
+      "rd": "ともしび",
+      "m": "あかり",
+      "gz": "家族を、いちばん先に照らす人。"
+    },
+    {
+      "c": "partner",
+      "who": "夫 → 妻",
+      "occ": "結婚記念日",
+      "story": "どんなに忙しい週でも、テーブルには季節の花がある。",
+      "k": "彩",
+      "rd": "いろどり",
+      "m": "いろどり",
+      "gz": "毎日に、色を絶やさない人。"
+    },
+    {
+      "c": "friends",
+      "who": "友 → 友",
+      "occ": "特別な日ではなく",
+      "story": "待ち合わせに、二十年いちども時間通りに来たことがない。それでも、いちばん会いたい人。",
+      "k": "遅",
+      "rd": "おそい",
+      "m": "遅刻",
+      "gz": "二十年待たされて、それでも会いたい人。"
+    },
+    {
+      "c": "children",
+      "who": "父 → 息子",
+      "occ": "卒業",
+      "story": "転んでも、泣きながら自分で立ち上がる子だった。だから心配より、楽しみのほうが大きい。",
+      "k": "立",
+      "rd": "たつ",
+      "m": "立ち上がる",
+      "gz": "何度でも、自分で立ち上がる人。"
+    },
+    {
+      "c": "mentor",
+      "who": "教え子 → 恩師",
+      "occ": "感謝",
+      "story": "「答えより、問いを大事にしなさい」。いまも、迷うたびに思い出す。",
+      "k": "問",
+      "rd": "とい",
+      "m": "問い",
+      "gz": "問い続けることを教えてくれた人。"
+    },
+    {
+      "c": "work",
+      "who": "部下 → 上司",
+      "occ": "退職",
+      "story": "わたしが大きな失敗をした日、「責任はこっちで持つ」と言ってくれた。",
+      "k": "盾",
+      "rd": "たて",
+      "m": "守るもの",
+      "gz": "いつも、わたしたちの前に立ってくれた人。"
+    }
+  ],
+  "zh-Hant": [
+    {
+      "c": "parents",
+      "who": "女兒 → 母親",
+      "occ": "生日",
+      "story": "每天早上五點起床，為全家做便當。從來沒聽她抱怨過一句。",
+      "k": "燈",
+      "rd": "dēng",
+      "m": "燈火",
+      "gz": "最先照亮全家的人。"
+    },
+    {
+      "c": "partner",
+      "who": "丈夫 → 妻子",
+      "occ": "結婚紀念日",
+      "story": "再忙的一週，餐桌上也總有當季的花。",
+      "k": "彩",
+      "rd": "cǎi",
+      "m": "色彩",
+      "gz": "讓我們每天都有顏色的人。"
+    },
+    {
+      "c": "friends",
+      "who": "朋友 → 朋友",
+      "occ": "不為特別的日子",
+      "story": "約好見面，二十年來沒有一次準時。可還是最想見的人。",
+      "k": "遲",
+      "rd": "chí",
+      "m": "遲到",
+      "gz": "讓我等了二十年，還是想見的人。"
+    },
+    {
+      "c": "children",
+      "who": "父親 → 兒子",
+      "occ": "畢業",
+      "story": "跌倒了，總是哭著自己站起來。所以比起擔心，更多的是期待。",
+      "k": "立",
+      "rd": "lì",
+      "m": "站起來",
+      "gz": "一次又一次，自己站起來的人。"
+    },
+    {
+      "c": "mentor",
+      "who": "學生 → 恩師",
+      "occ": "感謝",
+      "story": "「比起答案，更要珍惜問題。」至今迷惘時，我都會想起這句話。",
+      "k": "問",
+      "rd": "wèn",
+      "m": "提問",
+      "gz": "教會我一直發問的人。"
+    },
+    {
+      "c": "work",
+      "who": "部屬 → 上司",
+      "occ": "退休",
+      "story": "我犯下大錯的那天，她說：「責任我來扛。」",
+      "k": "盾",
+      "rd": "dùn",
+      "m": "守護",
+      "gz": "總是站在我們前面的人。"
+    }
+  ]
+}
+
+export interface Angle { q: string; ex: string; k: string; r: string }
+export const ANGLES: Record<RevealLang, Angle[]> = {
+  "en": [
+    {
+      "q": "What does this person always do or say, that would mean nothing to anyone else?",
+      "ex": "Every phone call ends with ‘Did you eat?’ Twenty years, never once ‘I love you.’",
+      "k": "食",
+      "r": "The one who loves by asking if you ate."
+    },
+    {
+      "q": "When did they show up for you, without being asked?",
+      "ex": "The night I failed my exam, my brother drove two hours just to sit in the car with me.",
+      "k": "駆",
+      "r": "The one who comes running."
+    },
+    {
+      "q": "What did they make, keep or fix with their hands?",
+      "ex": "My father still keeps the wooden spoon I carved at nine. It has been in his kitchen for thirty years.",
+      "k": "守",
+      "r": "The one who keeps what matters."
+    },
+    {
+      "q": "Is there a place that feels like them?",
+      "ex": "Her balcony full of tomatoes. Every summer she sends me a photo of the first one.",
+      "k": "実",
+      "r": "The one whose care grows fruit."
+    },
+    {
+      "q": "What did they never say, but always do?",
+      "ex": "He never said he was proud. He just kept every school certificate in a folder in his drawer.",
+      "k": "黙",
+      "r": "The one who said it in silence."
+    }
+  ],
+  "ja": [
+    {
+      "q": "その人が、いつもすること・言うことは？ ほかの人には何でもないこと。",
+      "ex": "電話の最後はいつも「ごはん食べた？」。二十年、「好き」とは一度も言わない。",
+      "k": "食",
+      "r": "「食べた？」で愛を伝える人。"
+    },
+    {
+      "q": "頼んでもいないのに、駆けつけてくれた時は？",
+      "ex": "試験に落ちた夜、兄は二時間運転してきて、車の中でただ隣に座っていた。",
+      "k": "駆",
+      "r": "迷わず駆けつけてくれる人。"
+    },
+    {
+      "q": "その人が、手でつくった・残した・直したものは？",
+      "ex": "九歳のわたしが彫った木のスプーンを、父は三十年、台所に置いている。",
+      "k": "守",
+      "r": "大切なものを守りつづける人。"
+    },
+    {
+      "q": "その人らしい場所は？",
+      "ex": "トマトでいっぱいのベランダ。毎年夏、最初の一個の写真を送ってくる。",
+      "k": "実",
+      "r": "手をかけて、実らせる人。"
+    },
+    {
+      "q": "言わなかったけれど、いつもしてくれたことは？",
+      "ex": "誇らしいとは一度も言わなかった。でも引き出しには、わたしの賞状が全部とってあった。",
+      "k": "黙",
+      "r": "黙って伝える人。"
+    }
+  ],
+  "zh-Hant": [
+    {
+      "q": "這個人總是做什麼、說什麼，對別人來說卻毫無意義？",
+      "ex": "每次電話最後都是「吃飯了沒？」。二十年，一次也沒說過「我愛你」。",
+      "k": "食",
+      "r": "用「吃了沒」來愛人的人。"
+    },
+    {
+      "q": "什麼時候，他沒被拜託就出現了？",
+      "ex": "考試落榜那晚，哥哥開了兩小時車過來，只是在車裡陪我坐著。",
+      "k": "駆",
+      "r": "總會趕來的人。"
+    },
+    {
+      "q": "他親手做過、留著、修好的東西是什麼？",
+      "ex": "我九歲刻的木湯匙，爸爸在廚房放了三十年。",
+      "k": "守",
+      "r": "守著重要東西的人。"
+    },
+    {
+      "q": "有沒有一個地方，就像這個人？",
+      "ex": "她種滿番茄的陽台。每年夏天，她都會傳第一顆番茄的照片給我。",
+      "k": "実",
+      "r": "用心讓一切結果的人。"
+    },
+    {
+      "q": "他從沒說出口，卻一直在做的事？",
+      "ex": "他從沒說過以我為榮，卻把我的每張獎狀都收在抽屜的資料夾裡。",
+      "k": "黙",
+      "r": "用沉默說話的人。"
+    }
+  ]
+}
+
+/** The reference's composer placeholders (kept for the "who is it for" free-text line, if used). */
+export const PLACEHOLDERS: Record<RevealLang, { cWhoPh: string; cMomPh: string }> = {
+  "en": {
+    "cWhoPh": "My mother, my best friend, my old teacher…",
+    "cMomPh": "Start with a small detail: something they always did, said, made or never said."
+  },
+  "ja": {
+    "cWhoPh": "母、親友、恩師…",
+    "cMomPh": "小さなことから。いつもしていたこと、言っていたこと、つくったもの、言わなかったこと。"
+  },
+  "zh-Hant": {
+    "cWhoPh": "媽媽、摯友、恩師…",
+    "cMomPh": "從一個小細節開始：他總是做的事、說的話、做的東西，或從沒說出口的事。"
+  }
+}

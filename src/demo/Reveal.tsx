@@ -20,6 +20,7 @@ import { carvedGlyph, contextToPayload, isChineseUi, type Copy, type GiftContext
 //   B adds an on-demand deep explanation; C adds the physical-gift preview.
 
 const PAPER_SHADOW = 'shadow-[6px_10px_28px_rgba(0,0,0,0.45)]'
+const CARD_SHADOW = 'shadow-[0_30px_60px_-34px_rgba(31,42,68,0.35)]'
 const REVEAL_INTERVAL_MS = 1100
 
 type Props = {
@@ -42,7 +43,8 @@ function InscriptionGlyph({
   language,
   script,
   size = 'text-7xl',
-  color = 'text-ivory',
+  color = 'text-fg',
+  customerGlyph = false,
 }: {
   candidate: Candidate
   copy: Copy
@@ -50,16 +52,18 @@ function InscriptionGlyph({
   script: InscriptionScript | null
   size?: string
   color?: string
+  /** The customer site draws the character in the heavy mincho, as the Reveal design does. */
+  customerGlyph?: boolean
 }) {
   const glyph = carvedGlyph(candidate, language, script)
   const note = copy.inscriptionNote(candidate, script)
   return (
-    <div className="flex flex-col items-center">
-      <span className={`font-mincho leading-none ${size} ${color}`} data-glyph>{glyph}</span>
-      <span className="font-label mt-3 text-xs tracking-[0.25em] text-gold">
+    <div className="flex flex-col items-center text-center">
+      <span className={`font-mincho leading-none ${customerGlyph ? 'font-black' : ''} ${size} ${color}`} data-glyph>{glyph}</span>
+      <span className="font-label mt-3 text-sm tracking-wide text-accent" data-reading>
         {copy.glyphReading(candidate, glyph)}
       </span>
-      {note && <span className="font-serif-jp mt-1 text-[10px] text-ivory/40">{note}</span>}
+      {note && <span className="font-serif-jp mt-1 text-[12px] text-mute">{note}</span>}
     </div>
   )
 }
@@ -83,6 +87,8 @@ export default function Reveal({ result, story, followUps = [], condition, copy,
     }
   }, [result])
 
+  // Customers see every card complete (with its choose button); the harness opens one card at a time to measure dwell.
+  const alwaysOpen = !diagnostics
   const [revealedCount, setRevealedCount] = useState(reduceMotion ? revealOrder.length : 0)
   const [openKanji, setOpenKanji] = useState<string | null>(null)
   const [selected, setSelected] = useState<string | null>(null)
@@ -206,59 +212,70 @@ export default function Reveal({ result, story, followUps = [], condition, copy,
   }
 
   const allRevealed = revealedCount >= revealOrder.length
+  const primaryBtn = diagnostics
+    ? 'font-label rounded-full bg-seal px-10 py-4 text-sm tracking-[0.15em] text-white transition-all disabled:cursor-not-allowed disabled:opacity-40'
+    : 'btn primary'
 
   return (
     <div>
-      <p className="font-serif-jp mb-8 text-sm text-ivory/60">{copy.revealIntro}</p>
+      <p className="font-serif-jp mb-8 text-sm text-mute" data-reveal-intro>{copy.revealIntro}</p>
 
-      <div className="flex flex-col gap-6">
+      <div className="flex flex-col gap-6" role="list">
         {revealOrder.slice(0, revealedCount).map((c) => {
           const isPrimary = c.kanji === result.primary_kanji
           const isFreestyle = c.slot === 'freestyle'
           const slotLabel = isFreestyle ? copy.slotLabels.freestyle : isPrimary ? copy.slotLabels.main : copy.slotLabels.second
-          const isOpen = openKanji === c.kanji
+          const isOpen = alwaysOpen || openKanji === c.kanji
           const isSelected = selected === c.kanji
           return (
             <motion.article
               key={c.kanji}
+              role="listitem"
               initial={reduceMotion ? false : { opacity: 0, y: 28 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.9, ease: [0.16, 1, 0.3, 1] }}
               data-slot={isFreestyle ? 'freestyle' : isPrimary ? 'main' : 'second'}
-              className={`paper-texture cursor-pointer rounded-sm px-6 ${
-                isFreestyle ? 'border border-dashed border-ivory/20 bg-paper/60 py-6 opacity-90' : `bg-paper py-8 ${PAPER_SHADOW}`
-              } ${isSelected ? 'ring-2 ring-gold' : isPrimary ? 'ring-1 ring-cinnabar/60' : ''}`}
-              onClick={() => toggleOpen(c)}
+              className={`rounded-2xl px-6 ${alwaysOpen ? '' : 'cursor-pointer'} ${
+                isFreestyle
+                  ? 'border border-dashed border-accent/60 bg-transparent py-6'
+                  : `border border-line bg-surface py-8 ${diagnostics ? PAPER_SHADOW : CARD_SHADOW} ${isPrimary ? 'border-t-4 border-t-seal' : ''}`
+              } ${isSelected ? 'ring-2 ring-accent' : ''}`}
+              onClick={alwaysOpen ? undefined : () => toggleOpen(c)}
             >
               <p
                 data-slot-label
-                className={`font-label mb-4 text-[11px] tracking-[0.3em] ${isPrimary ? 'text-gold' : isFreestyle ? 'text-ivory/40' : 'text-ivory/50'}`}
+                className={`font-label mb-4 inline-block rounded-full px-3 py-1 text-[12px] tracking-[0.12em] ${
+                  isPrimary ? 'bg-seal text-white' : isFreestyle ? 'border border-dashed border-accent text-accent' : 'bg-fg/10 text-fg'
+                }`}
               >
                 {slotLabel}
               </p>
-              <div className="flex items-center gap-6">
-                <InscriptionGlyph
-                  candidate={c}
-                  copy={copy}
-                  language={language}
-                  script={script}
-                  size={isFreestyle ? 'text-5xl sm:text-6xl' : 'text-6xl sm:text-7xl'}
-                  color={isPrimary ? 'text-cinnabar' : isFreestyle ? 'text-ivory/80' : 'text-ivory'}
-                />
-                <div className="min-w-0 flex-1">
-                  <p className="font-serif-jp text-base leading-relaxed text-ivory/90">
+              <div className="flex flex-col items-center gap-6 sm:flex-row sm:items-center">
+                <div className="sm:w-44 sm:shrink-0">
+                  <InscriptionGlyph
+                    candidate={c}
+                    copy={copy}
+                    language={language}
+                    script={script}
+                    customerGlyph={!diagnostics}
+                    size={isFreestyle ? 'text-6xl' : 'text-7xl'}
+                    color={isPrimary ? 'text-seal' : isFreestyle ? 'text-mute' : 'text-fg'}
+                  />
+                </div>
+                <div className="w-full min-w-0 flex-1 text-left">
+                  <p className="font-label text-base font-semibold leading-relaxed text-fg">
                     {c.one_line_gaze}
                   </p>
-                  <p className="font-serif-jp mt-3 border-l-2 border-gold/40 pl-3 text-sm text-ivory/55" data-anchor>
+                  <p className="font-serif-jp mt-3 border-l-2 border-accent/60 pl-3 text-sm text-mute" data-anchor>
                     「{c.story_anchor}」
                   </p>
                   {c.why_this && (
-                    <p className="font-serif-jp mt-3 text-sm italic leading-relaxed text-ivory/65" data-why-this>
+                    <p className="font-serif-jp mt-3 text-sm leading-relaxed text-fg" data-why-this>
                       {c.why_this}
                     </p>
                   )}
                   {!isFreestyle && c.classical_echo && (
-                    <p className="font-serif-jp mt-3 text-xs leading-relaxed text-ivory/45" data-classical>
+                    <p className="font-serif-jp mt-3 text-xs leading-relaxed text-mute" data-classical>
                       「{c.classical_echo.text}」 — {c.classical_echo.source}
                     </p>
                   )}
@@ -268,18 +285,18 @@ export default function Reveal({ result, story, followUps = [], condition, copy,
               <AnimatePresence>
                 {isOpen && (
                   <motion.div
-                    initial={reduceMotion ? false : { opacity: 0, height: 0 }}
+                    initial={reduceMotion || alwaysOpen ? false : { opacity: 0, height: 0 }}
                     animate={{ opacity: 1, height: 'auto' }}
                     exit={{ opacity: 0, height: 0 }}
                     transition={{ duration: 0.4 }}
                     className="overflow-hidden"
                     onClick={(e) => e.stopPropagation()}
                   >
-                    <div className="mt-6 border-t border-gold/15 pt-5">
+                    <div className="mt-6 border-t border-line pt-5">
                       {!isFreestyle && (condition === 'B' || condition === 'C') && (
                         <div className="mb-5">
                           {explanations[c.kanji] ? (
-                            <p className="font-serif-jp text-sm leading-loose text-ivory/80">
+                            <p className="font-serif-jp text-sm leading-loose text-fg">
                               {explanations[c.kanji]}
                             </p>
                           ) : (
@@ -287,13 +304,13 @@ export default function Reveal({ result, story, followUps = [], condition, copy,
                               type="button"
                               onClick={() => fetchExplanation(c)}
                               disabled={explainLoading !== null}
-                              className="font-label rounded-full border border-gold/40 px-4 py-1.5 text-xs text-ivory transition-colors hover:border-gold hover:bg-gold/10 disabled:opacity-40"
+                              className="font-label rounded-full border border-accent/60 px-4 py-1.5 text-xs text-fg transition-colors hover:border-accent hover:bg-accent/10 disabled:opacity-40"
                             >
                               {explainLoading === c.kanji ? copy.explainLoading : copy.explainButton}
                             </button>
                           )}
                           {explainError && explainLoading === null && !explanations[c.kanji] && (
-                            <p className="font-label mt-2 text-xs text-cinnabar">
+                            <p className="font-label mt-2 text-xs text-seal">
                               {explainError}
                             </p>
                           )}
@@ -304,14 +321,14 @@ export default function Reveal({ result, story, followUps = [], condition, copy,
                         <button
                           type="button"
                           onClick={() => openPreview(c)}
-                          className="font-label mr-3 mb-4 rounded-full border border-gold/40 px-4 py-1.5 text-xs text-ivory transition-colors hover:border-gold hover:bg-gold/10"
+                          className="font-label mr-3 mb-4 rounded-full border border-accent/60 px-4 py-1.5 text-xs text-fg transition-colors hover:border-accent hover:bg-accent/10"
                         >
                           {copy.previewButton}
                         </button>
                       )}
 
                       {diagnostics && c.suitability_flag && (
-                        <p className="font-label mb-4 text-[11px] leading-relaxed text-gold/70">
+                        <p className="font-label mb-4 text-[11px] leading-relaxed text-accent">
                           ⚑ {c.suitability_flag}
                         </p>
                       )}
@@ -319,11 +336,13 @@ export default function Reveal({ result, story, followUps = [], condition, copy,
                       <button
                         type="button"
                         onClick={() => select(c)}
-                        className={`font-label rounded-full px-5 py-2 text-xs tracking-[0.1em] transition-all ${
-                          isSelected
-                            ? 'bg-gold text-ink'
-                            : 'border border-gold/50 text-ivory hover:bg-gold/10'
-                        }`}
+                        aria-pressed={isSelected}
+                        data-select={isFreestyle ? 'freestyle' : isPrimary ? 'main' : 'second'}
+                        className={
+                          diagnostics
+                            ? `font-label rounded-full px-5 py-2 text-xs tracking-[0.1em] transition-all ${isSelected ? 'bg-accent text-page' : 'border border-accent/60 text-fg hover:bg-accent/10'}`
+                            : `btn ${isSelected ? 'primary' : 'ghost'}`
+                        }
                       >
                         {isSelected ? copy.selectedThis : copy.selectThis}
                       </button>
@@ -337,7 +356,7 @@ export default function Reveal({ result, story, followUps = [], condition, copy,
       </div>
 
       {!allRevealed && (
-        <p className="font-label mt-8 animate-pulse text-center text-xs tracking-[0.3em] text-ivory/40">
+        <p className="font-label mt-8 animate-pulse text-center text-xs tracking-[0.3em] text-mute" aria-hidden="true">
           …
         </p>
       )}
@@ -346,24 +365,24 @@ export default function Reveal({ result, story, followUps = [], condition, copy,
         <>
           {diagnostics && eliminated.length > 0 && (
             <details className="mt-10 opacity-70">
-              <summary className="font-label cursor-pointer text-xs tracking-[0.15em] text-ivory/50">
+              <summary className="font-label cursor-pointer text-xs tracking-[0.15em] text-mute">
                 {copy.eliminatedSummary(eliminated.length)}
               </summary>
               <div className="mt-4 flex flex-col gap-3">
                 {eliminated.map((c) => (
                   <div
                     key={c.kanji}
-                    className="rounded-sm border border-ivory/10 bg-paper/40 px-4 py-3"
+                    className="rounded-sm border border-line bg-surface px-4 py-3"
                   >
                     <div className="flex items-baseline gap-3">
-                      <span className="font-mincho text-2xl text-ivory/60">
+                      <span className="font-mincho text-2xl text-mute">
                         {carvedGlyph(c, language, script)}
                       </span>
-                      <span className="font-label text-[11px] text-ivory/40">
+                      <span className="font-label text-[11px] text-mute">
                         {copy.glyphReading(c, carvedGlyph(c, language, script))}
                       </span>
                     </div>
-                    <p className="font-serif-jp mt-1 text-xs leading-relaxed text-ivory/45">
+                    <p className="font-serif-jp mt-1 text-xs leading-relaxed text-mute">
                       {c.eliminated_reason}
                     </p>
                   </div>
@@ -377,27 +396,28 @@ export default function Reveal({ result, story, followUps = [], condition, copy,
               type="button"
               onClick={finalize}
               disabled={!selected || finalized}
-              className="font-label rounded-full bg-cinnabar px-10 py-4 text-sm tracking-[0.15em] text-ivory shadow-[0_8px_30px_rgba(192,57,43,0.35)] transition-all hover:shadow-[0_8px_44px_rgba(192,57,43,0.5)] disabled:cursor-not-allowed disabled:opacity-40"
+              className={primaryBtn}
+              data-testid="finalize"
             >
               {finalized ? copy.finalized(selected ?? '') : copy.finalizeButton}
             </button>
             {!selected && (
-              <p className="font-label text-[11px] text-ivory/40">
-                {copy.chooseHint}
+              <p className="font-label text-[12px] text-mute">
+                {diagnostics ? copy.chooseHint : copy.chooseHintCustomer}
               </p>
             )}
           </div>
         </>
       )}
 
-      {/* Condition C — physical-gift preview (reuses Screen 8 material) */}
+      {/* Condition C — physical-gift preview (reuses Screen 8 material); harness only */}
       <AnimatePresence>
         {previewFor && (
           <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            className="fixed inset-0 z-50 flex items-center justify-center bg-ink/85 p-6 backdrop-blur-sm"
+            className="fixed inset-0 z-50 flex items-center justify-center bg-page/85 p-6 backdrop-blur-sm"
             onClick={() => setPreviewFor(null)}
           >
             <motion.div
@@ -408,29 +428,29 @@ export default function Reveal({ result, story, followUps = [], condition, copy,
               onClick={(e) => e.stopPropagation()}
             >
               <div
-                className={`paper-texture flex aspect-[3/4] w-full flex-col items-center justify-center rounded-sm bg-paper ${PAPER_SHADOW}`}
+                className={`paper-texture flex aspect-[3/4] w-full flex-col items-center justify-center rounded-sm bg-surface ${PAPER_SHADOW}`}
               >
-                <span className="font-mincho text-[9rem] leading-none text-cinnabar">
+                <span className="font-mincho text-[9rem] leading-none text-seal">
                   {carvedGlyph(previewFor, language, script)}
                 </span>
-                <span className="font-label mt-6 text-xs tracking-[0.35em] text-gold">
+                <span className="font-label mt-6 text-xs tracking-[0.35em] text-accent">
                   {copy.glyphReading(previewFor, carvedGlyph(previewFor, language, script))}
                 </span>
                 {copy.previewNote(previewFor, script) && (
-                  <span className="font-serif-jp mt-2 text-[10px] text-ivory/40">
+                  <span className="font-serif-jp mt-2 text-[10px] text-mute">
                     {copy.previewNote(previewFor, script)}
                   </span>
                 )}
               </div>
-              <div className="mt-4 flex aspect-video w-full items-center justify-center rounded-sm border border-gold/20 bg-paper/50">
-                <span className="font-label text-[10px] uppercase tracking-[0.3em] text-ivory/40">
+              <div className="mt-4 flex aspect-video w-full items-center justify-center rounded-sm border border-line bg-surface">
+                <span className="font-label text-[10px] uppercase tracking-[0.3em] text-mute">
                   Rubbing Ceremony — Video Coming Soon
                 </span>
               </div>
               <button
                 type="button"
                 onClick={() => setPreviewFor(null)}
-                className="font-label mt-4 rounded-full border border-ivory/30 px-5 py-2 text-xs text-ivory/70 hover:border-ivory"
+                className="font-label mt-4 rounded-full border border-fg/30 px-5 py-2 text-xs text-mute hover:border-fg"
               >
                 {copy.close}
               </button>
