@@ -129,7 +129,7 @@ What the server needs (check `<URL>/api/health` → `"orders"`; it lists what is
 
 | Setting | Where | What |
 |---|---|---|
-| Storefront token | trigger substitution `_SHOPIFY_STOREFRONT_TOKEN` (**public by design**), or the Secret Manager secret `SHOPIFY_STOREFRONT_TOKEN` that `cloudbuild.yaml` mounts — the substitution wins when both are set | Storefront API access token |
+| Storefront token | the Secret Manager secret `SHOPIFY_STOREFRONT_TOKEN` that `cloudbuild.yaml` mounts (**the secret must exist or the deploy fails** — this caused the early build failures), and optionally the trigger substitution `_SHOPIFY_STOREFRONT_TOKEN`, which wins when set. The token is the **public** Storefront token, public by design | Storefront API access token |
 | `SHOPIFY_VARIANT_SIMPLE`, `SHOPIFY_VARIANT_STANDARD` | Cloud Build **substitutions** `_SHOPIFY_VARIANT_SIMPLE`, `_SHOPIFY_VARIANT_STANDARD` (defaults in `cloudbuild.yaml`: `67789502447864` = シンプル `ICHIREI-SIMPLE`, `67789502480632` = スタンダード `ICHIREI-STANDARD`) | the Shopify variant ids of the two packages |
 | `ORDER_BUCKET` | substitution `_ORDER_BUCKET` | the Cloud Storage bucket for orders |
 
@@ -201,6 +201,26 @@ The server reads the secret **at request time** through the Secret Manager API (
 - the Admin API version is `2025-01` (`SHOPIFY_API_VERSION` to change).
 
 **Overseas shipping.** The market “海外 ICHIREI” (JPY, EMS ¥6,000) is configured in Shopify; which market a checkout falls into is decided by Shopify from the buyer's country at checkout. The site does not pass a country — test one overseas order end to end before announcing.
+
+---
+
+## Current state (as of 2026-10-25) — what is set up in GCP and Shopify
+
+Recorded from the owner's report; nothing here is a secret value. Re-check with `<URL>/api/health`.
+
+| Item | State |
+|---|---|
+| Cloud Run service | `ichirei`, project `ichirei`, `asia-northeast1`; trigger `ichirei-deploy` deploys on push to `main`; live at https://ichirei.soul-id.jp |
+| Last verified build | on commit `49f3266` (Shopify launch: new prices, certificate line, `/track`) — **succeeded** |
+| `/api/health` | `orders` **ready** (store: `gcs`), `track` **ready**, nothing missing |
+| Runtime service account | `581109768569-compute@developer.gserviceaccount.com` |
+| Secret `SHOPIFY_STOREFRONT_TOKEN` | exists, holds the **public** Storefront token; the service account has `secretAccessor` (mounted by `cloudbuild.yaml`; its absence broke earlier builds) |
+| Secret `SHOPIFY_ADMIN_CLIENT_SECRET` | exists, holds the `shpss_` **client secret** of the *ICHIREI Tracking* app (Dev Dashboard); `secretAccessor` granted to the service account; read at request time by `/track` |
+| Order bucket | private `gs://ichirei-orders-581109768569` (not `ichirei-orders` as in the example commands above); `objectAdmin` for the service account; trigger substitution `_ORDER_BUCKET` = `ichirei-orders-581109768569` |
+| Trigger substitutions | `_SHOPIFY_VARIANT_SIMPLE=67789502447864`, `_SHOPIFY_VARIANT_STANDARD=67789502480632` (defaults in `cloudbuild.yaml`), `_SHOPIFY_ADMIN_CLIENT_ID=394a8e955f7e28104f3e2089630bb3a5`, `_ORDER_BUCKET` as above |
+| Credential hygiene | A `shpat_` token that was pasted into a chat was the **Headless private token**, not the Tracking app's; it was **rotated and the old one deleted**. The Tracking app uses only the `shpss_` client secret (client-credentials grant). |
+
+**Not yet verified:** a real order lookup on `/track` (the owner will supply an order number + email), an overseas test order (market 「海外 ICHIREI」, EMS ¥6,000), and whether the Tracking app is approved for protected customer data (order email / shipping country) and limited to orders of the last 60 days (see Step 8). Order objects in the bucket hold personal data — decide a retention rule.
 
 ---
 
