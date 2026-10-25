@@ -16,7 +16,8 @@ import Anthropic from '@anthropic-ai/sdk'
 import { readFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { applyPalette, loadPalette } from './palette.ts'
+import { applyPalette, applyReviewVerdicts, loadPalette } from './palette.ts'
+import { runReview } from './review.ts'
 import {
   DEFAULT_CONTEXT,
   displayScriptOf,
@@ -212,9 +213,17 @@ export async function runEngine(
   }
 
   // Palette referee (engine/palette.ts, data in engine/palette.csv): removes hard_block
-  // candidates and refuses an anchorless context_required kanji as primary. A missing or
-  // malformed palette fails the request loudly (above), never silently skips the blocklist.
-  return applyPalette(stamped, palette, trimmed)
+  // candidates and refuses an anchorless context_required kanji as primary; promotes slot 2, or
+  // returns `insufficient` when no main candidate survives. A missing or malformed palette fails the
+  // request loudly (above), never silently skips the blocklist.
+  const refereed = applyPalette(stamped, palette, trimmed)
+  if (refereed.status !== 'sufficient') return refereed
+
+  // The separate review call (engine/review.ts): a fresh model call checks the survivors again.
+  // Its verdicts are applied by the same referee code (a failed main → slot 2; a failed or
+  // unreviewed freestyle → dropped). It never throws; it never costs the customer their result.
+  const review = await runReview(refereed, palette, trimmed, context, { apiKey: opts.apiKey, signal: opts.signal, model: process.env.ICHIREI_REVIEW_MODEL ?? MODEL })
+  return applyReviewVerdicts(refereed, palette, trimmed, review)
 }
 
 export const ENGINE_CONFIG = { MODEL, EFFORT, MAX_TOKENS }

@@ -12,7 +12,7 @@
 //   {"type":"error","error":"<message>"}                       ...terminal
 
 import { runEngine } from '../engine/engine.ts'
-import { parseContext, type Condition } from '../engine/contract.ts'
+import { STORY_MAX, countChars, parseContext, type Condition } from '../engine/contract.ts'
 
 // Full Hobby-plan ceiling (also mirrored in vercel.json).
 export const maxDuration = 60
@@ -47,6 +47,10 @@ export async function POST(req: Request): Promise<Response> {
 
   if (typeof story !== 'string' || !story.trim()) {
     return jsonResponse(400, { error: 'Missing "story" (non-empty string)' })
+  }
+  // No minimum (STEP 0 judges sufficiency by content); a hard maximum, rejected before any model call.
+  if (countChars(story) > STORY_MAX) {
+    return jsonResponse(400, { error: `"story" is longer than ${STORY_MAX} characters (got ${countChars(story)})`, code: 'story_too_long', max: STORY_MAX })
   }
   const cond: Condition = VALID_CONDITIONS.includes(condition as Condition)
     ? (condition as Condition)

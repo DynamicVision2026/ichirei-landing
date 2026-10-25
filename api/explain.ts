@@ -3,7 +3,7 @@
 // engine/explain-prompt.{ja,zh,en}.md.
 
 import type { VercelRequest, VercelResponse } from '@vercel/node'
-import { parseContext } from '../engine/contract.ts'
+import { STORY_MAX, countChars, parseContext } from '../engine/contract.ts'
 import { runExplain, type ExplainCandidate } from '../engine/explain.ts'
 
 // Full Hobby-plan ceiling (also mirrored in vercel.json).
@@ -37,6 +37,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
   if (typeof story !== 'string' || !story.trim()) {
     return res.status(400).json({ error: 'Missing "story"' })
+  }
+  if (countChars(story) > STORY_MAX) {
+    return res.status(400).json({ error: `"story" is longer than ${STORY_MAX} characters`, code: 'story_too_long', max: STORY_MAX })
   }
   if (
     !candidate ||

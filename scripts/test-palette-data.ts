@@ -8,7 +8,7 @@ import { execFileSync } from 'node:child_process'
 import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { INSCRIPTION_FITNESS, OCCASIONS, PALETTE_COLUMNS, PALETTE_ROW_STATUSES, RELATIONSHIPS, type PaletteRow } from '../engine/contract.ts'
-import { loadPalette, parseCsv } from '../engine/palette.ts'
+import { FREESTYLE_CATEGORIES, classicalEchoOf, loadPalette, parseCsv } from '../engine/palette.ts'
 
 let failures = 0
 function check(name: string, cond: boolean, detail?: string) {
@@ -111,6 +111,18 @@ for (const [lang, rows] of [['ja', ja], ['zh', zh]] as const) {
   const [rh, ...rb] = parseCsv(readFileSync(join(process.cwd(), 'review', `palette_${lang}.csv`), 'utf8'))
   check(`review/palette_${lang}.csv: the 17 palette columns + an empty reviewer_comment column, one row per ${lang} palette row`, rh.join(',') === [...PALETTE_COLUMNS, 'reviewer_comment'].join(',') && rb.length === rows.length && rb.every((r) => r.length === 18 && r[17] === '' && r[0] === lang))
 }
+
+// ---- v6: the freestyle blocklist and the classical-echo review sheets -----------------------------
+const [blh, ...blb] = parseCsv(readFileSync(join(process.cwd(), 'engine', 'freestyle-blocklist.csv'), 'utf8'))
+check('freestyle blocklist: header language,kanji,category; every entry is ONE character in a known category; no duplicates', blh.join(',') === 'language,kanji,category' && blb.every((r) => r.length === 3 && [...r[1]].length === 1 && (FREESTYLE_CATEGORIES as readonly string[]).includes(r[2]) && ['ja', 'zh'].includes(r[0])) && new Set(blb.map((r) => `${r[0]}:${r[1]}`)).size === blb.length, `${blb.length} rows`)
+check('freestyle blocklist: all nine categories are present in BOTH families (zh lists simplified and traditional forms)', FREESTYLE_CATEGORIES.every((c) => ['ja', 'zh'].every((f) => blb.some((r) => r[0] === f && r[2] === c))) && ['胖', '瘦', '穷', '窮', '蠢', '杀', '殺'].every((k) => blb.some((r) => r[0] === 'zh' && r[1] === k)))
+check('freestyle blocklist: it leaves everyday playful characters alone (遅 笑 茶 酒 食 眠 / zh 迟 笑 茶 酒)', ['遅', '笑', '茶', '酒', '食', '眠'].every((k) => !blb.some((r) => r[0] === 'ja' && r[1] === k)) && ['迟', '遲', '笑', '茶', '酒'].every((k) => !blb.some((r) => r[0] === 'zh' && r[1] === k)))
+for (const lang of ['ja', 'zh'] as const) {
+  const [eh, ...eb] = parseCsv(readFileSync(join(process.cwd(), 'review', `classical_echo_${lang}.csv`), 'utf8'))
+  const rows = palette.values().filter((r) => r.language === lang && !classicalEchoOf(r))
+  check(`review/classical_echo_${lang}.csv: one row for every ${lang} palette row with no REVIEWED classical line (all of them today), with empty text/source/comment columns for the reviewer`, eh.includes('classical_text') && eh.includes('classical_source') && eh.includes('reviewer_comment') && eb.length === rows.length && eb.every((r) => r[eh.indexOf('classical_text')] === '' && r[eh.indexOf('classical_source')] === '' && r[eh.indexOf('reviewer_comment')] === ''), `${eb.length} vs ${rows.length}`)
+}
+check('classical echo: no shipped row is reviewed yet, so no classical line is shown anywhere (the model never writes one; the code only shows reviewed lines)', palette.values().every((r) => classicalEchoOf(r) === null))
 
 console.log(failures === 0 ? '\nAll palette data checks passed.' : `\n${failures} FAILED`)
 process.exit(failures === 0 ? 0 : 1)

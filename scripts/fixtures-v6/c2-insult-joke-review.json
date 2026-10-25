@@ -1,0 +1,118 @@
+{
+  "name": "c2-insult-joke-review",
+  "story": "サークルの後輩は、いつも先輩に使い走りをさせられている。みんなで「お前は下っ端だから」と笑うのがお決まりだ。でも文化祭の前の夜、一人で残って看板を仕上げてくれたのは彼だった。",
+  "context": {
+    "language": "ja",
+    "relationship": "community",
+    "direction": "across",
+    "occasion": "school_career",
+    "occasion_detail": null
+  },
+  "model_reply": {
+    "language": "ja",
+    "relationship": "community",
+    "direction": "across",
+    "occasion": "school_career",
+    "occasion_detail": null,
+    "inscription_script": null,
+    "status": "sufficient",
+    "follow_up_question": null,
+    "particulars": [
+      "下っ端と笑う",
+      "看板を仕上げた夜"
+    ],
+    "fingerprint": {
+      "relationship_note": "先輩 → 後輩",
+      "scarce_asset": "下っ端と笑う",
+      "unsaid_truth": "",
+      "dominant_truth_type": "Turning Point",
+      "dignity_direction": "",
+      "emotional_register": [
+        "playful",
+        "bittersweet"
+      ]
+    },
+    "candidates": [
+      {
+        "slot": "main",
+        "kanji": "看",
+        "reading": "かん",
+        "inscription_form": null,
+        "truth_type": "Turning Point",
+        "one_line_gaze": "文化祭の前の夜、一人で看板を仕上げてくれた。",
+        "story_anchor": "一人で残って看板を仕上げてくれた",
+        "unique_truth": "最後まで残った背中。",
+        "eliminated": false,
+        "eliminated_reason": null,
+        "suitability_flag": null,
+        "palette_status": "ok",
+        "flags": []
+      },
+      {
+        "slot": "second",
+        "kanji": "残",
+        "reading": "のこ",
+        "inscription_form": "殘",
+        "truth_type": "Hidden Cost",
+        "one_line_gaze": "みんなが帰ったあとも、彼は残っていた。",
+        "story_anchor": "一人で残って看板を仕上げてくれた",
+        "unique_truth": "見えない場所で担った時間。",
+        "eliminated": false,
+        "eliminated_reason": null,
+        "suitability_flag": null,
+        "palette_status": "ok",
+        "flags": []
+      },
+      {
+        "slot": "freestyle",
+        "kanji": "下",
+        "reading": "した",
+        "inscription_form": null,
+        "truth_type": "Play",
+        "one_line_gaze": "みんなに「下っ端」と笑われる人。",
+        "story_anchor": "お前は下っ端だから",
+        "unique_truth": "",
+        "eliminated": false,
+        "eliminated_reason": null,
+        "suitability_flag": null,
+        "palette_status": "ok",
+        "flags": [
+          "playful_freestyle"
+        ]
+      }
+    ],
+    "primary_kanji": "看",
+    "runner_up_kanji": "残",
+    "freestyle_kanji": "下",
+    "fallback_follow_up_question": "サークルで一緒に過ごした場面をひとつ教えてください。"
+  },
+  "review_reply": {
+    "verdicts": [
+      {
+        "slot": "main",
+        "kanji": "看",
+        "pass": true,
+        "reason": "ok"
+      },
+      {
+        "slot": "second",
+        "kanji": "残",
+        "pass": true,
+        "reason": "ok"
+      },
+      {
+        "slot": "freestyle",
+        "kanji": "下",
+        "pass": false,
+        "reason": "Mocks social status: laughing AT him, not with him."
+      }
+    ]
+  },
+  "expect": {
+    "status": "sufficient",
+    "primary": "看",
+    "second": "残",
+    "freestyle": null,
+    "freestyle_reason": "review: Mocks social status: laughing AT him, not with him."
+  }
+}

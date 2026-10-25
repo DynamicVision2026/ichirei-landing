@@ -12,13 +12,17 @@ import {
   OCCASION_CODES,
   OCCASION_DETAIL_MAX,
   RELATIONSHIP_CODES,
+  STORY_COUNTER_FROM,
+  STORY_MAX as UI_STORY_MAX,
   UI_LANGUAGES,
+  clipStory,
+  storyLength,
   carvedGlyph,
   contextComplete,
   contextToPayload,
   type Copy,
 } from '../src/demo/i18n.ts'
-import { DIRECTIONS, LANGUAGES, OCCASIONS, OCCASION_DETAIL_MAX as ENGINE_DETAIL_MAX, RELATIONSHIPS, parseContext } from '../engine/contract.ts'
+import { DIRECTIONS, LANGUAGES, OCCASIONS, OCCASION_DETAIL_MAX as ENGINE_DETAIL_MAX, RELATIONSHIPS, STORY_MAX as ENGINE_STORY_MAX, parseContext } from '../engine/contract.ts'
 
 let failures = 0
 function check(name: string, cond: boolean, detail?: string) {
@@ -30,7 +34,7 @@ function check(name: string, cond: boolean, detail?: string) {
 const SAMPLE = { kanji: '灯', inscription_form: '燈', reading: 'dēng', meaning: 'lamp' }
 const CALLS: Record<string, unknown[]> = {
   processingProgress: [123], serverError: [500], timeout: [290], eliminatedSummary: [3], finalized: ['灯'],
-  glyphReading: [SAMPLE, '燈'], inscriptionNote: [SAMPLE, 'traditional'], previewNote: [SAMPLE, 'traditional'], dateNotice: [7],
+  glyphReading: [SAMPLE, '燈'], storyCounter: [1700, 2000], inscriptionNote: [SAMPLE, 'traditional'], previewNote: [SAMPLE, 'traditional'], dateNotice: [7],
 }
 function strings(c: Copy): [string, string][] {
   const out: [string, string][] = []
@@ -54,6 +58,11 @@ function strings(c: Copy): [string, string][] {
 check('i18n: language codes = contract LANGUAGES', JSON.stringify([...UI_LANGUAGES]) === JSON.stringify([...LANGUAGES]))
 check('i18n: relationship / direction / occasion codes = contract lists', JSON.stringify([...RELATIONSHIP_CODES]) === JSON.stringify([...RELATIONSHIPS]) && JSON.stringify([...DIRECTION_CODES]) === JSON.stringify([...DIRECTIONS]) && JSON.stringify([...OCCASION_CODES]) === JSON.stringify([...OCCASIONS]))
 check('i18n: occasion_detail length cap = engine cap', OCCASION_DETAIL_MAX === ENGINE_DETAIL_MAX)
+check('i18n: story cap = engine cap = 2,000; the live counter starts at 1,500', UI_STORY_MAX === ENGINE_STORY_MAX && UI_STORY_MAX === 2000 && STORY_COUNTER_FROM === 1500)
+check('i18n: clipStory cuts to 2,000 characters by code point (a paste can never exceed the limit); shorter text is untouched', storyLength(clipStory('長'.repeat(2500))) === 2000 && clipStory('短い物語') === '短い物語' && storyLength(clipStory('𠮷'.repeat(2500))) === 2000 && clipStory('', 2000) === '')
+check('v6 copy: the story hint under the box, exactly as specified in all four languages (no minimum is promised)', COPY.ja.storyHint === '50〜300字くらいで十分です' && COPY['zh-Hans'].storyHint === '50〜300字就足够' && COPY['zh-Hant'].storyHint === '50〜300字就足夠' && COPY.en.storyHint === '50–300 characters is plenty')
+check('v6 copy: the counter reads "n / 2,000" in every language; the too-long message names 2,000', UI_LANGUAGES.every((l) => COPY[l].storyCounter(1732, 2000).includes('1732') && COPY[l].storyCounter(1732, 2000).includes('2000') && /2,000/.test(COPY[l].storyTooLong)))
+check('v6 copy: card labels — ja 本命/次点/遊び字, zh 本命/次选(次選)/趣字, en Main/Second/Freestyle; the old no-primary screen copy is gone', JSON.stringify(COPY.ja.slotLabels) === JSON.stringify({ main: '本命', second: '次点', freestyle: '遊び字' }) && JSON.stringify(COPY['zh-Hans'].slotLabels) === JSON.stringify({ main: '本命', second: '次选', freestyle: '趣字' }) && JSON.stringify(COPY['zh-Hant'].slotLabels) === JSON.stringify({ main: '本命', second: '次選', freestyle: '趣字' }) && JSON.stringify(COPY.en.slotLabels) === JSON.stringify({ main: 'Main', second: 'Second', freestyle: 'Freestyle' }) && UI_LANGUAGES.every((l) => !Object.keys(COPY[l]).some((k) => k.startsWith('noPrimary'))))
 
 // ---- same shape in all four languages ---------------------------------------------------
 const shape = (c: Copy) => strings(c).map(([k]) => k).join('|')

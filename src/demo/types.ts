@@ -11,8 +11,13 @@ export type TruthType =
   | 'Hidden Cost'
   | 'Private Symbol'
   | 'Forward Blessing'
+  | 'Play'
 
 export interface Candidate {
+  /** v6: main = the primary, second = its backup, freestyle = 遊び字 (never the primary). */
+  slot: 'main' | 'second' | 'freestyle'
+  /** v6: attached by the server from a reviewed palette row; null/absent otherwise. */
+  classical_echo?: { text: string; source: string } | null
   kanji: string
   reading: string
   /** en only: the character's core meaning in English. */
@@ -35,6 +40,8 @@ export interface Fingerprint {
   unsaid_truth: string | null
   dominant_truth_type: string | null
   dignity_direction: string | null
+  /** v6: the emotion(s) the story carries (1–2 words). */
+  emotional_register?: string[] | null
 }
 
 export interface EngineResult {
@@ -51,12 +58,14 @@ export interface EngineResult {
   candidates: Candidate[]
   primary_kanji: string | null
   runner_up_kanji?: string | null
+  /** v6: the freestyle candidate's kanji, or null. */
+  freestyle_kanji?: string | null
   referee?: {
     palette_rows: number
     original_primary: string | null
     primary_changed: boolean
     no_eligible_primary: boolean
-    promoted_from: 'runner_up' | 'array_order' | null
+    promoted_from: 'second' | null
     actions: { kanji: string; action: string; detail: string }[]
   }
 }

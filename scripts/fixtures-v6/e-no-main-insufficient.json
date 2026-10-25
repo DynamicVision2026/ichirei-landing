@@ -1,0 +1,92 @@
+{
+  "name": "e-no-main-insufficient",
+  "story": "父は毎朝、駅まで私を送ってくれた。別れ際に必ず「気をつけて」と言った。",
+  "context": {
+    "language": "ja",
+    "relationship": "parent_father",
+    "direction": "up",
+    "occasion": "birthday_milestone",
+    "occasion_detail": null
+  },
+  "model_reply": {
+    "language": "ja",
+    "relationship": "parent_father",
+    "direction": "up",
+    "occasion": "birthday_milestone",
+    "occasion_detail": null,
+    "inscription_script": null,
+    "status": "sufficient",
+    "follow_up_question": null,
+    "particulars": [
+      "毎朝の見送り"
+    ],
+    "fingerprint": {
+      "relationship_note": "子 → 父",
+      "scarce_asset": "毎朝の見送り",
+      "unsaid_truth": "",
+      "dominant_truth_type": "Role",
+      "dignity_direction": "",
+      "emotional_register": [
+        "grateful"
+      ]
+    },
+    "candidates": [
+      {
+        "slot": "main",
+        "kanji": "送",
+        "reading": "おくり",
+        "inscription_form": null,
+        "truth_type": "Role",
+        "one_line_gaze": "毎朝、駅まで送ってくれた。",
+        "story_anchor": "毎朝、駅まで私を送ってくれた",
+        "unique_truth": "見送りの持続。",
+        "eliminated": false,
+        "eliminated_reason": null,
+        "suitability_flag": null,
+        "palette_status": "ok",
+        "flags": []
+      },
+      {
+        "slot": "second",
+        "kanji": "別",
+        "reading": "わかれ",
+        "inscription_form": null,
+        "truth_type": "Hidden Cost",
+        "one_line_gaze": "別れ際に、必ず気をつけてと言った。",
+        "story_anchor": "別れ際に必ず「気をつけて」と言った",
+        "unique_truth": "別れ際の一言。",
+        "eliminated": false,
+        "eliminated_reason": null,
+        "suitability_flag": null,
+        "palette_status": "ok",
+        "flags": []
+      },
+      {
+        "slot": "freestyle",
+        "kanji": "駅",
+        "reading": "えき",
+        "inscription_form": "驛",
+        "truth_type": "Play",
+        "one_line_gaze": "毎朝の改札の人。",
+        "story_anchor": "毎朝、駅まで私を送ってくれた",
+        "unique_truth": "",
+        "eliminated": false,
+        "eliminated_reason": null,
+        "suitability_flag": null,
+        "palette_status": "off_palette",
+        "flags": []
+      }
+    ],
+    "primary_kanji": "送",
+    "runner_up_kanji": "別",
+    "freestyle_kanji": "駅",
+    "fallback_follow_up_question": "お父さまと一緒に過ごした、忘れられない場面をひとつ教えてください。"
+  },
+  "review_reply": {
+    "verdicts": []
+  },
+  "expect": {
+    "status": "insufficient",
+    "follow_up": "お父さまと一緒に過ごした、忘れられない場面をひとつ教えてください。"
+  }
+}

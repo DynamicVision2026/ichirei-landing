@@ -10,6 +10,7 @@ import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import {
   DEFAULT_CONTEXT,
+  SLOTS,
   displayScriptOf,
   promptFamilyOf,
   parseContext,
@@ -29,6 +30,10 @@ export interface ExplainCandidate {
   inscription_form?: string | null
   /** en only: the character's core meaning in English (null/absent for ja and zh). */
   meaning?: string | null
+  /** v6: which slot the candidate holds (main | second | freestyle); the freestyle is explained lightly. */
+  slot?: string | null
+  /** v6: the story's emotional register as the selection step read it (1–2 words), so the explanation follows the same tone. */
+  emotional_register?: string[] | null
 }
 
 /** Slots every explain prompt must contain; the zh prompt additionally needs the script slots and the en prompt the meaning slots. */
@@ -42,6 +47,8 @@ export const EXPLAIN_SLOTS = {
   direction: '{{ DIRECTION }}',
   occasion: '{{ OCCASION }}',
   occasion_detail: '{{ OCCASION_DETAIL }}',
+  emotional_register: '{{ EMOTIONAL_REGISTER }}',
+  slot: '{{ SLOT }}',
 } as const
 export const EXPLAIN_ZH_SLOTS = {
   language: '{{ LANGUAGE }}',
@@ -57,6 +64,13 @@ export const EXPLAIN_EN_SLOTS = {
 } as const
 
 const UNSPECIFIED = 'unspecified'
+
+/** 1–2 short words from the client, flattened to one line (they sit on one line of the prompt). */
+const cleanRegister = (r: unknown): string => {
+  if (!Array.isArray(r)) return UNSPECIFIED
+  const words = r.filter((x): x is string => typeof x === 'string').map((x) => x.replace(/[^\p{L}\p{N} -]/gu, '').trim().slice(0, 30)).filter(Boolean).slice(0, 2)
+  return words.length ? words.join(', ') : UNSPECIFIED
+}
 
 export function explainPromptFileName(language: Language): string {
   return `explain-prompt.${promptFamilyOf(language)}.md`
@@ -109,6 +123,8 @@ export function fillExplainPrompt(
     [EXPLAIN_SLOTS.direction, context.direction ?? UNSPECIFIED],
     [EXPLAIN_SLOTS.occasion, context.occasion ?? UNSPECIFIED],
     [EXPLAIN_SLOTS.occasion_detail, context.occasion_detail ?? UNSPECIFIED],
+    [EXPLAIN_SLOTS.emotional_register, cleanRegister(candidate.emotional_register)],
+    [EXPLAIN_SLOTS.slot, (SLOTS as readonly string[]).includes(candidate.slot ?? '') ? (candidate.slot as string) : UNSPECIFIED],
     [EXPLAIN_ZH_SLOTS.language, context.language],
     [EXPLAIN_ZH_SLOTS.display_script, displayScriptOf(context.language) ?? UNSPECIFIED],
     [EXPLAIN_ZH_SLOTS.inscription_form, candidate.inscription_form || candidate.kanji],

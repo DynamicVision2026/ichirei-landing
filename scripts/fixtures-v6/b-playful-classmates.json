@@ -1,0 +1,121 @@
+{
+  "name": "b-playful-classmates",
+  "story": "高校の同級生のあいつは、待ち合わせにいつも三十分遅れてくる。「ごめん、電車が」が口ぐせで、電車のせいだったことは一度もない。それなのに、私が引っ越した日だけは始発で来て、荷物を全部運んでくれた。",
+  "context": {
+    "language": "ja",
+    "relationship": "friend",
+    "direction": "across",
+    "occasion": "birthday_milestone",
+    "occasion_detail": "30歳"
+  },
+  "model_reply": {
+    "language": "ja",
+    "relationship": "friend",
+    "direction": "across",
+    "occasion": "birthday_milestone",
+    "occasion_detail": "30歳",
+    "inscription_script": null,
+    "status": "sufficient",
+    "follow_up_question": null,
+    "particulars": [
+      "三十分の遅刻",
+      "始発で来て荷物を運んだ"
+    ],
+    "fingerprint": {
+      "relationship_note": "友人 → 同級生",
+      "scarce_asset": "三十分の遅刻",
+      "unsaid_truth": "",
+      "dominant_truth_type": "Turning Point",
+      "dignity_direction": "",
+      "emotional_register": [
+        "playful",
+        "grateful"
+      ]
+    },
+    "candidates": [
+      {
+        "slot": "main",
+        "kanji": "来",
+        "reading": "らい",
+        "inscription_form": "來",
+        "truth_type": "Turning Point",
+        "one_line_gaze": "引っ越しの日、いちばん早く来てくれたのはあいつだった。",
+        "story_anchor": "始発で来て、荷物を全部運んでくれた",
+        "unique_truth": "遅刻の常連が、あの日だけは誰より早く来た。",
+        "eliminated": false,
+        "eliminated_reason": null,
+        "suitability_flag": null,
+        "palette_status": "ok",
+        "flags": []
+      },
+      {
+        "slot": "second",
+        "kanji": "待",
+        "reading": "まち",
+        "inscription_form": null,
+        "truth_type": "Hidden Cost",
+        "one_line_gaze": "三十分の待ち時間を、私はいつも黙って受け取っていた。",
+        "story_anchor": "待ち合わせにいつも三十分遅れてくる",
+        "unique_truth": "待たされることを許してきた時間。",
+        "eliminated": false,
+        "eliminated_reason": null,
+        "suitability_flag": null,
+        "palette_status": "ok",
+        "flags": []
+      },
+      {
+        "slot": "freestyle",
+        "kanji": "遅",
+        "reading": "おそ",
+        "inscription_form": "遲",
+        "truth_type": "Play",
+        "one_line_gaze": "「ごめん、電車が」で三十分、いつものあいつ。",
+        "story_anchor": "待ち合わせにいつも三十分遅れてくる",
+        "unique_truth": "",
+        "eliminated": false,
+        "eliminated_reason": null,
+        "suitability_flag": null,
+        "palette_status": "ok",
+        "flags": [
+          "playful_freestyle"
+        ]
+      }
+    ],
+    "primary_kanji": "来",
+    "runner_up_kanji": "待",
+    "freestyle_kanji": "遅",
+    "fallback_follow_up_question": "高校の同級生と過ごした、いちばん忘れられない場面をひとつ教えてください。"
+  },
+  "review_reply": {
+    "verdicts": [
+      {
+        "slot": "main",
+        "kanji": "来",
+        "pass": true,
+        "reason": "Anchored in the move-day; celebratory fit."
+      },
+      {
+        "slot": "second",
+        "kanji": "待",
+        "pass": true,
+        "reason": "Dignified and anchored."
+      },
+      {
+        "slot": "freestyle",
+        "kanji": "遅",
+        "pass": true,
+        "reason": "Teasing about lateness, shared joke, no insult."
+      }
+    ]
+  },
+  "expect": {
+    "status": "sufficient",
+    "primary": "来",
+    "second": "待",
+    "freestyle": "遅",
+    "register": [
+      "playful",
+      "grateful"
+    ]
+  }
+}

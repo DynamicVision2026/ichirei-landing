@@ -1,7 +1,7 @@
 // Browser e2e against the REAL Cloud Run server: frontend served by Hono,
 // /api/select streaming through the real engine to a fake Anthropic upstream.
 // Proves the shipped bundle paints from the root base, the stream is consumed
-// (including heartbeat pings), and all six candidates render when it completes.
+// (including heartbeat pings), and all three cards render when it completes.
 //
 //   node scripts/test-server-browser.mjs
 //   CHROMIUM_PATH=/path/to/chrome E2E_SHOTS_DIR=./shots node scripts/test-server-browser.mjs
@@ -66,17 +66,16 @@ try {
   check('reveal begins once the stream completes', true)
   await page.waitForTimeout(3200)
   const survivors = await page.locator('article').count()
-  // Golden fixture: 3 surviving candidates revealed + 3 eliminated in the diagnostics fold = 6.
-  await page.click('text=見送った字')
-  const eliminated = await page.locator('details').first().locator('.font-mincho').count()
-  check('six candidates rendered (3 revealed + 3 in diagnostics)', survivors === 3 && eliminated === 3, `survivors=${survivors} eliminated=${eliminated}`)
+  // v6 golden: three cards — second 黙, freestyle 封 (it passed the fake review), main 迎 — nothing eliminated.
+  const slots = await page.locator('article').evaluateAll((els) => els.map((e) => e.getAttribute('data-slot')).join())
+  check('three cards rendered (second, freestyle, main) with the review verdicts applied', survivors === 3 && slots === 'second,freestyle,main', `survivors=${survivors} slots=${slots}`)
   check('primary 迎 resolves last, in cinnabar', (await page.locator('article').last().locator('span').first().textContent()) === '迎' &&
     (await page.locator('article').last().locator('span').first().evaluate((el) => getComputedStyle(el).color)) === 'rgb(192, 57, 43)')
   await page.screenshot({ path: `${SHOTS}/cr-reveal.png` })
 
   // Chromium intermittently (about 4 runs in 10, also on the commit before Step 3) reports
   // net::ERR_ABORTED / canceled for /api/select and the keepalive /api/log beacons at the instant a
-  // fully-read stream ends. The UI assertions above (result revealed, 6 candidates, primary in
+  // fully-read stream ends. The UI assertions above (result revealed, 3 cards, primary in
   // cinnabar) prove the stream completed, so ERR_ABORTED is informational; any OTHER failure or
   // any 4xx/5xx still fails the test.
   const aborted = failed.filter((f) => /ERR_ABORTED/.test(f))

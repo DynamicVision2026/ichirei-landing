@@ -5,7 +5,7 @@ import Elicitation from './Elicitation'
 import Reveal from './Reveal'
 import OrderForm from './OrderForm'
 import { exportEvents, log, setCondition as logSetCondition, setStory as logSetStory } from './logging'
-import { COPY, DEFAULT_GIFT_CONTEXT, contextToPayload, type Copy, type GiftContext } from './i18n'
+import { COPY, DEFAULT_GIFT_CONTEXT, STORY_COUNTER_FROM, STORY_MAX, clipStory, contextToPayload, storyLength, type Copy, type GiftContext } from './i18n'
 import { getLanguage, setLanguage } from '../lang-store'
 import { useLanguage } from '../useLanguage'
 
@@ -148,44 +148,6 @@ function CustomerShell({ children }: { children: React.ReactNode }) {
   )
 }
 
-/**
- * Shown when the palette referee removed every candidate that could be the primary
- * (primary_kanji is null): says so plainly, lists what was removed and why, and points
- * back to the story. Candidates that survived (if any) are still revealed beneath it.
- */
-function NoPrimaryNotice({ result, copy, showRemoved }: { result: EngineResult; copy: Copy; showRemoved: boolean }) {
-  const removed = result.candidates.filter((c) => c.eliminated)
-  const kept = result.candidates.filter((c) => !c.eliminated)
-  return (
-    <section
-      role="alert"
-      data-testid="no-primary"
-      className="mb-10 rounded-sm border border-gold/40 bg-paper/50 p-6"
-    >
-      <p className="font-mincho text-xl leading-relaxed text-ivory">{copy.noPrimaryTitle}</p>
-      <p className="font-serif-jp mt-3 text-sm leading-loose text-ivory/70">{copy.noPrimaryBody}</p>
-      {showRemoved && removed.length > 0 && (
-        <div className="mt-5">
-          <p className="font-label mb-2 text-[11px] tracking-[0.15em] text-gold/70">{copy.noPrimaryRemoved}</p>
-          <ul className="flex flex-col gap-1.5">
-            {removed.map((c) => (
-              <li key={c.kanji} className="font-serif-jp text-xs leading-relaxed text-ivory/60">
-                <span className="font-mincho mr-2 text-lg text-ivory/80">{c.kanji}</span>
-                {c.eliminated_reason}
-              </li>
-            ))}
-          </ul>
-        </div>
-      )}
-      {showRemoved && kept.length > 0 && (
-        <p className="font-label mt-4 text-[11px] text-ivory/45">
-          {copy.noPrimaryKept}：{kept.map((c) => c.kanji).join(' ')}
-        </p>
-      )}
-    </section>
-  )
-}
-
 export default function DemoApp({ mode = 'harness' }: { mode?: Mode } = {}) {
   const customer = mode === 'customer'
   const [phase, setPhase] = useState<Phase>('elicit')
@@ -245,7 +207,8 @@ export default function DemoApp({ mode = 'harness' }: { mode?: Mode } = {}) {
       if (!res.ok) {
         let message: string | null = null
         try {
-          message = ((await res.json()) as { error?: string })?.error ?? null
+          const body = (await res.json()) as { error?: string; code?: string }
+          message = body?.code === 'story_too_long' ? copy.storyTooLong : (body?.error ?? null)
         } catch {
           message = null
         }
@@ -314,7 +277,7 @@ export default function DemoApp({ mode = 'harness' }: { mode?: Mode } = {}) {
   const submitFollowUp = () => {
     const answer = followUpAnswer.trim()
     if (!answer) return
-    const merged = `${story}\n\n${answer}`
+    const merged = clipStory(`${story}\n\n${answer}`)
     setStory(merged)
     void runEngine(merged)
   }
@@ -412,11 +375,18 @@ export default function DemoApp({ mode = 'harness' }: { mode?: Mode } = {}) {
             </p>
             <textarea
               value={followUpAnswer}
-              onChange={(e) => setFollowUpAnswer(e.target.value)}
+              onChange={(e) => setFollowUpAnswer(clipStory(e.target.value, Math.max(0, STORY_MAX - storyLength(story) - 2)))}
+              maxLength={Math.max(0, STORY_MAX - storyLength(story) - 2)}
+              data-testid="followup-input"
               rows={5}
               placeholder={copy.followUpPlaceholder}
               className="font-serif-jp w-full resize-none rounded-sm border border-gold/25 bg-paper/60 p-4 text-base leading-loose text-ivory outline-none transition-colors placeholder:text-ivory/25 focus:border-gold"
             />
+            {storyLength(story) + 2 + storyLength(followUpAnswer) >= STORY_COUNTER_FROM && (
+              <p data-testid="story-counter" className="font-label mt-2 text-right text-[11px] text-ivory/50">
+                {copy.storyCounter(storyLength(story) + 2 + storyLength(followUpAnswer), STORY_MAX)}
+              </p>
+            )}
             <button
               type="button"
               onClick={submitFollowUp}
@@ -446,8 +416,7 @@ export default function DemoApp({ mode = 'harness' }: { mode?: Mode } = {}) {
 
         {(phase === 'reveal' || phase === 'order') && result && (
           <div hidden={phase === 'order'}>
-            {result.primary_kanji === null && <NoPrimaryNotice result={result} copy={copy} showRemoved={!customer} />}
-            {result.candidates.some((c) => !c.eliminated) && (
+            {result.primary_kanji !== null && result.candidates.some((c) => !c.eliminated) && (
               <Reveal
                 result={result}
                 story={story}

@@ -35,6 +35,14 @@ export type OccasionCode = (typeof OCCASION_CODES)[number]
 /** Longest occasion_detail the API accepts (engine/contract.ts OCCASION_DETAIL_MAX). */
 export const OCCASION_DETAIL_MAX = 60
 
+/** Longest story the API accepts (engine/contract.ts STORY_MAX) — characters as Unicode code points. No minimum. */
+export const STORY_MAX = 2000
+/** The live "n / 2,000" counter appears from this length. */
+export const STORY_COUNTER_FROM = 1500
+export const storyLength = (text: string): number => [...text].length
+/** Cut to STORY_MAX characters (code points) — a paste can never push the story over the limit. */
+export const clipStory = (text: string, max = STORY_MAX): string => (storyLength(text) <= max ? text : [...text].slice(0, max).join(''))
+
 /** The gift's context as the sender fills it in. '' = not chosen yet. */
 export interface GiftContext {
   language: UiLanguage
@@ -77,6 +85,11 @@ export interface Copy {
   voiceListening: string
   voiceUnsupported: string
   storyPlaceholder: string
+  /** Soft hint under the story box (no minimum is enforced). */
+  storyHint: string
+  /** The live counter, shown from STORY_COUNTER_FROM characters. */
+  storyCounter: (n: number, max: number) => string
+  storyTooLong: string
   anglesHeading: string
   angles: string[]
   anglePlaceholder: string
@@ -117,11 +130,8 @@ export interface Copy {
   /** Small note under the glyph about which form is carved. */
   inscriptionNote: (c: { kanji: string; inscription_form: string | null }, script: InscriptionScript | null) => string | null
   previewNote: (c: { inscription_form: string | null }, script: InscriptionScript | null) => string | null
-  // no eligible primary
-  noPrimaryTitle: string
-  noPrimaryBody: string
-  noPrimaryRemoved: string
-  noPrimaryKept: string
+  // v6: the three cards
+  slotLabels: { main: string; second: string; freestyle: string }
   // purchase (customer flow, after a character is chosen)
   order: {
     heading: string
@@ -195,6 +205,9 @@ const ja: Copy = {
   voiceListening: '聞いています… タップで停止',
   voiceUnsupported: 'このブラウザは音声入力に対応していません — 下に書いてください',
   storyPlaceholder: 'たとえば——いつも同じ場所に座って、同じ湯のみでお茶を飲んでいた……',
+  storyHint: '50〜300字くらいで十分です',
+  storyCounter: (n, max) => `${n} / ${max}字`,
+  storyTooLong: '物語は2,000字までです。少し短くして、もう一度お試しください。',
   anglesHeading: '思い出の入り口',
   angles: [
     'いつものクセ・口ぐせ',
@@ -238,11 +251,7 @@ const ja: Copy = {
   glyphReading: (c) => `${c.inscription_form ? `${c.kanji} ・ ` : ''}${c.reading}`,
   inscriptionNote: (c) => (c.inscription_form ? `古体字（現代字：${c.kanji}）` : null),
   previewNote: (c) => (c.inscription_form ? '刻印は古体字を用います' : null),
-  noPrimaryTitle: '「この一字」と呼べる字が、まだ残っていません。',
-  noPrimaryBody:
-    '見つかった字のうち、贈る場面にふさわしくない字（避けたほうがよい意味や響きを持つ字など）が取り除かれ、中心にできる字が残りませんでした。その人と過ごした小さな場面をもうひとつ書き足して、もう一度お試しください。',
-  noPrimaryRemoved: '取り除かれた字',
-  noPrimaryKept: '残った字（中心にはできません）',
+  slotLabels: { main: '本命', second: '次点', freestyle: '遊び字' },
   order: {
     heading: 'ご注文',
     chosenLabel: 'あなたが選んだ一字',
@@ -320,6 +329,9 @@ const zhHans: Copy = {
   voiceListening: '正在聆听… 点按停止',
   voiceUnsupported: '此浏览器不支持语音输入——请在下方书写',
   storyPlaceholder: '例如——总是坐在同一个位置，用同一只杯子喝茶……',
+  storyHint: '50〜300字就足够',
+  storyCounter: (n, max) => `${n} / ${max}字`,
+  storyTooLong: '故事最多 2,000 字，请稍微缩短后再试。',
   anglesHeading: '回忆的入口',
   angles: [
     '常有的习惯、口头禅',
@@ -366,11 +378,7 @@ const zhHans: Copy = {
         : `刻字：繁體（简体：${c.kanji}）`
       : null,
   previewNote: (c, script) => (c.inscription_form ? (script === 'simplified' ? '刻字使用简体字' : '刻字使用繁體字') : null),
-  noPrimaryTitle: '目前没有可以称为“这一个字”的字了。',
-  noPrimaryBody:
-    '找到的字当中，不适合这个场合的字（带有应避讳的含义或谐音等）已被排除，剩下的字里没有可以作为中心的。请再补充一个和那个人一起度过的小场景，然后再试一次。',
-  noPrimaryRemoved: '被排除的字',
-  noPrimaryKept: '留下的字（不能作为中心）',
+  slotLabels: { main: '本命', second: '次选', freestyle: '趣字' },
   order: {
     heading: '下单',
     chosenLabel: '你选定的这个字',
@@ -448,6 +456,9 @@ const zhHant: Copy = {
   voiceListening: '正在聆聽… 點按停止',
   voiceUnsupported: '此瀏覽器不支援語音輸入——請在下方書寫',
   storyPlaceholder: '例如——總是坐在同一個位置，用同一只杯子喝茶……',
+  storyHint: '50〜300字就足夠',
+  storyCounter: (n, max) => `${n} / ${max}字`,
+  storyTooLong: '故事最多 2,000 字，請稍微縮短後再試。',
   anglesHeading: '回憶的入口',
   angles: [
     '常有的習慣、口頭禪',
@@ -494,11 +505,7 @@ const zhHant: Copy = {
         : `刻字：繁體（簡體：${c.kanji}）`
       : null,
   previewNote: (c, script) => (c.inscription_form ? (script === 'simplified' ? '刻字使用簡體字' : '刻字使用繁體字') : null),
-  noPrimaryTitle: '目前沒有可以稱為「這一個字」的字了。',
-  noPrimaryBody:
-    '找到的字當中，不適合這個場合的字（帶有應避諱的含義或諧音等）已被排除，剩下的字裡沒有可以作為中心的。請再補充一個和那個人一起度過的小場景，然後再試一次。',
-  noPrimaryRemoved: '被排除的字',
-  noPrimaryKept: '留下的字（不能作為中心）',
+  slotLabels: { main: '本命', second: '次選', freestyle: '趣字' },
   order: {
     heading: '下單',
     chosenLabel: '你選定的這個字',
@@ -579,6 +586,9 @@ const en: Copy = {
   voiceListening: 'Listening… tap to stop',
   voiceUnsupported: 'This browser does not support voice input — please write below',
   storyPlaceholder: 'For example — they always sat in the same spot and drank tea from the same cup…',
+  storyHint: '50–300 characters is plenty',
+  storyCounter: (n, max) => `${n} / ${max} characters`,
+  storyTooLong: 'Stories can be up to 2,000 characters. Please shorten it a little and try again.',
   anglesHeading: 'Ways in',
   angles: [
     'A habit or a phrase they always use',
@@ -623,11 +633,7 @@ const en: Copy = {
     `${c.inscription_form && carved !== c.kanji ? `${c.kanji} · ` : ''}${c.reading}${c.meaning ? ` — ${c.meaning}` : ''}`,
   inscriptionNote: (c) => (c.inscription_form ? `Carved in the old form, kyūjitai (modern form: ${c.kanji})` : null),
   previewNote: (c) => (c.inscription_form ? 'Carved in the old form, kyūjitai' : null),
-  noPrimaryTitle: 'No character is left that can stand as “the one”.',
-  noPrimaryBody:
-    'Of the characters found, those unsuited to this occasion (for instance with an unlucky meaning or sound in Japanese) were set aside, and none that could be the centre remained. Add one more small moment you shared with them and try again.',
-  noPrimaryRemoved: 'Set aside',
-  noPrimaryKept: 'Remaining (cannot be the centre)',
+  slotLabels: { main: 'Main', second: 'Second', freestyle: 'Freestyle' },
   order: {
     heading: 'Your order',
     chosenLabel: 'The character you chose',

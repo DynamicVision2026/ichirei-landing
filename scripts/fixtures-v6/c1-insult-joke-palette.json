@@ -1,0 +1,118 @@
+{
+  "name": "c1-insult-joke-palette",
+  "story": "大学の同期の彼は、とにかくよく食べる。みんなで笑いながら「また太ったな」と言うのが挨拶になっている。でも卒論の前の徹夜の夜、黙って夜食を買ってきてくれたのも彼だった。",
+  "context": {
+    "language": "ja",
+    "relationship": "friend",
+    "direction": "across",
+    "occasion": "school_career",
+    "occasion_detail": "卒業10年"
+  },
+  "model_reply": {
+    "language": "ja",
+    "relationship": "friend",
+    "direction": "across",
+    "occasion": "school_career",
+    "occasion_detail": "卒業10年",
+    "inscription_script": null,
+    "status": "sufficient",
+    "follow_up_question": null,
+    "particulars": [
+      "また太ったな",
+      "徹夜の夜食"
+    ],
+    "fingerprint": {
+      "relationship_note": "友人 → 大学の同期",
+      "scarce_asset": "また太ったな",
+      "unsaid_truth": "",
+      "dominant_truth_type": "Turning Point",
+      "dignity_direction": "",
+      "emotional_register": [
+        "playful",
+        "grateful"
+      ]
+    },
+    "candidates": [
+      {
+        "slot": "main",
+        "kanji": "夜",
+        "reading": "よる",
+        "inscription_form": null,
+        "truth_type": "Turning Point",
+        "one_line_gaze": "徹夜の夜、黙って夜食を買ってきてくれた。",
+        "story_anchor": "黙って夜食を買ってきてくれた",
+        "unique_truth": "言わずに差し出された夜食。",
+        "eliminated": false,
+        "eliminated_reason": null,
+        "suitability_flag": null,
+        "palette_status": "ok",
+        "flags": []
+      },
+      {
+        "slot": "second",
+        "kanji": "黙",
+        "reading": "もく",
+        "inscription_form": "默",
+        "truth_type": "Hidden Cost",
+        "one_line_gaze": "何も言わずに、そこにいてくれた。",
+        "story_anchor": "黙って夜食を買ってきてくれた",
+        "unique_truth": "語らない支え。",
+        "eliminated": false,
+        "eliminated_reason": null,
+        "suitability_flag": null,
+        "palette_status": "ok",
+        "flags": []
+      },
+      {
+        "slot": "freestyle",
+        "kanji": "太",
+        "reading": "ふと",
+        "inscription_form": "太",
+        "truth_type": "Play",
+        "one_line_gaze": "みんなに「また太ったな」と言われる人。",
+        "story_anchor": "また太ったな",
+        "unique_truth": "",
+        "eliminated": false,
+        "eliminated_reason": null,
+        "suitability_flag": null,
+        "palette_status": "ok",
+        "flags": [
+          "playful_freestyle"
+        ]
+      }
+    ],
+    "primary_kanji": "夜",
+    "runner_up_kanji": "黙",
+    "freestyle_kanji": "太",
+    "fallback_follow_up_question": "大学の同期と過ごした夜の場面をひとつ教えてください。"
+  },
+  "review_reply": {
+    "verdicts": [
+      {
+        "slot": "main",
+        "kanji": "夜",
+        "pass": true,
+        "reason": "ok"
+      },
+      {
+        "slot": "second",
+        "kanji": "黙",
+        "pass": true,
+        "reason": "ok"
+      },
+      {
+        "slot": "freestyle",
+        "kanji": "太",
+        "pass": true,
+        "reason": "the (broken) reviewer waved it through"
+      }
+    ]
+  },
+  "expect": {
+    "status": "sufficient",
+    "primary": "夜",
+    "second": "黙",
+    "freestyle": null,
+    "freestyle_reason": "palette: freestyle_blocked (weight)"
+  }
+}

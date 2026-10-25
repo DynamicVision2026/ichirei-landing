@@ -7,8 +7,11 @@ import { carvedGlyph, contextToPayload, isChineseUi, type Copy, type GiftContext
 // Progressive reveal (build spec §8) + condition presentation (§5) + the
 // behavioral instrumentation that makes this an experiment (§6).
 //
-// - Candidates surface one at a time (discovery, not menu); the cinnabar
-//   primary resolves last.
+// - v6: at most three cards — the MAIN candidate (本命, the cinnabar primary, resolves last), the
+//   SECOND (次点) and the FREESTYLE (遊び字: lighter, dashed, never cinnabar, no deep explanation).
+//   Each main card shows three layers: the story anchor in quotes, the one-line gaze, and — only when
+//   the server attached one from a reviewed palette row — a classical line with its source.
+// - Candidates surface one at a time (discovery, not menu).
 // - Inscription rule: the carved glyph is `inscription_form` when one exists (ja: kyūjitai;
 //   zh: traditional — unless the sender chose a simplified inscription), ALWAYS paired
 //   with the other form and the reading — never alone.
@@ -68,9 +71,11 @@ export default function Reveal({ result, story, condition, copy, context, diagno
   const { revealOrder, eliminated } = useMemo(() => {
     const alive = result.candidates.filter((c) => !c.eliminated)
     const primary = alive.find((c) => c.kanji === result.primary_kanji)
-    const rest = alive.filter((c) => c.kanji !== result.primary_kanji)
+    const freestyle = alive.find((c) => c.slot === 'freestyle')
+    const rest = alive.filter((c) => c.kanji !== result.primary_kanji && c.slot !== 'freestyle')
+    // second → freestyle → main last.
     return {
-      revealOrder: primary ? [...rest, primary] : rest,
+      revealOrder: [...rest, ...(freestyle ? [freestyle] : []), ...(primary ? [primary] : [])],
       eliminated: result.candidates.filter((c) => c.eliminated),
     }
   }, [result])
@@ -177,6 +182,8 @@ export default function Reveal({ result, story, condition, copy, context, diagno
             meaning: c.meaning ?? null,
             one_line_gaze: c.one_line_gaze,
             story_anchor: c.story_anchor,
+            slot: c.slot,
+            emotional_register: result.fingerprint?.emotional_register ?? null,
           },
           // v5: the same context the engine ran with, so the explanation matches language and occasion.
           ...contextToPayload({ ...context, language }),
@@ -201,6 +208,8 @@ export default function Reveal({ result, story, condition, copy, context, diagno
       <div className="flex flex-col gap-6">
         {revealOrder.slice(0, revealedCount).map((c) => {
           const isPrimary = c.kanji === result.primary_kanji
+          const isFreestyle = c.slot === 'freestyle'
+          const slotLabel = isFreestyle ? copy.slotLabels.freestyle : isPrimary ? copy.slotLabels.main : copy.slotLabels.second
           const isOpen = openKanji === c.kanji
           const isSelected = selected === c.kanji
           return (
@@ -209,31 +218,39 @@ export default function Reveal({ result, story, condition, copy, context, diagno
               initial={reduceMotion ? false : { opacity: 0, y: 28 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.9, ease: [0.16, 1, 0.3, 1] }}
-              className={`paper-texture cursor-pointer rounded-sm bg-paper px-6 py-8 ${PAPER_SHADOW} ${
-                isSelected
-                  ? 'ring-2 ring-gold'
-                  : isPrimary
-                    ? 'ring-1 ring-cinnabar/60'
-                    : ''
-              }`}
+              data-slot={isFreestyle ? 'freestyle' : isPrimary ? 'main' : 'second'}
+              className={`paper-texture cursor-pointer rounded-sm px-6 ${
+                isFreestyle ? 'border border-dashed border-ivory/20 bg-paper/60 py-6 opacity-90' : `bg-paper py-8 ${PAPER_SHADOW}`
+              } ${isSelected ? 'ring-2 ring-gold' : isPrimary ? 'ring-1 ring-cinnabar/60' : ''}`}
               onClick={() => toggleOpen(c)}
             >
+              <p
+                data-slot-label
+                className={`font-label mb-4 text-[11px] tracking-[0.3em] ${isPrimary ? 'text-gold' : isFreestyle ? 'text-ivory/40' : 'text-ivory/50'}`}
+              >
+                {slotLabel}
+              </p>
               <div className="flex items-center gap-6">
                 <InscriptionGlyph
                   candidate={c}
                   copy={copy}
                   language={language}
                   script={script}
-                  size="text-6xl sm:text-7xl"
-                  color={isPrimary ? 'text-cinnabar' : 'text-ivory'}
+                  size={isFreestyle ? 'text-5xl sm:text-6xl' : 'text-6xl sm:text-7xl'}
+                  color={isPrimary ? 'text-cinnabar' : isFreestyle ? 'text-ivory/80' : 'text-ivory'}
                 />
                 <div className="min-w-0 flex-1">
                   <p className="font-serif-jp text-base leading-relaxed text-ivory/90">
                     {c.one_line_gaze}
                   </p>
-                  <p className="font-serif-jp mt-3 border-l-2 border-gold/40 pl-3 text-sm text-ivory/55">
+                  <p className="font-serif-jp mt-3 border-l-2 border-gold/40 pl-3 text-sm text-ivory/55" data-anchor>
                     「{c.story_anchor}」
                   </p>
+                  {!isFreestyle && c.classical_echo && (
+                    <p className="font-serif-jp mt-3 text-xs leading-relaxed text-ivory/45" data-classical>
+                      「{c.classical_echo.text}」 — {c.classical_echo.source}
+                    </p>
+                  )}
                 </div>
               </div>
 
@@ -248,7 +265,7 @@ export default function Reveal({ result, story, condition, copy, context, diagno
                     onClick={(e) => e.stopPropagation()}
                   >
                     <div className="mt-6 border-t border-gold/15 pt-5">
-                      {(condition === 'B' || condition === 'C') && (
+                      {!isFreestyle && (condition === 'B' || condition === 'C') && (
                         <div className="mb-5">
                           {explanations[c.kanji] ? (
                             <p className="font-serif-jp text-sm leading-loose text-ivory/80">

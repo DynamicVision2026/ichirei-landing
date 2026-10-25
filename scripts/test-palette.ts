@@ -92,13 +92,19 @@ delete process.env.ICHIREI_PALETTE_PATH
 const clone = <T,>(x: T): T => JSON.parse(JSON.stringify(x))
 function cand(kanji: string, over: Partial<Candidate> = {}): Candidate {
   return {
-    kanji, reading: 'よみ', inscription_form: null, truth_type: 'Essence', one_line_gaze: 'g', story_anchor: '駅まで迎えに来て',
+    slot: 'main', kanji, reading: 'よみ', inscription_form: null, truth_type: 'Essence', one_line_gaze: 'g', story_anchor: '駅まで迎えに来て',
     unique_truth: 'u', eliminated: false, eliminated_reason: null, suitability_flag: null, palette_status: 'ok', flags: [], ...over,
   } as Candidate
 }
+/**
+ * A raw model result from a list of candidates. Slots are assigned unless a candidate is a freestyle: the one named
+ * by `runner_up_kanji` (default: the first non-primary candidate) is `second`; every other candidate is an inert extra
+ * `main` — the referee only ever looks at the primary and the second slot.
+ */
 function raw(candidates: Candidate[], primary: string | null, over: Partial<EngineResult> = {}): EngineResult {
-  // runner_up_kanji defaults to null here (the golden fixture's 黙 would otherwise leak into every case).
-  return { ...clone(GOLDEN), runner_up_kanji: null, candidates, primary_kanji: primary, ...over } as EngineResult
+  const runnerUp = over.runner_up_kanji !== undefined ? over.runner_up_kanji : (candidates.find((c) => c.kanji !== primary && c.slot !== 'freestyle')?.kanji ?? null)
+  const slotted = candidates.map((c) => (c.slot === 'freestyle' ? c : { ...c, slot: c.kanji === runnerUp && c.kanji !== primary ? ('second' as const) : ('main' as const) }))
+  return { ...clone(GOLDEN), runner_up_kanji: runnerUp, freestyle_kanji: null, candidates: slotted, primary_kanji: primary, ...over } as EngineResult
 }
 const kanjis = (r: EngineResult) => r.candidates.map((c) => c.kanji).join('')
 const get = (r: EngineResult, k: string) => r.candidates.find((c) => c.kanji === k)!
@@ -132,22 +138,24 @@ const zh = run(raw([cand('送'), cand('灯')], '灯', { language: 'zh-Hant' }))
 check('hard_block: language-scoped — the ja hard_block on 送 does not eliminate it in a zh result (the zh row is context_required)', get(zh, '送').eliminated === false && get(zh, '送').palette_status === 'context_required' && zh.referee?.actions.length === 0)
 
 // ---------------------------------------------------------------------------
-// 5. Promotion when the primary is removed.
+// 5. Promotion when the primary is removed: slot 2 (`second`) — nothing else, never the freestyle.
 // ---------------------------------------------------------------------------
-const removed = run(raw([cand('黙'), cand('送'), cand('灯')], '送'))
-check('promote: hard-blocked primary → the next surviving candidate in order becomes primary', removed.primary_kanji === '灯' && removed.referee?.primary_changed === true && removed.referee.original_primary === '送', String(removed.primary_kanji))
-check('promote: the result still validates (primary is among the non-eliminated candidates)', validateEngineResult({ ...removed, candidates: removed.candidates }).filter((p) => p.includes('primary')).length === 0)
-
-const wrap = run(raw([cand('黙'), cand('灯'), cand('送')], '送'))
-check('promote: when the blocked primary is last, search wraps to the start', wrap.primary_kanji === '黙')
-
-const skipping = run(raw([cand('送'), cand('愛', { eliminated: true, eliminated_reason: 'g1' }), cand('終'), cand('菊', { flags: ['no_heart_anchor'] }), cand('迎', { story_anchor: '' }), cand('灯')], '送'))
-check('promote: skips eliminated, hard_block, no_heart_anchor and anchorless context_required candidates', skipping.primary_kanji === '灯', String(skipping.primary_kanji))
-check('promote: an anchorless context_required kanji skipped as a target is flagged palette_anchor_missing and stays alive', get(skipping, '迎').eliminated === false && get(skipping, '迎').flags.includes('palette_anchor_missing'))
-
-const none = run(raw([cand('送'), cand('終'), cand('迎', { story_anchor: '' })], '送', { runner_up_kanji: '迎' }))
-check('promote: nothing eligible → primary_kanji null + referee.no_eligible_primary', none.primary_kanji === null && none.referee?.no_eligible_primary === true)
-check('promote: a result with no eligible primary is accepted by the contract validator', validateEngineResult(none).filter((p) => p.includes('primary')).length === 0, validateEngineResult(none).join('; '))
+const removed = run(raw([cand('黙'), cand('送'), cand('灯')], '送', { runner_up_kanji: '黙' }))
+check('promote: hard-blocked primary → the SECOND slot (黙) becomes primary, promoted_from "second"', removed.primary_kanji === '黙' && removed.referee?.primary_changed === true && removed.referee.original_primary === '送' && removed.referee.promoted_from === 'second')
+check('promote: the result still validates its primary (a live candidate, not the freestyle)', validateEngineResult({ ...removed, candidates: removed.candidates }).filter((p) => p.includes('primary')).length === 0)
+const notNext = run(raw([cand('黙'), cand('送'), cand('灯')], '送', { runner_up_kanji: '灯' }))
+check('promote: slot 2 is used even when another candidate comes first in array order (order is irrelevant now)', notNext.primary_kanji === '灯')
+const skipping = run(raw([cand('送'), cand('愛', { eliminated: true, eliminated_reason: 'g1' }), cand('終'), cand('菊', { flags: ['no_heart_anchor'] }), cand('迎', { story_anchor: '' }), cand('灯')], '送', { runner_up_kanji: '灯' }))
+check('promote: the second slot is promoted even though other candidates were eliminated, blocked, unanchored or anchorless', skipping.primary_kanji === '灯', String(skipping.primary_kanji))
+const noBackup = run(raw([cand('黙'), cand('送'), cand('灯')], '送', { runner_up_kanji: null }))
+check('promote: no second slot (or none eligible) → NOT array order any more: the result becomes insufficient', noBackup.status === 'insufficient' && noBackup.primary_kanji === null && noBackup.referee?.no_eligible_primary === true)
+const secondBlocked = run(raw([cand('黙'), cand('送'), cand('終')], '送', { runner_up_kanji: '終' }))
+check('promote: a hard-blocked second slot cannot be promoted → insufficient', secondBlocked.status === 'insufficient')
+const secondAnchorless = run(raw([cand('送'), cand('迎', { story_anchor: '' })], '送', { runner_up_kanji: '迎' }))
+check('promote: an anchorless context_required second slot is skipped (and flagged) → insufficient', secondAnchorless.status === 'insufficient' && secondAnchorless.referee?.actions.some((a) => a.kanji === '迎' && a.action === 'primary_refused_no_anchor') === true)
+check('promote: an insufficient-by-referee result carries the model\'s fallback question, no candidates and no primary, and validates', secondBlocked.follow_up_question === GOLDEN.fallback_follow_up_question && secondBlocked.candidates.length === 0 && secondBlocked.freestyle_kanji === null && validateEngineResult(secondBlocked).length === 0, validateEngineResult(secondBlocked).join('; '))
+const withFree = run(raw([cand('送'), cand('終'), cand('遅', { slot: 'freestyle', truth_type: 'Play', story_anchor: '駅まで送ってくれて' })], '送', { runner_up_kanji: '終' }))
+check('promote: the FREESTYLE is never promoted — with both main slots gone the result is insufficient even though a freestyle survived', withFree.status === 'insufficient' && withFree.primary_kanji === null && withFree.freestyle_kanji === null)
 
 // ---------------------------------------------------------------------------
 // 4b. Draft (unreviewed) `ok` rows do not vouch; reviewed ones do. Cautious rows always apply.
@@ -162,29 +170,17 @@ const shipped = applyPalette(raw([cand('愛', { palette_status: 'off_palette' })
 check('shipped draft palette: no draft ok row overwrites the model (nothing is reviewed yet)', get(shipped, '愛').palette_status === 'off_palette' && shipped.referee?.actions.length === 0)
 
 // ---------------------------------------------------------------------------
-// 5b. runner_up_kanji drives promotion; array order is only the fallback.
+// 5b. The runner-up that ships is the second slot, while it is still a valid backup.
 // ---------------------------------------------------------------------------
 const ru1 = run(raw([cand('黙'), cand('送'), cand('灯'), cand('駅')], '送', { runner_up_kanji: '駅' }))
-check('runner-up: a removed primary is replaced by the model\'s runner_up_kanji, NOT the next in array order', ru1.primary_kanji === '駅' && ru1.referee?.promoted_from === 'runner_up', String(ru1.primary_kanji))
+check('runner-up: a removed primary is replaced by the second slot (駅), NOT by another candidate', ru1.primary_kanji === '駅' && ru1.referee?.promoted_from === 'second')
 check('runner-up: once promoted it is consumed (runner_up_kanji becomes null)', ru1.runner_up_kanji === null)
 const ru2 = run(raw([cand('黙'), cand('餞', { story_anchor: '毎朝お弁当を作った' }), cand('灯'), cand('駅')], '餞', { runner_up_kanji: '駅' }))
-check('runner-up: an anchorless context_required primary is replaced by the runner-up too', ru2.primary_kanji === '駅' && ru2.referee?.promoted_from === 'runner_up')
-const ru3 = run(raw([cand('黙'), cand('送'), cand('灯'), cand('終')], '送', { runner_up_kanji: '終' }))
-check('runner-up: a hard-blocked runner-up is not used — falls back to array order', ru3.primary_kanji === '灯' && ru3.referee?.promoted_from === 'array_order' && ru3.runner_up_kanji === null)
-const ru4 = run(raw([cand('黙'), cand('送'), cand('灯'), cand('駅', { eliminated: true, eliminated_reason: 'g' })], '送', { runner_up_kanji: '駅' }))
-check('runner-up: an eliminated runner-up is not used — falls back to array order', ru4.primary_kanji === '灯' && ru4.referee?.promoted_from === 'array_order')
-const ru5 = run(raw([cand('黙'), cand('送'), cand('灯')], '送', { runner_up_kanji: null }))
-check('runner-up: runner_up_kanji null → array order fallback', ru5.primary_kanji === '灯' && ru5.referee?.promoted_from === 'array_order')
-const ru6in = raw([cand('黙'), cand('送'), cand('灯')], '送')
-delete (ru6in as Partial<EngineResult>).runner_up_kanji
-const ru6 = run(ru6in)
-check('runner-up: field MISSING from the model answer → array-order fallback, and the field stays missing so the gap is visible', ru6.primary_kanji === '灯' && !('runner_up_kanji' in ru6))
-const ru7 = run(raw([cand('黙'), cand('送'), cand('灯'), cand('駅')], '送', { runner_up_kanji: '送' }))
-check('runner-up: a runner-up equal to the removed primary is ignored', ru7.primary_kanji === '灯')
-const ru8 = run(raw([cand('黙'), cand('灯'), cand('駅')], '黙', { runner_up_kanji: '灯' }))
-check('runner-up: primary untouched → runner-up kept as is, promoted_from null', ru8.primary_kanji === '黙' && ru8.runner_up_kanji === '灯' && ru8.referee?.promoted_from === null)
-const ru9 = run(raw([cand('黙'), cand('病'), cand('灯')], '黙', { runner_up_kanji: '病' }))
-check('runner-up: a runner-up the palette blocks is cleared even when the primary stands', ru9.primary_kanji === '黙' && ru9.runner_up_kanji === null)
+check('runner-up: an anchorless context_required primary is replaced by the second slot too', ru2.primary_kanji === '駅' && ru2.referee?.promoted_from === 'second')
+const ru3 = run(raw([cand('黙'), cand('灯'), cand('終')], '黙', { runner_up_kanji: '終' }))
+check('runner-up: a hard-blocked second slot is cleared (runner_up_kanji null) even though the primary stands', ru3.primary_kanji === '黙' && ru3.runner_up_kanji === null)
+const ru4 = run(raw([cand('黙'), cand('灯'), cand('駅')], '黙', { runner_up_kanji: '駅' }))
+check('runner-up: a valid second slot is kept as the backup', ru4.runner_up_kanji === '駅' && ru4.primary_kanji === '黙')
 
 // ---------------------------------------------------------------------------
 // 5b2. blocked_occasions: a row listing THIS order's occasion is removed from the candidates.
@@ -206,13 +202,13 @@ check('blocked_occasion: a candidate the model already eliminated keeps the mode
 const hbo = at('wedding', [cand('黙'), cand('送')], '黙')
 check('blocked_occasion: a hard_block row stays a plain hard_block (reason palette: hard_block)', get(hbo, '送').eliminated_reason === 'palette: hard_block' && hbo.referee?.actions.length === 1 && hbo.referee.actions[0].action === 'hard_block_eliminated')
 const bp = at('new_baby', [cand('寿'), cand('黙'), cand('灯')], '寿', { runner_up_kanji: '灯' })
-check('blocked_occasion: a blocked PRIMARY is replaced by the model\'s runner-up', bp.primary_kanji === '灯' && bp.referee?.original_primary === '寿' && bp.referee.promoted_from === 'runner_up')
-const bp2 = at('new_baby', [cand('寿'), cand('黙'), cand('灯')], '寿')
-check('blocked_occasion: …or by array order when there is no usable runner-up', bp2.primary_kanji === '黙' && bp2.referee?.promoted_from === 'array_order')
+check('blocked_occasion: a blocked PRIMARY is replaced by the second slot', bp.primary_kanji === '灯' && bp.referee?.original_primary === '寿' && bp.referee.promoted_from === 'second')
+const bp2 = at('new_baby', [cand('寿'), cand('黙'), cand('灯')], '寿', { runner_up_kanji: null })
+check('blocked_occasion: …and with no second slot the result is insufficient (no array-order fallback)', bp2.status === 'insufficient' && bp2.follow_up_question === GOLDEN.fallback_follow_up_question)
 const br = at('new_baby', [cand('黙'), cand('寿'), cand('灯')], '黙', { runner_up_kanji: '寿' })
 check('blocked_occasion: a runner-up blocked at this occasion is cleared even though the primary stands', br.primary_kanji === '黙' && br.runner_up_kanji === null)
 const bn = at('new_baby', [cand('寿')], '寿')
-check('blocked_occasion: if the blocked one was the only candidate, no eligible primary remains', bn.primary_kanji === null && bn.referee?.no_eligible_primary === true)
+check('blocked_occasion: if the blocked one was the only candidate, nothing eligible remains → insufficient', bn.status === 'insufficient' && bn.primary_kanji === null && bn.referee?.no_eligible_primary === true)
 const shippedNb = applyPalette(raw([cand('黙'), cand('寿'), cand('娃'), cand('饯')], '黙', { occasion: 'new_baby', language: 'zh-Hant' }), palette, STORY)
 check('blocked_occasion (shipped palette, zh new_baby): 寿 is removed; 娃 (baby) is kept', get(shippedNb, '寿').eliminated === true && get(shippedNb, '娃').eliminated === false)
 const shippedRf = applyPalette(raw([cand('黙'), cand('餞', { story_anchor: '駅まで送ってくれて' }), cand('夕')], '餞', { occasion: 'retirement_farewell' }), palette, STORY)
@@ -246,7 +242,7 @@ check('ja rows do not leak into a zh result (迎 anchor rule is ja only)', zhNoJ
 // 6. Rule 2: a context_required kanji is primary only with its anchor line.
 // ---------------------------------------------------------------------------
 const noAnchor = run(raw([cand('黙'), cand('餞', { story_anchor: '' }), cand('灯')], '餞'))
-check('anchor: 餞 primary with an empty story_anchor is refused → next survivor promoted', noAnchor.primary_kanji === '灯' && noAnchor.referee?.primary_changed === true)
+check('anchor: 餞 primary with an empty story_anchor is refused → the second slot (黙) is promoted', noAnchor.primary_kanji === '黙' && noAnchor.referee?.primary_changed === true)
 check('anchor: the refused 餞 is NOT eliminated (it only loses primary) and is flagged palette_anchor_missing', get(noAnchor, '餞').eliminated === false && get(noAnchor, '餞').flags.includes('palette_anchor_missing') && noAnchor.referee?.actions.some((a) => a.kanji === '餞' && a.action === 'primary_refused_no_anchor') === true)
 check('anchor: 餞 keeps its palette verdict (context_required) and the row\'s register flag', get(noAnchor, '餞').palette_status === 'context_required' && get(noAnchor, '餞').flags.includes('farewell_register'))
 
@@ -284,9 +280,8 @@ check('empty palette: nothing is blocked, the model\'s primary stands (referee i
 // ---------------------------------------------------------------------------
 const golden = run(clone(GOLDEN))
 check('golden: 迎 stays primary (its anchor 盆に帰るたびに車で駅まで迎えに来て is verbatim in the story)', golden.primary_kanji === '迎' && golden.referee?.primary_changed === false)
-check('golden: 送 stays eliminated with the MODEL\'s reason; 迎 is context_required', get(golden, '送').eliminated_reason?.startsWith('ゲート3') === true && get(golden, '迎').palette_status === 'context_required')
-check('golden: runner-up 黙 is kept', golden.runner_up_kanji === '黙')
-check('golden: the refereed fixture still conforms to the contract', validateEngineResult(golden).length === 0, validateEngineResult(golden).join('; '))
+check('golden: 迎 is context_required (from the palette); 黙 is the second slot and the runner-up; the freestyle 封 survives its own rules (verbatim anchor, no blocklist hit)', get(golden, '迎').palette_status === 'context_required' && golden.runner_up_kanji === '黙' && golden.freestyle_kanji === '封' && !get(golden, '封').eliminated)
+check('golden: the refereed fixture still conforms to the v6 contract', validateEngineResult(golden).length === 0, validateEngineResult(golden).join('; '))
 
 // The reported first real run: 送 alive, 餞 primary.
 const live = run(raw([cand('黙'), cand('駅'), cand('送'), cand('餞', { story_anchor: '' }), cand('灯')], '餞', { runner_up_kanji: '灯' }))
@@ -296,9 +291,9 @@ check('regression (first live run): 送 is now eliminated by the palette, and an
 // 9. en uses the JA palette rows and taboo rules (the character is Japanese, carved in Japan).
 // ---------------------------------------------------------------------------
 const enRaw = (candidates: Candidate[], primary: string | null, over: Partial<EngineResult> = {}) => raw(candidates, primary, { language: 'en', inscription_script: null, ...over })
-const enHard = run(enRaw([cand('黙'), cand('送'), cand('灯')], '送'))
+const enHard = run(enRaw([cand('黙'), cand('送'), cand('灯')], '送', { runner_up_kanji: '灯' }))
 check('en: every ja hard_block kanji is eliminated for an English result too (same rows, same reason)', HARD.every((k) => { const c = get(run(enRaw([cand('黙'), cand(k)], '黙')), k); return c.eliminated === true && c.eliminated_reason === HARD_BLOCK_REASON && c.palette_status === 'off_palette' }))
-check('en: a removed primary is promoted exactly as for ja', enHard.primary_kanji === '灯' && enHard.referee?.primary_changed === true && enHard.referee.promoted_from === 'array_order')
+check('en: a removed primary is promoted exactly as for ja', enHard.primary_kanji === '灯' && enHard.referee?.primary_changed === true && enHard.referee.promoted_from === 'second')
 const enZhRow = run(enRaw([cand('送'), cand('灯')], '灯'))
 check('en: 送 is hard_block (the ja row), not context_required (the zh row)', get(enZhRow, '送').eliminated === true && get(enZhRow, '送').eliminated_reason === HARD_BLOCK_REASON)
 const enAnchor = run(enRaw([cand('黙'), cand('餞', { story_anchor: 'a fragment not in the story' }), cand('灯')], '餞', { runner_up_kanji: '黙' }))

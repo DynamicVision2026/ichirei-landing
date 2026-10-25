@@ -224,6 +224,16 @@ Recorded from the owner's report; nothing here is a secret value. Re-check with 
 
 ---
 
+## Engine v6 — what changed for operations (2026-10-25)
+
+- **Two model calls per run.** The selection call (as before), then a short **review call** (`engine/review-prompt.md`, effort `low`, ≤ 1,500 output tokens). Cost and latency go up a little; set `ICHIREI_REVIEW_MODEL` to a cheaper model if you like. `ICHIREI_REVIEW=off` skips it — but then the **freestyle (遊び字) is never shown** (it ships only after a PASS). The review's verdicts appear in the Cloud Run log as one `[ichirei-review] {…}` line each (slot, kanji, pass, reason; never the story).
+- **Three cards, not six.** Main (本命, cinnabar), Second (次点) and an optional Freestyle (遊び字). If neither main survives the palette referee and the review, the customer is asked the model's own fallback question (`insufficient`) — the freestyle is never promoted.
+- **Classical lines** appear only for palette rows that a named reviewer has signed (`reviewed_by` filled in), in the cell format `text — source` (space, em dash, space). **Nothing is shown today** (every row is `draft-unreviewed`). The review sheets for reviewers are `review/classical_echo_ja.csv` and `review/classical_echo_zh.csv` (regenerate with `node scripts/export-review.mjs`).
+- **`REQUIRE_CLASSICAL_ECHO`** (environment variable, **off** by default): when `1`, a main candidate without a reviewed classical line is not eligible. Switch it on only after the palette is reviewed, or most orders will come back `insufficient`. Add it with `gcloud run services update ichirei --region asia-northeast1 --update-env-vars REQUIRE_CLASSICAL_ECHO=1` (it will survive deploys; `cloudbuild.yaml` uses `--update-env-vars`).
+- **Story length:** no minimum; **2,000 characters** is the hard maximum on `/api/select`, `/api/explain` and the order endpoint (it was 10,000 on the order endpoint). Longer → `400 { code: "story_too_long", max: 2000 }` before any model call.
+
+---
+
 ## Editing the engine prompt
 
 `engine/prompt.ja.md`, `engine/prompt.zh.md` and `engine/prompt.en.md` (and `engine/explain-prompt.ja.md` / `.zh.md` / `.en.md`) are plain text read at request time. Edit → commit → push to the trigger's branch → Cloud Build rebuilds and redeploys automatically (~4–6 min). No code changes. (Editing on github.com in the browser works fine.)

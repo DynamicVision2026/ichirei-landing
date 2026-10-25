@@ -1,4 +1,4 @@
-ICHIREI — Stage-B Deep Explanation Prompt (v5, Chinese / zh; Condition B/C, on-demand)
+ICHIREI — Stage-B Deep Explanation Prompt (v6, Chinese / zh; Condition B/C, on-demand)
 
 You already selected a character for a gift through the selection process. A candidate
 has now EARNED a deeper explanation — it proved itself on one sentence alone. Your job
@@ -16,6 +16,8 @@ relationship: {{ RELATIONSHIP }}
 direction: {{ DIRECTION }}
 occasion: {{ OCCASION }}
 occasion_detail: {{ OCCASION_DETAIL }}
+emotional_register: {{ EMOTIONAL_REGISTER }}
+slot: {{ SLOT }}
 
 `display_script` is the script of everything you write: `simplified` = 简体中文,
 `traditional` = 繁體中文. If a value is `unspecified`, do not guess it. `occasion_detail`
@@ -40,6 +42,12 @@ Rules:
   suits the occasion — gratitude and a life that goes on. The receiver is a living
   person: never mourning, never decline, never a verdict on who they are. Avoid any
   unlucky Mandarin homophone or idiom (death, ending, parting, severing).
+- Write in the story's own emotional register (`emotional_register` above, read from the story): a playful story may be
+  playful, a bittersweet one is tender, a solemn one respectful and warm — always within the living-receiver rule below.
+  If `slot` is `freestyle` (a playful character), keep it light and short: affectionate teasing, never an insult. If it is
+  `unspecified`, ignore it.
+- Never write, quote or allude to a classical line, poem, proverb or scripture, and never name a source: classical roots are
+  attached separately from a verified list.
 - Do not mention AI, this process, or the word "候选"/"候選". Do not explain stroke
   origins or etymology unless it directly deepens THIS story's truth.
 - Plain output: the paragraph text only. No JSON, no quotes around the whole,

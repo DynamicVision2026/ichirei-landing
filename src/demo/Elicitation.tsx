@@ -6,6 +6,10 @@ import {
   OCCASION_CODES,
   OCCASION_DETAIL_MAX,
   RELATIONSHIP_CODES,
+  STORY_COUNTER_FROM,
+  STORY_MAX,
+  clipStory,
+  storyLength,
   UI_LANGUAGES,
   contextComplete,
   isChineseUi,
@@ -139,7 +143,7 @@ export default function Elicitation({
     const t = angleText.trim()
     if (!t || !activeAngle) return
     const line = `【${activeAngle}】${t}`
-    onStoryChange(story ? `${story}\n${line}` : line)
+    onStoryChange(clipStory(story ? `${story}\n${line}` : line))
     setAngleText('')
     setActiveAngle(null)
   }
@@ -299,11 +303,21 @@ export default function Elicitation({
 
       <textarea
         value={story}
-        onChange={(e) => onStoryChange(e.target.value)}
+        onChange={(e) => onStoryChange(clipStory(e.target.value))}
+        maxLength={STORY_MAX}
+        data-testid="story-input"
         rows={7}
         placeholder={copy.storyPlaceholder}
         className="font-serif-jp w-full resize-none rounded-sm border border-gold/25 bg-paper/60 p-4 text-base leading-loose text-ivory outline-none transition-colors placeholder:text-ivory/25 focus:border-gold"
       />
+      <div className="mt-2 flex items-baseline justify-between gap-4">
+        <p data-testid="story-hint" className="font-label text-[11px] text-ivory/40">{copy.storyHint}</p>
+        {storyLength(story) >= STORY_COUNTER_FROM && (
+          <p data-testid="story-counter" className={`font-label text-[11px] ${storyLength(story) >= STORY_MAX ? 'text-gold' : 'text-ivory/60'}`}>
+            {copy.storyCounter(storyLength(story), STORY_MAX)}
+          </p>
+        )}
+      </div>
 
       {/* Five memory angles — each opens an aimed input box */}
       <p className="font-label mt-6 mb-2 text-[11px] tracking-[0.2em] text-gold/70">

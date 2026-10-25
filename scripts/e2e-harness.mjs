@@ -29,7 +29,6 @@ const pickContext = async (page, ctx = {}) => {
   await page.selectOption('select[name=direction]', c.direction)
   await page.selectOption('select[name=occasion]', c.occasion)
 }
-const COPY_TRY = { ja: 'もう一度試す', 'zh-Hans': '再试一次', 'zh-Hant': '再試一次', en: 'Try again' }
 const FINALIZE = { ja: 'この一字を、贈る', 'zh-Hans': '就用这一个字', 'zh-Hant': '就用這一個字', en: 'Give this character' }
 const SUBMIT = { ja: 'その一字を、探しにいく', 'zh-Hans': '去寻找那一个字', 'zh-Hant': '去尋找那一個字', en: 'Find the one character' }
 
@@ -147,11 +146,19 @@ const browser = await chromium.launch({
   await page.waitForTimeout(300)
   check('finalize confirms selection', await page.locator('text=「迎」に決めました').isVisible())
 
-  // Eliminated diagnostics section
-  await page.click('text=見送った字')
-  await page.waitForTimeout(300)
-  check('eliminated section lists 送 funeral reason', await page.locator('details').first().locator('text=葬送の連想があり').isVisible())
-  check('eliminated 厳 shows kyūjitai 嚴', await page.locator('details').first().locator('text=嚴').isVisible())
+  // v6: three cards — 次点 first, 遊び字 in the middle, 本命 last — each labelled; the freestyle is lighter and never cinnabar
+  const cards = page.locator('article')
+  check('v6: three cards in the order 次点 → 遊び字 → 本命 (the main resolves last)', (await cards.evaluateAll((els) => els.map((e) => e.getAttribute('data-slot')))).join() === 'second,freestyle,main')
+  check('v6: each card carries its label (次点 / 遊び字 / 本命)', (await cards.evaluateAll((els) => els.map((e) => e.querySelector('[data-slot-label]')?.textContent))).join() === '次点,遊び字,本命')
+  const freeCard = page.locator('article[data-slot=freestyle]')
+  check('v6: the freestyle card (封) is lighter: dashed border, no shadow class, glyph NOT cinnabar', (await freeCard.getAttribute('class')).includes('border-dashed') && !(await freeCard.getAttribute('class')).includes('shadow-') && (await freeCard.locator('[data-glyph]').evaluate((el) => getComputedStyle(el).color)) !== 'rgb(192, 57, 43)' && (await freeCard.locator('[data-glyph]').innerText()) === '封')
+  check('v6: only the main card\'s glyph is cinnabar', (await page.locator('article[data-slot=second] [data-glyph]').evaluate((el) => getComputedStyle(el).color)) !== 'rgb(192, 57, 43)' && (await page.locator('article[data-slot=main] [data-glyph]').evaluate((el) => getComputedStyle(el).color)) === 'rgb(192, 57, 43)')
+  check('v6: each card shows its story anchor in quotes and its gaze; the freestyle has the light line', await freeCard.locator('[data-anchor]:has-text("「封筒を押し付けてきた」")').isVisible() && (await freeCard.innerText()).includes('押し付けてくる人') && (await page.locator('article[data-slot=main] [data-anchor]').innerText()) === '「盆に帰るたびに車で駅まで迎えに来て」')
+  check('v6: no classical line is shown (no reviewed palette row, nothing attached), and the freestyle card never offers the deep explanation', (await page.locator('[data-classical]').count()) === 0)
+  await freeCard.click()
+  await page.waitForTimeout(400)
+  check('v6: the freestyle card has no deep-explanation button (even in condition B) but can be selected', (await freeCard.locator('text=この一字を、深く読む').count()) === 0 && (await freeCard.locator('text=この一字を選ぶ').count()) === 1)
+  check('v6 (harness): the old "set aside" diagnostics block is empty in the golden — nothing was eliminated', (await page.locator('details', { hasText: '見送った字' }).count()) === 0)
   await page.screenshot({ path: `${SHOTS}/e2e-final.png` })
 
   // Raw contract still available for diagnostics
@@ -449,48 +456,113 @@ const mockPage = async (browser, { onExplain, result, order, track } = {}) => {
   await page.close()
 }
 
-// ---------- Run 8: no eligible primary → a clear message ----------
+// ---------- Run 8: both main slots removed → `insufficient` → the follow-up question (all four languages) ----------
 {
-  const noPrimary = (alive) => () => {
-    const r = clone(FIXTURE)
-    r.primary_kanji = null
-    r.runner_up_kanji = null
-    r.candidates = r.candidates.map((c, i) => (i < alive ? { ...c, eliminated: false, eliminated_reason: null } : { ...c, eliminated: true, eliminated_reason: 'palette: hard_block' }))
-    r.referee = { palette_rows: 649, original_primary: '迎', primary_changed: true, no_eligible_primary: true, promoted_from: null, actions: [{ kanji: '送', action: 'hard_block_eliminated', detail: 'palette: hard_block' }] }
-    return r
-  }
-  for (const [lang, expect] of [['ja', '「この一字」と呼べる字が、まだ残っていません。'], ['zh-Hans', '目前没有可以称为“这一个字”的字了。'], ['zh-Hant', '目前沒有可以稱為「這一個字」的字了。']]) {
-    const { page, errors } = await mockPage(browser, { result: noPrimary(0) })
-    await page.goto('http://localhost:5173/demo', { waitUntil: 'networkidle' })
-    await page.click(`[data-language=${lang}]`)
+  const QUESTION = { ja: 'お父さまと一緒に過ごした、忘れられない小さな場面をひとつ、教えてください。', 'zh-Hans': '请告诉我，你和他一起度过的一个难忘的小场景。', 'zh-Hant': '請告訴我，你和他一起度過的一個難忘的小場景。', en: 'Could you tell me one small moment you actually shared with him?' }
+  const HEADING = { ja: 'もうすこしだけ、聞かせてください', 'zh-Hans': '再多告诉我一点', 'zh-Hant': '再多告訴我一點', en: 'Tell us a little more' }
+  const insufficientByReferee = (body) => ({
+    ...clone(FIXTURE), language: body.language, status: 'insufficient', follow_up_question: QUESTION[body.language], particulars: [], candidates: [], primary_kanji: null, runner_up_kanji: null, freestyle_kanji: null, fallback_follow_up_question: null,
+    fingerprint: { relationship_note: null, scarce_asset: null, unsaid_truth: null, dominant_truth_type: null, dignity_direction: null, emotional_register: null },
+    referee: { palette_rows: 649, original_primary: '送', primary_changed: true, no_eligible_primary: true, promoted_from: null, actions: [{ kanji: '送', action: 'hard_block_eliminated', detail: 'palette: hard_block' }, { kanji: '別', action: 'hard_block_eliminated', detail: 'palette: hard_block' }, { kanji: '送', action: 'insufficient_no_main', detail: 'no main candidate survived the referee' }] },
+  })
+  for (const lang of ['ja', 'zh-Hans', 'zh-Hant', 'en']) {
+    const { page, errors, calls } = await mockPage(browser, { result: insufficientByReferee })
+    await page.goto(`http://localhost:5173/demo?lang=${lang}`, { waitUntil: 'networkidle' })
     await page.locator('textarea').first().fill(STORY)
     await pickContext(page)
     await page.click(`text=${SUBMIT[lang]}`)
-    await page.waitForSelector('[data-testid=no-primary]', { timeout: 8000 })
-    const box = page.locator('[data-testid=no-primary]')
-    check(`no primary (${lang}): a clear message is shown`, await box.locator(`text=${expect}`).isVisible())
-    check(`no primary (${lang}): the removed characters are listed with the reason`, await box.locator('text=palette: hard_block').count() >= 1)
-    check(`no primary (${lang}): no candidate card and no finalize button when nothing survived`, (await page.locator('article').count()) === 0 && (await page.locator('button:has-text("贈る")').count()) === 0)
-    const retry = COPY_TRY[lang]
-    check(`no primary (${lang}): the try-again button keeps the story`, await page.locator(`button:has-text("${retry}")`).isVisible())
+    await page.waitForSelector(`text=${HEADING[lang]}`, { timeout: 8000 })
+    check(`no main (${lang}): the model's own fallback question is shown as the follow-up — no candidate card, no finalize button, never the freestyle`, await page.locator(`text=${QUESTION[lang]}`).isVisible() && (await page.locator('article').count()) === 0 && (await page.locator(`button:has-text("${FINALIZE[lang]}")`).count()) === 0 && (await page.locator('[data-testid=no-primary]').count()) === 0)
     if (lang === 'ja') {
-      await page.screenshot({ path: `${SHOTS}/e2e-v5-no-primary.png` })
-      await page.click(`button:has-text("${retry}")`)
-      check('no primary: try again returns to the input with the story kept', (await page.locator('textarea').first().inputValue()) === STORY)
+      await page.screenshot({ path: `${SHOTS}/e2e-v6-no-main-followup.png` })
+      // answering it re-runs the engine with the answer appended
+      await page.locator('[data-testid=followup-input]').fill('帰り際に必ず「気をつけて」と言った。')
+      await page.click('text=つづきを探しにいく')
+      await page.waitForTimeout(600)
+      check('no main (ja): answering the question re-runs the engine with the answer appended to the story', calls.select.length === 2 && calls.select[1].story.includes(STORY) && calls.select[1].story.includes('帰り際に必ず「気をつけて」と言った。'))
     }
     check(`no page errors (run 8, ${lang})`, errors.length === 0)
     await page.close()
   }
-  // some candidates survive but none may be primary → message + the survivors are still shown
-  const { page, errors } = await mockPage(browser, { result: noPrimary(2) })
+}
+
+// ---------- Run 8b: v6 — labels in four languages, classical line, two cards without a freestyle, promotion ----------
+{
+  const LABELS = { ja: ['次点', '遊び字', '本命'], 'zh-Hans': ['次选', '趣字', '本命'], 'zh-Hant': ['次選', '趣字', '本命'], en: ['Second', 'Freestyle', 'Main'] }
+  const withEcho = (body) => {
+    const r = clone(FIXTURE)
+    r.language = body.language
+    r.candidates[0].classical_echo = { text: '慈母手中線，遊子身上衣', source: '孟郊「遊子吟」' }
+    r.candidates[1].classical_echo = null
+    return r
+  }
+  for (const lang of ['ja', 'zh-Hans', 'zh-Hant', 'en']) {
+    const { page, errors } = await mockPage(browser, { result: lang === 'ja' ? withEcho : (b) => ({ ...clone(FIXTURE), language: b.language, inscription_script: lang === 'en' ? null : 'traditional' }) })
+    await page.goto(`http://localhost:5173/demo?lang=${lang}`, { waitUntil: 'networkidle' })
+    await page.locator('textarea').first().fill(STORY)
+    await pickContext(page)
+    await page.click(`text=${SUBMIT[lang]}`)
+    await page.waitForSelector(`button:has-text("${FINALIZE[lang]}")`, { timeout: 15000 })
+    check(`v6 labels (${lang}): ${LABELS[lang].join(' / ')}`, (await page.locator('article [data-slot-label]').allInnerTexts()).join() === LABELS[lang].join())
+    if (lang === 'ja') {
+      check('v6 classical: the main card shows 「text」 — source from the server; the second (null) shows none; the freestyle never does', (await page.locator('article[data-slot=main] [data-classical]').innerText()) === '「慈母手中線，遊子身上衣」 — 孟郊「遊子吟」' && (await page.locator('[data-classical]').count()) === 1)
+      await page.screenshot({ path: `${SHOTS}/e2e-v6-cards-ja.png`, fullPage: true })
+    }
+    check(`no page errors (run 8b, ${lang})`, errors.length === 0)
+    await page.close()
+  }
+  // the referee promoted slot 2 and the freestyle was dropped → two cards; the promoted one carries 本命 and the cinnabar
+  const promoted = () => {
+    const r = clone(FIXTURE)
+    r.candidates[0].eliminated = true; r.candidates[0].eliminated_reason = 'palette: hard_block'
+    r.candidates[2].eliminated = true; r.candidates[2].eliminated_reason = 'review: Mocks social status'
+    r.primary_kanji = '黙'; r.runner_up_kanji = null; r.freestyle_kanji = null
+    return r
+  }
+  const { page, errors } = await mockPage(browser, { result: promoted })
   await page.goto('http://localhost:5173/demo', { waitUntil: 'networkidle' })
   await page.locator('textarea').first().fill(STORY)
   await pickContext(page)
   await page.click(`text=${SUBMIT.ja}`)
-  await page.waitForSelector('[data-testid=no-primary]', { timeout: 8000 })
-  await page.waitForSelector('article', { timeout: 8000 })
-  check('no primary with survivors: the message AND the surviving cards are shown (none is cinnabar-marked primary)', (await page.locator('[data-testid=no-primary]').isVisible()) && (await page.locator('article').count()) >= 1 && (await page.locator('article.ring-cinnabar\\/60').count()) === 0)
-  check('no page errors (run 8, survivors)', errors.length === 0)
+  await page.waitForSelector(`button:has-text("${FINALIZE.ja}")`, { timeout: 15000 })
+  check('v6 promotion: slot 1 removed and the freestyle dropped → ONE card, the promoted second slot (黙), labelled 本命 and cinnabar', (await page.locator('article').count()) === 1 && (await page.locator('article [data-slot-label]').innerText()) === '本命' && (await page.locator('article [data-glyph]').evaluate((el) => getComputedStyle(el).color)) === 'rgb(192, 57, 43)')
+  check('v6 diagnostics (harness only): the removed cards are listed with their reasons', (await page.locator('details', { hasText: '見送った字' }).count()) === 1)
+  check('no page errors (run 8b, promotion)', errors.length === 0)
+  await page.close()
+}
+
+// ---------- Run 8c: v6 — the story hint, the 2,000-character limit and the live counter ----------
+{
+  const { page, errors, calls } = await mockPage(browser)
+  await page.goto('http://localhost:5173/', { waitUntil: 'networkidle' })
+  const box = page.locator('#story-input [data-testid=story-input]')
+  check('story: the soft hint is under the box (ja), no counter yet, and the box has a hard maximum of 2,000', (await page.locator('#story-input [data-testid=story-hint]').innerText()) === '50〜300字くらいで十分です' && (await page.locator('#story-input [data-testid=story-counter]').count()) === 0 && (await box.getAttribute('maxlength')) === '2000')
+  await box.fill('あ'.repeat(1499))
+  check('story: no counter at 1,499 characters', (await page.locator('#story-input [data-testid=story-counter]').count()) === 0)
+  await box.fill('あ'.repeat(1500))
+  check('story: the live counter appears at 1,500 ("1500 / 2000字")', (await page.locator('#story-input [data-testid=story-counter]').innerText()) === '1500 / 2000字')
+  await box.fill('あ'.repeat(1732))
+  check('story: the counter follows the length', (await page.locator('#story-input [data-testid=story-counter]').innerText()) === '1732 / 2000字')
+  // a paste of 2,500 characters is cut to 2,000 and can never be submitted over the limit
+  await box.evaluate((el, text) => { const set = Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, 'value').set; set.call(el, text); el.dispatchEvent(new Event('input', { bubbles: true })) }, '長'.repeat(2500))
+  check('story: a 2,500-character paste is clipped to exactly 2,000 characters', (await box.inputValue()).length === 2000 && (await page.locator('#story-input [data-testid=story-counter]').innerText()) === '2000 / 2000字')
+  await pickContext(page)
+  await page.click(`#story-input >> text=${SUBMIT.ja}`)
+  await page.waitForSelector(`button:has-text("${FINALIZE.ja}")`, { timeout: 15000 })
+  check('story: what is sent is at most 2,000 characters', [...calls.select[0].story].length === 2000)
+  // the server's story_too_long answer is shown in the sender's language (not the raw English message)
+  const p2 = await browser.newPage({ viewport: { width: 1100, height: 950 } })
+  await p2.route('**/api/log', (route) => route.fulfill({ status: 204, body: '' }))
+  await p2.route('**/api/select', (route) => route.fulfill({ status: 400, contentType: 'application/json', body: JSON.stringify({ error: '"story" is longer than 2000 characters (got 2500)', code: 'story_too_long', max: 2000 }) }))
+  await p2.goto('http://localhost:5173/?lang=en', { waitUntil: 'networkidle' })
+  check('story (en): hint "50–300 characters is plenty"', (await p2.locator('#story-input [data-testid=story-hint]').innerText()) === '50–300 characters is plenty')
+  await p2.locator('#story-input [data-testid=story-input]').fill('My mum left the porch light on.')
+  await pickContext(p2, { relationship: 'parent_mother' })
+  await p2.click(`#story-input >> text=${SUBMIT.en}`)
+  await p2.waitForSelector('text=Stories can be up to 2,000 characters', { timeout: 6000 })
+  check('story (en): a story_too_long answer from the server is shown as the localized message and the form stays', await p2.locator('#story-input [data-testid=story-input]').isVisible())
+  await p2.close()
+  check('no page errors (run 8c)', errors.length === 0)
   await page.close()
 }
 
@@ -624,7 +696,7 @@ const mockPage = async (browser, { onExplain, result, order, track } = {}) => {
   await page.waitForSelector('#co', { timeout: 8000 })
   check('submit → redirected to the Shopify checkout URL the server returned', page.url().includes('/__checkout?cart=fake'))
   const body = calls.order[0]
-  check('POST /api/order: story, the engine result, the chosen kanji, language, names, date, inscription style and package', body.story === STORY && body.engine_result.candidates.length === 6 && body.selected_kanji === '黙' && body.language === 'ja' && body.sender_name === '山田 太郎' && body.receiver_name === '山田 一郎' && body.delivery_date === iso && body.inscription_style === 'kyujitai' && body.package === 'standard', JSON.stringify({ ...body, engine_result: '…', story: body.story?.slice(0, 10) }))
+  check('POST /api/order: story, the engine result, the chosen kanji, language, names, date, inscription style and package', body.story === STORY && body.engine_result.candidates.length === 3 && body.selected_kanji === '黙' && body.language === 'ja' && body.sender_name === '山田 太郎' && body.receiver_name === '山田 一郎' && body.delivery_date === iso && body.inscription_style === 'kyujitai' && body.package === 'standard', JSON.stringify({ ...body, engine_result: '…', story: body.story?.slice(0, 10) }))
   check('POST /api/order carries no price and no glyph (the server derives both)', !('price' in body) && !('glyph' in body) && !('amount' in body))
   check('no page errors (run 11)', errors.length === 0)
   if (errors.length) console.log('page errors:', errors)

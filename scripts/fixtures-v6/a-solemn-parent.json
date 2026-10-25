@@ -1,0 +1,127 @@
+{
+  "name": "a-solemn-parent",
+  "story": "父は口下手で厳しくて、ほめられた記憶なんてほとんどない。進路のことでも何度もぶつかった。ただ、私が東京に出るとき駅まで送ってくれて、改札で「金は要るか」って、それだけ言って封筒を押し付けてきた。あれから二十年、盆に帰るたびに車で駅まで迎えに来て、帰りも必ず送ってくれる。相変わらず、ほとんど何も話さないけど。",
+  "context": {
+    "language": "ja",
+    "relationship": "parent_father",
+    "direction": "up",
+    "occasion": "birthday_milestone",
+    "occasion_detail": "還暦"
+  },
+  "model_reply": {
+    "language": "ja",
+    "relationship": "parent_father",
+    "direction": "up",
+    "occasion": "birthday_milestone",
+    "occasion_detail": "還暦",
+    "inscription_script": null,
+    "status": "sufficient",
+    "follow_up_question": null,
+    "particulars": [
+      "駅までの送り迎え、二十年",
+      "「金は要るか」と封筒",
+      "ほとんど何も話さない"
+    ],
+    "fingerprint": {
+      "relationship_note": "子 → 父",
+      "scarce_asset": "駅での無言の送り迎え、二十年",
+      "unsaid_truth": "心配だと一度も言わないのに、一度も一人で発たせなかった。",
+      "dominant_truth_type": "Role",
+      "dignity_direction": "沈黙を冷たさではなく、行動で示す愛情として開く",
+      "emotional_register": [
+        "grateful",
+        "tender"
+      ]
+    },
+    "candidates": [
+      {
+        "kanji": "迎",
+        "reading": "むかえ",
+        "inscription_form": null,
+        "truth_type": "Role",
+        "one_line_gaze": "あなたは二十年、私の帰りをいつも駅で迎えてくれた。理由は、一度も言わずに。",
+        "story_anchor": "盆に帰るたびに車で駅まで迎えに来て",
+        "unique_truth": "会いに来るという行為そのもの。還暦を迎える、の一字でもある。",
+        "eliminated": false,
+        "eliminated_reason": null,
+        "suitability_flag": "一字で刻んだときの自然さは要確認（パレット照合待ち）",
+        "palette_status": "context_required",
+        "flags": [
+          "standalone_inscription_check"
+        ],
+        "slot": "main",
+        "classical_echo": null
+      },
+      {
+        "kanji": "黙",
+        "reading": "もく",
+        "inscription_form": "默",
+        "truth_type": "Hidden Cost",
+        "one_line_gaze": "あなたは言葉の代わりに、静けさのまま、そこにいてくれた。",
+        "story_anchor": "相変わらず、ほとんど何も話さないけど",
+        "unique_truth": "語らないことで支え続けた歳月。",
+        "eliminated": false,
+        "eliminated_reason": null,
+        "suitability_flag": null,
+        "palette_status": "ok",
+        "flags": [],
+        "slot": "second",
+        "classical_echo": null
+      },
+      {
+        "slot": "freestyle",
+        "kanji": "封",
+        "reading": "ふう",
+        "inscription_form": null,
+        "truth_type": "Play",
+        "one_line_gaze": "「金は要るか」とだけ言って、封筒を押し付けてくる人。",
+        "story_anchor": "封筒を押し付けてきた",
+        "unique_truth": "",
+        "eliminated": false,
+        "eliminated_reason": null,
+        "suitability_flag": null,
+        "palette_status": "off_palette",
+        "flags": [
+          "playful_freestyle"
+        ],
+        "classical_echo": null
+      }
+    ],
+    "primary_kanji": "迎",
+    "runner_up_kanji": "黙",
+    "freestyle_kanji": "封",
+    "fallback_follow_up_question": "お父さまと一緒に過ごした中で、忘れられない小さな場面をひとつ、教えてください。"
+  },
+  "review_reply": {
+    "verdicts": [
+      {
+        "slot": "main",
+        "kanji": "迎",
+        "pass": true,
+        "reason": "Role anchored in the station pick-ups; no taboo for a milestone birthday."
+      },
+      {
+        "slot": "second",
+        "kanji": "黙",
+        "pass": true,
+        "reason": "Opens the father into a quiet presence, not a verdict."
+      },
+      {
+        "slot": "freestyle",
+        "kanji": "封",
+        "pass": true,
+        "reason": "Gentle teasing about the envelope, shared and affectionate."
+      }
+    ]
+  },
+  "expect": {
+    "status": "sufficient",
+    "primary": "迎",
+    "second": "黙",
+    "freestyle": "封",
+    "register": [
+      "grateful",
+      "tender"
+    ]
+  }
+}

@@ -74,11 +74,12 @@ try {
   check('select: progress delta lines streamed', deltas.length >= 3, `deltas=${deltas.length}`)
   check('select: first delta arrives well before the result (true streaming, not buffered)', result && deltas[0] && result.at - deltas[0].at > 800, `first=${deltas[0]?.at} result=${result?.at}`)
   check('select: terminal result line equals the golden contract (after the palette referee)', JSON.stringify(result?.msg.result) === JSON.stringify(GOLDEN_REFEREED))
-  check('select: primary is 迎 with 6 candidates', result?.msg.result.primary_kanji === '迎' && result?.msg.result.candidates.length === 6)
+  check('select: primary is 迎, three candidates (main, second, freestyle 封), and the review verdicts are on the result', result?.msg.result.primary_kanji === '迎' && result?.msg.result.candidates.length === 3 && result?.msg.result.freestyle_kanji === '封' && result?.msg.result.review?.ran === true)
   check('select: result is the last line', lines.at(-1)?.msg.type === 'result')
 
   // What did the real engine actually send the model?
-  const sent = upstream.state.requests.at(-1)
+  const sent = upstream.state.requests.filter((r) => r.kind === 'select').at(-1)
+  check('review: the engine made a SECOND, separate model call (the review) after the selection call, with no selection reasoning in it', upstream.state.requests.some((r) => r.kind === 'review' && !String(r.body.messages[0].content).includes('Abandonment Resistance')))
   const prompt = sent?.body.messages?.[0]?.content ?? ''
   check('engine→model: model is claude-sonnet-5, streaming, effort high', sent?.body.model === 'claude-sonnet-5' && sent?.body.stream === true && sent?.body.output_config?.effort === 'high', JSON.stringify({ m: sent?.body.model, s: sent?.body.stream, e: sent?.body.output_config }))
   check('engine→model: max_tokens 20000 (full depth, unchanged)', sent?.body.max_tokens === 20000)
@@ -115,13 +116,13 @@ try {
   const ex = await post(base, '/api/explain', { story: STORY, candidate: cand })
   const exBody = await ex.json()
   check('explain: 200 {explanation}', ex.status === 200 && exBody.explanation === EXPLAIN_TEXT, JSON.stringify(exBody))
-  const exPrompt = upstream.state.requests.at(-1)?.body.messages?.[0]?.content ?? ''
+  const exPrompt = upstream.state.requests.filter((r) => r.kind === 'explain').at(-1)?.body.messages?.[0]?.content ?? ''
   check('explain: explain-prompt.ja.md loaded (default language) + candidate/story injected', exPrompt.includes('Stage-B Deep Explanation Prompt') && exPrompt.includes('Japanese / ja') && exPrompt.includes('迎') && exPrompt.includes(STORY) && !/\{\{ [A-Z_]+ \}\}/.test(exPrompt))
   const exZh = await post(base, '/api/explain', { story: '他總是把玄關的燈留著。', candidate: { kanji: '灯', inscription_form: '燈', reading: 'dēng', one_line_gaze: '你把燈留著。', story_anchor: '把玄關的燈留著' }, language: 'zh-Hant', relationship: 'parent_father', direction: 'up', occasion: 'seasonal_thanks' })
-  const exZhPrompt = upstream.state.requests.at(-1)?.body.messages?.[0]?.content ?? ''
+  const exZhPrompt = upstream.state.requests.filter((r) => r.kind === 'explain').at(-1)?.body.messages?.[0]?.content ?? ''
   check('explain: zh-Hant → explain-prompt.zh.md, display_script traditional, context + both forms injected', exZh.status === 200 && exZhPrompt.includes('Chinese / zh') && exZhPrompt.includes('display_script: traditional') && exZhPrompt.includes('occasion: seasonal_thanks') && exZhPrompt.includes('TRADITIONAL_FORM: 燈') && exZhPrompt.includes('SIMPLIFIED_FORM: 灯') && !/\{\{ [A-Z_]+ \}\}/.test(exZhPrompt))
   const exEn = await post(base, '/api/explain', { story: 'My mum left the porch light on every night until I got home.', candidate: { kanji: '灯', inscription_form: '燈', reading: 'on: tō · kun: hi, akari', meaning: 'lamp; a light kept lit', one_line_gaze: 'You left the porch light on every night.', story_anchor: 'left the porch light on' }, language: 'en', relationship: 'parent_mother', direction: 'up', occasion: 'birthday_milestone', inscription_script: 'simplified' })
-  const exEnPrompt = upstream.state.requests.at(-1)?.body.messages?.[0]?.content ?? ''
+  const exEnPrompt = upstream.state.requests.filter((r) => r.kind === 'explain').at(-1)?.body.messages?.[0]?.content ?? ''
   check('explain: en → explain-prompt.en.md, romaji reading + English meaning + carved form + context injected, no slot left', exEn.status === 200 && exEnPrompt.includes('English / en') && exEnPrompt.includes('reading: on: tō · kun: hi, akari') && exEnPrompt.includes('meaning: lamp; a light kept lit') && exEnPrompt.includes('carved old form 燈') && exEnPrompt.includes('relationship: parent_mother') && !/\{\{ [A-Z_]+ \}\}/.test(exEnPrompt))
   const exBadCtx = await post(base, '/api/explain', { story: STORY, candidate: cand, occasion: 'kanreki' })
   check('explain: an invalid context code → 400', exBadCtx.status === 400 && /occasion/.test((await exBadCtx.json()).error))
@@ -195,7 +196,7 @@ try {
       const okJ = await ok.json()
       check('orders: POST /api/order → 200 {order_ref, checkout_url, glyph, certificate_text}', ok.status === 200 && /^IC-\d{8}-[2-9A-Z]{8}$/.test(okJ.order_ref) && okJ.checkout_url === 'https://soul-id-2.myshopify.com/cart/c/k' && okJ.glyph === '迎' && okJ.certificate_text === 'この字は、あなたの目に映る、その人です。', JSON.stringify(okJ))
       const file = JSON.parse(readFileSync(join(dir, `${okJ.order_ref}.json`), 'utf8'))
-      check('orders: the story and the engine result are stored server-side under that order_ref (gaze line and anchor included)', file.story === STORY && file.engine_result.candidates.length === 6 && file.production.gaze_line === GOLDEN.candidates[0].one_line_gaze && file.production.story_anchor === GOLDEN.candidates[0].story_anchor && file.status === 'cart_created')
+      check('orders: the story and the engine result are stored server-side under that order_ref (gaze line and anchor included)', file.story === STORY && file.engine_result.candidates.length === 3 && file.production.gaze_line === GOLDEN.candidates[0].one_line_gaze && file.production.story_anchor === GOLDEN.candidates[0].story_anchor && file.status === 'cart_created')
       const line = seen[0].body.variables.input.lines[0]
       check('orders: Shopify got the Simple variant, the token header, and the eight attributes — without the story', seen[0].url === '/api/2025-01/graphql.json' && seen[0].token === 'shpat_server_test' && line.merchandiseId.endsWith('/1111') && line.attributes.map((a) => a.key).join() === 'kanji,inscription_form,reading,sender_name,receiver_name,delivery_date,language,order_ref' && line.attributes.at(-1).value === okJ.order_ref && !JSON.stringify(seen[0].body).includes('口下手'))
       const invalid = await post(orders.url, '/api/order', { ...orderBody, package: 'gold' })

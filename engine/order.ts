@@ -5,13 +5,14 @@
 // Plumbing only — nothing here selects or judges a character.
 
 import { randomBytes } from 'node:crypto'
-import { LANGUAGES, type Candidate, type EngineResult, type Language } from './contract.ts'
+import { LANGUAGES, STORY_MAX as ENGINE_STORY_MAX, countChars, type Candidate, type EngineResult, type Language } from './contract.ts'
 import { PACKAGES, PACKAGE_PRICE_JPY, type PackageId } from '../src/order/packages.ts'
 import { certificateText } from '../src/order/certificate.ts'
 import { STYLES_BY_LANGUAGE, glyphFor, type InscriptionStyle } from '../src/order/inscription.ts'
 
 export const NAME_MAX = 40
-export const STORY_MAX = 10_000
+/** Same cap as /api/select: a story that could not have been analysed cannot be ordered against. */
+export const STORY_MAX = ENGINE_STORY_MAX
 /** How far ahead a delivery date may be. */
 export const MAX_DAYS_AHEAD = 730
 
@@ -65,7 +66,7 @@ export function parseOrderRequest(body: unknown, now: Date = new Date()): Parsed
 
   if (!isText(body.story)) return fail('story', 'Missing "story"')
   const story = body.story.trim()
-  if (story.length > STORY_MAX) return fail('story', `"story" is longer than ${STORY_MAX} characters`)
+  if (countChars(story) > STORY_MAX) return fail('story', `"story" is longer than ${STORY_MAX} characters`)
 
   const result = body.engine_result
   if (!isObject(result) || result.status !== 'sufficient' || !Array.isArray(result.candidates)) {

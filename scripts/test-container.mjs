@@ -78,7 +78,7 @@ try {
   check('select: streams delta lines then the golden result (real engine in the image)', deltas.length >= 3 && JSON.stringify(result?.msg.result) === JSON.stringify(GOLDEN_REFEREED))
   check('select: true streaming (first delta well before result)', result && deltas[0] && result.at - deltas[0].at > 800)
   check('upstream saw claude-sonnet-5, prompt.ja.md injected, key from runtime env', (() => {
-    const r = upstream.state.requests.at(-1)
+    const r = upstream.state.requests.filter((x) => x.kind === 'select').at(-1)
     return r?.body.model === 'claude-sonnet-5' && r.body.messages[0].content.includes(STORY) && r.body.messages[0].content.includes('OUTPUT CONTRACT (runtime)') && r.headers['x-api-key'] === 'runtime-secret-not-baked'
   })())
 

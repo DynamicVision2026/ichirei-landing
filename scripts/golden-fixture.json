@@ -17,7 +17,11 @@
     "scarce_asset": "駅での無言の送り迎え、二十年",
     "unsaid_truth": "心配だと一度も言わないのに、一度も一人で発たせなかった。",
     "dominant_truth_type": "Role",
-    "dignity_direction": "沈黙を冷たさではなく、行動で示す愛情として開く"
+    "dignity_direction": "沈黙を冷たさではなく、行動で示す愛情として開く",
+    "emotional_register": [
+      "grateful",
+      "tender"
+    ]
   },
   "candidates": [
     {
@@ -34,7 +38,9 @@
       "palette_status": "context_required",
       "flags": [
         "standalone_inscription_check"
-      ]
+      ],
+      "slot": "main",
+      "classical_echo": null
     },
     {
       "kanji": "黙",
@@ -48,73 +54,31 @@
       "eliminated_reason": null,
       "suitability_flag": null,
       "palette_status": "ok",
-      "flags": []
+      "flags": [],
+      "slot": "second",
+      "classical_echo": null
     },
     {
-      "kanji": "駅",
-      "reading": "えき",
-      "inscription_form": "驛",
-      "truth_type": "Private Symbol",
-      "one_line_gaze": "あなたの心配は、いつもあの駅の改札で待っていた。",
-      "story_anchor": "駅まで送ってくれて",
-      "unique_truth": "ふたりの物語の舞台。",
+      "slot": "freestyle",
+      "kanji": "封",
+      "reading": "ふう",
+      "inscription_form": null,
+      "truth_type": "Play",
+      "one_line_gaze": "「金は要るか」とだけ言って、封筒を押し付けてくる人。",
+      "story_anchor": "封筒を押し付けてきた",
+      "unique_truth": "",
       "eliminated": false,
       "eliminated_reason": null,
-      "suitability_flag": "単独の刻印としては弱い（場所の名詞にとどまる）",
+      "suitability_flag": null,
       "palette_status": "off_palette",
       "flags": [
-        "weak_standalone_inscription"
-      ]
-    },
-    {
-      "kanji": "送",
-      "reading": "おくり",
-      "inscription_form": null,
-      "truth_type": "Hidden Cost",
-      "one_line_gaze": "あなたは一度も、私を一人で発たせなかった。",
-      "story_anchor": "帰りも必ず送ってくれる",
-      "unique_truth": "見送りの持続。",
-      "eliminated": true,
-      "eliminated_reason": "ゲート3（日本語の自然さ）：見送る・葬送の連想があり、存命の祝いに不向き。",
-      "suitability_flag": "葬送の連想",
-      "palette_status": "context_required",
-      "flags": [
-        "funeral_connotation"
-      ]
-    },
-    {
-      "kanji": "厳",
-      "reading": "げん",
-      "inscription_form": "嚴",
-      "truth_type": "Essence",
-      "one_line_gaze": "厳しさの奥で、あなたはずっと心配していた。",
-      "story_anchor": "父は口下手で厳しくて",
-      "unique_truth": "表向きの気質。",
-      "eliminated": true,
-      "eliminated_reason": "ゲート4（尊厳の境界）：人を「厳しい」という評決に閉じ込める。",
-      "suitability_flag": null,
-      "palette_status": "context_required",
-      "flags": [
-        "verdict_risk"
-      ]
-    },
-    {
-      "kanji": "愛",
-      "reading": "あい",
-      "inscription_form": null,
-      "truth_type": "Essence",
-      "one_line_gaze": "あなたはずっと家族を愛してくれた。",
-      "story_anchor": "封筒を押し付けてきた",
-      "unique_truth": "なし（汎用）。",
-      "eliminated": true,
-      "eliminated_reason": "ゲート1（置換テスト）：どの家族にも当てはまる。隔離規則違反。",
-      "suitability_flag": null,
-      "palette_status": "ok",
-      "flags": [
-        "generic_virtue"
-      ]
+        "playful_freestyle"
+      ],
+      "classical_echo": null
     }
   ],
   "primary_kanji": "迎",
-  "runner_up_kanji": "黙"
+  "runner_up_kanji": "黙",
+  "freestyle_kanji": "封",
+  "fallback_follow_up_question": "お父さまと一緒に過ごした中で、忘れられない小さな場面をひとつ、教えてください。"
 }

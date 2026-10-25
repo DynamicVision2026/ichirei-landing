@@ -62,7 +62,7 @@ const ja: LandingCopy = {
       'その人のことを書く',
       '言葉を、深く読む',
       '一字が浮かぶ',
-      '六つの候補',
+      '三つの候補',
       'あなたが選ぶ',
       '一字が、贈りものになる',
     ],
@@ -97,7 +97,7 @@ const zhHans: LandingCopy = {
   },
   process: {
     label: 'The Process',
-    steps: ['写下那个人', '深入读懂你的文字', '一个字浮现', '六个候选', '由你来选', '一个字，成为礼物'],
+    steps: ['写下那个人', '深入读懂你的文字', '一个字浮现', '三个候选', '由你来选', '一个字，成为礼物'],
   },
 }
 
@@ -129,7 +129,7 @@ const zhHant: LandingCopy = {
   },
   process: {
     label: 'The Process',
-    steps: ['寫下那個人', '深入讀懂你的文字', '一個字浮現', '六個候選', '由你來選', '一個字，成為禮物'],
+    steps: ['寫下那個人', '深入讀懂你的文字', '一個字浮現', '三個候選', '由你來選', '一個字，成為禮物'],
   },
 }
 
@@ -166,7 +166,7 @@ const en: LandingCopy = {
       'Write about them',
       'Your words, read closely',
       'A character appears',
-      'Six candidates',
+      'Three candidates',
       'You choose',
       'The character becomes a gift',
     ],

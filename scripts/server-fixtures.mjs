@@ -8,7 +8,7 @@ import http from 'node:http'
 import net from 'node:net'
 import { spawn } from 'node:child_process'
 import { readFileSync } from 'node:fs'
-import { applyPalette, loadPalette } from '../engine/palette.ts'
+import { applyPalette, applyReviewVerdicts, loadPalette } from '../engine/palette.ts'
 
 export const GOLDEN = JSON.parse(
   readFileSync(new URL('./golden-fixture.json', import.meta.url), 'utf8'),
@@ -27,8 +27,16 @@ export const GOLDEN_CONTEXT = {
 export const STORY =
   '父は口下手で厳しくて、ほめられた記憶なんてほとんどない。進路のことでも何度もぶつかった。ただ、私が東京に出るとき駅まで送ってくれて、改札で「金は要るか」って、それだけ言って封筒を押し付けてきた。あれから二十年、盆に帰るたびに車で駅まで迎えに来て、帰りも必ず送ってくれる。相変わらず、ほとんど何も話さないけど。'
 
-// What the engine returns for the golden model answer: the same JSON after the palette referee.
-export const GOLDEN_REFEREED = applyPalette(GOLDEN, loadPalette(), STORY)
+// What the fake reviewer answers: every candidate in the golden answer passes.
+export const REVIEW_VERDICTS = GOLDEN.candidates.map((c) => ({ slot: c.slot, kanji: c.kanji, pass: true, reason: 'ok (fake reviewer)' }))
+
+// What the engine returns for the golden model answer: the same JSON after the palette referee
+// and the review call (the fake reviewer passes everything).
+export const GOLDEN_REFEREED = applyReviewVerdicts(applyPalette(GOLDEN, loadPalette(), STORY), loadPalette(), STORY, {
+  ran: true,
+  skipped_reason: null,
+  verdicts: REVIEW_VERDICTS,
+})
 
 export const EXPLAIN_TEXT =
   '折り目正しくというより、行き先のあるやさしさだった。「金は要るか」とだけ言って封筒を押し付けたあの改札から二十年、あなたは一度も迎えを欠かさなかった。還暦を迎えるいま、こんどは私があなたを迎えにいく番だと思う。'
@@ -87,12 +95,16 @@ export async function startFakeAnthropic() {
         ? body.messages[0].content
         : JSON.stringify(body.messages?.[0]?.content)
     const isExplain = prompt.includes('Stage-B Deep Explanation Prompt')
+    const isReview = prompt.includes('Independent Review Prompt')
+    state.requests[state.requests.length - 1].kind = isExplain ? 'explain' : isReview ? 'review' : 'select'
     const text =
       m.kind === 'badjson'
         ? '申し訳ありません。JSONを生成できませんでした。'
         : isExplain
           ? EXPLAIN_TEXT
-          : JSON.stringify(GOLDEN)
+          : isReview
+            ? JSON.stringify({ verdicts: REVIEW_VERDICTS })
+            : JSON.stringify(GOLDEN)
 
     res.writeHead(200, { 'content-type': 'text/event-stream', 'cache-control': 'no-cache' })
     const sse = (event, data) => res.write(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`)

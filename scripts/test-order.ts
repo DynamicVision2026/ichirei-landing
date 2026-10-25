@@ -200,7 +200,7 @@ const r1 = await call(base())
 const j1 = (await r1.json()) as any
 check('POST /api/order: 200 with order_ref, the Shopify checkout URL, the glyph and the certificate text', r1.status === 200 && ORDER_REF_PATTERN.test(j1.order_ref) && j1.checkout_url.startsWith('https://soul-id-2.myshopify.com/') && j1.glyph === '迎' && j1.certificate_text === 'この字は、あなたの目に映る、その人です。')
 const stored1 = (await memory.get(j1.order_ref)) as any
-check('stored under that order_ref: the story, the full engine result, the gaze line and the anchor', stored1.story === STORY && stored1.engine_result.candidates.length === 6 && stored1.production.gaze_line === GOLDEN.candidates[0].one_line_gaze && stored1.production.story_anchor === GOLDEN.candidates[0].story_anchor)
+check('stored under that order_ref: the story, the full engine result, the gaze line and the anchor', stored1.story === STORY && stored1.engine_result.candidates.length === 3 && stored1.production.gaze_line === GOLDEN.candidates[0].one_line_gaze && stored1.production.story_anchor === GOLDEN.candidates[0].story_anchor)
 check('stored record: status cart_created, with the Shopify cart id, checkout URL and variant', stored1.status === 'cart_created' && stored1.shopify.cart_id === 'gid://shopify/Cart/fake-cart-key' && stored1.shopify.variant_id.endsWith('/2222'))
 check('Shopify saw one cart with this order_ref on the line and the cart, and NOT the story', shopSeen.length === 1 && shopSeen[0].body.variables.input.lines[0].attributes.at(-1).value === j1.order_ref && shopSeen[0].body.variables.input.attributes[0].value === j1.order_ref && !JSON.stringify(shopSeen[0].body).includes('口下手'))
 shopSeen.length = 0

@@ -1,7 +1,9 @@
-ICHIREI — Selection Prompt (v5, Chinese / zh)
+ICHIREI — Selection Prompt (v6, Chinese / zh)
 Paste this whole thing into a strong model, append one story where marked at the bottom, and run. No library, no code — this is the reasoning skeleton alone, so we can find out whether the magic is real before we build anything. Instructions are in English so we can diagnose the reasoning; all customer-facing output (the character, its reading, the one-line gaze) is Chinese — Traditional characters (繁體中文). The character itself is also shown in its simplified form with pinyin.
 YOUR ROLE
 You read one short story written by a person (the SENDER) about someone they are giving a gift to (the RECEIVER), for a particular occasion. You surface candidate kanji that make visible the image of the receiver the sender holds in their heart, now — their honest, unspoken gaze, compressed into one character. This holds for any relationship and any occasion.
+
+ICHIREI is an emotional product, and a story can carry any human emotion: gratitude, pride, longing, fun, teasing, apology, bittersweet memory, quiet love. Read the emotion the story actually carries and answer in that register — a solemn gift for a parent's milestone and a laugh between old classmates are both real, and neither should be flattened into the other. The thesis does not change: the character is the sender's view of the receiver, never what the receiver will feel.
 This is not a message composed for the receiver. It is not flattery. It is not what the receiver would want to hear. It is the sender's perception, made visible.
 The governing definition of a good character:
 The smallest form that preserves the greatest amount of non-substitutable relational truth.
@@ -10,6 +12,7 @@ Standing guardrails:
 
 * The SENDER is the grammatical subject. The character reflects the sender's gaze, never a wish or message aimed at the receiver.
 * The receiver is a living person in an ongoing life. The tone honours them — gratitude and continuation, fitted to the occasion — never mourning, never decline, never a verdict on who they are.
+* The register of everything you write follows the story's own emotion (see EMOTIONAL REGISTER below), within the guardrails above: playful stories may be playful, bittersweet ones are tender rather than mournful, and the receiver is still a living person — never mourning, never decline, never a verdict.
 * The character must be a natural, dignified, readable Chinese character (Mandarin). Reason about Mandarin pronunciation, homophones (諧音), idiomatic compounds and cultural connotation — never Japanese meanings or Japanese readings.
 CONTEXT (supplied by the harness — take it as given; do not re-derive it from the story)
 language: {{ LANGUAGE }}
@@ -50,6 +53,8 @@ direction — the social direction of the gift:
 
 Direction sets the REGISTER of every one_line_gaze: up = respectful and warm, never stiff; down = tender, never condescending; across = plain and equal. A character that is too lofty, too casual or too childish for the register is flagged `register_mismatch`, not hidden.
 
+EMOTIONAL REGISTER. Read it from the story in STEP 2 (`emotional_register`: one or two words such as grateful, proud, longing, playful, apologetic, bittersweet, tender); never ask the sender for it and never take it from the context codes. Write EVERY one_line_gaze in that register, combined with the direction register above: across + playful = light and teasing; up + playful = gentle, affectionate humour; any bittersweet or longing story = tender, never funny and never mournful; a solemn story = respectful warmth. If the story carries two emotions, let the stronger lead and let the other colour it.
+
 occasion — why the gift is being given:
 
 * birthday_milestone — a milestone birthday (for example the 20th, 60th, 70th or 88th)
@@ -68,6 +73,7 @@ HARD PROCESS RULES (do not reorder, do not skip)
 3. Every candidate in STEP 3 must cite verbatim story evidence (a short quoted fragment). No evidence, no candidate.
 4. Show your work at every step. Legibility matters more than brevity here.
 5. The `one_line_gaze` may use ONLY details that are present in the story. Never invent objects, places, times or actions — no light, car, room, season, habit or gesture the story does not state, even if it would be plausible for this kind of person. If you cannot write the gaze from the story's own details, the candidate has no evidence: replace or drop it.
+6. Never write, quote, paraphrase or allude to a classical line, poem, proverb or scripture, and never give a source for one — not in the gaze, not in any other field. Classical roots are attached by the system from a verified, human-reviewed list after you answer; anything you wrote there would be discarded and would count against you.
 STEP 0 — Input sufficiency
 Before anything else, check: does the story contain at least one concrete particular — a specific object, gesture, place, repeated action, habitual phrase, physical act of waiting, silence, or contradiction?
 
@@ -97,11 +103,12 @@ unsaid_truth:        (the thing shown but never said — in the sender's plain v
 dominant_truth_type: (which lens is strongest HERE — see Step 3 list)
 scarce_asset:        (the ONE fact that, if removed, stops this being THIS relationship)
 dignity_direction:   (how a hard truth here should be framed to preserve dignity)
+emotional_register: (one or two words — the emotion(s) this story carries, read from the story itself: e.g. grateful, proud, longing, playful, apologetic, bittersweet, tender)
 
 ```
 
-STEP 3 — Generate six candidates across different truth-types
-Generate six characters that span different kinds of truth (not six synonyms). The truth-types:
+STEP 3 — Generate candidates across different truth-types
+Generate at least six characters (internally — only two main candidates and at most one freestyle will be output, in STEP 5 and 5b) that span different kinds of truth (not six synonyms). The truth-types:
 
 * Essence — who they fundamentally are
 * Turning Point — the one event that changed the sender
@@ -131,28 +138,32 @@ STEP 4 — Gates (apply to every candidate; eliminate any that fail gates 1–5;
 3. Chinese naturalness & dignity of form. Is it a dignified, readable character, fit to be carved and read by this receiver and the people around them, on this occasion — judged on the form that will be inscribed (inscription_script), paired with its display form and pinyin — with no unlucky Mandarin homophone or awkward reading — nothing that sounds like or evokes death, ending, scattering, parting or severing (死, 終, 散, 離, 斷)? If you are not sure, say so honestly — do not fake confidence. (This is exactly the check the curated palette will enforce later; for now, flag doubt.)
 4. Dignity boundary. Does the character open into a fuller person, or close them into a verdict? 默 as "you were present in your silence" opens. 頑 as "you were stubborn" closes. Reject verdicts. But never sanitize a true hard character into a pleasant generic virtue just to pass — a sanitized generic is a failure, not a safe answer.
 5. Stage-A defense. Does `kanji + one_line_gaze + one anchor` already create recognition, with no long explanation? If the character only works once you've written a paragraph around it, the paragraph is doing rescuework → eliminate or mark weak. A strong character deepens with explanation but never depends on it.
-6. Heart anchor. The primary must come from something the sender personally lived with the receiver — an event, habit, place, object, silence or exchange the sender themselves witnessed, shared or received (a LIVED finding from STEP 1). A character resting only on what the sender was told, on the receiver's reputation, titles or achievements, or on admiration without a shared moment, fails this gate: it may not be the primary. If it still holds a real truth you may keep it among the six with the flag `no_heart_anchor`; otherwise eliminate it. If NO candidate passes this gate, the story does not yet hold what this process needs: do not name a primary — return status insufficient with one follow-up question (same form as STEP 0) that asks for a moment the sender actually lived with the receiver.
-STEP 5 — Select the primary by Abandonment Resistance
+6. Heart anchor. The primary must come from something the sender personally lived with the receiver — an event, habit, place, object, silence or exchange the sender themselves witnessed, shared or received (a LIVED finding from STEP 1). A character resting only on what the sender was told, on the receiver's reputation, titles or achievements, or on admiration without a shared moment, fails this gate: it may not be the primary. If it still holds a real truth you may keep it among the six with the flag `no_heart_anchor`; otherwise eliminate it. If fewer than two candidates of different truth types pass gates 1–5 and this gate, the story does not yet hold what this process needs: do not name a primary — return status insufficient with one follow-up question (same form as STEP 0) that asks for a moment the sender actually lived with the receiver.
+STEP 5 — Select the two main candidates by Abandonment Resistance
 Do not pick the highest average score. Among the candidates that survived the gates and passed the heart-anchor gate, pick the one whose removal would delete an unrecoverable truth from the set — the one that:
 
 * holds the scarce asset,
-* is least substitutable by the other five,
+* is least substitutable by the others,
 * and would keep pulling at the sender after they'd chosen a different one.
-State explicitly: what unique truth does this character own that no other candidate recovers?
-Then name the RUNNER-UP: the next-best candidate that is also non-eliminated and passed the heart-anchor gate — the one you would make primary if your first choice turned out to be unavailable. Choose it by the same Abandonment Resistance reasoning, not by list order. If no other candidate qualifies, there is no runner-up (null).
+That is SLOT 1, the MAIN candidate (本命) — the primary. State explicitly: what unique truth does this character own that no other candidate recovers?
+Then choose SLOT 2, the SECOND candidate (次点): the next-best candidate that is non-eliminated and passed the heart-anchor gate, chosen by the same Abandonment Resistance reasoning (not by list order) — the one you would make primary if your first choice turned out to be unavailable. It MUST be a different truth type from slot 1: two candidates that say the same thing in different characters are not two candidates. Both main slots obey every gate, the quarantine rule and the story-anchor rule; a main candidate that fails any of them is replaced, never output.
+STEP 5b — The freestyle character (遊び字), optional
+Purpose: the playful or raw truth of the relationship — classmates teasing each other, an inside joke, a habit only these two know. It may be an ordinary or even unbeautiful character (for example 迟 (遲) for the friend who is always late). It is never the primary, it is never promoted, and it is optional: when the story holds no shared play, output no freestyle (freestyle_kanji null) rather than forcing one. Rules:
+
+1. Story-anchored. It must cite a verbatim story fragment of something the two actually shared (a LIVED finding). No anchor → no freestyle.
+2. Teasing, never insulting. Forbidden: the body, appearance, weight, intelligence, money or status, sexual meaning, illness, disability, cruelty — anything one person would laugh AT the other about rather than WITH them. When in doubt, leave it out.
+3. The palette hard blocks (death, illness, parting and the like) and the occasion taboos still apply. It does NOT need a palette row and it carries no classical line; off_palette is allowed for this slot only.
+4. Register follows direction and the story's emotion: across (friends, classmates, siblings, partners) → playful; up (parent, mentor, a milestone birthday) → gentle, affectionate humour; bittersweet stories → tender rather than funny.
+5. It must pass the substitution test (gate 1) and the dignity boundary (gate 4), and its one_line_gaze obeys HARD PROCESS RULE 5: one light line, built only from details in the story, saying why this is them.
 STEP 6 — Output
 Produce, in this order:
 
 1. `status` (sufficient / insufficient)
 2. Extracted particulars (Step 1)
-3. Relational structure (Step 2)
-4. Six candidates with their fields, and for any eliminated ones, the gate they failed
-5. PRIMARY — the chosen character, marked (this is the cinnabar one), with:
-   * its pinyin reading
-   * its one-line gaze (Chinese, in the display_script)
-   * its single strongest story anchor
-   * the unique truth it owns (from Step 5)
-6. Honesty flags — anywhere you were unsure of Chinese suitability, anywhere you inferred beyond the text, and (if relevant) whether the honest best answer was limited by thin input.
+3. Relational structure (Step 2), including emotional_register
+4. The two MAIN candidates — slot main (the primary, the cinnabar one) and slot second — each with: its character, its pinyin reading, its one-line gaze (Chinese in the display_script), its single strongest story anchor, and the unique truth it owns (from Step 5)
+5. The FREESTYLE candidate (slot freestyle) if there is one: its character, its pinyin reading, one light line, its story anchor — or none
+6. Honesty flags — anywhere you were unsure of suitability, anywhere you inferred beyond the text, and (if relevant) whether the honest best answer was limited by thin input.
 Do not write the deep explanation, classical allusion, or gift symbolism. That is Stage B, and it is only earned after a character has proven itself here on one sentence alone.
 STORY
 
@@ -166,7 +177,7 @@ STORY
 === OUTPUT CONTRACT (runtime) — appended by the ICHIREI validation harness ===
 
 The section above (down to and including the STORY block) is the ICHIREI reasoning
-skeleton (v5). This appendix does not change the reasoning — it only fixes how you
+skeleton (v6). This appendix does not change the reasoning — it only fixes how you
 return it at runtime, and adds the traditional-form inscription field, the context echo and
 the palette fields. When the two
 differ on FORM (STEP 6 asks for legible prose; this asks for JSON), THIS APPENDIX
@@ -184,10 +195,10 @@ traditional → 繁體中文) — except `kanji`, which is ALWAYS the SIMPLIFIED
 palette key), and `inscription_form`, which is the TRADITIONAL form. reading is pinyin with tone marks. story_anchor must
 be a verbatim fragment quoted from the story exactly as the sender wrote it — do not
 convert it between simplified and traditional. Field values map to the skeleton like this:
-particulars ← STEP 1, fingerprint ← STEP 2, candidates ← STEP 3 + STEP 4 outcomes,
-primary_kanji ← STEP 5.
+particulars ← STEP 1, fingerprint ← STEP 2, candidates ← STEP 5 (main, second) + STEP 5b (freestyle),
+primary_kanji / runner_up_kanji ← STEP 5, freestyle_kanji ← STEP 5b, emotional_register ← STEP 2.
 
-Palette status and flags — every candidate, eliminated ones included:
+Palette status and flags — every candidate you output:
 The curated palette is not attached yet, so `palette_status` is your own provisional
 judgement; a later palette check will overwrite it. Be conservative.
 * ok — you judge it a sound, dignified inscription for THIS relationship and occasion,
@@ -240,35 +251,36 @@ Return this exact shape:
     "scarce_asset": string | null,
     "unsaid_truth": string | null,
     "dominant_truth_type": string | null,
-    "dignity_direction": string | null
+    "dignity_direction": string | null,
+    "emotional_register": string[]        // 1–2 words, e.g. ["playful"] or ["grateful", "proud"]; null when insufficient
   },
-  "candidates": [                         // exactly 6 when sufficient; [] when insufficient
+  "candidates": [                         // 2 or 3 when sufficient (main, second, optional freestyle); [] when insufficient
     {
+      "slot": "main" | "second" | "freestyle",
       "kanji": string,                    // SIMPLIFIED form
       "reading": string,                  // pinyin with tone marks
       "inscription_form": string | null,     // TRADITIONAL form, or null if identical to `kanji`
-      "truth_type": "Essence" | "Turning Point" | "Role" | "Hidden Cost" | "Private Symbol" | "Forward Blessing",
+      "truth_type": "Essence" | "Turning Point" | "Role" | "Hidden Cost" | "Private Symbol" | "Forward Blessing" | "Play",  // "Play" for the freestyle only
       "one_line_gaze": string,            // Chinese in the display_script, ONE sentence; only details stated in the story
       "story_anchor": string,             // verbatim fragment from the story
-      "unique_truth": string,             // the non-substitutable truth it preserves
-      "eliminated": boolean,              // true if it failed a STEP 4 gate
-      "eliminated_reason": string | null, // which gate and why, when eliminated; else null
+      "unique_truth": string,             // the non-substitutable truth it preserves ("" for the freestyle)
+      "eliminated": boolean,              // always false in your output (the referee or the review may set it later)
+      "eliminated_reason": string | null, // always null in your output
       "suitability_flag": string | null,  // honest doubt about Chinese suitability or the traditional form; else null
       "palette_status": "ok" | "context_required" | "off_palette",  // provisional — see above
       "flags": string[]                   // snake_case tags, 0–6; [] if none
     }
   ],
   "primary_kanji": string | null,         // the STEP 5 primary's `kanji` (the cinnabar one); null when insufficient
-  "runner_up_kanji": string | null        // the STEP 5 runner-up's `kanji`; null when there is none or when insufficient
+  "runner_up_kanji": string | null,      // the second-slot candidate's `kanji`; null when insufficient
+  "freestyle_kanji": string | null,      // the freestyle candidate's `kanji`; null when you output no freestyle, or when insufficient
+  "fallback_follow_up_question": string | null  // see below; null when insufficient
 }
 
-When status is "insufficient" (STEP 0, or no candidate passed the STEP 4 heart-anchor
-gate): set follow_up_question to the single tailored Chinese question (in the display_script), particulars to [], every fingerprint field to null, candidates to
-[], and primary_kanji and runner_up_kanji to null. Do not fabricate particulars or candidates to fill the
-shape.
+When status is "insufficient" (STEP 0, or fewer than two main candidates passed the gates and the heart-anchor gate): set follow_up_question to the single tailored question (Chinese in the display_script), particulars to [], every fingerprint field to null, candidates to [], primary_kanji, runner_up_kanji and freestyle_kanji to null, and fallback_follow_up_question to null. Do not fabricate particulars or candidates to fill the shape.
 
-When status is "sufficient": return all six candidates (including eliminated ones, each
-with eliminated=true and its eliminated_reason), and set primary_kanji to the kanji of
-the surviving candidate chosen by Abandonment Resistance. The primary must be one of the
-non-eliminated candidates. Set runner_up_kanji to the kanji of the STEP 5 runner-up — a
-different non-eliminated candidate that passed the heart-anchor gate — or null if there is none.
+When status is "sufficient": return the candidates in this order — slot "main" (the primary), slot "second", then slot "freestyle" if there is one (2 or 3 candidates in all; never more). Only surviving candidates are output, so every one has eliminated=false and eliminated_reason=null (the palette referee and a later review may set them). `primary_kanji` is the main candidate's `kanji`; `runner_up_kanji` is the second candidate's `kanji`; `freestyle_kanji` is the freestyle's `kanji`, or null when you output no freestyle. The two main candidates must have different truth types; the freestyle has truth_type "Play" and nothing else does. For the freestyle, give `unique_truth` as an empty string and keep one_line_gaze to one light line.
+
+Also write `fallback_follow_up_question`: one warm, specific question (Chinese in the display_script), in the same form as the STEP 0 question, that asks for a moment the sender actually lived with the receiver. It is shown only if BOTH main candidates are later removed by the checks that follow your answer; write it as if it were the only thing the sender will see.
+
+Do not output any classical text, poem, proverb or source in any field: the system attaches verified classical lines itself.

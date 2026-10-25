@@ -3,6 +3,8 @@
 // engine/prompt.zh.md and engine/prompt.en.md, and with src/demo/types.ts (the frontend copy).
 //
 // v5: ICHIREI covers all relationships and occasions, in Japanese, Chinese and English.
+// v6: three candidates — two MAIN (slot main = the cinnabar primary, slot second = its backup) and one
+// FREESTYLE (遊び字) — plus the story's emotional register; classical lines come from the palette, never the model.
 // The code lists below are the ONLY place the allowed values are enumerated in
 // code; what each code MEANS lives in the prompt files (cardinal rule).
 
@@ -87,6 +89,10 @@ export interface EngineContext {
 
 /** Longest occasion_detail accepted — it is a short label, not a second story. */
 export const OCCASION_DETAIL_MAX = 60
+
+/** Longest story accepted (characters, counted as Unicode code points). No minimum: STEP 0 judges sufficiency by content. */
+export const STORY_MAX = 2000
+export const countChars = (text: string): number => [...text].length
 
 export const DEFAULT_CONTEXT: EngineContext = {
   language: 'ja',
@@ -173,6 +179,7 @@ export type TruthType =
   | 'Hidden Cost'
   | 'Private Symbol'
   | 'Forward Blessing'
+  | 'Play' // freestyle slot only: the playful or raw truth of the relationship
 
 export const TRUTH_TYPES: readonly TruthType[] = [
   'Essence',
@@ -181,7 +188,18 @@ export const TRUTH_TYPES: readonly TruthType[] = [
   'Hidden Cost',
   'Private Symbol',
   'Forward Blessing',
+  'Play',
 ]
+
+/** The three places a candidate can have. `main` is the primary (cinnabar), `second` its backup, `freestyle` (遊び字) never a primary. */
+export const SLOTS = ['main', 'second', 'freestyle'] as const
+export type Slot = (typeof SLOTS)[number]
+
+/** A verified classical line attached from a REVIEWED palette row. The model never writes this. */
+export interface ClassicalEcho {
+  text: string
+  source: string
+}
 
 /**
  * Per-candidate palette verdict in the ENGINE OUTPUT.
@@ -258,6 +276,12 @@ export interface RefereeAction {
     | 'blocked_occasion_eliminated' // the row lists this order's occasion in blocked_occasions: moved to eliminated
     | 'blocked_occasion_already_eliminated' // as above, but the model had already eliminated it
     | 'primary_refused_no_anchor' // context_required + anchor_required, no usable story anchor
+    | 'freestyle_anchor_missing_eliminated' // the freestyle's story_anchor is not a verbatim fragment of the story
+    | 'freestyle_blocked_eliminated' // the freestyle kanji is on the freestyle blocklist (body, money, illness …)
+    | 'freestyle_duplicate_eliminated' // the freestyle is the same character as a main slot
+    | 'classical_echo_required_eliminated' // REQUIRE_CLASSICAL_ECHO is on and a main candidate has no reviewed classical line
+    | 'review_eliminated' // the separate review call failed this candidate
+    | 'insufficient_no_main' // no main candidate survived: the result became `insufficient`
   detail: string
 }
 
@@ -268,12 +292,16 @@ export interface RefereeReport {
   primary_changed: boolean
   /** True when no candidate could be primary after the referee ran (primary_kanji is then null). */
   no_eligible_primary: boolean
-  /** How a replacement primary was chosen: the model's runner-up, or array order as the fallback. null = no promotion. */
-  promoted_from: 'runner_up' | 'array_order' | null
+  /** `second` when slot 2 replaced a removed slot 1; null = no promotion. The freestyle is never promoted. */
+  promoted_from: 'second' | null
   actions: RefereeAction[]
 }
 
 export interface Candidate {
+  /** v6: which of the three places this candidate holds. */
+  slot: Slot
+  /** v6: set by CODE from a reviewed palette row (main and second only); the model's own value is always overwritten. */
+  classical_echo?: ClassicalEcho | null
   /** ja: modern Japanese form. zh (both scripts): the SIMPLIFIED form — the palette key. */
   kanji: string
   /** ja: hiragana. zh: pinyin with tone marks. en: romaji, on and kun labelled (e.g. "on: tō · kun: akari"). */
@@ -292,6 +320,7 @@ export interface Candidate {
   truth_type: TruthType
   one_line_gaze: string
   story_anchor: string
+  /** The non-substitutable truth it preserves. Optional prose for the freestyle slot (may be empty there). */
   unique_truth: string
   eliminated: boolean
   eliminated_reason: string | null
@@ -309,6 +338,16 @@ export interface Fingerprint {
   unsaid_truth: string | null
   dominant_truth_type: string | null
   dignity_direction: string | null
+  /** v6: the emotion(s) the story carries (one or two words, e.g. grateful, playful, bittersweet). Read from the story, never asked. */
+  emotional_register: string[] | null
+}
+
+/** The separate review call's verdict, recorded on the result (engine/review.ts). */
+export interface ReviewReport {
+  ran: boolean
+  /** Why the call did not run or could not be used (the freestyle is dropped then; the main slots stand on the referee alone). */
+  skipped_reason: string | null
+  verdicts: { slot: Slot; kanji: string; pass: boolean; reason: string }[]
 }
 
 export interface EngineResult {
@@ -328,12 +367,22 @@ export interface EngineResult {
   candidates: Candidate[]
   primary_kanji: string | null
   /**
-   * v5: the model's STEP 5 runner-up — the candidate to promote if the primary is removed
-   * or refused by the palette referee. null = none (or insufficient).
+   * The slot-2 candidate (`second`): the one promoted if the primary is removed or refused.
+   * null = none (or insufficient, or already promoted).
    */
   runner_up_kanji: string | null
+  /** v6: the freestyle (遊び字) candidate's kanji, or null when there is none (no story anchor, refused by the referee or the review). */
+  freestyle_kanji: string | null
+  /**
+   * v6: one question, in the result's language, to ask if BOTH main candidates turn out unusable.
+   * Written by the model up front (wording lives in the prompt); the referee turns it into
+   * follow_up_question when it has to return `insufficient`. null on insufficient results.
+   */
+  fallback_follow_up_question?: string | null
   /** Set by the palette referee on every sufficient result; absent on insufficient ones. */
   referee?: RefereeReport
+  /** Set by the review call (engine/review.ts) when it ran. */
+  review?: ReviewReport
 }
 
 export type Condition = 'A' | 'B' | 'C'
@@ -384,37 +433,72 @@ export function validateEngineResult(raw: unknown): string[] {
     if ((r.candidates ?? []).length !== 0) problems.push('insufficient but candidates not empty')
     if (r.primary_kanji !== null) problems.push('insufficient but primary_kanji not null')
     if (r.runner_up_kanji !== undefined && r.runner_up_kanji !== null) problems.push('insufficient but runner_up_kanji not null')
+    if (r.freestyle_kanji !== undefined && r.freestyle_kanji !== null) problems.push('insufficient but freestyle_kanji not null')
     return problems
   }
 
   if (r.follow_up_question !== null) problems.push('sufficient but follow_up_question not null')
   if (!Array.isArray(r.particulars) || r.particulars.length === 0) problems.push('particulars empty')
+  const register = r.fingerprint?.emotional_register
+  if (!Array.isArray(register) || register.length < 1 || register.length > 2 || register.some((x) => typeof x !== 'string' || !x.trim())) {
+    problems.push('fingerprint.emotional_register must be 1–2 non-empty strings')
+  }
+  if (r.fallback_follow_up_question === undefined || r.fallback_follow_up_question === null || typeof r.fallback_follow_up_question !== 'string' || !r.fallback_follow_up_question.trim()) {
+    problems.push('fallback_follow_up_question missing')
+  }
   const cands = Array.isArray(r.candidates) ? r.candidates : []
-  if (cands.length !== 6) problems.push(`expected 6 candidates, got ${cands.length}`)
+  if (cands.length < 2 || cands.length > 3) problems.push(`expected 2 or 3 candidates (2 main + optional freestyle), got ${cands.length}`)
+  const bySlot = (slot: Slot) => cands.filter((c) => c?.slot === slot)
+  for (const slot of ['main', 'second'] as const) {
+    if (bySlot(slot).length !== 1) problems.push(`expected exactly one "${slot}" candidate, got ${bySlot(slot).length}`)
+  }
+  if (bySlot('freestyle').length > 1) problems.push('more than one freestyle candidate')
   cands.forEach((c, i) => {
     const at = `candidates[${i}]${c?.kanji ? ` (${c.kanji})` : ''}`
-    for (const k of ['kanji', 'reading', 'one_line_gaze', 'story_anchor', 'unique_truth'] as const) {
+    if (!(SLOTS as readonly string[]).includes(c?.slot as string)) problems.push(`${at}.slot invalid`)
+    const free = c?.slot === 'freestyle'
+    for (const k of ['kanji', 'reading', 'one_line_gaze', 'story_anchor'] as const) {
       if (typeof c?.[k] !== 'string' || !c[k]) problems.push(`${at}.${k} missing`)
     }
+    // unique_truth is a main-slot field; the freestyle has "kanji, reading, one_line_gaze, story_anchor" only.
+    if (!free && (typeof c?.unique_truth !== 'string' || !c.unique_truth)) problems.push(`${at}.unique_truth missing`)
     if (c?.inscription_form !== null && typeof c?.inscription_form !== 'string') problems.push(`${at}.inscription_form must be string|null`)
     if (r.language === 'en' && (typeof c?.meaning !== 'string' || !c.meaning.trim())) problems.push(`${at}.meaning missing (required for en)`)
     if (c?.meaning !== undefined && c.meaning !== null && typeof c.meaning !== 'string') problems.push(`${at}.meaning must be string|null`)
     if (!TRUTH_TYPES.includes(c?.truth_type as TruthType)) problems.push(`${at}.truth_type invalid`)
+    else if (free !== (c.truth_type === 'Play')) problems.push(`${at}: truth_type "Play" belongs to the freestyle slot only`)
     if (typeof c?.eliminated !== 'boolean') problems.push(`${at}.eliminated not boolean`)
     if (c?.eliminated && !c?.eliminated_reason) problems.push(`${at} eliminated without reason`)
     if (!PALETTE_STATUSES.includes(c?.palette_status as PaletteStatus)) problems.push(`${at}.palette_status invalid`)
     if (!Array.isArray(c?.flags) || c.flags.some((f) => typeof f !== 'string')) problems.push(`${at}.flags must be string[]`)
+    if (c?.classical_echo !== undefined && c.classical_echo !== null && (typeof c.classical_echo.text !== 'string' || typeof c.classical_echo.source !== 'string' || !c.classical_echo.text || !c.classical_echo.source)) {
+      problems.push(`${at}.classical_echo must be {text, source} or null`)
+    }
+    if (free && c?.classical_echo) problems.push(`${at}: the freestyle never carries a classical line`)
   })
+  const main = bySlot('main')[0]
+  const second = bySlot('second')[0]
+  if (main && second && main.truth_type === second.truth_type) problems.push('main and second must be different truth types')
+  const freestyle = bySlot('freestyle')[0]
+  if (freestyle && [main, second].some((m) => m && m.kanji === freestyle.kanji)) problems.push('freestyle repeats a main kanji')
+
   const primary = cands.find((c) => c.kanji === r.primary_kanji)
   if (r.runner_up_kanji === undefined) problems.push('runner_up_kanji missing')
   else if (r.runner_up_kanji !== null) {
     const ru = cands.find((c) => c.kanji === r.runner_up_kanji)
     if (!ru) problems.push('runner_up_kanji is not among the candidates')
     else if (ru.eliminated) problems.push('runner_up_kanji points at an eliminated candidate')
+    else if (ru.slot !== 'second') problems.push('runner_up_kanji must be the second-slot candidate')
     else if (r.runner_up_kanji === r.primary_kanji) problems.push('runner_up_kanji equals primary_kanji')
   }
-  if (r.primary_kanji === null && r.referee?.no_eligible_primary === true) return problems
+  if (r.freestyle_kanji === undefined) problems.push('freestyle_kanji missing')
+  else if (r.freestyle_kanji === null) {
+    if (freestyle && !freestyle.eliminated) problems.push('freestyle_kanji is null but a live freestyle candidate exists')
+  } else if (!freestyle || freestyle.kanji !== r.freestyle_kanji || freestyle.eliminated) {
+    problems.push('freestyle_kanji must be the live freestyle candidate')
+  }
   if (!primary) problems.push('primary_kanji is not among the candidates')
   else if (primary.eliminated) problems.push('primary_kanji points at an eliminated candidate')
+  else if (primary.slot === 'freestyle') problems.push('primary_kanji must not be the freestyle candidate')
   return problems
 }
