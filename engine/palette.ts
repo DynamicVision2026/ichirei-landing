@@ -25,7 +25,7 @@
 import { readFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { romanizeReadings } from './romaji.ts'
+import { chooseReading } from './romaji.ts'
 import {
   FAMILIES,
   INSCRIPTION_FITNESS,
@@ -523,16 +523,20 @@ export function plainMeaning(coreMeanings: string, family: Family): string {
 }
 
 /**
- * en: the reading, the Mandarin reading and the plain meaning come from the PALETTE (the model's memory is not
- * trusted for them). A character with no ja row (only possible for the freestyle) keeps what the model wrote.
+ * en: the reading (the model's pick, checked against the row), the Mandarin reading and the plain meaning come
+ * from the PALETTE (the model's memory is not trusted for them). A character with no ja row (only possible for the freestyle) keeps what the model wrote.
  */
 function withEnglishFields(c: Candidate, palette: Palette): Candidate {
   const ja = rowFor(palette, 'ja', c)
   const zh = rowFor(palette, 'zh', c)
   const out: Candidate = { ...c }
   if (ja) {
-    const reading = romanizeReadings(ja.readings)
-    if (reading) out.reading = reading
+    // ONE reading: the model's pick if the row has it, else the first kun reading. The full list stays internal.
+    const chosen = chooseReading(ja.readings, c.reading)
+    if (chosen) {
+      out.reading = chosen.reading
+      out.reading_options = chosen.options
+    }
     const meaning = plainMeaning(ja.raw.core_meanings, 'ja')
     if (meaning) out.meaning = meaning
   }

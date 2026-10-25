@@ -325,7 +325,7 @@ export interface Candidate {
   classical_echo?: ClassicalEcho | null
   /** ja: modern Japanese form. zh (both scripts): the SIMPLIFIED form — the palette key. */
   kanji: string
-  /** ja: hiragana. zh: pinyin with tone marks. en: the Japanese reading in romaji, from the palette row (e.g. "tō · hi · akari"). */
+  /** ja: hiragana. zh: pinyin with tone marks. en: ONE Japanese reading in romaji — the model's pick if the palette row has it, else the row's first kun reading (e.g. "akari"). */
   reading: string
   /**
    * en only: the core meaning of the character in English — one short plain phrase ("lamp", "morning"),
@@ -333,6 +333,8 @@ export interface Candidate {
    * model's own value is overwritten); only a freestyle with no palette row keeps the model's. Absent/null for ja and zh.
    */
   meaning?: string | null
+  /** en only, internal (never shown): every romaji reading of the palette row; `reading` is the ONE shown. */
+  reading_options?: string[]
   /** en only: the Mandarin reading (pinyin) when the zh palette has a row for the character; attached by code. */
   reading_zh?: string | null
   /**
@@ -498,6 +500,7 @@ export function validateEngineResult(raw: unknown): string[] {
       if (!c?.eliminated && (typeof c?.meaning !== 'string' || !c.meaning.trim())) problems.push(`${at}.meaning missing (required for en)`)
       if (typeof c?.why_this !== 'string' || !c.why_this.trim()) problems.push(`${at}.why_this missing (required for en)`)
       else if (c.why_this.includes('\n')) problems.push(`${at}.why_this must be one sentence`)
+      if (c?.reading_options !== undefined && !(Array.isArray(c.reading_options) && c.reading_options.every((x: unknown) => typeof x === 'string'))) problems.push(`${at}.reading_options must be string[]`)
       if (c?.reading_zh !== undefined && c.reading_zh !== null && typeof c.reading_zh !== 'string') problems.push(`${at}.reading_zh must be string|null`)
     }
     if (c?.meaning !== undefined && c.meaning !== null && typeof c.meaning !== 'string') problems.push(`${at}.meaning must be string|null`)

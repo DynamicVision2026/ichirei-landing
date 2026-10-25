@@ -11,6 +11,7 @@ import { join } from 'node:path'
 import { runEngine } from '../engine/engine.ts'
 import { validateEngineResult, type EngineResult } from '../engine/contract.ts'
 import { loadPalette } from '../engine/palette.ts'
+import { chooseReading } from '../engine/romaji.ts'
 import { MemoryOrderStore } from '../engine/order-store.ts'
 import { createOrderHandler } from '../api/order.ts'
 import { CERTIFICATE_LINE_EN } from '../src/order/certificate.ts'
@@ -105,13 +106,25 @@ try {
   const lamp = get(f, '灯')
   const welcome = get(f, '迎')
   const late = get(f, '遅')
-  check('(2) 灯: reading (romaji) "tō · hi · akari" and reading_zh "dēng" and meaning "lamp" come from the PALETTE — the model\'s MODEL-WRONG values are replaced', lamp.reading === 'tō · hi · akari' && lamp.reading_zh === 'dēng' && lamp.meaning === 'lamp', JSON.stringify(lamp))
-  check('(2) 迎 (which the model gave NO reading or meaning): filled from the palette too', welcome.reading === 'gei · mukaeru' && welcome.reading_zh === 'yíng' && welcome.meaning === 'welcome', JSON.stringify(welcome))
+  check('(2) 灯: ONE reading — the model picked "akari" (a reading of the row) and it is kept; reading_zh "dēng" and meaning "lamp" come from the PALETTE — the model\'s MODEL-WRONG values are replaced; the full list stays internal', lamp.reading === 'akari' && JSON.stringify(lamp.reading_options) === '["tō","hi","akari"]' && lamp.reading_zh === 'dēng' && lamp.meaning === 'lamp', JSON.stringify(lamp))
+  check('(2) 迎 (the model picked "mukaeru"): one reading, and reading_zh and meaning filled from the palette too', welcome.reading === 'mukaeru' && welcome.reading_zh === 'yíng' && welcome.meaning === 'welcome', JSON.stringify(welcome))
   check('(2) why_this is the model\'s one plain sentence and survives untouched; the gaze line too', lamp.why_this === 'Lamplight is the light you left on for me, every night.' && !lamp.why_this.includes('\n') && lamp.one_line_gaze === 'You left the porch light on every night until I got home.')
   check('(2) the freestyle 遅 has no palette row: it keeps the model\'s own reading and meaning, reading_zh is null (nothing invented)', loadPalette().lookup('ja', '遅') === undefined && late.reading === 'osoi' && late.meaning === 'late' && late.reading_zh === null && late.why_this !== undefined)
   check('(2) the result conforms to the v7 contract (reading, meaning, why_this on every live en candidate); freestyle kept', validateEngineResult(f).length === 0 && f.freestyle_kanji === '遅', validateEngineResult(f).join('; '))
-  check('(2) the review call saw the attached fields (it judges what the buyer will see)', (seen.find((s) => s.kind === 'review')?.prompt ?? '').includes('tō · hi · akari'))
+  check('(2) the review call saw the attached fields (it judges what the buyer will see)', (seen.find((s) => s.kind === 'review')?.prompt ?? '').match(/"reading": ?"akari"/) !== null)
   check('(2) no cross-check log line for a clean en answer', xlogs().length === 0)
+
+  // ONE reading: the model's pick if the row has it, else the first kun reading
+  const ROW = ['トウ', 'ひ', 'あか-り']
+  check('(2) reading pick: a reading of the row is kept (akari), also without macrons ("to" = tō), in kana (ひ), or in any case', chooseReading(ROW, 'akari')?.reading === 'akari' && chooseReading(ROW, 'to')?.reading === 'tō' && chooseReading(ROW, 'ひ')?.reading === 'hi' && chooseReading(ROW, ' Akari ')?.reading === 'akari' && chooseReading(ROW, 'akari')?.source === 'model')
+  check('(2) reading pick: "tomoshibi" is NOT a reading of 灯 in the palette → falls back to the first kun reading "hi"; so does a list, a blank, an unknown word or nothing', ['tomoshibi', 'tō · hi · akari', '', '   ', 'zzz', null, undefined].every((x) => chooseReading(ROW, x as string)?.reading === 'hi' && chooseReading(ROW, x as string)?.source === 'fallback'))
+  check('(2) reading pick: the full list stays internal (reading_options), in palette order; a row with only on-yomi falls back to its first reading; no readings → null', JSON.stringify(chooseReading(ROW, 'x')?.options) === '["tō","hi","akari"]' && chooseReading(['ケイ', 'ギョウ'], null)?.reading === 'kei' && chooseReading([], 'x') === null)
+  check('(2) the card shows ONE word: no " · " in any en main/second reading', [lamp, welcome].every((c) => !c.reading.includes('·') && !c.reading.includes(' ')))
+  // the model's pick changes the reading everywhere: card, certificate, Shopify
+  const tomoshibi = await run('en-fields-from-palette', (r) => { r.candidates[0].reading = 'tomoshibi' })
+  check('(2) the model picks "tomoshibi" (not on the row): the card falls back to "hi"', get(tomoshibi, '灯').reading === 'hi')
+  const toPick = await run('en-fields-from-palette', (r) => { r.candidates[0].reading = 'tō' })
+  check('(2) the model picks the on reading "tō" (on the row): kept as "tō"', get(toPick, '灯').reading === 'tō')
 
   // =============================================================================================
   // 3. the bilingual certificate: stored with the order, and certificate_meaning_en goes to Shopify
@@ -128,13 +141,13 @@ try {
   const res = await handler(new Request('http://x/api/order', { method: 'POST', body: JSON.stringify(orderBody(f, '灯', 'kyujitai')) }))
   const body = (await res.json()) as any
   check('(3) the order response carries the certificate object', res.status === 200 && body.certificate?.character === '燈' && body.certificate.meaning_en === 'lamp', JSON.stringify(body))
-  check('(3) certificate: character = the carved form (燈), reading in kana "トウ・ひ・あかり", romanization "tō · hi · akari", meaning_en "lamp"', body.certificate.character === '燈' && body.certificate.reading === 'トウ・ひ・あかり' && body.certificate.romanization === 'tō · hi · akari' && body.certificate.meaning_en === 'lamp')
+  check('(3) certificate: character = the carved form (燈), reading in kana "トウ・ひ・あかり", romanization = the ONE reading "akari" (not the list), meaning_en "lamp"', body.certificate.character === '燈' && body.certificate.reading === 'トウ・ひ・あかり' && body.certificate.romanization === 'akari' && body.certificate.romanization === lamp.reading && body.certificate.meaning_en === 'lamp')
   check('(3) certificate: line (the buyer\'s language = English) and line_en (always) are the exact English line', body.certificate.line === CERTIFICATE_LINE_EN && body.certificate.line_en === 'This character is the person as seen through your eyes.')
   const ref = body.order_ref
   const rec = (await store.get(ref)) as any
   check('(3) stored with the order (order store): production.certificate, next to certificate_text; story and follow_ups kept apart', rec.production.certificate.meaning_en === 'lamp' && rec.production.certificate.character === '燈' && rec.production.certificate_text === CERTIFICATE_LINE_EN && Array.isArray(rec.follow_ups))
   const attrs = carts[0].variables.input.lines[0].attributes as { key: string; value: string }[]
-  check('(3) Shopify: certificate_meaning_en = "lamp" is a line attribute right next to kanji, inscription_form and reading', attrs.map((x) => x.key).slice(0, 4).join() === 'kanji,inscription_form,reading,certificate_meaning_en' && attrs[3].value === 'lamp' && attrs[2].value === 'tō · hi · akari', JSON.stringify(attrs))
+  check('(3) Shopify: certificate_meaning_en = "lamp" is a line attribute right next to kanji, inscription_form and reading', attrs.map((x) => x.key).slice(0, 4).join() === 'kanji,inscription_form,reading,certificate_meaning_en' && attrs[3].value === 'lamp' && attrs[2].value === 'akari', JSON.stringify(attrs))
   check('(3) …and the story, the gaze line and why_this are NOT in what Shopify sees', !JSON.stringify(carts[0]).includes('porch light') && !JSON.stringify(carts[0]).includes('Lamplight'))
   const resModern = await handler(new Request('http://x/api/order', { method: 'POST', body: JSON.stringify(orderBody(f, '灯', 'modern')) }))
   check('(3) the sender\'s inscription choice changes the certificate character (modern 灯) but not the readings or meaning', ((await resModern.json()) as any).certificate.character === '灯')

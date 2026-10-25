@@ -119,7 +119,8 @@ Span several types; do not mechanically force exactly one per type. For each can
 
 ```
 kanji:            
-reading / meaning:  (do NOT write these for the main candidates — the system attaches the reading (romaji, plus the Mandarin pinyin when it has one) and a one-phrase English meaning from its verified list)
+reading:          (romaji — pick the ONE Japanese reading that fits the character's meaning in THIS story, e.g. "tomoshibi" or "akari" for 灯 — a single word, not a list. The system checks it is a real reading of the character and replaces it with the first kun reading if not.)
+meaning:          (do NOT write this for the main candidates — the system attaches the one-phrase English meaning, and the Mandarin pinyin when it has one, from its verified list)
 why_this:         (ONE plain-English sentence that connects what the character means to the quoted story moment — no kanji jargon: no on/kun, radicals or stroke talk. Example: "Lamplight is the plainest thing in your story — the light you left on for me.")
 truth_type:       
 scarce_asset_it_preserves:
@@ -161,7 +162,7 @@ Produce, in this order:
 2. Extracted particulars (Step 1)
 3. Relational structure (Step 2), including emotional_register
 4. The two MAIN candidates — slot main (the primary, the cinnabar one) and slot second — each with: its character, its one-line gaze (English), its why_this sentence, its single strongest story anchor, and the unique truth it owns (from Step 5)
-5. The FREESTYLE candidate (slot freestyle) if there is one: its character, its romaji reading and one-phrase English meaning (the only candidate for which you write these), one light line, its why_this sentence, its story anchor — or none
+5. The FREESTYLE candidate (slot freestyle) if there is one: its character, its single romaji reading and one-phrase English meaning (the only candidate for which you write the meaning), one light line, its why_this sentence, its story anchor — or none
 6. Honesty flags — anywhere you were unsure of suitability, anywhere you inferred beyond the text, and (if relevant) whether the honest best answer was limited by thin input.
 Do not write the deep explanation, classical allusion, or gift symbolism. That is Stage B, and it is only earned after a character has proven itself here on one sentence alone.
 STORY
@@ -250,7 +251,7 @@ Return this exact shape:
     {
       "slot": "main" | "second" | "freestyle",
       "kanji": string,                    // modern Japanese form
-      "reading": string,                  // FREESTYLE ONLY: romaji, e.g. "tomoshibi". Omit for main and second — the system attaches it.
+      "reading": string,                  // romaji, ONE reading only — the one that fits the meaning and the story, e.g. "tomoshibi". The system checks it against the character's real readings.
       "meaning": string,                  // FREESTYLE ONLY: one short plain English phrase, e.g. "lamplight". Omit for main and second.
       "why_this": string,                 // ONE plain-English sentence tying the character's meaning to the quoted story moment; no kanji jargon
       "inscription_form": string | null,     // old-form variant, or null if none exists

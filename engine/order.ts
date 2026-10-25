@@ -9,7 +9,7 @@ import { LANGUAGES, STORY_MAX as ENGINE_STORY_MAX, countChars, parseFollowUps, t
 import { PACKAGES, PACKAGE_PRICE_JPY, type PackageId } from '../src/order/packages.ts'
 import { CERTIFICATE_LINE_EN, certificateText } from '../src/order/certificate.ts'
 import { loadPalette, plainMeaning, type Palette } from './palette.ts'
-import { kanaToRomaji, romanizeReadings } from './romaji.ts'
+import { chooseReading, kanaToRomaji, romanizeReadings } from './romaji.ts'
 import { STYLES_BY_LANGUAGE, glyphFor, type InscriptionStyle } from '../src/order/inscription.ts'
 
 export const NAME_MAX = 40
@@ -47,7 +47,8 @@ export function buildCertificate(candidate: Candidate, glyph: string, language: 
     if (row && row.readings.length > 0) reading = romanization = row.readings.slice(0, 3).join(' / ')
   } else if (row && row.readings.length > 0) {
     reading = [...new Set(row.readings.map((r) => r.replace(/-/g, '')))].slice(0, 4).join('・')
-    romanization = romanizeReadings(row.readings)
+    // en shows ONE reading (the candidate's, already checked against the row); ja keeps the list
+    romanization = language === 'en' ? (chooseReading(row.readings, candidate.reading)?.reading ?? candidate.reading) : romanizeReadings(row.readings)
   } else if (language === 'ja') {
     romanization = kanaToRomaji(candidate.reading) || candidate.reading
   }

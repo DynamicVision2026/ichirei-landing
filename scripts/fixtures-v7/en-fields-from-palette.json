@@ -48,7 +48,7 @@
         "suitability_flag": null,
         "palette_status": "ok",
         "flags": [],
-        "reading": "MODEL-WRONG",
+        "reading": "akari",
         "meaning": "MODEL-WRONG",
         "reading_zh": "MODEL-WRONG"
       },
@@ -65,7 +65,10 @@
         "eliminated_reason": null,
         "suitability_flag": null,
         "palette_status": "context_required",
-        "flags": []
+        "flags": [],
+        "reading": "mukaeru",
+        "meaning": "MODEL-WRONG",
+        "reading_zh": "MODEL-WRONG"
       },
       {
         "slot": "freestyle",

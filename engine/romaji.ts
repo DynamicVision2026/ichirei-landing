@@ -75,3 +75,36 @@ export function romanizeReadings(readings: readonly string[], max = 4): string {
   }
   return seen.join(' · ')
 }
+
+const plainLetters = (s: string) => s.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z]/g, '')
+const hiraganaOf = (s: string) => toHiragana(s).replace(/-/g, '').trim()
+
+export interface ChosenReading {
+  /** The ONE romaji reading to show (macrons kept, e.g. "tō" or "akari"). */
+  reading: string
+  /** Every romaji reading of the row, in palette order — kept internal, never shown. */
+  options: string[]
+  /** "model": the model's pick is one of the row's readings; "fallback": it was missing or not on the row. */
+  source: 'model' | 'fallback'
+}
+
+/**
+ * English shows ONE reading. The model picks the one that fits the meaning and the story; this only checks the
+ * pick is one of the palette row's readings (romaji with or without macrons, or the kana) and otherwise falls
+ * back to the first kun reading (the first hiragana reading; the first reading if the row has no kun).
+ * Plumbing only: no reading is chosen by code on its merits.
+ */
+export function chooseReading(readings: readonly string[], modelPick: string | null | undefined): ChosenReading | null {
+  const entries = readings.map((r) => ({ kana: hiraganaOf(r), romaji: kanaToRomaji(r), kun: !/[ァ-ヶ]/.test(r) })).filter((e) => e.romaji)
+  if (entries.length === 0) return null
+  const options = [...new Set(entries.map((e) => e.romaji))]
+  const pick = typeof modelPick === 'string' ? modelPick.trim() : ''
+  if (pick) {
+    const key = plainLetters(pick)
+    const kana = hiraganaOf(pick)
+    const hit = entries.find((e) => (key !== '' && plainLetters(e.romaji) === key) || e.kana === kana)
+    if (hit) return { reading: hit.romaji, options, source: 'model' }
+  }
+  const fallback = entries.find((e) => e.kun) ?? entries[0]
+  return { reading: fallback.romaji, options, source: 'fallback' }
+}
