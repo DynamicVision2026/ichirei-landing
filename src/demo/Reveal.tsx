@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { AnimatePresence, motion, useReducedMotion } from 'framer-motion'
 import type { Candidate, Condition, EngineResult } from './types'
 import { log } from './logging'
+import { choiceOf, track } from './analytics'
 import { carvedGlyph, contextToPayload, isChineseUi, type Copy, type GiftContext, type InscriptionScript, type UiLanguage } from './i18n'
 
 // Progressive reveal (build spec §8) + condition presentation (§5) + the
@@ -154,6 +155,7 @@ export default function Reveal({ result, story, followUps = [], condition, copy,
     flushDwell()
     log('final_selection', { kanji: selected })
     const chosen = result.candidates.find((c) => c.kanji === selected)
+    if (chosen) track('chosen', diagnostics ? 'harness' : 'customer', choiceOf(chosen, result.primary_kanji))
     if (onFinalize && chosen) {
       onFinalize(chosen) // the customer flow moves on to the order form; selection stays so "back" works
       return
@@ -195,6 +197,7 @@ export default function Reveal({ result, story, followUps = [], condition, copy,
       const data = await res.json()
       if (!res.ok) throw new Error(data?.error ?? `HTTP ${res.status}`)
       setExplanations((m) => ({ ...m, [c.kanji]: data.explanation }))
+      track('explain_opened', diagnostics ? 'harness' : 'customer', choiceOf(c, result.primary_kanji))
     } catch (e) {
       setExplainError(e instanceof Error ? e.message : String(e))
     } finally {
@@ -249,6 +252,11 @@ export default function Reveal({ result, story, followUps = [], condition, copy,
                   <p className="font-serif-jp mt-3 border-l-2 border-gold/40 pl-3 text-sm text-ivory/55" data-anchor>
                     「{c.story_anchor}」
                   </p>
+                  {c.why_this && (
+                    <p className="font-serif-jp mt-3 text-sm italic leading-relaxed text-ivory/65" data-why-this>
+                      {c.why_this}
+                    </p>
+                  )}
                   {!isFreestyle && c.classical_echo && (
                     <p className="font-serif-jp mt-3 text-xs leading-relaxed text-ivory/45" data-classical>
                       「{c.classical_echo.text}」 — {c.classical_echo.source}

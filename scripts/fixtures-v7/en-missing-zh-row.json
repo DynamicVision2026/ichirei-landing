@@ -1,0 +1,91 @@
+{
+  "name": "en-missing-zh-row",
+  "story": "Dad waited at the station every Friday, and he never once said he was waiting. He only ever asked whether the train was on time.",
+  "context": {
+    "language": "en",
+    "relationship": "parent_father",
+    "direction": "up",
+    "occasion": "parent_day",
+    "occasion_detail": null
+  },
+  "model_reply": {
+    "language": "en",
+    "relationship": "parent_father",
+    "direction": "up",
+    "occasion": "parent_day",
+    "occasion_detail": null,
+    "inscription_script": null,
+    "status": "sufficient",
+    "follow_up_question": null,
+    "particulars": [
+      "waited at the station"
+    ],
+    "fingerprint": {
+      "relationship_note": "granddaughter → grandmother",
+      "scarce_asset": "waited at the station",
+      "unsaid_truth": "",
+      "dominant_truth_type": "Role",
+      "dignity_direction": "",
+      "emotional_register": [
+        "grateful"
+      ]
+    },
+    "candidates": [
+      {
+        "slot": "main",
+        "kanji": "駅",
+        "inscription_form": "驛",
+        "truth_type": "Role",
+        "one_line_gaze": "You waited at the station every Friday.",
+        "story_anchor": "waited at the station every Friday",
+        "why_this": "The station is where your waiting happened, week after week.",
+        "unique_truth": "u",
+        "eliminated": false,
+        "eliminated_reason": null,
+        "suitability_flag": null,
+        "palette_status": "ok",
+        "flags": []
+      },
+      {
+        "slot": "second",
+        "kanji": "待",
+        "inscription_form": "待",
+        "truth_type": "Hidden Cost",
+        "one_line_gaze": "You never once said you were waiting.",
+        "story_anchor": "never once said he was waiting",
+        "why_this": "Waiting is what you did, and never mentioned.",
+        "unique_truth": "u",
+        "eliminated": false,
+        "eliminated_reason": null,
+        "suitability_flag": null,
+        "palette_status": "ok",
+        "flags": []
+      }
+    ],
+    "primary_kanji": "駅",
+    "runner_up_kanji": "待",
+    "freestyle_kanji": null,
+    "fallback_follow_up_question": "Could you tell me one Friday you remember?"
+  },
+  "review_reply": {
+    "verdicts": [
+      {
+        "slot": "main",
+        "kanji": "駅",
+        "pass": true,
+        "reason": "ok"
+      },
+      {
+        "slot": "second",
+        "kanji": "待",
+        "pass": true,
+        "reason": "ok"
+      }
+    ]
+  },
+  "expect": {
+    "primary": "待",
+    "eliminated": "駅",
+    "reason": "palette: no_row_in_zh"
+  }
+}

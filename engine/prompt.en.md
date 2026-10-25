@@ -13,7 +13,8 @@ Standing guardrails:
 * The SENDER is the grammatical subject. The character reflects the sender's gaze, never a wish or message aimed at the receiver.
 * The receiver is a living person in an ongoing life. The tone honours them — gratitude and continuation, fitted to the occasion — never mourning, never decline, never a verdict on who they are.
 * The register of everything you write follows the story's own emotion (see EMOTIONAL REGISTER below), within the guardrails above: playful stories may be playful, bittersweet ones are tender rather than mournful, and the receiver is still a living person — never mourning, never decline, never a verdict.
-* The character must be a natural, dignified, readable Japanese kanji. Reason about Japanese readings and connotations — never Chinese meanings — even though the sender reads English. The sender will not be able to judge the character's connotations for themselves, so you carry that responsibility: a character with an unlucky reading, a funeral or parting overtone, or an awkward register in Japan is not acceptable just because its English gloss sounds lovely.
+* The character must be a natural, dignified, readable Japanese kanji. Reason about Japanese readings and connotations first — even though the sender reads English. The sender will not be able to judge the character's connotations for themselves, so you carry that responsibility: a character with an unlucky reading, a funeral or parting overtone, or an awkward register in Japan is not acceptable just because its English gloss sounds lovely.
+* This gift is going to be shown to people in other kanji cultures too — friends in Taiwan, Hong Kong, Macau, Singapore, Korea. So ALSO check the character against its Mandarin reading and its Chinese meanings and homophones: a character that is fine in Japanese but sounds like death, ending, parting or severing in Mandarin (for example 鐘, 絆 or 断) must not be a main candidate. Prefer ordinary, well-known characters used in BOTH Japanese and Chinese; a character used only in Japan (for example 駅, 峠 or 凪) can only be the freestyle.
 * This is not a "what does my name / my word look like in kanji" tool. A person reaching for a kanji to express a feeling in English tends to ask for a famous character that suits the feeling in the abstract (the "tattoo kanji" cliché: love, strength, courage, peace, warrior, dragon). That is the failure to avoid. The character must come out of THIS story's particulars, never out of a feeling or a word the sender could have looked up.
 CONTEXT (supplied by the harness — take it as given; do not re-derive it from the story)
 language: {{ LANGUAGE }}
@@ -118,8 +119,8 @@ Span several types; do not mechanically force exactly one per type. For each can
 
 ```
 kanji:            
-reading:          (romaji, Hepburn with macrons — the character's Japanese on and kun readings, labelled: e.g. "on: tō · kun: hi, tomoshibi")
-meaning:          (the character's core meaning in English — a short phrase, e.g. "lamp; light that is kept lit")
+reading / meaning:  (do NOT write these for the main candidates — the system attaches the reading (romaji, plus the Mandarin pinyin when it has one) and a one-phrase English meaning from its verified list)
+why_this:         (ONE plain-English sentence that connects what the character means to the quoted story moment — no kanji jargon: no on/kun, radicals or stroke talk. Example: "Lamplight is the plainest thing in your story — the light you left on for me.")
 truth_type:       
 scarce_asset_it_preserves:
 story_anchor:     (verbatim fragment — the evidence)
@@ -133,7 +134,7 @@ STEP 4 — Gates (apply to every candidate; eliminate any that fail gates 1–5;
 
 1. Substitution Test. Mentally swap the names and surface details for another family, couple, friendship or team. Does the `one_line_gaze` still fit? If yes → generic → eliminate.
 2. Scarcity / counterfactual. Remove the central event from the story. Does the character still fit perfectly? If yes → it wasn't holding the scarce asset → eliminate.
-3. Japanese naturalness & dignity of form. Is it a dignified, readable kanji, fit to be carved and read in Japan, on this occasion, with no unlucky or awkward reading, and not a character a Japanese reader would find comic or clichéd on a gift (the tattoo-kanji effect)? If you are not sure, say so honestly — do not fake confidence. (This is exactly the check the curated palette will enforce later; for now, flag doubt.)
+3. Japanese naturalness & dignity of form. Is it a dignified, readable kanji, fit to be carved and read in Japan, on this occasion, with no unlucky or awkward reading, no unlucky Mandarin reading or homophone either (the gift may be shown in the Chinese-speaking world), and not a character a Japanese reader would find comic or clichéd on a gift (the tattoo-kanji effect)? If you are not sure, say so honestly — do not fake confidence. (This is exactly the check the curated palette will enforce later; for now, flag doubt.)
 4. Dignity boundary. Does the character open into a fuller person, or close them into a verdict? 黙 as "you were present in your silence" opens. 頑 as "you were stubborn" closes. Reject verdicts. But never sanitize a true hard character into a pleasant generic virtue just to pass — a sanitized generic is a failure, not a safe answer.
 5. Stage-A defense. Does `kanji + one_line_gaze + one anchor` already create recognition, with no long explanation? If the character only works once you've written a paragraph around it, the paragraph is doing rescuework → eliminate or mark weak. A strong character deepens with explanation but never depends on it.
 6. Heart anchor. The primary must come from something the sender personally lived with the receiver — an event, habit, place, object, silence or exchange the sender themselves witnessed, shared or received (a LIVED finding from STEP 1). A character resting only on what the sender was told, on the receiver's reputation, titles or achievements, or on admiration without a shared moment, fails this gate: it may not be the primary. If it still holds a real truth you may keep it among the six with the flag `no_heart_anchor`; otherwise eliminate it. If fewer than two candidates of different truth types pass gates 1–5 and this gate, the story does not yet hold what this process needs: do not name a primary — return status insufficient with one follow-up question (same form as STEP 0) that asks for a moment the sender actually lived with the receiver.
@@ -159,8 +160,8 @@ Produce, in this order:
 1. `status` (sufficient / insufficient)
 2. Extracted particulars (Step 1)
 3. Relational structure (Step 2), including emotional_register
-4. The two MAIN candidates — slot main (the primary, the cinnabar one) and slot second — each with: its character, its romaji reading and English meaning, its one-line gaze (English), its single strongest story anchor, and the unique truth it owns (from Step 5)
-5. The FREESTYLE candidate (slot freestyle) if there is one: its character, its romaji reading and English meaning, one light line, its story anchor — or none
+4. The two MAIN candidates — slot main (the primary, the cinnabar one) and slot second — each with: its character, its one-line gaze (English), its why_this sentence, its single strongest story anchor, and the unique truth it owns (from Step 5)
+5. The FREESTYLE candidate (slot freestyle) if there is one: its character, its romaji reading and one-phrase English meaning (the only candidate for which you write these), one light line, its why_this sentence, its story anchor — or none
 6. Honesty flags — anywhere you were unsure of suitability, anywhere you inferred beyond the text, and (if relevant) whether the honest best answer was limited by thin input.
 Do not write the deep explanation, classical allusion, or gift symbolism. That is Stage B, and it is only earned after a character has proven itself here on one sentence alone.
 STORY
@@ -176,7 +177,7 @@ STORY
 
 The section above (down to and including the STORY block) is the ICHIREI reasoning
 skeleton (v6). This appendix does not change the reasoning — it only fixes how you
-return it at runtime, and adds the kyūjitai inscription field, the romaji reading and English meaning, the context echo and the
+return it at runtime, and adds the kyūjitai inscription field, the why_this sentence, the context echo and the
 palette fields. When the two
 differ on FORM (STEP 6 asks for legible prose; this asks for JSON), THIS APPENDIX
 WINS. When they differ on REASONING, the skeleton above wins — nothing here relaxes a
@@ -187,8 +188,7 @@ the "show your work" — do not print it). Then emit EXACTLY ONE JSON object and
 else: no prose preamble, no explanation, no markdown code fences, no trailing text.
 The very first character of your output must be `{` and the very last must be `}`.
 
-Customer-facing string values: `kanji` is the Japanese character; `reading` is romaji
-(on and kun, labelled) and `meaning` is its English core meaning; `one_line_gaze` and
+Customer-facing string values: `kanji` is the Japanese character; `one_line_gaze`, `why_this` and
 `follow_up_question` are English. story_anchor must be a verbatim fragment quoted from the
 story (English, exactly as written). Field values map to the skeleton like this:
 particulars ← STEP 1, fingerprint ← STEP 2, candidates ← STEP 5 (main, second) + STEP 5b (freestyle),
@@ -222,7 +222,7 @@ one exists. For every candidate, set `inscription_form` to the character's kyūj
 to null when the character has no distinct kyūjitai form (its modern and old forms are
 identical, e.g. 迎, 送, 山). Judge STEP 4 gate 3 (naturalness/readability) on the modern
 form PAIRED WITH its reading — a character passes if it reads naturally when shown
-alongside its modern form, romaji and English meaning, even if the kyūjitai alone would be obscure. You
+alongside its modern form and romaji, even if the kyūjitai alone would be obscure. You
 have no kyūjitai lookup table; supply the variant from your own knowledge and, whenever
 you are not confident the kyūjitai form is correct, say so in that candidate's
 `suitability_flag`. Never guess silently.
@@ -250,8 +250,9 @@ Return this exact shape:
     {
       "slot": "main" | "second" | "freestyle",
       "kanji": string,                    // modern Japanese form
-      "reading": string,                  // romaji, on and kun labelled, e.g. "on: tō · kun: hi, tomoshibi"
-      "meaning": string,                  // English core meaning, a short phrase
+      "reading": string,                  // FREESTYLE ONLY: romaji, e.g. "tomoshibi". Omit for main and second — the system attaches it.
+      "meaning": string,                  // FREESTYLE ONLY: one short plain English phrase, e.g. "lamplight". Omit for main and second.
+      "why_this": string,                 // ONE plain-English sentence tying the character's meaning to the quoted story moment; no kanji jargon
       "inscription_form": string | null,     // old-form variant, or null if none exists
       "truth_type": "Essence" | "Turning Point" | "Role" | "Hidden Cost" | "Private Symbol" | "Forward Blessing" | "Play",  // "Play" for the freestyle only
       "one_line_gaze": string,            // English, ONE sentence; only details stated in the story, referencing at least one

@@ -315,7 +315,11 @@ const mockPage = async (browser, { onExplain, result, order, track } = {}) => {
   const page = await browser.newPage({ viewport: { width: 1100, height: 950 } })
   const errors = []
   page.on('pageerror', (e) => errors.push(String(e)))
-  const calls = { select: [], explain: [], order: [], track: [] }
+  const calls = { select: [], explain: [], order: [], track: [], analytics: [] }
+  await page.route('**/api/analytics', async (route) => {
+    try { calls.analytics.push(JSON.parse(route.request().postData() ?? '{}')) } catch {}
+    await route.fulfill({ status: 204, body: '' })
+  })
   if (track) {
     await page.route('**/api/track', async (route) => {
       const body = JSON.parse(route.request().postData() ?? '{}')
@@ -824,10 +828,10 @@ const mockPage = async (browser, { onExplain, result, order, track } = {}) => {
     r.inscription_script = null
     r.primary_kanji = '灯'
     r.runner_up_kanji = null
-    r.candidates = r.candidates.slice(0, 3).map((c, i) => ({ ...c, eliminated: false, eliminated_reason: null, meaning: ['lamp; a light kept lit', 'to wait', 'to welcome'][i] }))
-    r.candidates[0] = { ...r.candidates[0], kanji: '灯', inscription_form: '燈', reading: 'on: tō · kun: hi, akari', one_line_gaze: 'You left the porch light on every night.', story_anchor: 'left the porch light on' }
-    r.candidates[1] = { ...r.candidates[1], kanji: '待', inscription_form: null, reading: 'on: tai · kun: ma(tsu)' }
-    r.candidates[2] = { ...r.candidates[2], kanji: '迎', inscription_form: null, reading: 'on: gei · kun: mukae(ru)' }
+    r.candidates = r.candidates.slice(0, 3).map((c, i) => ({ ...c, eliminated: false, eliminated_reason: null, meaning: ['lamp', 'wait', 'welcome'][i], why_this: ['Lamplight is the light you left on for me.', 'Waiting is what you did, and never mentioned.', 'Welcoming is what the door meant.'][i], reading_zh: ['dēng', 'dài', 'yíng'][i] }))
+    r.candidates[0] = { ...r.candidates[0], kanji: '灯', inscription_form: '燈', reading: 'tō · hi · akari', one_line_gaze: 'You left the porch light on every night.', story_anchor: 'left the porch light on' }
+    r.candidates[1] = { ...r.candidates[1], kanji: '待', inscription_form: null, reading: 'tai · matsu' }
+    r.candidates[2] = { ...r.candidates[2], kanji: '迎', inscription_form: null, reading: 'gei · mukaeru' }
     return r
   }
   const { page, errors, calls } = await mockPage(browser, { result: enResult, order, onExplain: 'She kept the porch light on, and that was all she said.' })
@@ -856,21 +860,25 @@ const mockPage = async (browser, { onExplain, result, order, track } = {}) => {
   const sel = calls.select[0]
   check('en payload: language en, the context and occasion_detail, and NO inscription_script', sel.language === 'en' && sel.relationship === 'parent_mother' && sel.direction === 'up' && sel.occasion === 'birthday_milestone' && sel.occasion_detail === '70th birthday' && !('inscription_script' in sel), JSON.stringify(sel))
   const lamp = page.locator('article').filter({ has: page.locator('[data-glyph]:text-is("燈")') })
-  check('en reveal: the carved glyph is the Japanese kyūjitai 燈, shown with the modern 灯, the romaji on/kun reading and the English meaning', (await lamp.count()) === 1 && await lamp.locator('text=灯 · on: tō · kun: hi, akari — lamp; a light kept lit').isVisible())
+  check('en reveal: the carved glyph is the Japanese kyūjitai 燈, shown with the modern 灯, the romaji reading (from the palette), the pinyin and the one-phrase English meaning', (await lamp.count()) === 1 && await lamp.locator('text=灯 · tō · hi · akari · pinyin dēng — lamp').isVisible())
   check('en reveal: the note says what is carved (kyūjitai) and shows the modern form', await lamp.locator('text=Carved in the old form, kyūjitai (modern form: 灯)').isVisible())
   const plainCard = page.locator('article').filter({ has: page.locator('[data-glyph]:text-is("待")') })
-  check('en reveal: a character with no distinct old form shows romaji and meaning only', await plainCard.locator('text=on: tai · kun: ma(tsu) — to wait').isVisible())
+  check('en reveal: a character with no distinct old form shows romaji and meaning only', await plainCard.locator('text=tai · matsu · pinyin dài — wait').isVisible())
+  check('en reveal: each card shows the model\'s one plain-English why_this sentence under the gaze line', (await lamp.locator('[data-why-this]').innerText()) === 'Lamplight is the light you left on for me.' && (await plainCard.locator('[data-why-this]').innerText()) === 'Waiting is what you did, and never mentioned.')
+  check('learning loop: the select call carries a random session id and source "customer" — and nothing else new', /^[A-Za-z0-9_-]{16,64}$/.test(calls.select[0].session) && calls.select[0].source === 'customer')
   await lamp.click()
   await lamp.locator('text=Choose this character').click()
   await page.screenshot({ path: `${SHOTS}/e2e-reveal-en.png`, fullPage: true })
   await page.click(`button:has-text("${FINALIZE.en}")`)
+  await page.waitForTimeout(300)
+  check('learning loop: choosing a card reports ONE event "chosen" with the kind of card (灯 is the main) — and no story, kanji or name', calls.analytics.filter((e) => e.event === 'chosen').length === 1 && calls.analytics.find((e) => e.event === 'chosen').choice === 'main' && calls.analytics.find((e) => e.event === 'chosen').session === calls.select[0].session && Object.keys(calls.analytics[0]).sort().join() === 'choice,event,session,source' && !JSON.stringify(calls.analytics).includes('灯'))
 
   // -- the order form
   const form = page.locator('[data-testid=order-form]')
   await form.waitFor()
   check('en order form: kyūjitai (燈) pre-selected, modern (灯) offered; never traditional/simplified', (await page.locator('input[name=inscription_style][value=kyujitai]').isChecked()) && (await page.locator('input[name=inscription_style][value=modern]').count()) === 1 && (await page.locator('input[name=inscription_style][value=traditional]').count()) === 0 && (await page.locator('[data-order-glyph]').innerText()) === '燈')
-  check('en order form: English labels, packages and the romaji + meaning line under the glyph', (await form.innerText()).includes('Your order') && (await form.innerText()).includes('Requested delivery date') && (await form.innerText()).includes('Old form (kyūjitai)') && (await form.innerText()).includes('on: tō · kun: hi, akari — lamp; a light kept lit') && (await form.innerText()).includes('¥18,850'))
-  check('en certificate: "This character is the person, as seen through your eyes." and the shipping line', (await page.locator('[data-certificate]').innerText()) === 'This character is the person, as seen through your eyes.' && (await page.locator('[data-shipping]').innerText()) === 'Free shipping in Japan · ¥6,000 international shipping' && (await page.locator('[data-price=standard]').innerText()) === '¥18,850')
+  check('en order form: English labels, packages and the romaji + meaning line under the glyph', (await form.innerText()).includes('Your order') && (await form.innerText()).includes('Requested delivery date') && (await form.innerText()).includes('Old form (kyūjitai)') && (await form.innerText()).includes('tō · hi · akari · pinyin dēng — lamp') && (await form.innerText()).includes('¥18,850'))
+  check('en certificate: "This character is the person as seen through your eyes." and the shipping line', (await page.locator('[data-certificate]').innerText()) === 'This character is the person as seen through your eyes.' && (await page.locator('[data-shipping]').innerText()) === 'Free shipping in Japan · ¥6,000 international shipping' && (await page.locator('[data-price=standard]').innerText()) === '¥18,850')
   await page.fill('input[name=sender_name]', 'Emily Carter')
   await page.fill('input[name=receiver_name]', 'Margaret Carter')
   const d = new Date(); d.setDate(d.getDate() + 20)
@@ -895,6 +903,7 @@ const mockPage = async (browser, { onExplain, result, order, track } = {}) => {
   await submit.click()
   await page.waitForSelector('#co', { timeout: 8000 })
   const b = calls.order.at(-1)
+  check('learning loop: the order carries the same session id (the server records "ordered"), source customer', b.session === calls.select[0].session && b.source === 'customer')
   check('en order payload: language en, kyūjitai, Simple package, the names; no price, no glyph', b.language === 'en' && b.inscription_style === 'kyujitai' && b.package === 'simple' && b.sender_name === 'Emily Carter' && b.receiver_name === 'Margaret Carter' && b.selected_kanji === '灯' && b.engine_result.language === 'en' && !('price' in b) && !('glyph' in b))
   check('…and the browser is at the checkout URL', page.url().includes('cart=en'))
   check('no page errors (run 13, customer flow)', errors.length === 0)
@@ -909,8 +918,8 @@ const mockPage = async (browser, { onExplain, result, order, track } = {}) => {
     r.inscription_script = null
     r.primary_kanji = '灯'
     r.runner_up_kanji = null
-    r.candidates = r.candidates.slice(0, 3).map((c, i) => ({ ...c, eliminated: false, eliminated_reason: null, meaning: ['lamp; a light kept lit', 'to wait', 'to welcome'][i] }))
-    r.candidates[0] = { ...r.candidates[0], kanji: '灯', inscription_form: '燈', reading: 'on: tō · kun: hi, akari', one_line_gaze: 'You left the porch light on every night.', story_anchor: 'left the porch light on' }
+    r.candidates = r.candidates.slice(0, 3).map((c, i) => ({ ...c, eliminated: false, eliminated_reason: null, meaning: ['lamp', 'wait', 'welcome'][i], why_this: ['Lamplight is the light you left on for me.', 'Waiting is what you did, and never mentioned.', 'Welcoming is what the door meant.'][i], reading_zh: ['dēng', 'dài', 'yíng'][i] }))
+    r.candidates[0] = { ...r.candidates[0], kanji: '灯', inscription_form: '燈', reading: 'tō · hi · akari', one_line_gaze: 'You left the porch light on every night.', story_anchor: 'left the porch light on' }
     return r
   }
   const { page, errors, calls } = await mockPage(browser, { result: enResultDemo, onExplain: 'She kept the porch light on, and that was all she said.' })
@@ -932,7 +941,8 @@ const mockPage = async (browser, { onExplain, result, order, track } = {}) => {
   await lampD.locator('text=Read this character more deeply').click()
   await page.waitForSelector('text=She kept the porch light on', { timeout: 5000 })
   const ex = calls.explain[0]
-  check('en explain call: language en with the context, the romaji reading AND the English meaning, no inscription_script', ex.language === 'en' && ex.relationship === 'parent_mother' && ex.occasion === 'seasonal_thanks' && ex.candidate.kanji === '灯' && ex.candidate.inscription_form === '燈' && ex.candidate.reading === 'on: tō · kun: hi, akari' && ex.candidate.meaning === 'lamp; a light kept lit' && !('inscription_script' in ex), JSON.stringify(ex))
+  check('learning loop (/demo): the explanation reports "explain_opened" with source harness', calls.analytics.some((e) => e.event === 'explain_opened' && e.source === 'harness' && e.choice === 'main') && calls.select[0].source === 'harness')
+  check('en explain call: language en with the context, the romaji reading AND the English meaning, no inscription_script', ex.language === 'en' && ex.relationship === 'parent_mother' && ex.occasion === 'seasonal_thanks' && ex.candidate.kanji === '灯' && ex.candidate.inscription_form === '燈' && ex.candidate.reading === 'tō · hi · akari' && ex.candidate.meaning === 'lamp' && !('inscription_script' in ex), JSON.stringify(ex))
   check('no page errors (run 13, /demo)', errors.length === 0)
   await page.close()
 }

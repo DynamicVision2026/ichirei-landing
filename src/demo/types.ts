@@ -20,8 +20,12 @@ export interface Candidate {
   classical_echo?: { text: string; source: string } | null
   kanji: string
   reading: string
-  /** en only: the character's core meaning in English. */
+  /** en only: the character's core meaning in English (one plain phrase), attached by the server from the palette. */
   meaning?: string | null
+  /** en only: the Mandarin reading (pinyin) when the palette has one. */
+  reading_zh?: string | null
+  /** en only: one plain-English sentence tying the character's meaning to the quoted story moment. */
+  why_this?: string | null
   inscription_form: string | null
   truth_type: TruthType
   one_line_gaze: string

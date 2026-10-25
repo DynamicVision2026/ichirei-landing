@@ -11,6 +11,7 @@ import { serveStatic } from '@hono/node-server/serve-static'
 import { POST as selectPost } from '../api/select.ts'
 import { POST as orderPost } from '../api/order.ts'
 import { POST as trackPost } from '../api/track.ts'
+import { POST as analyticsPost } from '../api/analytics.ts'
 import { loadTrackConfig } from '../engine/track.ts'
 import { createOrderStore } from '../engine/order-store.ts'
 import { loadShopifyConfig } from '../engine/shopify.ts'
@@ -114,6 +115,8 @@ export function createApp(config: ServerConfig): Hono {
   app.post('/api/order', (c) => orderPost(c.req.raw))
   // Order status (read-only, ICHIREI orders only): number + email → status, carrier, tracking.
   app.post('/api/track', (c) => trackPost(c.req.raw))
+  // Learning loop: two browser events (chosen, explain_opened) → analytics/YYYY-MM-DD.jsonl. Always 204.
+  app.post('/api/analytics', (c) => analyticsPost(c.req.raw))
 
   const methodNotAllowed = (c: Context) =>
     c.json({ error: 'Method not allowed' }, 405, { Allow: 'POST' })
@@ -122,6 +125,7 @@ export function createApp(config: ServerConfig): Hono {
   app.all('/api/log', methodNotAllowed)
   app.all('/api/order', methodNotAllowed)
   app.all('/api/track', methodNotAllowed)
+  app.all('/api/analytics', methodNotAllowed)
   app.all('/api/*', (c) => c.json({ error: 'Not found' }, 404))
 
   // ---- Frontend (built Vite output) ------------------------------------

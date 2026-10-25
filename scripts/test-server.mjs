@@ -9,7 +9,7 @@
 
 import { execSync } from 'node:child_process'
 import http from 'node:http'
-import { mkdtempSync, readFileSync } from 'node:fs'
+import { mkdtempSync, readFileSync, readdirSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { GOLDEN, GOLDEN_REFEREED, GOLDEN_CONTEXT, STORY, EXPLAIN_TEXT, sleep, startFakeAnthropic, startServer, readNdjson } from './server-fixtures.mjs'
@@ -206,9 +206,19 @@ try {
       const file = JSON.parse(readFileSync(join(dir, `${okJ.order_ref}.json`), 'utf8'))
       check('orders: the story and the engine result are stored server-side under that order_ref (gaze line and anchor included)', file.story === STORY && file.engine_result.candidates.length === 3 && file.production.gaze_line === GOLDEN.candidates[0].one_line_gaze && file.production.story_anchor === GOLDEN.candidates[0].story_anchor && file.status === 'cart_created')
       const line = seen[0].body.variables.input.lines[0]
-      check('orders: Shopify got the Simple variant, the token header, and the eight attributes — without the story', seen[0].url === '/api/2025-01/graphql.json' && seen[0].token === 'shpat_server_test' && line.merchandiseId.endsWith('/1111') && line.attributes.map((a) => a.key).join() === 'kanji,inscription_form,reading,sender_name,receiver_name,delivery_date,language,order_ref' && line.attributes.at(-1).value === okJ.order_ref && !JSON.stringify(seen[0].body).includes('口下手'))
+      check('orders: Shopify got the Simple variant, the token header, and the nine attributes (certificate_meaning_en next to the reading) — without the story', seen[0].url === '/api/2025-01/graphql.json' && seen[0].token === 'shpat_server_test' && line.merchandiseId.endsWith('/1111') && line.attributes.map((a) => a.key).join() === 'kanji,inscription_form,reading,certificate_meaning_en,sender_name,receiver_name,delivery_date,language,order_ref' && line.attributes[3].value === 'welcome' && okJ.certificate.meaning_en === 'welcome' && okJ.certificate.line_en === 'This character is the person as seen through your eyes.' && line.attributes.at(-1).value === okJ.order_ref && !JSON.stringify(seen[0].body).includes('口下手'))
       const invalid = await post(orders.url, '/api/order', { ...orderBody, package: 'gold' })
       check('orders: invalid package → 400 and nothing more reaches Shopify', invalid.status === 400 && (await invalid.json()).field === 'package' && seen.length === 1)
+      // learning loop through the real server: a session id → "shown" (select), two browser events, "ordered" — all in <store>/analytics/
+      const sess = 'ServerSession' + 'Z'.repeat(10)
+      await readNdjson(await post(orders.url, '/api/select', { story: STORY, session: sess, source: 'customer', language: 'ja', relationship: 'parent_father', direction: 'up', occasion: 'birthday_milestone' }))
+      const an1 = await post(orders.url, '/api/analytics', { session: sess, source: 'customer', event: 'chosen', choice: 'main' })
+      const an2 = await post(orders.url, '/api/analytics', { session: sess, source: 'customer', event: 'explain_opened', choice: 'main' })
+      await post(orders.url, '/api/order', { ...orderBody, session: sess, source: 'customer', delivery_date: new Date(Date.now() + 31 * 86_400_000).toISOString().slice(0, 10) })
+      await sleep(300)
+      const adir = join(dir, 'analytics')
+      const alines = readdirSync(adir).flatMap((f) => readFileSync(join(adir, f), 'utf8').trim().split('\n').map((l) => JSON.parse(l)))
+      check('analytics (real server): shown → chosen → explain_opened → ordered for one session id, as JSONL under analytics/, with no story text, names or order_ref', an1.status === 204 && an2.status === 204 && ['shown', 'chosen', 'explain_opened', 'ordered'].every((e) => alines.some((l) => l.event === e && l.session === sess)) && alines.find((l) => l.event === 'shown').language === 'ja' && !JSON.stringify(alines).includes('IC-') && !JSON.stringify(alines).includes('山田') && !JSON.stringify(alines).includes('口下手'), JSON.stringify(alines))
     } finally {
       await orders.stop()
       shop.close()

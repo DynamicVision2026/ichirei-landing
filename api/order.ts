@@ -11,8 +11,10 @@
 //
 // Web-standard handler (like api/select.ts): mounted directly by server/app.ts and usable on Vercel.
 
+import { cleanSession, cleanSource, recordEvent } from '../engine/analytics.ts'
 import { buildRecord, lineAttributes, newOrderRef, parseOrderRequest, type OrderRecord } from '../engine/order.ts'
 import { createOrderStore, type OrderStore } from '../engine/order-store.ts'
+import type { Palette } from '../engine/palette.ts'
 import { ShopifyError, createCart, loadShopifyConfig, type ShopifyConfig } from '../engine/shopify.ts'
 
 const MAX_BODY_BYTES = 300_000
@@ -27,6 +29,8 @@ export interface OrderDeps {
   shopifyMissing: string[]
   now?: () => Date
   fetchImpl?: typeof fetch
+  /** Tests inject a palette; production reads engine/palette.csv. */
+  palette?: Palette
 }
 
 export function createOrderHandler(deps: () => OrderDeps) {
@@ -44,7 +48,7 @@ export function createOrderHandler(deps: () => OrderDeps) {
 
     const d = deps()
     const now = d.now?.() ?? new Date()
-    const parsed = parseOrderRequest(body, now)
+    const parsed = parseOrderRequest(body, now, d.palette)
     if (!parsed.ok) return json(400, { error: parsed.error, field: parsed.field })
 
     if (!d.store) {
@@ -79,11 +83,15 @@ export function createOrderHandler(deps: () => OrderDeps) {
         console.error('[ichirei-order] status update failed', orderRef, err instanceof Error ? err.message : err)
       }
       console.log('[ichirei-order]', JSON.stringify({ order_ref: orderRef, status: record.status, package: order.package, language: order.language }))
+      // Learning loop: "ordered" — the session id only, never the order_ref or anything the buyer typed.
+      const sessionId = cleanSession((body as { session?: unknown } | null)?.session)
+      if (sessionId) void recordEvent({ ts: (d.now?.() ?? new Date()).toISOString(), session: sessionId, source: cleanSource((body as { source?: unknown } | null)?.source), event: 'ordered' }, d.store, d.now?.() ?? new Date())
       return json(200, {
         order_ref: orderRef,
         checkout_url: cart.checkoutUrl,
         glyph: order.glyph,
         certificate_text: record.production.certificate_text,
+        certificate: record.production.certificate,
       })
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err)

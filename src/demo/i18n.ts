@@ -128,7 +128,7 @@ export interface Copy {
   finalized: (kanji: string) => string
   chooseHint: string
   /** The line under the carved glyph: the other form (+ reading). */
-  glyphReading: (c: { kanji: string; inscription_form: string | null; reading: string; meaning?: string | null }, carved: string) => string
+  glyphReading: (c: { kanji: string; inscription_form: string | null; reading: string; meaning?: string | null; reading_zh?: string | null }, carved: string) => string
   /** Small note under the glyph about which form is carved. */
   inscriptionNote: (c: { kanji: string; inscription_form: string | null }, script: InscriptionScript | null) => string | null
   previewNote: (c: { inscription_form: string | null }, script: InscriptionScript | null) => string | null
@@ -632,7 +632,7 @@ const en: Copy = {
   finalized: (k) => `“${k}” is chosen`,
   chooseHint: 'Open a character and press “Choose this character” to decide',
   glyphReading: (c, carved) =>
-    `${c.inscription_form && carved !== c.kanji ? `${c.kanji} · ` : ''}${c.reading}${c.meaning ? ` — ${c.meaning}` : ''}`,
+    `${c.inscription_form && carved !== c.kanji ? `${c.kanji} · ` : ''}${c.reading}${c.reading_zh ? ` · pinyin ${c.reading_zh}` : ''}${c.meaning ? ` — ${c.meaning}` : ''}`,
   inscriptionNote: (c) => (c.inscription_form ? `Carved in the old form, kyūjitai (modern form: ${c.kanji})` : null),
   previewNote: (c) => (c.inscription_form ? 'Carved in the old form, kyūjitai' : null),
   slotLabels: { main: 'Main', second: 'Second', freestyle: 'Freestyle' },

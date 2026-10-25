@@ -7,7 +7,9 @@
 import { randomBytes } from 'node:crypto'
 import { LANGUAGES, STORY_MAX as ENGINE_STORY_MAX, countChars, parseFollowUps, type Candidate, type EngineResult, type Language } from './contract.ts'
 import { PACKAGES, PACKAGE_PRICE_JPY, type PackageId } from '../src/order/packages.ts'
-import { certificateText } from '../src/order/certificate.ts'
+import { CERTIFICATE_LINE_EN, certificateText } from '../src/order/certificate.ts'
+import { loadPalette, plainMeaning, type Palette } from './palette.ts'
+import { kanaToRomaji, romanizeReadings } from './romaji.ts'
 import { STYLES_BY_LANGUAGE, glyphFor, type InscriptionStyle } from '../src/order/inscription.ts'
 
 export const NAME_MAX = 40
@@ -15,6 +17,50 @@ export const NAME_MAX = 40
 export const STORY_MAX = ENGINE_STORY_MAX
 /** How far ahead a delivery date may be. */
 export const MAX_DAYS_AHEAD = 730
+
+/**
+ * The bilingual certificate data, built by CODE from the chosen candidate and the palette (never from the
+ * model's memory when a palette row exists) so the workshop can print a bilingual card.
+ */
+export interface Certificate {
+  /** The inscription form actually carved. */
+  character: string
+  /** The reading in the character's own script: ja and en → kana from the Japanese row (トウ・ひ・あかり); zh → pinyin. */
+  reading: string
+  /** Latin-script reading: romaji (ja, en) or pinyin (zh). */
+  romanization: string
+  /** The plain-English meaning (palette), else the candidate's own; null if neither exists. */
+  meaning_en: string | null
+  /** The certificate line in the buyer's language. */
+  line: string
+  /** Always the English line. */
+  line_en: string
+}
+
+export function buildCertificate(candidate: Candidate, glyph: string, language: Language, palette: Palette): Certificate {
+  const find = (family: 'ja' | 'zh') => palette.lookup(family, candidate.kanji) ?? (candidate.inscription_form ? palette.lookup(family, candidate.inscription_form) : undefined)
+  const zhBuyer = language === 'zh-Hans' || language === 'zh-Hant'
+  const row = zhBuyer ? find('zh') : find('ja')
+  let reading = candidate.reading
+  let romanization = candidate.reading
+  if (zhBuyer) {
+    if (row && row.readings.length > 0) reading = romanization = row.readings.slice(0, 3).join(' / ')
+  } else if (row && row.readings.length > 0) {
+    reading = [...new Set(row.readings.map((r) => r.replace(/-/g, '')))].slice(0, 4).join('・')
+    romanization = romanizeReadings(row.readings)
+  } else if (language === 'ja') {
+    romanization = kanaToRomaji(candidate.reading) || candidate.reading
+  }
+  const meaning = row ? plainMeaning(row.raw.core_meanings, zhBuyer ? 'zh' : 'ja') : ''
+  return {
+    character: glyph,
+    reading,
+    romanization,
+    meaning_en: meaning || candidate.meaning?.trim() || null,
+    line: certificateText(language),
+    line_en: CERTIFICATE_LINE_EN,
+  }
+}
 
 export interface ValidOrder {
   story: string
@@ -25,6 +71,7 @@ export interface ValidOrder {
   candidate: Candidate
   /** The character to carve, from the candidate and the chosen style. */
   glyph: string
+  certificate: Certificate
   sender_name: string
   receiver_name: string
   delivery_date: string
@@ -57,7 +104,7 @@ export function cleanName(v: unknown): string | null {
   return s
 }
 
-export function parseOrderRequest(body: unknown, now: Date = new Date()): ParsedOrder {
+export function parseOrderRequest(body: unknown, now: Date = new Date(), palette?: Palette): ParsedOrder {
   if (!isObject(body)) return fail('body', 'Body must be a JSON object')
 
   const language = body.language
@@ -122,6 +169,7 @@ export function parseOrderRequest(body: unknown, now: Date = new Date()): Parsed
       language: lang,
       candidate,
       glyph: glyphFor(candidate, inscription_style),
+      certificate: buildCertificate(candidate, glyphFor(candidate, inscription_style), lang, palette ?? loadPalette()),
       sender_name: sender,
       receiver_name: receiver,
       delivery_date: date,
@@ -154,7 +202,8 @@ export interface Attribute {
 }
 
 /**
- * The eight line-item attributes, in this order. `kanji` is the selected character in its display
+ * The nine line-item attributes, in this order (`certificate_meaning_en` sits next to the kanji and reading so the
+ * workshop can print a bilingual card). `kanji` is the selected character in its display
  * form (ja: modern, zh: simplified); `inscription_form` is the glyph to CARVE (after the sender's
  * choice of kyūjitai/modern or traditional/simplified).
  */
@@ -163,6 +212,7 @@ export function lineAttributes(order: ValidOrder, orderRef: string): Attribute[]
     { key: 'kanji', value: order.candidate.kanji },
     { key: 'inscription_form', value: order.glyph },
     { key: 'reading', value: order.candidate.reading },
+    { key: 'certificate_meaning_en', value: order.certificate.meaning_en ?? '' },
     { key: 'sender_name', value: order.sender_name },
     { key: 'receiver_name', value: order.receiver_name },
     { key: 'delivery_date', value: order.delivery_date },
@@ -200,6 +250,7 @@ export interface OrderRecord {
     package: PackageId
     price_jpy: number
     certificate_text: string
+    certificate: Certificate
   }
   /** Kept here, never sent to Shopify. `story` is what the sender wrote first; `follow_ups` are their answers to the engine's questions. */
   story: string
@@ -234,6 +285,8 @@ export function buildRecord(order: ValidOrder, orderRef: string, now: Date = new
       package: order.package,
       price_jpy: PACKAGE_PRICE_JPY[order.package],
       certificate_text: certificateText(order.language),
+      /** The bilingual certificate data (character, reading, romanization, English meaning, both lines). */
+      certificate: order.certificate,
     },
     story: order.story,
     follow_ups: order.follow_ups,

@@ -1,0 +1,120 @@
+{
+  "name": "en-fields-from-palette",
+  "story": "My mum left the porch light on every night until I got home. She always met me at the door with a pot of tea, and she was never once on time for anything else.",
+  "context": {
+    "language": "en",
+    "relationship": "parent_mother",
+    "direction": "up",
+    "occasion": "birthday_milestone",
+    "occasion_detail": "70th birthday"
+  },
+  "model_reply": {
+    "language": "en",
+    "relationship": "parent_mother",
+    "direction": "up",
+    "occasion": "birthday_milestone",
+    "occasion_detail": "70th birthday",
+    "inscription_script": null,
+    "status": "sufficient",
+    "follow_up_question": null,
+    "particulars": [
+      "porch light",
+      "tea at the door",
+      "never on time"
+    ],
+    "fingerprint": {
+      "relationship_note": "granddaughter → grandmother",
+      "scarce_asset": "porch light",
+      "unsaid_truth": "",
+      "dominant_truth_type": "Private Symbol",
+      "dignity_direction": "",
+      "emotional_register": [
+        "grateful",
+        "playful"
+      ]
+    },
+    "candidates": [
+      {
+        "slot": "main",
+        "kanji": "灯",
+        "inscription_form": "燈",
+        "truth_type": "Private Symbol",
+        "one_line_gaze": "You left the porch light on every night until I got home.",
+        "story_anchor": "left the porch light on every night",
+        "why_this": "Lamplight is the light you left on for me, every night.",
+        "unique_truth": "u",
+        "eliminated": false,
+        "eliminated_reason": null,
+        "suitability_flag": null,
+        "palette_status": "ok",
+        "flags": [],
+        "reading": "MODEL-WRONG",
+        "meaning": "MODEL-WRONG",
+        "reading_zh": "MODEL-WRONG"
+      },
+      {
+        "slot": "second",
+        "kanji": "迎",
+        "inscription_form": "迎",
+        "truth_type": "Role",
+        "one_line_gaze": "You met me at the door with a pot of tea.",
+        "story_anchor": "met me at the door with a pot of tea",
+        "why_this": "Welcoming me is what the door and the tea meant.",
+        "unique_truth": "u",
+        "eliminated": false,
+        "eliminated_reason": null,
+        "suitability_flag": null,
+        "palette_status": "context_required",
+        "flags": []
+      },
+      {
+        "slot": "freestyle",
+        "kanji": "遅",
+        "inscription_form": "遲",
+        "truth_type": "Play",
+        "one_line_gaze": "You were never once on time for anything else.",
+        "story_anchor": "never once on time for anything else",
+        "why_this": "Late is the one word the whole family laughs about with you.",
+        "unique_truth": "",
+        "eliminated": false,
+        "eliminated_reason": null,
+        "suitability_flag": null,
+        "palette_status": "ok",
+        "flags": [],
+        "reading": "osoi",
+        "meaning": "late"
+      }
+    ],
+    "primary_kanji": "灯",
+    "runner_up_kanji": "迎",
+    "freestyle_kanji": "遅",
+    "fallback_follow_up_question": "Could you tell me one small moment you actually shared with her?"
+  },
+  "review_reply": {
+    "verdicts": [
+      {
+        "slot": "main",
+        "kanji": "灯",
+        "pass": true,
+        "reason": "ok"
+      },
+      {
+        "slot": "second",
+        "kanji": "迎",
+        "pass": true,
+        "reason": "ok"
+      },
+      {
+        "slot": "freestyle",
+        "kanji": "遅",
+        "pass": true,
+        "reason": "ok"
+      }
+    ]
+  },
+  "expect": {
+    "primary": "灯",
+    "second": "迎",
+    "freestyle": "遅"
+  }
+}

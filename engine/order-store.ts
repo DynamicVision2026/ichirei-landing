@@ -9,13 +9,20 @@
 // so it needs no SDK. Cloud Run's service account needs roles/storage.objectAdmin on the bucket
 // (DEPLOY.md). Env: ORDER_BUCKET, ORDER_STORE_DIR; tests may set GCS_API_BASE and GCS_ACCESS_TOKEN.
 
-import { mkdir, readFile, rename, writeFile } from 'node:fs/promises'
-import { join } from 'node:path'
+import { appendFile, mkdir, readFile, rename, writeFile } from 'node:fs/promises'
+import { dirname, join } from 'node:path'
 
 export interface OrderStore {
   readonly kind: 'gcs' | 'file' | 'memory'
   put(orderRef: string, record: object): Promise<void>
   get(orderRef: string): Promise<object | null>
+  /** Append one JSON line to an object like `analytics/2026-10-25.jsonl` (the learning loop; no story text, no names). */
+  appendJsonl(path: string, record: object): Promise<void>
+}
+
+const SAFE_PATH = /^analytics\/\d{4}-\d{2}-\d{2}\.jsonl$/
+function assertJsonlPath(path: string): void {
+  if (!SAFE_PATH.test(path)) throw new Error(`Unsafe analytics path: ${path.slice(0, 40)}`)
 }
 
 const SAFE_REF = /^[A-Za-z0-9-]{1,64}$/
@@ -34,6 +41,11 @@ export class MemoryOrderStore implements OrderStore {
     assertRef(ref)
     return this.records.has(ref) ? structuredClone(this.records.get(ref)!) : null
   }
+  readonly lines = new Map<string, string[]>()
+  async appendJsonl(path: string, record: object) {
+    assertJsonlPath(path)
+    this.lines.set(path, [...(this.lines.get(path) ?? []), JSON.stringify(record)])
+  }
 }
 
 export class FileOrderStore implements OrderStore {
@@ -49,6 +61,12 @@ export class FileOrderStore implements OrderStore {
     const tmp = `${path}.${process.pid}.tmp`
     await writeFile(tmp, JSON.stringify(record, null, 2) + '\n', 'utf8')
     await rename(tmp, path) // atomic: a reader never sees half a record
+  }
+  async appendJsonl(path: string, record: object) {
+    assertJsonlPath(path)
+    const file = join(this.dir, path)
+    await mkdir(dirname(file), { recursive: true })
+    await appendFile(file, JSON.stringify(record) + '\n', 'utf8') // O_APPEND: whole small lines never interleave
   }
   async get(ref: string) {
     assertRef(ref)
@@ -105,6 +123,38 @@ export class GcsOrderStore implements OrderStore {
       signal: AbortSignal.timeout(15_000),
     })
     if (!res.ok) throw new Error(`GCS put failed: HTTP ${res.status}`)
+  }
+
+  /**
+   * Cloud Storage has no append, so a daily JSONL object is read, extended and written back with
+   * `ifGenerationMatch` (0 for a new object): a concurrent writer makes the upload fail with 412 and we retry.
+   */
+  async appendJsonl(path: string, record: object) {
+    assertJsonlPath(path)
+    const name = encodeURIComponent(path)
+    const bucket = encodeURIComponent(this.bucket)
+    for (let attempt = 0; attempt < 6; attempt++) {
+      const auth = { authorization: `Bearer ${await this.token()}` }
+      const cur = await this.doFetch(`${this.api}/storage/v1/b/${bucket}/o/${name}?alt=media`, { headers: auth, signal: AbortSignal.timeout(15_000) })
+      let text = ''
+      let generation = '0'
+      if (cur.status === 200) {
+        text = await cur.text()
+        generation = cur.headers.get('x-goog-generation') ?? ''
+        if (!generation) throw new Error('GCS append: no x-goog-generation on the existing object')
+      } else if (cur.status !== 404) throw new Error(`GCS append read failed: HTTP ${cur.status}`)
+      if (text && !text.endsWith('\n')) text += '\n'
+      const res = await this.doFetch(`${this.api}/upload/storage/v1/b/${bucket}/o?uploadType=media&name=${name}&ifGenerationMatch=${generation}`, {
+        method: 'POST',
+        headers: { ...auth, 'content-type': 'application/x-ndjson; charset=utf-8' },
+        body: text + JSON.stringify(record) + '\n',
+        signal: AbortSignal.timeout(15_000),
+      })
+      if (res.ok) return
+      if (res.status !== 412) throw new Error(`GCS append failed: HTTP ${res.status}`)
+      await new Promise((r) => setTimeout(r, 20 + Math.random() * 80 * (attempt + 1)))
+    }
+    throw new Error('GCS append: gave up after repeated generation conflicts')
   }
 
   async get(ref: string) {

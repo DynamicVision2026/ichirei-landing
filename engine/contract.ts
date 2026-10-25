@@ -300,6 +300,8 @@ export interface RefereeAction {
     | 'freestyle_duplicate_eliminated' // the freestyle is the same character as a main slot
     | 'classical_echo_required_eliminated' // REQUIRE_CLASSICAL_ECHO is on and a main candidate has no reviewed classical line
     | 'review_eliminated' // the separate review call failed this candidate
+    | 'missing_row_eliminated' // en: a main candidate has no row in one of the two palettes (ja, zh)
+    | 'missing_row_already_eliminated' // as above, but the model had already eliminated it
     | 'insufficient_no_main' // no main candidate survived: the result became `insufficient`
   detail: string
 }
@@ -323,13 +325,21 @@ export interface Candidate {
   classical_echo?: ClassicalEcho | null
   /** ja: modern Japanese form. zh (both scripts): the SIMPLIFIED form — the palette key. */
   kanji: string
-  /** ja: hiragana. zh: pinyin with tone marks. en: romaji, on and kun labelled (e.g. "on: tō · kun: akari"). */
+  /** ja: hiragana. zh: pinyin with tone marks. en: the Japanese reading in romaji, from the palette row (e.g. "tō · hi · akari"). */
   reading: string
   /**
-   * en only: the core meaning of the character in English (a short phrase), shown beside the
-   * romaji reading. Absent/null for ja and zh. Required (non-empty) on en results.
+   * en only: the core meaning of the character in English — one short plain phrase ("lamp", "morning"),
+   * shown beside the reading. For main and second this is attached by CODE from the palette row (the
+   * model's own value is overwritten); only a freestyle with no palette row keeps the model's. Absent/null for ja and zh.
    */
   meaning?: string | null
+  /** en only: the Mandarin reading (pinyin) when the zh palette has a row for the character; attached by code. */
+  reading_zh?: string | null
+  /**
+   * en only: ONE plain-English sentence connecting the character's meaning to the quoted story moment, with no
+   * kanji jargon. Written by the model — it is the only field besides the gaze line the model writes for en.
+   */
+  why_this?: string | null
   /**
    * The inscription form when it differs from `kanji`: ja = kyūjitai (旧字体);
    * zh = TRADITIONAL form. null when identical. Same name and meaning as the
@@ -477,12 +487,19 @@ export function validateEngineResult(raw: unknown): string[] {
     if (!(SLOTS as readonly string[]).includes(c?.slot as string)) problems.push(`${at}.slot invalid`)
     const free = c?.slot === 'freestyle'
     for (const k of ['kanji', 'reading', 'one_line_gaze', 'story_anchor'] as const) {
+      if (r.language === 'en' && k === 'reading' && c?.eliminated) continue
       if (typeof c?.[k] !== 'string' || !c[k]) problems.push(`${at}.${k} missing`)
     }
     // unique_truth is a main-slot field; the freestyle has "kanji, reading, one_line_gaze, story_anchor" only.
     if (!free && (typeof c?.unique_truth !== 'string' || !c.unique_truth)) problems.push(`${at}.unique_truth missing`)
     if (c?.inscription_form !== null && typeof c?.inscription_form !== 'string') problems.push(`${at}.inscription_form must be string|null`)
-    if (r.language === 'en' && (typeof c?.meaning !== 'string' || !c.meaning.trim())) problems.push(`${at}.meaning missing (required for en)`)
+    if (r.language === 'en') {
+      // Readings and meanings are attached by code for live candidates; an eliminated one may lack them.
+      if (!c?.eliminated && (typeof c?.meaning !== 'string' || !c.meaning.trim())) problems.push(`${at}.meaning missing (required for en)`)
+      if (typeof c?.why_this !== 'string' || !c.why_this.trim()) problems.push(`${at}.why_this missing (required for en)`)
+      else if (c.why_this.includes('\n')) problems.push(`${at}.why_this must be one sentence`)
+      if (c?.reading_zh !== undefined && c.reading_zh !== null && typeof c.reading_zh !== 'string') problems.push(`${at}.reading_zh must be string|null`)
+    }
     if (c?.meaning !== undefined && c.meaning !== null && typeof c.meaning !== 'string') problems.push(`${at}.meaning must be string|null`)
     if (!TRUTH_TYPES.includes(c?.truth_type as TruthType)) problems.push(`${at}.truth_type invalid`)
     else if (free !== (c.truth_type === 'Play')) problems.push(`${at}: truth_type "Play" belongs to the freestyle slot only`)

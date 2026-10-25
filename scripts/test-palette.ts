@@ -11,9 +11,12 @@ import {
   applyPalette,
   loadPalette,
   parseCsv,
+  plainMeaning,
+  refereeFamilies,
   parsePalette,
 } from '../engine/palette.ts'
-import { PALETTE_COLUMNS, familyOf, validateEngineResult, type Candidate, type EngineResult } from '../engine/contract.ts'
+import { romanizeReadings } from '../engine/romaji.ts'
+import { PALETTE_COLUMNS, validateEngineResult, type Candidate, type EngineResult } from '../engine/contract.ts'
 
 let failures = 0
 function check(name: string, cond: boolean, detail?: string) {
@@ -288,21 +291,76 @@ const live = run(raw([cand('黙'), cand('駅'), cand('送'), cand('餞', { story
 check('regression (first live run): 送 is now eliminated by the palette, and an anchorless 餞 cannot be primary — the runner-up takes over', get(live, '送').eliminated && get(live, '送').eliminated_reason === 'palette: hard_block' && live.primary_kanji === '灯')
 
 // ---------------------------------------------------------------------------
-// 9. en uses the JA palette rows and taboo rules (the character is Japanese, carved in Japan).
+// 9. en is judged against BOTH palettes (ja and zh): the buyer reads English, but the gift may be shown in any kanji culture.
 // ---------------------------------------------------------------------------
+const logs: string[] = []
+const quiet = { log: (l: string) => logs.push(l) }
+const FORM: Record<string, string> = { 黙: '默', 灯: '燈', 餞: '餞', 迎: '迎', 駅: '驛', 鐘: '鐘', 絆: '絆', 断: '斷', 鬼: '鬼', 走: '走', 蓮: '蓮', 寿: '壽' }
+const ec = (kanji: string, over: Partial<Candidate> = {}) => cand(kanji, { inscription_form: FORM[kanji] ?? null, ...over })
 const enRaw = (candidates: Candidate[], primary: string | null, over: Partial<EngineResult> = {}) => raw(candidates, primary, { language: 'en', inscription_script: null, ...over })
-const enHard = run(enRaw([cand('黙'), cand('送'), cand('灯')], '送', { runner_up_kanji: '灯' }))
-check('en: every ja hard_block kanji is eliminated for an English result too (same rows, same reason)', HARD.every((k) => { const c = get(run(enRaw([cand('黙'), cand(k)], '黙')), k); return c.eliminated === true && c.eliminated_reason === HARD_BLOCK_REASON && c.palette_status === 'off_palette' }))
-check('en: a removed primary is promoted exactly as for ja', enHard.primary_kanji === '灯' && enHard.referee?.primary_changed === true && enHard.referee.promoted_from === 'second')
-const enZhRow = run(enRaw([cand('送'), cand('灯')], '灯'))
-check('en: 送 is hard_block (the ja row), not context_required (the zh row)', get(enZhRow, '送').eliminated === true && get(enZhRow, '送').eliminated_reason === HARD_BLOCK_REASON)
-const enAnchor = run(enRaw([cand('黙'), cand('餞', { story_anchor: 'a fragment not in the story' }), cand('灯')], '餞', { runner_up_kanji: '黙' }))
-check('en: a context_required + anchor_required kanji is refused as primary when its anchor is not verbatim in the story', enAnchor.primary_kanji === '黙' && enAnchor.referee?.actions.some((a) => a.kanji === '餞' && a.action === 'primary_refused_no_anchor') === true)
-const enAnchorOk = run(enRaw([cand('黙'), cand('餞', { story_anchor: 'my mum left the porch light on' }), cand('灯')], '餞'), 'Well, my mum left the porch light on every night.')
-check('en: …and kept when the English anchor IS verbatim in the English story', enAnchorOk.primary_kanji === '餞')
-const enOcc = run(enRaw([cand('黙'), cand('寿'), cand('灯')], '寿', { occasion: 'new_baby', runner_up_kanji: '灯' }))
-check('en: blocked_occasions apply (寿 is blocked for a new_baby order)', get(enOcc, '寿').eliminated_reason === 'palette: blocked_occasion' && enOcc.primary_kanji === '灯')
-check('en: the palette lookup is by the Japanese row, found by kanji and by kyūjitai', palette.lookup(familyOf('en'), '灯') === palette.lookup('ja', '灯') && palette.lookup(familyOf('en'), '燈') === palette.lookup('ja', '灯') && palette.lookup('ja', '灯') !== undefined)
+const runEn = (r: EngineResult, story = STORY) => applyPalette(r, palette, story, quiet)
+check('en cross-check: the referee judges en against ja AND zh; ja against ja only; zh against zh only', refereeFamilies('en').join() === 'ja,zh' && refereeFamilies('ja').join() === 'ja' && refereeFamilies('zh-Hant').join() === 'zh' && refereeFamilies('zh-Hans').join() === 'zh')
+check('en: every ja hard_block kanji is eliminated for an English result too (same rows, same reason, blocked by ja)', HARD.every((k) => { const c = get(runEn(enRaw([ec('灯'), cand(k)], '灯')), k); return c.eliminated === true && c.eliminated_reason === HARD_BLOCK_REASON && c.palette_status === 'off_palette' && c.flags.includes('blocked_by_ja') }))
+
+// the real pairs: fine in Japanese, blocked in Mandarin
+const ZH_ONLY = [['鐘', 'homophone_送终_funeral'], ['絆', 'trip_hinder_connotation'], ['断', 'severing'], ['鬼', 'ghost_death_association']] as const
+for (const [k] of ZH_ONLY) {
+  const jaOnly = run(raw([ec(k), cand('灯')], k))
+  check(`en cross-check: ${k} is not blocked in ja (${palette.lookup('ja', k)?.status}) but is hard_block in zh — so it IS blocked for ja? no: ja keeps it, en refuses it`, jaOnly.candidates.find((c) => c.kanji === k)?.eliminated === false && palette.lookup('zh', FORM[k])?.status === 'hard_block' && palette.lookup('ja', k)?.status !== 'hard_block')
+}
+logs.length = 0
+const ck = runEn(enRaw([ec('鐘'), ec('灯'), cand('遅', { slot: 'freestyle', story_anchor: '駅まで迎えに来て' })], '鐘', { runner_up_kanji: '灯' }))
+check('en cross-check: 鐘 (fine in ja, hard_block in zh) is refused as MAIN for en → eliminated "palette: hard_block", flagged blocked_by_zh; the second (灯) is promoted', get(ck, '鐘').eliminated === true && get(ck, '鐘').eliminated_reason === HARD_BLOCK_REASON && get(ck, '鐘').flags.includes('blocked_by_zh') && !get(ck, '鐘').flags.includes('blocked_by_ja') && ck.primary_kanji === '灯' && ck.referee?.promoted_from === 'second')
+check('en cross-check: the same answer for language ja keeps 鐘 as primary (the asymmetry is the point)', run(raw([ec('鐘'), cand('灯')], '鐘')).primary_kanji === '鐘')
+check('en cross-check: logged as "[ichirei-referee] en cross-check" with the kanji and the family that blocked it — and no story text', logs.length === 1 && logs[0].startsWith('[ichirei-referee] en cross-check ') && JSON.parse(logs[0].slice('[ichirei-referee] en cross-check '.length)).kanji === '鐘' && JSON.parse(logs[0].slice('[ichirei-referee] en cross-check '.length)).blocked_by.join() === 'zh' && !logs[0].includes('駅') && !logs[0].includes('迎えに'), logs.join('\n'))
+logs.length = 0
+runEn(enRaw([ec('灯'), cand('送', { story_anchor: 'x' }), cand('遅', { slot: 'freestyle' })], '灯'))
+check('en cross-check: the reverse pair (送 hard_block in ja, context_required in zh) is logged as blocked by ja', logs.some((l) => l.includes('"kanji":"送"') && l.includes('"blocked_by":["ja"]')), logs.join('\n'))
+for (const k of ['絆', '断', '鬼']) check(`en cross-check: ${k} is refused for en (blocked by zh)`, get(runEn(enRaw([ec(k), ec('灯')], k, { runner_up_kanji: '灯' })), k).eliminated === true && get(runEn(enRaw([ec(k), ec('灯')], k, { runner_up_kanji: '灯' })), k).flags.includes('blocked_by_zh'))
+
+// off-palette rule: a main candidate needs a row in BOTH palettes
+logs.length = 0
+const miss = runEn(enRaw([ec('駅'), ec('灯')], '駅', { runner_up_kanji: '灯' }))
+check('en off-palette rule: 駅 has a ja row but NO zh row → not eligible as a main candidate for en ("palette: no_row_in_zh"), flagged, the second is promoted', palette.lookup('ja', '駅') !== undefined && palette.lookup('zh', '驛') === undefined && palette.lookup('zh', '驿') === undefined && get(miss, '駅').eliminated === true && get(miss, '駅').eliminated_reason === 'palette: no_row_in_zh' && get(miss, '駅').flags.includes('no_zh_row') && miss.primary_kanji === '灯' && miss.referee?.actions.some((a) => a.kanji === '駅' && a.action === 'missing_row_eliminated') === true)
+check('en off-palette rule: logged with the family it lacks', logs.length === 1 && logs[0].includes('"kanji":"駅"') && logs[0].includes('"blocked_by":["zh"]') && logs[0].includes('no_row_in_zh'), logs.join('\n'))
+check('en off-palette rule: the same 駅 is fine as a MAIN for ja', run(raw([ec('駅'), cand('灯')], '駅')).primary_kanji === '駅')
+check('en off-palette rule: applies to the SECOND slot too (it cannot be promoted) → both mains gone → insufficient', runEn(enRaw([ec('鐘'), ec('駅')], '鐘', { runner_up_kanji: '駅' })).status === 'insufficient')
+const noRowAny = runEn(enRaw([cand('X'), ec('灯')], 'X', { runner_up_kanji: '灯' }))
+check('en off-palette rule: a character in NEITHER palette is not a main either', get(noRowAny, 'X').eliminated === true && get(noRowAny, 'X').eliminated_reason === 'palette: no_row_in_ja' && noRowAny.primary_kanji === '灯')
+check('en off-palette rule: the model\'s own elimination keeps its reason (still recorded)', (() => { const o = runEn(enRaw([ec('灯'), ec('駅', { eliminated: true, eliminated_reason: 'ゲート3' })], '灯')); return get(o, '駅').eliminated_reason === 'ゲート3' && o.referee?.actions.some((a) => a.action === 'missing_row_already_eliminated') === true })())
+
+// context_required / anchor in either palette; blocked occasions in either
+const zhCtx = runEn(enRaw([ec('走', { story_anchor: 'a fragment not in the story' }), ec('灯')], '走', { runner_up_kanji: '灯' }))
+check('en: 走 is ok in ja but context_required + anchor_required in zh → the anchor rule applies to en: refused as primary without a verbatim anchor', palette.lookup('ja', '走')?.status === 'ok' && palette.lookup('zh', '走')?.status === 'context_required' && zhCtx.primary_kanji === '灯' && zhCtx.referee?.actions.some((a) => a.kanji === '走' && a.action === 'primary_refused_no_anchor') === true)
+const zhCtxOk = runEn(enRaw([ec('走', { story_anchor: 'she ran to the gate' }), ec('灯')], '走', { runner_up_kanji: '灯' }), 'Every evening she ran to the gate to meet me.')
+check('en: …kept with a verbatim anchor, and its palette_status is context_required (the stricter row wins)', zhCtxOk.primary_kanji === '走' && get(zhCtxOk, '走').palette_status === 'context_required')
+check('en: for ja the same 走 is a plain ok main (no anchor needed)', run(raw([ec('走', { story_anchor: 'a fragment not in the story' }), cand('灯')], '走')).primary_kanji === '走')
+const wedding = runEn(enRaw([ec('蓮'), ec('灯')], '蓮', { occasion: 'wedding', runner_up_kanji: '灯' }))
+check('en: a blocked occasion in EITHER palette removes the main (蓮 is blocked for weddings in ja only)', get(wedding, '蓮').eliminated_reason === 'palette: blocked_occasion' && get(wedding, '蓮').flags.includes('blocked_by_ja') && wedding.primary_kanji === '灯')
+const enOcc = runEn(enRaw([ec('黙'), ec('寿'), ec('灯')], '寿', { occasion: 'new_baby', runner_up_kanji: '灯' }))
+check('en: blocked_occasions still apply (寿 is blocked for a new_baby order)', get(enOcc, '寿').eliminated_reason === 'palette: blocked_occasion' && enOcc.primary_kanji === '灯')
+check('en: the ja-only and en referee agree on a plain safe pair (灯 + 迎 stay main and second for both)', (() => { const e = runEn(enRaw([ec('灯'), ec('迎', { story_anchor: '駅まで迎えに来て' })], '灯')); const j = run(raw([ec('灯'), ec('迎', { story_anchor: '駅まで迎えに来て' })], '灯')); return e.primary_kanji === '灯' && e.runner_up_kanji === '迎' && j.primary_kanji === '灯' && j.runner_up_kanji === '迎' })())
+
+// the freestyle: no row needed, but both blocklists and both palettes' hard blocks apply
+const frNoRow = runEn(enRaw([ec('灯'), ec('迎', { story_anchor: '駅まで迎えに来て' }), ec('駅', { slot: 'freestyle', truth_type: 'Play', story_anchor: '駅まで送ってくれて' })], '灯'))
+check('en freestyle: a character with NO zh row (駅) is still allowed — the freestyle needs no palette row', frNoRow.freestyle_kanji === '駅')
+const frZh = runEn(enRaw([ec('灯'), ec('迎', { story_anchor: '駅まで迎えに来て' }), cand('胖', { slot: 'freestyle', truth_type: 'Play', story_anchor: '駅まで送ってくれて' })], '灯'))
+check('en freestyle: a character on the ZH-only blocklist (胖, weight) is refused for en — both blocklists are checked', frZh.freestyle_kanji === null && get(frZh, '胖').eliminated_reason === 'palette: freestyle_blocked (weight)' && palette.freestyleCategory('ja', ['胖']) === undefined)
+check('en freestyle: …while for ja the same 胖 is not on the ja list and is allowed', run(raw([ec('灯'), ec('迎', { story_anchor: '駅まで迎えに来て' }), cand('胖', { slot: 'freestyle', truth_type: 'Play', story_anchor: '駅まで送ってくれて' })], '灯')).freestyle_kanji === '胖')
+const frJa = runEn(enRaw([ec('灯'), ec('迎', { story_anchor: '駅まで迎えに来て' }), cand('太', { slot: 'freestyle', truth_type: 'Play', story_anchor: '駅まで送ってくれて' })], '灯'))
+check('en freestyle: a character on the JA-only blocklist (太) is refused too', frJa.freestyle_kanji === null && get(frJa, '太').eliminated_reason === 'palette: freestyle_blocked (weight)')
+const frHard = runEn(enRaw([ec('灯'), ec('迎', { story_anchor: '駅まで迎えに来て' }), ec('鐘', { slot: 'freestyle', truth_type: 'Play', story_anchor: '駅まで送ってくれて' })], '灯'))
+check('en freestyle: a hard_block in either palette (鐘 is blocked by zh) removes the freestyle as well', frHard.freestyle_kanji === null && get(frHard, '鐘').eliminated_reason === HARD_BLOCK_REASON)
+check('en cross-check never touches ja or zh results: no log line is written for them', (() => { logs.length = 0; applyPalette(raw([ec('鐘'), cand('灯')], '鐘'), palette, STORY, quiet); applyPalette(raw([cand('钟'), cand('灯')], '钟', { language: 'zh-Hant' }), palette, STORY, quiet); return logs.length === 0 })())
+
+// attached fields: reading, reading_zh, meaning come from the palette, never from the model
+const enAttach = runEn(enRaw([ec('灯', { reading: 'MODEL-GUESS', meaning: 'MODEL-GUESS', reading_zh: 'MODEL-GUESS', why_this: 'Lamplight is the light you left on for me.' }), ec('迎', { story_anchor: '駅まで迎えに来て', reading: 'x', meaning: 'x', why_this: 'Welcoming is what the station was.' })], '灯'))
+check('en attach: reading (romaji), reading_zh (pinyin) and meaning are overwritten from the palette rows; the model\'s why_this is kept', get(enAttach, '灯').reading === 'tō · hi · akari' && get(enAttach, '灯').reading_zh === 'dēng' && get(enAttach, '灯').meaning === 'lamp' && get(enAttach, '灯').why_this === 'Lamplight is the light you left on for me.' && get(enAttach, '迎').meaning === 'welcome')
+check('en attach: a candidate with no zh row (e.g. a ja-only freestyle 駅) has reading_zh null and keeps nothing invented; its reading/meaning come from the ja row', (() => { const o = runEn(enRaw([ec('灯'), ec('迎', { story_anchor: '駅まで迎えに来て' }), ec('駅', { slot: 'freestyle', truth_type: 'Play', story_anchor: '駅まで送ってくれて', reading: 'x', meaning: 'x', why_this: 'y' })], '灯')); const c = get(o, '駅'); return c.reading_zh === null && c.reading !== 'x' && c.meaning === 'station' })())
+check('en attach: for ja and zh results nothing is attached or changed (no reading_zh, the model\'s own reading stays)', (() => { const o = run(raw([ec('灯', { reading: 'ひ' }), cand('迎', { story_anchor: '駅まで迎えに来て' })], '灯')); return get(o, '灯').reading === 'ひ' && get(o, '灯').reading_zh === undefined })())
+check('en attach: plainMeaning picks the family-tagged item, drops parentheses, cuts at the first comma, lower-cases', plainMeaning('bond, ties (ja); to trip, hinder (zh)', 'ja') === 'bond' && plainMeaning('bond, ties (ja); to trip, hinder (zh)', 'zh') === 'to trip' && plainMeaning('Lamp; light', 'ja') === 'lamp' && plainMeaning('friend (of like mind)', 'ja') === 'friend' && plainMeaning('', 'ja') === '')
+check('en attach: EVERY shipped ja row yields a romaji reading made only of Latin letters/macrons and a non-empty plain meaning (nothing blank reaches a buyer)', palette.values().filter((r) => r.language === 'ja').every((r) => /^[a-zāīūēō ·]+$/i.test(romanizeReadings(r.readings)) && plainMeaning(r.raw.core_meanings, 'ja') !== ''), palette.values().filter((r) => r.language === 'ja').filter((r) => !/^[a-zāīūēō ·]+$/i.test(romanizeReadings(r.readings))).map((r) => r.kanji).join(' '))
+check('en attach: every shipped zh row has pinyin readings (reading_zh never comes out empty for a character that has a row)', palette.values().filter((r) => r.language === 'zh').every((r) => r.readings.length > 0))
 
 console.log(failures === 0 ? '\nAll palette referee checks passed.' : `\n${failures} FAILED`)
 process.exit(failures === 0 ? 0 : 1)

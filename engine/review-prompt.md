@@ -14,7 +14,7 @@ occasion_detail: {{ OCCASION_DETAIL }}
 THE RULES
 
 For slots `main` and `second` (the two main candidates), FAIL if ANY of these holds:
-1. Palette. The palette facts below show a taboo, a funeral / parting / illness / death connotation, a blocked occasion matching this order's occasion, or a register flag that clashes with the direction — and nothing in the story re-binds the character to a specific, harmless particular.
+1. Palette. The palette facts below (for en: either of the two rows, Japanese or Mandarin) show a taboo, a funeral / parting / illness / death connotation, a blocked occasion matching this order's occasion, or a register flag that clashes with the direction — and nothing in the story re-binds the character to a specific, harmless particular.
 2. Occasion taboo. The character evokes something this occasion must never evoke:
    - birthday_milestone: ending, decline, age as a burden, death.
    - wedding: parting, severing, leaving, returning, breaking, scattering.
@@ -52,5 +52,5 @@ One verdict per candidate given, in the order given, no more and no fewer.
 STORY
 {{ STORY }}
 
-CANDIDATES (JSON; `palette` is what the curated palette holds, or null if the character has no row)
+CANDIDATES (JSON; `palette` is what the curated palette holds, or null if the character has no row. For language en there is also `palette_zh`: the Mandarin palette's row for the same character, because an English-speaking buyer's gift may be shown to friends in Taiwan, Hong Kong, Macau or Singapore — apply the palette rule to BOTH rows)
 {{ CANDIDATES }}

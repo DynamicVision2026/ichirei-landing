@@ -8,7 +8,8 @@ import { execFileSync } from 'node:child_process'
 import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { INSCRIPTION_FITNESS, OCCASIONS, PALETTE_COLUMNS, PALETTE_ROW_STATUSES, RELATIONSHIPS, type PaletteRow } from '../engine/contract.ts'
-import { FREESTYLE_CATEGORIES, classicalEchoOf, loadPalette, parseCsv } from '../engine/palette.ts'
+import { FREESTYLE_CATEGORIES, classicalEchoOf, loadPalette, parseCsv, plainMeaning } from '../engine/palette.ts'
+import { kanaToRomaji, romanizeReadings } from '../engine/romaji.ts'
 
 let failures = 0
 function check(name: string, cond: boolean, detail?: string) {
@@ -123,6 +124,18 @@ for (const lang of ['ja', 'zh'] as const) {
   check(`review/classical_echo_${lang}.csv: one row for every ${lang} palette row with no REVIEWED classical line (all of them today), with empty text/source/comment columns for the reviewer`, eh.includes('classical_text') && eh.includes('classical_source') && eh.includes('reviewer_comment') && eb.length === rows.length && eb.every((r) => r[eh.indexOf('classical_text')] === '' && r[eh.indexOf('classical_source')] === '' && r[eh.indexOf('reviewer_comment')] === ''), `${eb.length} vs ${rows.length}`)
 }
 check('classical echo: no shipped row is reviewed yet, so no classical line is shown anywhere (the model never writes one; the code only shows reviewed lines)', palette.values().every((r) => classicalEchoOf(r) === null))
+
+// ---- v7: romaji, the English-meanings review sheet --------------------------------------------------
+check('romaji: on-yomi (katakana) get macrons, kun-yomi (hiragana) are plain, okurigana hyphens vanish', kanaToRomaji('トウ') === 'tō' && kanaToRomaji('ショウ') === 'shō' && kanaToRomaji('キョウ') === 'kyō' && kanaToRomaji('ユウ') === 'yū' && kanaToRomaji('ひ') === 'hi' && kanaToRomaji('あか-り') === 'akari' && kanaToRomaji('ちち') === 'chichi' && kanaToRomaji('きずな') === 'kizuna' && kanaToRomaji('しゃ') === 'sha' && kanaToRomaji('じゅう') === 'juu' && romanizeReadings(['トウ', 'ひ', 'あか-り']) === 'tō · hi · akari' && romanizeReadings(['ひ', 'ヒ']) === 'hi')
+const jaAll = palette.values().filter((r) => r.language === 'ja')
+check('romaji: EVERY ja palette row romanises to Latin letters (and macrons) only — nothing blank or left in kana', jaAll.every((r) => /^[a-zāīūēō ·]+$/.test(romanizeReadings(r.readings))), jaAll.filter((r) => !/^[a-zāīūēō ·]+$/.test(romanizeReadings(r.readings))).map((r) => r.kanji).join(' '))
+check('plain meanings: EVERY palette row yields a short plain-English phrase (1–4 words, no parentheses, no semicolons)', palette.values().every((r) => { const m = plainMeaning(r.raw.core_meanings, r.language); return m !== '' && m.split(' ').length <= 4 && !/[();]/.test(m) }), palette.values().filter((r) => { const m = plainMeaning(r.raw.core_meanings, r.language); return m === '' || m.split(' ').length > 4 || /[();]/.test(m) }).map((r) => `${r.kanji}:${plainMeaning(r.raw.core_meanings, r.language)}`).join(' | '))
+const [mh, ...mb] = parseCsv(readFileSync(join(process.cwd(), 'review', 'palette_review_en_meanings.csv'), 'utf8'))
+const shownJa = jaAll.filter((r) => r.status !== 'hard_block')
+check('review/palette_review_en_meanings.csv: for a native English reviewer — kanji, ja reading, pinyin, current English meaning first, then extras and EMPTY suggested_meaning / reviewer_comment', mh.slice(0, 4).join() === 'kanji,ja_reading,pinyin,current_english_meaning' && mh.includes('suggested_meaning') && mh.includes('reviewer_comment') && mb.every((r) => r[mh.indexOf('suggested_meaning')] === '' && r[mh.indexOf('reviewer_comment')] === ''))
+check('review/palette_review_en_meanings.csv: one row per ja palette row an English buyer can be shown (everything but hard_block), meaning = what the buyer sees, pinyin only where the zh palette has the character', mb.length === shownJa.length && mb.every((r) => { const row = palette.lookup('ja', r[0])!; const zh = palette.lookup('zh', r[0]) ?? (row.inscription_form ? palette.lookup('zh', row.inscription_form) : undefined); return r[3] === plainMeaning(row.raw.core_meanings, 'ja') && r[2] === (zh ? zh.readings.join('|') : '') && r[mh.indexOf('in_zh_palette')].startsWith(zh ? 'yes' : 'no') }))
+check('review sheet: 駅 (ja only) is flagged "no" for the zh palette (not offered as a main to English buyers); 灯 has pinyin dēng', (() => { const r = (k: string) => mb.find((x) => x[0] === k); return r('駅')?.[mh.indexOf('in_zh_palette')].startsWith('no') === true && r('灯')?.[2] === 'dēng' && r('灯')?.[3] === 'lamp' })())
+check('review sheet: hard_block characters never reach an English buyer, so they are not on it (送 is absent)', !mb.some((r) => r[0] === '送'))
 
 console.log(failures === 0 ? '\nAll palette data checks passed.' : `\n${failures} FAILED`)
 process.exit(failures === 0 ? 0 : 1)

@@ -4,6 +4,7 @@ import type { Candidate, Condition, EngineResult } from './types'
 import Elicitation from './Elicitation'
 import Reveal from './Reveal'
 import OrderForm from './OrderForm'
+import { sessionId } from './analytics'
 import { exportEvents, log, setCondition as logSetCondition, setStory as logSetStory } from './logging'
 import { COPY, DEFAULT_GIFT_CONTEXT, FOLLOW_UP_MAX, STORY_COUNTER_FROM, clipStory, contextToPayload, storyLength, type Copy, type GiftContext } from './i18n'
 import { getLanguage, setLanguage } from '../lang-store'
@@ -203,7 +204,7 @@ export default function DemoApp({ mode = 'harness' }: { mode?: Mode } = {}) {
       const res = await fetch('/api/select', {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ story: fullStory, ...(answers.length ? { follow_ups: answers } : {}), condition, ...contextToPayload(context) }),
+        body: JSON.stringify({ story: fullStory, ...(answers.length ? { follow_ups: answers } : {}), session: sessionId, source: customer ? 'customer' : 'harness', condition, ...contextToPayload(context) }),
         signal: controller.signal,
       })
       if (!res.ok) {

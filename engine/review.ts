@@ -61,7 +61,17 @@ export interface ReviewItem {
   meaning: string | null
   one_line_gaze: string
   story_anchor: string
-  palette: { status: string; readings: string[]; core_meanings: string; taboo_flags: string[]; register_flags: string[]; blocked_occasions: string[] } | null
+  palette: PaletteFacts | null
+  /** en only: the Mandarin palette's row for the same character (en is judged against ja AND zh). */
+  palette_zh?: PaletteFacts | null
+}
+interface PaletteFacts {
+  status: string
+  readings: string[]
+  core_meanings: string
+  taboo_flags: string[]
+  register_flags: string[]
+  blocked_occasions: string[]
 }
 
 /** The live candidates to review, in output order (main, second, freestyle). */
@@ -72,7 +82,10 @@ export function reviewItems(result: EngineResult, palette: Palette): ReviewItem[
     .filter((c: Candidate) => !c.eliminated)
     .sort((a, b) => order.indexOf(a.slot) - order.indexOf(b.slot))
     .map((c) => {
-      const row = palette.lookup(family, c.kanji) ?? (c.inscription_form ? palette.lookup(family, c.inscription_form) : undefined)
+      const find = (f: 'ja' | 'zh') => palette.lookup(f, c.kanji) ?? (c.inscription_form ? palette.lookup(f, c.inscription_form) : undefined)
+      const facts = (row: ReturnType<typeof find>): PaletteFacts | null =>
+        row ? { status: row.status, readings: row.readings, core_meanings: row.raw.core_meanings, taboo_flags: row.taboo_flags, register_flags: row.register_flags, blocked_occasions: row.blocked_occasions } : null
+      const row = find(family)
       return {
         slot: c.slot,
         kanji: c.kanji,
@@ -81,9 +94,8 @@ export function reviewItems(result: EngineResult, palette: Palette): ReviewItem[
         meaning: c.meaning ?? null,
         one_line_gaze: c.one_line_gaze,
         story_anchor: c.story_anchor,
-        palette: row
-          ? { status: row.status, readings: row.readings, core_meanings: row.raw.core_meanings, taboo_flags: row.taboo_flags, register_flags: row.register_flags, blocked_occasions: row.blocked_occasions }
-          : null,
+        palette: facts(row),
+        ...(result.language === 'en' ? { palette_zh: facts(find('zh')) } : {}),
       }
     })
 }

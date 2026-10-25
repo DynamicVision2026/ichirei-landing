@@ -107,7 +107,7 @@ try {
   // ---- 2b. English: its own prompt, the ja palette rows, romaji + meaning, no script slots ----
   const EN_STORY = 'My mum left the porch light on every night until I got home, even when I was thirty-eight. She never once said she was waiting. She would put the kettle on the moment she heard the gate.'
   const enCand = (slot: string, kanji: string, form: string | null, reading: string, meaning: string, truth: string, anchor: string, gaze: string, over: Record<string, unknown> = {}) => ({
-    slot, kanji, reading, meaning, inscription_form: form, truth_type: truth, one_line_gaze: gaze, story_anchor: anchor, unique_truth: slot === 'freestyle' ? '' : 'u',
+    slot, kanji, reading, meaning, why_this: `Why ${kanji}: it is the plain thing in the story.`, inscription_form: form, truth_type: truth, one_line_gaze: gaze, story_anchor: anchor, unique_truth: slot === 'freestyle' ? '' : 'u',
     eliminated: false, eliminated_reason: null, suitability_flag: null, palette_status: 'ok', flags: [], ...over,
   })
   const EN_GAZE = {
@@ -137,7 +137,7 @@ try {
   check('en: echo stamped (language en, inscription_script null even when the caller sent "simplified")', en.language === 'en' && en.inscription_script === null && en.relationship === 'parent_mother' && en.occasion_detail === '70th birthday')
   check('en referee uses the JA palette rows: slot 1 送 is hard_block-eliminated and slot 2 灯 is promoted; the freestyle 茶 is kept', en.candidates.find((c) => c.kanji === '送')?.eliminated_reason === 'palette: hard_block' && en.primary_kanji === '灯' && en.referee?.promoted_from === 'second' && en.referee.palette_rows === loadPalette().size && en.freestyle_kanji === '茶')
   check('en: the refereed result conforms to the contract (romaji reading + meaning on every candidate)', validateEngineResult(en).length === 0, validateEngineResult(en).join('; '))
-  check('en: reading and meaning pass through unchanged; the kanji stays Japanese with its kyūjitai', en.candidates.find((c) => c.kanji === '灯')?.reading === 'on: tō · kun: hi, akari' && en.candidates.find((c) => c.kanji === '灯')?.meaning === 'lamp; a light kept lit' && en.candidates.find((c) => c.kanji === '灯')?.inscription_form === '燈')
+  check('en: reading, Mandarin reading and meaning are ATTACHED FROM THE PALETTE (the model\'s own values are replaced); the kanji stays Japanese with its kyūjitai; why_this is the model\'s', en.candidates.find((c) => c.kanji === '灯')?.reading === 'tō · hi · akari' && en.candidates.find((c) => c.kanji === '灯')?.reading_zh === 'dēng' && en.candidates.find((c) => c.kanji === '灯')?.meaning === 'lamp' && en.candidates.find((c) => c.kanji === '灯')?.inscription_form === '燈' && en.candidates.find((c) => c.kanji === '灯')?.why_this === 'Why 灯: it is the plain thing in the story.')
   // The prompt asks for it (rule 6); this fixture check keeps the example answers honest: every
   // surviving gaze shares a content word with the story, and a generic line does not.
   const words = (t: string) => new Set((t.toLowerCase().match(/[a-z]{4,}/g) ?? []).filter((w) => !['that', 'this', 'with', 'were', 'your', 'have', 'been', 'they', 'when', 'even'].includes(w)))

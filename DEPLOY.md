@@ -137,7 +137,11 @@ What the server needs (check `<URL>/api/health` → `"orders"`; it lists what is
 1. **Products:** create the two packages so their **prices are the source of truth** (the site never sends a price): one product with two variants, or two products — *Simple* **¥9,800** and *Standard* **¥18,850** (tax-included, matching how the store prices). Make both **available to the sales channel / app that owns the Storefront token** (step 2) — a product that is not published to it cannot be put in a cart.
 2. **Storefront token:** *Settings → Apps and sales channels → Develop apps → Create an app* → *Configure Storefront API scopes*: **`unauthenticated_read_product_listings`** and **`unauthenticated_write_checkouts`** (plus `unauthenticated_read_checkouts`) → *Install app* → copy the **Storefront API access token**. (You already created the Secret Manager secret `SHOPIFY_STOREFRONT_TOKEN`; if you rotate the token, add a new version there.)
 3. **Variant ids:** open each product → the variant → the number at the end of the URL (`…/products/123/variants/`**`45678901234567`**) is the id. Either the number or the full `gid://shopify/ProductVariant/45678901234567` works.
-4. The eight line-item attributes (`kanji`, `inscription_form`, `reading`, `sender_name`, `receiver_name`, `delivery_date`, `language`, `order_ref`) show on each order as **line-item properties**; `order_ref` is also on the order itself. `inscription_form` is the **glyph to carve** (after the sender's choice of old/modern or traditional/simplified).
+4. The nine line-item attributes (`kanji`, `inscription_form`, `reading`, `certificate_meaning_en`, `sender_name`, `receiver_name`, `delivery_date`, `language`, `order_ref`) show on each order as **line-item properties**; `order_ref` is also on the order itself. `inscription_form` is the **glyph to carve** (after the sender's choice of old/modern or traditional/simplified).
+
+`certificate_meaning_en` is the one-phrase English meaning printed on the bilingual certificate. The order result also stores a `certificate` object (`character`, `reading`, `romanization`, `meaning_en`, `line`, `line_en`) built by code.
+
+**Analytics (no setup).** The same bucket also receives privacy-safe choice events under `analytics/YYYY-MM-DD.jsonl` (random session id, language, relationship, occasion, slot, choice, explained, ordered — no story, names or kanji text). Read them with `node scripts/report-choices.mjs --bucket <ORDER_BUCKET>` in Cloud Shell.
 
 **7b — Cloud Storage bucket + permissions (Cloud Shell).**
 ```bash
@@ -161,7 +165,7 @@ Orders contain **personal data** (names, the sender's story): keep the bucket pr
 
 **7c — Trigger substitutions.** Cloud Build → Triggers → `ichirei-deploy` → Edit → *Substitution variables*: `_ORDER_BUCKET` = `ichirei-orders`, `_SHOPIFY_VARIANT_SIMPLE` = `<id>`, `_SHOPIFY_VARIANT_STANDARD` = `<id>`. Save and run the trigger (the deploy now also mounts the new secret).
 
-**7d — Verify.** `<URL>/api/health` → `"orders": { "ready": true, "store": "gcs", … "missing": [] }`. Then on `<URL>/` choose a character, fill the form and press the order button: you land on a Shopify checkout with the package, and the line shows the eight properties. Do **not** complete a real payment while testing (or use Shopify's *Bogus Gateway* / a test order you cancel).
+**7d — Verify.** `<URL>/api/health` → `"orders": { "ready": true, "store": "gcs", … "missing": [] }`. Then on `<URL>/` choose a character, fill the form and press the order button: you land on a Shopify checkout with the package, and the line shows the nine properties. Do **not** complete a real payment while testing (or use Shopify's *Bogus Gateway* / a test order you cancel).
 
 **Looking an order up (production).** Console → **Cloud Storage → `ichirei-orders` → `orders/` → `IC-YYYYMMDD-XXXXXXXX.json`** → *Preview*. The top block **`production`** has everything at a glance — the character and the glyph to carve, reading, **gaze line**, **story anchor**, sender/receiver names, delivery date, package and the **certificate text**; below it are the full `story` and `engine_result`. `status` is `cart_created` once Shopify accepted the cart (`cart_failed` / `pending` orders were never checked out).
 

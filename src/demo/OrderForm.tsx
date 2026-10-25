@@ -3,6 +3,7 @@ import { motion, useReducedMotion } from 'framer-motion'
 import type { Candidate, EngineResult } from './types'
 import type { Copy, InscriptionStyle, OrderField, PackageId, UiLanguage } from './i18n'
 import { log } from './logging'
+import { sessionId } from './analytics'
 import { PACKAGES, PACKAGE_PRICE_JPY, formatYen } from '../order/packages.ts'
 import { certificateText } from '../order/certificate.ts'
 import { DEFAULT_STYLE, STYLES_BY_LANGUAGE, glyphFor, hasDistinctForm } from '../order/inscription.ts'
@@ -82,6 +83,8 @@ export default function OrderForm({ result, story, followUps = [], candidate, co
           delivery_date: date,
           inscription_style: style,
           package: pkg,
+          session: sessionId,
+          source: 'customer',
         }),
       })
       let data: { checkout_url?: string; order_ref?: string; code?: string; field?: string } | null = null

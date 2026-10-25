@@ -25,6 +25,7 @@
 import { readFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
+import { romanizeReadings } from './romaji.ts'
 import {
   FAMILIES,
   INSCRIPTION_FITNESS,
@@ -38,6 +39,7 @@ import {
   type ClassicalEcho,
   type EngineResult,
   type Family,
+  type Language,
   type PaletteRow,
   type RefereeAction,
   type RefereeReport,
@@ -49,6 +51,8 @@ export const FREESTYLE_BLOCKED_REASON = 'palette: freestyle_blocked'
 export const FREESTYLE_NO_ANCHOR_REASON = 'freestyle: story_anchor is not a verbatim fragment of the story'
 export const FREESTYLE_DUPLICATE_REASON = 'freestyle: same character as a main slot'
 export const CLASSICAL_ECHO_REQUIRED_REASON = 'palette: classical_echo_required'
+/** en only: a main candidate must have a row in BOTH palettes; the reason names the family it lacks. */
+export const noRowReason = (family: Family) => `palette: no_row_in_${family}`
 
 /** Why the freestyle slot refuses a character (categories of engine/freestyle-blocklist.csv). */
 export const FREESTYLE_CATEGORIES = ['body', 'appearance', 'weight', 'intelligence', 'money_status', 'sexual', 'illness', 'disability', 'cruelty'] as const
@@ -301,9 +305,24 @@ function rowFor(palette: Palette, family: Family, c: Candidate): PaletteRow | un
   return palette.lookup(family, c.kanji) ?? (c.inscription_form ? palette.lookup(family, c.inscription_form) : undefined)
 }
 
+/**
+ * Which palettes judge a language. ja → ja, zh-* → zh. en → BOTH ja and zh: an English-speaking buyer
+ * orders a Japanese kanji, but the gift may be shown to friends in Taiwan, Hong Kong, Macau or Singapore,
+ * so a main candidate must be safe in every kanji culture.
+ */
+export const refereeFamilies = (language: Language): Family[] => (language === 'en' ? ['ja', 'zh'] : [familyOf(language)])
+
+interface Found {
+  family: Family
+  row: PaletteRow | undefined
+}
+const rowsFor = (palette: Palette, families: Family[], c: Candidate): Found[] => families.map((family) => ({ family, row: rowFor(palette, family, c) }))
+
 const unique = (xs: string[]) => [...new Set(xs)]
 
 export interface RefereeOptions {
+  /** Log sink for `[ichirei-referee] en cross-check …` lines (default console.log). Never receives story text. */
+  log?: (line: string) => void
   /** REQUIRE_CLASSICAL_ECHO: main candidates need a reviewed classical line. Default: the environment (off). */
   requireClassicalEcho?: boolean
 }
@@ -368,45 +387,71 @@ function toInsufficient(result: EngineResult, referee: RefereeReport): EngineRes
 export function applyPalette(result: EngineResult, palette: Palette, story: string, opts: RefereeOptions = {}): EngineResult {
   if (result.status !== 'sufficient' || !Array.isArray(result.candidates) || result.candidates.length === 0) return result
   const requireEcho = opts.requireClassicalEcho ?? requireClassicalEchoFromEnv()
-  const language = familyOf(result.language)
+  const log = opts.log ?? ((l: string) => console.log(l))
+  const families = refereeFamilies(result.language)
+  const cross = families.length > 1
+  const language = familyOf(result.language) // the family whose classical lines are shown
   const actions: RefereeAction[] = []
 
-  // 1. Per-candidate: overwrite palette_status/flags from the row; enforce hard_block / blocked_occasion.
+  // The en cross-check log: the kanji and which family blocked it — never any story text.
+  const crossLog = (c: Candidate, blockedBy: Family[], reason: string) => {
+    if (cross) log(`[ichirei-referee] en cross-check ${JSON.stringify({ kanji: c.kanji, slot: c.slot, blocked_by: blockedBy, reason })}`)
+  }
+
+  // 1. Per-candidate: overwrite palette_status/flags from the row(s); enforce hard_block / blocked_occasion
+  //    (and, for en, the two-palette rules).
   const candidates: Candidate[] = result.candidates.map((orig) => {
     const c: Candidate = { ...orig, flags: [...(orig.flags ?? [])] }
-    const row = rowFor(palette, language, c)
-    if (!row) return c
-    // Blocked for THIS occasion → removed, like a hard_block (an order with no occasion blocks nothing).
-    if (row.status !== 'hard_block' && result.occasion !== null && row.blocked_occasions.includes(result.occasion)) {
+    const found = rowsFor(palette, families, c)
+    const rows = found.filter((f): f is Found & { row: PaletteRow } => f.row !== undefined)
+    if (rows.length === 0 && !(cross && isMainSlot(c))) return c
+    const eliminate = (reason: string, flag: string, already: RefereeAction['action'], fresh: RefereeAction['action'], blockedBy: Family[]) => {
       c.palette_status = 'off_palette'
-      c.flags = unique([...c.flags, 'palette_blocked_occasion'])
+      c.flags = unique([...c.flags, flag, ...(cross ? blockedBy.map((f) => `blocked_by_${f}`) : [])])
+      const via = cross ? ` [${blockedBy.join(',')}]` : ''
       if (c.eliminated) {
-        actions.push({ kanji: c.kanji, action: 'blocked_occasion_already_eliminated', detail: `kept the model's reason: ${c.eliminated_reason ?? '(none)'}` })
+        actions.push({ kanji: c.kanji, action: already, detail: `kept the model's reason: ${c.eliminated_reason ?? '(none)'}${via}` })
       } else {
         c.eliminated = true
-        c.eliminated_reason = BLOCKED_OCCASION_REASON
-        actions.push({ kanji: c.kanji, action: 'blocked_occasion_eliminated', detail: `${BLOCKED_OCCASION_REASON} (${result.occasion})` })
+        c.eliminated_reason = reason
+        actions.push({ kanji: c.kanji, action: fresh, detail: `${reason}${result.occasion && reason === BLOCKED_OCCASION_REASON ? ` (${result.occasion})` : ''}${via}` })
+        crossLog(c, blockedBy, reason)
+      }
+      return c
+    }
+    // A hard_block in ANY palette that judges this language removes the candidate.
+    const hard = rows.filter((f) => f.row.status === 'hard_block')
+    if (hard.length > 0) {
+      for (const f of rows) if (f.row.status !== 'ok' || f.row.reviewed) c.flags = unique([...c.flags, ...f.row.taboo_flags, ...f.row.register_flags])
+      return eliminate(HARD_BLOCK_REASON, 'palette_hard_block', 'hard_block_already_eliminated', 'hard_block_eliminated', hard.map((f) => f.family))
+    }
+    // Blocked for THIS occasion in any palette → removed too (an order with no occasion blocks nothing).
+    const occ = result.occasion === null ? [] : rows.filter((f) => f.row.blocked_occasions.includes(result.occasion as string))
+    if (occ.length > 0) {
+      return eliminate(BLOCKED_OCCASION_REASON, 'palette_blocked_occasion', 'blocked_occasion_already_eliminated', 'blocked_occasion_eliminated', occ.map((f) => f.family))
+    }
+    // en only: a MAIN candidate needs a row in both palettes; a character one culture has not vetted is not offered as a main.
+    const missing = cross && isMainSlot(c) ? found.filter((f) => !f.row).map((f) => f.family) : []
+    if (missing.length > 0) {
+      const reason = noRowReason(missing[0])
+      c.flags = unique([...c.flags, 'no_palette_row', ...missing.map((f) => `no_${f}_row`)])
+      c.palette_status = 'off_palette'
+      if (c.eliminated) {
+        actions.push({ kanji: c.kanji, action: 'missing_row_already_eliminated', detail: `kept the model's reason: ${c.eliminated_reason ?? '(none)'} [${missing.join(',')}]` })
+      } else {
+        c.eliminated = true
+        c.eliminated_reason = reason
+        actions.push({ kanji: c.kanji, action: 'missing_row_eliminated', detail: `${reason} [missing: ${missing.join(',')}]` })
+        crossLog(c, missing, reason)
       }
       return c
     }
     // An `ok` row nobody has reviewed yet does not vouch for the character: the model's own
-    // judgement stands until a named reviewer signs the row. context_required / hard_block
-    // rows are conservative, so they apply even while unreviewed.
-    if (row.status === 'ok' && !row.reviewed) return c
-    c.flags = unique([...c.flags, ...row.taboo_flags, ...row.register_flags])
-    if (row.status === 'ok') c.palette_status = 'ok'
-    else if (row.status === 'context_required') c.palette_status = 'context_required'
-    else {
-      c.palette_status = 'off_palette'
-      c.flags = unique([...c.flags, 'palette_hard_block'])
-      if (c.eliminated) {
-        actions.push({ kanji: c.kanji, action: 'hard_block_already_eliminated', detail: `kept the model's reason: ${c.eliminated_reason ?? '(none)'}` })
-      } else {
-        c.eliminated = true
-        c.eliminated_reason = HARD_BLOCK_REASON
-        actions.push({ kanji: c.kanji, action: 'hard_block_eliminated', detail: HARD_BLOCK_REASON })
-      }
-    }
+    // judgement stands until a named reviewer signs the row. context_required rows are
+    // conservative, so they apply even while unreviewed; with two palettes the more cautious wins.
+    for (const f of rows) if (f.row.status !== 'ok' || f.row.reviewed) c.flags = unique([...c.flags, ...f.row.taboo_flags, ...f.row.register_flags])
+    if (rows.some((f) => f.row.status === 'context_required')) c.palette_status = 'context_required'
+    else if (rows.length === families.length && rows.every((f) => f.row.reviewed)) c.palette_status = 'ok'
     return c
   })
 
@@ -423,8 +468,12 @@ export function applyPalette(result: EngineResult, palette: Palette, story: stri
     if (!anchorPresent(c, story)) drop(FREESTYLE_NO_ANCHOR_REASON, 'freestyle_anchor_missing_eliminated', 'freestyle_anchor_missing')
     else if (mainKanji.has(c.kanji) || (c.inscription_form && mainKanji.has(c.inscription_form))) drop(FREESTYLE_DUPLICATE_REASON, 'freestyle_duplicate_eliminated', 'freestyle_duplicate')
     else {
-      const category = palette.freestyleCategory(language, [c.kanji, c.inscription_form])
-      if (category) drop(`${FREESTYLE_BLOCKED_REASON} (${category})`, 'freestyle_blocked_eliminated', 'freestyle_blocked')
+      // en: checked against BOTH blocklists (the gift may be read in either culture).
+      const hit = families.map((f) => ({ family: f, category: palette.freestyleCategory(f, [c.kanji, c.inscription_form]) })).find((h) => h.category)
+      if (hit?.category) {
+        drop(`${FREESTYLE_BLOCKED_REASON} (${hit.category})`, 'freestyle_blocked_eliminated', 'freestyle_blocked')
+        crossLog(c, [hit.family], `${FREESTYLE_BLOCKED_REASON} (${hit.category})`)
+      }
     }
   }
 
@@ -443,18 +492,11 @@ export function applyPalette(result: EngineResult, palette: Palette, story: stri
 
   // 4. Who may be primary? Not eliminated, not flagged as lacking a heart anchor (the prompt's own
   //    gate 6), and — for a context_required kanji whose row demands an anchor — carrying a usable anchor.
-  const anchorMissing = (c: Candidate): boolean => {
-    const row = rowFor(palette, language, c)
-    return row?.status === 'context_required' && row.anchor_required && !anchorPresent(c, story)
-  }
-  const removedByReferee = (c: Candidate) => {
-    const row = rowFor(palette, language, c)
-    return (
-      row?.status === 'hard_block' ||
-      (row !== undefined && result.occasion !== null && row.blocked_occasions.includes(result.occasion)) ||
-      c.eliminated_reason === CLASSICAL_ECHO_REQUIRED_REASON
-    )
-  }
+  const anchorMissing = (c: Candidate): boolean =>
+    rowsFor(palette, families, c).some((f) => f.row?.status === 'context_required' && f.row.anchor_required) && !anchorPresent(c, story)
+  const removedByReferee = (c: Candidate) =>
+    rowsFor(palette, families, c).some((f) => f.row?.status === 'hard_block' || (f.row !== undefined && result.occasion !== null && f.row.blocked_occasions.includes(result.occasion))) ||
+    c.eliminated_reason?.startsWith('palette: ') === true
   const originalPrimary = result.primary_kanji
   const { primary, promotedFrom } = settlePrimary(candidates, originalPrimary, anchorMissing, removedByReferee, actions)
 
@@ -473,7 +515,32 @@ export function applyPalette(result: EngineResult, palette: Palette, story: stri
   return finish(result, candidates, primary, referee, palette, language, anchorMissing)
 }
 
-/** Fill in the derived fields (runner-up, freestyle, classical lines) from the settled candidates. */
+/** One short plain phrase from the palette's `core_meanings` cell: the item tagged for this family (else the first), parentheticals dropped, cut at the first comma. */
+export function plainMeaning(coreMeanings: string, family: Family): string {
+  const items = coreMeanings.split(';').map((x) => x.trim()).filter(Boolean)
+  const tagged = items.find((x) => new RegExp(`\\(${family}\\)`).test(x)) ?? items[0] ?? ''
+  return tagged.replace(/\s*\([^)]*\)/g, '').split(',')[0].trim().toLowerCase()
+}
+
+/**
+ * en: the reading, the Mandarin reading and the plain meaning come from the PALETTE (the model's memory is not
+ * trusted for them). A character with no ja row (only possible for the freestyle) keeps what the model wrote.
+ */
+function withEnglishFields(c: Candidate, palette: Palette): Candidate {
+  const ja = rowFor(palette, 'ja', c)
+  const zh = rowFor(palette, 'zh', c)
+  const out: Candidate = { ...c }
+  if (ja) {
+    const reading = romanizeReadings(ja.readings)
+    if (reading) out.reading = reading
+    const meaning = plainMeaning(ja.raw.core_meanings, 'ja')
+    if (meaning) out.meaning = meaning
+  }
+  out.reading_zh = zh && zh.readings.length > 0 ? zh.readings.slice(0, 3).join(' · ') : null
+  return out
+}
+
+/** Fill in the derived fields (runner-up, freestyle, classical lines, en readings) from the settled candidates. */
 function finish(
   result: EngineResult,
   candidates: Candidate[],
@@ -490,7 +557,7 @@ function finish(
   const freestyle = candidates.find((c) => c.slot === 'freestyle' && !c.eliminated)
   // Classical lines come from reviewed palette rows only; the model's own value is always discarded.
   const withEcho = candidates.map((c) => ({
-    ...c,
+    ...(result.language === 'en' ? withEnglishFields(c, palette) : c),
     classical_echo: isMainSlot(c) ? classicalEchoOf(rowFor(palette, language, c)) : null,
   }))
   return {
@@ -533,10 +600,9 @@ export function applyReviewVerdicts(
   if (live && (!review.ran || !review.verdicts.some((v) => v.slot === 'freestyle' && v.kanji === live.kanji))) {
     failFlag(live, review.skipped_reason ?? 'no review verdict for the freestyle')
   }
-  const anchorMissing = (c: Candidate): boolean => {
-    const row = rowFor(palette, language, c)
-    return row?.status === 'context_required' && row.anchor_required && !anchorPresent(c, story)
-  }
+  const families = refereeFamilies(result.language)
+  const anchorMissing = (c: Candidate): boolean =>
+    rowsFor(palette, families, c).some((f) => f.row?.status === 'context_required' && f.row.anchor_required) && !anchorPresent(c, story)
   // A candidate removed by the review or by an earlier referee rule (the model's own eliminations are not the referee's to act on).
   const removedByReferee = (c: Candidate) =>
     c.eliminated &&

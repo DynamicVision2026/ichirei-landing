@@ -12,6 +12,7 @@
 //   {"type":"error","error":"<message>"}                       ...terminal
 
 import { runEngine } from '../engine/engine.ts'
+import { cleanSession, cleanSource, recordEvent, shownEvent } from '../engine/analytics.ts'
 import { FOLLOW_UP_MAX, STORY_MAX, countChars, mergeStory, parseContext, parseFollowUps, type Condition } from '../engine/contract.ts'
 
 // Full Hobby-plan ceiling (also mirrored in vercel.json).
@@ -34,9 +35,11 @@ export async function POST(req: Request): Promise<Response> {
     return jsonResponse(400, { error: 'Body is not valid JSON' })
   }
 
-  const { story, follow_ups, condition, language, relationship, direction, occasion, occasion_detail, inscription_script } = (body ?? {}) as {
+  const { story, follow_ups, session, source, condition, language, relationship, direction, occasion, occasion_detail, inscription_script } = (body ?? {}) as {
     story?: unknown
     follow_ups?: unknown
+    session?: unknown
+    source?: unknown
     condition?: unknown
     language?: unknown
     relationship?: unknown
@@ -93,6 +96,9 @@ export async function POST(req: Request): Promise<Response> {
             }
           },
         })
+        // Learning loop: codes and booleans only, tied to a random browser session id (engine/analytics.ts). Never awaited.
+        const sessionId = cleanSession(session)
+        if (sessionId) void recordEvent(shownEvent(result, sessionId, cleanSource(source), new Date()))
         send({ type: 'result', result })
       } catch (err) {
         const message = err instanceof Error ? err.message : String(err)
