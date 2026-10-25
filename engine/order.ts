@@ -5,7 +5,7 @@
 // Plumbing only — nothing here selects or judges a character.
 
 import { randomBytes } from 'node:crypto'
-import { LANGUAGES, STORY_MAX as ENGINE_STORY_MAX, countChars, type Candidate, type EngineResult, type Language } from './contract.ts'
+import { LANGUAGES, STORY_MAX as ENGINE_STORY_MAX, countChars, parseFollowUps, type Candidate, type EngineResult, type Language } from './contract.ts'
 import { PACKAGES, PACKAGE_PRICE_JPY, type PackageId } from '../src/order/packages.ts'
 import { certificateText } from '../src/order/certificate.ts'
 import { STYLES_BY_LANGUAGE, glyphFor, type InscriptionStyle } from '../src/order/inscription.ts'
@@ -18,6 +18,8 @@ export const MAX_DAYS_AHEAD = 730
 
 export interface ValidOrder {
   story: string
+  /** The sender's answers to the engine's follow-up questions (each at most 600 characters), kept apart from the story. */
+  follow_ups: string[]
   engine_result: EngineResult
   language: Language
   candidate: Candidate
@@ -67,6 +69,8 @@ export function parseOrderRequest(body: unknown, now: Date = new Date()): Parsed
   if (!isText(body.story)) return fail('story', 'Missing "story"')
   const story = body.story.trim()
   if (countChars(story) > STORY_MAX) return fail('story', `"story" is longer than ${STORY_MAX} characters`)
+  const fu = parseFollowUps(body.follow_ups)
+  if (!fu.ok) return fail('follow_ups', fu.error)
 
   const result = body.engine_result
   if (!isObject(result) || result.status !== 'sufficient' || !Array.isArray(result.candidates)) {
@@ -113,6 +117,7 @@ export function parseOrderRequest(body: unknown, now: Date = new Date()): Parsed
     ok: true,
     order: {
       story,
+      follow_ups: fu.followUps,
       engine_result: result as unknown as EngineResult,
       language: lang,
       candidate,
@@ -196,8 +201,9 @@ export interface OrderRecord {
     price_jpy: number
     certificate_text: string
   }
-  /** Kept here, never sent to Shopify. */
+  /** Kept here, never sent to Shopify. `story` is what the sender wrote first; `follow_ups` are their answers to the engine's questions. */
   story: string
+  follow_ups: string[]
   engine_result: EngineResult
   shopify: { cart_id: string; checkout_url: string; variant_id: string } | null
   error: string | null
@@ -230,6 +236,7 @@ export function buildRecord(order: ValidOrder, orderRef: string, now: Date = new
       certificate_text: certificateText(order.language),
     },
     story: order.story,
+    follow_ups: order.follow_ups,
     engine_result: order.engine_result,
     shopify: null,
     error: null,

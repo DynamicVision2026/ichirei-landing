@@ -11,7 +11,7 @@ import http from 'node:http'
 import { readFileSync, readdirSync } from 'node:fs'
 import { join } from 'node:path'
 import { runEngine } from '../engine/engine.ts'
-import { STORY_MAX, countChars, validateEngineResult, type EngineResult } from '../engine/contract.ts'
+import { FOLLOW_UP_MAX, MAX_FOLLOW_UPS, STORY_MAX, countChars, mergeStory, parseFollowUps, validateEngineResult, type EngineResult } from '../engine/contract.ts'
 import { applyPalette, applyReviewVerdicts, classicalEchoOf, loadPalette, parseFreestyleBlocklist, parsePalette, FREESTYLE_CATEGORIES } from '../engine/palette.ts'
 import { REVIEW_SLOTS, fillReviewPrompt, loadReviewPrompt, parseVerdicts, reviewItems } from '../engine/review.ts'
 import { parseOrderRequest } from '../engine/order.ts'
@@ -245,30 +245,46 @@ try {
   check('contract: an insufficient result has no freestyle and no runner-up', validateEngineResult({ ...e, freestyle_kanji: '封' }).some((p) => p.includes('freestyle_kanji not null')) && validateEngineResult(e).length === 0)
 
   // =============================================================================================
-  // 7. Story length: no minimum, hard maximum 2,000 characters, rejected cleanly (d)
+  // 7. Story length: no minimum, hard maximum 600 characters, follow-up answers 600 EACH, rejected cleanly (d)
   // =============================================================================================
-  const long = '長'.repeat(2500)
+  const long = FIX.d.story
+  const post = (body: unknown) => selectPost(new Request('http://x/api/select', { method: 'POST', body: JSON.stringify(body) }))
   seen.length = 0
-  const selLong = await selectPost(new Request('http://x/api/select', { method: 'POST', body: JSON.stringify({ story: long, language: 'ja' }) }))
+  const selLong = await post({ story: long, language: 'ja' })
   const selLongBody = (await selLong.json()) as { error: string; code: string; max: number }
-  check('(d) a 2,500-character story → 400 story_too_long with the limit, before any model call', selLong.status === 400 && selLongBody.code === 'story_too_long' && selLongBody.max === 2000 && selLongBody.error.includes('2000') && seen.length === 0, JSON.stringify(selLongBody))
-  const edge = await selectPost(new Request('http://x/api/select', { method: 'POST', body: JSON.stringify({ story: '短'.repeat(2000), language: 'ja' }) }))
+  check('(d) the 700-character fixture story → 400 story_too_long with the limit (600), before any model call', countChars(long) === 700 && selLong.status === 400 && selLongBody.code === 'story_too_long' && selLongBody.max === 600 && selLongBody.error.includes('600') && selLongBody.error.includes('700') && seen.length === 0, JSON.stringify(selLongBody))
   selectReply = FIX.a.model_reply
-  check('(d) exactly 2,000 characters is accepted (streams); 2,001 is not', edge.status === 200 && (await selectPost(new Request('http://x/api/select', { method: 'POST', body: JSON.stringify({ story: '短'.repeat(2001) }) }))).status === 400)
+  reviewReply = FIX.a.review_reply
+  const edge = await post({ story: '短'.repeat(600), language: 'ja' })
+  check('(d) exactly 600 characters is accepted (streams); 601 is not', edge.status === 200 && (await post({ story: '短'.repeat(601) })).status === 400)
   await edge.text()
-  check('(d) characters are counted as Unicode code points, not UTF-16 units (2,000 × 𠮷 is fine, 2,001 is not)', countChars('𠮷'.repeat(2000)) === 2000 && '𠮷'.repeat(2000).length === 4000 && (await selectPost(new Request('http://x/api/select', { method: 'POST', body: JSON.stringify({ story: '𠮷'.repeat(2001) }) }))).status === 400)
+  check('(d) characters are counted as Unicode code points, not UTF-16 units (600 × 𠮷 is fine, 601 is not)', countChars('𠮷'.repeat(600)) === 600 && '𠮷'.repeat(600).length === 1200 && (await post({ story: '𠮷'.repeat(601) })).status === 400)
   seen.length = 0
-  const thin = await selectPost(new Request('http://x/api/select', { method: 'POST', body: JSON.stringify({ story: '父', language: 'ja' }) }))
+  const thin = await post({ story: '父', language: 'ja' })
   await thin.text()
   check('no minimum: a one-character story is not rejected by length (STEP 0 judges sufficiency by content)', thin.status === 200)
-  check('the cap is one shared constant (2,000) in the contract', STORY_MAX === 2000)
+  check('the caps are shared constants in the contract: story 600, each follow-up answer 600, at most 2 answers', STORY_MAX === 600 && FOLLOW_UP_MAX === 600 && MAX_FOLLOW_UPS === 2)
+
+  // follow-up answers: their own field, 600 each — so a 600-character story can still be followed up
+  const fuA = '甲'.repeat(600)
+  const fuB = '乙'.repeat(600)
+  seen.length = 0
+  const withFu = await post({ story: '短'.repeat(600), follow_ups: [fuA, fuB], language: 'ja' })
+  await withFu.text()
+  const sentPrompt = seen.find((x) => x.kind === 'select')?.prompt ?? ''
+  check('follow-ups: two answers of 600 characters each ride along with a 600-character story; the engine reads all three, in order', withFu.status === 200 && sentPrompt.includes('短'.repeat(600) + '\n\n' + fuA + '\n\n' + fuB))
+  check('follow-ups: an answer of 601 characters → 400 follow_up_too_long (max 600); a third answer → 400 too_many_follow_ups; a non-array → 400', (await (async () => { const r = await post({ story: '父', follow_ups: ['甲'.repeat(601)] }); const b = (await r.json()) as { code: string; max: number }; return r.status === 400 && b.code === 'follow_up_too_long' && b.max === 600 })()) && (await (async () => { const r = await post({ story: '父', follow_ups: ['a', 'b', 'c'] }); return r.status === 400 && ((await r.json()) as { code: string }).code === 'too_many_follow_ups' })()) && (await post({ story: '父', follow_ups: 'さらに' })).status === 400 && (await post({ story: '父', follow_ups: [5] })).status === 400)
+  check('follow-ups: blank answers are ignored; omitting the field is the same as an empty list', parseFollowUps(['  ', '本当の答え']).ok === true && (parseFollowUps(['  ', '本当の答え']) as { followUps: string[] }).followUps.join() === '本当の答え' && (parseFollowUps(undefined) as { followUps: string[] }).followUps.length === 0 && mergeStory('物語', ['答え']) === '物語\n\n答え' && mergeStory('物語') === '物語')
   const orderBody = { story: long, engine_result: clone(a), selected_kanji: '迎', language: 'ja', sender_name: '山田', receiver_name: '父', delivery_date: '2099-01-01', inscription_style: 'kyujitai', package: 'simple' }
-  const ord = parseOrderRequest(orderBody, new Date('2026-10-25T00:00:00Z'))
-  check('(d) the order endpoint rejects a story over 2,000 characters, naming the field (replaces the old 10,000)', ord.ok === false && ord.field === 'story' && ord.error.includes('2000'))
-  check('the order endpoint accepts a 2,000-character story', parseOrderRequest({ ...orderBody, story: '長'.repeat(2000), delivery_date: '2026-12-01' }, new Date('2026-10-25T00:00:00Z')).ok === true)
-  const freeOrder = parseOrderRequest({ ...orderBody, story: FIX.a.story, selected_kanji: '封', delivery_date: '2026-12-01', engine_result: clone(a) }, new Date('2026-10-25T00:00:00Z'))
+  const NOW = new Date('2026-10-25T00:00:00Z')
+  const ord = parseOrderRequest(orderBody, NOW)
+  check('(d) the order endpoint rejects the 700-character story, naming the field (limit 600; it was 10,000)', ord.ok === false && ord.field === 'story' && ord.error.includes('600'))
+  const ordOk = parseOrderRequest({ ...orderBody, story: '長'.repeat(600), follow_ups: [fuA, fuB], delivery_date: '2026-12-01' }, NOW)
+  check('the order endpoint accepts a 600-character story with two 600-character follow-up answers, and keeps the answers apart from the story', ordOk.ok === true && ordOk.order.story.length === 600 && ordOk.order.follow_ups.length === 2 && ordOk.order.follow_ups[1] === fuB)
+  check('the order endpoint refuses a 601-character answer or three answers, naming the field "follow_ups"', (() => { const r = parseOrderRequest({ ...orderBody, story: '父', follow_ups: ['甲'.repeat(601)], delivery_date: '2026-12-01' }, NOW); const r2 = parseOrderRequest({ ...orderBody, story: '父', follow_ups: ['a', 'b', 'c'], delivery_date: '2026-12-01' }, NOW); return r.ok === false && r.field === 'follow_ups' && r2.ok === false && r2.field === 'follow_ups' })())
+  const freeOrder = parseOrderRequest({ ...orderBody, story: FIX.a.story, selected_kanji: '封', delivery_date: '2026-12-01', engine_result: clone(a) }, NOW)
   check('ordering: the freestyle card can be chosen like any other card (its glyph, reading and gaze travel with the order)', freeOrder.ok === true && freeOrder.order.candidate.slot === 'freestyle' && freeOrder.order.glyph === '封')
-  const elimOrder = parseOrderRequest({ ...orderBody, story: FIX.c1.story, selected_kanji: '太', delivery_date: '2026-12-01', engine_result: clone(c1) }, new Date('2026-10-25T00:00:00Z'))
+  const elimOrder = parseOrderRequest({ ...orderBody, story: FIX.c1.story, selected_kanji: '太', delivery_date: '2026-12-01', engine_result: clone(c1) }, NOW)
   check('ordering: a refused (eliminated) freestyle cannot be ordered', elimOrder.ok === false && elimOrder.field === 'selected_kanji')
 } finally {
   console.log = origLog

@@ -5,7 +5,7 @@ import Elicitation from './Elicitation'
 import Reveal from './Reveal'
 import OrderForm from './OrderForm'
 import { exportEvents, log, setCondition as logSetCondition, setStory as logSetStory } from './logging'
-import { COPY, DEFAULT_GIFT_CONTEXT, STORY_COUNTER_FROM, STORY_MAX, clipStory, contextToPayload, storyLength, type Copy, type GiftContext } from './i18n'
+import { COPY, DEFAULT_GIFT_CONTEXT, FOLLOW_UP_MAX, STORY_COUNTER_FROM, clipStory, contextToPayload, storyLength, type Copy, type GiftContext } from './i18n'
 import { getLanguage, setLanguage } from '../lang-store'
 import { useLanguage } from '../useLanguage'
 
@@ -172,6 +172,8 @@ export default function DemoApp({ mode = 'harness' }: { mode?: Mode } = {}) {
   const [receivedChars, setReceivedChars] = useState(0)
   const [followUpQuestion, setFollowUpQuestion] = useState<string | null>(null)
   const [followUpAnswer, setFollowUpAnswer] = useState('')
+  // The answers already given (each at most FOLLOW_UP_MAX characters), kept apart from the story so each has its own limit.
+  const [followUps, setFollowUps] = useState<string[]>([])
   const followUpsUsed = useRef(0)
   const sessionLogged = useRef(false)
 
@@ -182,7 +184,7 @@ export default function DemoApp({ mode = 'harness' }: { mode?: Mode } = {}) {
     setConditionState(c)
   }
 
-  const runEngine = async (fullStory: string) => {
+  const runEngine = async (fullStory: string, answers: string[] = []) => {
     setPhase('processing')
     setError(null)
     setReceivedChars(0)
@@ -190,7 +192,7 @@ export default function DemoApp({ mode = 'harness' }: { mode?: Mode } = {}) {
       log('session_started', {})
       sessionLogged.current = true
     }
-    logSetStory(fullStory)
+    logSetStory([fullStory, ...answers].join('\n\n'))
     const controller = new AbortController()
     let timedOut = false
     const deadline = window.setTimeout(() => {
@@ -201,14 +203,14 @@ export default function DemoApp({ mode = 'harness' }: { mode?: Mode } = {}) {
       const res = await fetch('/api/select', {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ story: fullStory, condition, ...contextToPayload(context) }),
+        body: JSON.stringify({ story: fullStory, ...(answers.length ? { follow_ups: answers } : {}), condition, ...contextToPayload(context) }),
         signal: controller.signal,
       })
       if (!res.ok) {
         let message: string | null = null
         try {
           const body = (await res.json()) as { error?: string; code?: string }
-          message = body?.code === 'story_too_long' ? copy.storyTooLong : (body?.error ?? null)
+          message = body?.code === 'story_too_long' || body?.code === 'follow_up_too_long' ? copy.storyTooLong : (body?.error ?? null)
         } catch {
           message = null
         }
@@ -265,6 +267,9 @@ export default function DemoApp({ mode = 'harness' }: { mode?: Mode } = {}) {
   const tryAgain = () => {
     log('retry_clicked', { story_chars: story.length })
     followUpsUsed.current = 0
+    // The story box gets the story with the answers folded in (cut to the story limit), so nothing the sender wrote is lost.
+    setStory(clipStory([story, ...followUps].join('\n\n')))
+    setFollowUps([])
     setResult(null)
     setError(null)
     setFollowUpQuestion(null)
@@ -277,9 +282,10 @@ export default function DemoApp({ mode = 'harness' }: { mode?: Mode } = {}) {
   const submitFollowUp = () => {
     const answer = followUpAnswer.trim()
     if (!answer) return
-    const merged = clipStory(`${story}\n\n${answer}`)
-    setStory(merged)
-    void runEngine(merged)
+    setFollowUpAnswer('')
+    const next = [...followUps, clipStory(answer, FOLLOW_UP_MAX)]
+    setFollowUps(next)
+    void runEngine(story, next)
   }
 
   const Wrapper = customer ? CustomerShell : HarnessShell
@@ -336,7 +342,10 @@ export default function DemoApp({ mode = 'harness' }: { mode?: Mode } = {}) {
             <Elicitation
               story={story}
               onStoryChange={setStory}
-              onSubmit={() => void runEngine(story)}
+              onSubmit={() => {
+                setFollowUps([])
+                void runEngine(story)
+              }}
               submitting={false}
               copy={copy}
               context={context}
@@ -375,16 +384,16 @@ export default function DemoApp({ mode = 'harness' }: { mode?: Mode } = {}) {
             </p>
             <textarea
               value={followUpAnswer}
-              onChange={(e) => setFollowUpAnswer(clipStory(e.target.value, Math.max(0, STORY_MAX - storyLength(story) - 2)))}
-              maxLength={Math.max(0, STORY_MAX - storyLength(story) - 2)}
+              onChange={(e) => setFollowUpAnswer(clipStory(e.target.value, FOLLOW_UP_MAX))}
+              maxLength={FOLLOW_UP_MAX}
               data-testid="followup-input"
               rows={5}
               placeholder={copy.followUpPlaceholder}
               className="font-serif-jp w-full resize-none rounded-sm border border-gold/25 bg-paper/60 p-4 text-base leading-loose text-ivory outline-none transition-colors placeholder:text-ivory/25 focus:border-gold"
             />
-            {storyLength(story) + 2 + storyLength(followUpAnswer) >= STORY_COUNTER_FROM && (
+            {storyLength(followUpAnswer) >= STORY_COUNTER_FROM && (
               <p data-testid="story-counter" className="font-label mt-2 text-right text-[11px] text-ivory/50">
-                {copy.storyCounter(storyLength(story) + 2 + storyLength(followUpAnswer), STORY_MAX)}
+                {copy.storyCounter(storyLength(followUpAnswer), FOLLOW_UP_MAX)}
               </p>
             )}
             <button
@@ -420,6 +429,7 @@ export default function DemoApp({ mode = 'harness' }: { mode?: Mode } = {}) {
               <Reveal
                 result={result}
                 story={story}
+                followUps={followUps}
                 condition={customer ? 'A' : condition}
                 copy={copy}
                 context={context}
@@ -447,7 +457,7 @@ export default function DemoApp({ mode = 'harness' }: { mode?: Mode } = {}) {
         )}
 
         {customer && phase === 'order' && result && chosen && (
-          <OrderForm result={result} story={story} candidate={chosen} copy={copy} onBack={() => setPhase('reveal')} />
+          <OrderForm result={result} story={story} followUps={followUps} candidate={chosen} copy={copy} onBack={() => setPhase('reveal')} />
         )}
 
         {!customer && result && (phase === 'reveal' || phase === 'thin') && (

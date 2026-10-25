@@ -20,6 +20,7 @@ const NAME_MAX = 40
 type Props = {
   result: EngineResult
   story: string
+  followUps?: string[]
   candidate: Candidate
   copy: Copy
   onBack: () => void
@@ -39,7 +40,7 @@ const daysUntil = (iso: string) => {
 
 const FIELD_KEYS: readonly OrderField[] = ['sender_name', 'receiver_name', 'delivery_date', 'inscription_style', 'package']
 
-export default function OrderForm({ result, story, candidate, copy, onBack }: Props) {
+export default function OrderForm({ result, story, followUps = [], candidate, copy, onBack }: Props) {
   const reduceMotion = useReducedMotion()
   // The gift's language is the language the engine ran in (the certificate follows it).
   const language: UiLanguage = result.language ?? 'ja'
@@ -72,6 +73,7 @@ export default function OrderForm({ result, story, candidate, copy, onBack }: Pr
         headers: { 'content-type': 'application/json' },
         body: JSON.stringify({
           story,
+          ...(followUps.length ? { follow_ups: followUps } : {}),
           engine_result: result,
           selected_kanji: candidate.kanji,
           language,

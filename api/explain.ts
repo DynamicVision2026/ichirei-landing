@@ -3,7 +3,7 @@
 // engine/explain-prompt.{ja,zh,en}.md.
 
 import type { VercelRequest, VercelResponse } from '@vercel/node'
-import { STORY_MAX, countChars, parseContext } from '../engine/contract.ts'
+import { FOLLOW_UP_MAX, STORY_MAX, countChars, mergeStory, parseContext, parseFollowUps } from '../engine/contract.ts'
 import { runExplain, type ExplainCandidate } from '../engine/explain.ts'
 
 // Full Hobby-plan ceiling (also mirrored in vercel.json).
@@ -24,8 +24,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     }
   }
 
-  const { story, candidate, language, relationship, direction, occasion, occasion_detail, inscription_script } = (body ?? {}) as {
+  const { story, follow_ups, candidate, language, relationship, direction, occasion, occasion_detail, inscription_script } = (body ?? {}) as {
     story?: unknown
+    follow_ups?: unknown
     candidate?: Partial<ExplainCandidate>
     language?: unknown
     relationship?: unknown
@@ -41,6 +42,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (countChars(story) > STORY_MAX) {
     return res.status(400).json({ error: `"story" is longer than ${STORY_MAX} characters`, code: 'story_too_long', max: STORY_MAX })
   }
+  const fu = parseFollowUps(follow_ups)
+  if (!fu.ok) return res.status(400).json({ error: fu.error, code: fu.code, max: FOLLOW_UP_MAX })
   if (
     !candidate ||
     typeof candidate.kanji !== 'string' ||
@@ -60,7 +63,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   }
 
   try {
-    const explanation = await runExplain(story, candidate as ExplainCandidate, { context: parsed.context })
+    const explanation = await runExplain(mergeStory(story, fu.followUps), candidate as ExplainCandidate, { context: parsed.context })
     return res.status(200).json({ explanation })
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err)

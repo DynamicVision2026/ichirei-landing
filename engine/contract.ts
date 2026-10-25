@@ -91,8 +91,27 @@ export interface EngineContext {
 export const OCCASION_DETAIL_MAX = 60
 
 /** Longest story accepted (characters, counted as Unicode code points). No minimum: STEP 0 judges sufficiency by content. */
-export const STORY_MAX = 2000
+export const STORY_MAX = 600
+/** Each follow-up answer has its own limit (it is a separate field, not part of `story`), and at most MAX_FOLLOW_UPS are accepted. */
+export const FOLLOW_UP_MAX = 600
+export const MAX_FOLLOW_UPS = 2
 export const countChars = (text: string): number => [...text].length
+
+/** What the engine reads: the story, then each follow-up answer, one blank line between. */
+export const mergeStory = (story: string, followUps: readonly string[] = []): string => [story.trim(), ...followUps.map((f) => f.trim())].join('\n\n')
+
+export type FollowUpsParse = { ok: true; followUps: string[] } | { ok: false; error: string; code: 'follow_up_too_long' | 'too_many_follow_ups' | 'bad_follow_ups' }
+
+/** Validate the optional `follow_ups` field: an array of at most 2 non-empty strings of at most 600 characters EACH. */
+export function parseFollowUps(raw: unknown): FollowUpsParse {
+  if (raw === undefined || raw === null) return { ok: true, followUps: [] }
+  if (!Array.isArray(raw) || raw.some((x) => typeof x !== 'string')) return { ok: false, code: 'bad_follow_ups', error: '"follow_ups" must be an array of strings' }
+  const items = raw.map((x: string) => x.trim()).filter(Boolean)
+  if (items.length > MAX_FOLLOW_UPS) return { ok: false, code: 'too_many_follow_ups', error: `"follow_ups" has more than ${MAX_FOLLOW_UPS} answers` }
+  const over = items.find((x) => countChars(x) > FOLLOW_UP_MAX)
+  if (over !== undefined) return { ok: false, code: 'follow_up_too_long', error: `a follow-up answer is longer than ${FOLLOW_UP_MAX} characters (got ${countChars(over)})` }
+  return { ok: true, followUps: items }
+}
 
 export const DEFAULT_CONTEXT: EngineContext = {
   language: 'ja',

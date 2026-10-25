@@ -1,6 +1,6 @@
 // Serverless entry point for the ICHIREI engine (build spec §4).
 //
-// Its only job: receive { story, condition, language?, relationship?, direction?,
+// Its only job: receive { story, follow_ups?, condition, language?, relationship?, direction?,
 // occasion?, occasion_detail?, inscription_script? }, hand them to the engine, and return the engine's JSON. It holds the Anthropic API key (server-side only,
 // never sent to the browser) and contains no selection logic of its own.
 //
@@ -12,7 +12,7 @@
 //   {"type":"error","error":"<message>"}                       ...terminal
 
 import { runEngine } from '../engine/engine.ts'
-import { STORY_MAX, countChars, parseContext, type Condition } from '../engine/contract.ts'
+import { FOLLOW_UP_MAX, STORY_MAX, countChars, mergeStory, parseContext, parseFollowUps, type Condition } from '../engine/contract.ts'
 
 // Full Hobby-plan ceiling (also mirrored in vercel.json).
 export const maxDuration = 60
@@ -34,8 +34,9 @@ export async function POST(req: Request): Promise<Response> {
     return jsonResponse(400, { error: 'Body is not valid JSON' })
   }
 
-  const { story, condition, language, relationship, direction, occasion, occasion_detail, inscription_script } = (body ?? {}) as {
+  const { story, follow_ups, condition, language, relationship, direction, occasion, occasion_detail, inscription_script } = (body ?? {}) as {
     story?: unknown
+    follow_ups?: unknown
     condition?: unknown
     language?: unknown
     relationship?: unknown
@@ -52,6 +53,9 @@ export async function POST(req: Request): Promise<Response> {
   if (countChars(story) > STORY_MAX) {
     return jsonResponse(400, { error: `"story" is longer than ${STORY_MAX} characters (got ${countChars(story)})`, code: 'story_too_long', max: STORY_MAX })
   }
+  // Follow-up answers are separate fields with their own limit (600 each, at most two).
+  const fu = parseFollowUps(follow_ups)
+  if (!fu.ok) return jsonResponse(400, { error: fu.error, code: fu.code, max: FOLLOW_UP_MAX })
   const cond: Condition = VALID_CONDITIONS.includes(condition as Condition)
     ? (condition as Condition)
     : 'A'
@@ -78,7 +82,7 @@ export async function POST(req: Request): Promise<Response> {
       let received = 0
       let lastSent = 0
       try {
-        const result = await runEngine(story, cond, {
+        const result = await runEngine(mergeStory(story, fu.followUps), cond, {
           context: parsed.context,
           onDelta: (text) => {
             received += text.length

@@ -24,6 +24,8 @@ const REVEAL_INTERVAL_MS = 1100
 type Props = {
   result: EngineResult
   story: string
+  /** The answers to the engine's follow-up questions (kept apart from the story). */
+  followUps?: string[]
   condition: Condition
   copy: Copy
   context: GiftContext
@@ -61,7 +63,7 @@ function InscriptionGlyph({
   )
 }
 
-export default function Reveal({ result, story, condition, copy, context, diagnostics = true, onFinalize }: Props) {
+export default function Reveal({ result, story, followUps = [], condition, copy, context, diagnostics = true, onFinalize }: Props) {
   // The engine's echo is authoritative for what was actually run; fall back to the form state.
   const language: UiLanguage = result.language ?? context.language
   const script: InscriptionScript | null =
@@ -175,6 +177,7 @@ export default function Reveal({ result, story, condition, copy, context, diagno
         headers: { 'content-type': 'application/json' },
         body: JSON.stringify({
           story,
+          ...(followUps.length ? { follow_ups: followUps } : {}),
           candidate: {
             kanji: c.kanji,
             inscription_form: c.inscription_form,

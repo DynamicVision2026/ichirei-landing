@@ -36,9 +36,11 @@ export type OccasionCode = (typeof OCCASION_CODES)[number]
 export const OCCASION_DETAIL_MAX = 60
 
 /** Longest story the API accepts (engine/contract.ts STORY_MAX) — characters as Unicode code points. No minimum. */
-export const STORY_MAX = 2000
-/** The live "n / 2,000" counter appears from this length. */
-export const STORY_COUNTER_FROM = 1500
+export const STORY_MAX = 600
+/** Each follow-up answer is its own field with its own limit (engine/contract.ts FOLLOW_UP_MAX). */
+export const FOLLOW_UP_MAX = 600
+/** The live "n / 600" counter appears from this length. */
+export const STORY_COUNTER_FROM = 450
 export const storyLength = (text: string): number => [...text].length
 /** Cut to STORY_MAX characters (code points) — a paste can never push the story over the limit. */
 export const clipStory = (text: string, max = STORY_MAX): string => (storyLength(text) <= max ? text : [...text].slice(0, max).join(''))
@@ -207,7 +209,7 @@ const ja: Copy = {
   storyPlaceholder: 'たとえば——いつも同じ場所に座って、同じ湯のみでお茶を飲んでいた……',
   storyHint: '50〜300字くらいで十分です',
   storyCounter: (n, max) => `${n} / ${max}字`,
-  storyTooLong: '物語は2,000字までです。少し短くして、もう一度お試しください。',
+  storyTooLong: '物語は600字までです。少し短くして、もう一度お試しください。',
   anglesHeading: '思い出の入り口',
   angles: [
     'いつものクセ・口ぐせ',
@@ -331,7 +333,7 @@ const zhHans: Copy = {
   storyPlaceholder: '例如——总是坐在同一个位置，用同一只杯子喝茶……',
   storyHint: '50〜300字就足够',
   storyCounter: (n, max) => `${n} / ${max}字`,
-  storyTooLong: '故事最多 2,000 字，请稍微缩短后再试。',
+  storyTooLong: '故事最多 600 字，请稍微缩短后再试。',
   anglesHeading: '回忆的入口',
   angles: [
     '常有的习惯、口头禅',
@@ -458,7 +460,7 @@ const zhHant: Copy = {
   storyPlaceholder: '例如——總是坐在同一個位置，用同一只杯子喝茶……',
   storyHint: '50〜300字就足夠',
   storyCounter: (n, max) => `${n} / ${max}字`,
-  storyTooLong: '故事最多 2,000 字，請稍微縮短後再試。',
+  storyTooLong: '故事最多 600 字，請稍微縮短後再試。',
   anglesHeading: '回憶的入口',
   angles: [
     '常有的習慣、口頭禪',
@@ -588,7 +590,7 @@ const en: Copy = {
   storyPlaceholder: 'For example — they always sat in the same spot and drank tea from the same cup…',
   storyHint: '50–300 characters is plenty',
   storyCounter: (n, max) => `${n} / ${max} characters`,
-  storyTooLong: 'Stories can be up to 2,000 characters. Please shorten it a little and try again.',
+  storyTooLong: 'Stories can be up to 600 characters. Please shorten it a little and try again.',
   anglesHeading: 'Ways in',
   angles: [
     'A habit or a phrase they always use',
