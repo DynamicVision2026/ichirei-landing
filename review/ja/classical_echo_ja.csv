@@ -1,0 +1,323 @@
+﻿language,kanji,inscription_form,readings,core_meanings,"draft_classical_echo (unverified, from the draft)",echo_state,reviewed_by,classical_text,classical_source,reviewer_comment
+ja,父,父,フ|ちち,father,詩経・蓼莪「父兮生我，母兮鞠我」,draft-unreviewed,Claude(AI一次確認・底本未照合),,,本文は正確（『詩経』小雅「蓼莪」）。ただし「蓼莪」は亡き父母の恩に報いられない嘆きの詩（「欲報之德，昊天罔極」）。存命の父への贈り物には不適。偲ぶ場面（memorial）専用なら可
+ja,母,母,ボ|はは,mother,孟郊「遊子吟」慈母手中線，遊子身上衣,draft-unreviewed,Claude(AI一次確認・底本未照合),慈母手中線，遊子身上衣,孟郊「遊子吟」（唐）,
+ja,親,親,シン|おや|した-しい,"parent; close, intimate",,empty,Claude(AI一次確認・底本未照合),,,下書きなし・提案なし
+ja,子,子,シ|ス|こ,child; master (honorific),論語「子曰」(子 = the Master),draft-unreviewed,Claude(AI一次確認・底本未照合),,,「子曰」の「子」は孔子への尊称で「子ども」の意ではない。一節としても成立しない。提案：『万葉集』巻五・803 山上憶良「銀も金も玉も何せむに勝れる宝子にしかめやも」
+ja,孫,孫,ソン|まご,grandchild,,empty,Claude(AI一次確認・底本未照合),,,下書きなし・提案なし
+ja,兄,兄,ケイ|キョウ|あに,elder brother,論語・顔淵「四海之内皆兄弟也」,draft-unreviewed,Claude(AI一次確認・底本未照合),四海之内，皆兄弟也,『論語』顔淵第十二（子夏の言）,「兄弟」一般の意で、「兄」一字への添え句としてはやや弱い
+ja,弟,弟,テイ|ダイ|おとうと,younger brother; disciple,,empty,Claude(AI一次確認・底本未照合),,,下書きなし・提案なし
+ja,夫,夫,フ|フウ|おっと,husband,,empty,Claude(AI一次確認・底本未照合),,,下書きなし・提案なし
+ja,妻,妻,サイ|つま,wife,,empty,Claude(AI一次確認・底本未照合),,,下書きなし・提案なし
+ja,友,友,ユウ|とも,friend,論語・季氏「益者三友，損者三友」,draft-unreviewed,Claude(AI一次確認・底本未照合),,,本文は正確（季氏第十六）だが「損者三友」（害になる友）を含み、贈り物には後半が不向き。同章の「友直，友諒，友多聞，益矣」に差し替えを提案
+ja,朋,朋,ホウ|とも,friend (of like mind),論語・学而「有朋自遠方來，不亦樂乎」,draft-unreviewed,Claude(AI一次確認・底本未照合),有朋自遠方來，不亦樂乎,『論語』学而第一,
+ja,師,師,シ,teacher; master,論語・述而「三人行，必有我師焉」,draft-unreviewed,Claude(AI一次確認・底本未照合),三人行，必有我師焉,『論語』述而第七,「誰からでも学べる」の意で、恩師個人への賛辞としては弱い。提案：『徒然草』第五十二段「少しのことにも、先達はあらまほしき事なり」
+ja,恩,恩,オン,kindness; debt of gratitude,,empty,Claude(AI一次確認・底本未照合),,,下書きなし・提案なし
+ja,家,家,カ|ケ|いえ|うち,home; family,大学「修身齊家治國平天下」,draft-unreviewed,Claude(AI一次確認・底本未照合),,,「修身齊家治國平天下」は後世の要約で『大学』の原文ではない。原文は「身修而后家齊，家齊而后國治，國治而后天下平」（『大学』経一章）。また政治の文脈で家族への贈り物には硬い
+ja,族,族,ゾク,clan; family group,,empty,Claude(AI一次確認・底本未照合),,,下書きなし・提案なし
+ja,縁,緣,エン|ふち|えにし|ゆかり,fated affinity; bond; edge,,empty,Claude(AI一次確認・底本未照合),,,下書きなし・提案なし
+ja,絆,絆,ハン|きずな,"bond, ties (ja); to trip, hinder (zh)",,empty,Claude(AI一次確認・底本未照合),,,下書きなし・提案なし
+ja,君,君,クン|きみ,you (to a junior/equal); gentleman; ruler,論語・子路「君子和而不同，小人同而不和」,draft-unreviewed,Claude(AI一次確認・底本未照合),,,本文は正確（子路第十三）だが「小人」との対比を含み、贈る相手を比べる印象。提案：『古今和歌集』巻七・賀歌・343 読人しらず「わが君は千代に八千代にさざれ石の巌となりて苔のむすまで」
+ja,宝,寶,ホウ|たから,treasure,,empty,Claude(AI一次確認・底本未照合),,,【提案・要原典照合】『万葉集』巻五・803 山上憶良「銀も金も玉も何せむに勝れる宝子にしかめやも」
+ja,児,兒,ジ|ニ|こ,child,,empty,Claude(AI一次確認・底本未照合),,,下書きなし・提案なし
+ja,娘,娘,ジョウ|むすめ,daughter; girl,,empty,Claude(AI一次確認・底本未照合),,,下書きなし・提案なし
+ja,嫁,嫁,カ|よめ|とつ-ぐ,bride; to marry (of a woman),,empty,Claude(AI一次確認・底本未照合),,,下書きなし・提案なし
+ja,婿,婿,セイ|むこ,son-in-law; bridegroom,,empty,Claude(AI一次確認・底本未照合),,,下書きなし・提案なし
+ja,孝,孝,コウ,filial piety,孝経「身體髮膚，受之父母，不敢毀傷，孝之始也」,draft-unreviewed,Claude(AI一次確認・底本未照合),身體髮膚，受之父母，不敢毀傷，孝之始也,『孝経』開宗明義章第一,
+ja,見,見,ケン|み-る,see; look; meet,,empty,Claude(AI一次確認・底本未照合),,,下書きなし・提案なし
+ja,守,守,シュ|ス|まも-る,guard; protect; keep (watch over),,empty,Claude(AI一次確認・底本未照合),,,下書きなし・提案なし
+ja,待,待,タイ|ま-つ,wait; await; treat,,empty,Claude(AI一次確認・底本未照合),,,下書きなし・提案なし
+ja,帰,歸,キ|かえ-る,return home,陶淵明「歸去來兮辭」,draft-unreviewed,Claude(AI一次確認・底本未照合),,,作品名のみで一節がない。採るなら「歸去來兮，田園將蕪胡不歸」（陶淵明「歸去來兮辭」冒頭）。官を辞して故郷へ帰る詩なので退職には非常に合う（結婚は不可）
+ja,添,添,テン|そ-う,add; stay at someone's side,,empty,Claude(AI一次確認・底本未照合),,,下書きなし・提案なし
+ja,支,支,シ|ささ-える,support; prop up; branch,,empty,Claude(AI一次確認・底本未照合),,,下書きなし・提案なし
+ja,助,助,ジョ|たす-ける,help; rescue,,empty,Claude(AI一次確認・底本未照合),,,下書きなし・提案なし
+ja,励,勵,レイ|はげ-ます,encourage; strive,,empty,Claude(AI一次確認・底本未照合),,,下書きなし・提案なし
+ja,導,導,ドウ|みちび-く,lead; guide,,empty,Claude(AI一次確認・底本未照合),,,【提案・要原典照合】『徒然草』第五十二段「少しのことにも、先達はあらまほしき事なり」
+ja,育,育,イク|そだ-てる,raise; nurture,,empty,Claude(AI一次確認・底本未照合),,,下書きなし・提案なし
+ja,教,教,キョウ|おし-える,teach; instruct; religion,論語・衛霊公「有教無類」,draft-unreviewed,Claude(AI一次確認・底本未照合),有教無類,『論語』衛霊公第十五,
+ja,学,學,ガク|まな-ぶ,learn; study,論語・学而「學而時習之，不亦說乎」,draft-unreviewed,Claude(AI一次確認・底本未照合),學而時習之，不亦說乎,『論語』学而第一,「說」は「悦」の意（よろこばし）
+ja,習,習,シュウ|なら-う,learn by practice; habit,論語・学而「學而時習之」,draft-unreviewed,Claude(AI一次確認・底本未照合),學而時習之，不亦說乎,『論語』学而第一,「学」と同一句。重複でよければ可
+ja,歩,步,ホ|ブ|ある-く|あゆ-む,step; walk; pace,老子「千里之行，始於足下」,draft-unreviewed,Claude(AI一次確認・底本未照合),千里之行，始於足下,『老子』第六十四章（通行本）,版本（馬王堆帛書など）により字句に異同あり
+ja,走,走,ソウ|はし-る,"run (ja); walk, go (zh)",,empty,Claude(AI一次確認・底本未照合),,,下書きなし・提案なし
+ja,渡,渡,ト|わた-る,cross over; hand over,,empty,Claude(AI一次確認・底本未照合),,,下書きなし・提案なし
+ja,結,結,ケツ|むす-ぶ,tie; bind; conclude,,empty,Claude(AI一次確認・底本未照合),,,下書きなし・提案なし
+ja,連,連,レン|つら-なる,link; chain; accompany,白居易「長恨歌」在地願為連理枝,draft-unreviewed,Claude(AI一次確認・底本未照合),,,本文は正確（「在天願作比翼鳥，在地願爲連理枝」白居易「長恨歌」）。ただし悲恋の詩で、直後に「天長地久有時盡，此恨綿綿無絕期」と続く。結婚祝いでは四字熟語「比翼連理」として使う方が無難
+ja,寄,寄,キ|よ-る,send; entrust; draw near,,empty,Claude(AI一次確認・底本未照合),,,下書きなし・提案なし
+ja,抱,抱,ホウ|だ-く|かか-える,embrace; hold,,empty,Claude(AI一次確認・底本未照合),,,下書きなし・提案なし
+ja,包,包,ホウ|つつ-む,wrap; envelop,,empty,Claude(AI一次確認・底本未照合),,,下書きなし・提案なし
+ja,受,受,ジュ|う-ける,receive; accept; suffer,,empty,Claude(AI一次確認・底本未照合),,,下書きなし・提案なし
+ja,与,與,ヨ|あた-える,"give; with, and",,empty,Claude(AI一次確認・底本未照合),,,下書きなし・提案なし
+ja,贈,贈,ゾウ|ソウ|おく-る,present; give as a gift,,empty,Claude(AI一次確認・底本未照合),,,下書きなし・提案なし
+ja,願,願,ガン|ねが-う,wish; vow,,empty,Claude(AI一次確認・底本未照合),,,下書きなし・提案なし
+ja,祈,祈,キ|いの-る,pray; wish,,empty,Claude(AI一次確認・底本未照合),,,下書きなし・提案なし
+ja,誓,誓,セイ|ちか-う,vow; oath,,empty,Claude(AI一次確認・底本未照合),,,下書きなし・提案なし
+ja,信,信,シン|しん-じる,trust; faith; letter,論語・顔淵「民無信不立」,draft-unreviewed,Claude(AI一次確認・底本未照合),,,本文は正確（顔淵第十二）だが、直前が「自古皆有死」で、政治（為政者への民の信頼）の文脈。個人への贈り物には不向き
+ja,頼,賴,ライ|たよ-る,rely on (ja); but also blame/deny (zh),,empty,Claude(AI一次確認・底本未照合),,,下書きなし・提案なし
+ja,任,任,ニン|まか-せる,entrust; duty,,empty,Claude(AI一次確認・底本未照合),,,下書きなし・提案なし
+ja,語,語,ゴ|かた-る,words; speak; tell,,empty,Claude(AI一次確認・底本未照合),,,下書きなし・提案なし
+ja,話,話,ワ|はな-す,talk; speech; story,,empty,Claude(AI一次確認・底本未照合),,,下書きなし・提案なし
+ja,笑,笑,ショウ|わら-う|え-む,laugh; smile,,empty,Claude(AI一次確認・底本未照合),,,下書きなし・提案なし
+ja,歌,歌,カ|うた,song; sing,,empty,Claude(AI一次確認・底本未照合),,,【提案・要原典照合】『古今和歌集』仮名序（紀貫之）「やまとうたは、人の心を種として、よろづの言の葉とぞなれりける」
+ja,舞,舞,ブ|ま-う,dance,,empty,Claude(AI一次確認・底本未照合),,,下書きなし・提案なし
+ja,読,讀,ドク|よ-む,read,,empty,Claude(AI一次確認・底本未照合),,,下書きなし・提案なし
+ja,書,書,ショ|か-く,write; book; calligraphy,,empty,Claude(AI一次確認・底本未照合),,,下書きなし・提案なし
+ja,筆,筆,ヒツ|ふで,writing brush; pen,,empty,Claude(AI一次確認・底本未照合),,,下書きなし・提案なし
+ja,迎,迎,ゲイ|むか-える,welcome; go to meet,,empty,interim-unreviewed,,,
+ja,送,送,ソウ|おく-る,send; see off; give,,empty,interim-unreviewed,,,
+ja,餞,餞,セン|はなむけ,parting gift; farewell feast,,empty,interim-unreviewed,,,
+ja,灯,燈,トウ|ひ|あか-り,lamp; light,辛棄疾「驀然回首，那人卻在，燈火闌珊處」(青玉案・元夕),draft-unreviewed,Claude(AI一次確認・底本未照合),驀然回首，那人卻在，燈火闌珊處,辛棄疾「青玉案・元夕」（南宋）,恋人を探し当てる詞で恋愛色が強い。結婚・配偶者向け。「卻／却」は版本差
+ja,窓,窗,ソウ|まど,window,,empty,Claude(AI一次確認・底本未照合),,,下書きなし・提案なし
+ja,戸,戶,コ|と,door; household,,empty,Claude(AI一次確認・底本未照合),,,下書きなし・提案なし
+ja,門,門,モン|かど,gate; door,,empty,Claude(AI一次確認・底本未照合),,,下書きなし・提案なし
+ja,庭,庭,テイ|にわ,garden; courtyard,,empty,Claude(AI一次確認・底本未照合),,,下書きなし・提案なし
+ja,橋,橋,キョウ|はし,bridge,,empty,Claude(AI一次確認・底本未照合),,,下書きなし・提案なし
+ja,道,道,ドウ|みち,road; way; principle,老子「道可道，非常道」,draft-unreviewed,Claude(AI一次確認・底本未照合),,,本文は正確（『老子』第一章）だが「言葉にできる道は恒常の道ではない」という否定的・哲学的な句で、贈り物の添え句にならない
+ja,路,路,ロ|じ|みち,road; path,,empty,Claude(AI一次確認・底本未照合),,,下書きなし・提案なし
+ja,舟,舟,シュウ|ふね,boat,,empty,Claude(AI一次確認・底本未照合),,,下書きなし・提案なし
+ja,船,船,セン|ふね,ship,,empty,Claude(AI一次確認・底本未照合),,,下書きなし・提案なし
+ja,帆,帆,ハン|ほ,sail,李白「長風破浪會有時，直掛雲帆濟滄海」(行路難),draft-unreviewed,Claude(AI一次確認・底本未照合),長風破浪會有時，直掛雲帆濟滄海,李白「行路難」其一,門出（入学・就職・退職後の新生活）に良い
+ja,車,車,シャ|くるま,car; vehicle,,empty,Claude(AI一次確認・底本未照合),,,下書きなし・提案なし
+ja,針,針,シン|はり,needle,孟郊「遊子吟」慈母手中線,draft-unreviewed,Claude(AI一次確認・底本未照合),,,一節に「針」の字がない（「線」は糸）。この句は「糸」に移すことを提案
+ja,糸,絲,シ|いと,thread,,empty,Claude(AI一次確認・底本未照合),,,【提案・要原典照合】孟郊「遊子吟」の「慈母手中線，遊子身上衣」（「針」から移す）
+ja,衣,衣,イ|ころも|きぬ,clothing; garment,孟郊「遊子吟」遊子身上衣,draft-unreviewed,Claude(AI一次確認・底本未照合),慈母手中線，遊子身上衣,孟郊「遊子吟」（唐）,下書きの後半のみでは意味が通りにくいので対句全体に
+ja,帯,帶,タイ|おび,belt; sash; bring,,empty,Claude(AI一次確認・底本未照合),,,下書きなし・提案なし
+ja,本,本,ホン|もと,book; origin; root,論語・学而「君子務本，本立而道生」,draft-unreviewed,Claude(AI一次確認・底本未照合),君子務本，本立而道生,『論語』学而第一（有子の言）,
+ja,紙,紙,シ|かみ,paper,,empty,Claude(AI一次確認・底本未照合),,,下書きなし・提案なし
+ja,墨,墨,ボク|すみ,ink,,empty,Claude(AI一次確認・底本未照合),,,下書きなし・提案なし
+ja,琴,琴,キン|こと,zither (koto / guqin),詩経・関雎「窈窕淑女，琴瑟友之」,draft-unreviewed,Claude(AI一次確認・底本未照合),窈窕淑女，琴瑟友之,『詩経』周南「関雎」,求愛の詩。結婚・夫婦向け、親・上司には不向き
+ja,鏡,鏡,キョウ|かがみ,mirror,,empty,Claude(AI一次確認・底本未照合),,,下書きなし・提案なし
+ja,杯,盃,ハイ|さかずき,cup,,empty,Claude(AI一次確認・底本未照合),,,下書きなし・提案なし
+ja,茶,茶,チャ|サ,tea,,empty,Claude(AI一次確認・底本未照合),,,下書きなし・提案なし
+ja,酒,酒,シュ|さけ,alcohol; sake,,empty,Claude(AI一次確認・底本未照合),,,下書きなし・提案なし
+ja,米,米,ベイ|マイ|こめ,rice grain,,empty,Claude(AI一次確認・底本未照合),,,下書きなし・提案なし
+ja,飯,飯,ハン|めし,cooked rice; meal,,empty,Claude(AI一次確認・底本未照合),,,下書きなし・提案なし
+ja,味,味,ミ|あじ,taste; flavour,,empty,Claude(AI一次確認・底本未照合),,,下書きなし・提案なし
+ja,湯,湯,トウ|ゆ,hot water (ja); soup (zh),,empty,Claude(AI一次確認・底本未照合),,,下書きなし・提案なし
+ja,山,山,サン|やま,mountain,,empty,Claude(AI一次確認・底本未照合),,,【提案・要原典照合】『万葉集』巻三・318 山部赤人「田子の浦ゆうち出でて見れば真白にそ富士の高嶺に雪は降りける」（「山」の字は含まず「高嶺」）
+ja,川,川,セン|かわ,river,論語・子罕「逝者如斯夫，不舍晝夜」(川上の嘆),draft-unreviewed,Claude(AI一次確認・底本未照合),,,「川上の嘆」の「逝者如斯夫」は「逝」（hard_block）を含み、時の無常を嘆く句。贈り物には不可
+ja,海,海,カイ|うみ,sea,,empty,Claude(AI一次確認・底本未照合),,,下書きなし・提案なし
+ja,空,空,クウ|そら|から,sky; empty,,empty,Claude(AI一次確認・底本未照合),,,下書きなし・提案なし
+ja,森,森,シン|もり,forest,,empty,Claude(AI一次確認・底本未照合),,,下書きなし・提案なし
+ja,里,里,リ|さと,"village; hometown (ja); village, neighbourhood, unit of distance (zh)",,empty,Claude(AI一次確認・底本未照合),,,下書きなし・提案なし
+ja,村,村,ソン|むら,village,,empty,Claude(AI一次確認・底本未照合),,,下書きなし・提案なし
+ja,国,國,コク|くに,country; homeland,,empty,Claude(AI一次確認・底本未照合),,,下書きなし・提案なし
+ja,都,都,ト|ツ|みやこ,capital; metropolis,,empty,Claude(AI一次確認・底本未照合),,,下書きなし・提案なし
+ja,港,港,コウ|みなと,harbour,,empty,Claude(AI一次確認・底本未照合),,,下書きなし・提案なし
+ja,島,嶋,トウ|しま,island,,empty,Claude(AI一次確認・底本未照合),,,下書きなし・提案なし
+ja,春,春,シュン|はる,spring,孟郊「遊子吟」報得三春暉,draft-unreviewed,Claude(AI一次確認・底本未照合),誰言寸草心，報得三春暉,孟郊「遊子吟」（唐）,下書きは後半のみ。母の恩の句なので母の日に良い
+ja,夏,夏,カ|ゲ|なつ,summer,,empty,Claude(AI一次確認・底本未照合),,,【提案・要原典照合】『枕草子』第一段「夏は夜。月のころはさらなり」
+ja,秋,秋,シュウ|あき,autumn,,empty,Claude(AI一次確認・底本未照合),,,下書きなし・提案なし
+ja,冬,冬,トウ|ふゆ,winter,,empty,Claude(AI一次確認・底本未照合),,,【提案・要原典照合】『枕草子』第一段「冬はつとめて」
+ja,朝,朝,チョウ|あさ,morning,,empty,Claude(AI一次確認・底本未照合),,,下書きなし・提案なし
+ja,夕,夕,セキ|ゆう,evening,李商隱「夕陽無限好，只是近黃昏」(登樂遊原),draft-unreviewed,Claude(AI一次確認・底本未照合),,,「夕陽無限好，只是近黃昏」は晩年・衰えの象徴として広く知られ、還暦・長寿祝いには禁句に近い
+ja,夜,夜,ヤ|よる,night,,empty,Claude(AI一次確認・底本未照合),,,下書きなし・提案なし
+ja,暁,曉,ギョウ|あかつき,dawn; to know,,empty,Claude(AI一次確認・底本未照合),,,下書きなし・提案なし
+ja,月,月,ゲツ|ガツ|つき,moon; month,蘇軾「但願人長久，千里共嬋娟」(水調歌頭),draft-unreviewed,Claude(AI一次確認・底本未照合),但願人長久，千里共嬋娟,蘇軾「水調歌頭」（丙辰中秋）,一節に「月」の字はない（嬋娟＝月）。冒頭「明月幾時有」の併記を検討。離れて暮らす家族に良い
+ja,日,日,ニチ|ジツ|ひ,sun; day,,empty,Claude(AI一次確認・底本未照合),,,下書きなし・提案なし
+ja,星,星,セイ|ほし,star,,empty,Claude(AI一次確認・底本未照合),,,下書きなし・提案なし
+ja,雲,雲,ウン|くも,cloud,,empty,Claude(AI一次確認・底本未照合),,,下書きなし・提案なし
+ja,雨,雨,ウ|あめ,rain,,empty,Claude(AI一次確認・底本未照合),,,下書きなし・提案なし
+ja,風,風,フウ|フ|かぜ,wind; style,,empty,Claude(AI一次確認・底本未照合),,,下書きなし・提案なし
+ja,雪,雪,セツ|ゆき,snow,,empty,Claude(AI一次確認・底本未照合),,,【提案・要原典照合】『万葉集』巻三・318 山部赤人「田子の浦ゆうち出でて見れば真白にそ富士の高嶺に雪は降りける」
+ja,光,光,コウ|ひかり,light,,empty,Claude(AI一次確認・底本未照合),,,下書きなし・提案なし
+ja,影,影,エイ|かげ,shadow; image; trace,,empty,Claude(AI一次確認・底本未照合),,,下書きなし・提案なし
+ja,虹,虹,コウ|にじ,rainbow,,empty,Claude(AI一次確認・底本未照合),,,下書きなし・提案なし
+ja,花,花,カ|はな,flower; blossom,,empty,Claude(AI一次確認・底本未照合),,,下書きなし・提案なし
+ja,桜,櫻,オウ|さくら,cherry blossom,,empty,Claude(AI一次確認・底本未照合),,,【提案・要原典照合】『古今和歌集』巻一・53 在原業平「世の中にたえて桜のなかりせば春の心はのどけからまし」
+ja,梅,梅,バイ|うめ,plum,,empty,Claude(AI一次確認・底本未照合),,,【提案・要原典照合】『万葉集』巻五「梅花の歌三十二首」序「初春令月、氣淑風和、梅披鏡前之粉、蘭薫珮後之香」（「令和」の典拠）
+ja,桃,桃,トウ|もも,peach,詩経・桃夭「桃之夭夭，灼灼其華」,draft-unreviewed,Claude(AI一次確認・底本未照合),桃之夭夭，灼灼其華,『詩経』周南「桃夭」,嫁ぐ娘を祝う詩で結婚に最適。ただし日本語話者は「夭」から「夭折（若死に）」を連想し得るので、訳を添えたい
+ja,菊,菊,キク,chrysanthemum,陶淵明「採菊東籬下，悠然見南山」,draft-unreviewed,Claude(AI一次確認・底本未照合),採菊東籬下，悠然見南山,陶淵明「飲酒」其五,
+ja,蓮,蓮,レン|はす,lotus,周敦頤「愛蓮説」出淤泥而不染,draft-unreviewed,Claude(AI一次確認・底本未照合),予獨愛蓮之出淤泥而不染,周敦頤「愛蓮説」（北宋）,下書きは句の一部。主語を含む形に
+ja,竹,竹,チク|たけ,bamboo,,empty,Claude(AI一次確認・底本未照合),,,下書きなし・提案なし
+ja,松,松,ショウ|まつ,pine,論語・子罕「歲寒，然後知松柏之後凋也」,draft-unreviewed,Claude(AI一次確認・底本未照合),歲寒，然後知松柏之後彫也,『論語』子罕第九,通行本は「彫」（「凋」と表記する本もある）。逆境で真価がわかる、の意なので苦労を共にした相手に
+ja,柏,柏,ハク|かしわ,oak (ja); cypress (zh),,empty,Claude(AI一次確認・底本未照合),,,下書きなし・提案なし
+ja,木,木,ボク|モク|き,tree; wood,,empty,Claude(AI一次確認・底本未照合),,,下書きなし・提案なし
+ja,樹,樹,ジュ|き,tree,管子「十年樹木，百年樹人」,draft-unreviewed,Claude(AI一次確認・底本未照合),,,「十年樹木，百年樹人」は後世の成句。『管子』権修の原文は「十年之計，莫如樹木；終身之計，莫如樹人」。また「樹」は動詞（植える）
+ja,林,林,リン|はやし,woods,,empty,Claude(AI一次確認・底本未照合),,,下書きなし・提案なし
+ja,草,草,ソウ|くさ,grass,,empty,Claude(AI一次確認・底本未照合),,,下書きなし・提案なし
+ja,苗,苗,ビョウ|なえ,seedling,,empty,Claude(AI一次確認・底本未照合),,,下書きなし・提案なし
+ja,芽,芽,ガ|め,sprout,,empty,Claude(AI一次確認・底本未照合),,,【提案・要原典照合】『万葉集』巻八・1418 志貴皇子「石走る垂水の上のさわらびの萌え出づる春になりにけるかも」（「芽」の字は含まず「萌え」）
+ja,実,實,ジツ|み|みの-る,fruit; real,,empty,Claude(AI一次確認・底本未照合),,,下書きなし・提案なし
+ja,種,種,シュ|たね,seed; kind,,empty,Claude(AI一次確認・底本未照合),,,【提案・要原典照合】『古今和歌集』仮名序「人の心を種として」
+ja,根,根,コン|ね,root,,empty,Claude(AI一次確認・底本未照合),,,下書きなし・提案なし
+ja,葉,葉,ヨウ|は,leaf,,empty,Claude(AI一次確認・底本未照合),,,【提案・要原典照合】『古今和歌集』仮名序「よろづの言の葉とぞなれりける」
+ja,鶴,鶴,カク|つる,crane,,empty,Claude(AI一次確認・底本未照合),,,下書きなし・提案なし
+ja,亀,龜,キ|かめ,turtle,,empty,Claude(AI一次確認・底本未照合),,,下書きなし・提案なし
+ja,鳥,鳥,チョウ|とり,bird,,empty,Claude(AI一次確認・底本未照合),,,下書きなし・提案なし
+ja,蝶,蝶,チョウ|ちょう,butterfly,莊子「莊周夢蝶」,draft-unreviewed,Claude(AI一次確認・底本未照合),,,作品名（「胡蝶の夢」）で一節ではない。夢と現実の区別がつかないという主題で、贈り物の添え句には不向き
+ja,魚,魚,ギョ|さかな|うお,fish,,empty,Claude(AI一次確認・底本未照合),,,下書きなし・提案なし
+ja,鯉,鯉,リ|こい,carp,,empty,Claude(AI一次確認・底本未照合),,,下書きなし・提案なし
+ja,犬,犬,ケン|いぬ,dog,,empty,Claude(AI一次確認・底本未照合),,,下書きなし・提案なし
+ja,猫,貓,ビョウ|ねこ,cat,,empty,Claude(AI一次確認・底本未照合),,,下書きなし・提案なし
+ja,馬,馬,バ|うま,horse,,empty,Claude(AI一次確認・底本未照合),,,下書きなし・提案なし
+ja,優,優,ユウ|やさ-しい|すぐ-れる,gentle (ja); excellent,,empty,Claude(AI一次確認・底本未照合),,,下書きなし・提案なし
+ja,強,強,キョウ|ゴウ|つよ-い,strong,易経・乾「天行健，君子以自強不息」,draft-unreviewed,Claude(AI一次確認・底本未照合),天行健，君子以自強不息,『易経』乾卦・象伝,
+ja,健,健,ケン|すこ-やか,healthy; sturdy,易経・乾「天行健」,draft-unreviewed,Claude(AI一次確認・底本未照合),天行健，君子以自強不息,『易経』乾卦・象伝,下書きは前半のみ。「強」と同一句
+ja,和,和,ワ|なご-む|やわ-らぐ,harmony; peace; Japan(ese-style),論語・学而「禮之用，和為貴」,draft-unreviewed,Claude(AI一次確認・底本未照合),禮之用，和爲貴,『論語』学而第一（有子の言）,十七条憲法の「以和爲貴」もある（日本の典拠を好むなら）
+ja,誠,誠,セイ|まこと,sincerity,中庸「誠者天之道也」,draft-unreviewed,Claude(AI一次確認・底本未照合),誠者，天之道也；誠之者，人之道也,『中庸』第二十章,
+ja,義,義,ギ,righteousness; duty,,empty,Claude(AI一次確認・底本未照合),,,下書きなし・提案なし
+ja,礼,禮,レイ|ライ,courtesy; thanks; rites,論語・季氏「不學禮，無以立」,draft-unreviewed,Claude(AI一次確認・底本未照合),不學禮，無以立,『論語』季氏第十六,孔子が息子・伯魚に言った言葉。親から子への贈り物に合う
+ja,智,智,チ,wisdom,,empty,Claude(AI一次確認・底本未照合),,,下書きなし・提案なし
+ja,勇,勇,ユウ|いさ-ましい,courage,,empty,Claude(AI一次確認・底本未照合),,,下書きなし・提案なし
+ja,忍,忍,ニン|しの-ぶ,endure; conceal,,empty,Claude(AI一次確認・底本未照合),,,下書きなし・提案なし
+ja,耐,耐,タイ|た-える,endure; withstand,,empty,Claude(AI一次確認・底本未照合),,,下書きなし・提案なし
+ja,静,靜,セイ|ジョウ|しず-か,calm; quiet,諸葛亮「非寧靜無以致遠」,draft-unreviewed,Claude(AI一次確認・底本未照合),非淡泊無以明志，非寧靜無以致遠,諸葛亮「誡子書」,これも父から子への戒め
+ja,穏,穩,オン|おだ-やか,gentle; steady,,empty,Claude(AI一次確認・底本未照合),,,下書きなし・提案なし
+ja,温,溫,オン|あたた-かい,warm; gentle,論語・学而「溫良恭儉讓」,draft-unreviewed,Claude(AI一次確認・底本未照合),夫子溫良恭儉讓以得之,『論語』学而第一（子貢の言）,下書きは五字のみ。文として成立する形に
+ja,暖,暖,ダン|あたた-かい,warm,,empty,Claude(AI一次確認・底本未照合),,,下書きなし・提案なし
+ja,柔,柔,ジュウ|ニュウ|やわ-らか,soft; gentle,老子「柔弱勝剛強」,draft-unreviewed,Claude(AI一次確認・底本未照合),,,本文は正確（『老子』第三十六章）だが、同章は「將欲奪之，必固與之」など権謀の文脈。第七十八章「弱之勝強，柔之勝剛」への差し替えを提案
+ja,明,明,メイ|ミョウ|あか-るい,bright; clear,,empty,Claude(AI一次確認・底本未照合),,,下書きなし・提案なし
+ja,清,清,セイ|ショウ|きよ-い,pure; clear,,empty,Claude(AI一次確認・底本未照合),,,下書きなし・提案なし
+ja,純,純,ジュン,pure,,empty,Claude(AI一次確認・底本未照合),,,下書きなし・提案なし
+ja,素,素,ソ|ス|もと,plain; basic,,empty,Claude(AI一次確認・底本未照合),,,下書きなし・提案なし
+ja,直,直,チョク|ジキ|ただ-ちに,straight; honest,,empty,Claude(AI一次確認・底本未照合),,,下書きなし・提案なし
+ja,正,正,セイ|ショウ|ただ-しい,correct; upright,,empty,Claude(AI一次確認・底本未照合),,,下書きなし・提案なし
+ja,真,眞,シン|ま,true; genuine,,empty,Claude(AI一次確認・底本未照合),,,下書きなし・提案なし
+ja,善,善,ゼン|よ-い,good; benevolent,孟子「性善」,draft-unreviewed,Claude(AI一次確認・底本未照合),,,「性善」は孟子の学説名で一節ではない。提案：『老子』第八章「上善若水。水善利萬物而不爭」
+ja,美,美,ビ|うつく-しい,beautiful,,empty,Claude(AI一次確認・底本未照合),,,下書きなし・提案なし
+ja,凛,凜,リン|りり-しい,dignified; cold,,empty,Claude(AI一次確認・底本未照合),,,下書きなし・提案なし
+ja,潔,潔,ケツ|いさぎよ-い,clean; pure,,empty,Claude(AI一次確認・底本未照合),,,下書きなし・提案なし
+ja,謙,謙,ケン,humble,易経・謙「謙，亨」,draft-unreviewed,Claude(AI一次確認・底本未照合),謙，亨，君子有終,『易経』謙卦・卦辞,下書きは途中まで。「有終」は日本語の「有終の美」に通じ退職には良いが、「終」の字を含む点は場面確認を
+ja,寛,寬,カン|ひろ-い,generous; tolerant,,empty,Claude(AI一次確認・底本未照合),,,下書きなし・提案なし
+ja,厚,厚,コウ|あつ-い,thick; kind-hearted,易経・坤「地勢坤，君子以厚德載物」,draft-unreviewed,Claude(AI一次確認・底本未照合),地勢坤，君子以厚德載物,『易経』坤卦・象伝,
+ja,深,深,シン|ふか-い,deep,,empty,Claude(AI一次確認・底本未照合),,,下書きなし・提案なし
+ja,広,廣,コウ|ひろ-い,wide; broad,,empty,Claude(AI一次確認・底本未照合),,,下書きなし・提案なし
+ja,大,大,ダイ|タイ|おお-きい,big; great,,empty,Claude(AI一次確認・底本未照合),,,下書きなし・提案なし
+ja,悠,悠,ユウ,leisurely; long-lasting,陶淵明「悠然見南山」,draft-unreviewed,Claude(AI一次確認・底本未照合),採菊東籬下，悠然見南山,陶淵明「飲酒」其五,「菊」と同一句
+ja,永,永,エイ|なが-い,eternal,,empty,Claude(AI一次確認・底本未照合),,,下書きなし・提案なし
+ja,久,久,キュウ|ク|ひさ-しい,long time,老子「天長地久」,draft-unreviewed,Claude(AI一次確認・底本未照合),天長地久,『老子』第七章,「長恨歌」の「天長地久有時盡」（永遠にも終わりがある）と混同されないよう出典明記を
+ja,恒,恆,コウ|つね,constant,,empty,Claude(AI一次確認・底本未照合),,,下書きなし・提案なし
+ja,常,常,ジョウ|つね|とこ,constant; usual,,empty,Claude(AI一次確認・底本未照合),,,下書きなし・提案なし
+ja,安,安,アン|やす-らか,peace; safe,,empty,Claude(AI一次確認・底本未照合),,,下書きなし・提案なし
+ja,平,平,ヘイ|ビョウ|たい-らか,level; peaceful,,empty,Claude(AI一次確認・底本未照合),,,下書きなし・提案なし
+ja,楽,樂,ラク|ガク|たの-しい,joy; music,論語・学而「不亦樂乎」,draft-unreviewed,Claude(AI一次確認・底本未照合),有朋自遠方來，不亦樂乎,『論語』学而第一,
+ja,幸,幸,コウ|さいわ-い|しあわ-せ,happiness; luck,,empty,Claude(AI一次確認・底本未照合),,,下書きなし・提案なし
+ja,喜,喜,キ|よろこ-ぶ,joy; delight,,empty,Claude(AI一次確認・底本未照合),,,下書きなし・提案なし
+ja,福,福,フク,blessing; fortune,,empty,Claude(AI一次確認・底本未照合),,,下書きなし・提案なし
+ja,寿,壽,ジュ|ことぶき,longevity; congratulations,,empty,Claude(AI一次確認・底本未照合),,,下書きなし・提案なし
+ja,祝,祝,シュク|いわ-う,celebrate; blessing,,empty,Claude(AI一次確認・底本未照合),,,下書きなし・提案なし
+ja,賀,賀,ガ|よろこ-び,congratulate,,empty,Claude(AI一次確認・底本未照合),,,下書きなし・提案なし
+ja,慶,慶,ケイ|よろこ-ぶ,celebrate,,empty,Claude(AI一次確認・底本未照合),,,下書きなし・提案なし
+ja,吉,吉,キチ|キツ|よ-い,auspicious,,empty,Claude(AI一次確認・底本未照合),,,下書きなし・提案なし
+ja,祥,祥,ショウ,auspicious,,empty,Claude(AI一次確認・底本未照合),,,下書きなし・提案なし
+ja,運,運,ウン|はこ-ぶ,luck; carry,,empty,Claude(AI一次確認・底本未照合),,,下書きなし・提案なし
+ja,心,心,シン|こころ,heart; mind,,empty,Claude(AI一次確認・底本未照合),,,【提案・要原典照合】『古今和歌集』仮名序「やまとうたは、人の心を種として、よろづの言の葉とぞなれりける」
+ja,想,想,ソウ|おも-う,think of; miss; want,,empty,Claude(AI一次確認・底本未照合),,,下書きなし・提案なし
+ja,思,思,シ|おも-う,think; ponder; long for,,empty,Claude(AI一次確認・底本未照合),,,下書きなし・提案なし
+ja,念,念,ネン,thought; wish; to read aloud,,empty,Claude(AI一次確認・底本未照合),,,下書きなし・提案なし
+ja,情,情,ジョウ|セイ|なさ-け,feeling; affection,,empty,Claude(AI一次確認・底本未照合),,,下書きなし・提案なし
+ja,愛,愛,アイ|いと-しい|まな,love; affection,孟子・離婁下「仁者愛人，有禮者敬人」,draft-unreviewed,Claude(AI一次確認・底本未照合),仁者愛人，有禮者敬人,『孟子』離婁下,
+ja,慈,慈,ジ|いつく-しむ,compassion; kindness,孟郊「遊子吟」慈母手中線,draft-unreviewed,Claude(AI一次確認・底本未照合),慈母手中線，遊子身上衣,孟郊「遊子吟」（唐）,
+ja,悦,悅,エツ|よろこ-ぶ,delight,,empty,Claude(AI一次確認・底本未照合),,,下書きなし・提案なし
+ja,歓,歡,カン,joy; welcome,,empty,Claude(AI一次確認・底本未照合),,,下書きなし・提案なし
+ja,懐,懷,カイ|なつ-かしい|ふところ,fond memory; bosom,,empty,Claude(AI一次確認・底本未照合),,,下書きなし・提案なし
+ja,慕,慕,ボ|した-う,yearn for; admire,,empty,Claude(AI一次確認・底本未照合),,,下書きなし・提案なし
+ja,敬,敬,ケイ|うやま-う,respect,,empty,Claude(AI一次確認・底本未照合),,,下書きなし・提案なし
+ja,尊,尊,ソン|たっと-い,honour; esteem,,empty,Claude(AI一次確認・底本未照合),,,下書きなし・提案なし
+ja,誇,誇,コ|ほこ-る,"pride (ja); praise, exaggerate (zh)",,empty,Claude(AI一次確認・底本未照合),,,下書きなし・提案なし
+ja,手,手,シュ|て,hand,詩経・撃鼓「執子之手，與子偕老」,draft-unreviewed,Claude(AI一次確認・底本未照合),,,本文は正確（『詩経』邶風「撃鼓」）だが、出征兵士の詩で直前に「死生契闊，與子成說」、後に「不我活兮」と続く。中国では結婚式で人気だが、原典を知る人には不吉
+ja,背,背,ハイ|せ|せなか,back (body); turn away,朱自清『背影』,draft-unreviewed,Claude(AI一次確認・底本未照合),,,朱自清『背影』（1925年）は近代の随筆で古典ではない。また祖母の死と父の失業から始まる話で、日本の読者にはなじみも薄い
+ja,肩,肩,ケン|かた,shoulder,,empty,Claude(AI一次確認・底本未照合),,,下書きなし・提案なし
+ja,足,足,ソク|あし|た-りる,foot; enough,老子「知足者富」,draft-unreviewed,Claude(AI一次確認・底本未照合),知足者富,『老子』第三十三章,
+ja,目,目,モク|ボク|め,eye,,empty,Claude(AI一次確認・底本未照合),,,下書きなし・提案なし
+ja,声,聲,セイ|ショウ|こえ,voice,,empty,Claude(AI一次確認・底本未照合),,,下書きなし・提案なし
+ja,顔,顏,ガン|かお,face,,empty,Claude(AI一次確認・底本未照合),,,下書きなし・提案なし
+ja,汗,汗,カン|あせ,sweat,,empty,Claude(AI一次確認・底本未照合),,,下書きなし・提案なし
+ja,指,指,シ|ゆび,finger; to point,,empty,Claude(AI一次確認・底本未照合),,,下書きなし・提案なし
+ja,胸,胸,キョウ|むね,chest; heart,,empty,Claude(AI一次確認・底本未照合),,,下書きなし・提案なし
+ja,年,年,ネン|とし,year; age,,empty,Claude(AI一次確認・底本未照合),,,【提案・要原典照合】『おくのほそ道』序「月日は百代の過客にして、行かふ年も又旅人也」
+ja,歳,歲,サイ|セイ|とし,years of age,論語・子罕「歲寒，然後知松柏之後凋也」,draft-unreviewed,Claude(AI一次確認・底本未照合),歲寒，然後知松柏之後彫也,『論語』子罕第九,「松」と同一句
+ja,生,生,セイ|ショウ|い-きる|う-まれる,life; birth; raw,,empty,Claude(AI一次確認・底本未照合),,,下書きなし・提案なし
+ja,命,命,メイ|ミョウ|いのち,life; fate; command,,empty,Claude(AI一次確認・底本未照合),,,下書きなし・提案なし
+ja,誕,誕,タン,birth,,empty,Claude(AI一次確認・底本未照合),,,下書きなし・提案なし
+ja,初,初,ショ|はじ-め,first; beginning,,empty,Claude(AI一次確認・底本未照合),,,下書きなし・提案なし
+ja,始,始,シ|はじ-める,begin,,empty,Claude(AI一次確認・底本未照合),,,下書きなし・提案なし
+ja,新,新,シン|あたら-しい,new,,empty,Claude(AI一次確認・底本未照合),,,下書きなし・提案なし
+ja,継,繼,ケイ|つ-ぐ,inherit; continue,,empty,Claude(AI一次確認・底本未照合),,,下書きなし・提案なし
+ja,続,續,ゾク|つづ-く,continue,,empty,Claude(AI一次確認・底本未照合),,,下書きなし・提案なし
+ja,来,來,ライ|く-る,come,,empty,Claude(AI一次確認・底本未照合),,,下書きなし・提案なし
+ja,今,今,コン|キン|いま,now,,empty,Claude(AI一次確認・底本未照合),,,下書きなし・提案なし
+ja,昔,昔,セキ|シャク|むかし,long ago,,empty,Claude(AI一次確認・底本未照合),,,下書きなし・提案なし
+ja,時,時,ジ|とき,time,,empty,Claude(AI一次確認・底本未照合),,,下書きなし・提案なし
+ja,間,間,カン|ケン|あいだ|ま,interval; between,,empty,Claude(AI一次確認・底本未照合),,,下書きなし・提案なし
+ja,旅,旅,リョ|たび,journey,,empty,Claude(AI一次確認・底本未照合),,,【提案・要原典照合】『おくのほそ道』序「月日は百代の過客にして、行かふ年も又旅人也」。ただし続く「古人も多く旅に死せるあり」は引かないこと
+ja,巡,巡,ジュン|めぐ-る,circle; make rounds,,empty,Claude(AI一次確認・底本未照合),,,下書きなし・提案なし
+ja,会,會,カイ|エ|あ-う,meet; gathering,,empty,Claude(AI一次確認・底本未照合),,,下書きなし・提案なし
+ja,志,志,シ|こころざし,aspiration; will,論語・為政「吾十有五而志于學」,draft-unreviewed,Claude(AI一次確認・底本未照合),吾十有五而志于學,『論語』為政第二,「于／於」は版本差。同章の「六十而耳順」は還暦祝いの添え句として良い（「耳」「順」が候補に入れば）
+ja,望,望,ボウ|のぞ-む,hope; to look toward,,empty,Claude(AI一次確認・底本未照合),,,下書きなし・提案なし
+ja,夢,夢,ム|ゆめ,dream,莊子「莊周夢蝶」,draft-unreviewed,Claude(AI一次確認・底本未照合),,,「蝶」と同じく作品名のみで一節ではない
+ja,力,力,リョク|リキ|ちから,strength; power,,empty,Claude(AI一次確認・底本未照合),,,下書きなし・提案なし
+ja,勤,勤,キン|ゴン|つと-める,diligence,,empty,Claude(AI一次確認・底本未照合),,,下書きなし・提案なし
+ja,婚,婚,コン,marriage,,empty,Claude(AI一次確認・底本未照合),,,下書きなし・提案なし
+ja,宴,宴,エン|うたげ,banquet,,empty,Claude(AI一次確認・底本未照合),,,下書きなし・提案なし
+ja,祭,祭,サイ|まつ-り,festival; ritual,,empty,Claude(AI一次確認・底本未照合),,,下書きなし・提案なし
+ja,終,終,シュウ|お-わる,end; finish; last,,empty,interim-unreviewed,,,
+ja,離,離,リ|はな-れる,separate; leave,,empty,interim-unreviewed,,,
+ja,散,散,サン|ち-る,scatter; disperse,,empty,interim-unreviewed,,,
+ja,死,死,シ|し-ぬ,die,,empty,interim-unreviewed,,,
+ja,苦,苦,ク|くる-しい|にが-い,suffering; bitter,,empty,interim-unreviewed,,,
+ja,病,病,ビョウ|や-む|やまい,illness,,empty,interim-unreviewed,,,
+ja,断,斷,ダン|た-つ|ことわ-る,cut off; decide; refuse,,empty,Claude(AI一次確認・底本未照合),,,下書きなし・提案なし
+ja,喪,喪,モ|も|うしな-う,mourning; lose,,empty,Claude(AI一次確認・底本未照合),,,下書きなし・提案なし
+ja,四,四,シ|よん|よっつ,four,,empty,Claude(AI一次確認・底本未照合),,,下書きなし・提案なし
+ja,別,別,ベツ|わか-れる,part; separate; distinguish,,empty,interim-unreviewed,,,
+ja,切,切,セツ|サイ|き-る,cut; sever; earnest,,empty,interim-unreviewed,,,
+ja,去,去,キョ|コ|さ-る,go away; pass away,,empty,interim-unreviewed,,,
+ja,衰,衰,スイ|おとろ-える,decline; wane,,empty,interim-unreviewed,,,
+ja,老,老,ロウ|お-いる|ふ-ける,old; aged,,empty,interim-unreviewed,,,
+ja,消,消,ショウ|き-える,vanish; extinguish,,empty,interim-unreviewed,,,
+ja,弱,弱,ジャク|よわ-い,weak,,empty,interim-unreviewed,,,
+ja,無,無,ム|ブ|な-い,nothing; without,老子「道常無為而無不為」,draft-unreviewed,Claude(AI一次確認・底本未照合),,,hard_block の字のため添え句は不要
+ja,亡,亡,ボウ|モウ|な-い|ほろ-びる,perish; deceased,,empty,Claude(AI一次確認・底本未照合),,,下書きなし・提案なし
+ja,葬,葬,ソウ|ほうむ-る,bury; funeral,,empty,Claude(AI一次確認・底本未照合),,,下書きなし・提案なし
+ja,墓,墓,ボ|はか,grave,,empty,Claude(AI一次確認・底本未照合),,,下書きなし・提案なし
+ja,枯,枯,コ|か-れる,wither; dry up,,empty,Claude(AI一次確認・底本未照合),,,下書きなし・提案なし
+ja,滅,滅,メツ|ほろ-びる,destroy; extinguish,,empty,Claude(AI一次確認・底本未照合),,,下書きなし・提案なし
+ja,壊,壞,カイ|こわ-す,break; spoil,,empty,Claude(AI一次確認・底本未照合),,,下書きなし・提案なし
+ja,敗,敗,ハイ|やぶ-れる,defeat,,empty,Claude(AI一次確認・底本未照合),,,下書きなし・提案なし
+ja,失,失,シツ|うしな-う,lose; fail,,empty,Claude(AI一次確認・底本未照合),,,下書きなし・提案なし
+ja,絶,絕,ゼツ|た-える,cut off; extinct; utterly,,empty,Claude(AI一次確認・底本未照合),,,下書きなし・提案なし
+ja,逝,逝,セイ|ゆ-く,pass away,,empty,Claude(AI一次確認・底本未照合),,,下書きなし・提案なし
+ja,憂,憂,ユウ|うれ-い,worry; sorrow,,empty,Claude(AI一次確認・底本未照合),,,下書きなし・提案なし
+ja,悲,悲,ヒ|かな-しい,sad,,empty,Claude(AI一次確認・底本未照合),,,下書きなし・提案なし
+ja,哀,哀,アイ|あわ-れ,grief; pathos,,empty,Claude(AI一次確認・底本未照合),,,下書きなし・提案なし
+ja,嘆,歎,タン|なげ-く,sigh; lament,,empty,Claude(AI一次確認・底本未照合),,,下書きなし・提案なし
+ja,孤,孤,コ,alone; orphaned,,empty,Claude(AI一次確認・底本未照合),,,下書きなし・提案なし
+ja,恨,恨,コン|うら-む,resent; regret,,empty,Claude(AI一次確認・底本未照合),,,下書きなし・提案なし
+ja,憎,憎,ゾウ|にく-む,hate,,empty,Claude(AI一次確認・底本未照合),,,下書きなし・提案なし
+ja,罪,罪,ザイ|つみ,sin; crime,,empty,Claude(AI一次確認・底本未照合),,,下書きなし・提案なし
+ja,災,災,サイ|わざわ-い,disaster,,empty,Claude(AI一次確認・底本未照合),,,下書きなし・提案なし
+ja,痛,痛,ツウ|いた-い,pain,,empty,Claude(AI一次確認・底本未照合),,,下書きなし・提案なし
+ja,傷,傷,ショウ|きず,wound; hurt,,empty,Claude(AI一次確認・底本未照合),,,下書きなし・提案なし
+ja,負,負,フ|ま-ける|お-う,lose; bear,,empty,Claude(AI一次確認・底本未照合),,,下書きなし・提案なし
+ja,争,爭,ソウ|あらそ-う,contend; fight,,empty,Claude(AI一次確認・底本未照合),,,下書きなし・提案なし
+ja,毒,毒,ドク,poison,,empty,Claude(AI一次確認・底本未照合),,,下書きなし・提案なし
+ja,怒,怒,ド|ヌ|いか-る|おこ-る,anger,,empty,Claude(AI一次確認・底本未照合),,,下書きなし・提案なし
+ja,罰,罰,バツ|ばち,punish,,empty,Claude(AI一次確認・底本未照合),,,下書きなし・提案なし
+ja,鬼,鬼,キ|おに,demon (ja oni); ghost (zh),,empty,Claude(AI一次確認・底本未照合),,,下書きなし・提案なし
+ja,魔,魔,マ,demon; magic,,empty,Claude(AI一次確認・底本未照合),,,下書きなし・提案なし
+ja,霊,靈,レイ|リョウ|たま,spirit; soul,,empty,Claude(AI一次確認・底本未照合),,,下書きなし・提案なし
+ja,魂,魂,コン|たましい,soul,,empty,Claude(AI一次確認・底本未照合),,,下書きなし・提案なし
+ja,冷,冷,レイ|つめ-たい,cold,,empty,Claude(AI一次確認・底本未照合),,,下書きなし・提案なし
+ja,寒,寒,カン|さむ-い,cold (weather),論語・子罕「歲寒，然後知松柏之後凋也」,draft-unreviewed,Claude(AI一次確認・底本未照合),歲寒，然後知松柏之後彫也,『論語』子罕第九,context_required の字。逆境の物語がある場合のみ
+ja,涙,淚,ルイ|なみだ,tears,,empty,Claude(AI一次確認・底本未照合),,,下書きなし・提案なし
+ja,泣,泣,キュウ|な-く,weep,,empty,Claude(AI一次確認・底本未照合),,,下書きなし・提案なし
+ja,暗,暗,アン|くら-い,dark; secret,,empty,Claude(AI一次確認・底本未照合),,,下書きなし・提案なし
+ja,厳,嚴,ゲン|ゴン|きび-しい|おごそ-か,strict; solemn,,empty,Claude(AI一次確認・底本未照合),,,下書きなし・提案なし
+ja,黙,默,モク|だま-る,silent,,empty,Claude(AI一次確認・底本未照合),,,下書きなし・提案なし
+ja,傘,傘,サン|かさ,umbrella,,empty,Claude(AI一次確認・底本未照合),,,下書きなし・提案なし
+ja,梨,梨,リ|なし,pear,,empty,Claude(AI一次確認・底本未照合),,,下書きなし・提案なし
+ja,鐘,鐘,ショウ|かね,bell; clock (zh),,empty,Claude(AI一次確認・底本未照合),,,下書きなし・提案なし
+ja,扇,扇,セン|おうぎ,fan,,empty,Claude(AI一次確認・底本未照合),,,下書きなし・提案なし
+ja,妹,妹,マイ|いもうと,younger sister,,empty,Claude(AI一次確認・底本未照合),,,下書きなし・提案なし
+ja,伴,伴,ハン|バン|ともな-う,companion; to accompany,,empty,Claude(AI一次確認・底本未照合),,,下書きなし・提案なし
+ja,錆,錆,セイ|さび|さ-びる,rust,,empty,interim-unreviewed,,,
+ja,駅,驛,エキ,station,,empty,Claude(AI一次確認・底本未照合),,,下書きなし・提案なし
+ja,仲,仲,チュウ|なか,relationship between people; second,,empty,Claude(AI一次確認・底本未照合),,,下書きなし・提案なし
+ja,畑,畑,はたけ|はた,field (kokuji),,empty,Claude(AI一次確認・底本未照合),,,下書きなし・提案なし
+ja,姉,姉,シ|あね,elder sister,,empty,Claude(AI一次確認・底本未照合),,,下書きなし・提案なし
+ja,鍵,鍵,ケン|かぎ,key,,empty,Claude(AI一次確認・底本未照合),,,下書きなし・提案なし
+ja,暦,曆,レキ|こよみ,calendar,,empty,Claude(AI一次確認・底本未照合),,,下書きなし・提案なし
+ja,還,還,カン|かえ-る,return,,empty,Claude(AI一次確認・底本未照合),,,下書きなし・提案なし
+ja,峠,峠,トウ|とうげ,mountain pass (kokuji),,empty,Claude(AI一次確認・底本未照合),,,下書きなし・提案なし
+ja,凪,凪,なぎ,calm at sea (kokuji),,empty,Claude(AI一次確認・底本未照合),,,下書きなし・提案なし
+ja,躾,躾,しつけ,"upbringing, discipline (kokuji)",,empty,Claude(AI一次確認・底本未照合),,,下書きなし・提案なし
