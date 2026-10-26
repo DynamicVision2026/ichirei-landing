@@ -1,9 +1,9 @@
 /// <reference lib="dom" />
 // The sender's language (ja | zh-Hans | zh-Hant | en), shared by the landing page and /demo.
 // A tiny external store (no React import, so Node tests can load it): the choice is kept in
-// localStorage, can be forced with ?lang=, and otherwise follows the browser for Chinese only and
-// falls back to Japanese (Japan first: an English browser is NOT switched to English automatically —
-// English is reached with ?lang=en or the nav switch). React reads it through src/useLanguage.ts.
+// localStorage and can be forced with ?lang= (both win). On a first visit the language comes from the
+// browser's most preferred language (navigator.languages[0]): ja* → 日本語, any zh* → 繁中 (zh-Hant),
+// everything else, Korean included → English. React reads it through src/useLanguage.ts.
 
 import type { UiLanguage } from './demo/i18n.ts'
 
@@ -12,15 +12,18 @@ const VALID: readonly UiLanguage[] = ['ja', 'zh-Hans', 'zh-Hant', 'en']
 
 const isLang = (v: unknown): v is UiLanguage => typeof v === 'string' && (VALID as readonly string[]).includes(v)
 
-/** Pure: pick a language from ?lang=, the stored choice and the browser language (in that order). */
-export function detectLanguage(input: { search?: string; stored?: string | null; navigatorLanguage?: string }): UiLanguage {
+/**
+ * Pure: pick a language from ?lang=, the stored choice and the browser's languages (in that order).
+ * `navigatorLanguages` is navigator.languages (most preferred first); its first entry decides.
+ */
+export function detectLanguage(input: { search?: string; stored?: string | null; navigatorLanguages?: readonly string[]; navigatorLanguage?: string }): UiLanguage {
   const fromQuery = new URLSearchParams(input.search ?? '').get('lang')
   if (isLang(fromQuery)) return fromQuery
   if (isLang(input.stored)) return input.stored
-  const nav = (input.navigatorLanguage ?? '').toLowerCase()
-  if (/^zh-(tw|hk|mo)\b|^zh-hant/.test(nav)) return 'zh-Hant'
-  if (/^zh/.test(nav)) return 'zh-Hans'
-  return 'ja'
+  const nav = (input.navigatorLanguages?.[0] ?? input.navigatorLanguage ?? '').toLowerCase()
+  if (/^ja\b/.test(nav)) return 'ja'
+  if (/^zh\b/.test(nav)) return 'zh-Hant'
+  return 'en'
 }
 
 let current: UiLanguage | null = null
@@ -38,8 +41,8 @@ export function getLanguage(): UiLanguage {
   if (current === null) {
     current =
       typeof window === 'undefined'
-        ? 'ja'
-        : detectLanguage({ search: window.location.search, stored: readStored(), navigatorLanguage: window.navigator?.language })
+        ? 'en'
+        : detectLanguage({ search: window.location.search, stored: readStored(), navigatorLanguages: window.navigator?.languages, navigatorLanguage: window.navigator?.language })
     if (typeof document !== 'undefined') document.documentElement.lang = current
   }
   return current

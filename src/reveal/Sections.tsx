@@ -230,10 +230,9 @@ export function Moments({ t }: { t: T }) {
             </span>
             <Picture
               name={`scenes/${m.n}`}
-              width={m.n === 'm1' ? 1 : m.n === 'm4' || m.n === 'm6' ? 2 : 1}
-              height={m.n === 'm1' ? 1 : 1}
+              width={m.n === 'm4' || m.n === 'm6' ? 2 : 1}
+              height={1}
               sizes={m.n === 'm1' || m.n === 'm4' || m.n === 'm6' ? '(max-width: 860px) 100vw, 560px' : '(max-width: 860px) 50vw, 280px'}
-              style={m.n === 'm4' ? { objectPosition: 'center 80%' } : undefined}
             />
             <figcaption className="cap">
               <span className="k" aria-hidden="true">

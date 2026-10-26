@@ -104,7 +104,7 @@ check('photos: the 12 scenes and the 2 gift-set photos exist as JPG, with 640w a
 check('photos: every category in the hero has its scene photo', CATEGORIES.every((c) => existsSync(`${IMG}scenes/${c}.jpg`)))
 check('photos: no stray image files (every JPG in public/img is one the page uses)', readdirSync(`${IMG}scenes`).filter((f) => f.endsWith('.jpg')).length === 12)
 const sections = readFileSync(new URL('../src/reveal/Sections.tsx', import.meta.url), 'utf8')
-check('photos: the m4 photo is positioned center 80%', sections.includes("objectPosition: 'center 80%'"))
+check('photos: no per-photo crop override any more (the final m4 is already framed)', !sections.includes('objectPosition'))
 const picture = readFileSync(new URL('../src/reveal/Picture.tsx', import.meta.url), 'utf8')
 check('photos: <picture> WebP with JPG fallback, width/height set, lazy unless it is the hero, removes itself on error', picture.includes('type="image/webp"') && picture.includes('width={width}') && picture.includes('height={height}') && picture.includes("loading={eager ? 'eager' : 'lazy'}") && picture.includes('onError'))
 

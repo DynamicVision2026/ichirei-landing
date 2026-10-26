@@ -31,7 +31,7 @@ const browser = await chromium.launch({
   args: ['--no-sandbox'],
 })
 try {
-  const page = await browser.newPage({ viewport: { width: 1100, height: 950 } })
+  const page = await browser.newPage({ locale: 'ja-JP', viewport: { width: 1100, height: 950 } })
   const errors = []
   const failed = []
   page.on('pageerror', (e) => errors.push(String(e)))

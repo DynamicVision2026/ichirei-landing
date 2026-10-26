@@ -40,8 +40,8 @@ const GO = { ja: 'わたしの物語から字を見つける', 'zh-Hans': '从�
 const SUBMIT = { ja: 'その一字を、探しにいく', 'zh-Hans': '去寻找那一个字', 'zh-Hant': '去尋找那一個字', en: 'Find the one character' }
 
 let failures = 0
-const check = (name, cond) => {
-  console.log(`${cond ? 'PASS' : 'FAIL'}  ${name}`)
+const check = (name, cond, detail) => {
+  console.log(`${cond ? 'PASS' : 'FAIL'}  ${name}${!cond && detail ? '  -> ' + String(detail).slice(0, 300) : ''}`)
   if (!cond) failures++
 }
 
@@ -52,7 +52,7 @@ const browser = await chromium.launch({
 
 // ---------- Run 1: sufficient path, full experiment flow ----------
 {
-  const page = await browser.newPage({ viewport: { width: 1100, height: 950 } })
+  const page = await browser.newPage({ locale: 'ja-JP', viewport: { width: 1100, height: 950 } })
   const errors = []
   page.on('pageerror', (e) => errors.push(String(e)))
 
@@ -190,7 +190,7 @@ const browser = await chromium.launch({
 
 // ---------- Run 2: insufficient → follow-up loop ----------
 {
-  const page = await browser.newPage({ viewport: { width: 1100, height: 950 } })
+  const page = await browser.newPage({ locale: 'ja-JP', viewport: { width: 1100, height: 950 } })
   const errors = []
   page.on('pageerror', (e) => errors.push(String(e)))
   let call = 0
@@ -236,7 +236,7 @@ const browser = await chromium.launch({
 // No route interception on /api/select: the request travels through the dev
 // server proxy to scripts/mock-api.mjs, which streams deltas over ~3s.
 {
-  const page = await browser.newPage({ viewport: { width: 1100, height: 950 } })
+  const page = await browser.newPage({ locale: 'ja-JP', viewport: { width: 1100, height: 950 } })
   const errors = []
   page.on('pageerror', (e) => errors.push(String(e)))
   await page.route('**/api/log', (route) => route.fulfill({ status: 204, body: '' }))
@@ -261,7 +261,7 @@ const browser = await chromium.launch({
 
 // ---------- Run 4: client-side hard timeout -> visible error, no hang ----------
 {
-  const page = await browser.newPage({ viewport: { width: 1100, height: 950 } })
+  const page = await browser.newPage({ locale: 'ja-JP', viewport: { width: 1100, height: 950 } })
   const errors = []
   page.on('pageerror', (e) => errors.push(String(e)))
   await page.route('**/api/log', (route) => route.fulfill({ status: 204, body: '' }))
@@ -284,7 +284,7 @@ const browser = await chromium.launch({
 
 // ---------- Run 5: NDJSON error line surfaces as visible error ----------
 {
-  const page = await browser.newPage({ viewport: { width: 1100, height: 950 } })
+  const page = await browser.newPage({ locale: 'ja-JP', viewport: { width: 1100, height: 950 } })
   const errors = []
   page.on('pageerror', (e) => errors.push(String(e)))
   await page.route('**/api/log', (route) => route.fulfill({ status: 204, body: '' }))
@@ -319,7 +319,7 @@ const chromeText = (page) =>
     return root.innerText
   })
 const mockPage = async (browser, { onExplain, result, order, track } = {}) => {
-  const page = await browser.newPage({ viewport: { width: 1100, height: 950 } })
+  const page = await browser.newPage({ locale: 'ja-JP', viewport: { width: 1100, height: 950 } })
   const errors = []
   page.on('pageerror', (e) => errors.push(String(e)))
   const calls = { select: [], explain: [], order: [], track: [], analytics: [] }
@@ -603,7 +603,7 @@ const mockPage = async (browser, { onExplain, result, order, track } = {}) => {
   await f.page.close()
 
   // the server's story_too_long answer is shown in the sender's language (not the raw English message)
-  const p2 = await browser.newPage({ viewport: { width: 1100, height: 950 } })
+  const p2 = await browser.newPage({ locale: 'ja-JP', viewport: { width: 1100, height: 950 } })
   await p2.route('**/api/log', (route) => route.fulfill({ status: 204, body: '' }))
   await p2.route('**/api/select', (route) => route.fulfill({ status: 400, contentType: 'application/json', body: JSON.stringify({ error: '"story" is longer than 600 characters (got 700)', code: 'story_too_long', max: 600 }) }))
   await p2.goto('http://localhost:5173/?lang=en', { waitUntil: 'networkidle' })
@@ -619,7 +619,7 @@ const mockPage = async (browser, { onExplain, result, order, track } = {}) => {
 // ---------- Run 9: the Reveal landing page — sections, copy per language, honesty, no test controls ----------
 const SECTION_ORDER = ['.hero', '.strip', '.philo', '#shape', '#angles', '#write', '#how', '#moments', '.reviewsEmpty', '#gifts', '.faq', '.closing']
 {
-  const page = await browser.newPage({ viewport: { width: 1280, height: 900 } })
+  const page = await browser.newPage({ locale: 'ja-JP', viewport: { width: 1280, height: 900 } })
   const errors = []
   page.on('pageerror', (e) => errors.push(String(e)))
   const calls = { select: [] }
@@ -647,7 +647,11 @@ const SECTION_ORDER = ['.hero', '.strip', '.philo', '#shape', '#angles', '#write
   // the photos: WebP with JPG fallback, lazy below the hero, sizes given
   const imgs = await page.evaluate(() => [...document.querySelectorAll('picture img')].map((i) => ({ src: i.getAttribute('src'), lazy: i.loading, w: i.getAttribute('width'), h: i.getAttribute('height'), webp: !!i.parentElement.querySelector('source[type="image/webp"]') })))
   check('photos: every photo is a <picture> with WebP + JPG fallback and width/height; only the hero image is eager', imgs.length === 9 && imgs.every((i) => i.webp && i.w && i.h && i.src.endsWith('.jpg')) && imgs.filter((i) => i.lazy === 'eager').length === 1 && imgs[0].lazy === 'eager')
-  check('photos: the m4 photo is positioned center 80%', (await page.locator('img[src$="m4.jpg"]').evaluate((e) => getComputedStyle(e).objectPosition)) === '50% 80%')
+  check('photos: m4 has no crop override (object-position is the default 50% 50%)', (await page.locator('img[src$="m4.jpg"]').evaluate((e) => getComputedStyle(e).objectPosition)) === '50% 50%')
+  await page.locator('#moments').scrollIntoViewIfNeeded()
+  await page.waitForTimeout(400)
+  const mosaicCols = await page.evaluate(() => { const g = document.querySelector('.mosaic'); const kids = [...g.children].map((c) => getComputedStyle(c).gridColumnEnd); const cols = getComputedStyle(g).gridTemplateColumns.split(' ').length; const r = g.getBoundingClientRect(); const m6 = g.querySelector('.m6').getBoundingClientRect(); const m5 = g.querySelector('.m5').getBoundingClientRect(); return { cols, kids, m6w: Math.round(m6.width), m5w: Math.round(m5.width), rowEnd: Math.round(g.querySelector('.m4').getBoundingClientRect().right), m6right: Math.round(m6.right), sameRow: Math.abs(m5.top - m6.top) < 2 } })
+  check('mosaic (desktop, 4 columns): m6 spans 3 columns next to m5, so the last row has no empty cell', mosaicCols.cols === 4 && mosaicCols.m6w > 3 * mosaicCols.m5w && mosaicCols.sameRow && Math.abs(mosaicCols.m6right - mosaicCols.rowEnd) <= 1, JSON.stringify(mosaicCols))
   // a missing photo leaves the coloured frame, never a broken image
   await page.route('**/img/scenes/m3*', (route) => route.fulfill({ status: 404, body: '' }))
   await page.reload({ waitUntil: 'networkidle' })
@@ -687,7 +691,7 @@ const SECTION_ORDER = ['.hero', '.strip', '.philo', '#shape', '#angles', '#write
   await page.close()
 
   // reduced motion: the carousel never auto-advances and the progress animation is off
-  const rctx = await browser.newContext({ reducedMotion: 'reduce', viewport: { width: 1280, height: 900 } })
+  const rctx = await browser.newContext({ reducedMotion: 'reduce', locale: 'en-US', viewport: { width: 1280, height: 900 } })
   const rp = await rctx.newPage()
   await rp.route('**/api/**', (route) => route.fulfill({ status: 204, body: '' }))
   await rp.goto('http://localhost:5173/?lang=en', { waitUntil: 'networkidle' })
@@ -701,7 +705,7 @@ const SECTION_ORDER = ['.hero', '.strip', '.philo', '#shape', '#angles', '#write
 
 // ---------- Run 10: three languages on the landing page (EN, 日本語, 繁中), remembered, shared with /demo ----------
 {
-  const page = await browser.newPage({ viewport: { width: 1280, height: 900 } })
+  const page = await browser.newPage({ locale: 'ja-JP', viewport: { width: 1280, height: 900 } })
   const errors = []
   page.on('pageerror', (e) => errors.push(String(e)))
   const calls = { select: [] }
@@ -711,7 +715,7 @@ const SECTION_ORDER = ['.hero', '.strip', '.philo', '#shape', '#angles', '#write
   await page.goto('http://localhost:5173/', { waitUntil: 'networkidle' })
   await page.evaluate(() => localStorage.clear())
   await page.reload({ waitUntil: 'networkidle' })
-  check('landing: three language buttons (EN, 日本語, 繁中), ja pressed by default', (await page.locator('.lang button').count()) === 3 && (await page.locator('.lang [data-lang=ja][aria-pressed=true]').count()) === 1)
+  check('landing: three language buttons (EN, 日本語, 繁中); with no stored choice an ja-JP browser gets 日本語', (await page.locator('.lang button').count()) === 3 && (await page.locator('.lang [data-lang=ja][aria-pressed=true]').count()) === 1)
   const LANGS = {
     en: { title: 'ICHIREI 一字礼 — A Gift of One Character', h1: 'Between you and me, one character.', cta: 'Tell your story', go: GO.en, htmlLang: 'en', hint: '50–300 characters is plenty', desc: 'ICHIREI (一字礼) — the person you see' },
     ja: { title: 'ICHIREI 一字礼 — 一字の贈りもの', h1: 'あなたとわたし、一字の距離。', cta: '物語を書く', go: GO.ja, htmlLang: 'ja', hint: '50〜300字くらいで十分です', desc: 'ICHIREI（一字礼）— あなたの目に映る、その人を、一文字に。' },
@@ -750,19 +754,24 @@ const SECTION_ORDER = ['.hero', '.strip', '.philo', '#shape', '#angles', '#write
   check('no page errors (run 10)', errors.length === 0)
   if (errors.length) console.log('page errors:', errors)
   await page.close()
-  // browser language zh-TW with nothing stored → 繁中; an English browser → ja (Japan first; English is opt-in)
-  const ctx = await browser.newContext({ locale: 'zh-TW', viewport: { width: 1200, height: 900 } })
-  const p2 = await ctx.newPage()
-  await p2.route('**/api/**', (route) => route.fulfill({ status: 204, body: '' }))
-  await p2.goto('http://localhost:5173/', { waitUntil: 'networkidle' })
-  check('a zh-TW browser with no stored choice gets 繁中', (await p2.locator('h1').innerText()).replace(/\n/g, '') === '你和我之間，只隔一個字。')
-  await ctx.close()
-  const ctx2 = await browser.newContext({ locale: 'en-US', viewport: { width: 1200, height: 900 } })
-  const p3 = await ctx2.newPage()
-  await p3.route('**/api/**', (route) => route.fulfill({ status: 204, body: '' }))
-  await p3.goto('http://localhost:5173/', { waitUntil: 'networkidle' })
-  check('an en-US browser → ja (the default; English is opt-in through the switch or ?lang=en)', (await p3.locator('h1').innerText()).replace(/\n/g, '') === 'あなたとわたし、一字の距離。')
-  await ctx2.close()
+  // first visit: the browser's most preferred language decides — ja* → 日本語, any zh* → 繁中, everything else (ko included) → EN
+  const FIRST = [['ja-JP', 'あなたとわたし、一字の距離。', 'ja'], ['zh-TW', '你和我之間，只隔一個字。', 'zh-Hant'], ['zh-HK', '你和我之間，只隔一個字。', 'zh-Hant'], ['zh-CN', '你和我之間，只隔一個字。', 'zh-Hant'], ['en-US', 'Between you and me, one character.', 'en'], ['ko-KR', 'Between you and me, one character.', 'en'], ['fr-FR', 'Between you and me, one character.', 'en']]
+  for (const [locale, h1, htmlLang] of FIRST) {
+    const ctx = await browser.newContext({ locale, viewport: { width: 1200, height: 900 } })
+    const p2 = await ctx.newPage()
+    await p2.route('**/api/**', (route) => route.fulfill({ status: 204, body: '' }))
+    await p2.goto('http://localhost:5173/', { waitUntil: 'networkidle' })
+    check(`first visit, browser ${locale}: the page opens in ${htmlLang}`, (await p2.locator('h1').innerText()) === h1 && (await p2.getAttribute('html', 'lang')) === htmlLang && (await p2.locator(`.lang [data-lang="${htmlLang}"][aria-pressed=true]`).count()) === 1)
+    if (locale === 'ko-KR') {
+      // a stored choice and ?lang= still win
+      await p2.evaluate(() => localStorage.setItem('ichirei.lang', 'ja'))
+      await p2.reload({ waitUntil: 'networkidle' })
+      check('ko-KR browser with a stored 日本語: the stored choice wins', (await p2.locator('h1').innerText()) === 'あなたとわたし、一字の距離。')
+      await p2.goto('http://localhost:5173/?lang=zh-Hant', { waitUntil: 'networkidle' })
+      check('…and ?lang=zh-Hant wins over the stored choice', (await p2.locator('h1').innerText()) === '你和我之間，只隔一個字。')
+    }
+    await ctx.close()
+  }
 }
 
 // ---------- Run 11: the customer flow at / — choose, order, redirect to Shopify checkout (ja) ----------
