@@ -3,6 +3,7 @@ import { AnimatePresence, motion, useReducedMotion } from 'framer-motion'
 import type { Candidate, Condition, EngineResult } from './types'
 import { log } from './logging'
 import { choiceOf, track } from './analytics'
+import { isMemorial } from '../order/memorial.ts'
 import { carvedGlyph, contextToPayload, isChineseUi, type Copy, type GiftContext, type InscriptionScript, type UiLanguage } from './i18n'
 
 // Progressive reveal (build spec §8) + condition presentation (§5) + the
@@ -75,7 +76,7 @@ export default function Reveal({ result, story, followUps = [], condition, copy,
     isChineseUi(language) ? (result.inscription_script ?? context.inscriptionScript) : null
   const reduceMotion = useReducedMotion()
   // Remembrance: the main character is ink (never cinnabar — a red name on a grave means a living person) and nothing is "given".
-  const memorial = (result.occasion ?? context.occasion) === 'memorial'
+  const memorial = isMemorial(result.occasion ?? context.occasion)
 
   const { revealOrder, eliminated } = useMemo(() => {
     const alive = result.candidates.filter((c) => !c.eliminated)

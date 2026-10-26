@@ -8,6 +8,7 @@ import { randomBytes } from 'node:crypto'
 import { LANGUAGES, STORY_MAX as ENGINE_STORY_MAX, countChars, parseFollowUps, type Candidate, type EngineResult, type Language } from './contract.ts'
 import { PACKAGES, PACKAGE_PRICE_JPY, type PackageId } from '../src/order/packages.ts'
 import { CERTIFICATE_LINE_EN, certificateText } from '../src/order/certificate.ts'
+import { isMemorial } from '../src/order/memorial.ts'
 import { loadPalette, plainMeaning, type Palette } from './palette.ts'
 import { chooseReading, kanaToRomaji, romanizeReadings } from './romaji.ts'
 import { STYLES_BY_LANGUAGE, glyphFor, type InscriptionStyle } from '../src/order/inscription.ts'
@@ -176,7 +177,7 @@ export function parseOrderRequest(body: unknown, now: Date = new Date(), palette
       language: lang,
       candidate,
       glyph: glyphFor(candidate, inscription_style),
-      certificate: buildCertificate(candidate, glyphFor(candidate, inscription_style), lang, palette ?? loadPalette(), result.occasion === 'memorial'),
+      certificate: buildCertificate(candidate, glyphFor(candidate, inscription_style), lang, palette ?? loadPalette(), isMemorial(result.occasion as string | null)),
       sender_name: sender,
       receiver_name: receiver,
       delivery_date: date,

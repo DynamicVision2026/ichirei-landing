@@ -5,6 +5,7 @@ import type { Copy, InscriptionStyle, OrderField, PackageId, UiLanguage } from '
 import { log } from './logging'
 import { sessionId } from './analytics'
 import { PACKAGES, PACKAGE_PRICE_JPY, formatYen } from '../order/packages.ts'
+import { isMemorial } from '../order/memorial.ts'
 import { certificateText } from '../order/certificate.ts'
 import { DEFAULT_STYLE, STYLES_BY_LANGUAGE, glyphFor, hasDistinctForm } from '../order/inscription.ts'
 import { useCurrency } from '../reveal/useCurrency.ts'
@@ -48,7 +49,7 @@ export default function OrderForm({ result, story, followUps = [], candidate, co
   const language: UiLanguage = result.language ?? 'ja'
   const o = copy.order
   // Remembrance: ink instead of cinnabar on the slip, and the receiver field is the person being remembered.
-  const memorial = result.occasion === 'memorial'
+  const memorial = isMemorial(result.occasion)
   const distinct = hasDistinctForm(candidate)
 
   const [sender, setSender] = useState('')

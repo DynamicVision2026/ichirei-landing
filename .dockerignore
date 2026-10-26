@@ -21,3 +21,6 @@ cloudbuild.yaml
 Dockerfile
 .dockerignore
 review
+# Internal test data (copyrighted retellings) and story-run results: never in the image
+test-data
+story-run-*

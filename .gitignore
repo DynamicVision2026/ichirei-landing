@@ -29,3 +29,8 @@ dist-ssr
 # Local env
 .env
 .env.local
+
+# Internal test data and run results (retellings of copyrighted stories — never publish, never commit; this repo is PUBLIC)
+test-data/
+story-run-*.csv
+story-run-*.json
