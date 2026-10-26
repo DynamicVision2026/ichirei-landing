@@ -7,6 +7,7 @@
 // The response is STREAMED as NDJSON so the connection carries bytes from the
 // moment the model starts reasoning (Vercel won't idle-kill it, and the client
 // gets live progress). Protocol, one JSON object per line:
+//   {"type":"stage","stage":"reading|choosing|checking|replacing"}  ...as the engine moves on (honest progress steps)
 //   {"type":"delta","chars":<cumulative model output chars>}   ...repeated
 //   {"type":"result","result":<engine JSON contract>}          ...terminal
 //   {"type":"error","error":"<message>"}                       ...terminal
@@ -87,6 +88,7 @@ export async function POST(req: Request): Promise<Response> {
       try {
         const result = await runEngine(mergeStory(story, fu.followUps), cond, {
           context: parsed.context,
+          onStage: (stage) => send({ type: 'stage', stage }),
           onDelta: (text) => {
             received += text.length
             // Throttle progress lines: one per ~200 chars of model output.

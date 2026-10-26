@@ -91,17 +91,17 @@ const browser = await chromium.launch({
   check('processing view shows', await page.locator('text=言葉を読んでいます').isVisible())
   await page.screenshot({ path: `${SHOTS}/e2e-processing.png` })
 
-  // Progressive reveal: 3 alive candidates at ~1.1s intervals, 迎 (primary) last
+  // Progressive reveal: 3 alive candidates at ~1.1s intervals, the main (迎) FIRST, then the second, then the freestyle
   await page.waitForSelector('article', { timeout: 10000 })
   const afterFirst = await page.locator('article').count()
   check('reveal is progressive (starts with 1)', afterFirst === 1)
   const firstGlyph = await page.locator('article').first().locator('span').first().textContent()
-  check('primary does NOT surface first', firstGlyph !== '迎')
+  check('v8: the main 迎 surfaces first', firstGlyph === '迎')
   await page.waitForTimeout(2600) // let all three land
   check('all survivors revealed', (await page.locator('article').count()) === 3)
   const lastGlyph = await page.locator('article').last().locator('span').first().textContent()
-  check('primary 迎 resolves last', lastGlyph === '迎')
-  const primaryColor = await page.locator('article').last().locator('span').first()
+  check('v8: the freestyle (封) comes last', lastGlyph === '封')
+  const primaryColor = await page.locator('article[data-slot=main]').locator('span').first()
     .evaluate((el) => getComputedStyle(el).color)
   check('primary rendered in cinnabar', primaryColor === 'rgb(192, 57, 43)')
 
@@ -121,7 +121,7 @@ const browser = await chromium.launch({
 
   // Dwell + return: open 迎, then re-open 黙 → candidate_returned
   await page.waitForTimeout(700)
-  await page.locator('article').last().click() // opens 迎 (flushes 黙 dwell)
+  await page.locator('article[data-slot=main]').click() // opens 迎 (flushes 黙 dwell)
   await page.waitForTimeout(400)
   await mokuCard.click() // re-open 黙 → returned
 
@@ -146,17 +146,20 @@ const browser = await chromium.launch({
 
   // Selection: select 黙 first, then 迎 (selection_changed x2), finalize
   await page.locator('article', { hasText: '静けさのまま' }).locator('text=この一字を選ぶ').click()
-  await page.locator('article').last().click() // open 迎
+  await page.locator('article[data-slot=main]').click() // open 迎
   await page.waitForTimeout(400)
-  await page.locator('article').last().locator('text=この一字を選ぶ').click()
+  await page.locator('article[data-slot=main]').locator('text=この一字を選ぶ').click()
   await page.click('text=この一字を、贈る')
   await page.waitForTimeout(300)
   check('finalize confirms selection', await page.locator('text=「迎」に決めました').isVisible())
 
-  // v6: three cards — 次点 first, 遊び字 in the middle, 本命 last — each labelled; the freestyle is lighter and never cinnabar
+  // v8: three cards — 本命 first, 次点, 遊び字 last (DOM order AND visual order) — each labelled; the freestyle is lighter and never cinnabar
   const cards = page.locator('article')
-  check('v6: three cards in the order 次点 → 遊び字 → 本命 (the main resolves last)', (await cards.evaluateAll((els) => els.map((e) => e.getAttribute('data-slot')))).join() === 'second,freestyle,main')
-  check('v6: each card carries its label (次点 / 遊び字 / 本命)', (await cards.evaluateAll((els) => els.map((e) => e.querySelector('[data-slot-label]')?.textContent))).join() === '次点,遊び字,本命')
+  check('v8: three cards in the DOM order 本命 → 次点 → 遊び字 (main, second, freestyle)', (await cards.evaluateAll((els) => els.map((e) => e.getAttribute('data-slot')))).join() === 'main,second,freestyle')
+  check('v8: the VISUAL order is the same (top-to-bottom, then left-to-right)', await cards.evaluateAll((els) => { const r = els.map((e) => e.getBoundingClientRect()); const key = (x) => Math.round(x.top / 4) * 100000 + x.left; return r.every((x, i) => i === 0 || key(r[i - 1]) <= key(x)) }))
+  check('v6: each card carries its label (本命 / 次点 / 遊び字)', (await cards.evaluateAll((els) => els.map((e) => e.querySelector('[data-slot-label]')?.textContent))).join() === '本命,次点,遊び字')
+  check('v8: every kanji glyph is marked notranslate (Chrome auto-translate must not touch it)', await page.evaluate(() => { const g = [...document.querySelectorAll('[data-glyph]')]; return g.length >= 3 && g.every((n) => n.classList.contains('notranslate') && n.getAttribute('translate') === 'no') }))
+  check('v8: the page opts out of auto-translate (<html translate=no>, meta google notranslate)', await page.evaluate(() => document.documentElement.getAttribute('translate') === 'no' && document.querySelector('meta[name=google][content=notranslate]') !== null))
   const freeCard = page.locator('article[data-slot=freestyle]')
   check('v6: the freestyle card (封) is lighter: dashed border, no shadow class, glyph NOT cinnabar', (await freeCard.getAttribute('class')).includes('border-dashed') && !(await freeCard.getAttribute('class')).includes('shadow-') && (await freeCard.locator('[data-glyph]').evaluate((el) => getComputedStyle(el).color)) !== 'rgb(192, 57, 43)' && (await freeCard.locator('[data-glyph]').innerText()) === '封')
   check('v6: only the main card\'s glyph is cinnabar', (await page.locator('article[data-slot=second] [data-glyph]').evaluate((el) => getComputedStyle(el).color)) !== 'rgb(192, 57, 43)' && (await page.locator('article[data-slot=main] [data-glyph]').evaluate((el) => getComputedStyle(el).color)) === 'rgb(192, 57, 43)')
@@ -246,14 +249,17 @@ const browser = await chromium.launch({
   await pickContext(page)
   await page.click('text=その一字を、探しにいく')
   check('stream: processing view shows', await page.locator('text=言葉を読んでいます').isVisible())
-  // Progress deltas should surface as a live received-chars counter
-  await page.waitForSelector('text=一字一字、書きあがっています', { timeout: 6000 })
-  check('stream: live progress counter appears mid-stream', true)
+  // v8: the server's stage lines surface as honest progress steps (reading → choosing → checking), not one spinner
+  await page.waitForSelector('[data-testid=processing-steps] [data-step=choosing][data-state=now]', { timeout: 6000 })
+  const stepState = await page.locator('[data-testid=processing-steps] li').evaluateAll((els) => els.map((e) => `${e.getAttribute('data-step')}:${e.getAttribute('data-state')}`).join())
+  check('stream: progress steps — reading done, choosing now, checking next (the text is the sender\'s language)', stepState === 'reading:done,choosing:now,checking:next' && (await page.locator('[data-step=choosing]').innerText()).includes('一字ずつ、選んでいます'), stepState)
+  await page.waitForSelector('[data-testid=processing-steps] [data-step=checking][data-state=now]', { timeout: 8000 })
+  check('stream: the checking step becomes current as the server reports it', true)
   // When the terminal result line lands, the reveal begins
   await page.waitForSelector('article', { timeout: 10000 })
   await page.waitForTimeout(2600)
   check('stream: all survivors revealed after stream completes', (await page.locator('article').count()) === 3)
-  check('stream: primary 迎 resolves last', (await page.locator('article').last().locator('span').first().textContent()) === '迎')
+  check('stream: the main 迎 comes first', (await page.locator('article').first().locator('span').first().textContent()) === '迎')
   check('no page errors (run 3)', errors.length === 0)
   if (errors.length) console.log('page errors:', errors)
   await page.close()
@@ -499,7 +505,7 @@ const mockPage = async (browser, { onExplain, result, order, track } = {}) => {
 
 // ---------- Run 8b: v6 — labels in four languages, classical line, two cards without a freestyle, promotion ----------
 {
-  const LABELS = { ja: ['次点', '遊び字', '本命'], 'zh-Hans': ['次选', '趣字', '本命'], 'zh-Hant': ['次選', '趣字', '本命'], en: ['Second', 'Freestyle', 'Main'] }
+  const LABELS = { ja: ['本命', '次点', '遊び字'], 'zh-Hans': ['本命', '次选', '趣字'], 'zh-Hant': ['本命', '次選', '趣字'], en: ['Main', 'Second', 'Freestyle'] }
   const withEcho = (body) => {
     const r = clone(FIXTURE)
     r.language = body.language

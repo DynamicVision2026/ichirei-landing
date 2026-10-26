@@ -34,7 +34,7 @@ function check(name: string, cond: boolean, detail?: string) {
 // Every string a Copy can show, with sample arguments for the function-valued entries.
 const SAMPLE = { kanji: '灯', inscription_form: '燈', reading: 'dēng', meaning: 'lamp' }
 const CALLS: Record<string, unknown[]> = {
-  processingProgress: [123], serverError: [500], timeout: [290], eliminatedSummary: [3], finalized: ['灯'],
+  serverError: [500], timeout: [290], eliminatedSummary: [3], finalized: ['灯'],
   glyphReading: [SAMPLE, '燈'], storyCounter: [523, 600], inscriptionNote: [SAMPLE, 'traditional'], previewNote: [SAMPLE, 'traditional'], dateNotice: [7],
 }
 function strings(c: Copy): [string, string][] {

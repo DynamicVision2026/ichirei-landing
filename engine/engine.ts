@@ -18,6 +18,7 @@ import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { applyPalette, applyReviewVerdicts, loadPalette } from './palette.ts'
 import { runReview } from './review.ts'
+import { completeMains } from './replace.ts'
 import {
   DEFAULT_CONTEXT,
   displayScriptOf,
@@ -151,7 +152,12 @@ export interface RunEngineOptions {
    *  the rest unspecified. Validated against the code lists in contract.ts. */
   context?: Partial<EngineContext>
   /** Token usage of each model call (stage 'select' = the main call, 'review' = the separate review call) — for cost accounting by the test runner. */
-  onUsage?: (stage: 'select' | 'review', usage: { model: string; input_tokens: number; output_tokens: number }) => void
+  onUsage?: (stage: 'select' | 'review' | 'replace', usage: { model: string; input_tokens: number; output_tokens: number }) => void
+  /**
+   * Honest progress for the page: 'reading' while the model reads and thinks (nothing to show yet), 'choosing' once it starts
+   * writing the characters, 'checking' while the separate review runs, 'replacing' while a missing main card is replaced.
+   */
+  onStage?: (stage: 'reading' | 'choosing' | 'checking' | 'replacing') => void
 }
 
 /**
@@ -177,6 +183,8 @@ export async function runEngine(
   const palette = loadPalette()
 
   const client = new Anthropic(opts.apiKey ? { apiKey: opts.apiKey } : {})
+  const tStart = Date.now()
+  opts.onStage?.('reading')
 
   // Stream + finalMessage so heavy reasoning at high effort doesn't hit an HTTP
   // timeout; the function still returns one assembled JSON response to the caller.
@@ -189,8 +197,16 @@ export async function runEngine(
     },
     opts.signal ? { signal: opts.signal } : undefined,
   )
-  if (opts.onDelta) stream.on('text', opts.onDelta)
+  let firstDelta = true
+  stream.on('text', (text) => {
+    if (firstDelta) {
+      firstDelta = false
+      opts.onStage?.('choosing')
+    }
+    opts.onDelta?.(text)
+  })
   const message = await stream.finalMessage()
+  const selectMs = Date.now() - tStart
   opts.onUsage?.('select', { model: MODEL, input_tokens: message.usage?.input_tokens ?? 0, output_tokens: message.usage?.output_tokens ?? 0 })
 
   const textOut = message.content
@@ -225,13 +241,36 @@ export async function runEngine(
   // returns `insufficient` when no main candidate survives. A missing or malformed palette fails the
   // request loudly (above), never silently skips the blocklist.
   const refereed = applyPalette(stamped, palette, trimmed)
-  if (refereed.status !== 'sufficient') return refereed
+  if (refereed.status !== 'sufficient') {
+    logTiming({ select_ms: selectMs, review_ms: 0, replace_ms: 0, total_ms: Date.now() - tStart, status: refereed.status, stop_reason: message.stop_reason, output_tokens: message.usage?.output_tokens ?? null })
+    return refereed
+  }
 
   // The separate review call (engine/review.ts): a fresh model call checks the survivors again.
   // Its verdicts are applied by the same referee code (a failed main → slot 2; a failed or
   // unreviewed freestyle → dropped). It never throws; it never costs the customer their result.
+  opts.onStage?.('checking')
+  const tReview = Date.now()
   const review = await runReview(refereed, palette, trimmed, context, { apiKey: opts.apiKey, signal: opts.signal, model: process.env.ICHIREI_REVIEW_MODEL ?? MODEL, onUsage: opts.onUsage ? (u) => opts.onUsage!('review', u) : undefined })
-  return applyReviewVerdicts(refereed, palette, trimmed, review)
+  const reviewMs = Date.now() - tReview
+  const reviewed = applyReviewVerdicts(refereed, palette, trimmed, review)
+
+  // A main slot that ended up empty (never produced, or removed by the referee or the review) is replaced, not shown as two cards.
+  const tReplace = Date.now()
+  const completed = await completeMains(reviewed, palette, trimmed, context, prompt, {
+    apiKey: opts.apiKey,
+    signal: opts.signal,
+    model: process.env.ICHIREI_REPLACE_MODEL ?? process.env.ICHIREI_REVIEW_MODEL ?? MODEL,
+    onUsage: opts.onUsage,
+    onStage: opts.onStage,
+  })
+  logTiming({ select_ms: selectMs, review_ms: reviewMs, replace_ms: Date.now() - tReplace, total_ms: Date.now() - tStart, status: completed.status, stop_reason: message.stop_reason, output_tokens: message.usage?.output_tokens ?? null })
+  return completed
+}
+
+/** One line per run: where the time went (no story text). Read it in the Cloud Run logs. */
+function logTiming(t: { select_ms: number; review_ms: number; replace_ms: number; total_ms: number; status: string; stop_reason: string | null; output_tokens: number | null }) {
+  console.log(`[ichirei-timing] ${JSON.stringify({ ...t, model: MODEL, effort: EFFORT, max_tokens: MAX_TOKENS })}`)
 }
 
 export const ENGINE_CONFIG = { MODEL, EFFORT, MAX_TOKENS }

@@ -39,11 +39,14 @@ const server = createServer(async (req, res) => {
     }
     // Simulate the model streaming: 10 progress lines spread over TOTAL_MS.
     const steps = 10
+    res.write(JSON.stringify({ type: 'stage', stage: 'reading' }) + '\n')
     for (let i = 1; i <= steps; i++) {
       await sleep(TOTAL_MS / (steps + 1))
+      if (i === 3) res.write(JSON.stringify({ type: 'stage', stage: 'choosing' }) + '\n')
       res.write(JSON.stringify({ type: 'delta', chars: i * 210 }) + '\n')
     }
-    await sleep(TOTAL_MS / (steps + 1))
+    res.write(JSON.stringify({ type: 'stage', stage: 'checking' }) + '\n')
+    await sleep(Math.max(1500, TOTAL_MS / (steps + 1))) // the "checking" step stays on screen long enough to be observed
     res.write(JSON.stringify({ type: 'result', result: FIXTURE }) + '\n')
     return res.end()
   }

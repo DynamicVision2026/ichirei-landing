@@ -85,7 +85,7 @@ export default function Hero({ lang, currency, rates }: { lang: RevealLang; curr
 
         <div className="heroArt">
           <figure className={`ph${swap ? ' swap' : ''}`} style={{ ['--cat' as string]: `var(--c-${e.c})` }}>
-            <span className="phk" aria-hidden="true">
+            <span className="phk notranslate" aria-hidden="true">
               {e.k}
             </span>
             <span className="phc">{SCENE[e.c][lang]}</span>
@@ -108,7 +108,7 @@ export default function Hero({ lang, currency, rates }: { lang: RevealLang; curr
             <p className="story">{e.story}</p>
             <div className="arrow" aria-hidden="true" />
             <div className="out">
-              <span className="k">
+              <span className="k notranslate">
                 {e.k}
               </span>
               <div className="meta">

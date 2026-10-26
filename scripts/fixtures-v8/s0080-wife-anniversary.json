@@ -1,0 +1,97 @@
+{
+  "name": "s0080-wife-anniversary",
+  "story_id": "0080",
+  "note": "Live test: good, all three right. Must stay exactly as it is (no replacement call).",
+  "story": "妻の日記をこっそり読んでしまいました。妻は昼ごはんをいつも納豆ご飯やお茶漬けで済ませ、友達との外食は月一回と決めていました。それなのに日記には、今日は私の好きな牡蠣を買うんだと楽しそうに書いてありました。私への文句もありましたが、最後は必ず「でも頑張ってるからな」で締めくくられていました。稼ぎが少ないのに専業主婦でいてほしいと頼んだのは私です。それでも妻はお金のことで責めたことがなく、節約も楽しいと笑います。タバコは減らせとよく言われます。",
+  "context": {
+    "language": "ja",
+    "relationship": "spouse",
+    "direction": "across",
+    "occasion": "wedding"
+  },
+  "model_reply": {
+    "language": "ja",
+    "relationship": "spouse",
+    "direction": "across",
+    "occasion": "wedding",
+    "occasion_detail": null,
+    "inscription_script": null,
+    "status": "sufficient",
+    "follow_up_question": null,
+    "particulars": [
+      "p1",
+      "p2"
+    ],
+    "fingerprint": {
+      "relationship_note": "x",
+      "scarce_asset": "x",
+      "unsaid_truth": "",
+      "dominant_truth_type": "Essence",
+      "dignity_direction": "",
+      "emotional_register": [
+        "grateful",
+        "playful"
+      ]
+    },
+    "candidates": [
+      {
+        "slot": "main",
+        "kanji": "労",
+        "inscription_form": "勞",
+        "reading": "ねぎらう",
+        "truth_type": "Hidden Cost",
+        "one_line_gaze": "稼ぎが少なくても、責めずに、節約まで楽しんでくれる人。",
+        "story_anchor": "節約も楽しいと笑います",
+        "unique_truth": "u",
+        "eliminated": false,
+        "eliminated_reason": null,
+        "suitability_flag": null,
+        "palette_status": "ok",
+        "flags": []
+      },
+      {
+        "slot": "second",
+        "kanji": "寛",
+        "inscription_form": "寬",
+        "reading": "ひろい",
+        "truth_type": "Essence",
+        "one_line_gaze": "日記の最後は必ず「でも頑張ってるからな」で締めくくる人。",
+        "story_anchor": "でも頑張ってるからな",
+        "unique_truth": "u",
+        "eliminated": false,
+        "eliminated_reason": null,
+        "suitability_flag": null,
+        "palette_status": "ok",
+        "flags": []
+      },
+      {
+        "slot": "freestyle",
+        "kanji": "煙",
+        "inscription_form": null,
+        "reading": "けむり",
+        "truth_type": "Play",
+        "one_line_gaze": "タバコは減らせと、いつも言う人。",
+        "story_anchor": "タバコは減らせとよく言われます",
+        "unique_truth": "",
+        "eliminated": false,
+        "eliminated_reason": null,
+        "suitability_flag": null,
+        "palette_status": "ok",
+        "flags": []
+      }
+    ],
+    "primary_kanji": "労",
+    "runner_up_kanji": "寛",
+    "freestyle_kanji": "煙",
+    "fallback_follow_up_question": "いちばん思い出す、ちいさな場面をひとつ教えてください。"
+  },
+  "review_fail": {},
+  "replacements": [],
+  "expect": {
+    "main": "労",
+    "second": "寛",
+    "freestyle": "煙",
+    "cause": null,
+    "replacement": false
+  }
+}

@@ -65,7 +65,7 @@ export default function RevealPage() {
       <header className="top">
         <div className="wrap">
           <a className="brand" href="#top">
-            <span className="ji" aria-hidden="true">
+            <span className="ji notranslate" aria-hidden="true">
               字
             </span>
             <b>ICHIREI</b>

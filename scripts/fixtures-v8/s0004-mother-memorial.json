@@ -1,0 +1,119 @@
+{
+  "name": "s0004-mother-memorial",
+  "story_id": "0004",
+  "note": "Live test: tone correct, no celebration characters; main 代 was the mechanism. Review fails it, 綴 is promoted; the first replacement (a celebration character) is blocked, the second is accepted.",
+  "story": "母は和裁の仕立て直しを長く続けた人で、父を早くに亡くしてから一人で私と弟を育てました。私が介護の仕事を選んだとき、人の世話はいい仕事だと一言だけ言ってくれました。母が認知症で施設に入ってから、私は母が私をわからなくなるのが怖くて、だんだん会いに行かなくなりました。最期にも間に合いませんでした。遺品を整理していたら、私の名前で施設の職員さんに宛てた手紙が何十通も出てきました。母の字でした。来ない私の代わりに、母が娘のふりをして書いていたんです。最後の一枚にだけ、来てくれてありがとうと母自身の字で書かれていました。",
+  "context": {
+    "language": "ja",
+    "relationship": "parent_mother",
+    "direction": "up",
+    "occasion": "memorial"
+  },
+  "model_reply": {
+    "language": "ja",
+    "relationship": "parent_mother",
+    "direction": "up",
+    "occasion": "memorial",
+    "occasion_detail": null,
+    "inscription_script": null,
+    "status": "sufficient",
+    "follow_up_question": null,
+    "particulars": [
+      "p1",
+      "p2"
+    ],
+    "fingerprint": {
+      "relationship_note": "x",
+      "scarce_asset": "x",
+      "unsaid_truth": "",
+      "dominant_truth_type": "Essence",
+      "dignity_direction": "",
+      "emotional_register": [
+        "apologetic",
+        "longing"
+      ]
+    },
+    "candidates": [
+      {
+        "slot": "main",
+        "kanji": "代",
+        "inscription_form": null,
+        "reading": "かわる",
+        "truth_type": "Hidden Cost",
+        "one_line_gaze": "来ない私の代わりに、娘のふりをして書いてくれた人。",
+        "story_anchor": "母が娘のふりをして書いていた",
+        "unique_truth": "u",
+        "eliminated": false,
+        "eliminated_reason": null,
+        "suitability_flag": null,
+        "palette_status": "ok",
+        "flags": []
+      },
+      {
+        "slot": "second",
+        "kanji": "綴",
+        "inscription_form": "綴",
+        "reading": "つづる",
+        "truth_type": "Private Symbol",
+        "one_line_gaze": "私の名前で、何十通も手紙を書き続けてくれた人。",
+        "story_anchor": "何十通も出てきました",
+        "unique_truth": "u",
+        "eliminated": false,
+        "eliminated_reason": null,
+        "suitability_flag": null,
+        "palette_status": "ok",
+        "flags": []
+      }
+    ],
+    "primary_kanji": "代",
+    "runner_up_kanji": "綴",
+    "freestyle_kanji": null,
+    "fallback_follow_up_question": "いちばん思い出す、ちいさな場面をひとつ教えてください。"
+  },
+  "review_fail": {
+    "代": "Scene noun: names the mechanism (writing in her place), not who she was"
+  },
+  "replacements": [
+    {
+      "slot": "second",
+      "kanji": "喜",
+      "inscription_form": null,
+      "reading": "よろこぶ",
+      "truth_type": "Essence",
+      "one_line_gaze": "最後に「来てくれてありがとう」と書いてくれた人。",
+      "story_anchor": "来てくれてありがとう",
+      "unique_truth": "u",
+      "eliminated": false,
+      "eliminated_reason": null,
+      "suitability_flag": null,
+      "palette_status": "ok",
+      "flags": []
+    },
+    {
+      "slot": "second",
+      "kanji": "慈",
+      "inscription_form": "慈",
+      "reading": "いつくしむ",
+      "truth_type": "Essence",
+      "one_line_gaze": "人の世話はいい仕事だと、一言だけ言ってくれた人。",
+      "story_anchor": "人の世話はいい仕事だと一言だけ言ってくれました",
+      "unique_truth": "u",
+      "eliminated": false,
+      "eliminated_reason": null,
+      "suitability_flag": null,
+      "palette_status": "ok",
+      "flags": []
+    }
+  ],
+  "expect": {
+    "main": "綴",
+    "second": "慈",
+    "freestyle": null,
+    "cause": "review",
+    "replacement": true,
+    "promoted": true,
+    "rejected": [
+      "喜"
+    ]
+  }
+}

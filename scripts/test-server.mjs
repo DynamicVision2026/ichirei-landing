@@ -34,7 +34,7 @@ execSync('npm run build', { stdio: 'ignore', env: { ...process.env, ICHIREI_BASE
 const upstream = await startFakeAnthropic()
 const server = await startServer({
   upstreamUrl: upstream.url,
-  env: { ICHIREI_HEARTBEAT_MS: '1000', ICHIREI_RATES: 'off' },
+  env: { ICHIREI_HEARTBEAT_MS: '1000', ICHIREI_RATES: 'off', ICHIREI_SELECT_LIMIT: 'off', ICHIREI_EXPLAIN_LIMIT: 'off' },
 })
 const base = server.url
 
@@ -76,6 +76,9 @@ try {
   check('select: terminal result line equals the golden contract (after the palette referee)', JSON.stringify(result?.msg.result) === JSON.stringify(GOLDEN_REFEREED))
   check('select: primary is 迎, three candidates (main, second, freestyle 封), and the review verdicts are on the result', result?.msg.result.primary_kanji === '迎' && result?.msg.result.candidates.length === 3 && result?.msg.result.freestyle_kanji === '封' && result?.msg.result.review?.ran === true)
   check('select: result is the last line', lines.at(-1)?.msg.type === 'result')
+  // v8: honest progress — the server says what it is really doing, in order, before the result
+  const stageLines = lines.filter((l) => l.msg.type === 'stage')
+  check('select: stage lines reading → choosing → checking arrive in order, the first before any model output, the last before the result', stageLines.map((l) => l.msg.stage).join() === 'reading,choosing,checking' && stageLines[0].at <= deltas[0].at && stageLines.at(-1).at <= result.at, JSON.stringify(stageLines.map((l) => [l.msg.stage, l.at])))
 
   // What did the real engine actually send the model?
   const sent = upstream.state.requests.filter((r) => r.kind === 'select').at(-1)
@@ -159,6 +162,50 @@ try {
   upstream.state.mode = { kind: 'stream', gapMs: 0, totalMs: 500 }
   const after = await readNdjson(await post(base, '/api/select', { story: STORY }))
   check('abort: next request after a disconnect still completes', after.at(-1)?.msg.type === 'result')
+
+  // ---- H2. Per-IP rate limit on the two routes that cost a model call (v8) ----------------------
+  {
+    const limited = await startServer({ upstreamUrl: upstream.url, env: { ICHIREI_RATES: 'off', ICHIREI_SELECT_LIMIT: '2/60', ICHIREI_EXPLAIN_LIMIT: '1/60' } })
+    try {
+      upstream.state.mode = { kind: 'stream', gapMs: 0, totalMs: 200 }
+      const calls = upstream.state.requests.length
+      const ok1 = await post(limited.url, '/api/select', { story: STORY }, { headers: { 'content-type': 'application/json', 'x-forwarded-for': '203.0.113.7' } })
+      await readNdjson(ok1)
+      const ok2 = await post(limited.url, '/api/select', { story: STORY }, { headers: { 'content-type': 'application/json', 'x-forwarded-for': '203.0.113.7' } })
+      await readNdjson(ok2)
+      const modelCalls = upstream.state.requests.length - calls
+      const third = await post(limited.url, '/api/select', { story: STORY }, { headers: { 'content-type': 'application/json', 'x-forwarded-for': '203.0.113.7' } })
+      const body = await third.json()
+      check('rate limit: the 3rd /api/select from one IP within the window is 429 { code: rate_limited } with Retry-After (3600 s)', ok1.status === 200 && ok2.status === 200 && third.status === 429 && body.code === 'rate_limited' && third.headers.get('retry-after') === '3600', JSON.stringify({ s: third.status, body }))
+      check('rate limit: a refused request never reaches the model (no new upstream call after the 429)', upstream.state.requests.length === calls + modelCalls)
+      const other = await post(limited.url, '/api/select', { story: STORY }, { headers: { 'content-type': 'application/json', 'x-forwarded-for': '198.51.100.9' } })
+      check('rate limit: another IP is not affected', other.status === 200)
+      await readNdjson(other)
+      const cand = GOLDEN.candidates[0]
+      const ex = () => post(limited.url, '/api/explain', { story: STORY, candidate: { kanji: cand.kanji, reading: cand.reading, one_line_gaze: cand.one_line_gaze, story_anchor: cand.story_anchor }, ...GOLDEN_CONTEXT }, { headers: { 'content-type': 'application/json', 'x-forwarded-for': '203.0.113.7' } })
+      const e1 = await ex()
+      const e2 = await ex()
+      check('rate limit: /api/explain has its own, separate budget (1 allowed here, then 429 rate_limited)', e1.status !== 429 && e2.status === 429 && (await e2.json()).code === 'rate_limited')
+      const h = await fetch(limited.url + '/api/health')
+      check('rate limit: /api/health and the static page are never limited', h.status === 200 && (await fetch(limited.url + '/')).status === 200)
+    } finally {
+      await limited.stop()
+    }
+    // default budget: 12 per hour per IP; "off" disables it
+    const dflt = await startServer({ upstreamUrl: upstream.url, env: { ICHIREI_RATES: 'off' } })
+    try {
+      upstream.state.mode = { kind: 'stream', gapMs: 0, totalMs: 50 }
+      let last = 0
+      for (let i = 0; i < 13; i++) {
+        const r = await post(dflt.url, '/api/select', { story: '   ' }) // invalid body: refused with 400 before any model call, but still counts
+        last = r.status
+        if (r.status === 429) break
+      }
+      check('rate limit: default is 12 per hour per IP — the 13th request is 429', last === 429, String(last))
+    } finally {
+      await dflt.stop()
+    }
+  }
 
   // ---- I. Missing key → clear Cloud Run-specific error -----------------
   const keyless = await startServer({ upstreamUrl: upstream.url, withKey: false })

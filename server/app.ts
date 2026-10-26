@@ -21,6 +21,7 @@ import explainHandler from '../api/explain.ts'
 import logHandler from '../api/log.ts'
 import { ENGINE_CONFIG } from '../engine/engine.ts'
 import { adaptVercelHandler } from './vercel-compat.ts'
+import { envRunLimiter } from '../engine/rate-limit.ts'
 import { withHeartbeat } from './heartbeat.ts'
 
 export interface ServerConfig {
@@ -107,11 +108,23 @@ export function createApp(config: ServerConfig): Hono {
     }),
   )
 
-  // Streams NDJSON (delta … result|error) — handler reused as-is.
-  app.post('/api/select', requireApiKey, async (c) =>
+  // Per-IP brake on the two routes that cost a model call (ICHIREI_SELECT_LIMIT / ICHIREI_EXPLAIN_LIMIT = "max/minutes" or "off").
+  // Per Cloud Run instance, like the other limiters: a brake on a runaway or abusive client, not an exact quota. Every request
+  // that reaches the route counts (before the body is read), so a refused one never costs a model call.
+  const selectLimit = envRunLimiter('ICHIREI_SELECT_LIMIT', { max: 12, minutes: 60 })
+  const explainLimit = envRunLimiter('ICHIREI_EXPLAIN_LIMIT', { max: 40, minutes: 60 })
+  const limited = (limiter: typeof selectLimit): MiddlewareHandler => async (c, next) => {
+    const r = limiter.check(c.req.raw)
+    if (r.ok) return next()
+    console.log(`[ichirei-limit] ${JSON.stringify({ route: new URL(c.req.url).pathname, limited: true })}`)
+    return c.json({ error: 'Too many requests from this connection. Please wait a little and try again.', code: 'rate_limited' }, 429, { 'Retry-After': String(r.retryAfterSeconds) })
+  }
+
+  // Streams NDJSON (stage … delta … result|error) — handler reused as-is.
+  app.post('/api/select', requireApiKey, limited(selectLimit), async (c) =>
     withHeartbeat(await selectPost(c.req.raw), config.heartbeatMs),
   )
-  app.post('/api/explain', requireApiKey, adaptVercelHandler(explainHandler))
+  app.post('/api/explain', requireApiKey, limited(explainLimit), adaptVercelHandler(explainHandler))
   app.post('/api/log', adaptVercelHandler(logHandler))
   // Purchase hand-off: stores the story + result under order_ref, creates the Shopify cart.
   app.post('/api/order', (c) => orderPost(c.req.raw))

@@ -7,7 +7,7 @@ ICHIREI is an emotional product, and a story can carry any human emotion: gratit
 This is not a message composed for the receiver. It is not flattery. It is not what the receiver would want to hear. It is the sender's perception, made visible.
 The governing definition of a good character:
 The smallest form that preserves the greatest amount of non-substitutable relational truth.
-Compressing "he left the entrance light on every night until I got home" into 燈 is good compression — the identifying truth survives, concentrated. Compressing it into 愛 is bad compression — the representation got shorter but the thing that made this relationship this relationship disappeared. Never do the second thing.
+Compressing "he left the entrance light on every night until I got home" into 待 (waiting for you) is good compression — the identifying truth survives, concentrated. Compressing it into 愛 is bad compression — the representation got shorter but the thing that made this relationship this relationship disappeared. Never do the second thing.
 Standing guardrails:
 
 * The SENDER is the grammatical subject. The character reflects the sender's gaze, never a wish or message aimed at the receiver.
@@ -127,7 +127,7 @@ Generate at least six characters (internally — only two main candidates and at
 * Turning Point — the one event that changed the sender
 * Role — their function in the sender's life
 * Hidden Cost — what it cost them, seen only now
-* Private Symbol — a concrete recurring object/gesture/place, turned into a character
+* Private Symbol — a concrete recurring object/gesture/place. As a MAIN candidate it must be turned into the quality of the person that it proves (see the person test); the bare object or gesture is a freestyle character.
 * Forward Blessing — the wish for what comes next in the receiver's life, fitted to the occasion
 Span several types; do not mechanically force exactly one per type. For each candidate give:
 
@@ -143,23 +143,32 @@ why_not_generic:  (what binds this to THIS story specifically)
 
 ```
 
-Quarantine rule: the generic virtue characters — 愛, 善, 強, 健, 光, 情, 恩, 福, 安, 孝 and their kin — are forbidden unless re-bound to a specific particular from the story. 燈 as "warmth" is banned; 燈 as "the light you left on every night I came home late" is allowed and may even be the strongest answer. If the only character you can reach is an un-bound generic, that is a signal the extraction was too shallow — go back, don't ship the generic.
-STEP 4 — Gates (apply to every candidate; eliminate any that fail gates 1–5; gate 6 decides who may be the primary)
+WHAT A MAIN CANDIDATE NAMES — THE PERSON TEST (slots 1 and 2)
+The scene is the evidence, never the answer. The character in slot 1 and in slot 2 must name a quality, a stance or a way of loving that belongs to the PERSON — who they are — and that the scene proves. It must not name an object or an action that merely appears in the scene.
+
+* The test: "If this scene had never happened, would this character still be true of them?" If yes, it names the person: it may be a main candidate. If no, it is a scene noun (the thing, the place, the deed itself): it may be used only as the freestyle.
+* Concrete objects and deeds — a flower, a pair of shoes, a lunch box, a lamp, a letter, a ticket, a handover, "paid for" or "wrote down" — are allowed ONLY in the freestyle slot. As a main candidate they fail, even when the story is full of them and the character is a good one.
+* The mechanism is not the person either. Ask what the object or the action SHOWS about them (their constant readiness, a promise they keep, a way of staying close, a stubborn gentleness) and name that.
+* This is how the existing gates read it: gate 2 asks whether the gaze is bound to this story; the person test asks whether the character names them. A main candidate must pass both.
+
+Quarantine rule: the generic virtue characters — 愛, 善, 強, 健, 光, 情, 恩, 福, 安, 孝 and their kin — are forbidden unless re-bound to a specific particular from the story. 燈 as "warmth" is banned; 燈 as "warmth" is banned, and 燈 for "the light you left on every night I came home late" fails the person test below as a main candidate, because it names the lamp, not her; it is a freestyle at most. What the lamp proves — someone who waits up and keeps a place for you — is what a main character has to name. If the only character you can reach is an un-bound generic, that is a signal the extraction was too shallow — go back, don't ship the generic.
+STEP 4 — Gates (apply to every candidate; eliminate any that fail gates 1–5; gate 6 decides who may be the primary; gate 7 decides who may be a main candidate at all)
 
 1. Substitution Test. Mentally swap the names and surface details for another family, couple, friendship or team. Does the `one_line_gaze` still fit? If yes → generic → eliminate.
-2. Scarcity / counterfactual. Remove the central event from the story. Does the character still fit perfectly? If yes → it wasn't holding the scarce asset → eliminate.
+2. Scarcity. Name the scarce asset from STEP 2. Read the character together with its gaze and anchor: does the pair preserve it? Take the scarce asset away — if the gaze would still read the same, the pair was not holding it → eliminate. (This is about the gaze being bound to THIS story. The character itself must still name the person: see the person test in gate 7.)
 3. Chinese naturalness & dignity of form. Is it a dignified, readable character, fit to be carved and read by this receiver and the people around them, on this occasion — judged on the form that will be inscribed (inscription_script), paired with its display form and pinyin — with no unlucky Mandarin homophone or awkward reading — nothing that sounds like or evokes death, ending, scattering, parting or severing (死, 終, 散, 離, 斷)? If you are not sure, say so honestly — do not fake confidence. (This is exactly the check the curated palette will enforce later; for now, flag doubt.)
 4. Dignity boundary. Does the character open into a fuller person, or close them into a verdict? 默 as "you were present in your silence" opens. 頑 as "you were stubborn" closes. Reject verdicts. But never sanitize a true hard character into a pleasant generic virtue just to pass — a sanitized generic is a failure, not a safe answer.
 5. Stage-A defense. Does `kanji + one_line_gaze + one anchor` already create recognition, with no long explanation? If the character only works once you've written a paragraph around it, the paragraph is doing rescuework → eliminate or mark weak. A strong character deepens with explanation but never depends on it.
 6. Heart anchor. The primary must come from something the sender personally lived with the receiver — an event, habit, place, object, silence or exchange the sender themselves witnessed, shared or received (a LIVED finding from STEP 1). A character resting only on what the sender was told, on the receiver's reputation, titles or achievements, or on admiration without a shared moment, fails this gate: it may not be the primary. If it still holds a real truth you may keep it among the six with the flag `no_heart_anchor`; otherwise eliminate it. If fewer than two candidates of different truth types pass gates 1–5 and this gate, the story does not yet hold what this process needs: do not name a primary — return status insufficient with one follow-up question (same form as STEP 0) that asks for a moment the sender actually lived with the receiver.
+7. Person test (main slots only). Ask: "If this scene had never happened, would this character still be true of them?" If not, the character names an object or an action in the scene, not the person: it may only be the freestyle. State your answer for each main candidate.
 STEP 5 — Select the two main candidates by Abandonment Resistance
 Do not pick the highest average score. Among the candidates that survived the gates and passed the heart-anchor gate, pick the one whose removal would delete an unrecoverable truth from the set — the one that:
 
 * holds the scarce asset,
 * is least substitutable by the others,
 * and would keep pulling at the sender after they'd chosen a different one.
-That is SLOT 1, the MAIN candidate (本命) — the primary. State explicitly: what unique truth does this character own that no other candidate recovers?
-Then choose SLOT 2, the SECOND candidate (次点): the next-best candidate that is non-eliminated and passed the heart-anchor gate, chosen by the same Abandonment Resistance reasoning (not by list order) — the one you would make primary if your first choice turned out to be unavailable. It MUST be a different truth type from slot 1: two candidates that say the same thing in different characters are not two candidates. Both main slots obey every gate, the quarantine rule and the story-anchor rule; a main candidate that fails any of them is replaced, never output.
+Before you choose, apply the person test to every remaining candidate: a scene noun is out of the running for both main slots. That is SLOT 1, the MAIN candidate (本命) — the primary. State explicitly: what unique truth does this character own that no other candidate recovers?
+Then choose SLOT 2, the SECOND candidate (次点): the next-best candidate that is non-eliminated and passed the heart-anchor gate, chosen by the same Abandonment Resistance reasoning (not by list order) — the one you would make primary if your first choice turned out to be unavailable. It MUST be a different truth type from slot 1: two candidates that say the same thing in different characters are not two candidates. Both main slots obey every gate, the quarantine rule and the story-anchor rule; a main candidate that fails any of them is replaced, never output. Both main slots pass the person test: each names a quality, a stance or a way of loving of the person, proved by the scene — never an object or an action that merely appears in it.
 STEP 5b — The freestyle character (遊び字), optional
 Purpose: the playful or raw truth of the relationship — classmates teasing each other, an inside joke, a habit only these two know. It may be an ordinary or even unbeautiful character (for example 迟 (遲) for the friend who is always late). It is never the primary, it is never promoted, and it is optional: when the story holds no shared play, output no freestyle (freestyle_kanji null) rather than forcing one. Rules:
 
@@ -168,6 +177,7 @@ Purpose: the playful or raw truth of the relationship — classmates teasing eac
 3. The palette hard blocks (death, illness, parting and the like) and the occasion taboos still apply. It does NOT need a palette row and it carries no classical line; off_palette is allowed for this slot only.
 4. Register follows direction and the story's emotion: across (friends, classmates, siblings, partners) → playful; up (parent, mentor, a milestone birthday) → gentle, affectionate humour; bittersweet stories → tender rather than funny.
 5. It must pass the substitution test (gate 1) and the dignity boundary (gate 4), and its one_line_gaze obeys HARD PROCESS RULE 5: one light line, built only from details in the story, saying why this is them.
+6. Concrete objects and actions from the story (the flower, the shoes, the lunch box, the ticket) belong HERE, not in the main slots: the freestyle is the one place where a scene noun is welcome, as long as it is shared play and obeys rules 1–5.
 STEP 6 — Output
 Produce, in this order:
 

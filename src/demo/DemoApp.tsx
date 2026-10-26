@@ -37,13 +37,17 @@ const ENGINE_TIMEOUT_MS = (() => {
   return Number.isFinite(p) && p > 0 ? p : 290_000
 })()
 
+/** What the server is really doing (api/select.ts sends one `stage` line per step; engine/engine.ts onStage). */
+type EngineStage = 'reading' | 'choosing' | 'checking' | 'replacing'
+const STEP_ORDER: EngineStage[] = ['reading', 'choosing', 'checking', 'replacing']
+
 /** The engine stream ended without a terminal line (shown with the sender's UI language). */
 class StreamCutError extends Error {}
 
 /** Consume the /api/select NDJSON stream; resolves on the terminal line. */
 async function consumeEngineStream(
   body: ReadableStream<Uint8Array>,
-  onProgress: (chars: number) => void,
+  onStage: (stage: EngineStage) => void,
 ): Promise<EngineResult> {
   const reader = body.getReader()
   const decoder = new TextDecoder()
@@ -52,13 +56,15 @@ async function consumeEngineStream(
     const trimmed = line.trim()
     if (!trimmed) return null
     const msg = JSON.parse(trimmed) as
-      | { type: 'delta'; chars: number }
+      | { type: 'delta'; chars: number } // model output progress — the stage events carry the real steps
+      | { type: 'stage'; stage: EngineStage }
       | { type: 'ping' } // server heartbeat during silent reasoning — ignore
       | { type: 'result'; result: EngineResult }
       | { type: 'error'; error: string }
     if (msg.type === 'ping') return null
-    if (msg.type === 'delta') {
-      onProgress(msg.chars)
+    if (msg.type === 'delta') return null
+    if (msg.type === 'stage') {
+      onStage(msg.stage)
       return null
     }
     if (msg.type === 'error') throw new Error(msg.error)
@@ -108,8 +114,11 @@ type Phase = 'elicit' | 'processing' | 'followup' | 'suggest' | 'reveal' | 'orde
  */
 export type Mode = 'harness' | 'customer'
 
-function ProcessingView({ receivedChars, copy }: { receivedChars: number; copy: Copy }) {
+function ProcessingView({ stage, copy }: { stage: EngineStage; copy: Copy }) {
   const reduceMotion = useReducedMotion()
+  // reading → choosing → checking are always listed; the extra "finding one more" step appears only when the engine really does it.
+  const steps = STEP_ORDER.filter((s) => s !== 'replacing' || stage === 'replacing')
+  const at = STEP_ORDER.indexOf(stage)
   return (
     <div className="flex flex-col items-center gap-10 py-24 text-accent" role="status">
       <svg width="120" height="120" viewBox="0 0 140 140" fill="none" aria-hidden="true">
@@ -129,9 +138,19 @@ function ProcessingView({ receivedChars, copy }: { receivedChars: number; copy: 
         <p className="font-serif-jp text-lg tracking-wider text-fg">
           {copy.processingTitle}
         </p>
-        <p className="font-label mt-3 text-[12px] text-mute">
-          {receivedChars > 0 ? copy.processingProgress(receivedChars) : copy.processingWait}
-        </p>
+        <ol className="font-label mt-5 flex flex-col items-center gap-1.5 text-[13px]" data-testid="processing-steps">
+          {steps.map((s) => {
+            const i = STEP_ORDER.indexOf(s)
+            const state = i < at ? 'done' : i === at ? 'now' : 'next'
+            return (
+              <li key={s} data-step={s} data-state={state} aria-current={state === 'now' ? 'step' : undefined} className={state === 'now' ? 'text-fg' : state === 'done' ? 'text-mute' : 'text-mute opacity-50'}>
+                <span aria-hidden="true">{state === 'done' ? '✓ ' : state === 'now' ? '· ' : '  '}</span>
+                {copy.processingSteps[s]}
+              </li>
+            )
+          })}
+        </ol>
+        <p className="font-label mt-4 text-[12px] text-mute">{copy.processingWait}</p>
       </div>
     </div>
   )
@@ -179,7 +198,7 @@ export default function DemoApp({ mode = 'harness', aside }: { mode?: Mode; asid
   const [condition, setConditionState] = useState<Condition>('A')
   const [result, setResult] = useState<EngineResult | null>(null)
   const [error, setError] = useState<string | null>(null)
-  const [receivedChars, setReceivedChars] = useState(0)
+  const [stage, setStage] = useState<EngineStage>('reading')
   const [followUpQuestion, setFollowUpQuestion] = useState<string | null>(null)
   const [followUpAnswer, setFollowUpAnswer] = useState('')
   // The answers already given (each at most FOLLOW_UP_MAX characters), kept apart from the story so each has its own limit.
@@ -210,7 +229,7 @@ export default function DemoApp({ mode = 'harness', aside }: { mode?: Mode; asid
   const runEngine = async (fullStory: string, answers: string[] = [], ctx: GiftContext = context) => {
     setPhase('processing')
     setError(null)
-    setReceivedChars(0)
+    setStage('reading')
     if (!sessionLogged.current) {
       log('session_started', {})
       sessionLogged.current = true
@@ -233,7 +252,7 @@ export default function DemoApp({ mode = 'harness', aside }: { mode?: Mode; asid
         let message: string | null = null
         try {
           const body = (await res.json()) as { error?: string; code?: string }
-          message = body?.code === 'story_too_long' || body?.code === 'follow_up_too_long' ? copy.storyTooLong : (body?.error ?? null)
+          message = body?.code === 'story_too_long' || body?.code === 'follow_up_too_long' ? copy.storyTooLong : body?.code === 'rate_limited' ? copy.rateLimited : (body?.error ?? null)
         } catch {
           message = null
         }
@@ -242,7 +261,7 @@ export default function DemoApp({ mode = 'harness', aside }: { mode?: Mode; asid
       const isStream =
         (res.headers.get('content-type') ?? '').includes('ndjson') && res.body
       const engineResult: EngineResult = isStream
-        ? await consumeEngineStream(res.body!, setReceivedChars)
+        ? await consumeEngineStream(res.body!, setStage)
         : ((await res.json()) as EngineResult)
       setResult(engineResult)
       log('engine_run', {
@@ -302,7 +321,7 @@ export default function DemoApp({ mode = 'harness', aside }: { mode?: Mode; asid
     setError(null)
     setFollowUpQuestion(null)
     setFollowUpAnswer('')
-    setReceivedChars(0)
+    setStage('reading')
     setChosen(null)
     setPhase('elicit')
   }
@@ -386,7 +405,7 @@ export default function DemoApp({ mode = 'harness', aside }: { mode?: Mode; asid
         </>
       )}
 
-      {phase === 'processing' && <ProcessingView receivedChars={receivedChars} copy={copy} />}
+      {phase === 'processing' && <ProcessingView stage={stage} copy={copy} />}
 
       {phase === 'followup' && followUpQuestion && (
         <motion.div

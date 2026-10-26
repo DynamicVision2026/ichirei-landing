@@ -1,0 +1,98 @@
+{
+  "name": "s0020-mother-thanks",
+  "story_id": "0020",
+  "note": "Live test: main 花 (a thing in the story), second missing. Fixture: the person-type main, no second generated → one replacement.",
+  "story": "母は小中学校の頃、毎朝お弁当を作ってくれました。春には庭の花を一輪のせてくれるような人で、私は恥ずかしいような誇らしいような気持ちでした。中学に上がったとき「もういらない」と断ってしまい、母は何も言わずに台所に戻りました。それから二十年以上、ちゃんとお礼を言ったことがありません。教師になって、お弁当のない生徒に自分の分を分けるようになって、母のことを思い出しました。先日思い切って電話で「帰るときお弁当作って」と頼んだら、母は「ちょうど今詰めてたところ」と言いました。来月帰ります。",
+  "context": {
+    "language": "ja",
+    "relationship": "parent_mother",
+    "direction": "up",
+    "occasion": "parent_day"
+  },
+  "model_reply": {
+    "language": "ja",
+    "relationship": "parent_mother",
+    "direction": "up",
+    "occasion": "parent_day",
+    "occasion_detail": null,
+    "inscription_script": null,
+    "status": "sufficient",
+    "follow_up_question": null,
+    "particulars": [
+      "p1",
+      "p2"
+    ],
+    "fingerprint": {
+      "relationship_note": "x",
+      "scarce_asset": "x",
+      "unsaid_truth": "",
+      "dominant_truth_type": "Essence",
+      "dignity_direction": "",
+      "emotional_register": [
+        "grateful",
+        "tender"
+      ]
+    },
+    "candidates": [
+      {
+        "slot": "main",
+        "kanji": "備",
+        "inscription_form": "備",
+        "reading": "そなえる",
+        "truth_type": "Essence",
+        "one_line_gaze": "断られても、何も言わずに、またお弁当を詰めてくれる人。",
+        "story_anchor": "ちょうど今詰めてたところ",
+        "unique_truth": "u",
+        "eliminated": false,
+        "eliminated_reason": null,
+        "suitability_flag": null,
+        "palette_status": "ok",
+        "flags": []
+      },
+      {
+        "slot": "freestyle",
+        "kanji": "詰",
+        "inscription_form": null,
+        "reading": "つめる",
+        "truth_type": "Play",
+        "one_line_gaze": "「ちょうど今詰めてたところ」の人。",
+        "story_anchor": "ちょうど今詰めてたところ",
+        "unique_truth": "",
+        "eliminated": false,
+        "eliminated_reason": null,
+        "suitability_flag": null,
+        "palette_status": "ok",
+        "flags": []
+      }
+    ],
+    "primary_kanji": "備",
+    "runner_up_kanji": null,
+    "freestyle_kanji": "詰",
+    "fallback_follow_up_question": "いちばん思い出す、ちいさな場面をひとつ教えてください。"
+  },
+  "review_fail": {},
+  "replacements": [
+    {
+      "slot": "second",
+      "kanji": "支",
+      "inscription_form": null,
+      "reading": "ささえる",
+      "truth_type": "Hidden Cost",
+      "one_line_gaze": "断られても、何も言わずに台所に戻って、また用意してくれた人。",
+      "story_anchor": "何も言わずに台所に戻りました",
+      "unique_truth": "u",
+      "eliminated": false,
+      "eliminated_reason": null,
+      "suitability_flag": null,
+      "palette_status": "ok",
+      "flags": []
+    }
+  ],
+  "expect": {
+    "main": "備",
+    "second": "支",
+    "freestyle": "詰",
+    "cause": "not_generated",
+    "replacement": true
+  }
+}

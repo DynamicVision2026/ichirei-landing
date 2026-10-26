@@ -79,9 +79,9 @@ try {
   const survivors = await page.locator('article').count()
   // v6 golden: three cards — second 黙, freestyle 封 (it passed the fake review), main 迎 — nothing eliminated.
   const slots = await page.locator('article').evaluateAll((els) => els.map((e) => e.getAttribute('data-slot')).join())
-  check('three cards rendered (second, freestyle, main) with the review verdicts applied', survivors === 3 && slots === 'second,freestyle,main', `survivors=${survivors} slots=${slots}`)
-  check('primary 迎 resolves last, in cinnabar', (await page.locator('article').last().locator('span').first().textContent()) === '迎' &&
-    (await page.locator('article').last().locator('span').first().evaluate((el) => getComputedStyle(el).color)) === 'rgb(192, 57, 43)')
+  check('three cards rendered (main, second, freestyle) with the review verdicts applied', survivors === 3 && slots === 'main,second,freestyle', `survivors=${survivors} slots=${slots}`)
+  check('primary 迎 comes first, in cinnabar', (await page.locator('article').first().locator('span').first().textContent()) === '迎' &&
+    (await page.locator('article').first().locator('span').first().evaluate((el) => getComputedStyle(el).color)) === 'rgb(192, 57, 43)')
   await page.screenshot({ path: `${SHOTS}/cr-reveal.png` })
 
   // Chromium intermittently (about 4 runs in 10, also on the commit before Step 3) reports

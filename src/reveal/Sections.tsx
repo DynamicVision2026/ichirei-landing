@@ -19,7 +19,7 @@ export function Strip({ t }: { t: T }) {
       <ul className="wrap">
         {items.map(([k, text]) => (
           <li key={k}>
-            <span className="k" aria-hidden="true">
+            <span className="k notranslate" aria-hidden="true">
               {k}
             </span>
             <span>{text}</span>
@@ -45,7 +45,7 @@ export function Philosophy({ t }: { t: T }) {
             ] as const
           ).map(([n, text]) => (
             <div key={n}>
-              <span className="phN" aria-hidden="true">
+              <span className="phN notranslate" aria-hidden="true">
                 {n}
               </span>
               <p>{text}</p>
@@ -79,7 +79,7 @@ export function StoryShape({ t }: { t: T }) {
             <span className="lbl">{t.strongL}</span>
             <q>{t.s1s}</q>
             <span className="res">
-              <b className="k">燈</b>
+              <b className="k notranslate">燈</b>
               <span>{t.s1r}</span>
             </span>
           </div>
@@ -94,7 +94,7 @@ export function StoryShape({ t }: { t: T }) {
             <span className="lbl">{t.strongL2}</span>
             <q>{t.s2s}</q>
             <span className="res">
-              <b className="k">隣</b>
+              <b className="k notranslate">隣</b>
               <span>{t.s2r}</span>
             </span>
           </div>
@@ -147,7 +147,7 @@ export function Angles({ t, lang }: { t: T; lang: RevealLang }) {
               tabIndex={i === ag ? 0 : -1}
               onClick={() => setAg(i)}
             >
-              <b className="k" aria-hidden="true">
+              <b className="k notranslate" aria-hidden="true">
                 {ANGLE_KANJI[i]}
               </b>
               <span>{label}</span>
@@ -160,7 +160,7 @@ export function Angles({ t, lang }: { t: T; lang: RevealLang }) {
           <span className="lbl">{t.exL}</span>
           <q className="ex">{a.ex}</q>
           <div className="agRes">
-            <b className="k">{a.k}</b>
+            <b className="k notranslate">{a.k}</b>
             <span>{a.r}</span>
           </div>
         </div>
@@ -225,7 +225,7 @@ export function Moments({ t }: { t: T }) {
       <div className="wrap mosaic">
         {MOMENTS.map((m) => (
           <figure key={m.n} className={`ph ${m.n}`} style={{ ['--cat' as string]: `var(--c-${m.cat})` }}>
-            <span className="phk" aria-hidden="true">
+            <span className="phk notranslate" aria-hidden="true">
               {m.k}
             </span>
             <Picture
@@ -235,7 +235,7 @@ export function Moments({ t }: { t: T }) {
               sizes={m.n === 'm1' || m.n === 'm4' || m.n === 'm6' ? '(max-width: 860px) 100vw, 560px' : '(max-width: 860px) 50vw, 280px'}
             />
             <figcaption className="cap">
-              <span className="k" aria-hidden="true">
+              <span className="k notranslate" aria-hidden="true">
                 {m.k}
               </span>
               <span>
@@ -388,7 +388,7 @@ export function Closing({ t }: { t: T }) {
   return (
     <section className="closing">
       <div className="wrap">
-        <span className="k" aria-hidden="true">
+        <span className="k notranslate" aria-hidden="true">
           字
         </span>
         <h2>{t.clH}</h2>

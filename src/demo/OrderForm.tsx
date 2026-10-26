@@ -138,7 +138,7 @@ export default function OrderForm({ result, story, followUps = [], candidate, co
       {/* The chosen character on its slip, with the certificate line */}
       <div className={`slip${memorial ? ' memorial' : ''}`} data-memorial={memorial ? 'yes' : undefined}>
         <p className="clab">{o.chosenLabel}</p>
-        <span data-order-glyph className="k slipGlyph">
+        <span data-order-glyph className="k slipGlyph notranslate">
           {glyph}
         </span>
         <span className="slipReading">{copy.glyphReading(candidate, glyph)}</span>
@@ -197,7 +197,7 @@ export default function OrderForm({ result, story, followUps = [], candidate, co
               {STYLES_BY_LANGUAGE[language].map((st) => (
                 <label key={st} className={`opt${style === st ? ' on' : ''}`}>
                   <input type="radio" name="inscription_style" value={st} checked={style === st} onChange={() => setStyle(st)} />
-                  <span className="k optGlyph">{glyphFor(candidate, st)}</span>
+                  <span className="k optGlyph notranslate">{glyphFor(candidate, st)}</span>
                   <span>{o.inscriptionStyles[st]}</span>
                 </label>
               ))}

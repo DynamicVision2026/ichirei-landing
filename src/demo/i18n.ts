@@ -118,7 +118,8 @@ export interface Copy {
   // processing / follow-up / thin
   processingTitle: string
   processingWait: string
-  processingProgress: (chars: number) => string
+  /** The honest progress steps shown while the engine runs (what the server is really doing). */
+  processingSteps: { reading: string; choosing: string; checking: string; replacing: string }
   followUpHeading: string
   followUpPlaceholder: string
   followUpSubmit: string
@@ -131,6 +132,8 @@ export interface Copy {
   // errors
   serverError: (status: number) => string
   streamCut: string
+  /** HTTP 429 from /api/select: too many runs from this connection. */
+  rateLimited: string
   timeout: (seconds: number) => string
   // reveal
   revealIntro: string
@@ -260,7 +263,7 @@ const ja: Copy = {
   speechLang: 'ja-JP',
   processingTitle: '言葉を読んでいます...',
   processingWait: '深く読むほど時間がかかります（1〜2分ほどお待ちください）',
-  processingProgress: (n) => `一字一字、書きあがっています … ${n}`,
+  processingSteps: { reading: '物語を読んでいます…', choosing: '一字ずつ、選んでいます…', checking: '場面にふさわしいか、確かめています…', replacing: 'もう一字、探しています…' },
   followUpHeading: 'もうすこしだけ、聞かせてください',
   followUpPlaceholder: '思い出したことを、そのまま。',
   followUpSubmit: 'つづきを探しにいく',
@@ -273,6 +276,7 @@ const ja: Copy = {
   rawContract: 'raw contract（診断用）',
   serverError: (s) => `サーバーエラー（HTTP ${s}）`,
   streamCut: 'エンジンの応答が途中で切れました（サーバー側タイムアウトの可能性）',
+  rateLimited: 'この接続からのご利用が短い間に重なりました。しばらくおいて、もう一度お試しください。',
   timeout: (s) =>
     `結果が届く前に時間切れになりました（${s}秒）。もう一度お試しください。続く場合はサーバー側の制限の可能性があります（ICHIREI_EFFORT=medium で短縮できます）。`,
   revealIntro: 'あなたの言葉から、一字ずつ浮かびあがります。気になった字に触れてください。',
@@ -402,7 +406,7 @@ const zhHans: Copy = {
   speechLang: 'zh-CN',
   processingTitle: '正在阅读你的文字……',
   processingWait: '读得越深越花时间（请稍候，约 1～2 分钟）',
-  processingProgress: (n) => `一笔一画，正在成形 … ${n}`,
+  processingSteps: { reading: '正在阅读你的故事……', choosing: '正在逐字挑选……', checking: '正在核对是否合乎场合……', replacing: '正在再寻一个字……' },
   followUpHeading: '再多告诉我一点',
   followUpPlaceholder: '想起什么，就写什么。',
   followUpSubmit: '继续寻找',
@@ -414,6 +418,7 @@ const zhHans: Copy = {
   rawContract: 'raw contract（诊断用）',
   serverError: (s) => `服务器错误（HTTP ${s}）`,
   streamCut: '引擎的回应中途中断（可能是服务器端超时）',
+  rateLimited: '此连接在短时间内的请求过多。请稍候片刻再试。',
   timeout: (s) => `结果送达前已超时（${s} 秒）。请再试一次；若持续出现，可能是服务器端的限制。`,
   revealIntro: '从你的文字里，一个字一个字浮现出来。请触碰让你在意的字。',
   selectThis: '选择这个字',
@@ -547,7 +552,7 @@ const zhHant: Copy = {
   speechLang: 'zh-TW',
   processingTitle: '正在閱讀你的文字……',
   processingWait: '讀得越深越花時間（請稍候，約 1～2 分鐘）',
-  processingProgress: (n) => `一筆一畫，正在成形 … ${n}`,
+  processingSteps: { reading: '正在閱讀你的故事……', choosing: '正在逐字挑選……', checking: '正在核對是否合乎場合……', replacing: '正在再尋一個字……' },
   followUpHeading: '再多告訴我一點',
   followUpPlaceholder: '想起什麼，就寫什麼。',
   followUpSubmit: '繼續尋找',
@@ -559,6 +564,7 @@ const zhHant: Copy = {
   rawContract: 'raw contract（診斷用）',
   serverError: (s) => `伺服器錯誤（HTTP ${s}）`,
   streamCut: '引擎的回應中途中斷（可能是伺服器端逾時）',
+  rateLimited: '此連線在短時間內的請求過多。請稍候片刻再試。',
   timeout: (s) => `結果送達前已逾時（${s} 秒）。請再試一次；若持續出現，可能是伺服器端的限制。`,
   revealIntro: '從你的文字裡，一個字一個字浮現出來。請觸碰讓你在意的字。',
   selectThis: '選擇這個字',
@@ -695,7 +701,7 @@ const en: Copy = {
   speechLang: 'en-US',
   processingTitle: 'Reading your words…',
   processingWait: 'The deeper the reading, the longer it takes (about one to two minutes).',
-  processingProgress: (n) => `The characters are taking shape … ${n}`,
+  processingSteps: { reading: 'Reading your story…', choosing: 'Choosing the characters…', checking: 'Checking them against your occasion…', replacing: 'Finding one more character…' },
   followUpHeading: 'Tell us a little more',
   followUpPlaceholder: 'Whatever you remember, just as it comes.',
   followUpSubmit: 'Keep looking',
@@ -708,6 +714,7 @@ const en: Copy = {
   rawContract: 'raw contract (diagnostics)',
   serverError: (s) => `Server error (HTTP ${s})`,
   streamCut: 'The engine’s reply was cut off (possibly a server-side timeout).',
+  rateLimited: 'Too many requests from this connection in a short time. Please wait a little and try again.',
   timeout: (s) =>
     `The result did not arrive in time (${s} seconds). Please try again; if it keeps happening it may be a server-side limit.`,
   revealIntro: 'One character at a time, they rise out of your words. Touch the one that draws you.',

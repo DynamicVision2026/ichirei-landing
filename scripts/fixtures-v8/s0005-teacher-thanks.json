@@ -1,0 +1,100 @@
+{
+  "name": "s0005-teacher-thanks",
+  "story_id": "0005",
+  "note": "Live test: main 証 good, second 届 a literal action. Review fails the scene noun; a quality-type second replaces it.",
+  "story": "中学のときの国語の先生のことです。私は二年の冬に父の転勤で引っ越し、それきり会っていませんでした。五十を過ぎたころ、先生から短い手紙が届き、会いに行きました。先生は脳梗塞の後で、字を書くのも大変そうでした。そこで渡されたのは一枚の細長い紙で、私が転校した日から、就職、子どもの誕生、父の死まで、先生が知るたびに一行ずつ書き足してくれていました。私は先生のことをほとんど思い出しもしなかったのに、先生はずっと私の人生を見ていてくれたんです。先生には、まだ元気でいてほしいと思っています。",
+  "context": {
+    "language": "ja",
+    "relationship": "mentor",
+    "direction": "up",
+    "occasion": "seasonal_thanks"
+  },
+  "model_reply": {
+    "language": "ja",
+    "relationship": "mentor",
+    "direction": "up",
+    "occasion": "seasonal_thanks",
+    "occasion_detail": null,
+    "inscription_script": null,
+    "status": "sufficient",
+    "follow_up_question": null,
+    "particulars": [
+      "p1",
+      "p2"
+    ],
+    "fingerprint": {
+      "relationship_note": "x",
+      "scarce_asset": "x",
+      "unsaid_truth": "",
+      "dominant_truth_type": "Essence",
+      "dignity_direction": "",
+      "emotional_register": [
+        "grateful",
+        "tender"
+      ]
+    },
+    "candidates": [
+      {
+        "slot": "main",
+        "kanji": "証",
+        "inscription_form": "證",
+        "reading": "あかし",
+        "truth_type": "Hidden Cost",
+        "one_line_gaze": "会わなかった間も、一行ずつ、私の人生を書き足してくれた人。",
+        "story_anchor": "一行ずつ書き足してくれていました",
+        "unique_truth": "u",
+        "eliminated": false,
+        "eliminated_reason": null,
+        "suitability_flag": null,
+        "palette_status": "ok",
+        "flags": []
+      },
+      {
+        "slot": "second",
+        "kanji": "届",
+        "inscription_form": null,
+        "reading": "とどく",
+        "truth_type": "Turning Point",
+        "one_line_gaze": "短い手紙を、私に届けてくれた人。",
+        "story_anchor": "短い手紙が届き",
+        "unique_truth": "u",
+        "eliminated": false,
+        "eliminated_reason": null,
+        "suitability_flag": null,
+        "palette_status": "ok",
+        "flags": []
+      }
+    ],
+    "primary_kanji": "証",
+    "runner_up_kanji": "届",
+    "freestyle_kanji": null,
+    "fallback_follow_up_question": "いちばん思い出す、ちいさな場面をひとつ教えてください。"
+  },
+  "review_fail": {
+    "届": "Scene noun: names the letter that arrived, not the person"
+  },
+  "replacements": [
+    {
+      "slot": "second",
+      "kanji": "見",
+      "inscription_form": null,
+      "reading": "みる",
+      "truth_type": "Essence",
+      "one_line_gaze": "私のことを思い出しもしなかった間も、ずっと私の人生を見ていてくれた人。",
+      "story_anchor": "先生はずっと私の人生を見ていてくれたんです",
+      "unique_truth": "u",
+      "eliminated": false,
+      "eliminated_reason": null,
+      "suitability_flag": null,
+      "palette_status": "ok",
+      "flags": []
+    }
+  ],
+  "expect": {
+    "main": "証",
+    "second": "見",
+    "freestyle": null,
+    "cause": "review",
+    "replacement": true
+  }
+}

@@ -9,7 +9,7 @@ import { carvedGlyph, contextToPayload, isChineseUi, type Copy, type GiftContext
 // Progressive reveal (build spec §8) + condition presentation (§5) + the
 // behavioral instrumentation that makes this an experiment (§6).
 //
-// - v6: at most three cards — the MAIN candidate (本命, the cinnabar primary, resolves last), the
+// - v6: at most three cards — the MAIN candidate (本命, the cinnabar primary, shown first), the
 //   SECOND (次点) and the FREESTYLE (遊び字: lighter, dashed, never cinnabar, no deep explanation).
 //   Each main card shows three layers: the story anchor in quotes, the one-line gaze, and — only when
 //   the server attached one from a reviewed palette row — a classical line with its source.
@@ -60,7 +60,7 @@ function InscriptionGlyph({
   const note = copy.inscriptionNote(candidate, script)
   return (
     <div className="flex flex-col items-center text-center">
-      <span className={`font-mincho leading-none ${customerGlyph ? 'font-black' : ''} ${size} ${color}`} data-glyph>{glyph}</span>
+      <span className={`font-mincho notranslate leading-none ${customerGlyph ? 'font-black' : ''} ${size} ${color}`} data-glyph translate="no">{glyph}</span>
       <span className="font-label mt-3 text-sm tracking-wide text-accent" data-reading>
         {copy.glyphReading(candidate, glyph)}
       </span>
@@ -83,9 +83,9 @@ export default function Reveal({ result, story, followUps = [], condition, copy,
     const primary = alive.find((c) => c.kanji === result.primary_kanji)
     const freestyle = alive.find((c) => c.slot === 'freestyle')
     const rest = alive.filter((c) => c.kanji !== result.primary_kanji && c.slot !== 'freestyle')
-    // second → freestyle → main last.
+    // main → second → freestyle: the reading order, the tab order and the visual order are all the same.
     return {
-      revealOrder: [...rest, ...(freestyle ? [freestyle] : []), ...(primary ? [primary] : [])],
+      revealOrder: [...(primary ? [primary] : []), ...rest, ...(freestyle ? [freestyle] : [])],
       eliminated: result.candidates.filter((c) => c.eliminated),
     }
   }, [result])
@@ -106,7 +106,7 @@ export default function Reveal({ result, story, followUps = [], condition, copy,
   const openHistoryRef = useRef<string[]>([])
   const openOrderRef = useRef(0)
 
-  // Progressive reveal timer — one card at a time, primary last.
+  // Progressive reveal timer — one card at a time (main first).
   useEffect(() => {
     if (revealedCount >= revealOrder.length) return
     const t = window.setTimeout(() => setRevealedCount((n) => n + 1), REVEAL_INTERVAL_MS)

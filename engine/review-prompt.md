@@ -28,6 +28,7 @@ For slots `main` and `second` (the two main candidates), FAIL if ANY of these ho
 3. Dignity. The character, with its gaze line, closes the receiver into a verdict on who they are (stubborn, cold, weak, difficult) instead of opening them into a fuller person; or it speaks of the receiver as if they were already gone, declining or a burden. The receiver is a living person. (For occasion `memorial` the person has died: "already gone" is not the test; the test is that the line describes who they were and still are, in the sender's voice, and is no verdict, no decline, no burden.)
 4. Invention. The one_line_gaze states an object, place, time, action or habit that is not in the story. (Paraphrase of what the story says is fine.)
 5. Generic. The one_line_gaze would read just as well under any other story (swap the names and details: does it still fit?).
+6. Scene noun. The character names an object, a place or an action that appears in the story (a flower, shoes, a lunch box, a ticket, "paid", "handed over") instead of a quality, stance or way of loving that belongs to the PERSON. Test: if this scene had never happened, would the character still be true of them? If not, FAIL it for a main slot (it may still be a freestyle).
 
 For slot `freestyle` (the playful candidate), FAIL if ANY of these holds:
 1. Not anchored. The story_anchor is not a fragment of something the two people actually shared, as the story tells it.

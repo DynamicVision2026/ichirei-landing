@@ -305,6 +305,8 @@ export interface RefereeAction {
     | 'review_eliminated' // the separate review call failed this candidate
     | 'missing_row_eliminated' // en: a main candidate has no row in one of the two palettes (ja, zh)
     | 'missing_row_already_eliminated' // as above, but the model had already eliminated it
+    | 'replacement_added' // a main slot was empty after the referee and the review: a replacement call filled it
+    | 'replacement_rejected' // a replacement candidate was refused (duplicate, anchor not in the story, referee or review)
     | 'insufficient_no_main' // no main candidate survived: the result became `insufficient`
   detail: string
 }
@@ -488,10 +490,14 @@ export function validateEngineResult(raw: unknown): string[] {
     problems.push('fallback_follow_up_question missing')
   }
   const cands = Array.isArray(r.candidates) ? r.candidates : []
-  if (cands.length < 2 || cands.length > 3) problems.push(`expected 2 or 3 candidates (2 main + optional freestyle), got ${cands.length}`)
+  // 2 or 3 candidates (2 main + optional freestyle); a replacement call (engine/replace.ts) can add a fourth, leaving the removed one in place, eliminated
+  if (cands.length < 2 || cands.length > 4) problems.push(`expected 2 to 4 candidates (2 main + optional freestyle, + at most one replacement), got ${cands.length}`)
   const bySlot = (slot: Slot) => cands.filter((c) => c?.slot === slot)
   for (const slot of ['main', 'second'] as const) {
-    if (bySlot(slot).length !== 1) problems.push(`expected exactly one "${slot}" candidate, got ${bySlot(slot).length}`)
+    // one per slot — except that a replacement (engine/replace.ts) may sit next to the candidate it replaced, which is then eliminated
+    const live = bySlot(slot).filter((c) => !c.eliminated)
+    if (bySlot(slot).length < 1 || bySlot(slot).length > 2 || (bySlot(slot).length === 2 && !bySlot(slot).some((c) => c.eliminated) && slot === 'main')) problems.push(`expected exactly one "${slot}" candidate, got ${bySlot(slot).length}`)
+    if (live.length > 2) problems.push(`more than two live "${slot}" candidates`)
   }
   if (bySlot('freestyle').length > 1) problems.push('more than one freestyle candidate')
   cands.forEach((c, i) => {
@@ -525,11 +531,11 @@ export function validateEngineResult(raw: unknown): string[] {
     }
     if (free && c?.classical_echo) problems.push(`${at}: the freestyle never carries a classical line`)
   })
-  const main = bySlot('main')[0]
-  const second = bySlot('second')[0]
-  if (main && second && main.truth_type === second.truth_type) problems.push('main and second must be different truth types')
+  const livePrimary = cands.find((c) => c.kanji === r.primary_kanji)
+  const liveRunnerUp = r.runner_up_kanji ? cands.find((c) => c.kanji === r.runner_up_kanji && !c.eliminated) : undefined
+  if (livePrimary && liveRunnerUp && livePrimary.truth_type === liveRunnerUp.truth_type) problems.push('main and second must be different truth types')
   const freestyle = bySlot('freestyle')[0]
-  if (freestyle && [main, second].some((m) => m && m.kanji === freestyle.kanji)) problems.push('freestyle repeats a main kanji')
+  if (freestyle && cands.some((m) => m.slot !== 'freestyle' && !m.eliminated && m.kanji === freestyle.kanji)) problems.push('freestyle repeats a main kanji')
 
   const primary = cands.find((c) => c.kanji === r.primary_kanji)
   if (r.runner_up_kanji === undefined) problems.push('runner_up_kanji missing')

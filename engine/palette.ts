@@ -397,7 +397,8 @@ function settlePrimary(
   const noAnchor = primaryCand ? !removed && !primaryCand.eliminated && anchorMissing(primaryCand) : false
   if (!primaryCand || (!removed && !noAnchor)) return { primary: originalPrimary, promotedFrom: null }
   if (noAnchor) refuse(primaryCand, 'context_required kanji needs a usable story anchor to be primary')
-  const second = candidates.find((c) => c.slot === 'second' && c.kanji !== originalPrimary)
+  // (a replacement call can leave an eliminated and a live `second`: the live one is the candidate)
+  const second = candidates.find((c) => c.slot === 'second' && c.kanji !== originalPrimary && !c.eliminated) ?? candidates.find((c) => c.slot === 'second' && c.kanji !== originalPrimary)
   if (second && eligible(second)) return { primary: second.kanji, promotedFrom: 'second' }
   if (second && !second.eliminated && anchorMissing(second)) refuse(second, 'second slot skipped as promotion target: no usable story anchor')
   return { primary: null, promotedFrom: null }
@@ -601,7 +602,7 @@ function finish(
   anchorMissing: (c: Candidate) => boolean,
 ): EngineResult {
   // The backup that ships must still be a valid one: the second slot, still eligible and not the primary.
-  const second = candidates.find((c) => c.slot === 'second')
+  const second = candidates.find((c) => c.slot === 'second' && c.kanji !== primary && !c.eliminated) ?? candidates.find((c) => c.slot === 'second')
   const backupOk = second && second.kanji !== primary && !second.eliminated && !second.flags.includes('no_heart_anchor') && !anchorMissing(second)
   const runnerUp = backupOk ? second.kanji : result.runner_up_kanji === undefined ? undefined : null
   const freestyle = candidates.find((c) => c.slot === 'freestyle' && !c.eliminated)

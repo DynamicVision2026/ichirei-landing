@@ -52,3 +52,36 @@ export function clientIp(req: Request): string {
   if (xff.length === 0) return 'unknown'
   return xff.length >= 2 ? xff[xff.length - 2] : xff[0]
 }
+
+/** "12/60" → at most 12 hits per 60 minutes; "off" (or 0 / false / no) → no limit; anything unreadable → the default. */
+export function parseLimitSpec(spec: string | undefined, fallback: { max: number; minutes: number }): { max: number; minutes: number } | null {
+  const text = (spec ?? '').trim()
+  if (/^(off|0|false|no)$/i.test(text)) return null
+  const m = /^(\d+)\s*\/\s*(\d+)$/.exec(text)
+  if (m && Number(m[1]) > 0 && Number(m[2]) > 0) return { max: Number(m[1]), minutes: Number(m[2]) }
+  return fallback
+}
+
+/**
+ * A per-IP limiter for one expensive route, configured by an env variable ("max/minutes" or "off") that is read on every
+ * call (so a test or an operator change takes effect without a restart of the module). `check` records the hit and says
+ * whether the caller may go on; `retryAfterSeconds` is the window, a safe upper bound for Retry-After.
+ */
+export function envRunLimiter(envName: string, fallback: { max: number; minutes: number }) {
+  let spec = ''
+  let limiter: SlidingWindowLimiter | null = null
+  let windowSeconds = 0
+  return {
+    check(req: Request, env: NodeJS.ProcessEnv = process.env, now = Date.now()): { ok: true } | { ok: false; retryAfterSeconds: number } {
+      const raw = env[envName] ?? ''
+      const parsed = parseLimitSpec(raw, fallback)
+      if (!parsed) return { ok: true }
+      if (raw !== spec || !limiter) {
+        spec = raw
+        limiter = new SlidingWindowLimiter(parsed.max, parsed.minutes * 60_000)
+        windowSeconds = parsed.minutes * 60
+      }
+      return limiter.hit(clientIp(req), now) ? { ok: true } : { ok: false, retryAfterSeconds: windowSeconds }
+    },
+  }
+}
