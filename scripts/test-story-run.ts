@@ -100,6 +100,61 @@ if (csvName) {
 check('end to end: four model calls for two stories (select + review each)', calls === 4, String(calls))
 upstream.close()
 
+// ---- end to end against a fake /api/select (the --target path: streaming NDJSON, no key) ------------------------------------
+const bodies: any[] = []
+let inFlight = 0
+let maxInFlight = 0
+const site = http.createServer(async (req, res) => {
+  let raw = ''
+  for await (const c of req) raw += c
+  const body = JSON.parse(raw)
+  bodies.push({ path: req.url, body })
+  inFlight++
+  maxInFlight = Math.max(maxInFlight, inFlight)
+  res.writeHead(200, { 'content-type': 'application/x-ndjson; charset=utf-8' })
+  res.write(JSON.stringify({ type: 'delta', chars: 200 }) + '\n')
+  await new Promise((r) => setTimeout(r, 30))
+  res.write(JSON.stringify({ type: 'ping' }) + '\n')
+  // T1 (living) gets a result split across two chunks; T2 (memorial) gets a terminal error line
+  if (body.occasion === 'memorial') res.write(JSON.stringify({ type: 'error', error: 'Engine failed: overloaded' }) + '\n')
+  else {
+    const line = JSON.stringify({ type: 'result', result: result('parent_day', [cand('main', '迎'), cand('second', '守'), cand('freestyle', '笑')], '迎') }) + '\n'
+    res.write(line.slice(0, 40))
+    await new Promise((r) => setTimeout(r, 10))
+    res.write(line.slice(40))
+  }
+  inFlight--
+  res.end()
+})
+await new Promise<void>((r) => site.listen(0, '127.0.0.1', r))
+const dir2 = mkdtempSync(join(tmpdir(), 'story-run-api-test-'))
+writeFileSync(join(dir2, 'db.csv'), toCsv([header, ...dbRows]))
+const { ANTHROPIC_API_KEY: _drop, ...envNoKey } = process.env
+let out2 = ''
+try {
+  out2 = await new Promise<string>((resolve, reject) => {
+    import('node:child_process').then(({ execFile }) =>
+      execFile('node', ['--experimental-strip-types', '--disable-warning=ExperimentalWarning', 'scripts/run-story-db.mjs', '--db', join(dir2, 'db.csv'), '--out', dir2, '--target', `http://127.0.0.1:${(site.address() as { port: number }).port}/`], { env: envNoKey, cwd: process.cwd() }, (err, stdout, stderr) => (err ? reject(new Error(String(stderr) + String(stdout))) : resolve(stdout))),
+    )
+  })
+} catch (e) {
+  out2 = String(e)
+}
+site.close()
+check('--target <url>: no ANTHROPIC_API_KEY needed, POST /api/select once per story, one at a time by default', bodies.length === 2 && bodies.every((b) => b.path === '/api/select') && maxInFlight === 1, out2 + JSON.stringify(bodies))
+check('--target <url>: the body is the website\'s (story + condition A + language/relationship/direction/occasion), with no session id (no analytics)', bodies.length === 2 && bodies[0].body.story === LIVE.story && bodies[0].body.condition === 'A' && bodies[0].body.language === 'ja' && bodies[0].body.relationship === 'parent_father' && bodies[0].body.direction === 'up' && bodies[0].body.occasion === 'parent_day' && bodies[1].body.occasion === 'memorial' && bodies.every((b) => !('session' in b.body)), JSON.stringify(bodies))
+const csv2 = readdirSync(dir2).find((f) => /^story-run-\d{8}\.csv$/.test(f))
+if (csv2) {
+  const [h, ...b] = parseCsv(readFileSync(join(dir2, csv2), 'utf8').replace(/^﻿/, ''))
+  const rec = (id: string) => Object.fromEntries(h.map((k, i) => [k, b.find((r) => r[0] === id)?.[i] ?? ''])) as Record<string, string>
+  const a1 = rec('T1')
+  const a2 = rec('T2')
+  check('--target <url>: the streamed result becomes a normal row (three kanji, measured seconds), tokens and cost left blank', a1.status === 'sufficient' && a1.kanji_main === '迎' && a1.kanji_freestyle === '笑' && Number(a1.seconds) > 0 && a1.input_tokens === '' && a1.cost_usd_est === '', JSON.stringify(a1))
+  check('--target <url>: a terminal error line is reported as an error row with the server\'s message (never a made-up result)', a2.status === 'error' && a2.flags === 'error' && a2.error.includes('overloaded') && a2.kanji_main === '', JSON.stringify(a2))
+  const sum2 = readFileSync(join(dir2, csv2.replace('.csv', '-summary.txt')), 'utf8')
+  check('--target <url>: the summary says cost is not measured and lists the time per run', sum2.includes('Cost: not measured') && sum2.includes('T1 ') && sum2.includes('T2 '), sum2)
+} else check('--target <url>: the CSV is written', false, out2)
+
 if (failures > 0) {
   console.log(`\n${failures} story-run check(s) FAILED`)
   process.exit(1)

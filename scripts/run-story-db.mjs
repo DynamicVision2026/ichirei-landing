@@ -3,15 +3,23 @@
 //   node --experimental-strip-types scripts/run-story-db.mjs --dry-run          # plan + cost estimate, no model call
 //   ANTHROPIC_API_KEY=… node --experimental-strip-types scripts/run-story-db.mjs --limit 5     # a small calibration run
 //   ANTHROPIC_API_KEY=… node --experimental-strip-types scripts/run-story-db.mjs               # all (≈144 runs)
+//   node --experimental-strip-types scripts/run-story-db.mjs --target production --ids 0020,0080   # via the live site, no key
 //
 // Options
 //   --db <csv>           the story database (default test-data/private/ICHIREI_Story_Test_DB_v1.csv)
 //   --out <dir>          where story-run-YYYYMMDD.csv (+ .jsonl, + -summary.txt) go (default test-data/private)
 //   --only main|memorial|all   which rows (default all = the `main` rows + the rows with receiver_alive = no)
-//   --limit N            the first N selected rows only (calibration)     --ids 0011,0042   only these ids
+//   --limit N            the first N selected rows only (calibration)     --ids 0011,0042   only these ids, in this order
 //   --concurrency N      parallel runs (default 3)                         --timeout-s N     per run (default 300)
 //   --resume             skip ids already in today's .jsonl (a long run can be continued)
 //   --price-in / --price-out   USD per million tokens (default 3 / 15 — an ASSUMPTION, override with the real rates)
+//   --target model|production|<http(s) base url>   model (default) calls the engine in-process with ANTHROPIC_API_KEY;
+//                        production POSTs to https://ichirei.soul-id.jp/api/select (streaming NDJSON, the same body the
+//                        website sends; no key here, the server holds it); a base url targets any other deployment. Through
+//                        the API the server does not report token usage, so tokens and cost are left blank. Default
+//                        concurrency is 1 for an API target (one story at a time). No session id is sent, so the runs
+//                        never enter the learning-loop analytics.
+//                        Behind an HTTPS proxy, run with NODE_USE_ENV_PROXY=1 (Node >= 22.21) so fetch uses HTTPS_PROXY.
 //
 // PRIVACY: the database is retellings of copyrighted stories, for internal testing only. It is committed in
 // test-data/private/ because this repo is PRIVATE (docker-ignored, never in the image); run outputs are git-ignored.
@@ -47,10 +55,15 @@ const OUT = opt('out', join(root, 'test-data', 'private'))
 const ONLY = opt('only', 'all')
 const LIMIT = Number(opt('limit', '0')) || 0
 const IDS = opt('ids', '') ? new Set(opt('ids', '').split(',').map((s) => s.trim())) : null
-const CONCURRENCY = Math.max(1, Number(opt('concurrency', '3')) || 3)
 const TIMEOUT_S = Number(opt('timeout-s', '300')) || 300
 const PRICE_IN = Number(opt('price-in', '3'))
 const PRICE_OUT = Number(opt('price-out', '15'))
+const TARGET_ARG = opt('target', 'model')
+const PRODUCTION_URL = 'https://ichirei.soul-id.jp'
+/** null = the in-process engine; otherwise the base url whose /api/select is called. */
+export const apiBase = (target) => (target === 'model' ? null : target === 'production' ? PRODUCTION_URL : /^https?:\/\//.test(target) ? target.replace(/\/+$/, '') : undefined)
+const API_BASE = apiBase(TARGET_ARG)
+const CONCURRENCY = Math.max(1, Number(opt('concurrency', API_BASE ? '1' : '3')) || 1)
 const SAMEWORD_SHARE = 0.1
 /** Sameness is a property of a whole set: with fewer runs than this a share of 10% means nothing, so it is not raised. */
 const SAMENESS_MIN_RUNS = 20
@@ -126,8 +139,8 @@ export function describeRun(row, ctx, outcome) {
   const base = {
     id: row.id, category: row.category, sender_to_receiver: row.sender_to_receiver, receiver_alive: row.receiver_alive,
     occasion_db: ctx.occasion_from, occasion_used: ctx.occasion, relationship_used: ctx.relationship, direction_used: ctx.direction,
-    seconds: outcome.seconds.toFixed(1), input_tokens: outcome.input_tokens, output_tokens: outcome.output_tokens,
-    cost_usd_est: outcome.cost.toFixed(4),
+    seconds: outcome.seconds.toFixed(1), input_tokens: outcome.input_tokens ?? '', output_tokens: outcome.output_tokens ?? '',
+    cost_usd_est: outcome.cost == null ? '' : outcome.cost.toFixed(4),
   }
   const flags = []
   if (outcome.error) {
@@ -199,7 +212,9 @@ export function summarize(descs, { priceIn, priceOut }) {
   const tin = descs.reduce((s, d) => s + Number(d.input_tokens), 0)
   const tout = descs.reduce((s, d) => s + Number(d.output_tokens), 0)
   lines.push(`Story run summary — ${descs.length} runs (${ok.length} produced a result, ${descs.length - ok.length} errored or timed out)`)
-  lines.push(`Cost estimate: $${cost.toFixed(2)} (${tin} input + ${tout} output tokens at $${priceIn} / $${priceOut} per million — assumed rates, change with --price-in/--price-out). Mean $${(cost / Math.max(1, descs.length)).toFixed(3)} per run, ${(descs.reduce((s, d) => s + Number(d.seconds), 0) / Math.max(1, descs.length)).toFixed(0)} s per run.`)
+  const meanS = (descs.reduce((s, d) => s + Number(d.seconds), 0) / Math.max(1, descs.length)).toFixed(0)
+  if (descs.every((d) => d.cost_usd_est === '')) lines.push(`Cost: not measured (the API does not report token usage). Time: mean ${meanS} s per run (${descs.map((d) => `${d.id} ${d.seconds} s`).join(', ')}).`)
+  else lines.push(`Cost estimate: $${cost.toFixed(2)} (${tin} input + ${tout} output tokens at $${priceIn} / $${priceOut} per million — assumed rates, change with --price-in/--price-out). Mean $${(cost / Math.max(1, descs.length)).toFixed(3)} per run, ${meanS} s per run.`)
   lines.push('')
   lines.push('Kanji spread per category (main kanji: count)')
   const byCat = new Map()
@@ -237,6 +252,38 @@ export function estimate(n, priceIn = PRICE_IN, priceOut = PRICE_OUT) {
   return { per, total: per * n, low: per * n * 0.6, high: per * n * 1.6 }
 }
 
+// ---- the API target ----------------------------------------------------------------------------------------------------------
+/** The request body the website sends (src/demo/DemoApp.tsx + contextToPayload), minus the session id (keeps tests out of analytics). */
+export const apiBody = (story, ctx) => ({ story, source: 'harness', condition: 'A', language: ctx.language, relationship: ctx.relationship, direction: ctx.direction, occasion: ctx.occasion })
+
+/** POST /api/select and read the NDJSON stream to its terminal line (delta and ping lines are progress only). */
+export async function callSelect(base, body, signal) {
+  const res = await fetch(`${base}/api/select`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body), signal })
+  if (!res.ok) {
+    const text = (await res.text().catch(() => '')).slice(0, 200)
+    throw new Error(`HTTP ${res.status}${text ? `: ${text}` : ''}`)
+  }
+  if (!(res.headers.get('content-type') ?? '').includes('ndjson') || !res.body) return await res.json()
+  const decoder = new TextDecoder()
+  let buffer = ''
+  let final = null
+  const handle = (line) => {
+    const t = line.trim()
+    if (!t) return
+    const msg = JSON.parse(t)
+    if (msg.type === 'error') throw new Error(`server: ${msg.error}`)
+    if (msg.type === 'result') final = msg.result
+  }
+  for await (const chunk of res.body) {
+    buffer += decoder.decode(chunk, { stream: true })
+    let nl
+    while ((nl = buffer.indexOf('\n')) !== -1) { handle(buffer.slice(0, nl)); buffer = buffer.slice(nl + 1) }
+  }
+  handle(buffer + decoder.decode())
+  if (!final) throw new Error('stream ended without a result line')
+  return final
+}
+
 // ---- the run -------------------------------------------------------------------------------------------------------------
 async function runOne(row) {
   const occ = occasionFor(row)
@@ -245,7 +292,7 @@ async function runOne(row) {
   const t0 = Date.now()
   const outcome = { seconds: 0, input_tokens: 0, output_tokens: 0, cost: 0 }
   try {
-    const result = await runEngine(row.test_story_ja, 'A', {
+    const result = API_BASE ? await callSelect(API_BASE, apiBody(row.test_story_ja, ctx), AbortSignal.timeout(TIMEOUT_S * 1000)) : await runEngine(row.test_story_ja, 'A', {
       context: { language: 'ja', relationship: ctx.relationship, direction: ctx.direction, occasion: ctx.occasion },
       signal: AbortSignal.timeout(TIMEOUT_S * 1000),
       onUsage: (_stage, u) => { usage.in += u.input_tokens; usage.out += u.output_tokens },
@@ -256,23 +303,26 @@ async function runOne(row) {
     outcome.timedOut = /Timeout|AbortError|aborted/i.test(outcome.error)
   }
   outcome.seconds = (Date.now() - t0) / 1000
-  outcome.input_tokens = usage.in
-  outcome.output_tokens = usage.out
-  outcome.cost = (usage.in * PRICE_IN + usage.out * PRICE_OUT) / 1e6
+  if (API_BASE) Object.assign(outcome, { input_tokens: null, output_tokens: null, cost: null })
+  else Object.assign(outcome, { input_tokens: usage.in, output_tokens: usage.out, cost: (usage.in * PRICE_IN + usage.out * PRICE_OUT) / 1e6 })
   return describeRun(row, ctx, outcome)
 }
 
 async function main() {
+  if (API_BASE === undefined) {
+    console.error(`--target must be model, production or an http(s) base url (got ${TARGET_ARG})`)
+    process.exit(2)
+  }
   if (!existsSync(DB)) {
     console.error(`Story database not found: ${DB}\nPut ICHIREI_Story_Test_DB_v1.csv in test-data/private/ or pass --db.`)
     process.exit(2)
   }
   let rows = selectRows(loadDb(DB), ONLY)
-  if (IDS) rows = rows.filter((r) => IDS.has(r.id))
+  if (IDS) rows = [...IDS].map((id) => rows.find((r) => r.id === id)).filter(Boolean) // in the order given
   if (LIMIT) rows = rows.slice(0, LIMIT)
   const memorialN = rows.filter((r) => r.receiver_alive === 'no').length
   const est = estimate(rows.length)
-  console.log(`Story run: ${rows.length} stories (${rows.length - memorialN} living-person rows, ${memorialN} memorial rows); engine model ${ENGINE_CONFIG.MODEL}, effort ${ENGINE_CONFIG.EFFORT}, concurrency ${CONCURRENCY}`)
+  console.log(`Story run: ${rows.length} stories (${rows.length - memorialN} living-person rows, ${memorialN} memorial rows); ${API_BASE ? `target ${API_BASE}/api/select (the server's model and effort)` : `engine model ${ENGINE_CONFIG.MODEL}, effort ${ENGINE_CONFIG.EFFORT}`}, concurrency ${CONCURRENCY}`)
   console.log(`Cost estimate (assumptions: ~${ASSUMED.select_in + ASSUMED.review_in} tokens in and ~${ASSUMED.select_out + ASSUMED.review_out} out per run at $${PRICE_IN}/$${PRICE_OUT} per MTok): ~$${est.total.toFixed(0)} (range $${est.low.toFixed(0)}–$${est.high.toFixed(0)}), about $${est.per.toFixed(2)} per run. Run --limit 5 first to replace the assumptions with measured numbers.`)
   if (flag('dry-run')) {
     const byCat = new Map()
@@ -281,7 +331,7 @@ async function main() {
     for (const r of rows.slice(0, 5)) { const o = occasionFor(r); console.log(`  ${r.id} ${r.category} ${r.sender_to_receiver} → ${relationshipFor(r)}/${directionFor(r)}/${o.code} (${o.from})`) }
     return
   }
-  if (!process.env.ANTHROPIC_API_KEY) {
+  if (!API_BASE && !process.env.ANTHROPIC_API_KEY) {
     console.error('ANTHROPIC_API_KEY is not set: the real engine needs a model key (this script never mocks one). Use --dry-run to see the plan.')
     process.exit(3)
   }
@@ -310,7 +360,7 @@ async function main() {
       done.set(row.id, d)
       appendFileSync(jsonl, JSON.stringify(d) + '\n')
       finished++
-      origLog(`[${finished}/${rows.length}] ${row.id} ${d.occasion_used} → ${d.status}${d.main ? ' ' + d.main : ''}${d.flags ? '  flags: ' + d.flags : ''}  ${d.seconds}s $${d.cost_usd_est}`)
+      origLog(`[${finished}/${rows.length}] ${row.id} ${d.occasion_used} → ${d.status}${d.main ? ' ' + d.main : ''}${d.flags ? '  flags: ' + d.flags : ''}  ${d.seconds}s${d.cost_usd_est ? ' $' + d.cost_usd_est : ''}${d.error ? '  ' + d.error : ''}`)
     }
   }
   await Promise.all(Array.from({ length: Math.min(CONCURRENCY, todo.length) }, worker))
