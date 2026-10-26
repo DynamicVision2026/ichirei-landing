@@ -45,6 +45,7 @@ Rules:
   and the story support. Close by opening gently toward what comes next, in a tone that
   suits the occasion — gratitude and a life that goes on. The receiver is a living
   person: never mourning, never decline, never a verdict on who they are.
+- REMEMBRANCE (only when `occasion` is `memorial`; otherwise ignore this bullet). The sender is remembering someone who has died; the character is the sender's own view of that person, kept by the sender or their family. Nothing is being given to anyone, so do not speak of giving, a gift or a receiver. Replace the "living receiver" and "what comes next" rules above with these: write in the voice of remembering — who they were, and still are, to the sender — built from this story's details; tender, grateful, longing or bittersweet, never celebratory and never mournful; never write about death, loss, grief, the funeral or the afterlife as such; never console or advise the sender; no verdict on who they were. If `slot` is `freestyle`, be gently affectionate, never teasing.
 - Write in the story's own emotional register (`emotional_register` above, read from the story): a playful story may be
   playful, a bittersweet one is tender, a solemn one respectful and warm — always within the living-receiver rule below.
   If `slot` is `freestyle` (a playful character), keep it light and short: affectionate teasing, never an insult. If it is

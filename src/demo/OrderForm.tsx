@@ -47,6 +47,8 @@ export default function OrderForm({ result, story, followUps = [], candidate, co
   // The gift's language is the language the engine ran in (the certificate follows it).
   const language: UiLanguage = result.language ?? 'ja'
   const o = copy.order
+  // Remembrance: ink instead of cinnabar on the slip, and the receiver field is the person being remembered.
+  const memorial = result.occasion === 'memorial'
   const distinct = hasDistinctForm(candidate)
 
   const [sender, setSender] = useState('')
@@ -97,7 +99,9 @@ export default function OrderForm({ result, story, followUps = [], candidate, co
       if (!res.ok || !data?.checkout_url) {
         const field = FIELD_KEYS.find((f) => f === data?.field)
         const message = field
-          ? o.errors.field(field)
+          ? memorial && field === 'receiver_name'
+            ? o.errors.field(field).replace(o.receiverLabel, copy.memorial.receiverLabel)
+            : o.errors.field(field)
           : data?.code === 'store_not_configured' || data?.code === 'shopify_not_configured'
             ? o.errors.notConfigured
             : o.errors.generic
@@ -131,7 +135,7 @@ export default function OrderForm({ result, story, followUps = [], candidate, co
       <span className="eyebrow">{o.heading}</span>
 
       {/* The chosen character on its slip, with the certificate line */}
-      <div className="slip">
+      <div className={`slip${memorial ? ' memorial' : ''}`} data-memorial={memorial ? 'yes' : undefined}>
         <p className="clab">{o.chosenLabel}</p>
         <span data-order-glyph className="k slipGlyph">
           {glyph}
@@ -146,7 +150,7 @@ export default function OrderForm({ result, story, followUps = [], candidate, co
       <div className="composer">
         <div className="orderGrid">
           <div>
-            <label className="clab" htmlFor="sender_name">{o.senderLabel}</label>
+            <label className="clab" htmlFor="sender_name">{memorial ? copy.memorial.senderLabel : o.senderLabel}</label>
             <input
               id="sender_name"
               name="sender_name"
@@ -159,7 +163,7 @@ export default function OrderForm({ result, story, followUps = [], candidate, co
             />
           </div>
           <div>
-            <label className="clab" htmlFor="receiver_name">{o.receiverLabel}</label>
+            <label className="clab" htmlFor="receiver_name">{memorial ? copy.memorial.receiverLabel : o.receiverLabel}</label>
             <input
               id="receiver_name"
               name="receiver_name"
@@ -167,7 +171,7 @@ export default function OrderForm({ result, story, followUps = [], candidate, co
               maxLength={NAME_MAX}
               value={receiver}
               onChange={(e) => setReceiver(e.target.value)}
-              placeholder={o.receiverPlaceholder}
+              placeholder={memorial ? copy.memorial.receiverPlaceholder : o.receiverPlaceholder}
             />
           </div>
           <div>

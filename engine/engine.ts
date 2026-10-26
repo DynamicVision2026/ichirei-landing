@@ -150,6 +150,8 @@ export interface RunEngineOptions {
   /** language / relationship / direction / occasion / occasion_detail / inscription_script. Omitted fields: language 'ja',
    *  the rest unspecified. Validated against the code lists in contract.ts. */
   context?: Partial<EngineContext>
+  /** Token usage of each model call (stage 'select' = the main call, 'review' = the separate review call) — for cost accounting by the test runner. */
+  onUsage?: (stage: 'select' | 'review', usage: { model: string; input_tokens: number; output_tokens: number }) => void
 }
 
 /**
@@ -189,6 +191,7 @@ export async function runEngine(
   )
   if (opts.onDelta) stream.on('text', opts.onDelta)
   const message = await stream.finalMessage()
+  opts.onUsage?.('select', { model: MODEL, input_tokens: message.usage?.input_tokens ?? 0, output_tokens: message.usage?.output_tokens ?? 0 })
 
   const textOut = message.content
     .filter((b): b is Anthropic.TextBlock => b.type === 'text')
@@ -202,8 +205,9 @@ export async function runEngine(
   // The prompt asks the model to echo the context; stamp the request's own values
   // so the echo can never disagree with what the caller actually sent. (Plumbing,
   // not selection: nothing about the candidates is touched.)
+  const extracted = extractJson(textOut)
   const stamped: EngineResult = {
-    ...extractJson(textOut),
+    ...extracted,
     language: context.language,
     relationship: context.relationship,
     direction: context.direction,
@@ -211,6 +215,10 @@ export async function runEngine(
     occasion_detail: context.occasion_detail,
     inscription_script: context.inscription_script,
   }
+  // Remembrance: a suggestion only, and only when the sender did not already choose memorial. Normalised here (the model
+  // decides; this is plumbing): true or absent, never a stray value.
+  if (context.occasion !== 'memorial' && (extracted as { suggest_memorial?: unknown }).suggest_memorial === true) stamped.suggest_memorial = true
+  else delete stamped.suggest_memorial
 
   // Palette referee (engine/palette.ts, data in engine/palette.csv): removes hard_block
   // candidates and refuses an anchorless context_required kanji as primary; promotes slot 2, or
@@ -222,7 +230,7 @@ export async function runEngine(
   // The separate review call (engine/review.ts): a fresh model call checks the survivors again.
   // Its verdicts are applied by the same referee code (a failed main → slot 2; a failed or
   // unreviewed freestyle → dropped). It never throws; it never costs the customer their result.
-  const review = await runReview(refereed, palette, trimmed, context, { apiKey: opts.apiKey, signal: opts.signal, model: process.env.ICHIREI_REVIEW_MODEL ?? MODEL })
+  const review = await runReview(refereed, palette, trimmed, context, { apiKey: opts.apiKey, signal: opts.signal, model: process.env.ICHIREI_REVIEW_MODEL ?? MODEL, onUsage: opts.onUsage ? (u) => opts.onUsage!('review', u) : undefined })
   return applyReviewVerdicts(refereed, palette, trimmed, review)
 }
 

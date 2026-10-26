@@ -366,7 +366,7 @@ const mockPage = async (browser, { onExplain, result, order, track } = {}) => {
     (await page.locator('[data-language]').count()) === 4 &&
     (await page.locator('select[name=relationship] option').count()) === 14 &&
     (await page.locator('select[name=direction] option').count()) === 4 &&
-    (await page.locator('select[name=occasion] option').count()) === 8 &&
+    (await page.locator('select[name=occasion] option').count()) === 9 &&
     (await page.locator('input[name=occasion_detail]').count()) === 1)
   check('selectors: ja is the default language; no inscription-script toggle for ja', (await page.locator('[data-language=ja][aria-pressed=true]').count()) === 1 && (await page.locator('[data-inscription-script]').count()) === 0)
   await page.locator('textarea').first().fill(STORY)
@@ -634,7 +634,7 @@ const SECTION_ORDER = ['.hero', '.strip', '.philo', '#shape', '#angles', '#write
   check('landing ja: honesty — no native-speaker claim, no AI, no payment methods, no review counts or ratings', !/ネイティブ|\bAI\b|人工知能|VISA|Visa|PayPal|クレジット|★|⭐/.test(t) && t.includes('本物のレビューが、ここに並びます'))
   check('landing ja: the trust strip has three items (no "checked by native speakers")', (await page.locator('.strip li').count()) === 3)
   check('landing ja: no test controls (no A/B/C, no log export, no golden fixture, no harness label)', !/condition|ログ書き出し|golden fixture|VALIDATION HARNESS|raw contract/.test(t))
-  check('landing ja: the composer is the real flow — chips for relationship, direction and occasion, the textarea, the "0 / 600字" counter, the soft hint', (await page.locator('[data-chip^="relationship:"]').count()) === 13 && (await page.locator('[data-chip^="direction:"]').count()) === 3 && (await page.locator('[data-chip^="occasion:"]').count()) === 7 && (await page.locator('#moment').count()) === 1 && (await page.locator('[data-testid=story-counter]').innerText()) === '0 / 600字' && (await page.locator('[data-testid=story-hint]').innerText()) === '50〜300字くらいで十分です')
+  check('landing ja: the composer is the real flow — chips for relationship, direction and occasion, the textarea, the "0 / 600字" counter, the soft hint', (await page.locator('[data-chip^="relationship:"]').count()) === 13 && (await page.locator('[data-chip^="direction:"]').count()) === 3 && (await page.locator('[data-chip^="occasion:"]').count()) === 8 && (await page.locator('#moment').count()) === 1 && (await page.locator('[data-testid=story-counter]').innerText()) === '0 / 600字' && (await page.locator('[data-testid=story-hint]').innerText()) === '50〜300字くらいで十分です')
   check('landing ja: no language pills inside the flow (the nav switch is the one control) and no inscription-script toggle', (await page.locator('#write [data-language]').count()) === 0 && (await page.locator('[data-inscription-script]').count()) === 0)
   check('landing ja: the nav switch shows exactly EN, 日本語, 繁中', (await page.locator('.lang button').allInnerTexts()).join('|') === 'EN|日本語|繁中')
   await page.locator('#gifts').scrollIntoViewIfNeeded()
@@ -650,7 +650,7 @@ const SECTION_ORDER = ['.hero', '.strip', '.philo', '#shape', '#angles', '#write
   check('photos: m4 has no crop override (object-position is the default 50% 50%)', (await page.locator('img[src$="m4.jpg"]').evaluate((e) => getComputedStyle(e).objectPosition)) === '50% 50%')
   await page.locator('#moments').scrollIntoViewIfNeeded()
   await page.waitForTimeout(400)
-  const mosaicCols = await page.evaluate(() => { const g = document.querySelector('.mosaic'); const kids = [...g.children].map((c) => getComputedStyle(c).gridColumnEnd); const cols = getComputedStyle(g).gridTemplateColumns.split(' ').length; const r = g.getBoundingClientRect(); const m6 = g.querySelector('.m6').getBoundingClientRect(); const m5 = g.querySelector('.m5').getBoundingClientRect(); return { cols, kids, m6w: Math.round(m6.width), m5w: Math.round(m5.width), rowEnd: Math.round(g.querySelector('.m4').getBoundingClientRect().right), m6right: Math.round(m6.right), sameRow: Math.abs(m5.top - m6.top) < 2 } })
+  const mosaicCols = await page.evaluate(() => { const g = document.querySelector('.mosaic'); const kids = [...g.children].map((c) => getComputedStyle(c).gridColumnEnd); const cols = getComputedStyle(g).gridTemplateColumns.split(' ').length; const m6 = g.querySelector('.m6').getBoundingClientRect(); const m5 = g.querySelector('.m5').getBoundingClientRect(); return { cols, kids, m6w: Math.round(m6.width), m5w: Math.round(m5.width), rowEnd: Math.round(g.querySelector('.m4').getBoundingClientRect().right), m6right: Math.round(m6.right), sameRow: Math.abs(m5.top - m6.top) < 2 } })
   check('mosaic (desktop, 4 columns): m6 spans 3 columns next to m5, so the last row has no empty cell', mosaicCols.cols === 4 && mosaicCols.m6w > 3 * mosaicCols.m5w && mosaicCols.sameRow && Math.abs(mosaicCols.m6right - mosaicCols.rowEnd) <= 1, JSON.stringify(mosaicCols))
   // a missing photo leaves the coloured frame, never a broken image
   await page.route('**/img/scenes/m3*', (route) => route.fulfill({ status: 404, body: '' }))
@@ -1039,6 +1039,81 @@ const SECTION_ORDER = ['.hero', '.strip', '.philo', '#shape', '#angles', '#write
   check('en explain call: language en with the context, the romaji reading AND the English meaning, no inscription_script', ex.language === 'en' && ex.relationship === 'parent_mother' && ex.occasion === 'seasonal_thanks' && ex.candidate.kanji === '灯' && ex.candidate.inscription_form === '燈' && ex.candidate.reading === 'akari' && ex.candidate.meaning === 'lamp' && !('inscription_script' in ex), JSON.stringify(ex))
   check('no page errors (run 13, /demo)', errors.length === 0)
   await page.close()
+}
+
+// ---------- Run 13b: remembrance (occasion memorial) — the chip, the suggestion, ink instead of cinnabar, no gift wording ----------
+{
+  const INK = 'rgb(31, 42, 68)'
+  const SEAL = 'rgb(200, 64, 45)'
+  const memResult = (body) => {
+    const r = clone(FIXTURE)
+    r.language = body.language
+    r.occasion = body.occasion
+    r.inscription_script = null
+    // the sender chose a gift occasion but the story says the person has died: the model suggests remembrance
+    if (body.occasion !== 'memorial') r.suggest_memorial = true
+    return r
+  }
+  const orderOk = () => ({ json: { order_ref: 'IC-20261026-MEMREF22', checkout_url: 'http://localhost:5173/__checkout?cart=mem', glyph: '默', certificate_text: 'x', certificate: { memorial: true } } })
+  const { page, errors, calls } = await mockPage(browser, { result: memResult, order: orderOk })
+  await page.goto('http://localhost:5173/?lang=ja', { waitUntil: 'networkidle' })
+  const chips = await page.locator('[data-chip^="occasion:"]').evaluateAll((els) => els.map((e) => e.dataset.chip))
+  check('memorial: "偲ぶ" is the last occasion chip, after the existing seven (nothing is set silently: no chip is pressed at the start)', chips.length === 8 && chips[7] === 'occasion:memorial' && (await page.locator('[data-chip="occasion:memorial"]').innerText()) === '偲ぶ' && (await page.locator('[data-chip^="occasion:"][aria-pressed=true]').count()) === 0)
+  await page.locator('#moment').fill('父は、私が帰省するたびに玄関の灯りをつけて待っていた。去年の冬に亡くなったけれど、今も思い出す。')
+  await pickContext(page, { relationship: 'parent_father', direction: 'up', occasion: 'birthday_milestone' })
+  await page.click('[data-chip="occasion:memorial"]')
+  check('memorial: choosing it changes the direction wording to one that never speaks of giving (その人は、あなたより / 目上の方 …)', (await page.locator('#cg-direction').innerText()) === 'その人は、あなたより' && !(await page.locator('[data-chip^="direction:"]').allInnerTexts()).some((t) => /へ|贈/.test(t)))
+  await page.click('[data-chip="occasion:birthday_milestone"]')
+  check('memorial: the direction label returns to the gift wording for the other occasions', (await page.locator('#cg-direction').innerText()) === '贈る向き')
+  // -- the suggestion: the engine says the story is about someone who has died; the page asks (and shows no cards yet)
+  await page.click(`#write >> text=${GO.ja}`)
+  await page.waitForSelector('[data-testid=memorial-suggest]', { timeout: 15000 })
+  check('suggestion: the page asks the sender before showing anything — no cards, no silent switch of the occasion', (await page.locator('#write article[data-slot]').count()) === 0 && (await page.locator('[data-testid=memorial-suggest]').innerText()).includes('亡くなった方のお話のようです。') && calls.select.length === 1 && calls.select[0].occasion === 'birthday_milestone')
+  // "No, continue as it is" → the cards, as for any gift (cinnabar main)
+  await page.click('[data-testid=memorial-no]')
+  await page.waitForSelector('[data-testid=finalize]', { timeout: 15000 })
+  check('suggestion declined: the cards appear as before (cinnabar main), no second engine call, the finalize button keeps its usual wording', calls.select.length === 1 && (await page.locator('article[data-slot=main] [data-glyph]').evaluate((el) => getComputedStyle(el).color)) === SEAL && (await page.locator('[data-testid=finalize]').innerText()) === FINALIZE.ja)
+  await page.click('#write >> text=もう一度試す')
+  await page.locator('#moment').waitFor()
+  // -- accept: run again as memorial (the same story, the same answers)
+  check('after "try again" the story is kept and no chip is pressed for the occasion except the sender\'s own (birthday_milestone)', (await page.locator('[data-chip="occasion:birthday_milestone"][aria-pressed=true]').count()) === 1)
+  await page.click(`#write >> text=${GO.ja}`)
+  await page.waitForSelector('[data-testid=memorial-suggest]', { timeout: 15000 })
+  await page.click('[data-testid=memorial-yes]')
+  await page.waitForSelector('[data-testid=finalize]', { timeout: 15000 })
+  check('suggestion accepted: the engine runs again with occasion memorial (same story), then the cards appear', calls.select.length === 3 && calls.select[2].occasion === 'memorial' && calls.select[2].story === calls.select[1].story && (await page.locator('#write article[data-slot]').count()) === 3)
+  const colours = await page.evaluate(() => ({ main: getComputedStyle(document.querySelector('article[data-slot=main] [data-glyph]')).color, label: getComputedStyle(document.querySelector('article[data-slot=main] [data-slot-label]')).backgroundColor, border: getComputedStyle(document.querySelector('article[data-slot=main]')).borderTopColor, marked: document.querySelector('article[data-slot=main]').dataset.memorial }))
+  check('memorial result: the main character, its label and its top rule are ink, never cinnabar; the card is marked data-memorial', colours.main === INK && colours.label === INK && colours.border === INK && colours.marked === 'yes', JSON.stringify(colours))
+  check('memorial result: the finalize button says 「この一字を、残す」 (nothing is given)', (await page.locator('[data-testid=finalize]').innerText()) === 'この一字を、残す')
+  const gift = (t) => /贈/.test(t)
+  const chrome = await page.evaluate(() => { const root = document.querySelector('#write').cloneNode(true); root.querySelectorAll('article').forEach((n) => n.remove()); return root.innerText })
+  check('memorial result: no 贈 (give / gift) wording anywhere in the flow outside the model-written cards', !gift(chrome), chrome.slice(0, 300))
+  await page.locator('article[data-slot=main]').locator('text=この一字を選ぶ').click()
+  await page.click('[data-testid=finalize]')
+  const form = page.locator('[data-testid=order-form]')
+  await form.waitFor()
+  const slip = await page.evaluate(() => ({ glyph: getComputedStyle(document.querySelector('[data-order-glyph]')).color, top: getComputedStyle(document.querySelector('.slip')).borderTopColor, marked: document.querySelector('.slip').dataset.memorial }))
+  check('memorial order form: the slip glyph and rule are ink, not cinnabar', slip.glyph === INK && slip.top === INK && slip.marked === 'yes', JSON.stringify(slip))
+  const formText = await form.innerText()
+  check('memorial order form: the receiver field is 「偲ぶ方のお名前」, there is no 贈 wording, the certificate line is the usual one', formText.includes('偲ぶ方のお名前') && !gift(formText) && (await page.locator('[data-certificate]').innerText()) === 'この字は、あなたの目に映る、その人です。', formText.slice(0, 300))
+  await page.fill('input[name=sender_name]', '山田 花子')
+  await page.fill('input[name=receiver_name]', '山田 一郎')
+  const d = new Date(); d.setDate(d.getDate() + 20)
+  await page.fill('input[name=delivery_date]', `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`)
+  await page.click('label:has(input[name=package][value=simple])')
+  await page.click('[data-testid=order-submit]')
+  await page.waitForSelector('#co', { timeout: 8000 })
+  check('memorial order: the engine result sent with the order says occasion memorial (the server derives memorial from it); no client "memorial" field', calls.order[0].engine_result.occasion === 'memorial' && !('memorial' in calls.order[0]))
+  check('no page errors (run 13b)', errors.length === 0)
+  if (errors.length) console.log('page errors:', errors)
+  await page.close()
+  // English: the chip label
+  const en = await mockPage(browser, { result: memResult })
+  await en.page.goto('http://localhost:5173/?lang=en', { waitUntil: 'networkidle' })
+  check('memorial (en): the last occasion chip is "In memory"; zh-Hant: 追思', (await en.page.locator('[data-chip="occasion:memorial"]').innerText()) === 'In memory')
+  await en.page.goto('http://localhost:5173/?lang=zh-Hant', { waitUntil: 'networkidle' })
+  check('memorial (zh-Hant): 追思', (await en.page.locator('[data-chip="occasion:memorial"]').innerText()) === '追思')
+  await en.page.close()
 }
 
 // ---------- Run 14: /track — order status, four languages ----------

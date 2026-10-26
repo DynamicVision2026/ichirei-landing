@@ -1,0 +1,103 @@
+{
+  "name": "memorial-story",
+  "story": "父は、私が帰省するたびに玄関の灯りをつけて待っていた。去年の冬に亡くなったけれど、帰省すると少しだけ嬉しそうだった顔を、今も思い出す。",
+  "context": {
+    "language": "ja",
+    "relationship": "parent_father",
+    "direction": "up",
+    "occasion": "memorial"
+  },
+  "model_reply": {
+    "language": "ja",
+    "relationship": "parent_father",
+    "direction": "up",
+    "occasion": "memorial",
+    "occasion_detail": null,
+    "inscription_script": null,
+    "status": "sufficient",
+    "follow_up_question": null,
+    "particulars": [
+      "玄関の灯り",
+      "帰省のたび"
+    ],
+    "fingerprint": {
+      "relationship_note": "娘 → 父",
+      "scarce_asset": "玄関の灯り",
+      "unsaid_truth": "",
+      "dominant_truth_type": "Private Symbol",
+      "dignity_direction": "",
+      "emotional_register": [
+        "grateful",
+        "longing"
+      ]
+    },
+    "candidates": [
+      {
+        "slot": "main",
+        "kanji": "祝",
+        "inscription_form": null,
+        "reading": "いわう",
+        "truth_type": "Essence",
+        "one_line_gaze": "帰省を、いつも祝うように迎えてくれた人。",
+        "story_anchor": "帰省するたびに",
+        "unique_truth": "u",
+        "eliminated": false,
+        "eliminated_reason": null,
+        "suitability_flag": null,
+        "palette_status": "ok",
+        "flags": []
+      },
+      {
+        "slot": "second",
+        "kanji": "灯",
+        "inscription_form": "燈",
+        "reading": "ひ",
+        "truth_type": "Private Symbol",
+        "one_line_gaze": "帰るたびに、玄関の灯りをつけて待っていてくれた人。",
+        "story_anchor": "玄関の灯りをつけて",
+        "unique_truth": "u",
+        "eliminated": false,
+        "eliminated_reason": null,
+        "suitability_flag": null,
+        "palette_status": "ok",
+        "flags": []
+      },
+      {
+        "slot": "freestyle",
+        "kanji": "喜",
+        "inscription_form": null,
+        "reading": "よろこぶ",
+        "truth_type": "Play",
+        "one_line_gaze": "いつも、帰ると少しだけ嬉しそうだった人。",
+        "story_anchor": "少しだけ嬉しそう",
+        "unique_truth": "",
+        "eliminated": false,
+        "eliminated_reason": null,
+        "suitability_flag": null,
+        "palette_status": "ok",
+        "flags": []
+      }
+    ],
+    "primary_kanji": "祝",
+    "runner_up_kanji": "灯",
+    "freestyle_kanji": "喜",
+    "fallback_follow_up_question": "いちばん思い出す、ちいさな場面をひとつ教えてください。"
+  },
+  "review_reply": {
+    "verdicts": [
+      {
+        "slot": "second",
+        "kanji": "灯",
+        "pass": true,
+        "reason": "ok"
+      }
+    ]
+  },
+  "expect": {
+    "primary": "灯",
+    "eliminated": [
+      "祝",
+      "喜"
+    ]
+  }
+}

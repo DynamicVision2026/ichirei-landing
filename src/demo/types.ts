@@ -61,6 +61,8 @@ export interface EngineResult {
   fingerprint: Fingerprint
   candidates: Candidate[]
   primary_kanji: string | null
+  /** Remembrance: the story clearly says the person has died and the occasion is not memorial — the page asks the sender. */
+  suggest_memorial?: boolean
   runner_up_kanji?: string | null
   /** v6: the freestyle candidate's kanji, or null. */
   freestyle_kanji?: string | null

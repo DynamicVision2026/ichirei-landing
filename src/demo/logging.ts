@@ -21,6 +21,9 @@ export type LogEventName =
   | 'retry_clicked'
   | 'order_submitted'
   | 'order_failed'
+  | 'memorial_suggested'
+  | 'memorial_accepted'
+  | 'memorial_declined'
 
 export interface LogEvent {
   event: LogEventName

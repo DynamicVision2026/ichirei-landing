@@ -64,8 +64,21 @@ occasion — why the gift is being given:
 * retirement_farewell — retirement, leaving, or a farewell
 * parent_day — Mother's Day, Father's Day or a similar day of thanks to parents
 * seasonal_thanks — a seasonal or yearly gesture of thanks (for example mid-summer or year-end gifts)
+* memorial — remembrance: the sender tells a story about someone who has died (see REMEMBRANCE below)
 
 The occasion shapes what a fitting character is. A character that sits badly with the occasion (for example one that evokes an ending at a celebration) is flagged `occasion_mismatch`, and its palette_status can be at best `context_required`.
+
+REMEMBRANCE (applies ONLY when occasion is memorial; for every other occasion ignore this whole block)
+The sender is telling a story about someone who has died. The character is still the sender's own honest view of that person — the thesis does not change — and it is kept by the sender or their family. The person who has died is the SUBJECT, not a receiver: nothing is given to anyone, so never write as if the character were being handed to them. For this occasion only, these rules win over the guardrails above where they differ:
+
+* Remembering voice. Write every one_line_gaze (and every why_this) as a description of who they were — and still are — to the sender: warm, concrete, built from the story's own details, in the sender's voice. Never write about death, loss, dying, grief, the funeral or the afterlife as such, and never address, console or advise the sender.
+* The guardrail "the receiver is a living person" is lifted for this occasion only. Everything else still holds: no verdict on who they were, no flattery, no message aimed at them.
+* Register: tender, grateful, longing or bittersweet — never cheerful in the manner of a celebration, never mournful. Let the story's own emotion lead within these four.
+* Fitting characters. Celebration characters (for example 祝, 寿, 喜, 慶, 賀, 婚) and characters whose main sense is birth or a fresh start do not fit this occasion: if you think of one, discard it (flag `occasion_mismatch` if you must keep it); the system blocks them anyway. The palette hard blocks (death, illness, parting and the like) still apply in full.
+* The freestyle (STEP 5b) may be gently affectionate — families laugh about the people they love too — but never teasing: nothing at their expense, nothing that would make the family wince.
+* Direction and relationship describe who they were to the sender (up = older or senior, down = younger or in the sender's care, across = an equal); use them for the register only.
+
+SUGGESTING REMEMBRANCE (applies ONLY when occasion is NOT memorial). If the story clearly says that the person has died — plainly stated, not merely a memory of the past, a distant relationship or an ambiguous "gone" — set `suggest_memorial` to true. Otherwise false. This only lets the page ask the sender; never change the occasion yourself and never write in the remembering voice unless occasion is memorial. When occasion is memorial, `suggest_memorial` is false.
 HARD PROCESS RULES (do not reorder, do not skip)
 
 1. Do not name any candidate character until STEP 3. If you find yourself thinking of a character during STEP 1–2, discard it and keep extracting.
@@ -242,6 +255,7 @@ Return this exact shape:
   "direction": "up" | "down" | "across" | null,  // echo of CONTEXT.direction
   "occasion": string | null,             // echo of CONTEXT.occasion (the code)
   "occasion_detail": string | null,      // echo of CONTEXT.occasion_detail verbatim, null if unspecified
+  "suggest_memorial": boolean,           // true only when occasion is not memorial AND the story clearly says the person has died; otherwise false
   "inscription_script": "traditional" | "simplified",  // echo of CONTEXT.inscription_script
   "status": "sufficient" | "insufficient",
   "follow_up_question": string | null,   // Chinese in the display_script; non-null ONLY when status is "insufficient"; otherwise null

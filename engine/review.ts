@@ -143,6 +143,8 @@ export interface RunReviewOptions {
   /** Injected in tests; defaults to a real Anthropic client. */
   client?: Pick<Anthropic, 'messages'>
   log?: (line: string) => void
+  /** Token usage of the review call (cost accounting). */
+  onUsage?: (usage: { model: string; input_tokens: number; output_tokens: number }) => void
 }
 
 /**
@@ -168,6 +170,7 @@ export async function runReview(result: EngineResult, palette: Palette, story: s
       { signal: AbortSignal.any(signals) },
     )
     const message = await stream.finalMessage()
+    opts.onUsage?.({ model: opts.model, input_tokens: message.usage?.input_tokens ?? 0, output_tokens: message.usage?.output_tokens ?? 0 })
     if (message.stop_reason === 'refusal') throw new Error('reviewer refused the request')
     const text = message.content.filter((b): b is Anthropic.TextBlock => b.type === 'text').map((b) => b.text).join('')
     const verdicts = parseVerdicts(text, items)

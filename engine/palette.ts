@@ -66,10 +66,16 @@ export class Palette {
   private readonly index = new Map<string, PaletteRow>()
   /** `family:character` → category, for the freestyle slot only (engine/freestyle-blocklist.csv). */
   readonly freestyleBlocked: Map<string, string>
+  /**
+   * character → category (celebration | birth_beginning), engine/memorial-block.csv: the DEFAULT block for the
+   * `memorial` occasion, applied to every slot until reviewers have filled in `blocked_occasions` for memorial.
+   */
+  readonly memorialBlocked: Map<string, string>
 
-  constructor(rows: PaletteRow[], freestyleBlocked: Map<string, string> = new Map()) {
+  constructor(rows: PaletteRow[], freestyleBlocked: Map<string, string> = new Map(), memorialBlocked: Map<string, string> = new Map()) {
     this.rows = rows
     this.freestyleBlocked = freestyleBlocked
+    this.memorialBlocked = memorialBlocked
     const put = (row: PaletteRow, form: string, role: string) => {
       const key = keyOf(row.language, form)
       const other = this.index.get(key)
@@ -93,6 +99,15 @@ export class Palette {
 
   values(): PaletteRow[] {
     return this.rows
+  }
+
+  /** The memorial default-block category of a character in either of its forms, if it is blocked. */
+  memorialCategory(forms: (string | null | undefined)[]): string | undefined {
+    for (const f of forms) {
+      const hit = f ? this.memorialBlocked.get(f) : undefined
+      if (hit) return hit
+    }
+    return undefined
   }
 
   /** The freestyle-blocklist category of a character in either of its forms, if it is blocked. */
@@ -215,6 +230,25 @@ export function parseFreestyleBlocklist(text: string): Map<string, string> {
   return out
 }
 
+export const MEMORIAL_CATEGORIES = ['celebration', 'birth_beginning'] as const
+
+/** Parse engine/memorial-block.csv (`kanji,category,note`): characters that do not fit remembrance. Throws on anything malformed. */
+export function parseMemorialBlock(text: string): Map<string, string> {
+  const [header, ...body] = parseCsv(text)
+  if (!header || header.join(',') !== 'kanji,category,note') throw new Error('memorial-block.csv: header must be exactly kanji,category,note')
+  const out = new Map<string, string>()
+  body.forEach((cells, i) => {
+    const at = `memorial-block.csv row ${i + 2}`
+    if (cells.length !== 3) throw new Error(`${at}: expected 3 columns, got ${cells.length}`)
+    const [kanji, category] = cells
+    if (!kanji || [...kanji].length !== 1) throw new Error(`${at}: kanji must be exactly one character`)
+    if (!(MEMORIAL_CATEGORIES as readonly string[]).includes(category)) throw new Error(`${at}: unknown category "${category}"`)
+    if (out.has(kanji)) throw new Error(`${at}: duplicate ${kanji}`)
+    out.set(kanji, category)
+  })
+  return out
+}
+
 function resolveSiblingPath(file: string, override: string | undefined): string {
   if (override) return override
   const here = dirname(fileURLToPath(import.meta.url))
@@ -264,7 +298,15 @@ export function loadPalette(): Palette {
   } catch (e) {
     throw new Error(`freestyle-blocklist.csv not found at ${blPath} — refusing to run without it (${(e as Error).message})`)
   }
-  return new Palette(palette.rows, parseFreestyleBlocklist(blText))
+  // So does the memorial default block (remembrance): a missing file would silently let celebration characters through.
+  const mbPath = resolveSiblingPath('memorial-block.csv', process.env.ICHIREI_MEMORIAL_BLOCK_PATH)
+  let mbText: string
+  try {
+    mbText = readFileSync(mbPath, 'utf8')
+  } catch (e) {
+    throw new Error(`memorial-block.csv not found at ${mbPath} — refusing to run without it (${(e as Error).message})`)
+  }
+  return new Palette(palette.rows, parseFreestyleBlocklist(blText), parseMemorialBlock(mbText))
 }
 
 /**
@@ -404,7 +446,10 @@ export function applyPalette(result: EngineResult, palette: Palette, story: stri
     const c: Candidate = { ...orig, flags: [...(orig.flags ?? [])] }
     const found = rowsFor(palette, families, c)
     const rows = found.filter((f): f is Found & { row: PaletteRow } => f.row !== undefined)
-    if (rows.length === 0 && !(cross && isMainSlot(c))) return c
+    // Remembrance: the default block (celebration / new-beginning characters) applies to every slot, row or no row.
+    const memorialHit = result.occasion === 'memorial' ? palette.memorialCategory([c.kanji, c.inscription_form]) : undefined
+    const noRows = rows.length === 0 && !(cross && isMainSlot(c))
+    if (noRows && !memorialHit) return c
     const eliminate = (reason: string, flag: string, already: RefereeAction['action'], fresh: RefereeAction['action'], blockedBy: Family[]) => {
       c.palette_status = 'off_palette'
       c.flags = unique([...c.flags, flag, ...(cross ? blockedBy.map((f) => `blocked_by_${f}`) : [])])
@@ -427,7 +472,8 @@ export function applyPalette(result: EngineResult, palette: Palette, story: stri
     }
     // Blocked for THIS occasion in any palette → removed too (an order with no occasion blocks nothing).
     const occ = result.occasion === null ? [] : rows.filter((f) => f.row.blocked_occasions.includes(result.occasion as string))
-    if (occ.length > 0) {
+    if (occ.length > 0 || memorialHit) {
+      if (memorialHit) c.flags = unique([...c.flags, 'memorial_default_block', `memorial_${memorialHit}`])
       return eliminate(BLOCKED_OCCASION_REASON, 'palette_blocked_occasion', 'blocked_occasion_already_eliminated', 'blocked_occasion_eliminated', occ.map((f) => f.family))
     }
     // en only: a MAIN candidate needs a row in both palettes; a character one culture has not vetted is not offered as a main.

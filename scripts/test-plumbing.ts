@@ -54,9 +54,9 @@ check(
     JSON.stringify(['parent_mother', 'parent_father', 'child', 'grandparent', 'spouse', 'romance', 'sibling', 'friend', 'work', 'pet', 'in_law', 'mentor', 'community']),
 )
 check(
-  'occasion codes = the 7 in the spec',
+  'occasion codes = the 7 in the spec + memorial (remembrance)',
   JSON.stringify([...OCCASIONS]) ===
-    JSON.stringify(['birthday_milestone', 'wedding', 'new_baby', 'school_career', 'retirement_farewell', 'parent_day', 'seasonal_thanks']),
+    JSON.stringify(['birthday_milestone', 'wedding', 'new_baby', 'school_career', 'retirement_farewell', 'parent_day', 'seasonal_thanks', 'memorial']),
 )
 check('direction codes = up | down | across', JSON.stringify([...DIRECTIONS]) === JSON.stringify(['up', 'down', 'across']))
 check('languages = ja | zh-Hans | zh-Hant | en (no bare zh)', JSON.stringify([...LANGUAGES]) === JSON.stringify(['ja', 'zh-Hans', 'zh-Hant', 'en']))

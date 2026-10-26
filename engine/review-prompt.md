@@ -23,8 +23,9 @@ For slots `main` and `second` (the two main candidates), FAIL if ANY of these ho
    - retirement_farewell: death, decline, "used up", "finished" — a gentle farewell is fine, an ending as a verdict is not.
    - parent_day: old age as decline, burden, debt, death.
    - seasonal_thanks: debt, burden, illness, obligation.
+   - memorial (remembrance of someone who has died; nothing is being given): a celebration character (祝, 寿, 喜, 慶, 賀, 婚 and the like), a character whose main sense is birth or a fresh start, or a gaze line that speaks of death, loss, grief, the funeral or the afterlife as such, or consoles the sender. The gaze must be in the remembering voice: who they were, and still are, to the sender.
    Apply the occasion given above; if it is `unspecified`, apply only the dignity rule.
-3. Dignity. The character, with its gaze line, closes the receiver into a verdict on who they are (stubborn, cold, weak, difficult) instead of opening them into a fuller person; or it speaks of the receiver as if they were already gone, declining or a burden. The receiver is a living person.
+3. Dignity. The character, with its gaze line, closes the receiver into a verdict on who they are (stubborn, cold, weak, difficult) instead of opening them into a fuller person; or it speaks of the receiver as if they were already gone, declining or a burden. The receiver is a living person. (For occasion `memorial` the person has died: "already gone" is not the test; the test is that the line describes who they were and still are, in the sender's voice, and is no verdict, no decline, no burden.)
 4. Invention. The one_line_gaze states an object, place, time, action or habit that is not in the story. (Paraphrase of what the story says is fine.)
 5. Generic. The one_line_gaze would read just as well under any other story (swap the names and details: does it still fit?).
 
@@ -32,7 +33,7 @@ For slot `freestyle` (the playful candidate), FAIL if ANY of these holds:
 1. Not anchored. The story_anchor is not a fragment of something the two people actually shared, as the story tells it.
 2. Insulting. It teases about — or would be heard as mocking — the receiver's body, appearance, weight, intelligence, money or status, sexual meaning, illness, disability, or anything cruel. Teasing must be WITH the receiver, never AT them. A joke the receiver would only laugh at because they are being polite is a FAIL.
 3. Hard block or taboo. It carries a death / illness / parting / severing connotation, or the occasion taboo above applies to it.
-4. Wrong register. For a bittersweet or longing story it jokes; for an `up` direction it is anything but gentle and affectionate; it speaks for the receiver instead of the sender.
+4. Wrong register. For occasion `memorial` it teases at all (gentle affection is fine, teasing is not); for a bittersweet or longing story it jokes; for an `up` direction it is anything but gentle and affectionate; it speaks for the receiver instead of the sender.
 5. Invention. As main rule 4.
 
 The freestyle does NOT need a palette row and may be an ordinary or even unlovely character — that alone is never a reason to fail it.

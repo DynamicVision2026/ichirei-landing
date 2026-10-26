@@ -14,12 +14,19 @@
 // (when the Mandarin palette has the character), the plain-English meaning the buyer will actually see
 // (`current_english_meaning`) and the full palette meaning, plus empty `suggested_meaning` / `reviewer_comment`.
 //
+// Remembrance (occasion `memorial`): every palette sheet has two extra columns, `memorial_default_block` (the category if
+// the character is on the default block list engine/memorial-block.csv, else empty) and `memorial (block|ok)` for the
+// reviewer's verdict; write `memorial` into `blocked_occasions` of engine/palette.csv to block a character for it. Two
+// more sheets: review/memorial_default_block.csv (the starter list, with a keep/remove column) and review/review_codes.csv
+// (every code a reviewer may type in `blocked_occasions`, memorial included).
+//
 // engine/palette.csv stays the single source of truth; reviewers send comments back
 // and the changes are applied there. Re-run this after any palette edit.
 
 import { readFileSync, writeFileSync, mkdirSync } from 'node:fs'
 import { join } from 'node:path'
-import { classicalEchoOf, parseCsv, parsePalette, plainMeaning } from '../engine/palette.ts'
+import { classicalEchoOf, parseCsv, parseMemorialBlock, parsePalette, plainMeaning } from '../engine/palette.ts'
+import { OCCASIONS } from '../engine/contract.ts'
 import { romanizeReadings } from '../engine/romaji.ts'
 
 const root = join(import.meta.dirname, '..')
@@ -30,6 +37,8 @@ const quote = (cell) => (/[",\n\r]/.test(cell) ? `"${cell.replaceAll('"', '""')}
 const toCsv = (lines) => lines.map((cells) => cells.map(quote).join(',')).join('\n') + '\n'
 
 const palette = parsePalette(readFileSync(join(root, 'engine', 'palette.csv'), 'utf8'))
+const memorialBlock = parseMemorialBlock(readFileSync(join(root, 'engine', 'memorial-block.csv'), 'utf8'))
+const memorialCsv = parseCsv(readFileSync(join(root, 'engine', 'memorial-block.csv'), 'utf8'))
 const col = (r, name) => r[header.indexOf(name)]
 
 /** Rows that still need a classical line: none recorded, or the row is not reviewed (so nothing would be shown). */
@@ -72,7 +81,10 @@ export function enMeaningRows() {
 export function reviewFiles() {
   const files = {}
   for (const lang of ['ja', 'zh']) {
-    files[`palette_${lang}.csv`] = toCsv([[...header, 'reviewer_comment'], ...rows.filter((r) => r[langIdx] === lang).map((r) => [...r, ''])])
+    files[`palette_${lang}.csv`] = toCsv([
+      [...header, 'memorial_default_block', 'memorial (block|ok)', 'reviewer_comment'],
+      ...rows.filter((r) => r[langIdx] === lang).map((r) => [...r, memorialBlock.get(col(r, 'kanji')) ?? memorialBlock.get(col(r, 'inscription_form')) ?? '', '', '']),
+    ])
     files[`classical_echo_${lang}.csv`] = toCsv([
       ECHO_HEADER,
       ...echoRows(lang).map((r) => {
@@ -83,6 +95,20 @@ export function reviewFiles() {
       }),
     ])
   }
+  files['memorial_default_block.csv'] = toCsv([
+    ['kanji', 'category', 'note', 'keep_blocked (yes|no)', 'reviewer_comment'],
+    ...memorialCsv.slice(1).map((r) => [...r, '', '']),
+  ])
+  const OCCASION_NOTES = {
+    birthday_milestone: 'a milestone birthday', wedding: 'a wedding or marriage anniversary', new_baby: 'the birth of a child',
+    school_career: 'graduation, entering school, a new job, a promotion', retirement_farewell: 'retirement, leaving, a farewell',
+    parent_day: "Mother's Day, Father's Day and the like", seasonal_thanks: 'a seasonal or yearly thanks',
+    memorial: 'REMEMBRANCE: the sender tells a story about someone who has died; the character is kept by the sender or their family, never given. Block celebration characters and anything whose main sense is birth or a fresh start; the starter list is engine/memorial-block.csv',
+  }
+  files['review_codes.csv'] = toCsv([
+    ['column', 'code', 'meaning'],
+    ...OCCASIONS.map((o) => ['blocked_occasions', o, OCCASION_NOTES[o] ?? '']),
+  ])
   files['palette_review_en_meanings.csv'] = toCsv([EN_HEADER, ...enMeaningRows()])
   return files
 }

@@ -35,9 +35,14 @@ export interface Certificate {
   line: string
   /** Always the English line. */
   line_en: string
+  /**
+   * Remembrance (occasion `memorial`): the person has died and the piece is kept by the sender or their family. The workshop
+   * carves in black or gold — no red seal, no red-and-white cord (in Japan a red name on a grave means a living person).
+   */
+  memorial: boolean
 }
 
-export function buildCertificate(candidate: Candidate, glyph: string, language: Language, palette: Palette): Certificate {
+export function buildCertificate(candidate: Candidate, glyph: string, language: Language, palette: Palette, memorial = false): Certificate {
   const find = (family: 'ja' | 'zh') => palette.lookup(family, candidate.kanji) ?? (candidate.inscription_form ? palette.lookup(family, candidate.inscription_form) : undefined)
   const zhBuyer = language === 'zh-Hans' || language === 'zh-Hant'
   const row = zhBuyer ? find('zh') : find('ja')
@@ -60,6 +65,7 @@ export function buildCertificate(candidate: Candidate, glyph: string, language: 
     meaning_en: meaning || candidate.meaning?.trim() || null,
     line: certificateText(language),
     line_en: CERTIFICATE_LINE_EN,
+    memorial,
   }
 }
 
@@ -170,7 +176,7 @@ export function parseOrderRequest(body: unknown, now: Date = new Date(), palette
       language: lang,
       candidate,
       glyph: glyphFor(candidate, inscription_style),
-      certificate: buildCertificate(candidate, glyphFor(candidate, inscription_style), lang, palette ?? loadPalette()),
+      certificate: buildCertificate(candidate, glyphFor(candidate, inscription_style), lang, palette ?? loadPalette(), result.occasion === 'memorial'),
       sender_name: sender,
       receiver_name: receiver,
       delivery_date: date,
@@ -203,7 +209,7 @@ export interface Attribute {
 }
 
 /**
- * The nine line-item attributes, in this order (`certificate_meaning_en` sits next to the kanji and reading so the
+ * The nine line-item attributes (plus `ichirei_memorial=yes` as a tenth, for remembrance orders only), in this order (`certificate_meaning_en` sits next to the kanji and reading so the
  * workshop can print a bilingual card). `kanji` is the selected character in its display
  * form (ja: modern, zh: simplified); `inscription_form` is the glyph to CARVE (after the sender's
  * choice of kyūjitai/modern or traditional/simplified).
@@ -219,6 +225,8 @@ export function lineAttributes(order: ValidOrder, orderRef: string): Attribute[]
     { key: 'delivery_date', value: order.delivery_date },
     { key: 'language', value: order.language },
     { key: 'order_ref', value: orderRef },
+    // Remembrance: tells the workshop to carve in black or gold — no red seal, no red-and-white cord.
+    ...(order.certificate.memorial ? [{ key: 'ichirei_memorial', value: 'yes' }] : []),
   ]
 }
 

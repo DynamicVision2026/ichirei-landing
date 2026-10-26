@@ -74,6 +74,8 @@ export default function Reveal({ result, story, followUps = [], condition, copy,
   const script: InscriptionScript | null =
     isChineseUi(language) ? (result.inscription_script ?? context.inscriptionScript) : null
   const reduceMotion = useReducedMotion()
+  // Remembrance: the main character is ink (never cinnabar — a red name on a grave means a living person) and nothing is "given".
+  const memorial = (result.occasion ?? context.occasion) === 'memorial'
 
   const { revealOrder, eliminated } = useMemo(() => {
     const alive = result.candidates.filter((c) => !c.eliminated)
@@ -235,17 +237,18 @@ export default function Reveal({ result, story, followUps = [], condition, copy,
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.9, ease: [0.16, 1, 0.3, 1] }}
               data-slot={isFreestyle ? 'freestyle' : isPrimary ? 'main' : 'second'}
+              data-memorial={memorial ? 'yes' : undefined}
               className={`rounded-2xl px-6 ${alwaysOpen ? '' : 'cursor-pointer'} ${
                 isFreestyle
                   ? 'border border-dashed border-accent/60 bg-transparent py-6'
-                  : `border border-line bg-surface py-8 ${diagnostics ? PAPER_SHADOW : CARD_SHADOW} ${isPrimary ? 'border-t-4 border-t-seal' : ''}`
+                  : `border border-line bg-surface py-8 ${diagnostics ? PAPER_SHADOW : CARD_SHADOW} ${isPrimary ? (memorial ? 'border-t-4 border-t-fg' : 'border-t-4 border-t-seal') : ''}`
               } ${isSelected ? 'ring-2 ring-accent' : ''}`}
               onClick={alwaysOpen ? undefined : () => toggleOpen(c)}
             >
               <p
                 data-slot-label
                 className={`font-label mb-4 inline-block rounded-full px-3 py-1 text-[12px] tracking-[0.12em] ${
-                  isPrimary ? 'bg-seal text-white' : isFreestyle ? 'border border-dashed border-accent text-accent' : 'bg-fg/10 text-fg'
+                  isPrimary ? (memorial ? 'bg-fg text-page' : 'bg-seal text-white') : isFreestyle ? 'border border-dashed border-accent text-accent' : 'bg-fg/10 text-fg'
                 }`}
               >
                 {slotLabel}
@@ -259,7 +262,7 @@ export default function Reveal({ result, story, followUps = [], condition, copy,
                     script={script}
                     customerGlyph={!diagnostics}
                     size={isFreestyle ? 'text-6xl' : 'text-7xl'}
-                    color={isPrimary ? 'text-seal' : isFreestyle ? 'text-mute' : 'text-fg'}
+                    color={isPrimary ? (memorial ? 'text-fg' : 'text-seal') : isFreestyle ? 'text-mute' : 'text-fg'}
                   />
                 </div>
                 <div className="w-full min-w-0 flex-1 text-left">
@@ -399,7 +402,7 @@ export default function Reveal({ result, story, followUps = [], condition, copy,
               className={primaryBtn}
               data-testid="finalize"
             >
-              {finalized ? copy.finalized(selected ?? '') : copy.finalizeButton}
+              {finalized ? copy.finalized(selected ?? '') : memorial ? copy.memorial.finalizeButton : copy.finalizeButton}
             </button>
             {!selected && (
               <p className="font-label text-[12px] text-mute">
@@ -430,7 +433,7 @@ export default function Reveal({ result, story, followUps = [], condition, copy,
               <div
                 className={`paper-texture flex aspect-[3/4] w-full flex-col items-center justify-center rounded-sm bg-surface ${PAPER_SHADOW}`}
               >
-                <span className="font-mincho text-[9rem] leading-none text-seal">
+                <span className={`font-mincho text-[9rem] leading-none ${memorial ? 'text-fg' : 'text-seal'}`}>
                   {carvedGlyph(previewFor, language, script)}
                 </span>
                 <span className="font-label mt-6 text-xs tracking-[0.35em] text-accent">

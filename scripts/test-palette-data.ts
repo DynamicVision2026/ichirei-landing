@@ -110,8 +110,19 @@ try { execFileSync('node', ['scripts/export-review.mjs', '--check'], { stdio: 'p
 check('review files are up to date with engine/palette.csv (run node scripts/export-review.mjs)', stale === '', stale)
 for (const [lang, rows] of [['ja', ja], ['zh', zh]] as const) {
   const [rh, ...rb] = parseCsv(readFileSync(join(process.cwd(), 'review', `palette_${lang}.csv`), 'utf8'))
-  check(`review/palette_${lang}.csv: the 17 palette columns + an empty reviewer_comment column, one row per ${lang} palette row`, rh.join(',') === [...PALETTE_COLUMNS, 'reviewer_comment'].join(',') && rb.length === rows.length && rb.every((r) => r.length === 18 && r[17] === '' && r[0] === lang))
+  check(`review/palette_${lang}.csv: the 17 palette columns + memorial_default_block, memorial (block|ok) and reviewer_comment columns, one row per ${lang} palette row`, rh.join(',') === [...PALETTE_COLUMNS, 'memorial_default_block', 'memorial (block|ok)', 'reviewer_comment'].join(',') && rb.length === rows.length && rb.every((r) => r.length === 20 && r[18] === '' && r[19] === '' && r[0] === lang))
 }
+
+// ---- remembrance (occasion `memorial`) -------------------------------------------------------------
+const [mbh, ...mbb] = parseCsv(readFileSync(join(process.cwd(), 'engine', 'memorial-block.csv'), 'utf8'))
+check('memorial default block: the starter list (kanji,category,note) names celebration characters 祝 寿 喜 慶 賀 婚 and birth / new-beginning ones, each once', mbh.join(',') === 'kanji,category,note' && ['祝', '寿', '喜', '慶', '賀', '婚', '誕', '産', '始', '初', '新', '芽'].every((k) => mbb.some((r) => r[0] === k)) && new Set(mbb.map((r) => r[0])).size === mbb.length && mbb.every((r) => ['celebration', 'birth_beginning'].includes(r[1])))
+check('memorial: `memorial` appears in review/review_codes.csv as a code reviewers may type in blocked_occasions', readFileSync(join(process.cwd(), 'review', 'review_codes.csv'), 'utf8').includes('blocked_occasions,memorial,'))
+const [ph0, ...pb0] = parseCsv(readFileSync(join(process.cwd(), 'review', 'palette_ja.csv'), 'utf8'))
+const MEMO_LIST = new Set(mbb.map((r) => r[0]))
+const colDefault = ph0.indexOf('memorial_default_block')
+const colVerdict = ph0.indexOf('memorial (block|ok)')
+check('review sheets carry the memorial marking columns: memorial_default_block is filled exactly for characters on the default list, the verdict column is empty for the reviewer', colDefault > 0 && colVerdict > colDefault && pb0.every((r) => r[colVerdict] === '' && (r[colDefault] !== '') === (MEMO_LIST.has(r[1]) || MEMO_LIST.has(r[2]))))
+check('review/memorial_default_block.csv lists the default block with keep_blocked and reviewer_comment columns for the reviewers', readFileSync(join(process.cwd(), 'review', 'memorial_default_block.csv'), 'utf8').startsWith('kanji,category,note,keep_blocked (yes|no),reviewer_comment'))
 
 // ---- v6: the freestyle blocklist and the classical-echo review sheets -----------------------------
 const [blh, ...blb] = parseCsv(readFileSync(join(process.cwd(), 'engine', 'freestyle-blocklist.csv'), 'utf8'))

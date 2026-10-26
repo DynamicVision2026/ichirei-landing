@@ -99,7 +99,7 @@ const GOLDEN_CONTEXT: GiftContext = {
 const GOLDEN_FIXTURE =
   '父は口下手で厳しくて、ほめられた記憶なんてほとんどない。進路のことでも何度もぶつかった。ただ、私が東京に出るとき駅まで送ってくれて、改札で「金は要るか」って、それだけ言って封筒を押し付けてきた。あれから二十年、盆に帰るたびに車で駅まで迎えに来て、帰りも必ず送ってくれる。相変わらず、ほとんど何も話さないけど。'
 
-type Phase = 'elicit' | 'processing' | 'followup' | 'reveal' | 'order' | 'thin'
+type Phase = 'elicit' | 'processing' | 'followup' | 'suggest' | 'reveal' | 'order' | 'thin'
 
 /**
  * harness  — /demo: the internal validation harness (A/B/C conditions, log export, golden fixture,
@@ -185,6 +185,7 @@ export default function DemoApp({ mode = 'harness', aside }: { mode?: Mode; asid
   // The answers already given (each at most FOLLOW_UP_MAX characters), kept apart from the story so each has its own limit.
   const [followUps, setFollowUps] = useState<string[]>([])
   const followUpsUsed = useRef(0)
+  const memorialDeclined = useRef(false)
   const sessionLogged = useRef(false)
 
   // Customer site: when the flow moves on (processing → follow-up → cards → order form) bring the start of the
@@ -206,7 +207,7 @@ export default function DemoApp({ mode = 'harness', aside }: { mode?: Mode; asid
     setConditionState(c)
   }
 
-  const runEngine = async (fullStory: string, answers: string[] = []) => {
+  const runEngine = async (fullStory: string, answers: string[] = [], ctx: GiftContext = context) => {
     setPhase('processing')
     setError(null)
     setReceivedChars(0)
@@ -225,7 +226,7 @@ export default function DemoApp({ mode = 'harness', aside }: { mode?: Mode; asid
       const res = await fetch('/api/select', {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ story: fullStory, ...(answers.length ? { follow_ups: answers } : {}), session: sessionId, source: customer ? 'customer' : 'harness', condition, ...contextToPayload(context) }),
+        body: JSON.stringify({ story: fullStory, ...(answers.length ? { follow_ups: answers } : {}), session: sessionId, source: customer ? 'customer' : 'harness', condition, ...contextToPayload(ctx) }),
         signal: controller.signal,
       })
       if (!res.ok) {
@@ -249,11 +250,11 @@ export default function DemoApp({ mode = 'harness', aside }: { mode?: Mode; asid
         primary: engineResult.primary_kanji,
         candidates: engineResult.candidates.length,
         no_eligible_primary: engineResult.referee?.no_eligible_primary ?? false,
-        language: context.language,
-        relationship: context.relationship,
-        direction: context.direction,
-        occasion: context.occasion,
-        has_occasion_detail: context.occasionDetail.trim() !== '',
+        language: ctx.language,
+        relationship: ctx.relationship,
+        direction: ctx.direction,
+        occasion: ctx.occasion,
+        has_occasion_detail: ctx.occasionDetail.trim() !== '',
         follow_ups_used: followUpsUsed.current,
       })
       if (engineResult.status === 'insufficient') {
@@ -266,6 +267,10 @@ export default function DemoApp({ mode = 'harness', aside }: { mode?: Mode; asid
         } else {
           setPhase('thin')
         }
+      } else if (engineResult.suggest_memorial === true && ctx.occasion !== 'memorial' && !memorialDeclined.current) {
+        // The story clearly says the person has died: ask the sender (never switch the occasion silently).
+        log('memorial_suggested', {})
+        setPhase('suggest')
       } else {
         setPhase('reveal')
       }
@@ -289,6 +294,7 @@ export default function DemoApp({ mode = 'harness', aside }: { mode?: Mode; asid
   const tryAgain = () => {
     log('retry_clicked', { story_chars: story.length })
     followUpsUsed.current = 0
+    memorialDeclined.current = false
     // The story box gets the story with the answers folded in (cut to the story limit), so nothing the sender wrote is lost.
     setStory(clipStory([story, ...followUps].join('\n\n')))
     setFollowUps([])
@@ -299,6 +305,21 @@ export default function DemoApp({ mode = 'harness', aside }: { mode?: Mode; asid
     setReceivedChars(0)
     setChosen(null)
     setPhase('elicit')
+  }
+
+  // The sender's answer to "this sounds like someone who has passed away": look again as memorial, or keep what was found.
+  const acceptMemorial = () => {
+    log('memorial_accepted', {})
+    const next = { ...context, occasion: 'memorial' as const }
+    setContext(next)
+    setResult(null)
+    followUpsUsed.current = 0
+    void runEngine(story, followUps, next)
+  }
+  const declineMemorial = () => {
+    log('memorial_declined', {})
+    memorialDeclined.current = true
+    setPhase('reveal')
   }
 
   const submitFollowUp = () => {
@@ -406,6 +427,23 @@ export default function DemoApp({ mode = 'harness', aside }: { mode?: Mode; asid
             {copy.followUpSubmit}
           </button>
         </motion.div>
+      )}
+
+      {phase === 'suggest' && (
+        <div className={customer ? 'composer' : 'text-center'} data-testid="memorial-suggest" role="group" aria-labelledby="memorial-suggest-title">
+          <p id="memorial-suggest-title" className="font-mincho text-xl leading-relaxed text-fg">
+            {copy.memorial.suggestTitle}
+          </p>
+          <p className="font-serif-jp mt-4 text-sm leading-loose text-mute">{copy.memorial.suggestBody}</p>
+          <div className="mt-8 flex flex-wrap gap-3">
+            <button type="button" data-testid="memorial-yes" onClick={acceptMemorial} className={customer ? 'btn primary' : 'font-label rounded-full bg-accent px-6 py-2.5 text-sm text-page'}>
+              {copy.memorial.suggestYes}
+            </button>
+            <button type="button" data-testid="memorial-no" onClick={declineMemorial} className={customer ? 'btn ghost' : 'font-label rounded-full border border-accent/40 px-6 py-2.5 text-sm text-fg hover:border-accent'}>
+              {copy.memorial.suggestNo}
+            </button>
+          </div>
+        </div>
       )}
 
       {phase === 'thin' && (

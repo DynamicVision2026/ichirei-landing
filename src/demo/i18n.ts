@@ -26,7 +26,7 @@ export const RELATIONSHIP_CODES = [
 export const DIRECTION_CODES = ['up', 'down', 'across'] as const
 export const OCCASION_CODES = [
   'birthday_milestone', 'wedding', 'new_baby', 'school_career', 'retirement_farewell',
-  'parent_day', 'seasonal_thanks',
+  'parent_day', 'seasonal_thanks', 'memorial',
 ] as const
 export type RelationshipCode = (typeof RELATIONSHIP_CODES)[number]
 export type DirectionCode = (typeof DIRECTION_CODES)[number]
@@ -81,6 +81,23 @@ export interface Copy {
   relationships: Record<RelationshipCode, string>
   directions: Record<DirectionCode, string>
   occasions: Record<OccasionCode, string>
+  /**
+   * Wording for the `memorial` occasion (remembrance). The character is the sender's view of someone who has
+   * died, kept by the sender or their family — nothing here speaks of giving it to anyone.
+   */
+  memorial: {
+    directionLabel: string
+    directions: Record<DirectionCode, string>
+    finalizeButton: string
+    senderLabel: string
+    receiverLabel: string
+    receiverPlaceholder: string
+    /** Shown instead of the cards when the engine reads the story as being about someone who has died (the sender decides). */
+    suggestTitle: string
+    suggestBody: string
+    suggestYes: string
+    suggestNo: string
+  }
   // elicitation
   openingAsk: string
   voiceStart: string
@@ -203,6 +220,23 @@ const ja: Copy = {
     retirement_farewell: '退職・送別',
     parent_day: '母の日・父の日などの感謝',
     seasonal_thanks: 'お中元・お歳暮など季節の感謝',
+    memorial: '偲ぶ',
+  },
+  memorial: {
+    directionLabel: 'その人は、あなたより',
+    directions: {
+      up: '目上の方（親・恩師・上司など）',
+      down: '目下の方（子ども・後輩・部下など）',
+      across: '対等な相手（配偶者・友人・きょうだいなど）',
+    },
+    finalizeButton: 'この一字を、残す',
+    senderLabel: 'あなたのお名前',
+    receiverLabel: '偲ぶ方のお名前',
+    receiverPlaceholder: '例：山田 花子',
+    suggestTitle: '亡くなった方のお話のようです。',
+    suggestBody: '「偲ぶ」として探しなおしますか？ 字の選びかたが、やわらかく変わります。選ぶのはあなたです。',
+    suggestYes: '「偲ぶ」で探しなおす',
+    suggestNo: 'このまま見る',
   },
   openingAsk: 'その人のことを、全部書かなくていい。その人らしい、小さなことを、ひとつだけ。',
   voiceStart: '声で話す',
@@ -328,6 +362,23 @@ const zhHans: Copy = {
     retirement_farewell: '退休与送别',
     parent_day: '母亲节、父亲节等感恩日',
     seasonal_thanks: '节日与岁末的感谢',
+    memorial: '追思',
+  },
+  memorial: {
+    directionLabel: '对方比你',
+    directions: {
+      up: '长辈或上位者（父母、师长、上司）',
+      down: '晚辈或下位者（孩子、晚辈、下属）',
+      across: '平辈（伴侣、朋友、兄弟姐妹）',
+    },
+    finalizeButton: '就留下这一个字',
+    senderLabel: '你的姓名',
+    receiverLabel: '追思对象的姓名',
+    receiverPlaceholder: '例如：李华',
+    suggestTitle: '这听起来是关于一位已经离世的人。',
+    suggestBody: '要改用“追思”重新寻找吗？选字的方式会变得更温柔。由你来决定。',
+    suggestYes: '改用“追思”重新寻找',
+    suggestNo: '维持原样',
   },
   openingAsk: '不必写下那个人的全部。只写一件最像那个人的小事就好。',
   voiceStart: '用语音说',
@@ -456,6 +507,23 @@ const zhHant: Copy = {
     retirement_farewell: '退休與送別',
     parent_day: '母親節、父親節等感恩日',
     seasonal_thanks: '節日與歲末的感謝',
+    memorial: '追思',
+  },
+  memorial: {
+    directionLabel: '對方比你',
+    directions: {
+      up: '長輩或上位者（父母、師長、上司）',
+      down: '晚輩或下位者（孩子、晚輩、部屬）',
+      across: '平輩（伴侶、朋友、兄弟姊妹）',
+    },
+    finalizeButton: '就留下這一個字',
+    senderLabel: '你的姓名',
+    receiverLabel: '追思對象的姓名',
+    receiverPlaceholder: '例如：李華',
+    suggestTitle: '這聽起來是關於一位已經離世的人。',
+    suggestBody: '要改用「追思」重新尋找嗎？選字的方式會變得更溫柔。由你來決定。',
+    suggestYes: '改用「追思」重新尋找',
+    suggestNo: '維持原樣',
   },
   openingAsk: '不必寫下那個人的全部。只寫一件最像那個人的小事就好。',
   voiceStart: '用語音說',
@@ -587,6 +655,23 @@ const en: Copy = {
     retirement_farewell: 'Retirement or farewell',
     parent_day: "Mother's Day, Father's Day and the like",
     seasonal_thanks: 'Seasonal or year-end thanks',
+    memorial: 'In memory',
+  },
+  memorial: {
+    directionLabel: 'They were',
+    directions: {
+      up: 'Someone older or senior (parent, mentor, boss)',
+      down: 'Someone younger or in your care (child, junior)',
+      across: 'An equal (partner, friend, sibling)',
+    },
+    finalizeButton: 'Keep this character',
+    senderLabel: 'Your name',
+    receiverLabel: 'Name of the person you are remembering',
+    receiverPlaceholder: 'e.g. Margaret Carter',
+    suggestTitle: 'This sounds like a story about someone who has passed away.',
+    suggestBody: 'Would you like to look again as “In memory”? The characters are chosen differently, more gently. It is your decision.',
+    suggestYes: 'Yes, look again as “In memory”',
+    suggestNo: 'No, continue as it is',
   },
   openingAsk: "You don't have to write everything about them. Just one small thing that is so like them.",
   voiceStart: 'Speak instead',

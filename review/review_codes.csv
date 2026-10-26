@@ -1,0 +1,9 @@
+column,code,meaning
+blocked_occasions,birthday_milestone,a milestone birthday
+blocked_occasions,wedding,a wedding or marriage anniversary
+blocked_occasions,new_baby,the birth of a child
+blocked_occasions,school_career,"graduation, entering school, a new job, a promotion"
+blocked_occasions,retirement_farewell,"retirement, leaving, a farewell"
+blocked_occasions,parent_day,"Mother's Day, Father's Day and the like"
+blocked_occasions,seasonal_thanks,a seasonal or yearly thanks
+blocked_occasions,memorial,"REMEMBRANCE: the sender tells a story about someone who has died; the character is kept by the sender or their family, never given. Block celebration characters and anything whose main sense is birth or a fresh start; the starter list is engine/memorial-block.csv"

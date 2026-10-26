@@ -72,6 +72,9 @@ export const OCCASIONS = [
   'retirement_farewell',
   'parent_day',
   'seasonal_thanks',
+  // remembrance: the sender tells a story about someone who has died. The character is the sender's view of that person,
+  // kept by the sender or their family — no cinnabar, no celebration characters (palette default block), no gift wording.
+  'memorial',
 ] as const
 export type Occasion = (typeof OCCASIONS)[number]
 
@@ -410,6 +413,12 @@ export interface EngineResult {
    * follow_up_question when it has to return `insufficient`. null on insufficient results.
    */
   fallback_follow_up_question?: string | null
+  /**
+   * Remembrance: true when the story clearly says the person has died and the occasion the sender chose is NOT
+   * `memorial`. The model decides (wording in the prompts); the page never switches the occasion silently —
+   * it asks the sender, and only then runs again with `memorial`. Absent/false otherwise.
+   */
+  suggest_memorial?: boolean
   /** Set by the palette referee on every sufficient result; absent on insufficient ones. */
   referee?: RefereeReport
   /** Set by the review call (engine/review.ts) when it ran. */
@@ -474,6 +483,7 @@ export function validateEngineResult(raw: unknown): string[] {
   if (!Array.isArray(register) || register.length < 1 || register.length > 2 || register.some((x) => typeof x !== 'string' || !x.trim())) {
     problems.push('fingerprint.emotional_register must be 1–2 non-empty strings')
   }
+  if (r.suggest_memorial !== undefined && typeof r.suggest_memorial !== 'boolean') problems.push('suggest_memorial must be boolean')
   if (r.fallback_follow_up_question === undefined || r.fallback_follow_up_question === null || typeof r.fallback_follow_up_question !== 'string' || !r.fallback_follow_up_question.trim()) {
     problems.push('fallback_follow_up_question missing')
   }
