@@ -10,7 +10,7 @@
 // ships only after a PASS.
 //
 // Env: ICHIREI_REVIEW=off disables the call; ICHIREI_REVIEW_MODEL, ICHIREI_REVIEW_EFFORT (default
-// low), ICHIREI_REVIEW_MAX_TOKENS (default 1500), ICHIREI_REVIEW_PROMPT_PATH.
+// low), ICHIREI_REVIEW_MAX_TOKENS (default 2500; the reasoning counts against it), ICHIREI_REVIEW_PROMPT_PATH.
 
 import Anthropic from '@anthropic-ai/sdk'
 import { readFileSync } from 'node:fs'
@@ -18,6 +18,7 @@ import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { familyOf, type Candidate, type EngineContext, type EngineResult, type ReviewReport, type Slot } from './contract.ts'
 import type { Palette } from './palette.ts'
+import { callSignal } from './limits.ts'
 
 export const REVIEW_SLOTS = {
   language: '{{ LANGUAGE }}',
@@ -164,10 +165,10 @@ export async function runReview(result: EngineResult, palette: Palette, story: s
     const prompt = fillReviewPrompt(loadReviewPrompt(), story, context, items)
     const client = opts.client ?? new Anthropic(opts.apiKey ? { apiKey: opts.apiKey } : {})
     const effort = (process.env.ICHIREI_REVIEW_EFFORT ?? 'low') as 'low' | 'medium' | 'high'
-    const signals = [AbortSignal.timeout(60_000), ...(opts.signal ? [opts.signal] : [])]
+    const signal = callSignal(opts.signal, 60_000)
     const stream = client.messages.stream(
-      { model: opts.model, max_tokens: Number(process.env.ICHIREI_REVIEW_MAX_TOKENS ?? 1500), output_config: { effort }, messages: [{ role: 'user', content: prompt }] },
-      { signal: AbortSignal.any(signals) },
+      { model: opts.model, max_tokens: Number(process.env.ICHIREI_REVIEW_MAX_TOKENS ?? 2500), output_config: { effort }, messages: [{ role: 'user', content: prompt }] },
+      { signal },
     )
     const message = await stream.finalMessage()
     opts.onUsage?.({ model: opts.model, input_tokens: message.usage?.input_tokens ?? 0, output_tokens: message.usage?.output_tokens ?? 0 })

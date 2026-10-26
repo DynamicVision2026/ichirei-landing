@@ -80,7 +80,7 @@ if (argv.includes('--child')) {
 // ------------------------------------------------------------------------------------------------------------------------------
 // parent
 // ------------------------------------------------------------------------------------------------------------------------------
-const configs = (optAll('config').length ? optAll('config') : ['baseline:', 'effort-medium:ICHIREI_EFFORT=medium', 'medium-8k:ICHIREI_EFFORT=medium,ICHIREI_MAX_TOKENS=8000']).map((c) => {
+const configs = (optAll('config').length ? optAll('config') : ['current-defaults:', 'previous-defaults:ICHIREI_EFFORT=high,ICHIREI_MAX_TOKENS=20000,ICHIREI_REVIEW_MODEL=claude-sonnet-5']).map((c) => {
   const i = c.indexOf(':')
   const name = c.slice(0, i)
   const env = Object.fromEntries(c.slice(i + 1).split(',').filter(Boolean).map((kv) => [kv.slice(0, kv.indexOf('=')), kv.slice(kv.indexOf('=') + 1)]))

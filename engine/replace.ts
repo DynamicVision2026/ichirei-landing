@@ -14,6 +14,7 @@ import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { anchorPresent, applyPalette, applyReviewVerdicts, type Palette } from './palette.ts'
 import { runReview } from './review.ts'
+import { callSignal } from './limits.ts'
 import type { Candidate, EngineContext, EngineResult, RefereeAction } from './contract.ts'
 
 export const REPLACE_SLOTS = { surviving: '{{ SURVIVING }}', avoid: '{{ AVOID }}' } as const
@@ -115,7 +116,10 @@ export function parseReplacement(raw: string): Candidate | null {
 export interface ReplaceOptions {
   apiKey?: string
   signal?: AbortSignal
+  /** The model that writes the replacement. */
   model: string
+  /** The model that reviews it (the same one that reviews every candidate); defaults to `model`. */
+  reviewModel?: string
   /** Injected in tests; defaults to a real Anthropic client. */
   client?: Pick<Anthropic, 'messages'>
   log?: (line: string) => void
@@ -154,10 +158,10 @@ export async function completeMains(
       const prompt = fillReplacePrompt(selectionFilled, loadReplacePrompt(), current, extraAvoid)
       const client = opts.client ?? new Anthropic(opts.apiKey ? { apiKey: opts.apiKey } : {})
       const effort = (process.env.ICHIREI_REPLACE_EFFORT ?? 'medium') as 'low' | 'medium' | 'high'
-      const signals = [AbortSignal.timeout(90_000), ...(opts.signal ? [opts.signal] : [])]
+      const signal = callSignal(opts.signal)
       const stream = client.messages.stream(
         { model: opts.model, max_tokens: Number(process.env.ICHIREI_REPLACE_MAX_TOKENS ?? 6000), output_config: { effort }, messages: [{ role: 'user', content: prompt }] },
-        { signal: AbortSignal.any(signals) },
+        { signal },
       )
       const message = await stream.finalMessage()
       opts.onUsage?.('replace', { model: opts.model, input_tokens: message.usage?.input_tokens ?? 0, output_tokens: message.usage?.output_tokens ?? 0 })
@@ -196,7 +200,7 @@ export async function completeMains(
       continue
     }
     opts.onStage?.('checking')
-    const review = await runReview(refereed, palette, story, context, { apiKey: opts.apiKey, signal: opts.signal, model: opts.model, client: opts.client, log, onUsage: opts.onUsage ? (u) => opts.onUsage!('review', u) : undefined })
+    const review = await runReview(refereed, palette, story, context, { apiKey: opts.apiKey, signal: opts.signal, model: opts.reviewModel ?? opts.model, client: opts.client, log, onUsage: opts.onUsage ? (u) => opts.onUsage!('review', u) : undefined })
     const judged = applyReviewVerdicts(refereed, palette, story, review)
     const final = judged.candidates[0]
     if (judged.status !== 'sufficient' || !final || final.eliminated) {

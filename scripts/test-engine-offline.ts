@@ -27,6 +27,8 @@ const ZH_STORY = '他總是把玄關的燈留著，不管我多晚回家。二�
 // ---- fake Anthropic upstream ---------------------------------------------
 const seen: { body: any; headers: http.IncomingHttpHeaders; kind: 'select' | 'review' }[] = []
 let reply: unknown = GOLDEN
+let mode: 'normal' | 'hang' | 'truncate' = 'normal'
+const hung: http.ServerResponse[] = []
 const upstream = http.createServer(async (req, res) => {
   let raw = ''
   for await (const chunk of req) raw += chunk
@@ -34,8 +36,14 @@ const upstream = http.createServer(async (req, res) => {
   const kind = String(body.messages?.[0]?.content).includes('Independent Review Prompt') ? 'review' : 'select'
   seen.push({ body, headers: req.headers, kind })
   // The review call (v6) is answered separately: every candidate of the current selection reply passes.
+  if (mode === 'hang' && kind === 'select') {
+    res.writeHead(200, { 'content-type': 'text/event-stream' })
+    res.write(`event: message_start\ndata: ${JSON.stringify({ type: 'message_start', message: { id: 'm', type: 'message', role: 'assistant', model: 'x', content: [], stop_reason: null, stop_sequence: null, usage: { input_tokens: 1, output_tokens: 0 } } })}\n\n`)
+    hung.push(res) // a model that never finishes
+    return
+  }
   const passAll = { verdicts: ((reply as { candidates?: { slot: string; kanji: string }[] })?.candidates ?? []).map((c) => ({ slot: c.slot, kanji: c.kanji, pass: true, reason: 'ok (fake reviewer)' })) }
-  const text = kind === 'review' ? JSON.stringify(passAll) : typeof reply === 'string' ? reply : JSON.stringify(reply)
+  const text = kind === 'review' ? JSON.stringify(passAll) : typeof reply === 'string' ? reply : mode === 'truncate' ? JSON.stringify(reply).slice(0, 300) : JSON.stringify(reply)
   res.writeHead(200, { 'content-type': 'text/event-stream' })
   const sse = (event: string, data: unknown) => res.write(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`)
   sse('message_start', { type: 'message_start', message: { id: 'msg_fake', type: 'message', role: 'assistant', model: 'claude-sonnet-5', content: [], stop_reason: null, stop_sequence: null, usage: { input_tokens: 10, output_tokens: 1 } } })
@@ -44,7 +52,7 @@ const upstream = http.createServer(async (req, res) => {
     sse('content_block_delta', { type: 'content_block_delta', index: 0, delta: { type: 'text_delta', text: text.slice(i, i + 200) } })
   }
   sse('content_block_stop', { type: 'content_block_stop', index: 0 })
-  sse('message_delta', { type: 'message_delta', delta: { stop_reason: 'end_turn', stop_sequence: null }, usage: { output_tokens: 99 } })
+  sse('message_delta', { type: 'message_delta', delta: { stop_reason: mode === 'truncate' && kind === 'select' ? 'max_tokens' : 'end_turn', stop_sequence: null }, usage: { output_tokens: 99 } })
   sse('message_stop', { type: 'message_stop' })
   res.end()
 })
@@ -82,7 +90,51 @@ try {
   check('golden→model: heart-anchor gate + widened substitution test are in what the model sees', p1.includes('6. Heart anchor.') && p1.includes('another family, couple, friendship or team'))
   // 還暦 is allowed to reach the model only as the sender's occasion_detail (and as the example in its definition).
   check('golden→model: no 還暦-only wording reaches the model beyond occasion_detail', !/還暦|Kanreki|sixty/.test(p1.split('\n').filter((l) => !l.startsWith('occasion_detail:') && !l.startsWith('`occasion_detail` is optional')).join('\n')))
-  check('golden→model: model claude-sonnet-5, streaming, effort high, max_tokens 20000 (depth unchanged)', lastSelect().body.model === 'claude-sonnet-5' && lastSelect().body.stream === true && lastSelect().body.output_config?.effort === 'high' && lastSelect().body.max_tokens === 20000)
+  check('speed defaults: selection call is claude-sonnet-5, streaming, effort medium, max_tokens 8000', lastSelect().body.model === 'claude-sonnet-5' && lastSelect().body.stream === true && lastSelect().body.output_config?.effort === 'medium' && lastSelect().body.max_tokens === 8000, JSON.stringify({ m: lastSelect().body.model, e: lastSelect().body.output_config, t: lastSelect().body.max_tokens }))
+  const lastReview = seen.filter((x) => x.kind === 'review').at(-1)!
+  check('speed defaults: the review call runs on the fastest current model (claude-haiku-5-5) at low effort', lastReview.body.model === 'claude-haiku-5-5' && lastReview.body.output_config?.effort === 'low' && lastReview.body.max_tokens === 2500, JSON.stringify({ m: lastReview.body.model, e: lastReview.body.output_config, t: lastReview.body.max_tokens }))
+  check('speed defaults: the longest valid answer in the fixtures fits max_tokens 8000 with room for the reasoning (≈ 1.5 tokens per character is a generous bound)', JSON.stringify(GOLDEN).length * 1.5 < 8000 / 2, String(JSON.stringify(GOLDEN).length))
+  const { ENGINE_CONFIG } = await import('../engine/engine.ts')
+  check('speed defaults: ENGINE_CONFIG (what /api/health reports) says the same', ENGINE_CONFIG.EFFORT === 'medium' && ENGINE_CONFIG.MAX_TOKENS === 8000 && ENGINE_CONFIG.REVIEW_MODEL === 'claude-haiku-5-5' && ENGINE_CONFIG.CALL_TIMEOUT_MS === 90_000)
+
+  // cloudbuild.yaml must carry the SAME settings and pass them on every deploy (--update-env-vars), or a deploy could reset them
+  {
+    const cb = readFileSync(join(process.cwd(), 'cloudbuild.yaml'), 'utf8')
+    const sub = (k: string) => new RegExp(`^\\s*${k}:\\s*'([^']*)'`, 'm').exec(cb)?.[1]
+    check('cloudbuild.yaml: substitutions equal the code defaults (medium / 8000 / claude-haiku-5-5 / low / 90000)', sub('_EFFORT') === String(ENGINE_CONFIG.EFFORT) && sub('_MAX_TOKENS') === String(ENGINE_CONFIG.MAX_TOKENS) && sub('_REVIEW_MODEL') === ENGINE_CONFIG.REVIEW_MODEL && sub('_REVIEW_EFFORT') === ENGINE_CONFIG.REVIEW_EFFORT && sub('_CALL_TIMEOUT_MS') === String(ENGINE_CONFIG.CALL_TIMEOUT_MS), JSON.stringify(['_EFFORT', '_MAX_TOKENS', '_REVIEW_MODEL', '_REVIEW_EFFORT', '_CALL_TIMEOUT_MS'].map(sub)))
+    const upd = /--update-env-vars=(\S+)/.exec(cb)?.[1] ?? ''
+    check('cloudbuild.yaml: every deploy sets ICHIREI_EFFORT, ICHIREI_MAX_TOKENS, ICHIREI_REVIEW_MODEL, ICHIREI_REVIEW_EFFORT and ICHIREI_CALL_TIMEOUT_MS from those substitutions', ['ICHIREI_EFFORT=${_EFFORT}', 'ICHIREI_MAX_TOKENS=${_MAX_TOKENS}', 'ICHIREI_REVIEW_MODEL=${_REVIEW_MODEL}', 'ICHIREI_REVIEW_EFFORT=${_REVIEW_EFFORT}', 'ICHIREI_CALL_TIMEOUT_MS=${_CALL_TIMEOUT_MS}'].every((x) => upd.includes(x)), upd)
+  }
+
+  // ---- 1b. one model call may take at most ICHIREI_CALL_TIMEOUT_MS (default 90 s) ---------------------------------------
+  {
+    const { callTimeoutMs, ModelTimeoutError } = await import('../engine/limits.ts')
+    check('call timeout: 90 s by default; ICHIREI_CALL_TIMEOUT_MS lowers or raises it; junk falls back to 90 s', callTimeoutMs({}) === 90_000 && callTimeoutMs({ ICHIREI_CALL_TIMEOUT_MS: '30000' }) === 30_000 && callTimeoutMs({ ICHIREI_CALL_TIMEOUT_MS: 'abc' }) === 90_000 && callTimeoutMs({ ICHIREI_CALL_TIMEOUT_MS: '-5' }) === 90_000)
+    process.env.ICHIREI_CALL_TIMEOUT_MS = '400'
+    mode = 'hang'
+    const t0 = Date.now()
+    let err: unknown = null
+    try {
+      await runEngine(GOLDEN_STORY, 'A')
+    } catch (e) {
+      err = e
+    }
+    check('call timeout: a model that never finishes is cut off at the ceiling with a clear ModelTimeoutError (no hang, no retry storm)', err instanceof ModelTimeoutError && Date.now() - t0 < 5000, `${String(err)} after ${Date.now() - t0} ms`)
+    const apiLines = await ndjson(await post({ story: GOLDEN_STORY }))
+    check('call timeout: /api/select ends with a terminal error line carrying code model_timeout (the page shows its timeout message)', apiLines.at(-1)?.type === 'error' && apiLines.at(-1).code === 'model_timeout', JSON.stringify(apiLines.at(-1)))
+    for (const r of hung) r.destroy()
+    delete process.env.ICHIREI_CALL_TIMEOUT_MS
+
+    mode = 'truncate'
+    let cut: unknown = null
+    try {
+      await runEngine(GOLDEN_STORY, 'A')
+    } catch (e) {
+      cut = e
+    }
+    check('max_tokens: an answer cut off by the output limit is reported as exactly that (not as a JSON parse error)', cut instanceof Error && /ran out of output room/.test(cut.message) && /8000/.test(cut.message), String(cut))
+    mode = 'normal'
+  }
 
   // ---- 2. Chinese ------------------------------------------------------------
   const zhReply = { ...GOLDEN, language: 'zh-Hant', relationship: 'friend', direction: 'across', occasion: 'wedding', occasion_detail: '結婚10年' }

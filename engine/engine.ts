@@ -13,6 +13,7 @@
 // Editing a prompt file changes the engine's behavior with no change to this code.
 
 import Anthropic from '@anthropic-ai/sdk'
+import { callSignal, callTimeoutMs, ModelTimeoutError, timedOut } from './limits.ts'
 import { readFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -32,13 +33,18 @@ import {
 
 // --- Configurable in ONE place (build spec §3) ---
 const MODEL = process.env.ICHIREI_MODEL ?? 'claude-sonnet-5'
-const EFFORT = (process.env.ICHIREI_EFFORT ?? 'high') as
+const EFFORT = (process.env.ICHIREI_EFFORT ?? 'medium') as
   | 'low'
   | 'medium'
   | 'high'
   | 'xhigh'
   | 'max'
-const MAX_TOKENS = Number(process.env.ICHIREI_MAX_TOKENS ?? 20000)
+// 8000 covers the longest valid answer (three candidates + fingerprint, ≈ 2–3k tokens; the longest fixture is ~2,100 characters)
+// with room left for the reasoning, which counts against this limit too. A run that still hits it is reported as such, not as a parse error.
+const MAX_TOKENS = Number(process.env.ICHIREI_MAX_TOKENS ?? 8000)
+// The review only checks a short answer: the fastest current model at low effort (ICHIREI_REVIEW_MODEL / ICHIREI_REVIEW_EFFORT override).
+export const DEFAULT_REVIEW_MODEL = 'claude-haiku-5-5'
+const REVIEW_MODEL = process.env.ICHIREI_REVIEW_MODEL ?? DEFAULT_REVIEW_MODEL
 
 // Slots every prompt file must contain. The story slot is the original Phase 0
 // placeholder; the four context slots are new in v5.
@@ -188,6 +194,8 @@ export async function runEngine(
 
   // Stream + finalMessage so heavy reasoning at high effort doesn't hit an HTTP
   // timeout; the function still returns one assembled JSON response to the caller.
+  // One call may take at most ICHIREI_CALL_TIMEOUT_MS (default 90 s) — a slow call fails clearly instead of holding the sender for minutes.
+  const signal = callSignal(opts.signal)
   const stream = client.messages.stream(
     {
       model: MODEL,
@@ -195,7 +203,7 @@ export async function runEngine(
       output_config: { effort: EFFORT },
       messages: [{ role: 'user', content: prompt }],
     },
-    opts.signal ? { signal: opts.signal } : undefined,
+    { signal },
   )
   let firstDelta = true
   stream.on('text', (text) => {
@@ -205,7 +213,16 @@ export async function runEngine(
     }
     opts.onDelta?.(text)
   })
-  const message = await stream.finalMessage()
+  let message: Anthropic.Message
+  try {
+    message = await stream.finalMessage()
+  } catch (err) {
+    if (timedOut(signal)) {
+      console.log(`[ichirei-timing] ${JSON.stringify({ select_ms: Date.now() - tStart, status: 'timeout', model: MODEL, effort: EFFORT, max_tokens: MAX_TOKENS })}`)
+      throw new ModelTimeoutError(Math.round(callTimeoutMs() / 1000))
+    }
+    throw err
+  }
   const selectMs = Date.now() - tStart
   opts.onUsage?.('select', { model: MODEL, input_tokens: message.usage?.input_tokens ?? 0, output_tokens: message.usage?.output_tokens ?? 0 })
 
@@ -221,7 +238,17 @@ export async function runEngine(
   // The prompt asks the model to echo the context; stamp the request's own values
   // so the echo can never disagree with what the caller actually sent. (Plumbing,
   // not selection: nothing about the candidates is touched.)
-  const extracted = extractJson(textOut)
+  let extracted: EngineResult
+  try {
+    extracted = extractJson(textOut)
+  } catch (err) {
+    // Reasoning + answer did not fit in max_tokens: say so (and log it), instead of a bare parse error.
+    if (message.stop_reason === 'max_tokens') {
+      console.log(`[ichirei-engine] max_tokens_hit ${JSON.stringify({ max_tokens: MAX_TOKENS, output_tokens: message.usage?.output_tokens ?? null, effort: EFFORT })}`)
+      throw new Error(`The model ran out of output room (max_tokens ${MAX_TOKENS}) before finishing its answer`)
+    }
+    throw err
+  }
   const stamped: EngineResult = {
     ...extracted,
     language: context.language,
@@ -251,7 +278,7 @@ export async function runEngine(
   // unreviewed freestyle → dropped). It never throws; it never costs the customer their result.
   opts.onStage?.('checking')
   const tReview = Date.now()
-  const review = await runReview(refereed, palette, trimmed, context, { apiKey: opts.apiKey, signal: opts.signal, model: process.env.ICHIREI_REVIEW_MODEL ?? MODEL, onUsage: opts.onUsage ? (u) => opts.onUsage!('review', u) : undefined })
+  const review = await runReview(refereed, palette, trimmed, context, { apiKey: opts.apiKey, signal: opts.signal, model: REVIEW_MODEL, onUsage: opts.onUsage ? (u) => opts.onUsage!('review', u) : undefined })
   const reviewMs = Date.now() - tReview
   const reviewed = applyReviewVerdicts(refereed, palette, trimmed, review)
 
@@ -260,7 +287,9 @@ export async function runEngine(
   const completed = await completeMains(reviewed, palette, trimmed, context, prompt, {
     apiKey: opts.apiKey,
     signal: opts.signal,
-    model: process.env.ICHIREI_REPLACE_MODEL ?? process.env.ICHIREI_REVIEW_MODEL ?? MODEL,
+    // the replacement is a selection (it must pass the person test): the selection model; only its review uses the review model
+    model: process.env.ICHIREI_REPLACE_MODEL ?? MODEL,
+    reviewModel: REVIEW_MODEL,
     onUsage: opts.onUsage,
     onStage: opts.onStage,
   })
@@ -270,7 +299,7 @@ export async function runEngine(
 
 /** One line per run: where the time went (no story text). Read it in the Cloud Run logs. */
 function logTiming(t: { select_ms: number; review_ms: number; replace_ms: number; total_ms: number; status: string; stop_reason: string | null; output_tokens: number | null }) {
-  console.log(`[ichirei-timing] ${JSON.stringify({ ...t, model: MODEL, effort: EFFORT, max_tokens: MAX_TOKENS })}`)
+  console.log(`[ichirei-timing] ${JSON.stringify({ ...t, model: MODEL, effort: EFFORT, max_tokens: MAX_TOKENS, review_model: REVIEW_MODEL })}`)
 }
 
-export const ENGINE_CONFIG = { MODEL, EFFORT, MAX_TOKENS }
+export const ENGINE_CONFIG = { MODEL, EFFORT, MAX_TOKENS, REVIEW_MODEL, REVIEW_EFFORT: process.env.ICHIREI_REVIEW_EFFORT ?? 'low', CALL_TIMEOUT_MS: callTimeoutMs() }
