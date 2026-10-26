@@ -1,0 +1,5651 @@
+[
+ {
+  "id": "0001",
+  "title": "親方の革砥を継いだ夏",
+  "url": "https://lacrima.jp/heartwarming_story/oyakata-no-kawato-wo-tsuida-natsu/",
+  "category": "mentor",
+  "sender_to_receiver": "弟子→親方",
+  "direction": "up",
+  "receiver_alive": "no",
+  "occasions": [
+   "thanks"
+  ],
+  "emotion": [
+   "grateful",
+   "bittersweet"
+  ],
+  "themes": [
+   "職人",
+   "継承",
+   "根拠のない信頼",
+   "居場所"
+  ],
+  "key_moment_ja": "何をしても続かなかった若者に、病床の親方が理由も言わず店を任せると告げた。",
+  "test_story_ja": "親方は私の祖父の弟で、町の小さな床屋でした。私は何をやっても一年もたない人間で、職を転々としていました。そんな私に、体を壊した親方が店を継いでほしいと言ってくれたんです。会ったのは子どもの頃に二回だけ。布団の上から、刃物の扱い方とお客さん一人ひとりの好みを、ほとんど言葉少なに教えてくれました。後で奥さんから、親方も若い頃は続かない人だったと聞きました。だから私を選んだんだと思います。親方はその年の夏に亡くなりましたが、今も毎朝、親方の道具を手入れしてから店を開けています。",
+  "test_use": "edge",
+  "note": "Receiver (master) dies mid-story; living alternatives are the widow or regular customers."
+ },
+ {
+  "id": "0002",
+  "title": "実話｜紅花染めの白猫",
+  "url": "https://lacrima.jp/heartwarming_story/jitsuwa-benibanazome-no-shiroi-neko/",
+  "category": "mentor",
+  "sender_to_receiver": "弟子→親方",
+  "direction": "up",
+  "receiver_alive": "yes",
+  "occasions": [
+   "thanks",
+   "birthday"
+  ],
+  "emotion": [
+   "apologetic",
+   "grateful"
+  ],
+  "themes": [
+   "職人",
+   "沈黙の優しさ",
+   "戦争の記憶",
+   "供養"
+  ],
+  "key_moment_ja": "毎晩裏口に来る猫に黙って餌を置き続けた親方の理由が、空襲で亡くした幼い妹だった。",
+  "test_story_ja": "住み込みで染物の修業をさせてもらっている親方のことです。親方は無口で、私が失敗しても叱らず、黙って新しい布を渡してくれる人です。工房の裏口に毎晩来る白い猫がいて、私は布に毛がつくのが嫌で何度も追い払っていました。親方は何も言わず、毎晩欠けた茶碗にご飯を置いていました。親方が肺炎で寝込んだとき、初めて理由を聞きました。戦争の空襲で幼い妹さんを亡くしていて、その妹がかわいがっていた猫の血を引く子たちだったそうです。私は何も知らずに追い払っていました。親方は私の頭に手を置いただけで、責めませんでした。今は私が毎晩茶碗を置いています。",
+  "test_use": "main",
+  "note": "Dark wartime backstory and pet death, but receiver (master) alive and relationship clear."
+ },
+ {
+  "id": "0003",
+  "title": "父の道具袋で待っていた犬",
+  "url": "https://lacrima.jp/heartwarming_story/chichi-no-douguebukuro-de-matte-ita-inu/",
+  "category": "parents",
+  "sender_to_receiver": "娘→父",
+  "direction": "up",
+  "receiver_alive": "yes",
+  "occasions": [
+   "parents_day",
+   "thanks",
+   "birthday"
+  ],
+  "emotion": [
+   "grateful",
+   "tender"
+  ],
+  "themes": [
+   "大工",
+   "無言の愛",
+   "見守り",
+   "犬"
+  ],
+  "key_moment_ja": "寡黙な父が、娘の飼い犬との日々をこっそりノートに書き続け、最期まで看取っていた。",
+  "test_story_ja": "父は大工で、私はその助手として家業を継ぎました。父は褒めも叱りもせず、見て覚えろと言うだけの人です。私が拾ってきた犬を、父は飼えとも捨てろとも言いませんでしたが、翌朝には寝床が作ってありました。犬は父の古い道具袋の上で寝るのが好きで、父は袋が要る日でも犬をどかさず、別の袋を持って現場に行きました。私が出産で入院している間に犬は亡くなり、父がずっとそばにいてくれたそうです。後で、父が犬と私のことを何年も書き留めていたノートを見つけました。見ていないふりをして、ずっと見てくれていたんだと思います。",
+  "test_use": "main",
+  "note": ""
+ },
+ {
+  "id": "0004",
+  "title": "母の代筆 二十九通",
+  "url": "https://lacrima.jp/heartwarming_story/okaachan-no-daihitsu/",
+  "category": "parents",
+  "sender_to_receiver": "娘→母",
+  "direction": "up",
+  "receiver_alive": "no",
+  "occasions": [
+   "none"
+  ],
+  "emotion": [
+   "apologetic",
+   "longing"
+  ],
+  "themes": [
+   "代筆",
+   "介護",
+   "後悔",
+   "母の庇い"
+  ],
+  "key_moment_ja": "面会に来ない娘を庇うため、母が娘の名で施設宛ての手紙を何年も書き続けていた。",
+  "test_story_ja": "母は和裁の仕立て直しを長く続けた人で、父を早くに亡くしてから一人で私と弟を育てました。私が介護の仕事を選んだとき、人の世話はいい仕事だと一言だけ言ってくれました。母が認知症で施設に入ってから、私は母が私をわからなくなるのが怖くて、だんだん会いに行かなくなりました。最期にも間に合いませんでした。遺品を整理していたら、私の名前で施設の職員さんに宛てた手紙が何十通も出てきました。母の字でした。来ない私の代わりに、母が娘のふりをして書いていたんです。最後の一枚にだけ、来てくれてありがとうと母自身の字で書かれていました。",
+  "test_use": "edge",
+  "note": "Receiver deceased; strong guilt/apology framing."
+ },
+ {
+  "id": "0005",
+  "title": "恩師の三十五年の一行",
+  "url": "https://lacrima.jp/heartwarming_story/onshi-no-sanjuugonen-no-ichigyou/",
+  "category": "mentor",
+  "sender_to_receiver": "教え子→恩師",
+  "direction": "up",
+  "receiver_alive": "yes",
+  "occasions": [
+   "thanks",
+   "birthday"
+  ],
+  "emotion": [
+   "grateful",
+   "tender"
+  ],
+  "themes": [
+   "恩師",
+   "見守り",
+   "手紙",
+   "人生の節目"
+  ],
+  "key_moment_ja": "転校で別れた生徒の人生の節目を、恩師が三十五年間一枚の短冊に書き足していた。",
+  "test_story_ja": "中学のときの国語の先生のことです。私は二年の冬に父の転勤で引っ越し、それきり会っていませんでした。五十を過ぎたころ、先生から短い手紙が届き、会いに行きました。先生は脳梗塞の後で、字を書くのも大変そうでした。そこで渡されたのは一枚の細長い紙で、私が転校した日から、就職、子どもの誕生、父の死まで、先生が知るたびに一行ずつ書き足してくれていました。私は先生のことをほとんど思い出しもしなかったのに、先生はずっと私の人生を見ていてくれたんです。先生には、まだ元気でいてほしいと思っています。",
+  "test_use": "main",
+  "note": ""
+ },
+ {
+  "id": "0006",
+  "title": "実話｜祖父の未完の紙芝居",
+  "url": "https://lacrima.jp/heartwarming_story/jitsuwa-sofu-no-mikan-no-kamishibai/",
+  "category": "grandparents",
+  "sender_to_receiver": "孫→祖父",
+  "direction": "up",
+  "receiver_alive": "no",
+  "occasions": [
+   "none"
+  ],
+  "emotion": [
+   "longing",
+   "grateful"
+  ],
+  "themes": [
+   "紙芝居",
+   "継承",
+   "自然",
+   "未完"
+  ],
+  "key_moment_ja": "祖父が遺した未完の紙芝居の最後の一枚に、研究者になった孫の姿が下描きされていた。",
+  "test_story_ja": "祖父は若い頃に紙芝居をしていて、その後は郵便配達をしていました。私が小さい頃、雨の日になると縁側で手描きの紙芝居を見せてくれました。主役より隅に描かれた草や鳥を私が指さすと、祖父はうれしそうに笑っていました。山で一緒にあけびを採って食べたこともあります。大学で植物を学ぶと電話で伝えると、いいなとだけ言ってくれました。祖父が亡くなってから納戸を片付けていたら、続きの紙芝居がたくさん出てきて、最後の一枚は色も塗られていない下描きで、顕微鏡をのぞく女の人が描かれていました。裏には、この続きをお前が描いてほしいと書いてありました。",
+  "test_use": "edge",
+  "note": "Receiver deceased; legacy/inheritance theme."
+ },
+ {
+  "id": "0007",
+  "title": "ばあちゃんの真空管",
+  "url": "https://lacrima.jp/heartwarming_story/baachan-no-shinkukan/",
+  "category": "grandparents",
+  "sender_to_receiver": "孫→祖母",
+  "direction": "up",
+  "receiver_alive": "no",
+  "occasions": [
+   "none"
+  ],
+  "emotion": [
+   "tender",
+   "longing"
+  ],
+  "themes": [
+   "ラジオ",
+   "認知症",
+   "声",
+   "名前"
+  ],
+  "key_moment_ja": "孫を忘れた祖母が、ラジオから流れる孫の声にだけ幼い頃の呼び名で反応した。",
+  "test_story_ja": "祖母は祖父を早くに亡くしてから、台所でずっとラジオをつけて暮らしていた人です。子どもの頃、自分の名前の漢字が書けずにいた私に、祖母は字の意味を一つずつ教えてくれて、それから私を短いあだ名で呼ぶようになりました。祖母が認知症で施設に入ったので、私は近くの小さなラジオ局に就職し、深夜番組を担当しました。祖母はもう私の顔も名前もわからなくなっていましたが、私の番組の夜だけは起きて聴いていたそうです。ある日面会でラジオをつけると、祖母は昔のあだ名で私を呼び、また話してると笑いました。その年の秋に亡くなりました。",
+  "test_use": "edge",
+  "note": "Receiver deceased; dementia."
+ },
+ {
+  "id": "0008",
+  "title": "妻が拾った4380の音",
+  "url": "https://lacrima.jp/heartwarming_story/tsuma-ga-hirotta-4380-no-oto/",
+  "category": "partner",
+  "sender_to_receiver": "夫→妻",
+  "direction": "across",
+  "receiver_alive": "no",
+  "occasions": [
+   "anniversary"
+  ],
+  "emotion": [
+   "longing",
+   "apologetic"
+  ],
+  "themes": [
+   "夫婦",
+   "無口",
+   "毎朝の感謝",
+   "貝殻"
+  ],
+  "key_moment_ja": "妻が毎朝浜辺で夫のバイクの音を聞き分け、無事を確かめるたびに貝殻を一つ拾っていた。",
+  "test_story_ja": "妻はよく笑ってよく喋る人で、口下手な私とは正反対でした。私は二十五年新聞配達をしていて、毎朝帰ると妻は必ず、お疲れさま、帰ってきてくれてありがとう、と言ってくれました。私はいつも、うん、としか返しませんでした。妻が病気で亡くなってから、台所の奥の古い樽に、何千もの貝殻が日付と一緒にしまってあるのを見つけました。近所の人に聞くと、妻は毎朝犬と浜を歩きながら、遠くから聞こえる私のバイクの音を聞き分けて、無事だとわかると貝殻を一つ拾っていたそうです。ちゃんと返事をしてこなかったことを、今になって後悔しています。",
+  "test_use": "edge",
+  "note": "Receiver (wife) deceased; dog also central."
+ },
+ {
+  "id": "0009",
+  "title": "実話｜師匠の最後の鋏の音",
+  "url": "https://lacrima.jp/heartwarming_story/shisho-no-saigo-no-hasami-no-oto/",
+  "category": "mentor",
+  "sender_to_receiver": "弟子→師匠",
+  "direction": "up",
+  "receiver_alive": "no",
+  "occasions": [
+   "thanks"
+  ],
+  "emotion": [
+   "grateful",
+   "bittersweet"
+  ],
+  "themes": [
+   "理容師",
+   "師弟",
+   "道具の継承",
+   "無口"
+  ],
+  "key_moment_ja": "最期の散髪のあと、師匠が弟子の鋏の音を自分の店の音と同じだと認めた。",
+  "test_story_ja": "師匠は町の床屋を六十年近く続けた人で、高校を出て荒れていた私を、紹介もなしに住み込みで雇ってくれました。無口で、間違えても黙って首を振るだけ。一度も声を荒げたことがありません。私が独立して、師匠が店を畳んだとき、自分が最初に使っていた砥石を私に渡してくれました。施設に入ってからは、月に一度私が髪を切りに通いました。最後の散髪の日、師匠は鏡を見て、私の鋏の音が自分の店の音と同じだと言ってくれました。その三日後に亡くなりました。後で、師匠には若くして亡くなった最初の弟子がいたことを知りました。",
+  "test_use": "edge",
+  "note": "Receiver deceased."
+ },
+ {
+  "id": "0010",
+  "title": "母の常連ノート",
+  "url": "https://lacrima.jp/heartwarming_story/mother-regular-notebook/",
+  "category": "parents",
+  "sender_to_receiver": "娘→母",
+  "direction": "up",
+  "receiver_alive": "no",
+  "occasions": [
+   "none"
+  ],
+  "emotion": [
+   "longing",
+   "grateful"
+  ],
+  "themes": [
+   "無口な母",
+   "食堂",
+   "見守り",
+   "ノート"
+  ],
+  "key_moment_ja": "無口な母が、常連客と同じノートに娘の人生の出来事も黙って書き留めていた。",
+  "test_story_ja": "母は港の近くで小さな食堂を一人で切り盛りしていました。無口で、褒め言葉もねぎらいの言葉もない人で、私は母を人に興味のない人だと思っていました。授業参観に来ても、誰とも話さず後ろに立っているだけでした。母が亡くなって店を片付けていたら、常連さん一人ひとりの好みや体調、家族のことを書いたノートが十冊以上出てきました。最後の一冊の表紙の裏には私の名前があって、就職や帰省のたびに気づいたことが短く書いてありました。最後の日には、私が作ったお粥をよく食べた、明日も来てくれるかもしれない、とありました。母はずっと見ていてくれたんです。",
+  "test_use": "edge",
+  "note": "Receiver deceased."
+ },
+ {
+  "id": "0011",
+  "title": "息子の「ありがとうございました」",
+  "url": "https://lacrima.jp/heartwarming_story/musuko-no-arigatou/",
+  "category": "children",
+  "sender_to_receiver": "父→息子",
+  "direction": "down",
+  "receiver_alive": "yes",
+  "occasions": [
+   "birthday",
+   "thanks",
+   "new_start"
+  ],
+  "emotion": [
+   "proud",
+   "tender"
+  ],
+  "themes": [
+   "親子の距離",
+   "バス運転手",
+   "憧れ",
+   "陰の気遣い"
+  ],
+  "key_moment_ja": "会話の少ない息子が、二年以上毎朝こっそり父のバスにのど飴を置き続けていた。",
+  "test_story_ja": "私はバスの運転手で、朝が早く夜も遅いので、小学生の息子とはほとんど顔を合わせません。話しかけても短い返事ばかりで、どこか距離があると思っていました。毎朝運転席にのど飴が一つ置いてあって、誰だろうと思いながら気にしていませんでした。ある日、常連のおばあさんから、バス停で転んだときに男の子が助けてくれて、お父さんのバスを見に来ていると話していたと聞きました。妻に聞くと、飴を置いていたのも息子で、私が昔ぽろっと言った一言を覚えていて、雨の日も冬も二年以上続けていたそうです。先日、息子が私のバスに乗って、降りるときに、ありがとうございましたと言ってくれました。",
+  "test_use": "main",
+  "note": "Original told in third person from the father's side."
+ },
+ {
+  "id": "0012",
+  "title": "父のカメラに残ったもの",
+  "url": "https://lacrima.jp/heartwarming_story/chichi-no-camera-ni-nokotta-mono/",
+  "category": "parents",
+  "sender_to_receiver": "息子→父",
+  "direction": "up",
+  "receiver_alive": "no",
+  "occasions": [
+   "none"
+  ],
+  "emotion": [
+   "longing",
+   "bittersweet"
+  ],
+  "themes": [
+   "無言の愛",
+   "漁師",
+   "すれ違い",
+   "写真"
+  ],
+  "key_moment_ja": "父が息子の撮影地を一人で巡り、同じ景色を撮り続けていたと遺品で知る。",
+  "test_story_ja": "父は島の漁師で、ほとんどしゃべらない人でした。私がカメラの仕事を選んだとき「食べていけるのか」と言われ、それから十年以上まともに話さないままでした。亡くなったあと、押し入れから古いカメラが出てきて、現像すると私が雑誌で撮った場所ばかり写っていました。ピントもずれていて、決して上手ではありませんでした。母に聞くと、私の載った雑誌は全部買って本棚に並べていたそうです。反対されたと思い込んでいたけれど、父はずっと黙って私の後ろを歩いてくれていたんだと思います。",
+  "test_use": "edge",
+  "note": "Receiver deceased; strong father story but no living recipient."
+ },
+ {
+  "id": "0013",
+  "title": "俺が作った足で歩いてくれ",
+  "url": "https://lacrima.jp/heartwarming_story/ore-ga-tsukutta-ashi-de-aruite-kure/",
+  "category": "friends",
+  "sender_to_receiver": "幼馴染(男)→幼馴染(女)",
+  "direction": "across",
+  "receiver_alive": "yes",
+  "occasions": [
+   "apology",
+   "thanks"
+  ],
+  "emotion": [
+   "apologetic",
+   "tender"
+  ],
+  "themes": [
+   "謝罪",
+   "幼馴染",
+   "義足",
+   "赦し"
+  ],
+  "key_moment_ja": "二十数年前に傷つけた幼馴染が、自分の作った義足で石畳を歩き切って振り返る。",
+  "test_story_ja": "小学校からずっと一緒に通学していた幼馴染がいます。中学のとき彼女が事故で片足を失い、松葉杖で戻ってきたのに、私はどう接していいかわからず、ひどい一言を言ってしまいました。謝れないまま卒業し、二十年以上たって、義肢の仕事をしている私の担当患者として再会しました。最初は担当を替えてほしいと言われました。それでも黙って何週間も調整を続け、完成した義足で彼女が路地を歩いたとき、振り向いて「遅い」と言われました。彼女のお母さんから、彼女はずっと私が謝りに来ると信じて待っていたと聞きました。",
+  "test_use": "main",
+  "note": "Apology-driven peer story; sender is also receiver's prosthetist."
+ },
+ {
+  "id": "0014",
+  "title": "父が三十年彫り続けたもの",
+  "url": "https://lacrima.jp/heartwarming_story/chichi-ga-sanjuunen-horitsuzuketa-mono/",
+  "category": "parents",
+  "sender_to_receiver": "息子→父",
+  "direction": "up",
+  "receiver_alive": "yes",
+  "occasions": [
+   "kanreki",
+   "retirement",
+   "thanks"
+  ],
+  "emotion": [
+   "grateful",
+   "tender"
+  ],
+  "themes": [
+   "単身赴任",
+   "不器用な父",
+   "帆船",
+   "ただいま"
+  ],
+  "key_moment_ja": "父が長年かけた帆船模型の底に、帰れなかった年ごとの「ただいま」を刻んでいた。",
+  "test_story_ja": "父は海上自衛官で、私が小さい頃からずっと単身で各地を回っていました。たまに帰ってきても「飯食ったか」くらいしか言わず、私も何を話せばいいかわからず避けていました。定年後、父は沖縄の小さな島に一人で移りました。ある日、父から木箱が届き、中には私が生まれた年から作り始めたという帆船の模型が入っていました。会いに行くと、船の底に、家に帰れなかった年ごとに一言ずつ彫った跡があると見せてくれました。言葉が少ないと思っていた父は、言葉を別の場所に置いていたんだと思います。来月また島に行くつもりです。",
+  "test_use": "main"
+ },
+ {
+  "id": "0015",
+  "title": "木曜日の油絵",
+  "url": "https://lacrima.jp/heartwarming_story/mokuyo-bi-no-aburae/",
+  "category": "work",
+  "sender_to_receiver": "銭湯店主→常連客",
+  "direction": "up",
+  "receiver_alive": "no",
+  "occasions": [
+   "none"
+  ],
+  "emotion": [
+   "bittersweet",
+   "longing"
+  ],
+  "themes": [
+   "銭湯",
+   "常連",
+   "無言の通い",
+   "看板描き"
+  ],
+  "key_moment_ja": "毎週木曜に来ていた無口な老人が、脱衣場の絵の作者で、それを確かめに来ていたと知る。",
+  "test_story_ja": "うちの銭湯に毎週木曜日だけ来るおじいさんがいました。口数が少なく、小銭を置いて軽くうなずくだけの人でした。脱衣所に昔から飾ってある古い富士山の絵の前で、いつも少しだけ足を止めていました。昔は看板を描く仕事をしていたけれど、手が震えてもう描けないと話してくれたことがあります。廃業の噂が出ても、変わらず毎週来てくれました。入院して亡くなったあと息子さんが来て、あの絵はおじいさんが若い頃に描いたものだと教えてくれました。自分の絵がまだそこにあるか、毎週確かめに来ていたそうです。",
+  "test_use": "edge",
+  "note": "Customer relationship, receiver deceased; weak sender-receiver bond until after death."
+ },
+ {
+  "id": "0016",
+  "title": "鉄瓶のある縁側で",
+  "url": "https://lacrima.jp/heartwarming_story/tetsubin-no-engawa-de/",
+  "category": "other",
+  "sender_to_receiver": "男性→初恋の人",
+  "direction": "across",
+  "receiver_alive": "no",
+  "occasions": [
+   "none"
+  ],
+  "emotion": [
+   "longing",
+   "bittersweet"
+  ],
+  "themes": [
+   "初恋",
+   "片思い",
+   "縁側",
+   "待ち続ける"
+  ],
+  "key_moment_ja": "想いを告げられず嫁いだ初恋の人が、晩年まで縁側のお茶の味を語っていたと娘から聞く。",
+  "test_story_ja": "若い頃、農繁期になると隣の集落から手伝いに来ていた娘さんがいました。よく働いて、よく笑う人でした。仕事の合間に縁側で番茶を出すと、毎回おいしいと言ってくれました。台風の夜、一緒に土のうを運んだときに、この人と生きたいと思いましたが、結局何も言えないまま、彼女は遠くへ嫁いでいきました。私は結婚せず、ずっと同じ縁側でお茶を入れてきました。五十年近くたって彼女の娘さんが訪ねてきて、彼女が亡くなったこと、最後まであの縁側のお茶の話をしていたことを教えてくれました。",
+  "test_use": "edge",
+  "note": "Unrequited first love, never partners; receiver deceased."
+ },
+ {
+  "id": "0017",
+  "title": "停まったままの時計",
+  "url": "https://lacrima.jp/heartwarming_story/tomatta-mama-no-tokei/",
+  "category": "grandparents",
+  "sender_to_receiver": "孫娘→祖父",
+  "direction": "up",
+  "receiver_alive": "yes",
+  "occasions": [
+   "thanks",
+   "birthday"
+  ],
+  "emotion": [
+   "grateful",
+   "tender"
+  ],
+  "themes": [
+   "駐在さん",
+   "寡黙",
+   "命の恩人",
+   "懐中時計"
+  ],
+  "key_moment_ja": "幼い孫を雨の山で捜し出した時刻で時計を止め、以後毎年その日に孫の様子を記していた。",
+  "test_story_ja": "祖父は山あいの集落でずっと駐在さんをしていました。無口で、夏休みに泊まりに行っても頭をなでてくれることもない人でしたが、私が箸を落とすとすぐ新しいのを黙って出してくれました。祖父が施設に入ることになり家を片付けていたら、止まった懐中時計と古い日誌が出てきました。三歳の私が雨の山で迷子になり、祖父が必死に探して見つけてくれた日の時刻でした。日誌には、それから毎年その日に私の近況が一行ずつ書いてありました。今は私の名前も忘れがちな祖父ですが、時計を見せると「無事でよかった」と言ってくれました。",
+  "test_use": "main",
+  "note": "Grandparent category (outside 6 core); receiver has dementia."
+ },
+ {
+  "id": "0018",
+  "title": "窯の前の命",
+  "url": "https://lacrima.jp/heartwarming_story/kama-no-mae-no-inochi/",
+  "category": "other",
+  "sender_to_receiver": "陶芸家→飼い猫",
+  "direction": "down",
+  "receiver_alive": "yes",
+  "occasions": [
+   "none"
+  ],
+  "emotion": [
+   "tender",
+   "bittersweet"
+  ],
+  "themes": [
+   "喪失",
+   "ペット",
+   "日常の再生",
+   "妻の器"
+  ],
+  "key_moment_ja": "妻の命日に窯の前で凍えていた子猫を拾い、亡き妻の器で水を飲ませる。",
+  "test_story_ja": "妻を亡くして一年になる朝、窯の火を落としたあとの窯場で、冷えきった子猫を見つけました。妻は猫が嫌いで、私も工房に入れるつもりはなかったのですが、その日は命日だったので放っておけませんでした。水を入れる器がなくて、若い頃に私が妻のために焼いた不格好な鉢を使いました。それから一年、昼になると鳴いてご飯を催促し、夕方は縁側で一緒に山を眺めます。仕事に逃げてばかりだった私の毎日に、また区切りができました。今朝も、妻の鉢の前で水を換えてもらうのを待っていました。",
+  "test_use": "edge",
+  "note": "Pet as receiver; deceased wife is a second implicit receiver."
+ },
+ {
+  "id": "0019",
+  "title": "親友の本棚の奥に",
+  "url": "https://lacrima.jp/heartwarming_story/shinyuu-no-hondana-no-oku/",
+  "category": "friends",
+  "sender_to_receiver": "親友→親友",
+  "direction": "across",
+  "receiver_alive": "no",
+  "occasions": [
+   "none"
+  ],
+  "emotion": [
+   "grateful",
+   "longing"
+  ],
+  "themes": [
+   "古書店",
+   "口下手",
+   "覚えていてくれた",
+   "友情"
+  ],
+  "key_moment_ja": "亡き親友が何年も前から、自分の好みを覚えて選んだ本を一冊ずつ付箋付きで残していた。",
+  "test_story_ja": "高校の同級生で、三十年以上付き合いのある親友がいました。家業の古本屋を継いだ無口な男で、私が店に寄るたびに「これ面白いぞ」と本を差し出してきました。私は「いつか読む」と受け取るだけで、半分も読んでいませんでした。彼が急に亡くなったあと、店の奥に私宛ての紙袋が置いてあり、十数冊の本にそれぞれ短いメモが貼ってありました。私が昔ぽろっと言った好みを、彼はほとんど覚えていました。最後の一冊には、私が店に来ることが彼の支えだったと書いてありました。今度は全部読むつもりです。",
+  "test_use": "edge",
+  "note": "Receiver deceased."
+ },
+ {
+  "id": "0020",
+  "title": "お母さん、弁当作って",
+  "url": "https://lacrima.jp/heartwarming_story/okaasan-obento-tsukutte/",
+  "category": "parents",
+  "sender_to_receiver": "娘→母",
+  "direction": "up",
+  "receiver_alive": "yes",
+  "occasions": [
+   "parents_day",
+   "thanks"
+  ],
+  "emotion": [
+   "grateful",
+   "longing"
+  ],
+  "themes": [
+   "母の弁当",
+   "季節の花",
+   "照れ",
+   "帰省"
+  ],
+  "key_moment_ja": "久々に弁当を頼む電話をすると、母はちょうど娘の好物を詰めていたところだった。",
+  "test_story_ja": "母は小中学校の頃、毎朝お弁当を作ってくれました。春には庭の花を一輪のせてくれるような人で、私は恥ずかしいような誇らしいような気持ちでした。中学に上がったとき「もういらない」と断ってしまい、母は何も言わずに台所に戻りました。それから二十年以上、ちゃんとお礼を言ったことがありません。教師になって、お弁当のない生徒に自分の分を分けるようになって、母のことを思い出しました。先日思い切って電話で「帰るときお弁当作って」と頼んだら、母は「ちょうど今詰めてたところ」と言いました。来月帰ります。",
+  "test_use": "main",
+  "note": "Secondary teacher-student thread (teacher sharing lunch) present."
+ },
+ {
+  "id": "0021",
+  "title": "また彫ってください",
+  "url": "https://lacrima.jp/heartwarming_story/mata-hotte-kudasai/",
+  "category": "work",
+  "sender_to_receiver": "義肢職人→元患者",
+  "direction": "down",
+  "receiver_alive": "yes",
+  "occasions": [
+   "thanks",
+   "new_start"
+  ],
+  "emotion": [
+   "proud",
+   "tender"
+  ],
+  "themes": [
+   "職人",
+   "ウサギの彫り",
+   "二十年越し",
+   "受け継ぐ優しさ"
+  ],
+  "key_moment_ja": "二十年前に彫ったウサギ付きの義足を抱え、成長した少女が「また彫って」と訪ねてくる。",
+  "test_story_ja": "二十年前、離島の病院で七歳の女の子の義足を作りました。病室ではひと言も話してくれなかったので、しゃがんで好きなものを聞いたら「ウサギ」とだけ答えてくれました。義足のカバーに小さなウサギを彫って渡すと、初めて笑ってくれました。その後連絡はなく、使いにくかったのではとずっと気にしていました。先日、大人になった彼女がすり減った義足を抱えて工房に来ました。今は看護師になり、怖がる子どもの横でしゃがめる大人になりたかったと話してくれました。新しい義足にも、またウサギを彫るつもりです。",
+  "test_use": "main",
+  "note": "Craftsman-to-former-patient; could also be flipped (patient->craftsman, mentor-like)."
+ },
+ {
+  "id": "0022",
+  "title": "パパのいるあした",
+  "url": "https://lacrima.jp/heartwarming_story/papa-no-iru-ashita/",
+  "category": "children",
+  "sender_to_receiver": "父→娘",
+  "direction": "down",
+  "receiver_alive": "yes",
+  "occasions": [
+   "birthday",
+   "new_start"
+  ],
+  "emotion": [
+   "tender",
+   "bittersweet"
+  ],
+  "themes": [
+   "単身赴任",
+   "待つ子",
+   "あした",
+   "家族"
+  ],
+  "key_moment_ja": "単身赴任から戻った夜、幼い娘が父のいる明日は早く来ると眠り際に言う。",
+  "test_story_ja": "娘が四歳のとき、仕事の都合で一年近く単身赴任をしました。毎晩七時にビデオ通話をすると、娘は必ず「あした帰ってくる？」と聞いてきました。妻によると、通話のあと娘は私の絵を描いて居間の壁に貼り、「ここのパパはいつもいるから」と言っていたそうです。ある夜、「あしたってなかなか来ないね」と言われ、何も返せませんでした。赴任が終わって家に帰ると、壁一面が私の絵で埋まっていました。その夜、布団で娘が「パパがいるとあしたが早く来るね」と言ってすぐ寝てしまい、私は隣で泣きました。",
+  "test_use": "main"
+ },
+ {
+  "id": "0023",
+  "title": "先生はずっと通っていた",
+  "url": "https://lacrima.jp/heartwarming_story/sensei-wa-zutto-kayotte-ita/",
+  "category": "mentor",
+  "sender_to_receiver": "弟子→師匠",
+  "direction": "up",
+  "receiver_alive": "yes",
+  "occasions": [
+   "thanks",
+   "retirement"
+  ],
+  "emotion": [
+   "grateful",
+   "proud"
+  ],
+  "themes": [
+   "和菓子職人",
+   "師弟",
+   "無言の承認",
+   "頷き"
+  ],
+  "key_moment_ja": "独立を止めた師匠が、実はその翌日に一番古い木型を託す支度をし、店に通っていた。",
+  "test_story_ja": "和菓子の師匠のもとで十年以上修業しました。口数の少ない人で、褒めるときは黙ってうなずくだけでした。独立したいと言ったとき「まだ早い」と言われ、反対されたと思ってわだかまりを抱えたまま店を出ました。師匠が施設に入ることになり工房を片付けに行くと、私の名前を書いた箱に、師匠が一番大事にしていた木型と「もう行け」という短いメモが入っていました。日付は私が独立を切り出した翌日でした。奥さんによると、師匠は毎月こっそり私の店に菓子を買いに来ていたそうです。会いに行くと、私の名前を呼んで、昔と同じようにうなずいてくれました。",
+  "test_use": "main",
+  "note": "Receiver alive but has dementia."
+ },
+ {
+  "id": "0024",
+  "title": "父の宿帳の余白",
+  "url": "https://lacrima.jp/heartwarming_story/chichi-no-shukucho-no-yohaku/",
+  "category": "parents",
+  "sender_to_receiver": "娘→父",
+  "direction": "up",
+  "receiver_alive": "yes",
+  "occasions": [
+   "retirement",
+   "thanks"
+  ],
+  "emotion": [
+   "grateful",
+   "tender"
+  ],
+  "themes": [
+   "温泉宿",
+   "寡黙な父",
+   "宿帳",
+   "言えなかったありがとう"
+  ],
+  "key_moment_ja": "店じまいの日、父が四十数年分の宿帳の隅に娘の節目を一行ずつ書き留めていたと知る。",
+  "test_story_ja": "父は山あいの小さな温泉宿を母と二人で四十年以上続けてきました。私が運動会で一番になっても「そうか」と言うだけの、口数の少ない父です。七十五歳で宿を閉めることになり、片付けを手伝いに帰りました。蔵に並んだ古い宿帳を開くと、お客さんの記録の端に、私が生まれた日や入学した日、東京に出た日のことが短い句のように書いてありました。父は、面と向かっては言えなかったからここに書いたと照れくさそうに言いました。翌朝、縁側で初めて父に「ありがとう」と言うと、父は小さく「俺もだ」と返してくれました。",
+  "test_use": "main"
+ },
+ {
+  "id": "0025",
+  "title": "妻の名が彫られた鑿",
+  "url": "https://lacrima.jp/heartwarming_story/tsuma-no-na-ga-horareta-nomi/",
+  "category": "partner",
+  "sender_to_receiver": "夫→妻",
+  "direction": "across",
+  "receiver_alive": "yes",
+  "occasions": [
+   "anniversary",
+   "thanks"
+  ],
+  "emotion": [
+   "grateful",
+   "apologetic"
+  ],
+  "themes": [
+   "船大工",
+   "夫婦",
+   "口下手",
+   "亡き父の礼"
+  ],
+  "key_moment_ja": "亡き父の鑿に妻の名が刻まれていた理由を知り、妻に渡すと妻は静かに受け止めた。",
+  "test_story_ja": "結婚して三十五年、妻は毎朝決まった時間に朝ご飯を作ってくれます。私は船大工の仕事ばかりで、娘が生まれたときもすぐには駆けつけず、妻にろくにお礼を言ったこともありません。最近は会話もほとんどありませんでした。先日、亡くなった父の道具箱から、柄に妻の名前が彫られた鑿が見つかりました。父の弟子だった人に聞くと、私を婿に出さずに済むよう父が妻の実家に頭を下げ、その礼として毎日妻の名を握って仕事をしていたそうです。鑿を妻に見せると、妻は「もう十分よ」と言って、泣いている私の背中に手を置いてくれました。今度、二人で乗る小さな船を作るつもりです。",
+  "test_use": "main",
+  "note": "Revelation centers on deceased father; receiver is wife."
+ },
+ {
+  "id": "0026",
+  "title": "タカさんの真鍮の笛",
+  "url": "https://lacrima.jp/heartwarming_story/takasan_no_shinchu_no_fue/",
+  "category": "other",
+  "sender_to_receiver": "常連の子→食堂の女将",
+  "direction": "up",
+  "receiver_alive": "no",
+  "occasions": [
+   "thanks",
+   "none"
+  ],
+  "emotion": [
+   "grateful",
+   "longing"
+  ],
+  "themes": [
+   "食堂",
+   "見守り",
+   "恩送り",
+   "無言の優しさ"
+  ],
+  "key_moment_ja": "泣いて店に来た少年に、亡夫の形見の笛を渡し、誰かのために吹けと教えた。",
+  "test_story_ja": "子どもの頃、母が夜勤の日はいつも近所の小さな洋食屋に通っていました。店のおばあさんは愛想を言う人ではなく、黙ってオムライスを出してくれるだけでした。学校でいじめられて泣きながら入った晩、おばあさんは初めて向かいに座り、ご主人の形見だという小さな笛を私にくれました。怖いときは自分より弱い誰かのために吹きなさい、と。大人になってから、同じ笛をもらった子が他にも大勢いたと知りました。おばあさんはもう亡くなりましたが、今は私が保健室で、その笛を子どもたちに渡しています。",
+  "test_use": "edge",
+  "note": "Receiver dies; non-family neighbour/restaurant owner; strong mentor-like gratitude."
+ },
+ {
+  "id": "0027",
+  "title": "兄ちゃんの鋏の音",
+  "url": "https://lacrima.jp/heartwarming_story/ani-chan-no-hasami-no-oto/",
+  "category": "siblings",
+  "sender_to_receiver": "兄→弟",
+  "direction": "across",
+  "receiver_alive": "no",
+  "occasions": [
+   "apology",
+   "none"
+  ],
+  "emotion": [
+   "apologetic",
+   "longing"
+  ],
+  "themes": [
+   "理容師",
+   "兄弟",
+   "和解",
+   "言えなかった言葉"
+  ],
+  "key_moment_ja": "弟が友人の前で、兄の鋏の音で気持ちが全部わかると誇らしげに話す映像が残っていた。",
+  "test_story_ja": "弟は耳のいい子で、私が床屋の仕事で鳴らす鋏の音を聞き分けていました。二十代のころ、店を手伝いたいと言ってくれた弟にきつい言い方をして喧嘩になり、謝れないまま弟は病気で亡くなりました。三十年たって弟の娘が訪ねてきて、昔の動画を見せてくれました。弟は友達の前で、兄貴は無口だけど手で話す人だ、自慢の兄だと笑っていました。弟も私に謝りたがっていたそうです。姪の結婚式の朝、弟が誕生日にくれた鋏で姪の髪を整えました。",
+  "test_use": "edge",
+  "note": "Receiver (brother) deceased; secondary living receiver is the niece (伯父→姪, wedding)."
+ },
+ {
+  "id": "0028",
+  "title": "祖父が染めてくれた名前",
+  "url": "https://lacrima.jp/heartwarming_story/sofu-ga-somete-kureta-namae/",
+  "category": "grandparents",
+  "sender_to_receiver": "孫娘→祖父",
+  "direction": "up",
+  "receiver_alive": "yes",
+  "occasions": [
+   "thanks",
+   "retirement",
+   "birthday"
+  ],
+  "emotion": [
+   "grateful",
+   "tender"
+  ],
+  "themes": [
+   "染物職人",
+   "無口",
+   "見守り",
+   "手ぬぐい"
+  ],
+  "key_moment_ja": "無口な祖父がくれた藍の手ぬぐいの隅に、孫の名前が小さく染め抜かれていた。",
+  "test_story_ja": "祖父は商店街で染物をしていた人で、昔から口数が少なく、子どもの頃の私は少し怖かったです。保育士になってからは年に一度会うかどうかでした。祖父が膝を悪くして店を休んだ年、一人で会いに行ったら、帰り際に藍染めの手ぬぐいを一枚くれました。家に帰る途中、端っこに小さく私の名前がひらがなで入っているのに気づきました。母に聞くと、私が資格試験に受かった年に作って、渡しそびれていたそうです。祖父は今施設にいて、会いに行くと相変わらずぶっきらぼうですが、少しだけ笑ってくれます。",
+  "test_use": "main",
+  "note": ""
+ },
+ {
+  "id": "0029",
+  "title": "不器用な先輩が残したもの",
+  "url": "https://lacrima.jp/heartwarming_story/bukiyo-na-senpai-ga-nokoshita-mono/",
+  "category": "mentor",
+  "sender_to_receiver": "後輩→先輩",
+  "direction": "up",
+  "receiver_alive": "yes",
+  "occasions": [
+   "thanks",
+   "retirement"
+  ],
+  "emotion": [
+   "grateful",
+   "apologetic"
+  ],
+  "themes": [
+   "気象観測",
+   "厳しい指導",
+   "陰の支え",
+   "言葉にしない人"
+  ],
+  "key_moment_ja": "受賞した研究発表は、厳しい先輩が黙って推薦書を書いて出してくれたものだった。",
+  "test_story_ja": "離島の観測所に配属された新人の頃、指導してくれた先輩は本当に厳しい人でした。褒められたことは一度もなく、毎日細かいミスを指摘されました。台風の夜に機械が不調になったときは、黙って直し方を教えてくれて、次は自分で気づけとだけ言われました。数年後に私の研究が賞をもらっても先輩は何も言わず、そのまま早期退職しました。後になって、推薦書も資料も全部先輩が一人で用意してくれていたと知りました。本人には言うなと口止めしていたそうです。今は私が後輩に同じ口調で注意しています。",
+  "test_use": "main",
+  "note": ""
+ },
+ {
+  "id": "0030",
+  "title": "父が磨いていたもの",
+  "url": "https://lacrima.jp/heartwarming_story/chichi-ga-migaite-ita-mono/",
+  "category": "parents",
+  "sender_to_receiver": "息子→父",
+  "direction": "up",
+  "receiver_alive": "yes",
+  "occasions": [
+   "parents_day",
+   "birthday",
+   "thanks"
+  ],
+  "emotion": [
+   "grateful",
+   "tender"
+  ],
+  "themes": [
+   "大工",
+   "靴磨き",
+   "無言の愛",
+   "帰省"
+  ],
+  "key_moment_ja": "二年帰らなかった息子の置いていった靴を、父はずっと土間で磨き続けていた。",
+  "test_story_ja": "父は長野で四十年近く大工をしていた無口な人です。私は東京で働いていて、話すのが気まずくて二年ほど実家に帰っていませんでした。父が食べられなくなっていると聞いて帰ると、父は土間で私が前に置いていった革靴を磨いていました。母によると、私が帰ったあといつも靴を磨いていたそうです。中学の卒業祝いに買ってくれた靴まで残っていました。帰り際、父は長年使った砥石を、もう使わないからと私に持たせてくれました。今は三か月に一度帰っていて、そのたびに父が靴を磨いてくれます。",
+  "test_use": "main",
+  "note": ""
+ },
+ {
+  "id": "0031",
+  "title": "娘の朝のおまじない",
+  "url": "https://lacrima.jp/heartwarming_story/musume-no-asa-no-omajinai/",
+  "category": "children",
+  "sender_to_receiver": "父→娘",
+  "direction": "down",
+  "receiver_alive": "yes",
+  "occasions": [
+   "birthday",
+   "new_start"
+  ],
+  "emotion": [
+   "tender",
+   "grateful"
+  ],
+  "themes": [
+   "おまじない",
+   "高所作業",
+   "娘の気遣い",
+   "不器用な父"
+  ],
+  "key_moment_ja": "娘は毎朝、父の仕事道具の安全帯にそっと息を吹きかけ、無事を祈っていた。",
+  "test_story_ja": "私は電気工事の仕事で毎日高いところに上ります。朝は娘が起きる前に家を出るので、娘とはあまり話せず、宿題したかと聞くくらいでした。娘が二年生のとき、家庭訪問で先生から、娘が毎朝玄関に掛けてある私の安全帯に息を吹きかけて、お父さんが落ちないようにおまじないをしていると聞きました。全然知りませんでした。次の日少し早く起きて見ていたら、本当に小さくふうっとしてから学校へ行きました。その夜は娘の好きなプリンを買って帰りました。",
+  "test_use": "main",
+  "note": ""
+ },
+ {
+  "id": "0032",
+  "title": "走れなかった日から",
+  "url": "https://lacrima.jp/heartwarming_story/hashirenakatta-hi-kara/",
+  "category": "friends",
+  "sender_to_receiver": "幼なじみ→親友",
+  "direction": "across",
+  "receiver_alive": "yes",
+  "occasions": [
+   "thanks",
+   "apology",
+   "new_start"
+  ],
+  "emotion": [
+   "apologetic",
+   "grateful"
+  ],
+  "themes": [
+   "幼なじみ",
+   "ランニング",
+   "二十年越しの再会",
+   "和解"
+  ],
+  "key_moment_ja": "事故で走れなくなった親友が、いつか一緒に走る日のために揃いの靴を車に積んでいた。",
+  "test_story_ja": "中学のころの親友は陸上部で一番足が速く、二人でよく海沿いを走っていました。おそろいのシューズを買って、いつか一緒にマラソンを走ろうと話していました。高校に入ってすぐ彼が事故にあって膝を痛めたとき、私はどう声をかけていいかわからず、病院の入口まで行って帰ってしまいました。それきり二十年会いませんでした。去年、私の勤める整備工場に彼が車検で来ました。トランクに、あのときと同じ型の新品のシューズが入っていて、私と走る日のために持っていたと言われました。来春、一緒にハーフを走ります。",
+  "test_use": "main",
+  "note": ""
+ },
+ {
+  "id": "0033",
+  "title": "三十四枚の手ぬぐい",
+  "url": "https://lacrima.jp/heartwarming_story/sanjuyon-mai-no-tenugui/",
+  "category": "grandparents",
+  "sender_to_receiver": "孫→祖母",
+  "direction": "up",
+  "receiver_alive": "yes",
+  "occasions": [
+   "birthday",
+   "thanks"
+  ],
+  "emotion": [
+   "grateful",
+   "apologetic"
+  ],
+  "themes": [
+   "藍染め",
+   "待ち続ける愛",
+   "帰省",
+   "手仕事"
+  ],
+  "key_moment_ja": "会えない年も毎年、孫の名と年号を入れた手ぬぐいを一枚ずつ染めてしまっていた。",
+  "test_story_ja": "愛媛の山の町に八十歳の祖母が一人で住んでいます。私は東京で蕎麦屋をやっていて、忙しさを理由に十五年近くほとんど帰っていませんでした。電話ではいつも元気だから気にするなと言う人です。久しぶりに顔を見に帰ったとき、戸棚の引き出しから私の名前と年が入った藍染めの手ぬぐいがたくさん出てきました。生まれた年から毎年一枚ずつ、渡せないまま染めていたそうです。謝ったら、会えなかったのはお互いさまだと言われました。今年の分を一枚もらって帰り、これからは毎年取りに行くつもりです。",
+  "test_use": "main",
+  "note": ""
+ },
+ {
+  "id": "0034",
+  "title": "おやじがかんなを渡した朝",
+  "url": "https://lacrima.jp/heartwarming_story/oyaji-ga-kanna-wo-watashita-asa/",
+  "category": "parents",
+  "sender_to_receiver": "息子→父",
+  "direction": "up",
+  "receiver_alive": "yes",
+  "occasions": [
+   "retirement",
+   "thanks",
+   "apology"
+  ],
+  "emotion": [
+   "grateful",
+   "apologetic"
+  ],
+  "themes": [
+   "大工",
+   "かんな",
+   "和解",
+   "職人"
+  ],
+  "key_moment_ja": "父から渡されたかんなの裏に、三歳の息子の名前がずっと彫られていた。",
+  "test_story_ja": "父は腕のいい大工で、ほとんどしゃべらない人です。高校を出るとき家業を継いでほしいと言われて断ってから、十三年まともに話していませんでした。郵便の配達で父の家の近くを回るようになり、近所の人から父が腰の手術をして大工をやめたと聞きました。思い切って訪ねると、父は飯は食べているかとだけ聞き、帰り際に長年使っていたかんなを持っていけと渡してくれました。家で見ると、持ち手の目立たない所に、私の名前と三歳の春と彫ってありました。その晩、初めて父にありがとうと電話しました。",
+  "test_use": "main",
+  "note": ""
+ },
+ {
+  "id": "0035",
+  "title": "三枚目の朝",
+  "url": "https://lacrima.jp/heartwarming_story/sanmaimeno-asa/",
+  "category": "other",
+  "sender_to_receiver": "飼い主→飼い猫",
+  "direction": "across",
+  "receiver_alive": "no",
+  "occasions": [
+   "none"
+  ],
+  "emotion": [
+   "longing",
+   "grateful"
+  ],
+  "themes": [
+   "老猫",
+   "寄り添い",
+   "手仕事",
+   "別れ"
+  ],
+  "key_moment_ja": "老猫は嫌がって脱いだはずの手縫いの靴下を、最期の寝床に敷き詰めていた。",
+  "test_story_ja": "十七年一緒に暮らした猫がいました。鳴き声がとても小さく、私が夜に縫い物をしていると必ずかごの横で丸くなる子でした。年をとって床で滑るようになったので、仕事の技術を使って滑り止めの靴下を縫ったのですが、はかせるとすぐ脱いでしまいました。三枚目を縫った翌朝、猫は縫い物かごの中で亡くなっていて、底には私が縫った三枚の靴下が重ねて敷いてありました。離婚の夜もしんどい夜も、あの子が隣にいてくれたから手を動かし続けられました。",
+  "test_use": "edge",
+  "note": "Pet; receiver deceased."
+ },
+ {
+  "id": "0036",
+  "title": "ランドセルの色",
+  "url": "https://lacrima.jp/heartwarming_story/randoseru-no-iro/",
+  "category": "siblings",
+  "sender_to_receiver": "妹→兄",
+  "direction": "across",
+  "receiver_alive": "yes",
+  "occasions": [
+   "thanks",
+   "apology",
+   "new_start"
+  ],
+  "emotion": [
+   "grateful",
+   "apologetic"
+  ],
+  "themes": [
+   "兄妹",
+   "犠牲",
+   "ランドセル",
+   "和解"
+  ],
+  "key_moment_ja": "兄はかつてアルバイト代を全部使って妹にランドセルを買い、黙って家を守っていた。",
+  "test_story_ja": "兄は父が倒れたとき、大学をあきらめて実家の農家を継ぎました。私はそれをわかっていながら、上京すると言った夜に兄の短い返事に腹を立てて家を飛び出し、十一年ほとんど話しませんでした。去年、娘のランドセルを買いに行った店で、偶然同じ年の息子を連れた兄に会いました。子どもの頃、私のランドセルが壊れたとき、兄が自分のバイト代で新しいのを買ってくれたことを、兄はちゃんと覚えていました。あのときのありがとうをやっと言えました。兄は娘の入学式に来てくれるそうです。",
+  "test_use": "main",
+  "note": ""
+ },
+ {
+  "id": "0037",
+  "title": "龍之介の絵日記",
+  "url": "https://lacrima.jp/heartwarming_story/ryunosuke-no-enikki/",
+  "category": "other",
+  "sender_to_receiver": "保育士→元園児",
+  "direction": "down",
+  "receiver_alive": "yes",
+  "occasions": [
+   "thanks",
+   "farewell"
+  ],
+  "emotion": [
+   "tender",
+   "grateful"
+  ],
+  "themes": [
+   "保育士",
+   "無口な子",
+   "スケッチブック",
+   "見つめる眼差し"
+  ],
+  "key_moment_ja": "無口な園児のスケッチブックには、どのページの隅にも先生の姿が描かれていた。",
+  "test_story_ja": "海辺の幼稚園で受け持っていた年少の男の子は、ほとんどしゃべらない子でした。私が近づくと目をそらすので、嫌われているのかと思っていました。砂場で転んだ日、手当てをしていると、自分の小さなハンカチで私の手の砂を一生懸命拭いてくれました。その子は秋に急に転園してしまい、お別れも言えませんでした。冬の終わりにお母さんからスケッチブックが届き、開くとどの絵にもエプロンの私が端っこにいて、最後のページにカタカナで先生ありがとうと書いてありました。",
+  "test_use": "edge",
+  "note": "Teacher→young pupil (reverse mentor); receiver is a small child, no ongoing contact."
+ },
+ {
+  "id": "0038",
+  "title": "削りかけの木",
+  "url": "https://lacrima.jp/heartwarming_story/kezurikake_no_ki/",
+  "category": "parents",
+  "sender_to_receiver": "息子→父",
+  "direction": "up",
+  "receiver_alive": "yes",
+  "occasions": [
+   "birthday",
+   "parents_day",
+   "thanks"
+  ],
+  "emotion": [
+   "grateful",
+   "tender"
+  ],
+  "themes": [
+   "林業",
+   "木彫り",
+   "無言の愛",
+   "陶芸"
+  ],
+  "key_moment_ja": "無口な父は息子の誕生日ごとに、その年の息子の姿を木彫りにして残していた。",
+  "test_story_ja": "母を早くに亡くし、山で林業をする父と二人で育ちました。父は何を話しても、そうか、としか言わない人で、私は邪魔に思われていると感じて中学を出てすぐ家を出ました。今は陶芸で窯を持っています。父が腰を痛めて入院したとき、実家の作業小屋で小さな木彫りの人形を見つけました。私の誕生日ごとに一体ずつ、その年の私の姿が彫ってありました。母がつけていた私の記録帳にも、父の字で毎年一行ずつ書き足してありました。病院で父に自分の焼いた湯呑みを渡したら、重さがちょうどいいと言ってくれました。",
+  "test_use": "main",
+  "note": ""
+ },
+ {
+  "id": "0039",
+  "title": "切り抜いてくれた人",
+  "url": "https://lacrima.jp/heartwarming_story/kirinuite-kureta-hito/",
+  "category": "mentor",
+  "sender_to_receiver": "教え子→恩師",
+  "direction": "up",
+  "receiver_alive": "yes",
+  "occasions": [
+   "thanks",
+   "birthday"
+  ],
+  "emotion": [
+   "grateful",
+   "proud"
+  ],
+  "themes": [
+   "恩師",
+   "信じる力",
+   "消防士",
+   "陰の応援"
+  ],
+  "key_moment_ja": "恩師は二十年間、教え子が関わった火災や救助の記事を切り抜いて帳面に貼り続けていた。",
+  "test_story_ja": "中学のとき荒れていた私に、担任の先生だけは怒らずに隣に座ってくれました。君の手は人を助ける手だと言って、消防士の募集案内をくれた人です。卒業式では私だけに手書きの賞状をくれて、裏に一言、信じていると書いてありました。その後消防士になりましたが、遠慮して報告できないまま二十年たちました。離島の署に異動した先で、救急で運んだのがその先生でした。先生は私の関わった現場の新聞記事を何年も切り抜いて、ノートに貼ってくれていました。今は毎週先生の家に寄って、畑を手伝っています。",
+  "test_use": "main",
+  "note": ""
+ },
+ {
+  "id": "0040",
+  "title": "弟は黙って研いでいた",
+  "url": "https://lacrima.jp/heartwarming_story/otouto-wa-damatte-toideita/",
+  "category": "siblings",
+  "sender_to_receiver": "兄→弟",
+  "direction": "across",
+  "receiver_alive": "yes",
+  "occasions": [
+   "new_start",
+   "thanks"
+  ],
+  "emotion": [
+   "proud",
+   "grateful"
+  ],
+  "themes": [
+   "蕎麦職人",
+   "兄弟",
+   "継承",
+   "和解"
+  ],
+  "key_moment_ja": "店を嫌って出た弟が、父の砥石で包丁を研ぎ、父の手つきで蕎麦を打ってみせた。",
+  "test_story_ja": "うちは新潟の山の蕎麦屋で、私が三代目です。四つ下の弟は手先が器用だったのに、十八で店を継がないと東京に出ていきました。父が亡くなったとき、弟は父の砥石だけを形見に持って帰り、それきり三年会いませんでした。この冬、弟が砥石を返しに来て、店で蕎麦を打たせてくれと言いました。水回しの手つきが父そっくりで驚きました。父が亡くなる前の一年、毎月電話で打ち方を習っていたそうです。延しはまだ下手なので、来月からは私が教えることにしました。",
+  "test_use": "main",
+  "note": ""
+ },
+ {
+  "id": "0041",
+  "title": "つまらん作品も、誰かの人生に",
+  "url": "https://lacrima.jp/heartwarming_story/teacher-letter-tsumaran/",
+  "category": "other",
+  "sender_to_receiver": "元担任→教え子",
+  "direction": "down",
+  "receiver_alive": "yes",
+  "occasions": [
+   "thanks",
+   "new_start"
+  ],
+  "emotion": [
+   "proud",
+   "apologetic"
+  ],
+  "themes": [
+   "教師",
+   "厳しさ",
+   "編集者",
+   "届いた言葉"
+  ],
+  "key_moment_ja": "厳しく作文を突き返し続けた教え子が、編集者となって本と感謝の手紙を送ってきた。",
+  "test_story_ja": "高校で国語を三十年教えてきました。生徒の作文には厳しく、心が入っていないと何度も書き直させました。特に一人の女子生徒には毎回だめを出し、泣かせてしまったこともあります。彼女は高三で文章の道をやめると言い、私は何も言えませんでした。定年の春、その子から手紙と本が届きました。結局もう一度書き直す決心をして、働きながら学び、今は出版社で編集者をしているそうです。私の言葉がつらかったけれど今の仕事の軸になった、と書いてありました。厳しすぎたかもしれない私を、彼女は許してくれていました。",
+  "test_use": "edge",
+  "note": "Narrator is teacher→former student (reverse of mentor); natural gift direction is student→teacher."
+ },
+ {
+  "id": "0042",
+  "title": "いらないと言った朝",
+  "url": "https://lacrima.jp/heartwarming_story/iranai-to-itta-asa/",
+  "category": "parents",
+  "sender_to_receiver": "娘→父",
+  "direction": "up",
+  "receiver_alive": "yes",
+  "occasions": [
+   "parents_day",
+   "birthday",
+   "thanks",
+   "apology"
+  ],
+  "emotion": [
+   "apologetic",
+   "grateful"
+  ],
+  "themes": [
+   "父子家庭",
+   "弁当",
+   "不器用な愛",
+   "和解"
+  ],
+  "key_moment_ja": "娘に弁当を断られた後も、父はかわいい弁当の作り方の切り抜きを集め続けていた。",
+  "test_story_ja": "母が早くに亡くなり、大工の父が毎朝お弁当を作ってくれていました。卵焼きときんぴらとウインナーの茶色いお弁当で、中学生のとき友達に笑われて、もういらないと言ってしまいました。父はそれから一度も作りませんでした。去年、父が屋根から落ちて入院し、着替えを取りに実家へ行くと、押入れから昔の弁当箱と、かわいいお弁当の作り方を切り抜いた紙の束が出てきました。私が断った年から集めていたようです。次の日、同じおかずに花形のにんじんを一つ添えて病院に持っていくと、父は真っ先にそれを食べました。",
+  "test_use": "main",
+  "note": ""
+ },
+ {
+  "id": "0043",
+  "title": "青磁の湯呑み",
+  "url": "https://lacrima.jp/heartwarming_story/seiji_no_yunomi/",
+  "category": "mentor",
+  "sender_to_receiver": "教え子→恩師",
+  "direction": "up",
+  "receiver_alive": "yes",
+  "occasions": [
+   "thanks",
+   "birthday"
+  ],
+  "emotion": [
+   "grateful",
+   "longing"
+  ],
+  "themes": [
+   "恩師",
+   "無言の教え",
+   "再会",
+   "見る目"
+  ],
+  "key_moment_ja": "くしゃくしゃに丸めた下手な絵を広げて、線の良さだけを静かに認めてくれた。",
+  "test_story_ja": "中学の美術の先生のことです。絵が下手で、自分の絵を丸めて捨てようとしたとき、先生はそれを広げて「この線はいい」とだけ言ってくれました。それから二年間、放課後の美術室に通いました。先生はほとんど何も言わず、横で自分の絵を描きながら、ときどき影の付け方をひと言だけ教えてくれました。夕方の光が窓から変わっていくのを二人で黙って見ていた時間が、今の写真の仕事の原点です。卒業の日にお礼を言えずに走って逃げてしまい、十七年ぶりに偶然再会したときも、先生は私の写真集を見ていてくれました。急がずにものを見ることを教えてくれた人です。",
+  "test_use": "main",
+  "note": ""
+ },
+ {
+  "id": "0044",
+  "title": "届けられなかった荷物",
+  "url": "https://lacrima.jp/heartwarming_story/todokerarenakatta-nimotsu/",
+  "category": "parents",
+  "sender_to_receiver": "息子→母",
+  "direction": "up",
+  "receiver_alive": "yes",
+  "occasions": [
+   "apology",
+   "parents_day",
+   "birthday"
+  ],
+  "emotion": [
+   "apologetic",
+   "grateful"
+  ],
+  "themes": [
+   "和解",
+   "待つ愛",
+   "下町",
+   "湯呑み"
+  ],
+  "key_moment_ja": "七年ぶりに家の前に立った息子を、母は責めずにいつもの調子で迎え入れた。",
+  "test_story_ja": "高校を出るとき、大学に行けと言う母とけんかして家を飛び出しました。そのあと七年間、一度も連絡しませんでした。配達の仕事で実家の近くを毎週通っていたのに、わざと母の家の前を避けていました。あとで近所の人から、母が私の配達の曜日だけ二階の窓を開けて、遠くを走る私のトラックを見ていたと聞きました。思い切って家の前に車を止めたら、母は玄関を開けて、怒りもせず泣きもせず「おかえり」とだけ言いました。台所には私の湯呑みがずっと出しっぱなしになっていました。何も聞かずに待っていてくれた母に、ちゃんと謝りたいです。",
+  "test_use": "main",
+  "note": ""
+ },
+ {
+  "id": "0045",
+  "title": "十八年かかった手紙",
+  "url": "https://lacrima.jp/heartwarming_story/18-nen-kakatta-tegami/",
+  "category": "friends",
+  "sender_to_receiver": "幼馴染(男)→幼馴染(女)",
+  "direction": "across",
+  "receiver_alive": "no",
+  "occasions": [
+   "none"
+  ],
+  "emotion": [
+   "longing",
+   "bittersweet"
+  ],
+  "themes": [
+   "幼馴染",
+   "見送り",
+   "すれ違い",
+   "折り鶴"
+  ],
+  "key_moment_ja": "上京の朝に来なかった彼女が、実は家の窓から見えなくなるまで見送っていたと知る。",
+  "test_story_ja": "小学校から高校まで一緒だった、三軒隣の花屋の娘のことです。私がけんかをすれば止めてくれて、試験前に弱音を吐けば笑って教科書を開いてくれる、落ち着いた子でした。上京する朝、駅まで見送ると言っていたのに来なくて、それがずっと引っかかっていました。年賀状もいつの間にか途切れました。十八年ぶりに帰省したら彼女はもう亡くなっていて、母が預かっていた封筒を渡されました。中には小さな折り鶴と、あの朝は窓から私が見えなくなるまで見ていた、という短いメモが入っていました。最後まで花を育てていたそうです。",
+  "test_use": "edge",
+  "note": "Receiver deceased; childhood friend with possible unspoken romance."
+ },
+ {
+  "id": "0046",
+  "title": "母のおにぎり",
+  "url": "https://lacrima.jp/heartwarming_story/haha-no-onigiri/",
+  "category": "parents",
+  "sender_to_receiver": "息子→母",
+  "direction": "up",
+  "receiver_alive": "yes",
+  "occasions": [
+   "parents_day",
+   "birthday",
+   "thanks"
+  ],
+  "emotion": [
+   "grateful",
+   "tender"
+  ],
+  "themes": [
+   "おにぎり",
+   "無言の愛",
+   "介護",
+   "日常"
+  ],
+  "key_moment_ja": "息子の好みが変わるたび、母は何も言わずにおにぎりの具を替え続けていた。",
+  "test_story_ja": "母は私が子どもの頃から三十になるまで、毎朝おにぎりを握ってくれていました。私が高校でツナマヨにはまったときも、大学で鮭が好きになったときも、何も言わずに具が変わっていました。夜中に帰っても冷蔵庫にラップをしたおにぎりがありました。正直、当たり前すぎて気にも留めていませんでした。その母が脳卒中で倒れて、左半身に麻痺が残りました。初めて自分でおにぎりを握って持っていったら、形はいびつだったのに、母は泣きながら何度もおいしいと言ってくれました。今は毎朝、私が母の分を握っています。ずっと黙って私を見ていてくれた母です。",
+  "test_use": "main",
+  "note": ""
+ },
+ {
+  "id": "0047",
+  "title": "古い首輪と、もう一度歩く道",
+  "url": "https://lacrima.jp/heartwarming_story/furui-kubigwa-to-mou-ichido-aruku-michi/",
+  "category": "other",
+  "sender_to_receiver": "飼い主→保護犬",
+  "direction": "down",
+  "receiver_alive": "yes",
+  "occasions": [
+   "none"
+  ],
+  "emotion": [
+   "tender",
+   "grateful"
+  ],
+  "themes": [
+   "保護犬",
+   "再出発",
+   "消防士",
+   "寄り添い"
+  ],
+  "key_moment_ja": "古い首輪を外した老犬が、新しい首輪で毎朝玄関で尾を振って待つようになった。",
+  "test_story_ja": "冬の夜勤明けに、路地で古い首輪をつけた老犬が震えて座っているのを見つけて、そのまま連れて帰りました。名前はヒロにしました。最初は目に力がなかったのに、少しずつ玄関まで迎えに来るようになり、小さく尻尾を振るようになりました。首輪がきつくなって新しいのに替えたとき、なんだか自分もやり直せる気がして、仕事の配置換えを決めました。落ち込んでいた後輩が家に来たときも、ヒロは黙って膝に乗ってくれました。今はもう毛がほとんど白くなりましたが、毎朝一緒にゆっくり散歩しています。",
+  "test_use": "edge",
+  "note": "Receiver is a pet dog."
+ },
+ {
+  "id": "0048",
+  "title": "妻の弁当箱が教えてくれたこと",
+  "url": "https://lacrima.jp/heartwarming_story/tsuma-no-bentougo-ga-oshiete-kureta-koto/",
+  "category": "partner",
+  "sender_to_receiver": "夫→妻",
+  "direction": "across",
+  "receiver_alive": "no",
+  "occasions": [
+   "none"
+  ],
+  "emotion": [
+   "longing",
+   "grateful"
+  ],
+  "themes": [
+   "弁当",
+   "妻",
+   "伝えられなかった感謝",
+   "看護師"
+  ],
+  "key_moment_ja": "形見の弁当箱の底に、夫の写真を好きだと書いた妻の小さなメモが残っていた。",
+  "test_story_ja": "妻は元看護師で、結婚してから毎朝、私の弁当を詰めてくれました。私は写真の仕事で頭がいっぱいで、ろくに顔も見ずに「ありがとう」と言って出かけていました。妻は人の顔色を見て必要なものに気づく人で、きっと私の疲れ具合に合わせて中身を変えてくれていたのだと思います。五年前に病気で亡くなりました。先日、古い弁当箱を開けたら、底に色あせた付箋が一枚残っていて、私の撮る写真が好きだと書いてありました。毎日そういうメモを貼ってくれていたのかもしれません。もっとちゃんと顔を見て、お礼を言えばよかったです。",
+  "test_use": "edge",
+  "note": "Receiver deceased (memorial)."
+ },
+ {
+  "id": "0049",
+  "title": "父の壊れた眼鏡",
+  "url": "https://lacrima.jp/heartwarming_story/chichi-no-kowareta-megane/",
+  "category": "parents",
+  "sender_to_receiver": "息子→父",
+  "direction": "up",
+  "receiver_alive": "no",
+  "occasions": [
+   "none"
+  ],
+  "emotion": [
+   "longing",
+   "grateful"
+  ],
+  "themes": [
+   "時計職人",
+   "遠慮",
+   "継承",
+   "父の誇り"
+  ],
+  "key_moment_ja": "職人の息子に頼めば済むのに、父は壊れた眼鏡をテープで自分で直して使い続けた。",
+  "test_story_ja": "父は商店街で小さな時計屋をしていました。私は店を継がずに隣町で修理専門の工房を開きました。父は病気のことも腰の痛みも、私が忙しいだろうからと一切言わず、入院して三週間たってから初めて知りました。亡くなったあと、父の箱からテープでぐるぐる巻きに補修した眼鏡が出てきました。私に頼めば三十分で直せたのに、手を煩わせたくなくて自分で直したようです。残っていたノートには、私が贈った懐中時計を病院の待合室で眺めていたことや、私を誇りに思っていると書いてありました。その眼鏡は私が丁寧に直して、工房に置いています。",
+  "test_use": "edge",
+  "note": "Receiver deceased."
+ },
+ {
+  "id": "0050",
+  "title": "祖父の釣り日誌",
+  "url": "https://lacrima.jp/heartwarming_story/sofu-no-tsuri-nissho/",
+  "category": "grandparents",
+  "sender_to_receiver": "孫娘→祖父",
+  "direction": "up",
+  "receiver_alive": "no",
+  "occasions": [
+   "none"
+  ],
+  "emotion": [
+   "grateful",
+   "longing"
+  ],
+  "themes": [
+   "無口",
+   "見守り",
+   "釣り",
+   "誕生日"
+  ],
+  "key_moment_ja": "無口な祖父が孫の誕生日ごとに湖へ行き、鯉を放して短い祝いを書き残していた。",
+  "test_story_ja": "祖父は長野の山奥で一人暮らしをしていて、ほとんどしゃべらない人でした。高校合格を報告しても「そうか」しか言わず、怖くて、大学からは会いにも行かなくなりました。亡くなってから遺品の中に何十冊もの釣りの記録ノートが見つかりました。毎年私の誕生日の日付に、湖まで歩いて鯉を一匹放したこと、元気に育ってよかったという一言が書いてありました。進学のときも就職のときも、母から聞いて同じように書いていました。私が顔を見せなかった年も、ずっとそうしていたようです。ありがとうを言いそびれたままです。",
+  "test_use": "edge",
+  "note": "Receiver deceased."
+ },
+ {
+  "id": "0051",
+  "title": "雪の日の兄の手帳",
+  "url": "https://lacrima.jp/heartwarming_story/yuki-no-hi-no-ani-no-techo/",
+  "category": "siblings",
+  "sender_to_receiver": "妹→兄",
+  "direction": "across",
+  "receiver_alive": "no",
+  "occasions": [
+   "none"
+  ],
+  "emotion": [
+   "apologetic",
+   "longing"
+  ],
+  "themes": [
+   "兄妹",
+   "写真家",
+   "すれ違い",
+   "誕生日"
+  ],
+  "key_moment_ja": "会いに行きたいという兄の連絡を断った妹の誕生日を、兄は毎年手帳に記していた。",
+  "test_story_ja": "四つ上の兄は、両親の離婚で父と北海道に行き、海辺の村で写真を撮って暮らしていました。それから会うことはほとんどなく、年に一度短いメールが来るくらいでした。三十二歳の誕生日に、兄から東京に行っていいかと連絡があったのに、仕事が忙しくて「落ち着いたら」と返したきりでした。兄はそのとき病気だったそうで、翌年亡くなりました。残された手帳には毎年私の誕生日に、元気でいるといいなと一行ずつ書いてありました。子どもの頃、兄の写真の雲を私がすごいと言ったことを、兄はずっと覚えていてくれました。",
+  "test_use": "edge",
+  "note": "Receiver deceased; strong regret."
+ },
+ {
+  "id": "0052",
+  "title": "母が毎朝つづけていた祈り",
+  "url": "https://lacrima.jp/heartwarming_story/haha-ga-maiasa-tsuzuketeita-inori/",
+  "category": "parents",
+  "sender_to_receiver": "娘→母",
+  "direction": "up",
+  "receiver_alive": "yes",
+  "occasions": [
+   "parents_day",
+   "birthday",
+   "thanks"
+  ],
+  "emotion": [
+   "grateful",
+   "apologetic"
+  ],
+  "themes": [
+   "折り鶴",
+   "祈り",
+   "手芸店",
+   "母娘"
+  ],
+  "key_moment_ja": "娘が生まれた日から母は毎日一羽ずつ鶴を折り、一万羽を超えても黙っていた。",
+  "test_story_ja": "母は商店街で小さな手芸店をしていて、退屈している子どもがいるとさっと折り紙で鶴やうさぎを折ってみせる人でした。私が保育士になったのも母の影響です。でも仕事が忙しくなって、母からの電話も「また今度」と後回しにしていました。母が脳梗塞で倒れて実家を片付けたとき、押し入れの箱から番号のついた折り鶴が一万羽以上出てきました。私が生まれた日から毎日一羽ずつ、元気でいてと願いながら折っていたそうです。寂しいとは一度も言わない母でした。今はリハビリ中で、最初の一羽を手に握らせたら、私の手を包んでくれました。",
+  "test_use": "main",
+  "note": ""
+ },
+ {
+  "id": "0053",
+  "title": "父のお守り",
+  "url": "https://lacrima.jp/heartwarming_story/chichi-no-omamori/",
+  "category": "parents",
+  "sender_to_receiver": "息子→父",
+  "direction": "up",
+  "receiver_alive": "yes",
+  "occasions": [
+   "parents_day",
+   "birthday",
+   "thanks",
+   "kanreki"
+  ],
+  "emotion": [
+   "grateful",
+   "proud"
+  ],
+  "themes": [
+   "消防士",
+   "無言の応援",
+   "お守り",
+   "父の過去"
+  ],
+  "key_moment_ja": "息子が消防士になった年から、父は何も言わず玄関に火除けのお守りを置き続けていた。",
+  "test_story_ja": "私が消防士になったとき、父は「危ない仕事だ」と言っただけで、それ以降も何を報告しても「そうか」としか言いませんでした。ずっと認めてもらえていないと思っていました。父が脳梗塞で入院したとき、実家の靴箱の上に古い火除けのお守りがあるのに気づき、母から私が採用された年からずっとそこにあると聞きました。病院で父の昔の同僚に会い、父も若い頃は消防士で、けがと私の誕生をきっかけに辞めたことを初めて知りました。父は自分の話を一度もしませんでした。退院の日、送ると言ったら最後に「そうか」と受け入れてくれました。",
+  "test_use": "main",
+  "note": ""
+ },
+ {
+  "id": "0054",
+  "title": "縫い込まれた許し",
+  "url": "https://lacrima.jp/heartwarming_story/nuikomareta-yurushi/",
+  "category": "grandparents",
+  "sender_to_receiver": "孫→祖父",
+  "direction": "up",
+  "receiver_alive": "no",
+  "occasions": [
+   "none"
+  ],
+  "emotion": [
+   "bittersweet",
+   "grateful"
+  ],
+  "themes": [
+   "許し",
+   "照れ隠し",
+   "漁師",
+   "薬剤師"
+  ],
+  "key_moment_ja": "孫の進路をけなした漁師の祖父が、認知症になってから謝罪の言葉をお守りに縫い込んだ。",
+  "test_story_ja": "祖父は港町の漁師で、口数が少なく、学校から帰ると振り向きもせず「飯あるぞ」と言う人でした。高校生のとき薬剤師になりたいと話したら、祖父だけが、男のする仕事じゃないと言いました。私は腹を立てて、それから十年以上まともに口をききませんでした。祖父が認知症になって帰省したとき、膝の上で布を縫っていて、できあがったお守りを私に渡しました。亡くなって何年もたってから紐が切れ、中から、本当はうれしかった、ひどいことを言って悪かったという手紙が出てきました。言葉にするのが本当に苦手な人でした。",
+  "test_use": "edge",
+  "note": "Receiver deceased; reconciliation after death."
+ },
+ {
+  "id": "0055",
+  "title": "祖父の弁当箱",
+  "url": "https://lacrima.jp/heartwarming_story/sofu-no-bentobako/",
+  "category": "grandparents",
+  "sender_to_receiver": "孫→祖父",
+  "direction": "up",
+  "receiver_alive": "no",
+  "occasions": [
+   "none"
+  ],
+  "emotion": [
+   "grateful",
+   "apologetic"
+  ],
+  "themes": [
+   "弁当",
+   "不器用な愛",
+   "造船所",
+   "合格"
+  ],
+  "key_moment_ja": "父を亡くした孫のため、祖父は夜明け前に毎日黙って弁当を詰めて出勤していた。",
+  "test_story_ja": "五歳で父を亡くし、母と祖父の家で育ちました。造船所で働く祖父は怒鳴ってばかりで、何を考えているのかわかりませんでした。でも毎朝、暗いうちから台所で私の弁当を詰めて、こちらも見ずに出かけていきました。頼んでもいないのに、私の好きなおかずが入っていました。五年生のとき、恥ずかしくて弁当はもういいと言ったら、次の日から台所に祖父はいませんでした。薬剤師の試験に受かっても祖父からは何もなく、亡くなったあと、古い弁当箱の中から合格を祝って職場で自慢したと書いたメモが出てきました。",
+  "test_use": "edge",
+  "note": "Receiver deceased."
+ },
+ {
+  "id": "0056",
+  "title": "完成しなかったマフラー",
+  "url": "https://lacrima.jp/heartwarming_story/kansei-shinakatta-mafura/",
+  "category": "partner",
+  "sender_to_receiver": "夫→妻",
+  "direction": "across",
+  "receiver_alive": "no",
+  "occasions": [
+   "none"
+  ],
+  "emotion": [
+   "longing",
+   "tender"
+  ],
+  "themes": [
+   "編みかけ",
+   "秘めた病",
+   "夫婦",
+   "続きを編む"
+  ],
+  "key_moment_ja": "余命を夫に隠したまま、妻は夫のためのマフラーを毎晩少しずつ編み続けていた。",
+  "test_story_ja": "妻は三年前に胃がんで亡くなりました。病気のことを知っていたのに、私が仕事に手がつかなくなるからと最後まで黙っていて、普段通り台所で笑っていました。私はやせていく妻に気づきませんでした。入院前、毎晩ソファで何かを編んでいて、聞くと内緒、冬までに仕上げると言っていました。三年たってようやく袋を開けたら、半分ほどの白いマフラーと、私の首が冷えやすいから長めに編むと書いたノートが入っていました。編み方を覚えて、続きは私が仕上げました。いびつですが、今はそれを巻いて仕事に出ています。",
+  "test_use": "edge",
+  "note": "Receiver deceased (memorial)."
+ },
+ {
+  "id": "0057",
+  "title": "俺が捨てた折り鶴",
+  "url": "https://lacrima.jp/heartwarming_story/ore-ga-suteta-orizuru/",
+  "category": "mentor",
+  "sender_to_receiver": "元担任→教え子",
+  "direction": "down",
+  "receiver_alive": "yes",
+  "occasions": [
+   "apology",
+   "thanks"
+  ],
+  "emotion": [
+   "apologetic",
+   "proud"
+  ],
+  "themes": [
+   "師弟",
+   "後悔",
+   "折り紙",
+   "才能"
+  ],
+  "key_moment_ja": "担任に折り紙を捨てられた夜も、生徒は先生は自分を心配していると母に話していた。",
+  "test_story_ja": "中学で担任をしていたとき、授業中ずっと机の下で折り紙を折っている男子生徒がいました。怒鳴っても言い返さず、静かにこちらを見返してくるだけの子でした。ある日、私は机の上の折り紙を全部ゴミ箱に捨ててしまい、彼は翌日から学校に来なくなりました。私はその後教師を辞めて、ずっと後悔していました。最近偶然彼のお母さんに会い、彼が今パリで折り紙の作家をしていると聞きました。捨てられた夜も、先生は心配してくれているんだと話していたそうです。託されたという一羽の白い鶴を受け取りました。",
+  "test_use": "edge",
+  "note": "Reverse direction: teacher writing about former student; apology-centred."
+ },
+ {
+  "id": "0058",
+  "title": "商店街のハーモニカが繋いだ、幼馴染との最後の約束",
+  "url": "https://lacrima.jp/heartwarming_story/shoutengai-no-haamonika-ga-tsunaida-osananajimi-to-no-saigo-no-yakusoku/",
+  "category": "friends",
+  "sender_to_receiver": "幼馴染→幼馴染",
+  "direction": "across",
+  "receiver_alive": "yes",
+  "occasions": [
+   "thanks",
+   "apology"
+  ],
+  "emotion": [
+   "tender",
+   "bittersweet"
+  ],
+  "themes": [
+   "幼馴染",
+   "ハーモニカ",
+   "商店街",
+   "再会"
+  ],
+  "key_moment_ja": "正体を名乗れない運転手を、幼馴染は最初から気づいたうえで毎週選んで乗っていた。",
+  "test_story_ja": "同じ商店街で育った幼馴染がいます。帰り道はいつも肉屋のコロッケを並んで食べて、彼はベンチでハーモニカを吹いていました。中学の終わりに彼の家の店がつぶれ、一家は突然いなくなりました。机に残っていたハーモニカを、私は十五年間タクシーに積んでいました。ある夜、やせた彼が客として乗ってきても、私は名乗れませんでした。彼は毎週同じ時間に乗ってきて、私だと最初から分かっていたのに、私から声をかけるのを待っていてくれたそうです。今は病気と闘いながら、退院するたびにベンチでハーモニカを吹いています。",
+  "test_use": "main",
+  "note": "Receiver alive but seriously ill."
+ },
+ {
+  "id": "0059",
+  "title": "万年筆のキャップに残された手紙",
+  "url": "https://lacrima.jp/heartwarming_story/mannenhitsu-no-kyappu-ni-nokosareta-tegami/",
+  "category": "mentor",
+  "sender_to_receiver": "古書店主→常連客の元教師",
+  "direction": "up",
+  "receiver_alive": "no",
+  "occasions": [
+   "none"
+  ],
+  "emotion": [
+   "grateful",
+   "bittersweet"
+  ],
+  "themes": [
+   "厳しさ",
+   "言葉",
+   "古書店",
+   "託された万年筆"
+  ],
+  "key_moment_ja": "小言ばかりの常連客が、店主の本への愛情を惜しんで厳しく言っていたと遺言で明かす。",
+  "test_story_ja": "古本屋をしていた頃、週に一度来る元国語の先生がいました。私の書いた本の紹介カードを見て字が汚いと言い、文章に主語がない、棚の並びが不親切だと、来るたびに指摘されました。言い返さずに毎回直していましたが、褒められたことは一度もありません。先生が亡くなったあと、娘さんから愛用の万年筆が届き、キャップの中に手紙が入っていました。本当は私のカードが面白くて通っていた、本への愛情が本物だったからもったいなくて口うるさく言った、と書いてありました。その万年筆で、遅すぎるお礼を書きました。",
+  "test_use": "edge",
+  "note": "Receiver deceased; customer acting as informal mentor."
+ },
+ {
+  "id": "0060",
+  "title": "祖母のお守りの中に入っていたもの",
+  "url": "https://lacrima.jp/heartwarming_story/sobo-no-omamori-no-naka-ni-haitteita-mono/",
+  "category": "grandparents",
+  "sender_to_receiver": "孫→祖母",
+  "direction": "up",
+  "receiver_alive": "no",
+  "occasions": [
+   "none"
+  ],
+  "emotion": [
+   "longing",
+   "apologetic"
+  ],
+  "themes": [
+   "遠慮",
+   "見えない祈り",
+   "後悔"
+  ],
+  "key_moment_ja": "遺品整理で、渡せずにしまわれていた自分宛ての願い事を見つけた。",
+  "test_story_ja": "祖母は田舎で一人暮らしをしていました。子どもの頃は長い休みのたびに預けられ、行くといつも冷えたカップゼリーを出してくれました。大人になってからは年に一度顔を出す程度で、月に一度の電話も「忙しいのにごめんね」で終わるのが祖母の癖でした。倒れたと聞いても仕事を理由に週末まで延ばし、間に合いませんでした。片付けのとき、仏壇の引き出しから古いお守りが出てきて、中には小さい頃の呼び名で私の無事を願う紙が入っていました。受験や就職のたびにそれを握って拝んでいたそうです。迷惑をかけまいと遠慮ばかりしていた人でした。今もそのお守りは財布に入れています。",
+  "test_use": "edge",
+  "note": "Receiver deceased; grief/regret framing."
+ },
+ {
+  "id": "0061",
+  "title": "雪の日に届いた、父からの最後の手紙",
+  "url": "https://lacrima.jp/heartwarming_story/yuki-no-hi-ni-todoita-chichi-kara-no-saigo-no-tegami/",
+  "category": "parents",
+  "sender_to_receiver": "息子→父",
+  "direction": "up",
+  "receiver_alive": "no",
+  "occasions": [
+   "none"
+  ],
+  "emotion": [
+   "longing",
+   "proud"
+  ],
+  "themes": [
+   "寡黙",
+   "継承",
+   "郵便"
+  ],
+  "key_moment_ja": "亡くなった父から局経由で手紙が届き、父も同じ仕事をしていたと知った。",
+  "test_story_ja": "父は口数が少なく、褒められた記憶がほとんどありません。私が郵便の仕事に就くと言ったときも、ひと言うなずいただけで新聞に目を戻しました。ずっと認められていないと思っていました。父が亡くなって半年後の冬、同僚が封筒を渡してくれました。父が何年も前に局へ預けていたものでした。中には古い鍵と短い手紙。私の就職をずっと誇りに思っていたこと、その鍵は父が昔初めて一人で配達を任された日にもらったものだと書いてありました。父も配達をしていたなんて、そのとき初めて知りました。今もその鍵を持って毎朝同じように配達に出ています。",
+  "test_use": "edge",
+  "note": "Receiver deceased; posthumous letter."
+ },
+ {
+  "id": "0062",
+  "title": "花嫁の笑顔を、君へ",
+  "url": "https://lacrima.jp/heartwarming_story/hanayome_no_egao/",
+  "category": "children",
+  "sender_to_receiver": "父→娘",
+  "direction": "down",
+  "receiver_alive": "yes",
+  "occasions": [
+   "wedding"
+  ],
+  "emotion": [
+   "proud",
+   "tender"
+  ],
+  "themes": [
+   "花嫁",
+   "亡き妻の面影",
+   "成長"
+  ],
+  "key_moment_ja": "式で礼を言われ、泣くまいとした父が笑いながら崩れた瞬間に娘も笑い泣きした。",
+  "test_story_ja": "一人娘が先日結婚しました。式の最後に「今までありがとう、大好き」と言われ、笑って送り出すつもりが涙と鼻水でぐしゃぐしゃになりました。娘も泣きながら笑っていました。妻を病気で亡くしたとき、娘は病室で声が出なくなるほど泣きました。それから二人で暮らしてきました。最初は焦がしてばかりだった料理も、今では毎回ちゃんとおいしい。緊張して彼を家に連れてきた日は、二人とも玄関で手が震えていました。ドレス姿の笑顔は若い頃の妻にそっくりでした。泣き虫で、意地っ張りで、でもまっすぐな子です。",
+  "test_use": "main",
+  "note": "Text partly addressed to deceased wife; receiver is daughter. Near-duplicate of 0063/0078."
+ },
+ {
+  "id": "0063",
+  "title": "娘が嫁いだ日、妻に報告したこと",
+  "url": "https://lacrima.jp/heartwarming_story/musume_ga_tosuida_hi/",
+  "category": "children",
+  "sender_to_receiver": "父→娘",
+  "direction": "down",
+  "receiver_alive": "yes",
+  "occasions": [
+   "wedding"
+  ],
+  "emotion": [
+   "proud",
+   "tender"
+  ],
+  "themes": [
+   "花嫁",
+   "亡き妻",
+   "父娘二人"
+  ],
+  "key_moment_ja": "式から帰り、仏壇の妻に娘の嫁入りを報告した。",
+  "test_story_ja": "たった一人の娘が嫁に行きました。泣かないと決めていたのに、「お父さん大好き」と言われた途端にだめでした。小さい頃は転んでは悔しがって泣き、ランドセルを背負うとカメラに顔を押しつけてきた子です。思春期には洗濯物を分けてと怒鳴ったくせに、すぐ照れていました。母親を亡くした日、あの子は病室で誰よりも泣きました。それでも家のことを覚え、今では料理も私よりずっと上手です。式の間、何度もこちらを振り向いて照れ笑いしていました。家に帰って仏壇に手を合わせ、妻に「嫁に行ったぞ」と報告しました。",
+  "test_use": "main",
+  "note": "Near-duplicate of 0062/0078 (same base story)."
+ },
+ {
+  "id": "0064",
+  "title": "飴玉ひとつで教わった優しさ",
+  "url": "https://lacrima.jp/heartwarming_story/amedama_hitotsu/",
+  "category": "other",
+  "sender_to_receiver": "客→見知らぬ人",
+  "direction": "across",
+  "receiver_alive": "unclear",
+  "occasions": [
+   "none"
+  ],
+  "emotion": [
+   "apologetic",
+   "grateful"
+  ],
+  "themes": [
+   "見知らぬ人",
+   "飴玉",
+   "ためらい"
+  ],
+  "key_moment_ja": "手伝えずに固まっていた自分に、相手のほうが先に謝ってきた。",
+  "test_story_ja": "近所のスーパーのセルフ精算機で、隣の人が震える手で何度も小銭を落としていました。手伝おうと思ったのに、怒られたらどうしようと考えて体が固まってしまいました。するとその人がこちらを見て、小さく「ごめんね」と言ったんです。謝るのはこっちなのに。慌てて小銭を拾って一緒に入れると、ほっとした顔でお礼を言い、ポケットから飴をひとつくれました。数十円を拾っただけなのに、その飴がやけに重く感じました。名前も知らない人ですが、もう一度会えたらちゃんとお礼を言いたいです。",
+  "test_use": "exclude",
+  "note": "One-off encounter with an unnamed stranger; no ongoing relationship."
+ },
+ {
+  "id": "0065",
+  "title": "パパの1時間を買うために",
+  "url": "https://lacrima.jp/heartwarming_story/papa_no_ichi_jikan/",
+  "category": "children",
+  "sender_to_receiver": "父→娘",
+  "direction": "down",
+  "receiver_alive": "yes",
+  "occasions": [
+   "birthday",
+   "thanks"
+  ],
+  "emotion": [
+   "apologetic",
+   "tender"
+  ],
+  "themes": [
+   "時間",
+   "仕事と家族",
+   "気づき"
+  ],
+  "key_moment_ja": "娘が貯めた小銭を差し出し、父の一時間を買いたいと言った。",
+  "test_story_ja": "毎晩遅く帰る生活が続いていました。ある夜、起きて待っていた娘に、パパは一時間でいくら稼ぐのかと聞かれ、疲れていた私はきつく答えてしまいました。さらにお金を少し貸してと言われて叱ってしまい、娘は黙って部屋へ戻りました。あとで謝りに行ってお金を渡すと、娘は枕の下から小銭を出して全部数え、「これでパパの一時間を買える？明日早く帰ってきて遊んでほしい」と言いました。わがままを言わない子なのに。翌日は定時で帰り、家の前で待っていた娘と思いきり遊びました。",
+  "test_use": "main",
+  "note": "Widely circulated parable (originally Western); generic but clear."
+ },
+ {
+  "id": "0066",
+  "title": "色鉛筆のアルバム",
+  "url": "https://lacrima.jp/heartwarming_story/iro_enpitsu/",
+  "category": "parents",
+  "sender_to_receiver": "息子→母",
+  "direction": "up",
+  "receiver_alive": "unclear",
+  "occasions": [
+   "parents_day",
+   "thanks",
+   "apology"
+  ],
+  "emotion": [
+   "apologetic",
+   "grateful"
+  ],
+  "themes": [
+   "母子家庭",
+   "手描きの記録",
+   "宝物"
+  ],
+  "key_moment_ja": "破り捨てた絵を、母が朝早くからテープで一枚ずつ貼り直していた。",
+  "test_story_ja": "うちは母と二人の貧しい家で、カメラがありませんでした。代わりに母は、赤ん坊の私を色鉛筆で描いて、横に一言ずつ書き添えたアルバムを何冊も作っていました。小学生のとき、遊びに来た友達にそれを見つけられて笑われ、恥ずかしさのあまり全部破って捨ててしまいました。仕事から帰った母はごみ箱を見て泣き崩れました。翌朝起きると、母は破片を拾い集めてテープでつなぎ直していて、「嫌な思いさせてごめんね。でもこれはお母さんの宝物なの」と言いました。謝った私に、母は笑って許してくれました。",
+  "test_use": "main"
+ },
+ {
+  "id": "0067",
+  "title": "失われた笑顔と奇跡の誕生日",
+  "url": "https://lacrima.jp/heartwarming_story/ushinawareta_egao_to_kiseki_no_tanjyoubi/",
+  "category": "children",
+  "sender_to_receiver": "父→亡き子",
+  "direction": "down",
+  "receiver_alive": "no",
+  "occasions": [
+   "none"
+  ],
+  "emotion": [
+   "longing",
+   "bittersweet"
+  ],
+  "themes": [
+   "子との死別",
+   "夫婦の再生",
+   "空席"
+  ],
+  "key_moment_ja": "店に頼んで残してもらった空席に、子ども用の食事が運ばれてきた。",
+  "test_story_ja": "五歳の息子を病気で亡くしました。入院中、私は仕事であまり病院に行けず、退院したらディズニーに連れて行こうと軽く考えていました。それが叶わないまま、妻とは喧嘩ばかりになり、離婚も頭にありました。生きていれば六歳の誕生日に、約束どおり二人でレストランへ行きました。混雑していて席を詰めるよう頼まれましたが、真ん中は息子の席だからと事情を話しました。すると料理と一緒にお子さまランチが運ばれ、店中で誕生日を祝ってくれました。ミッキーが大好きな子でした。あの日から、妻と二人で前を向くと決めました。",
+  "test_use": "edge",
+  "note": "Told third-hand by narrator about husband's boss; receiver deceased child; supernatural elements omitted."
+ },
+ {
+  "id": "0068",
+  "title": "妻の忘れ形見を育てて ― 父と娘の泣ける物語",
+  "url": "https://lacrima.jp/heartwarming_story/tsuma_no_wasure_gatami/",
+  "category": "children",
+  "sender_to_receiver": "父→娘",
+  "direction": "down",
+  "receiver_alive": "yes",
+  "occasions": [
+   "wedding",
+   "new_start"
+  ],
+  "emotion": [
+   "proud",
+   "tender"
+  ],
+  "themes": [
+   "男手ひとつ",
+   "亡き妻の忘れ形見",
+   "花嫁"
+  ],
+  "key_moment_ja": "バージンロードで足が震える父に、娘が頬へキスして笑った。",
+  "test_story_ja": "妻を早くに亡くし、娘を赤ん坊のときから一人で育てました。寝かしつけ方も分からず、泣かせては謝ってばかりでした。思春期には、大事なことを早く言ってよと怒られながら、慌てて薬局へ走ったこともあります。大学の合格を電話で聞いたときは、こちらが泣いてしまいました。先日の結婚式では腕を組んで歩きましたが、緊張で足がぎこちなく、娘にロボットみたいだと笑われました。最後に頬へキスされ、照れ隠しの冗談まで言われました。口は悪いけど、気遣いの細やかな子に育ってくれました。",
+  "test_use": "main"
+ },
+ {
+  "id": "0069",
+  "title": "小さな勇気が呼んだ奇跡",
+  "url": "https://lacrima.jp/heartwarming_story/chiisana_yuuki_ga_yonda_kiseki/",
+  "category": "children",
+  "sender_to_receiver": "母→娘",
+  "direction": "down",
+  "receiver_alive": "yes",
+  "occasions": [
+   "birthday",
+   "thanks"
+  ],
+  "emotion": [
+   "proud",
+   "tender"
+  ],
+  "themes": [
+   "小さな勇気",
+   "誕生日",
+   "おこづかい"
+  ],
+  "key_moment_ja": "幼い娘が自分の小遣いだけを握って一人でケーキ屋に行った。",
+  "test_story_ja": "私の誕生日に、幼稚園の娘が一人でケーキを買いに行っていたと後で知りました。ポケットに自分のおこづかいの小銭だけを入れて、いちごののったケーキをくださいと店員さんに頼んだそうです。一度は足りないと言われ、泣くのをこらえて帰りかけたところ、転んで散らばった小銭を数え直したらちょうど足りたとか。夜、「ママおめでとう」と箱を差し出され、思わず抱きしめました。人見知りで恥ずかしがりの子なのに、私を驚かせたい一心で頑張ってくれました。",
+  "test_use": "edge",
+  "note": "Narrated by a bystander; reframed from mother's view; family scene partly imagined in source."
+ },
+ {
+  "id": "0070",
+  "title": "命を守ってくれた笑顔",
+  "url": "https://lacrima.jp/heartwarming_story/inochi_wo_mamotte_kureta_egao/",
+  "category": "other",
+  "sender_to_receiver": "父→救助した自衛隊員",
+  "direction": "across",
+  "receiver_alive": "yes",
+  "occasions": [
+   "thanks"
+  ],
+  "emotion": [
+   "grateful"
+  ],
+  "themes": [
+   "命の恩人",
+   "笑顔",
+   "痛みを隠す"
+  ],
+  "key_moment_ja": "背中に大怪我をしながら、救助中ずっと息子と虫の話をしていた。",
+  "test_story_ja": "数年前、息子と出かけた先で大型トラックに追突され、二人とも車に挟まれました。最初に駆けつけたのは通りかかった自衛隊員の方々でした。若い隊員さんが助手席に潜り込み、息子を引き出してくれました。お礼を言うと「当たり前のことです」と笑っていましたが、背中は血だらけで、後で十七針縫ったと聞きました。病院で息子は、お兄ちゃんが笑ってクワガタの話をしてくれたから泣かなかったと言いました。後日、駐屯地の行事で再会でき、バイクに息子を乗せてくれました。息子にとって今も一番のヒーローです。",
+  "test_use": "edge",
+  "note": "Receiver is a rescuer/near-stranger, though they met again."
+ },
+ {
+  "id": "0071",
+  "title": "恩師の体温計",
+  "url": "https://lacrima.jp/heartwarming_story/onshi-no-taionkei/",
+  "category": "mentor",
+  "sender_to_receiver": "教え子→恩師",
+  "direction": "up",
+  "receiver_alive": "no",
+  "occasions": [
+   "thanks"
+  ],
+  "emotion": [
+   "grateful",
+   "longing"
+  ],
+  "themes": [
+   "恩師",
+   "沈黙の五分",
+   "継承"
+  ],
+  "key_moment_ja": "記憶を失った恩師が、検温の最中に昔と同じ言葉で自分の名を呼んだ。",
+  "test_story_ja": "山奥の村で育ち、体が弱くて学校をよく休みました。一人で全学年を見ていた先生は、私が休むたびに長い坂を登って家まで来て、体温計を脇に挟み、黙って五分待ってから帳面に数字を書いてくれました。高熱の夜は朝まで額を冷やしてくれました。村を出るとき、その体温計を譲ってくれました。私は看護師になり、何十年も胸ポケットに入れていました。晩年、先生が私の病棟に入院してきましたが、私のことはもう覚えていませんでした。それでも毎朝同じように五分の検温を続けました。ある朝、先生が昔の言葉で私の名を呼び、手を握り返してくれました。",
+  "test_use": "edge",
+  "note": "Receiver dies at end of story."
+ },
+ {
+  "id": "0072",
+  "title": "車いすの息子と受けた心ない言葉",
+  "url": "https://lacrima.jp/heartwarming_story/kuruma_isu_no_musuko_to_uketa_kokoro_nai_kotoba/",
+  "category": "other",
+  "sender_to_receiver": "母→バス運転手",
+  "direction": "across",
+  "receiver_alive": "yes",
+  "occasions": [
+   "thanks"
+  ],
+  "emotion": [
+   "grateful"
+  ],
+  "themes": [
+   "差別",
+   "守ってくれた人",
+   "障がい"
+  ],
+  "key_moment_ja": "罵声を浴びせた乗客たちのほうを、運転手が降ろした。",
+  "test_story_ja": "息子は生まれつきの病気で車いすに乗っています。通院のバスで、運転手さんが車いすの場所を空けてくれたのですが、立たされた乗客たちが息子の見た目について聞こえよがしにひどいことを言い始めました。息子が小さな声で降りようかと言い、私が言い返すと笑われました。次の停留所で運転手さんに降りてくださいと言われ、私たちが降ろされるのだと思いました。でも運転手さんは、降りるのは後ろの方々ですとはっきり言い、他の乗客も味方してくれました。お礼を言うと、それが仕事ですからと笑っていました。",
+  "test_use": "edge",
+  "note": "Very dark theme (hate speech); receiver is a stranger."
+ },
+ {
+  "id": "0073",
+  "title": "娘の手紙と、父になれた日",
+  "url": "https://lacrima.jp/heartwarming_story/musume_no_tegami_to_chichi_ni_nareta_hi/",
+  "category": "children",
+  "sender_to_receiver": "継父→娘",
+  "direction": "down",
+  "receiver_alive": "yes",
+  "occasions": [
+   "wedding",
+   "thanks"
+  ],
+  "emotion": [
+   "proud",
+   "tender"
+  ],
+  "themes": [
+   "血のつながらない親子",
+   "男手ひとつ",
+   "花嫁の手紙"
+  ],
+  "key_moment_ja": "嫁ぐ前、娘が箪笥の引き出し全部にひらがなで中身を書いて貼っていった。",
+  "test_story_ja": "娘は妻の連れ子で、出会ったとき中学生でした。妻が事故で亡くなってから、血のつながらない私と高校生の娘の二人暮らしが始まりました。親戚には反対され、周りから妙な目で見られたこともありますが、娘は「こんなオッサンと何かあるわけない」と笑い飛ばしてくれました。その娘が先日結婚しました。式の手紙で、父親は私だけだと言ってくれました。家を出る前には、箪笥の引き出しひとつひとつに、何が入っているかひらがなで書いて貼っていきました。どれだけ頼りないと思われていたのか。でも、そういう気配りのできる子です。",
+  "test_use": "main"
+ },
+ {
+  "id": "0074",
+  "title": "パパ、本当にありがとう",
+  "url": "https://lacrima.jp/heartwarming_story/papa_hontou_ni_arigatou/",
+  "category": "children",
+  "sender_to_receiver": "叔父(育ての父)→姪",
+  "direction": "down",
+  "receiver_alive": "yes",
+  "occasions": [
+   "new_start",
+   "thanks"
+  ],
+  "emotion": [
+   "tender",
+   "proud"
+  ],
+  "themes": [
+   "育ての親",
+   "呼び名",
+   "音楽の夢"
+  ],
+  "key_moment_ja": "最後まで呼ばれなかった「パパ」が、上京の日の置き手紙に初めて書かれていた。",
+  "test_story_ja": "姉夫婦が事故で亡くなり、五歳と三歳の姪を引き取りました。結婚したばかりの妻は、二人産んだと思えばいいと言ってくれました。下の子は少しずつパパ、ママと呼ぶようになりましたが、上の子は私をずっとあだ名で呼んでいました。その子が、亡き姉と同じピアノを続けて音大に合格し、春に上京しました。ちょうど私は出張中で見送れませんでした。帰ると家族宛ての手紙が残っていて、怒られてムカついたことも遊んでもらって嬉しかったことも書いてあり、最後にパパありがとうとありました。頑固で、まっすぐな子です。",
+  "test_use": "main"
+ },
+ {
+  "id": "0075",
+  "title": "兄の背中",
+  "url": "https://lacrima.jp/heartwarming_story/ani_no_senaka/",
+  "category": "siblings",
+  "sender_to_receiver": "妹→兄",
+  "direction": "across",
+  "receiver_alive": "yes",
+  "occasions": [
+   "thanks",
+   "birthday"
+  ],
+  "emotion": [
+   "grateful",
+   "tender"
+  ],
+  "themes": [
+   "守ってくれた兄",
+   "家庭崩壊",
+   "大丈夫"
+  ],
+  "key_moment_ja": "母が家を出る夜、小学生の兄が玄関で妹たちのために母を引き止めていた。",
+  "test_story_ja": "両親が何度も離婚と再婚を繰り返し、家の中はいつも怒鳴り声でした。そのたびに兄は私と赤ん坊の妹を連れ出し、大丈夫だよと言い続けてくれました。母がいなくなった朝、嘘つきと兄を責めたこともあります。大人になって母から聞いたのは、母が家を出た夜、まだ小学生だった兄が玄関で泣きながら、妹たちのために行かないでと頼んでいたという話でした。それを知っていて、翌朝何も言わずおはようと言ってくれていたんです。思春期に荒れた私を祖父母から庇ってくれたのも兄でした。今は子どものいる父親です。",
+  "test_use": "main"
+ },
+ {
+  "id": "0076",
+  "title": "道に咲く愛",
+  "url": "https://lacrima.jp/heartwarming_story/michi_ni_saku_hana/",
+  "category": "parents",
+  "sender_to_receiver": "養女→養母",
+  "direction": "up",
+  "receiver_alive": "unclear",
+  "occasions": [
+   "thanks"
+  ],
+  "emotion": [
+   "grateful"
+  ],
+  "themes": [
+   "拾われた命",
+   "無償の愛",
+   "平等"
+  ],
+  "key_moment_ja": "貧しい暮らしでも、飴を必ず子どもたちに同じ数ずつ分けた。",
+  "test_story_ja": "母は廃品を拾って暮らしを立てながら、道端に捨てられていた子どもを何十人も拾い、育ててきました。私もその一人です。夜中に私たちが寝てから廃品集めに出て、明け方に帰ってきました。食事は芋や大根ばかりでしたが、母はいつも私たちに先に食べさせ、自分は残りを食べていました。飴が手に入れば、実の子にも拾った子にも必ず同じ数ずつ分けてくれました。今、母は病気で入院していますが、私はまだ百歳まで生きてくれると信じています。",
+  "test_use": "exclude",
+  "note": "Third-person news feature about a public figure, not a personal sender story."
+ },
+ {
+  "id": "0077",
+  "title": "強面上司の不器用な優しさ",
+  "url": "https://lacrima.jp/heartwarming_story/kowamote_jyoushi_no_bukiyou_na_yasashisa/",
+  "category": "mentor",
+  "sender_to_receiver": "部下→上司",
+  "direction": "up",
+  "receiver_alive": "yes",
+  "occasions": [
+   "thanks",
+   "retirement"
+  ],
+  "emotion": [
+   "grateful"
+  ],
+  "themes": [
+   "不器用な優しさ",
+   "休む勇気",
+   "強面"
+  ],
+  "key_moment_ja": "無断で休み続けた夜、苦手な上司が家まで来てバーへ連れ出した。",
+  "test_story_ja": "理由も分からず仕事に行けなくなり、何日も休んでいました。ある夜チャイムが鳴り、ドアを開けると、苦手だった強面の上司が立っていました。クビを言い渡されると思ったら、黙って行きつけのバーに連れて行かれました。心配していたと言われ、辞めようか迷っていると正直に話すと、心が少し疲れているだけだから焦るな、ゆっくり休めと言ってくれました。そして、その代わり俺がへばったときは助けろよ、と照れくさそうに笑いました。あの夜がなければ今の私はいません。",
+  "test_use": "main"
+ },
+ {
+  "id": "0078",
+  "title": "大好きな娘へ",
+  "url": "https://lacrima.jp/heartwarming_story/daisuki_na_musume_he/",
+  "category": "children",
+  "sender_to_receiver": "父→娘",
+  "direction": "down",
+  "receiver_alive": "yes",
+  "occasions": [
+   "wedding"
+  ],
+  "emotion": [
+   "proud",
+   "tender"
+  ],
+  "themes": [
+   "花嫁",
+   "成長",
+   "亡き妻の面影"
+  ],
+  "key_moment_ja": "笑顔が亡き妻に似てきた娘が、ドレス姿で笑い泣きしていた。",
+  "test_story_ja": "一人娘が嫁ぎました。式で大好きと言われ、笑顔で送るつもりが、情けない泣き笑いになりました。生まれたての頃は私を見て泣き出し、よちよち歩いては転んでしがみついてきた子です。大きすぎる制服で照れ笑いし、反抗期には洗濯物を一緒にするなと怒っていました。母親を亡くした日は病室で泣き叫びました。初めは失敗ばかりだった料理も、いつの間にか毎回おいしくなりました。彼を連れてきた日は真っ赤になっていました。ドレス姿の笑顔は妻にそっくりでした。",
+  "test_use": "main",
+  "note": "Near-duplicate of 0062/0063."
+ },
+ {
+  "id": "0079",
+  "title": "世界一やさしい娘",
+  "url": "https://lacrima.jp/heartwarming_story/sekai_ichi_yasashii_musume/",
+  "category": "children",
+  "sender_to_receiver": "父→娘",
+  "direction": "down",
+  "receiver_alive": "yes",
+  "occasions": [
+   "birthday",
+   "thanks"
+  ],
+  "emotion": [
+   "tender",
+   "apologetic"
+  ],
+  "themes": [
+   "子の気遣い",
+   "夫婦喧嘩",
+   "やさしさ"
+  ],
+  "key_moment_ja": "両親の喧嘩を自分のせいだと思った娘が、求人に電話して働こうとした。",
+  "test_story_ja": "娘がバイオリンを習いたいと言い出したとき、仕事で疲れていた私は妻に怒鳴ってしまい、夫婦で気まずくなりました。翌日、妻が泣きながら新聞の求人の切り抜きを見せてきました。小学二年の娘がその会社に電話して働きたいと言ったそうです。自分のせいで喧嘩になったから、自分で稼げば習い事もできるし、パパの仕事の大変さも分かると思ったと。ドアの隙間から心配そうに覗く娘を呼び、働かなくていい、バイオリンはやっていいと言いながら、涙が止まりませんでした。こんなに人に気を遣う優しい子です。",
+  "test_use": "main"
+ },
+ {
+  "id": "0080",
+  "title": "嫁の日記",
+  "url": "https://lacrima.jp/heartwarming_story/yome_no_nikki/",
+  "category": "partner",
+  "sender_to_receiver": "夫→妻",
+  "direction": "across",
+  "receiver_alive": "yes",
+  "occasions": [
+   "anniversary",
+   "thanks",
+   "birthday"
+  ],
+  "emotion": [
+   "grateful",
+   "playful"
+  ],
+  "themes": [
+   "節約",
+   "献身",
+   "明るさ"
+  ],
+  "key_moment_ja": "自分の昼は簡素に済ませ、夫の好物を買う日を楽しみにしていた。",
+  "test_story_ja": "妻の日記をこっそり読んでしまいました。妻は昼ごはんをいつも納豆ご飯やお茶漬けで済ませ、友達との外食は月一回と決めていました。それなのに日記には、今日は私の好きな牡蠣を買うんだと楽しそうに書いてありました。私への文句もありましたが、最後は必ず「でも頑張ってるからな」で締めくくられていました。稼ぎが少ないのに専業主婦でいてほしいと頼んだのは私です。それでも妻はお金のことで責めたことがなく、節約も楽しいと笑います。タバコは減らせとよく言われます。",
+  "test_use": "main"
+ },
+ {
+  "id": "0081",
+  "title": "展示場での再会",
+  "url": "https://lacrima.jp/heartwarming_story/tenji_jyou_de_no_saikai/",
+  "category": "partner",
+  "sender_to_receiver": "私→恋人",
+  "direction": "across",
+  "receiver_alive": "yes",
+  "occasions": [
+   "anniversary"
+  ],
+  "emotion": [
+   "tender"
+  ],
+  "themes": [
+   "初恋",
+   "再会",
+   "変わらない笑顔"
+  ],
+  "key_moment_ja": "展示場で偶然再会した同級生が、初恋の相手だったと打ち明けた。",
+  "test_story_ja": "家族で住宅展示場に行ったとき、後ろから名前を呼ばれました。小学校の同級生で、そこで働いていたんです。すっかり大人になっていたけれど、笑った顔は昔のままでした。その夜、卒業アルバムを引っ張り出して見返しました。何か月かして街でまた偶然会い、それからメールでなんでもない話をするようになりました。半年ほどして初めて二人で食事をした帰り、実は初恋だったと言われて、私は泣いてしまいました。照れながらもまっすぐ気持ちを言ってくれる人です。",
+  "test_use": "main",
+  "note": "Thin on receiver's character; mostly reunion narrative."
+ },
+ {
+  "id": "0082",
+  "title": "やさしさに感激",
+  "url": "https://lacrima.jp/heartwarming_story/yasashisa_ni_kangeki/",
+  "category": "other",
+  "sender_to_receiver": "私→見知らぬ人",
+  "direction": "across",
+  "receiver_alive": "unclear",
+  "occasions": [
+   "none"
+  ],
+  "emotion": [
+   "grateful"
+  ],
+  "themes": [
+   "忘れ物",
+   "匿名の親切"
+  ],
+  "key_moment_ja": "置き忘れたスケッチブックが、誰かの手でビニール袋に包まれていた。",
+  "test_story_ja": "暑い日、バス停の植え込みにスケッチブックを敷いて座り、そのまま置き忘れてバスに乗ってしまいました。教室に着いて気づき、一時間ほどして戻ると、スケッチブックは白いビニール袋に包まれて同じ場所に置かれていました。雨に濡れないようにと誰かが気を配ってくれたのだと思います。誰がしてくれたのか分かりませんが、その小さな心遣いが嬉しくて涙が出ました。ありがとうと伝えたいです。",
+  "test_use": "exclude",
+  "note": "Receiver is anonymous; no relationship."
+ },
+ {
+  "id": "0083",
+  "title": "父のノート",
+  "url": "https://lacrima.jp/heartwarming_story/chichi_no_note/",
+  "category": "parents",
+  "sender_to_receiver": "娘→父",
+  "direction": "up",
+  "receiver_alive": "no",
+  "occasions": [
+   "wedding"
+  ],
+  "emotion": [
+   "grateful",
+   "bittersweet"
+  ],
+  "themes": [
+   "余命",
+   "花嫁姿",
+   "隠した本心"
+  ],
+  "key_moment_ja": "病身の父が車椅子を断り、自分の足でバージンロードを歩いた。",
+  "test_story_ja": "大学生のとき、父が末期のがんだと家族だけが知らされました。花嫁姿と孫を見せたくて、彼と相談して結婚と出産を急ぎました。父には病気のことを知っているとは言えず、学生の妊娠に激怒され、ひどく反対されました。何度も話してやっと許してもらいました。式の日、痩せた父は車椅子を断って、私と並んで自分の足で歩いてくれました。娘が生まれると嬉しそうに抱っこしてくれて、その一週間後に亡くなりました。遺品のノートには、全部分かっていて感謝していると書いてありました。",
+  "test_use": "edge",
+  "note": "Narrated by a friend of the daughter; receiver deceased."
+ },
+ {
+  "id": "0084",
+  "title": "雨の日の再会",
+  "url": "https://lacrima.jp/heartwarming_story/ame_no_hi_no_saikai/",
+  "category": "parents",
+  "sender_to_receiver": "子→養母",
+  "direction": "up",
+  "receiver_alive": "yes",
+  "occasions": [
+   "parents_day",
+   "thanks",
+   "apology"
+  ],
+  "emotion": [
+   "apologetic",
+   "grateful"
+  ],
+  "themes": [
+   "育ての母",
+   "和解",
+   "いってらっしゃい"
+  ],
+  "key_moment_ja": "雨の日に母へ駆け寄り、無視してきた詫びの代わりに「いってきます」と言った。",
+  "test_story_ja": "私は施設から今の両親に引き取られて育ちました。中学のとき父が急に亡くなり、そこで初めて実の子でないと知りました。裏切られた気がして母に冷たく当たりました。母は朝から晩まで市場とスーパーで働いていましたが、通学路ですれ違っても友達の手前で無視し、悪口まで言いました。母は何も言わず、黙って足早に通り過ぎるようになりました。ある雨の日、疲れた様子で歩く母を見て、たまらず駆け寄り「いってきます」とだけ言いました。母は泣きながら何度もいってらっしゃいと返してくれました。",
+  "test_use": "main"
+ },
+ {
+  "id": "0085",
+  "title": "公園での約束",
+  "url": "https://lacrima.jp/heartwarming_story/kouen_de_no_yakusoku/",
+  "category": "other",
+  "sender_to_receiver": "芸人→入院中の少女",
+  "direction": "down",
+  "receiver_alive": "no",
+  "occasions": [
+   "none"
+  ],
+  "emotion": [
+   "longing",
+   "bittersweet"
+  ],
+  "themes": [
+   "笑わせる約束",
+   "別れ",
+   "芸人"
+  ],
+  "key_moment_ja": "毎日ネタを見せ続けて、少女がやっと一度だけ笑った。",
+  "test_story_ja": "公園でロケをしていたとき、近くの病院から来た車椅子の女の子に、全然面白くないと言われました。それなら笑うまで毎日見せてやると約束し、仕事の合間に通い続けました。ひと月たっても笑ってくれませんでしたが、ある日、初めて少しだけ笑ってくれました。また明日来ると言うと、勝手に来ればと返されました。次の日、彼女は来ませんでした。容体が悪くなったと聞きました。病院で渡された日記には、私のことが好きだと書いてありました。今も月に一度、その公園でネタをやっています。",
+  "test_use": "exclude",
+  "note": "Third-hand celebrity anecdote; receiver deceased stranger."
+ },
+ {
+  "id": "0086",
+  "title": "ラジオから伝わる愛",
+  "url": "https://lacrima.jp/heartwarming_story/radio_kara_tsutawaru_ai/",
+  "category": "partner",
+  "sender_to_receiver": "妻→夫",
+  "direction": "across",
+  "receiver_alive": "yes",
+  "occasions": [
+   "anniversary",
+   "thanks"
+  ],
+  "emotion": [
+   "grateful",
+   "tender"
+  ],
+  "themes": [
+   "無口な夫",
+   "98点",
+   "不器用な愛"
+  ],
+  "key_moment_ja": "ラジオで妻の点数を聞かれた無口な夫が、迷わず高得点をつけた。",
+  "test_story_ja": "私は小さな店を朝から晩まで一人で切り盛りしていて、家のことも夫の食事もまともにできず、ずっと申し訳なく思っていました。疲れがたまって一週間入院したとき、夫の職場がラジオの企画に出ることになり、病室で聴きました。他の人たちは笑いを取るために奥さんに低い点をつけていて、私は心の中で自分は二十点だと思っていました。でも無口な夫は、九十八点、あれでなきゃうちの嫁は務まらないと答えました。家では何も言わない人なのに。涙が止まりませんでした。",
+  "test_use": "main",
+  "note": "Narrated by a neighbour child; reframed as the wife's view."
+ },
+ {
+  "id": "0087",
+  "title": "最後まで守った芝犬",
+  "url": "https://lacrima.jp/heartwarming_story/saigo_made_mamotta_shibainu/",
+  "category": "other",
+  "sender_to_receiver": "飼い主→柴犬",
+  "direction": "down",
+  "receiver_alive": "no",
+  "occasions": [
+   "none"
+  ],
+  "emotion": [
+   "longing"
+  ],
+  "themes": [
+   "忠犬",
+   "最期",
+   "命の恩"
+  ],
+  "key_moment_ja": "犬が窓に体当たりして吠え回り、倒れた飼い主を近所に知らせた。",
+  "test_story_ja": "夫を亡くしてから一人で暮らしていて、柴犬だけが話し相手でした。心臓が悪い私が台所で倒れたとき、あの子は怪我をしながら窓を破って外に出て、ずっと吠えて人を呼んでくれたそうです。そのおかげで見つけてもらい、手術を受けて助かりました。それからの数年、またあの子と穏やかに暮らすことができました。散歩のときはいつも私の歩く速さに合わせてくれる子でした。",
+  "test_use": "exclude",
+  "note": "Told by a neighbour; both owner and dog die; no living sender/receiver pair."
+ },
+ {
+  "id": "0088",
+  "title": "思いやりと妹への愛情",
+  "url": "https://lacrima.jp/heartwarming_story/omoiyari_to_imouto_he_no_aijyou/",
+  "category": "siblings",
+  "sender_to_receiver": "妹→兄",
+  "direction": "across",
+  "receiver_alive": "yes",
+  "occasions": [
+   "birthday",
+   "thanks"
+  ],
+  "emotion": [
+   "tender",
+   "grateful"
+  ],
+  "themes": [
+   "兄の我慢",
+   "譲る心",
+   "小遣い"
+  ],
+  "key_moment_ja": "自分の分の紙も妹に渡し、兄は離れた場所から見守っていた。",
+  "test_story_ja": "小さい頃、お祭りの金魚すくいをどうしてもやりたくて兄にせがみました。家は貧しく、兄は握りしめていた百円玉三枚で一回分だけ払ってくれました。夢中ですくっていると、お店のおじさんがわざと濡らした紙を兄にくれたのに、私がぶつかって自分の紙を破ってしまいました。泣きそうな私に、兄は自分の紙を渡して、ちょっと向こう見てくると離れていきました。あとで知りましたが、ずっと陰から見ていたそうです。帰り道は手をつないでくれました。いつも自分のことは後回しにする兄です。",
+  "test_use": "edge",
+  "note": "Narrated by stall owner; reframed from the sister's view."
+ },
+ {
+  "id": "0089",
+  "title": "厳しさの中の優しさ",
+  "url": "https://lacrima.jp/heartwarming_story/kibishisa_no_naka_no_yasashisa/",
+  "category": "mentor",
+  "sender_to_receiver": "教え子→先生",
+  "direction": "up",
+  "receiver_alive": "unclear",
+  "occasions": [
+   "thanks",
+   "retirement"
+  ],
+  "emotion": [
+   "grateful"
+  ],
+  "themes": [
+   "厳しさと優しさ",
+   "陰の支え",
+   "弁当"
+  ],
+  "key_moment_ja": "弁当を開けられずにいた子の隣に、厳しい先生が座って一緒に食べた。",
+  "test_story_ja": "小学六年のとき、家が苦しく、給食費もよく払えませんでした。遠足の昼、周りがお弁当を見せ合う中、私は自分の弁当を開けられずにいました。そこへ隣のクラスの、怖いと評判の先生が来て、一緒に食べていいかと座り、大きな弁当を私や周りの子に分けてくれました。それからクラスに馴染めるようになりました。何年も経ってから、先生が給食費や修学旅行費をこっそり立て替え、休日には勉強まで見てくれていたと知りました。表では厳しく、陰で黙って支えてくれる人でした。",
+  "test_use": "edge",
+  "note": "Narrated by a classmate; reframed from the helped student's view."
+ },
+ {
+  "id": "0090",
+  "title": "懐かしの大声援",
+  "url": "https://lacrima.jp/heartwarming_story/natsukashi_no_daiseien/",
+  "category": "parents",
+  "sender_to_receiver": "息子→両親",
+  "direction": "up",
+  "receiver_alive": "no",
+  "occasions": [
+   "none"
+  ],
+  "emotion": [
+   "longing",
+   "bittersweet"
+  ],
+  "themes": [
+   "応援",
+   "野球",
+   "初盆"
+  ],
+  "key_moment_ja": "観戦中、母の母校の子どもたちが元気に声援を送る姿に両親を重ねた。",
+  "test_story_ja": "母は晩年、テレビで野球や相撲を見ながら大声で応援するのが大好きでした。末期のがんで、最後は自宅で看取りました。施設にいた父も、その数か月後に後を追うように亡くなりました。元ラグビー選手でスポーツ好きの父と母は、子どもの頃よく私を野球や相撲に連れて行ってくれました。初盆のあと家族で球場に行くと、修学旅行の小学生たちが元気に声援を送っていて、その中に母の母校の子たちがいました。母のあの大きな声援を思い出しました。",
+  "test_use": "edge",
+  "note": "Both parents deceased; reminiscence with weak focus on a single receiver."
+ },
+ {
+  "id": "0091",
+  "title": "弟の深い愛",
+  "url": "https://lacrima.jp/heartwarming_story/otouti_no_fukai_ai/",
+  "category": "children",
+  "sender_to_receiver": "母→次男",
+  "direction": "down",
+  "receiver_alive": "yes",
+  "occasions": [
+   "birthday",
+   "thanks"
+  ],
+  "emotion": [
+   "proud",
+   "tender"
+  ],
+  "themes": [
+   "きょうだい",
+   "思いやり",
+   "障がい"
+  ],
+  "key_moment_ja": "隣の席の子の腕が治るよう、七夕の短冊にこっそり願っていた。",
+  "test_story_ja": "長男には脳に障がいがあり、小さい頃の次男はケンカのたびに兄をばかにして、私はつらい思いをしていました。でも兄が友達に手を上げたとき、次男は「殴るなら僕を殴って」と止めに入りました。小学校に上がると、手の不自由な隣の席の子の着替えを、誰にも言わず毎回手伝っていたそうです。授業参観の日、七夕の短冊に「隣の子の腕が早く治りますように」と書いてあるのを先生が見つけて教えてくれました。自分からは何も言わない子です。",
+  "test_use": "main"
+ },
+ {
+  "id": "0092",
+  "title": "父の献身",
+  "url": "https://lacrima.jp/heartwarming_story/chichi_no_kenshin/",
+  "category": "parents",
+  "sender_to_receiver": "娘→父",
+  "direction": "up",
+  "receiver_alive": "unclear",
+  "occasions": [
+   "kanreki",
+   "retirement",
+   "thanks",
+   "parents_day"
+  ],
+  "emotion": [
+   "grateful",
+   "proud"
+  ],
+  "themes": [
+   "働き者",
+   "家族のため",
+   "真面目"
+  ],
+  "key_moment_ja": "店に立ちながら、朝から晩までいくつものアルバイトを掛け持ちしていた。",
+  "test_story_ja": "両親は小さな喫茶店をやっていて、私は一人娘です。中卒の父はとにかく真面目な人でした。景気が悪くなって客が減っても、モーニングとランチには必ず店に立ち、その合間に弁当の配達、午後は郵便の配達、週末にも別のアルバイトをしていました。細い体で足も肩もいつも疲れていて、夜は母がマッサージするのが日課でした。私の学費と家のローンのためでした。酔ったときに、お前のためなら火の中でも飛び込むと言っていたのは本気だったと思います。",
+  "test_use": "main",
+  "note": "Receiver status not stated; likely alive."
+ },
+ {
+  "id": "0093",
+  "title": "旅で得た千円札",
+  "url": "https://lacrima.jp/heartwarming_story/tabi_de_eta_senensatsu/",
+  "category": "other",
+  "sender_to_receiver": "私→見知らぬ老婦人",
+  "direction": "up",
+  "receiver_alive": "unclear",
+  "occasions": [
+   "none"
+  ],
+  "emotion": [
+   "grateful"
+  ],
+  "themes": [
+   "見知らぬ人",
+   "恩送り",
+   "旅"
+  ],
+  "key_moment_ja": "所持金の尽きた学生に、老婦人がゆで卵と千円札を渡してくれた。",
+  "test_story_ja": "学生の頃、貧乏旅行で帰りの切符を買ったら残金が八十円になり、丸一日何も食べずに駅のホームで途方に暮れていました。見知らぬおばあさんが声をかけてくれて、ゆで卵を二つ分けてくれ、さらに千円札をポケットに入れてくれました。大人になったら同じような若い人を助けてあげてね、と言われました。その千円札は使えないまま、もう十年以上手元にあります。いつか誰かに返すつもりです。",
+  "test_use": "exclude",
+  "note": "One-off encounters with anonymous strangers."
+ },
+ {
+  "id": "0094",
+  "title": "美味かったな",
+  "url": "https://lacrima.jp/heartwarming_story/umakattana/",
+  "category": "friends",
+  "sender_to_receiver": "私→親友",
+  "direction": "across",
+  "receiver_alive": "yes",
+  "occasions": [
+   "thanks",
+   "birthday"
+  ],
+  "emotion": [
+   "grateful"
+  ],
+  "themes": [
+   "さりげない気遣い",
+   "親友",
+   "恥をかばう"
+  ],
+  "key_moment_ja": "注文で笑われた自分をかばい、友が自分の注文を同じものに変えた。",
+  "test_story_ja": "家が貧しく、中学を出てすぐ働き始めました。一年ぶりに同級生と会って食堂に入ったとき、メニューの漢字がほとんど読めず、読めたオムライスにご飯もつけてと頼んで店員さんに戸惑われ、周りに笑われました。すると友達がすぐ、自分の注文を取り消して俺もオムライスとご飯で、と言ってくれました。店を出るとき、美味かったな、仕事頑張れよと笑っていました。何も説明しないのに全部分かってくれる人です。今も一番の親友です。",
+  "test_use": "main"
+ },
+ {
+  "id": "0095",
+  "title": "笑顔のつながり",
+  "url": "https://lacrima.jp/heartwarming_story/egao_no_tsunagari/",
+  "category": "friends",
+  "sender_to_receiver": "同級生→同級生",
+  "direction": "across",
+  "receiver_alive": "yes",
+  "occasions": [
+   "thanks"
+  ],
+  "emotion": [
+   "grateful",
+   "playful"
+  ],
+  "themes": [
+   "明るさ",
+   "クラスの絆",
+   "貧しさを笑う"
+  ],
+  "key_moment_ja": "破れた制服を笑いに変え、もらった制服を掲げて大会で活躍した。",
+  "test_story_ja": "中学の同級生に、七人きょうだいの長男で家計の苦しさを隠さない男子がいました。背が急に伸びて制服がきつくなり、ふざけていたら背中が裂けたことがあります。本人はそれをネタにしてみんなを笑わせていました。誰かが余っている制服はないかと声をかけ、翌日には何着か集まりました。彼はそれを高く掲げてありがとうと言い、お礼に点を取ると宣言して、その日のバレー大会で本当にクラスを優勝させました。どんな状況でも周りを明るくする人でした。",
+  "test_use": "edge",
+  "note": "Collective/bystander narration; receiver is a classmate seen by the group."
+ },
+ {
+  "id": "0096",
+  "title": "隅っこの守護者",
+  "url": "https://lacrima.jp/heartwarming_story/sumikko_no_shugosha/",
+  "category": "other",
+  "sender_to_receiver": "飼い主→犬",
+  "direction": "down",
+  "receiver_alive": "no",
+  "occasions": [
+   "none"
+  ],
+  "emotion": [
+   "longing",
+   "tender"
+  ],
+  "themes": [
+   "ペット",
+   "隅っこの子",
+   "最期まで"
+  ],
+  "key_moment_ja": "ブリーダーで部屋の隅に縮こまっていた子犬を迷わず選んだ。",
+  "test_story_ja": "海外で小さな子ども二人を育てていた頃、夫の提案で犬を見に行きました。元気な子犬が多い中、部屋の隅でじっとしている一匹がいて、母犬にも相手にされずもらい手がないと聞き、その子に決めました。最初は臆病でいつも隅に隠れていましたが、だんだん子どもたちと遊ぶようになりました。病気で治らないと分かってからも、最後まで家で一緒に過ごし、同じベッドで眠りました。静かに旅立ちました。また会えたら、どれだけ大好きだったか伝えたいです。",
+  "test_use": "edge",
+  "note": "Pet; receiver deceased."
+ },
+ {
+  "id": "0097",
+  "title": "父と歩む未来",
+  "url": "https://lacrima.jp/heartwarming_story/chichi_to_ayumu_mirai/",
+  "category": "parents",
+  "sender_to_receiver": "娘→父",
+  "direction": "up",
+  "receiver_alive": "no",
+  "occasions": [
+   "none"
+  ],
+  "emotion": [
+   "apologetic",
+   "longing"
+  ],
+  "themes": [
+   "反対と見守り",
+   "病を隠す",
+   "進学"
+  ],
+  "key_moment_ja": "見送りに来なかったはずの父が、実は遠くから見ていた。",
+  "test_story_ja": "父が大好きでした。高校三年で県外の学校に行きたいと言うと、父だけが強く反対し、初めて大げんかになりました。母と二人で内緒で準備をして、引っ越しを告げても父は勝手にしろとだけ。出発の日も来てくれませんでした。後になって、父はずっと病気で、私の邪魔をしたくなくて黙っていたこと、見送りの日も遠くから見ていたことを知りました。届いたメールには、自分で決めたことは最後までやれ、見守っていると書いてありました。結婚相手は父に似た優しい人です。",
+  "test_use": "edge",
+  "note": "Receiver deceased (implied)."
+ },
+ {
+  "id": "0098",
+  "title": "父の告白",
+  "url": "https://lacrima.jp/heartwarming_story/chichi_no_kokuhaku/",
+  "category": "parents",
+  "sender_to_receiver": "息子→継父",
+  "direction": "up",
+  "receiver_alive": "yes",
+  "occasions": [
+   "wedding",
+   "thanks",
+   "birthday"
+  ],
+  "emotion": [
+   "playful",
+   "grateful"
+  ],
+  "themes": [
+   "血のつながらない親子",
+   "打ち明け",
+   "笑いと涙"
+  ],
+  "key_moment_ja": "意を決して打ち明けた父に、息子が「知ってたよ」と返した。",
+  "test_story_ja": "結婚したい人がいると話したら、数日後に家族会議が開かれました。父がこれまで見たことのない真剣な顔で、実は血がつながっていないと切り出しました。知ってると言おうとしても、お前は俺の息子だと泣きながら叫んで聞いてくれません。やっと知ってるよと伝えると、父はえ？と固まりました。父は昔隣に住んでいたおじさんで、小さい頃パパになったらどうかと聞かれたのを覚えていたんです。父は、知っていて一緒にいてくれたのかと泣いていました。不器用で、まっすぐな人です。",
+  "test_use": "main",
+  "note": "Humorous tone."
+ },
+ {
+  "id": "0099",
+  "title": "震災後のファミレスにて",
+  "url": "https://lacrima.jp/heartwarming_story/shinsai_go_no_famiresu_nite/",
+  "category": "other",
+  "sender_to_receiver": "店員→見知らぬ客",
+  "direction": "across",
+  "receiver_alive": "unclear",
+  "occasions": [
+   "none"
+  ],
+  "emotion": [
+   "grateful"
+  ],
+  "themes": [
+   "震災",
+   "義侠",
+   "見知らぬ人"
+  ],
+  "key_moment_ja": "騒ぐ若者たちを一喝し、店員に喧嘩は自分たちの仕事だと笑った。",
+  "test_story_ja": "震災の後、勤めていたファミレスで無料のバイキングを出していました。店は被災した人たちで満席でしたが、観光気分の若者たちが騒いで無茶な注文をし、お年寄りが帰ってほしいと頼んでも笑うだけでした。私が出て行ってくださいと言ったとき、刺青の男の人が前に出て一喝し、若者たちは帰っていきました。その人は、店員さんは喧嘩しないほうがいい、そういうのは僕らの仕事だからと笑い、ごちそうさまと言って足を少し引きずりながら帰っていきました。",
+  "test_use": "exclude",
+  "note": "One-off encounter with an unnamed stranger."
+ },
+ {
+  "id": "0100",
+  "title": "お兄ちゃんの約束",
+  "url": "https://lacrima.jp/heartwarming_story/oniichan_no_yakusoku/",
+  "category": "children",
+  "sender_to_receiver": "母→長男",
+  "direction": "down",
+  "receiver_alive": "yes",
+  "occasions": [
+   "birthday",
+   "thanks"
+  ],
+  "emotion": [
+   "tender",
+   "proud"
+  ],
+  "themes": [
+   "きょうだい愛",
+   "約束",
+   "障がい"
+  ],
+  "key_moment_ja": "弟と同じ学校は無理だと知った兄が、弟が楽しく通える学校を探してと指切りを求めた。",
+  "test_story_ja": "下の息子には障がいがあり、来年の就学先に悩んでいます。小学一年の上の子が、来年は弟と一緒に学校に行くんだと嬉しそうに話すので、難しいことを正直に伝えました。上の子は泣いて、登校は手をつなぐし、休み時間は見に行くし、いじめられないよう守るからと訴え、部屋にこもってしまいました。しばらくして出てきて、本当は一緒がいいけど無理なら我慢する、その代わり弟が楽しく通えていじめのない学校を探して、と真剣に言いました。二人で指切りしました。",
+  "test_use": "main"
+ },
+ {
+  "id": "0101",
+  "title": "愛の記憶",
+  "url": "https://lacrima.jp/heartwarming_story/ai_no_kioku/",
+  "category": "partner",
+  "sender_to_receiver": "夫→妻",
+  "direction": "across",
+  "receiver_alive": "yes",
+  "occasions": [
+   "anniversary",
+   "apology"
+  ],
+  "emotion": [
+   "apologetic",
+   "tender"
+  ],
+  "themes": [
+   "昔のメール",
+   "一途",
+   "疑いと和解"
+  ],
+  "key_moment_ja": "見知らぬ男からと思ったメールは、自分が昔送ったものだった。",
+  "test_story_ja": "妻がお風呂に入っている間に、つい携帯を見てしまいました。知らない番号からの甘いメールが百通以上も保存されていて、カッとなって問い詰めました。妻は笑って、自分が送ったのを忘れたのと言いました。よく見ると、差出人は私の昔の番号でした。電池がすぐ切れるほど古い携帯を使い続けていたのは、メールが消えるのが嫌だったからだそうです。謝ると、妻は笑って抱きしめてくれました。今度の週末、私のお金で新しい携帯に替えに行きます。",
+  "test_use": "main"
+ },
+ {
+  "id": "0102",
+  "title": "母という存在",
+  "url": "https://lacrima.jp/heartwarming_story/haha_to_iu_sonzai/",
+  "category": "children",
+  "sender_to_receiver": "母→子",
+  "direction": "down",
+  "receiver_alive": "unclear",
+  "occasions": [
+   "none"
+  ],
+  "emotion": [
+   "tender"
+  ],
+  "themes": [
+   "見守る",
+   "親心"
+  ],
+  "key_moment_ja": "具体的な出来事はなく、子の幸せを願う母の思いが綴られている。",
+  "test_story_ja": "子どもたちがもう大人になって、それぞれの道を歩いています。元気な声を聞くだけで、腰が痛くても頭が痛くても気分が晴れます。悩んでいる様子を見ると何とかしてあげたくなるのに、何もできず、つい余計なひと言を言っては後悔します。感謝なんてしなくていいから、自分の足で立って、自分の人生を楽しんでほしい。苦しいときも投げ出さずに生きてほしい。それだけを毎日願っています。",
+  "test_use": "exclude",
+  "note": "Essay-style message with no concrete events or specific receiver."
+ },
+ {
+  "id": "0103",
+  "title": "隠された記憶",
+  "url": "https://lacrima.jp/heartwarming_story/kakusareta_kioku/",
+  "category": "parents",
+  "sender_to_receiver": "娘→父",
+  "direction": "up",
+  "receiver_alive": "yes",
+  "occasions": [
+   "wedding",
+   "thanks"
+  ],
+  "emotion": [
+   "grateful",
+   "tender"
+  ],
+  "themes": [
+   "父子家庭",
+   "亡き母の記憶",
+   "秘めた贈り物"
+  ],
+  "key_moment_ja": "披露宴で父が、ずっと渡せずにいた母のビデオを流した。",
+  "test_story_ja": "母は私が生まれてすぐ病気で亡くなり、私は写真でしか母の顔を知りませんでした。父は男手ひとつで私を育ててくれました。結婚披露宴の最後、父は挨拶で、ずっと渡す時機を考えていたものがあると言って、古いビデオテープを流しました。映っていたのは、病院のベッドで生まれたばかりの私を抱いて笑う母でした。初めて動く母の顔と声を見て、涙が止まりませんでした。父は泣きもせず、いつもどおり淡々としていました。そういう人です。",
+  "test_use": "edge",
+  "note": "Narrated by a wedding guest; reframed from the bride's view."
+ },
+ {
+  "id": "0104",
+  "title": "両親への感謝",
+  "url": "https://lacrima.jp/heartwarming_story/ryoushin_he_no_kansha/",
+  "category": "other",
+  "sender_to_receiver": "教師→生徒たち",
+  "direction": "down",
+  "receiver_alive": "unclear",
+  "occasions": [
+   "none"
+  ],
+  "emotion": [
+   "grateful"
+  ],
+  "themes": [
+   "親への感謝",
+   "卒業",
+   "授業"
+  ],
+  "key_moment_ja": "卒業式後、生徒に目を閉じさせ、隣の親の手を握らせた。",
+  "test_story_ja": "高校教師として、卒業式の後に三年生と保護者を集めて最後の授業をしました。保護者を席に座らせ、生徒をその隣に座らせて目を閉じさせ、これまで親にかけた心配を思い出すよう話しました。そして隣にいる親の手を握るように言いました。教室中にすすり泣く声が広がりました。目を開けさせて授業を終え、外に出るとき、親子が抱き合って泣いているのが見えました。",
+  "test_use": "exclude",
+  "note": "Teacher's account of a lesson; no specific sender-receiver relationship."
+ },
+ {
+  "id": "0105",
+  "title": "天国に持っていく思い出",
+  "url": "https://lacrima.jp/heartwarming_story/tengoku_ni_motte_iku_omoide/",
+  "category": "parents",
+  "sender_to_receiver": "娘→母",
+  "direction": "up",
+  "receiver_alive": "yes",
+  "occasions": [
+   "parents_day",
+   "thanks",
+   "new_start"
+  ],
+  "emotion": [
+   "grateful",
+   "apologetic"
+  ],
+  "themes": [
+   "支える母",
+   "妊娠",
+   "反抗と感謝"
+  ],
+  "key_moment_ja": "叱った直後、母は自分が代わりに産んであげたかったと泣き出した。",
+  "test_story_ja": "高校生のとき、天国にどの場面を持っていきたいか母に聞くと、私が生まれた瞬間だと即答されました。裕福でもないのに私立に通わせ、塾にも行かせてくれたのに、私は反抗ばかりでした。保育の仕事に就いてから予定外の妊娠をし、相手には反対されました。一人じゃ無理だと母に泣きつくと、ものすごく叱られたあと、自分に子宮があれば代わりに産んであげたのにと泣き出しました。母は私が家に入れたお金をこっそり貯めておいてくれていました。もうすぐおばあちゃんになる母です。",
+  "test_use": "main"
+ },
+ {
+  "id": "0106",
+  "title": "小さな勇気、大きな友情",
+  "url": "https://lacrima.jp/heartwarming_story/chiisana_yuuki_ookina_yuujyou/",
+  "category": "friends",
+  "sender_to_receiver": "子どもたち→盲目の子",
+  "direction": "across",
+  "receiver_alive": "yes",
+  "occasions": [
+   "none"
+  ],
+  "emotion": [
+   "tender"
+  ],
+  "themes": [
+   "小さな友情",
+   "見知らぬ子",
+   "助け合い"
+  ],
+  "key_moment_ja": "悪態をついた子たちが、結局ドアを開けて氷を買い家まで送った。",
+  "test_story_ja": "コンビニで働いています。目の見えない常連の子が一人で店の前に立っていたとき、同い年くらいの男の子二人が意地悪なことを言ったので、注意しようとしました。でも二人はすぐドアを開けてやり、手を引いて店に入れてくれました。お母さんが熱を出して氷を買いに来たと聞くと、氷を持ってきてお金まで払い、治ったら一緒に遊べよと言って家まで送っていきました。",
+  "test_use": "exclude",
+  "note": "Bystander observation of strangers; no sender-receiver relationship."
+ },
+ {
+  "id": "0107",
+  "title": "一緒に最後まで",
+  "url": "https://lacrima.jp/heartwarming_story/issho_ni_saigo_made/",
+  "category": "partner",
+  "sender_to_receiver": "妻→夫",
+  "direction": "across",
+  "receiver_alive": "no",
+  "occasions": [
+   "none"
+  ],
+  "emotion": [
+   "tender",
+   "bittersweet"
+  ],
+  "themes": [
+   "添い遂げる",
+   "老夫婦",
+   "最期"
+  ],
+  "key_moment_ja": "救急室で妻自ら夫の胸を押しながら、二人の思い出を語りかけた。",
+  "test_story_ja": "主人は八十六で、長く肺を患っていました。私が買い物から戻ると、居間でもう動かなくなっていました。病院で、私は先生に頼んで胸の押し方を教わり、最後は自分の手でやらせてもらいました。昔から身の回りのことが何一つできない人で、ずっと私が世話を焼いてきました。けんかもたくさんしたけれど、隣にいられて本当に楽しかった。いつも糊のきいた白いシャツを着ていた、あの人らしい最後でした。",
+  "test_use": "edge",
+  "note": "Receiver dies at start; narrator is ER doctor observing."
+ },
+ {
+  "id": "0108",
+  "title": "弟の物語が変えた家族",
+  "url": "https://lacrima.jp/heartwarming_story/otouto_no_monogatari-2/",
+  "category": "siblings",
+  "sender_to_receiver": "姉→弟",
+  "direction": "across",
+  "receiver_alive": "yes",
+  "occasions": [
+   "birthday",
+   "thanks"
+  ],
+  "emotion": [
+   "tender",
+   "grateful"
+  ],
+  "themes": [
+   "家族の再生",
+   "子供の純粋さ",
+   "食卓"
+  ],
+  "key_moment_ja": "幼い弟がノートに書いた理想の家族の物語が、崩れかけた家族を食卓に戻した。",
+  "test_story_ja": "弟とは十二歳離れています。両親がけんかばかりしていた頃、私は外で遊んでばかりで家にあまり帰りませんでした。ある日、六歳の弟がノートに書いた作文を父が読んで泣いていました。みんなで笑ってご飯を食べて、日曜はお出かけする家族の話でした。現実とは全然違ったけど、その夜初めて家族で鍋を囲んで、弟はずっと笑っていました。今うちが仲良くいられるのは、あの子のおかげです。",
+  "test_use": "main"
+ },
+ {
+  "id": "0109",
+  "title": "天に向かっての約束",
+  "url": "https://lacrima.jp/heartwarming_story/ten_ni_mukatte_no_yakusoku/",
+  "category": "children",
+  "sender_to_receiver": "父→娘",
+  "direction": "down",
+  "receiver_alive": "yes",
+  "occasions": [
+   "birthday"
+  ],
+  "emotion": [
+   "tender",
+   "proud"
+  ],
+  "themes": [
+   "母を亡くした子",
+   "健気さ",
+   "成長"
+  ],
+  "key_moment_ja": "四歳の誕生日、母の墓前で泣かないと宣言し、空に向かって母を呼んだ。",
+  "test_story_ja": "妻が亡くなって七か月、娘が四歳になりました。休みを取って二人でお墓参りに行きました。少し前まで毎晩ママに会いたいと泣いていたのに、最近泣かなくなっていて、お墓の前で「もうお姉さんだから泣かない」と教えてくれました。帰りに丘の上から、ママいつでも帰ってきてね、と大きな声で叫んでいました。小さい体でがんばっている娘を見て、私も父親としてしっかりしようと思いました。",
+  "test_use": "main",
+  "note": "Mother deceased; father writing about living daughter."
+ },
+ {
+  "id": "0110",
+  "title": "彼女の愛と意志",
+  "url": "https://lacrima.jp/heartwarming_story/kanojyo_no_ai_to_ishi/",
+  "category": "partner",
+  "sender_to_receiver": "彼氏→彼女",
+  "direction": "across",
+  "receiver_alive": "yes",
+  "occasions": [
+   "anniversary",
+   "thanks"
+  ],
+  "emotion": [
+   "grateful",
+   "tender"
+  ],
+  "themes": [
+   "支え",
+   "共に歩む",
+   "八つ当たり"
+  ],
+  "key_moment_ja": "八つ当たりした僕に、彼女は怒らずお母さんを支えようと励ましてくれた。",
+  "test_story_ja": "父が借金を作っていなくなり、別居していた母と暮らし始めました。周りには平気な顔をしていましたが本当はきつくて、つい彼女に当たってしまいました。いつもならけんかになるのに、その日の彼女は違いました。私が支えるから、あんたはお母さんを支えてあげて、一緒にがんばろう、と言ってくれたんです。片想いから必死で付き合ってもらった人です。情けないくらい泣きました。今も二人で母を支えています。",
+  "test_use": "main"
+ },
+ {
+  "id": "0111",
+  "title": "最後のショットバー",
+  "url": "https://lacrima.jp/heartwarming_story/saigo_no_shotbar/",
+  "category": "siblings",
+  "sender_to_receiver": "弟→姉",
+  "direction": "across",
+  "receiver_alive": "no",
+  "occasions": [
+   "none"
+  ],
+  "emotion": [
+   "longing",
+   "grateful"
+  ],
+  "themes": [
+   "命の恩",
+   "姉弟",
+   "生きる"
+  ],
+  "key_moment_ja": "二十歳の祝いに連れて行ったバーで、姉は事故の日の思いを打ち明けて泣いた。",
+  "test_story_ja": "姉とは服も音楽も趣味が同じで、よく一緒に買い物に行きました。小学生のころ僕が事故に遭ったとき、一緒にいた姉はかばおうとしてくれたそうです。二十歳の誕生日には初めてのバーに連れて行ってくれて、酔って、僕の姉でよかったと泣いていました。困ったときは必ず話を聞いてくれて、ポテトサラダも作ってくれました。病気を隠したまま去年亡くなりました。姉の分までちゃんと生きていきます。",
+  "test_use": "edge",
+  "note": "Receiver (sister) died last year."
+ },
+ {
+  "id": "0112",
+  "title": "丸坊主の誓い",
+  "url": "https://lacrima.jp/heartwarming_story/marubouzu_no_chikai/",
+  "category": "siblings",
+  "sender_to_receiver": "姉→弟",
+  "direction": "across",
+  "receiver_alive": "yes",
+  "occasions": [
+   "thanks",
+   "birthday"
+  ],
+  "emotion": [
+   "proud",
+   "tender"
+  ],
+  "themes": [
+   "思いやり",
+   "丸坊主",
+   "連帯"
+  ],
+  "key_moment_ja": "病気で髪を失った友達のため、弟は自分から床屋で丸坊主にして帰ってきた。",
+  "test_story_ja": "中学生の弟がある日、急に坊主頭で帰ってきました。失恋かと聞いたら、病気で長く入院していた女の子が学校に戻ってくるからだと言います。治療で髪がなくなったのを気にしていたから、自分も坊主なら少しは楽かなって。次の日、クラスの男子みんなが同じことをしていたそうで、先生まで坊主でした。弟は今も、意外と似合うからとその髪型を続けています。不器用だけど優しい弟が自慢です。",
+  "test_use": "main",
+  "note": "Narrator gender unclear; sibling observing."
+ },
+ {
+  "id": "0113",
+  "title": "声を失った猫",
+  "url": "https://lacrima.jp/heartwarming_story/koe_wo_ushinatta_neko/",
+  "category": "other",
+  "sender_to_receiver": "飼い主→猫",
+  "direction": "across",
+  "receiver_alive": "yes",
+  "occasions": [
+   "thanks"
+  ],
+  "emotion": [
+   "grateful",
+   "tender"
+  ],
+  "themes": [
+   "ペット",
+   "命の恩人",
+   "声"
+  ],
+  "key_moment_ja": "声の出ない猫が、どん底の夜に初めて大きな声で鳴いて足元にすり寄ってきた。",
+  "test_story_ja": "うちの猫は子猫のとき空き地で目もふさがった状態で鳴き続けていたのを拾った子です。助からないかもと言われたけど、きれいな猫に育ちました。ただ喉をつぶしたのか、ほとんど鳴きません。何年も後、人に裏切られて本気で全部終わりにしようとした夜、その猫が部屋に入ってきて足元で大きな声で鳴きました。あんな声は初めて聞きました。十八年たった今も元気でいてくれる、命の恩人です。",
+  "test_use": "edge",
+  "note": "Pet receiver; suicide-attempt context."
+ },
+ {
+  "id": "0114",
+  "title": "母の愛、娘の成長",
+  "url": "https://lacrima.jp/heartwarming_story/musume_no_seichou/",
+  "category": "parents",
+  "sender_to_receiver": "娘→母",
+  "direction": "up",
+  "receiver_alive": "yes",
+  "occasions": [
+   "birthday",
+   "thanks",
+   "parents_day"
+  ],
+  "emotion": [
+   "grateful",
+   "bittersweet"
+  ],
+  "themes": [
+   "母心",
+   "気づき",
+   "振袖"
+  ],
+  "key_moment_ja": "成人した私を呼び戻して振袖の写真を撮り、それを宝物だと何度も眺めていた母。",
+  "test_story_ja": "母はさっぱりしていて、あまり表情に出さない人です。私は病気のあと早くに家を出て、ほとんど連絡もしませんでした。二十三のとき母から職場に電話があって、振袖の写真を撮りたいと言われました。写真館で嬉しそうにしていて、出来上がった写真を何度も見ていました。今、自分の娘の振袖を選びながら、あのときの母の気持ちがやっとわかりました。寂しかったよね。母は今六十七歳。これから幸せな時間を返したいです。",
+  "test_use": "main"
+ },
+ {
+  "id": "0115",
+  "title": "想像の中の少女と共に",
+  "url": "https://lacrima.jp/heartwarming_story/sozo_no_naka_no_shoujyo/",
+  "category": "other",
+  "sender_to_receiver": "捕虜→仲間",
+  "direction": "across",
+  "receiver_alive": "unclear",
+  "occasions": [
+   "none"
+  ],
+  "emotion": [
+   "bittersweet"
+  ],
+  "themes": [
+   "戦争",
+   "想像力",
+   "連帯"
+  ],
+  "key_moment_ja": "捕虜たちは見えない少女の席を作り、互いに礼儀を守って全員生き延びた。",
+  "test_story_ja": "",
+  "test_use": "exclude",
+  "note": "Third-person wartime anecdote about POWs inventing an imaginary girl; no sender-receiver relationship."
+ },
+ {
+  "id": "0116",
+  "title": "天からの手紙",
+  "url": "https://lacrima.jp/heartwarming_story/ten_kara_no_tegami/",
+  "category": "partner",
+  "sender_to_receiver": "妻→夫",
+  "direction": "across",
+  "receiver_alive": "no",
+  "occasions": [
+   "none"
+  ],
+  "emotion": [
+   "longing",
+   "grateful"
+  ],
+  "themes": [
+   "遺された手紙",
+   "子育て",
+   "亡き夫"
+  ],
+  "key_moment_ja": "息子の一歳の誕生日に、亡き夫が生前に用意した手紙が母子それぞれに届いた。",
+  "test_story_ja": "妊娠がわかったころ夫のがんが見つかり、息子の顔を見る前に亡くなりました。一人で育てていて、ときどき電池が切れたように動けなくなります。息子が一歳になった日、家に夫からの手紙が二通届いていました。息子には下手な絵とお祝いの言葉、私にはお母さんも一歳おめでとう、と。夫は最後まで私たちのことを考えていた人でした。ありがとう。息子はちゃんと育てます。",
+  "test_use": "edge",
+  "note": "Receiver deceased husband."
+ },
+ {
+  "id": "0117",
+  "title": "電話越しの陽だまり",
+  "url": "https://lacrima.jp/heartwarming_story/denwa_goshi_no_hidamari/",
+  "category": "other",
+  "sender_to_receiver": "俺→電話の男",
+  "direction": "across",
+  "receiver_alive": "yes",
+  "occasions": [
+   "none"
+  ],
+  "emotion": [
+   "bittersweet",
+   "tender"
+  ],
+  "themes": [
+   "見知らぬ人",
+   "母の代わり",
+   "自立"
+  ],
+  "key_moment_ja": "詐欺だと思った電話の相手に母親のふりで付き合い、最後に感謝の伝言が残された。",
+  "test_story_ja": "家の電話に知らない若い男から、母さん？とかかってきました。詐欺だと思って面白半分に母親のふりをしたら、就職が決まったと嬉しそうに話し始めました。それから数日、朝と夜に電話が来て、昔の思い出をたくさん聞かされました。最後の留守電で、亡くなった母が戻ったみたいで楽しかった、これからは一人でやっていく、とお礼を言われました。顔も知らないけど、あの人が元気でいてほしいです。",
+  "test_use": "edge",
+  "note": "Stranger; anonymous phone relationship."
+ },
+ {
+  "id": "0118",
+  "title": "再会と再出発",
+  "url": "https://lacrima.jp/heartwarming_story/saikai_to_saishuppatsu/",
+  "category": "friends",
+  "sender_to_receiver": "僕→幼なじみ",
+  "direction": "across",
+  "receiver_alive": "no",
+  "occasions": [
+   "none"
+  ],
+  "emotion": [
+   "longing",
+   "grateful"
+  ],
+  "themes": [
+   "幼なじみ",
+   "再出発",
+   "励まし"
+  ],
+  "key_moment_ja": "どん底で帰った故郷で再会した幼なじみが、互いに励まし合える相手になった。",
+  "test_story_ja": "三年前、仕事も金もなくして全部やめようと思っていました。最後に祖母に会いたくて田舎に帰ったら、スーパーで幼なじみに声をかけられました。彼女も離婚の話し合い中で、二人で悩みを話しては励まし合いました。それで僕は働きながら夜学に入れました。結婚を申し込んだけど断られて、それでも友達でいてくれました。最近、彼女が病気で亡くなっていたと知りました。あの再会がなければ今の僕はいません。",
+  "test_use": "edge",
+  "note": "Receiver (friend) died; also rejected proposal."
+ },
+ {
+  "id": "0119",
+  "title": "父の願いと医者への道",
+  "url": "https://lacrima.jp/heartwarming_story/isha_he_no_michi/",
+  "category": "parents",
+  "sender_to_receiver": "息子→父",
+  "direction": "up",
+  "receiver_alive": "no",
+  "occasions": [
+   "none"
+  ],
+  "emotion": [
+   "longing",
+   "grateful"
+  ],
+  "themes": [
+   "遺志",
+   "医者",
+   "余命"
+  ],
+  "key_moment_ja": "余命を告げられた父が、何かやりたいことはないのかと僕に将来を問いかけた。",
+  "test_story_ja": "高一の夏、父ががんで長くないと知らされました。商売の借金もあって、高校も続けられないかもと思っていました。父は治療しながら働き続けて、学費は何とかするから勉強しろと言いました。目標がなかった僕に、やりたいことはないのかと聞いてくれて、医者になると決めました。父は高三の夏に亡くなりました。今はがんの医者として働いています。息子が病気を治してくれると母に話していたと聞きました。",
+  "test_use": "edge",
+  "note": "Father deceased."
+ },
+ {
+  "id": "0120",
+  "title": "夢への橋渡し",
+  "url": "https://lacrima.jp/heartwarming_story/yume_he_no_hashi_watashi/",
+  "category": "work",
+  "sender_to_receiver": "元ホステス→常連客",
+  "direction": "up",
+  "receiver_alive": "no",
+  "occasions": [
+   "none"
+  ],
+  "emotion": [
+   "grateful",
+   "longing"
+  ],
+  "themes": [
+   "見守り",
+   "無口",
+   "応援"
+  ],
+  "key_moment_ja": "店を辞めた翌日、これからは昼の世界で生きなさいと突き放す優しいメールが来た。",
+  "test_story_ja": "学費のために夜の店で働いていたとき、最初のお客さんは七十歳の無口なおじいさんでした。毎週来ても、うん、そうだねとしか言わない人。でも困ったときはいつも助けてくれて、深夜になると静かに帰っていきました。辞めた次の日、もう夜の人間とは関わらないで、とメールが来ました。それから毎年誕生日にメールを送っていましたが、三年目にご家族から亡くなったと知らせがありました。日記に私を応援する言葉があったそうです。",
+  "test_use": "edge",
+  "note": "Receiver deceased; nightlife context."
+ },
+ {
+  "id": "0121",
+  "title": "またあなたの子供になりたい",
+  "url": "https://lacrima.jp/heartwarming_story/mata_anata_no_kodomo_ni_naritai/",
+  "category": "parents",
+  "sender_to_receiver": "息子→義母",
+  "direction": "up",
+  "receiver_alive": "no",
+  "occasions": [
+   "none"
+  ],
+  "emotion": [
+   "grateful",
+   "longing"
+  ],
+  "themes": [
+   "継母",
+   "本当の母",
+   "無償の愛"
+  ],
+  "key_moment_ja": "父の死後、親族の前で継母がこの子は私の子だと言い切って引き取ってくれた。",
+  "test_story_ja": "六歳のとき父が再婚して、新しい母が来ました。最初から本当の子みたいに可愛がってくれました。父が事故で亡くなったとき、親戚が私の引き取り先を話し合う中で、母はこの子は私の子だと言って譲りませんでした。必死に働いて、就職しようとしていた私を大学にも行かせてくれました。孫の顔も見せられたけど、先月急に亡くなりました。血はつながっていなくても、私の母はこの人だけです。",
+  "test_use": "edge",
+  "note": "Receiver (stepmother) deceased."
+ },
+ {
+  "id": "0122",
+  "title": "余命と永遠の誓い",
+  "url": "https://lacrima.jp/heartwarming_story/yomei_to_eien_no_chikai/",
+  "category": "partner",
+  "sender_to_receiver": "妻→夫",
+  "direction": "across",
+  "receiver_alive": "no",
+  "occasions": [
+   "none"
+  ],
+  "emotion": [
+   "longing",
+   "grateful"
+  ],
+  "themes": [
+   "入籍",
+   "余命",
+   "喪主"
+  ],
+  "key_moment_ja": "余命わずかな彼に病室で求婚し、役所の計らいでその日のうちに夫婦になれた。",
+  "test_story_ja": "彼は肺がんで余命を告げられていました。年上でバツイチだったので、なかなか結婚に踏み切れずにいました。最後は私が送りたいと思って、病室で私から結婚を申し込みました。彼はもちろんと言ってくれました。役所の方が特別に手続きを急いでくれて、その日のうちに夫婦になれました。二十三日後に彼は亡くなりました。主人と呼べたこと、同じ姓になれたことが今も支えです。毎日会いたいです。",
+  "test_use": "edge",
+  "note": "Receiver deceased; secondary gratitude to municipal clerk."
+ },
+ {
+  "id": "0123",
+  "title": "見落とされた優しさ",
+  "url": "https://lacrima.jp/heartwarming_story/miotosareta_yasashisa/",
+  "category": "partner",
+  "sender_to_receiver": "妻→夫",
+  "direction": "across",
+  "receiver_alive": "yes",
+  "occasions": [
+   "anniversary",
+   "thanks"
+  ],
+  "emotion": [
+   "grateful",
+   "tender"
+  ],
+  "themes": [
+   "幼なじみ",
+   "陰の守り",
+   "気づき"
+  ],
+  "key_moment_ja": "いじめが止んだのは、隣の幼なじみが陰で私をかばって殴られていたからだった。",
+  "test_story_ja": "昔から無愛想で、友達も少なく、いじめられることもありました。隣の家の幼なじみはいつも笑っている子でしたが、顔にあざを作って、階段から落ちて入院したこともありました。あとで、私へのいじめを止めるために彼が代わりにやられていたと知りました。彼はずっと私を見ていたと言ってくれて、付き合うことになりました。今はその人が夫で、夫そっくりの娘と三人で笑って暮らしています。",
+  "test_use": "main"
+ },
+ {
+  "id": "0124",
+  "title": "重なる運命のメッセージ",
+  "url": "https://lacrima.jp/heartwarming_story/kasanaru_unmei_no_message/",
+  "category": "partner",
+  "sender_to_receiver": "彼女→彼",
+  "direction": "across",
+  "receiver_alive": "unclear",
+  "occasions": [
+   "wedding"
+  ],
+  "emotion": [
+   "tender",
+   "bittersweet"
+  ],
+  "themes": [
+   "余命",
+   "妊娠",
+   "覚悟"
+  ],
+  "key_moment_ja": "余命一年の告白と妊娠の告白が同じ日に重なり、二人で前を向くと決めた。",
+  "test_story_ja": "いつもの駐車場で待ち合わせた日、お互い大事な話があって、照れくさいのでメールで伝え合いました。彼は病気で、たぶんあと一年だと書いてきました。私は、赤ちゃんができたと送りました。お金はないけど三人で幸せになろう、プロポーズを待ってるって。読み終わって、二人とも似たもの同士だねと笑いました。限られた時間でも、一番いい思い出で埋めたいと思っています。",
+  "test_use": "edge",
+  "note": "Third-person; receiver terminally ill, outcome unknown."
+ },
+ {
+  "id": "0125",
+  "title": "少年とテツ",
+  "url": "https://lacrima.jp/heartwarming_story/shounen_to_tetsu/",
+  "category": "other",
+  "sender_to_receiver": "私→近所の少年",
+  "direction": "down",
+  "receiver_alive": "yes",
+  "occasions": [
+   "none"
+  ],
+  "emotion": [
+   "bittersweet",
+   "tender"
+  ],
+  "themes": [
+   "犬",
+   "不良少年",
+   "再会"
+  ],
+  "key_moment_ja": "愛犬の死を知った少年が、一年ぶりに現れて声を上げて泣いた。",
+  "test_story_ja": "病気で仕事を休んで実家にいたころ、犬の散歩でいつも遅刻しそうな不良っぽい少年と会いました。犬と仲良くなって、よく部屋に遊びに来ていました。外では荒れていても、うちでは犬と笑う普通の子でした。ある夜急にいなくなり、一年後、犬が死んだときにふらっと現れて泣き崩れました。施設で年下の子を大事にしていた話もしてくれました。あの子が今どこかで元気でいてほしいです。",
+  "test_use": "edge",
+  "note": "Neighbour boy, dog deceased; delinquency/abuse themes."
+ },
+ {
+  "id": "0126",
+  "title": "母の願い",
+  "url": "https://lacrima.jp/heartwarming_story/haha_no_negai/",
+  "category": "children",
+  "sender_to_receiver": "母→子供たち",
+  "direction": "down",
+  "receiver_alive": "yes",
+  "occasions": [
+   "birthday",
+   "thanks"
+  ],
+  "emotion": [
+   "tender",
+   "apologetic"
+  ],
+  "themes": [
+   "見守り",
+   "無力さ",
+   "願い"
+  ],
+  "key_moment_ja": "苦しむ子に何もできない自分を責めながら、ただ強く生きてと願い続ける母。",
+  "test_story_ja": "子供たちが元気でいてくれることが、何よりの喜びです。お礼を言ってもらう必要はなくて、自分の足で歩いている姿を見られればそれで十分。でも、悩んで行き詰まっているのを見るのは本当につらい。口を出して後悔したこともあるし、結局見守ることしかできません。頼りない母でごめんね。それでも、生きる場所は必ずあるから、自分を投げ出さないでほしい。何かできることがあったら、いつでも言ってね。",
+  "test_use": "edge",
+  "note": "Abstract monologue to multiple children, no concrete moment."
+ },
+ {
+  "id": "0127",
+  "title": "父の小さな優しさ",
+  "url": "https://lacrima.jp/heartwarming_story/chichi_no_chiisana_yasashisa/",
+  "category": "parents",
+  "sender_to_receiver": "息子→父",
+  "direction": "up",
+  "receiver_alive": "unclear",
+  "occasions": [
+   "parents_day",
+   "thanks"
+  ],
+  "emotion": [
+   "grateful",
+   "tender"
+  ],
+  "themes": [
+   "無言の愛",
+   "不器用",
+   "遠足"
+  ],
+  "key_moment_ja": "夜遅く帰った父が、遠足のリュックの食べかけのお菓子を黙って新品に入れ替えた。",
+  "test_story_ja": "子供のころ母が入院していて、遠足の準備を一人でしました。おやつを買うお金もなく、家の残り物のお菓子を袋に詰めました。夜遅く帰ってきた父はそれをのぞいて、何も言いませんでした。次の朝見たら、おまけ付きのお菓子やチョコに変わっていました。寝ている間にコンビニに行ってくれたんです。口数の少ない父ですが、ああいう人です。今でもあの朝のことをよく思い出します。",
+  "test_use": "main"
+ },
+ {
+  "id": "0128",
+  "title": "天使の誕生日に",
+  "url": "https://lacrima.jp/heartwarming_story/tenshi_no_tanjyoubi_ni/",
+  "category": "other",
+  "sender_to_receiver": "母→テーマパークのスタッフ",
+  "direction": "up",
+  "receiver_alive": "yes",
+  "occasions": [
+   "thanks"
+  ],
+  "emotion": [
+   "grateful",
+   "bittersweet"
+  ],
+  "themes": [
+   "もてなし",
+   "亡き娘",
+   "供養"
+  ],
+  "key_moment_ja": "亡き娘の誕生日、店員が子供用の椅子を置いて娘がいるようにもてなしてくれた。",
+  "test_story_ja": "一年前、生まれつき体の弱かった娘を亡くしました。娘の誕生日で命日でもある日に、元気になったら一緒に行こうと夢見ていたテーマパークへ夫と出かけました。レストランで事情を話し、子供用のランチを頼みました。お店の方は隣に子供用の椅子を用意して、娘がそこにいるように接してくれました。夫と二人で泣きました。あの日、ちゃんと娘を祝えた気がします。スタッフの皆さんに本当に感謝しています。",
+  "test_use": "edge",
+  "note": "Gratitude to anonymous staff; also deceased infant daughter."
+ },
+ {
+  "id": "0129",
+  "title": "継承されるタスキ",
+  "url": "https://lacrima.jp/heartwarming_story/keishou_sareru_tasuki/",
+  "category": "parents",
+  "sender_to_receiver": "息子→父",
+  "direction": "up",
+  "receiver_alive": "no",
+  "occasions": [
+   "none"
+  ],
+  "emotion": [
+   "longing",
+   "apologetic"
+  ],
+  "themes": [
+   "継承",
+   "走る",
+   "和解"
+  ],
+  "key_moment_ja": "病床の父が、走って駆けつけた息子に古いタスキを手渡して笑った。",
+  "test_story_ja": "父は昔、箱根駅伝を走った人です。無口で少し怖い父でしたが、一緒に走るときだけはよく話してくれました。陸上を始めた私の大会にはいつも来て、記録が出ると嬉しそうに飲んでいました。高校で伸び悩んで、うるさいと怒鳴って部活をやめてしまいました。父ががんで倒れた日、病院まで走っていくと、父は母が作った古いタスキを渡してくれました。今、そのタスキをいつか息子に渡すつもりで、また走っています。",
+  "test_use": "edge",
+  "note": "Father deceased."
+ },
+ {
+  "id": "0130",
+  "title": "おばあちゃんの願い",
+  "url": "https://lacrima.jp/heartwarming_story/obaachan_no_negai/",
+  "category": "grandparents",
+  "sender_to_receiver": "孫→祖母",
+  "direction": "up",
+  "receiver_alive": "no",
+  "occasions": [
+   "none"
+  ],
+  "emotion": [
+   "longing",
+   "grateful"
+  ],
+  "themes": [
+   "すごろく",
+   "願い",
+   "孤独"
+  ],
+  "key_moment_ja": "祖母の遺品のノートに、孫に友達ができるよう願う手作りのすごろくがあった。",
+  "test_story_ja": "子供のころ事情があって祖母の家に預けられました。知らない土地で友達もいなくて、ノートに自分で作ったすごろくを書いては祖母に自慢していました。祖母はいつもにこにこ聞いてくれました。家に戻るときも笑顔で送り出してくれました。先日、八十九で亡くなりました。遺品のノートに祖母が作ったすごろくがあって、ゴールの下に私に友達がたくさんできますようにと書いてありました。友達、できたよ。",
+  "test_use": "edge",
+  "note": "Grandmother deceased."
+ },
+ {
+  "id": "0131",
+  "title": "仲直りのビーフシチュー",
+  "url": "https://lacrima.jp/heartwarming_story/nakanaori_no_beef_stew/",
+  "category": "partner",
+  "sender_to_receiver": "夫→妻",
+  "direction": "across",
+  "receiver_alive": "yes",
+  "occasions": [
+   "apology",
+   "anniversary"
+  ],
+  "emotion": [
+   "apologetic",
+   "grateful"
+  ],
+  "themes": [
+   "仲直り",
+   "八つ当たり",
+   "手料理"
+  ],
+  "key_moment_ja": "朝食をひっくり返した夜、妻は好物のシチューを作って仲直りしようと笑った。",
+  "test_story_ja": "寝不足で朝から機嫌が悪く、黙っていた妻にいらいらして、作ってくれた朝ごはんを床にぶちまけてしまいました。妻は泣きながら片付けていて、私は謝らずに出勤しました。実家に帰ってしまったかもと思いながら帰ると、家は明るくて、妻は私の好きなビーフシチューを作って、これで仲直りしようと言ってくれました。本当は朝の味噌汁も食べたかった。もう二度と当たりません。",
+  "test_use": "main"
+ },
+ {
+  "id": "0132",
+  "title": "再生の誓い",
+  "url": "https://lacrima.jp/heartwarming_story/saisei_no_chikai/",
+  "category": "other",
+  "sender_to_receiver": "私→隣家の娘",
+  "direction": "down",
+  "receiver_alive": "yes",
+  "occasions": [
+   "wedding",
+   "thanks"
+  ],
+  "emotion": [
+   "grateful",
+   "tender"
+  ],
+  "themes": [
+   "救い",
+   "再生",
+   "もう一人の娘"
+  ],
+  "key_moment_ja": "妻子を失い心を閉ざしていた私の前に、隣の幼い女の子がそっと座っていた。",
+  "test_story_ja": "二十歳で結婚した妻と、生まれる前の子を事故で亡くしました。半年ほど何も感じられず、ただ生きているだけでした。ある朝目を覚ますと、前からよく話していた隣の家の小さな女の子がそばに座っていました。それがきっかけで少しずつ立ち直れました。その子が先日結婚して、式に呼んでもらい、花嫁の前で泣いてしまいました。私は今も独りですが、あの子が困ったら必ず助けます。娘のような存在です。",
+  "test_use": "edge",
+  "note": "Non-family neighbour relationship; bereavement background."
+ },
+ {
+  "id": "0133",
+  "title": "二人三脚の約束",
+  "url": "https://lacrima.jp/heartwarming_story/ninin_sankyaku_no_yakusoku/",
+  "category": "partner",
+  "sender_to_receiver": "妻→夫",
+  "direction": "across",
+  "receiver_alive": "yes",
+  "occasions": [
+   "anniversary",
+   "thanks"
+  ],
+  "emotion": [
+   "grateful",
+   "tender"
+  ],
+  "themes": [
+   "支え",
+   "障害",
+   "小さな幸せ"
+  ],
+  "key_moment_ja": "思いつめた日に夫から、今日あった小さな幸せを並べたメールが届いた。",
+  "test_story_ja": "結婚五年目にやっと授かった子に、二歳で障害があるとわかりました。目の前が真っ暗で、全部終わりにしようとまで思いました。そのとき夫からメールが届きました。今日、子供がママ大好きと言ったこと、夜明け前に三人で散歩したこと、夕飯がおいしかったこと、狭いお風呂に三人で入ったこと。君の好きなドラマのDVDも買ってきたよ、と。ゆっくりでいいから一緒に歩こうと。今は家族三人で楽しく暮らしています。",
+  "test_use": "main",
+  "note": "Contains suicidal ideation mention."
+ },
+ {
+  "id": "0134",
+  "title": "未読のメッセージ",
+  "url": "https://lacrima.jp/heartwarming_story/midoku_no_message/",
+  "category": "parents",
+  "sender_to_receiver": "娘→母",
+  "direction": "up",
+  "receiver_alive": "no",
+  "occasions": [
+   "none"
+  ],
+  "emotion": [
+   "longing",
+   "apologetic"
+  ],
+  "themes": [
+   "届いていたメール",
+   "後悔",
+   "母の愛"
+  ],
+  "key_moment_ja": "昔のメールボックスに、亡き母から送られていた祝いや気遣いの言葉が並んでいた。",
+  "test_story_ja": "中三のとき母が病気で入院し、夏に亡くなりました。毎日お見舞いに行っても、早く帰りたいとばかり思っていました。高校でつまずいていた頃、昔使っていたメールを開いたら、母からのメールがいくつも届いていました。誕生日おめでとう、大会出場おめでとう、ご飯食べた？お父さんを手伝ってね。新しいアドレスを教えなかったことを後悔しました。一年遅れで、ごめんね、ありがとう、大好き、と返信しました。",
+  "test_use": "edge",
+  "note": "Mother deceased."
+ },
+ {
+  "id": "0135",
+  "title": "父娘の絆",
+  "url": "https://lacrima.jp/heartwarming_story/chichi_musume_no_kizuna/",
+  "category": "children",
+  "sender_to_receiver": "父→娘",
+  "direction": "down",
+  "receiver_alive": "yes",
+  "occasions": [
+   "wedding",
+   "thanks"
+  ],
+  "emotion": [
+   "proud",
+   "tender"
+  ],
+  "themes": [
+   "血のつながらない親子",
+   "男手一つ",
+   "花嫁の手紙"
+  ],
+  "key_moment_ja": "嫁ぐ前の娘が、箪笥の引き出しに中身を書いた紙を貼って出ていった。",
+  "test_story_ja": "二十五で結婚した妻には十三歳の娘がいました。四年後に妻が事故で亡くなり、二十九の私と十七の娘が残されました。親戚には色々言われ、学校でも変な目で見られましたが、娘は笑い飛ばしてくれました。私にとって本当の娘です。その娘が二十五で結婚しました。式の手紙で、お父さんはあなただけと言ってくれて、涙が止まりませんでした。出ていく前に、私が困らないよう箪笥に中身を書いた紙を貼っていきました。",
+  "test_use": "main",
+  "note": "Stepfather-daughter; wife deceased."
+ },
+ {
+  "id": "0136",
+  "title": "手話で結ぶ絆",
+  "url": "https://lacrima.jp/heartwarming_story/shuwa_de_musubu_kizuna/",
+  "category": "partner",
+  "sender_to_receiver": "夫→妻",
+  "direction": "across",
+  "receiver_alive": "yes",
+  "occasions": [
+   "anniversary",
+   "thanks"
+  ],
+  "emotion": [
+   "grateful",
+   "tender"
+  ],
+  "themes": [
+   "手話",
+   "立ち直り",
+   "家族"
+  ],
+  "key_moment_ja": "どん底の夜、妻がゆっくり手を動かして大好き、一緒に頑張ろうと手話で伝えた。",
+  "test_story_ja": "三歳の娘がほとんど耳が聞こえないとわかって、妻と二人で泣いてばかりいました。お互いに自分を責めて、周りに知られるのも怖くて、正直、三人で消えてしまおうかと考えた夜もありました。ある晩、妻が私に向かってゆっくり手を動かしていました。覚えたばかりの手話で、大好き、一緒に頑張ろう、と。その手が本当にきれいでした。それから娘の顔をちゃんと見るようになりました。今、娘は手でたくさんお話しします。",
+  "test_use": "main",
+  "note": "Mentions family-suicide ideation."
+ },
+ {
+  "id": "0137",
+  "title": "桜色の約束",
+  "url": "https://lacrima.jp/heartwarming_story/sakura_iro_no_yakusoku/",
+  "category": "partner",
+  "sender_to_receiver": "彼氏→彼女",
+  "direction": "across",
+  "receiver_alive": "yes",
+  "occasions": [
+   "anniversary",
+   "apology"
+  ],
+  "emotion": [
+   "apologetic",
+   "grateful"
+  ],
+  "themes": [
+   "嘘",
+   "信頼",
+   "桜"
+  ],
+  "key_moment_ja": "嘘がばれて泣いて怒った彼女が、数日後にむしろ自分が怒りすぎたと頭を下げた。",
+  "test_story_ja": "自分に自信がなくて、すぐ見栄で嘘をつく人間でした。高校で隣の席になった彼女と付き合い始めて、もう嘘はつかないと決めたのに、補習を隠して習い事だと言い、お花見を一日延ばしてもらいました。ばれて、成績なんて気にしないのにと泣いて帰ってしまいました。謝りに行くと、彼女の方が怒りすぎたと頭を下げました。桜が一番好きな花だったそうです。それから本当に嘘をやめました。今も一緒にいます。",
+  "test_use": "main"
+ },
+ {
+  "id": "0138",
+  "title": "パパと綴られた手紙",
+  "url": "https://lacrima.jp/heartwarming_story/papa_to_tuzurareta_tegami/",
+  "category": "children",
+  "sender_to_receiver": "父→娘",
+  "direction": "down",
+  "receiver_alive": "yes",
+  "occasions": [
+   "new_start",
+   "thanks"
+  ],
+  "emotion": [
+   "proud",
+   "tender"
+  ],
+  "themes": [
+   "姪を育てる",
+   "パパ",
+   "旅立ち"
+  ],
+  "key_moment_ja": "上京した長女の置き手紙の最後に、七年越しで初めてパパと書いてあった。",
+  "test_story_ja": "姉夫婦が事故で亡くなり、五歳と三歳の姪が残りました。結婚したばかりでしたが、一緒に住むかと聞くと二人はうんと言い、妻も自分の子と思えばいいと言ってくれました。上の子はなかなかパパと呼んでくれず、ずっとあだ名でした。姉と同じくピアノが好きで、音大に推薦で受かって上京しました。出張から帰ると家族宛ての手紙があって、最後にパパありがとう、大好き、とありました。私も大好きだよ。",
+  "test_use": "main",
+  "note": "Uncle raising nieces as daughters."
+ },
+ {
+  "id": "0139",
+  "title": "予期せぬ守り神",
+  "url": "https://lacrima.jp/heartwarming_story/yoki_senu_mamorigami/",
+  "category": "work",
+  "sender_to_receiver": "同期→同期",
+  "direction": "across",
+  "receiver_alive": "yes",
+  "occasions": [
+   "thanks",
+   "farewell"
+  ],
+  "emotion": [
+   "grateful",
+   "bittersweet"
+  ],
+  "themes": [
+   "同期",
+   "陰の支え",
+   "謎"
+  ],
+  "key_moment_ja": "意識不明の私を毎日看病し、目覚める前に黙って会社を去った同期の彼女。",
+  "test_story_ja": "内定式で会った同期の彼女は、とても優秀で、私生活を一切話さない変わった人でした。同じ部署になって、からかいながら少しずつ愚痴を言える仲になりました。誕生日を偶然知って、おまけのカメのおもちゃを渡したら子供みたいに喜んでいました。出張先の事故で私が意識不明になったとき、彼女は毎日病室に来てくれて、医療費まで一部出してくれていたそうです。目が覚める前に彼女は会社を辞めていました。ちゃんとお礼が言いたいです。",
+  "test_use": "main",
+  "note": "Receiver whereabouts unknown."
+ },
+ {
+  "id": "0140",
+  "title": "触れる魔法",
+  "url": "https://lacrima.jp/heartwarming_story/furerumahou/",
+  "category": "other",
+  "sender_to_receiver": "客→キャラクター",
+  "direction": "up",
+  "receiver_alive": "unclear",
+  "occasions": [
+   "none"
+  ],
+  "emotion": [
+   "tender"
+  ],
+  "themes": [
+   "テーマパーク",
+   "思いやり",
+   "目撃"
+  ],
+  "key_moment_ja": "目の見えない夫婦の手を、キャラクターが自分の耳や鼻に導いて触れさせた。",
+  "test_story_ja": "",
+  "test_use": "exclude",
+  "note": "Observed scene with costumed character and strangers; no personal relationship."
+ },
+ {
+  "id": "0141",
+  "title": "再建の約束",
+  "url": "https://lacrima.jp/heartwarming_story/saikennnoyakusoku/",
+  "category": "other",
+  "sender_to_receiver": "青年→自衛隊員",
+  "direction": "up",
+  "receiver_alive": "yes",
+  "occasions": [
+   "thanks"
+  ],
+  "emotion": [
+   "grateful"
+  ],
+  "themes": [
+   "震災",
+   "復興",
+   "感謝"
+  ],
+  "key_moment_ja": "避難所で青年が涙ながらに隊員へ礼を言い、一人の隊員の胸に飛び込んだ。",
+  "test_story_ja": "震災のあと、避難所で暮らしていました。何もかも壊れた中で、毎日毎時間、自衛隊の人たちが命がけで支えてくれました。撤収の日、若い者を代表して話をさせてもらい、これからは僕らが町を立て直しますと言いました。言い終わって、思わずいつも世話になった隊員さんに抱きついて泣きました。隊員さんも黙って強く抱きしめてくれました。あの人たちの背中があったから、前を向けました。",
+  "test_use": "edge",
+  "note": "Collective gratitude to rescue personnel; narrated as observer."
+ },
+ {
+  "id": "0142",
+  "title": "遠くて近い二人",
+  "url": "https://lacrima.jp/heartwarming_story/tookutetikaifutari/",
+  "category": "parents",
+  "sender_to_receiver": "娘→父",
+  "direction": "up",
+  "receiver_alive": "yes",
+  "occasions": [
+   "parents_day",
+   "birthday"
+  ],
+  "emotion": [
+   "tender",
+   "bittersweet"
+  ],
+  "themes": [
+   "離婚",
+   "面会",
+   "父娘"
+  ],
+  "key_moment_ja": "再婚した母の新しい夫を聞かれ、娘は一番好きなのはお父さんだと答えた。",
+  "test_story_ja": "両親が離婚して、私は母と暮らしています。父とはたまにファミレスで会います。父は昔から私の好きなメニューを覚えていて、いつも好きなの頼みなと言います。母は元気か、ちゃんと食べてるか、と毎回同じことを聞きます。この前、新しいお父さんは優しいかと聞かれて、優しいけど、一番好きなのはお父さんだよと答えたら、父は急に黙って泣いてしまいました。明るくふるまっている父が大好きです。",
+  "test_use": "edge",
+  "note": "Narrator is bystander; reframed as daughter→father."
+ },
+ {
+  "id": "0143",
+  "title": "空を見れば",
+  "url": "https://lacrima.jp/heartwarming_story/sora_wo_mireba/",
+  "category": "parents",
+  "sender_to_receiver": "息子→母",
+  "direction": "up",
+  "receiver_alive": "unclear",
+  "occasions": [
+   "birthday",
+   "parents_day"
+  ],
+  "emotion": [
+   "tender",
+   "longing"
+  ],
+  "themes": [
+   "小遣い",
+   "贈り物",
+   "病"
+  ],
+  "key_moment_ja": "病の母に贈る靴を、一緒に出かけたいからと少し大きめで選んだ男の子。",
+  "test_story_ja": "小四の息子がいる母親です。病気で入院していて、たぶん長くはありません。ある日息子が、お小遣いの三百円ちょっとで靴を買ってきてくれました。白いヒールの靴でした。もう外には行けないのと言うと、息子は、一生懸命生きた人は星になるから空を見れば寂しくない、でも諦めないで、と言いました。水族館に一緒に行きたいから大きめにしたんだって。あの子を抱きしめて泣きました。",
+  "test_use": "edge",
+  "note": "Narrator is teacher; mother terminally ill; sender reframed."
+ },
+ {
+  "id": "0144",
+  "title": "兄妹の絆",
+  "url": "https://lacrima.jp/heartwarming_story/kyoudai_no_kizuna/",
+  "category": "siblings",
+  "sender_to_receiver": "妹→兄",
+  "direction": "across",
+  "receiver_alive": "yes",
+  "occasions": [
+   "birthday",
+   "thanks"
+  ],
+  "emotion": [
+   "grateful",
+   "tender"
+  ],
+  "themes": [
+   "兄妹",
+   "かばう",
+   "安心"
+  ],
+  "key_moment_ja": "母に怒鳴られ続けた妹に、無口な兄がゆっくり好きなものを食べなと声をかけた。",
+  "test_story_ja": "母はいつも機嫌が悪くて、外食でも何か言うたびに怒鳴られます。ファミレスでカレーをこぼしたときも、なんでちゃんと食べられないのと言われました。そのとき、ずっと黙っていたお兄ちゃんが、急がなくていい、好きなものをゆっくり食べなと言ってくれました。それから学校の話を、うんうんと最後まで聞いてくれました。家の中でお兄ちゃんがいるから大丈夫だと思えます。",
+  "test_use": "edge",
+  "note": "Observed by waitress; harsh parenting; sender reframed."
+ },
+ {
+  "id": "0145",
+  "title": "夏の記憶、婆ちゃんとツトム",
+  "url": "https://lacrima.jp/heartwarming_story/natsu_no_kioku/",
+  "category": "other",
+  "sender_to_receiver": "旅人→見知らぬ老婆",
+  "direction": "up",
+  "receiver_alive": "unclear",
+  "occasions": [
+   "none"
+  ],
+  "emotion": [
+   "tender",
+   "bittersweet"
+  ],
+  "themes": [
+   "旅",
+   "認知症",
+   "ひととき"
+  ],
+  "key_moment_ja": "路上でスイカを売る老婆が、旅の私を誰かと思い違えて優しく語りかけた。",
+  "test_story_ja": "夏にバイクで高知を走っていたとき、道ばたでスイカとトマトを売っているおばあさんがいました。食べていいか聞くと、笑ってスイカを切ってくれました。トマトもすすめてくれて、そのとき私を誰か別の名前で呼びました。学校は休みかと聞くので、話を合わせてこれから行くよと答えると、あの子はよく勉強していた、と嬉しそうでした。あのおばあさん、今年もあそこにいるかな。",
+  "test_use": "edge",
+  "note": "Stranger with dementia; one-off encounter."
+ },
+ {
+  "id": "0146",
+  "title": "望まれた存在",
+  "url": "https://lacrima.jp/heartwarming_story/nozomareta_sonzai/",
+  "category": "children",
+  "sender_to_receiver": "父→子",
+  "direction": "down",
+  "receiver_alive": "yes",
+  "occasions": [
+   "birthday",
+   "new_start"
+  ],
+  "emotion": [
+   "tender",
+   "proud"
+  ],
+  "themes": [
+   "誕生",
+   "存在の肯定",
+   "家族の待望"
+  ],
+  "key_moment_ja": "妊娠の知らせを聞き、平静を装うつもりが言葉より先に涙があふれた父。",
+  "test_story_ja": "妻が妊娠したと聞いたとき、かっこよく、そうか、と言うつもりが先に泣いていました。妻は子供ができないと自分を責めていたからです。それから妻は食事も外出も我慢して、つわりで全身に湿疹が出ても耐えました。私も初めて毎日手洗いをするようになりました。生まれた日は、私も妻も、祖父母も曾祖母も泣きました。何もできなくても、生まれてきただけで君は大切な存在なんだよ。",
+  "test_use": "main"
+ },
+ {
+  "id": "0147",
+  "title": "恩師が繋いでくれた友情",
+  "url": "https://lacrima.jp/heartwarming_story/onshi_ga_tsunaide_kureta_yuujyou/",
+  "category": "friends",
+  "sender_to_receiver": "私→親友",
+  "direction": "across",
+  "receiver_alive": "yes",
+  "occasions": [
+   "birthday",
+   "thanks"
+  ],
+  "emotion": [
+   "grateful",
+   "tender"
+  ],
+  "themes": [
+   "親友",
+   "不登校",
+   "居場所"
+  ],
+  "key_moment_ja": "一か月かけて登校できるようになった彼女から、初めてカラオケに誘う電話が来た。",
+  "test_story_ja": "中三の夏、担任に頼まれて、不登校の子の家に運動会の練習に呼びに行きました。ほとんど話したこともなかったのに、彼女は好きなアニメの話をどんどんしてくれて、すぐ仲良くなりました。少しずつ学校に来るようになって、ある日電話で一時間もしゃべったあと、明日カラオケ行かない？と誘ってくれました。私は友達と遊びに行ったことがなくて、泣きそうでした。初めて親友と呼べた人です。",
+  "test_use": "main",
+  "note": "Teacher also a possible secondary receiver."
+ },
+ {
+  "id": "0148",
+  "title": "兄として、父として",
+  "url": "https://lacrima.jp/heartwarming_story/anitoshite_chichitoshite/",
+  "category": "siblings",
+  "sender_to_receiver": "妹→兄",
+  "direction": "up",
+  "receiver_alive": "yes",
+  "occasions": [
+   "wedding",
+   "thanks"
+  ],
+  "emotion": [
+   "grateful",
+   "apologetic"
+  ],
+  "themes": [
+   "親代わり",
+   "兄",
+   "犠牲"
+  ],
+  "key_moment_ja": "父と思っていた人が兄だと知りながら、娘として育てられたことを式で打ち明けた。",
+  "test_story_ja": "両親が事故で亡くなったとき、私はまだ小さく、二十一歳だった兄が父親として私を育ててくれました。家事も仕事も一人で全部こなしていました。高校のとき兄の日記を見て本当のことを知りましたが、ずっと言えませんでした。自分のせいで兄の人生を変えてしまったと思っていました。結婚式の手紙でお兄ちゃんと呼んで謝ると、兄は、大きくなってくれただけで十分だと言ってくれました。",
+  "test_use": "main",
+  "note": "Narrator is friend; reframed as sister→brother-as-father."
+ },
+ {
+  "id": "0149",
+  "title": "彼女からの涙の告白",
+  "url": "https://lacrima.jp/heartwarming_story/kanojyo_kara_no_namida_no_kokuhaku/",
+  "category": "partner",
+  "sender_to_receiver": "彼→彼女",
+  "direction": "across",
+  "receiver_alive": "yes",
+  "occasions": [
+   "wedding",
+   "anniversary"
+  ],
+  "emotion": [
+   "tender"
+  ],
+  "themes": [
+   "プロポーズ",
+   "秘密",
+   "受容"
+  ],
+  "key_moment_ja": "求婚に泣いて謝った彼女が、子供を産めない体だと打ち明けた。",
+  "test_story_ja": "同棲して五年以上たって、やっと結婚を申し込みました。緊張でうまく言えなくて、彼女は顔色が悪いよと心配していました。結婚してくれと言うと、彼女は泣いてごめんなさいと言いました。頭が真っ白になりましたが、彼女は病気で子供が産めない体だと話してくれました。ずっと言えなくて苦しかったと。こんな私でもいいのと聞かれて、何度もうなずきました。この人と一緒に生きていきます。",
+  "test_use": "main"
+ },
+ {
+  "id": "0150",
+  "title": "出会いの贈り物と感謝の気持ち",
+  "url": "https://lacrima.jp/heartwarming_story/deai_no_okurimono_to_kansha_no_kimochi/",
+  "category": "other",
+  "sender_to_receiver": "少年→近所のおじさん",
+  "direction": "up",
+  "receiver_alive": "no",
+  "occasions": [
+   "none"
+  ],
+  "emotion": [
+   "grateful",
+   "longing"
+  ],
+  "themes": [
+   "第二の父",
+   "再会",
+   "別れ"
+  ],
+  "key_moment_ja": "幼い頃遊んでくれたおじさんが再び現れ、病気を手紙で知らせて去っていった。",
+  "test_story_ja": "中三の帰り道、家の前で知らない男の人に名前を呼ばれました。小さいころ公園で遊んでくれたおじさんだと言います。風船を買ってくれたこと、滑り台で転んで泣いたとき慰めてくれたことを話してくれて、少しずつ思い出しました。それからよく公園でサッカーを教わり、第二のお父さんみたいに思っていました。急に来なくなり、病気だという手紙が届いて、数か月後に亡くなりました。",
+  "test_use": "edge",
+  "note": "Receiver deceased; unclear relationship."
+ },
+ {
+  "id": "0151",
+  "title": "伝説になった校長先生",
+  "url": "https://lacrima.jp/heartwarming_story/densetsu_ni_natta_kouchou_sensei/",
+  "category": "other",
+  "sender_to_receiver": "生徒→校長",
+  "direction": "up",
+  "receiver_alive": "unclear",
+  "occasions": [
+   "none"
+  ],
+  "emotion": [
+   "playful"
+  ],
+  "themes": [
+   "正義",
+   "校長",
+   "逸話"
+  ],
+  "key_moment_ja": "万引き生徒の親に詰め寄られた校長が、逆に痛快な一言で切り返した。",
+  "test_story_ja": "",
+  "test_use": "exclude",
+  "note": "Anecdote about a principal's retort; narrator is bystander, no personal bond."
+ },
+ {
+  "id": "0152",
+  "title": "ここ一番の踏ん張りどころ",
+  "url": "https://lacrima.jp/heartwarming_story/koko_ichiban_no_funbari_dokoro/",
+  "category": "work",
+  "sender_to_receiver": "板前→板長",
+  "direction": "up",
+  "receiver_alive": "unclear",
+  "occasions": [
+   "none"
+  ],
+  "emotion": [
+   "proud"
+  ],
+  "themes": [
+   "修業",
+   "忍耐",
+   "職人"
+  ],
+  "key_moment_ja": "板長のいびりに耐え、ひたすら速く綺麗に働き続けていじめを止めさせた。",
+  "test_story_ja": "",
+  "test_use": "exclude",
+  "note": "Quoted magazine interview with a celebrity chef on perseverance; no affectionate relationship."
+ },
+ {
+  "id": "0153",
+  "title": "変わらぬ優しい笑顔",
+  "url": "https://lacrima.jp/heartwarming_story/kawaranu_yasashii_egao/",
+  "category": "mentor",
+  "sender_to_receiver": "教え子→恩師",
+  "direction": "up",
+  "receiver_alive": "yes",
+  "occasions": [
+   "thanks",
+   "retirement"
+  ],
+  "emotion": [
+   "grateful",
+   "proud"
+  ],
+  "themes": [
+   "恩師",
+   "いじめ",
+   "救い"
+  ],
+  "key_moment_ja": "ホームルームで先生がいじめの加害者を名指しで一喝し、いじめが止まった。",
+  "test_story_ja": "中学のころ、毎日いじめられて胃に穴が開くほどでした。家は貧しく、母は朝から晩まで働いていて相談できませんでした。中三でもう限界だったとき、担任の先生が気づいてくれました。小柄で冗談が通じる若い先生でしたが、ホームルームで相手の名前をはっきり呼んで怒鳴ってくれました。それでいじめは止まりました。後で日本一になって帰ったとき、先生のおかげだと伝えたら、変わらない笑顔で小さくうなずいてくれました。",
+  "test_use": "main",
+  "note": "Published memoir excerpt."
+ },
+ {
+  "id": "0154",
+  "title": "大切な5つの言葉",
+  "url": "https://lacrima.jp/heartwarming_story/taisetsu_na_itsutsu_no_kotoba/",
+  "category": "other",
+  "sender_to_receiver": "—",
+  "direction": "across",
+  "receiver_alive": "unclear",
+  "occasions": [
+   "none"
+  ],
+  "emotion": [
+   "tender"
+  ],
+  "themes": [
+   "格言",
+   "生き方"
+  ],
+  "key_moment_ja": "人生訓を五つ並べた文章で、特定の人物や出来事は登場しない。",
+  "test_story_ja": "",
+  "test_use": "exclude",
+  "note": "List of aphorisms; no narrative or relationship."
+ },
+ {
+  "id": "0155",
+  "title": "相手を思い遣る心",
+  "url": "https://lacrima.jp/heartwarming_story/aite_wo_omoiyaru_kokoro/",
+  "category": "work",
+  "sender_to_receiver": "CA→乗客",
+  "direction": "up",
+  "receiver_alive": "unclear",
+  "occasions": [
+   "none"
+  ],
+  "emotion": [
+   "grateful"
+  ],
+  "themes": [
+   "気遣い",
+   "礼儀",
+   "有名人"
+  ],
+  "key_moment_ja": "会話中でも体ごとこちらを向いて、何度も丁寧に礼を言ってくれた乗客。",
+  "test_story_ja": "",
+  "test_use": "exclude",
+  "note": "Business-book anecdote about a celebrity passenger; no personal relationship."
+ },
+ {
+  "id": "0156",
+  "title": "まるで紙吹雪のように",
+  "url": "https://lacrima.jp/heartwarming_story/marude_kami_fubuki_no_youni/",
+  "category": "other",
+  "sender_to_receiver": "留学生→列車の乗客",
+  "direction": "up",
+  "receiver_alive": "yes",
+  "occasions": [
+   "thanks"
+  ],
+  "emotion": [
+   "grateful"
+  ],
+  "themes": [
+   "見知らぬ人の善意",
+   "異国",
+   "命の恩"
+  ],
+  "key_moment_ja": "臨時停車した駅で、乗客たちが窓から励ましと紙幣を雨のように投げてくれた。",
+  "test_story_ja": "若いころ留学先で重い結核になり、遠くの療養所まで列車で向かいました。お金も食べ物もほとんどなくて、具合も悪いままでした。車掌さんがジュースやサンドイッチをくれて、さらに列車を療養所の町に臨時で停めてくれました。降りると、乗客の皆さんが窓から連絡先とお金を包んだ紙を投げて、きっと助かるよと声をかけてくれました。入院中もお見舞いに来てくれて、治療費まで誰かが払ってくれていました。",
+  "test_use": "edge",
+  "note": "Third-person anecdote; anonymous collective receivers."
+ },
+ {
+  "id": "0157",
+  "title": "病院の窓辺から",
+  "url": "https://lacrima.jp/heartwarming_story/byouin_no_madobe_kara/",
+  "category": "other",
+  "sender_to_receiver": "看護師→患者",
+  "direction": "down",
+  "receiver_alive": "no",
+  "occasions": [
+   "none"
+  ],
+  "emotion": [
+   "tender"
+  ],
+  "themes": [
+   "窓辺",
+   "日課",
+   "つながり"
+  ],
+  "key_moment_ja": "頑なな老女が毎朝窓から工員に手を振り、笑顔を取り戻していった。",
+  "test_story_ja": "",
+  "test_use": "exclude",
+  "note": "Third-person parable; no identifiable sender relationship; receiver dies."
+ },
+ {
+  "id": "0158",
+  "title": "自分らしく生きる言葉",
+  "url": "https://lacrima.jp/heartwarming_story/jibun_rashiku_ikiru_kotoba/",
+  "category": "other",
+  "sender_to_receiver": "—",
+  "direction": "across",
+  "receiver_alive": "unclear",
+  "occasions": [
+   "none"
+  ],
+  "emotion": [
+   "tender"
+  ],
+  "themes": [
+   "格言",
+   "自己受容"
+  ],
+  "key_moment_ja": "自分らしく生きるための言葉を並べた文章で、人物や出来事はない。",
+  "test_story_ja": "",
+  "test_use": "exclude",
+  "note": "Aphorisms; no narrative or relationship."
+ },
+ {
+  "id": "0159",
+  "title": "今は亡き僕の先生",
+  "url": "https://lacrima.jp/heartwarming_story/ima_ha_naki_boku_no_sensei/",
+  "category": "mentor",
+  "sender_to_receiver": "患者→かかりつけ医",
+  "direction": "up",
+  "receiver_alive": "no",
+  "occasions": [
+   "none"
+  ],
+  "emotion": [
+   "longing",
+   "grateful"
+  ],
+  "themes": [
+   "恩師",
+   "主治医",
+   "誇り"
+  ],
+  "key_moment_ja": "幼い頃からの主治医が、悩む僕に好きなことと嫌なことを書く紙を渡した。",
+  "test_story_ja": "小さいころから体が弱くて、いつも同じ診療所の先生に診てもらっていました。一日に何十人診ても笑顔を絶やさない人でした。高校でいじめられて引きこもったとき、先生がカウンセリングで話を聞いてくれました。好きなことと嫌なことを書いて次に持ってきてと紙を渡された翌朝、先生が診察中に亡くなったと聞きました。孫みたいに気にかけていたと娘さんから聞きました。先生、僕の誇りはあなたです。",
+  "test_use": "edge",
+  "note": "Receiver deceased."
+ },
+ {
+  "id": "0160",
+  "title": "豊かさの秘密",
+  "url": "https://lacrima.jp/heartwarming_story/yutaka_sa_no_himitsu/",
+  "category": "other",
+  "sender_to_receiver": "—",
+  "direction": "across",
+  "receiver_alive": "unclear",
+  "occasions": [
+   "none"
+  ],
+  "emotion": [
+   "playful"
+  ],
+  "themes": [
+   "トイレ掃除",
+   "開運"
+  ],
+  "key_moment_ja": "トイレ掃除と豊かさの関係を説く話で、人物間の出来事はない。",
+  "test_story_ja": "",
+  "test_use": "exclude",
+  "note": "Self-help essay; no relationship story."
+ },
+ {
+  "id": "0161",
+  "title": "恩師の愛情",
+  "url": "https://lacrima.jp/heartwarming_story/onshi_no_aijyou/",
+  "category": "mentor",
+  "sender_to_receiver": "教え子→恩師",
+  "direction": "up",
+  "receiver_alive": "yes",
+  "occasions": [
+   "thanks",
+   "retirement"
+  ],
+  "emotion": [
+   "grateful",
+   "tender"
+  ],
+  "themes": [
+   "恩師",
+   "寄り添い",
+   "教師の道"
+  ],
+  "key_moment_ja": "息をするのもつらいと打ち明けた私の前で、先生が黙ってぽろぽろ泣いてくれた。",
+  "test_story_ja": "高二のとき失恋と仲間外れが重なって、毎日泣いていました。理由は親にも先生にも言えませんでした。でも一人の先生がずっと気にかけてくれて、放課後の教室で二人で話しました。五分くらい黙ったあと、やっと息をするのがつらいと言えました。先生は責めずに、静かに泣き出しました。あなたが大切だから涙が出るんだね、と。二人でぐちゃぐちゃになるまで泣きました。今、私も教師をしています。",
+  "test_use": "main",
+  "note": "Depression context."
+ },
+ {
+  "id": "0162",
+  "title": "俺の娘が、俺の嫁になった話",
+  "url": "https://lacrima.jp/heartwarming_story/ore_no_musume/",
+  "category": "children",
+  "sender_to_receiver": "父→娘",
+  "direction": "down",
+  "receiver_alive": "yes",
+  "occasions": [
+   "wedding",
+   "thanks"
+  ],
+  "emotion": [
+   "proud",
+   "tender"
+  ],
+  "themes": [
+   "母代わり",
+   "男手一つ",
+   "嫁ぐ日"
+  ],
+  "key_moment_ja": "母の遺言どおり十五年父の世話をしてきた娘が、式で約束を守ったと告げた。",
+  "test_story_ja": "妻が病気で亡くなったとき、娘は十歳でした。料理が下手な俺に代わって娘が毎日ご飯を作り、一緒に食べて、うっとうしいくらいそばにいました。よくけんかしてボロボロで帰ってきましたが、片親だとからかわれるたびに言い返していたと後で知りました。二十五で結婚した式で、母さんに頼まれて父さんの面倒を見てきたと読み上げられました。こいつは青春を全部俺にくれました。今夜は娘が最初に作った肉じゃがでも作ります。",
+  "test_use": "main",
+  "note": "Playful-gruff narrator voice."
+ },
+ {
+  "id": "0163",
+  "title": "自衛隊の誇り",
+  "url": "https://lacrima.jp/heartwarming_story/jieitai-no-hokori/",
+  "category": "other",
+  "sender_to_receiver": "—",
+  "direction": "up",
+  "receiver_alive": "unclear",
+  "occasions": [
+   "none"
+  ],
+  "emotion": [
+   "proud"
+  ],
+  "themes": [
+   "自衛隊",
+   "信念"
+  ],
+  "key_moment_ja": "自衛隊不要論をぶつけられた隊員が、そういう人も守るのが仕事だと答えた。",
+  "test_story_ja": "",
+  "test_use": "exclude",
+  "note": "Short quote anecdote; no personal relationship."
+ },
+ {
+  "id": "0164",
+  "title": "先生の決心",
+  "url": "https://lacrima.jp/heartwarming_story/sensei-no-kesshin/",
+  "category": "mentor",
+  "sender_to_receiver": "教え子→担任",
+  "direction": "up",
+  "receiver_alive": "unclear",
+  "occasions": [
+   "thanks"
+  ],
+  "emotion": [
+   "grateful"
+  ],
+  "themes": [
+   "恩師",
+   "寄り添い",
+   "髪"
+  ],
+  "key_moment_ja": "髪を切られて泣く教え子のため、先生が自慢の長い髪を同じ長さに切った。",
+  "test_story_ja": "小学五年のとき、友達がシラミのせいで長い髪を切ることになり、男の子みたいとからかわれて学校に来るのを嫌がるようになりました。担任の先生は色々説明してくれましたが、みんなには響きませんでした。一週間後、先生は腰まであった自分の長い髪をばっさり短くして教室に来て、その子とおそろいの髪留めをつけました。からかいはそれで止まりました。私はそんな先生に習えたことを誇りに思っています。",
+  "test_use": "edge",
+  "note": "Grandmother's retold memory; receiver is classmate's teacher, likely deceased."
+ },
+ {
+  "id": "0165",
+  "title": "先生がくれた宝物",
+  "url": "https://lacrima.jp/heartwarming_story/sensei-ga-kureta-takaramono/",
+  "category": "mentor",
+  "sender_to_receiver": "生徒→塾講師",
+  "direction": "up",
+  "receiver_alive": "yes",
+  "occasions": [
+   "thanks",
+   "farewell"
+  ],
+  "emotion": [
+   "grateful",
+   "longing"
+  ],
+  "themes": [
+   "恩師",
+   "共感",
+   "約束"
+  ],
+  "key_moment_ja": "辞める最後の日、明るい先生が自分も昔いじめられていたと話して初めて泣いた。",
+  "test_story_ja": "中一のころ、友達からの嫌がらせと家のことで、もう消えたいと思っていました。塾の英語の先生はいつも明るくて楽しい人で、元気がない私に気づいて、言える範囲でいいからと声をかけてくれました。それから毎週話を聞いてくれました。地元に帰るので辞めると聞いたときは何度も泣きました。最後の日、先生も昔同じ思いをしていたと話して、いつか頑張ったと報告しに来いと涙ぐんでいました。いつか必ず会いに行きます。",
+  "test_use": "main",
+  "note": "Teen self-harm ideation mentioned."
+ },
+ {
+  "id": "0166",
+  "title": "思いやり",
+  "url": "https://lacrima.jp/heartwarming_story/omoiyari/",
+  "category": "other",
+  "sender_to_receiver": "—",
+  "direction": "across",
+  "receiver_alive": "unclear",
+  "occasions": [
+   "none"
+  ],
+  "emotion": [
+   "tender"
+  ],
+  "themes": [
+   "寓話",
+   "思いやり"
+  ],
+  "key_moment_ja": "長い箸で互いに食べさせ合う天国と、自分だけ食べようとする地獄の対比。",
+  "test_story_ja": "",
+  "test_use": "exclude",
+  "note": "Parable; no relationship story."
+ },
+ {
+  "id": "0167",
+  "title": "一冊のノート",
+  "url": "https://lacrima.jp/heartwarming_story/issatsu-no-note/",
+  "category": "work",
+  "sender_to_receiver": "先輩→後輩",
+  "direction": "down",
+  "receiver_alive": "no",
+  "occasions": [
+   "none"
+  ],
+  "emotion": [
+   "bittersweet",
+   "longing"
+  ],
+  "themes": [
+   "新人教育",
+   "病",
+   "ノート"
+  ],
+  "key_moment_ja": "亡くなった後輩が、教わったことを入院中まで帳面に書き留めていたと知った。",
+  "test_story_ja": "入社三年目に新人の教育係になった。正直、覚えが遅くてよく大きな声を出していた。途中で彼が重い病気だと分かり、ご両親から「手加減しないで一人前にしてやってほしい」と頼まれた。それからは毎日必死に教えたけれど、帰りに一人で飲んでは言い過ぎたかと悩んでいた。入院先に見舞うと「戻ったらまた教えてください」と笑っていた。彼が亡くなったあと、私が教えたことを全部書き込んだ帳面を渡された。最後まで真面目に向き合ってくれた後輩だった。",
+  "test_use": "edge",
+  "note": "Receiver (junior colleague) died; sender is the trainer."
+ },
+ {
+  "id": "0168",
+  "title": "天才数学者の意志",
+  "url": "https://lacrima.jp/heartwarming_story/tensai-suugakusha-no-ishi/",
+  "category": "other",
+  "sender_to_receiver": "—",
+  "direction": "up",
+  "receiver_alive": "no",
+  "occasions": [
+   "none"
+  ],
+  "emotion": [
+   "proud"
+  ],
+  "themes": [
+   "数学者",
+   "闘病"
+  ],
+  "key_moment_ja": "難病と闘いながら、子の成長を支えに弱音を吐かなかった若い研究者。",
+  "test_story_ja": "大学の先輩に、若くして亡くなった数学の研究者がいました。十代で重い病気になり、何度も手術を受けながら研究を続けていたそうです。周りが驚くほど頭が良いのに、いばることがなく、誰からも慕われていました。病気が進んでも弱音を言わず、小さな子どもの成長を楽しみにしていたと聞きました。今でもその人の名前のついた賞があり、子どもたちが算数に挑戦しています。",
+  "test_use": "exclude",
+  "note": "Biographical article about a public figure; no sender relationship."
+ },
+ {
+  "id": "0169",
+  "title": "インドネシア建国の神話",
+  "url": "https://lacrima.jp/heartwarming_story/indonesia-kenkoku-no-shinwa/",
+  "category": "other",
+  "sender_to_receiver": "—",
+  "direction": "across",
+  "receiver_alive": "no",
+  "occasions": [
+   "none"
+  ],
+  "emotion": [
+   "proud"
+  ],
+  "themes": [
+   "歴史",
+   "独立"
+  ],
+  "key_moment_ja": "外国の独立戦争に日本兵が残って共に戦ったという歴史の語り。",
+  "test_story_ja": "子どもの頃、祖父から南の国の独立の話を聞いたことがあります。長いあいだ外国に支配されていた国で、戦争が終わったあとも現地に残り、その国の人たちと一緒に戦った日本の兵隊がいたそうです。多くは帰ってこなかったけれど、その国では今も大切に語り継がれていると祖父は言っていました。誰かのために自分の人生を差し出した人たちの話として、ずっと心に残っています。",
+  "test_use": "exclude",
+  "note": "Historical/political essay; no personal relationship."
+ },
+ {
+  "id": "0170",
+  "title": "命綱を譲った男性",
+  "url": "https://lacrima.jp/heartwarming_story/inochiduna-wo-yuzutta-dansei/",
+  "category": "other",
+  "sender_to_receiver": "—",
+  "direction": "across",
+  "receiver_alive": "no",
+  "occasions": [
+   "none"
+  ],
+  "emotion": [
+   "grateful"
+  ],
+  "themes": [
+   "事故",
+   "自己犠牲"
+  ],
+  "key_moment_ja": "救助の綱を二度も隣の女性に譲り、自分は川に沈んだ乗客。",
+  "test_story_ja": "昔、冬の川に旅客機が落ちた事故のニュースを見ました。氷の水につかった生存者のところへヘリが綱を下ろしたのに、ある男性はそれを二度も近くの女性に回したそうです。女性は助かり、その人は最後に引き上げられたときには亡くなっていました。会ったこともない人ですが、自分よりも先に他人を出すということを考えると、今でも胸が詰まります。",
+  "test_use": "exclude",
+  "note": "News account of a stranger's heroism; no sender relationship."
+ },
+ {
+  "id": "0171",
+  "title": "おじさんとの約束",
+  "url": "https://lacrima.jp/heartwarming_story/ojisan-tono-yakusoku/",
+  "category": "work",
+  "sender_to_receiver": "バイト仲間（学生）→年上の同僚",
+  "direction": "up",
+  "receiver_alive": "yes",
+  "occasions": [
+   "thanks",
+   "new_start"
+  ],
+  "emotion": [
+   "grateful",
+   "tender"
+  ],
+  "themes": [
+   "日雇い",
+   "家族の再生",
+   "約束"
+  ],
+  "key_moment_ja": "家族の元へ戻れたら知らせてと頼んだら、新生活の春に本当に電話をくれた。",
+  "test_story_ja": "学生のころ、日雇いのバイト先でいつも一緒に休憩していた五十代のおじさんがいました。平日は役所勤めで、週末だけ働いていると聞きました。奥さんにありがとうをうまく言えないまま家を出てしまい、一人で暮らしているとのことでした。不器用だけど、子どもを通して仲直りしようとずっと頑張っていました。私が就職でバイトを辞めるとき、家に戻れたら連絡してくださいとお願いしました。四月、研修中に電話が鳴って「家に戻ったよ」と。約束を覚えていてくれたのが本当にうれしかったです。",
+  "test_use": "main"
+ },
+ {
+  "id": "0172",
+  "title": "一生の宝物",
+  "url": "https://lacrima.jp/heartwarming_story/isshou-no-takaramono/",
+  "category": "friends",
+  "sender_to_receiver": "元訓練生→同期の仲間",
+  "direction": "across",
+  "receiver_alive": "yes",
+  "occasions": [
+   "thanks"
+  ],
+  "emotion": [
+   "grateful",
+   "bittersweet"
+  ],
+  "themes": [
+   "同期",
+   "血判状",
+   "責任"
+  ],
+  "key_moment_ja": "不正で辞めさせられた仲間のために、同期全員が嘆願書に血判を押していた。",
+  "test_story_ja": "若いころ、パイロットを目指す訓練課程にいました。毎晩遅くまでみんなで勉強した仲間です。私は自分の過ちで課程を外されることになりました。そのとき同期が全員で、取り消しを願う書面に判を押して教官に持って行ってくれました。結局決まりは変わらず、私は夢をあきらめました。しばらくは悔しくて、みんなとも距離を置いていました。十年以上たって同期会に出て、ようやく素直に言えました。あの書面は今も私の一番の宝物です。",
+  "test_use": "edge",
+  "note": "Multiple receivers (whole cohort); sender's own misconduct backdrop."
+ },
+ {
+  "id": "0173",
+  "title": "祖父の恩人",
+  "url": "https://lacrima.jp/heartwarming_story/sofu_no_onjin/",
+  "category": "other",
+  "sender_to_receiver": "孫→祖父の元上官",
+  "direction": "up",
+  "receiver_alive": "yes",
+  "occasions": [
+   "thanks"
+  ],
+  "emotion": [
+   "grateful",
+   "tender"
+  ],
+  "themes": [
+   "戦友",
+   "恩人",
+   "偶然の出会い"
+  ],
+  "key_moment_ja": "飲み屋で慰めてくれた老人が、祖父を地雷原から背負って逃げた元上官だった。",
+  "test_story_ja": "仕事で大きな失敗をして、家に帰りたくなくて知らない町の飲み屋に入りました。隣のおじいさんが声をかけてくれて、愚痴を全部聞いてくれました。泣いている私の背中をさすって、悩むのは真剣だからだと言ってくれました。話すうちに、その方が昔、祖父と同じ部隊にいたことが分かりました。祖父がけがをして動けなくなったとき、危ない場所まで戻って背負って逃げてくれた人だったのです。祖父も私も救ってくれた恩人です。先日、二人がお酒を酌み交わせました。",
+  "test_use": "edge",
+  "note": "Receiver is grandfather's wartime superior; chance meeting; war theme."
+ },
+ {
+  "id": "0174",
+  "title": "忘れられない生徒",
+  "url": "https://lacrima.jp/heartwarming_story/wasurerarenai_seito/",
+  "category": "mentor",
+  "sender_to_receiver": "教師→元生徒",
+  "direction": "down",
+  "receiver_alive": "yes",
+  "occasions": [
+   "new_start",
+   "thanks"
+  ],
+  "emotion": [
+   "proud",
+   "tender"
+  ],
+  "themes": [
+   "教師",
+   "生徒",
+   "夢"
+  ],
+  "key_moment_ja": "卒業式の日、孤立していた生徒が先生ごとに選んだ便箋で感謝の手紙をくれた。",
+  "test_story_ja": "高校で教えていたころ、クラスになじめず、気持ちが不安定な女の子がいました。家でも学校でも居場所がなく、担任とはよく言い合いになっていました。私はなるべく話を聞くようにしていたのですが、話してみると冗談も言う明るい子でした。卒業式の日、彼女は先生一人ひとりに違う封筒を選んで手紙を配っていて、私には好きなキャラクターの便箋と似顔絵がありました。私みたいな先生になると書いてありました。今は大学生です。夢をかなえる姿を見られる日を楽しみにしています。",
+  "test_use": "main",
+  "note": "Sender is teacher, receiver former student (reverse mentor)."
+ },
+ {
+  "id": "0175",
+  "title": "野球と夢",
+  "url": "https://lacrima.jp/heartwarming_story/yakyuu_to_yume/",
+  "category": "mentor",
+  "sender_to_receiver": "監督→部員",
+  "direction": "down",
+  "receiver_alive": "yes",
+  "occasions": [
+   "new_start",
+   "thanks"
+  ],
+  "emotion": [
+   "proud",
+   "tender"
+  ],
+  "themes": [
+   "野球",
+   "家族思い",
+   "両立"
+  ],
+  "key_moment_ja": "家計を助けるため退部すると電話してきた部員と、続ける方法を一緒に探した。",
+  "test_story_ja": "うちの野球部に、借り物の帽子と古いグラブで練習している二年生がいます。母一人で五人の子を育てている家で、道具を買う余裕はありません。ある夜、彼から「部活を辞めてバイトします」と電話がありました。お母さんが家計のことで泣いているのを見てしまったそうです。どうしても辞めさせたくなくて、二人で続けられる方法を考えました。今はスーパーで働きながら、練習を早めに抜けて頑張っています。家族のためにも仲間のためにも手を抜かない子です。",
+  "test_use": "edge",
+  "note": "Source is a third-person news piece; reframed from the coach's view."
+ },
+ {
+  "id": "0176",
+  "title": "大きなバラの花束",
+  "url": "https://lacrima.jp/heartwarming_story/ookina_bara_no_hanataba/",
+  "category": "work",
+  "sender_to_receiver": "店長→退職するスタッフ",
+  "direction": "down",
+  "receiver_alive": "yes",
+  "occasions": [
+   "retirement",
+   "farewell",
+   "thanks"
+  ],
+  "emotion": [
+   "grateful",
+   "proud"
+  ],
+  "themes": [
+   "接客",
+   "送別",
+   "花束"
+  ],
+  "key_moment_ja": "最後の日に客席を回らせると、客から一本ずつ渡されたバラが花束になった。",
+  "test_story_ja": "十年近く店を支えてくれた接客担当のスタッフが、今月で辞めます。頼んだことは何でも素直に、一生懸命やってくれる人でした。最後の日に何か返したくて、こっそりお客さん一人ひとりにバラを一本ずつ預け、彼女に渡してもらうようお願いしました。挨拶回りを終えるころには、彼女の腕には大きな花束ができていて、目に涙をためていました。帰り際、お客さんから「いいスタッフがいる店だ」と言われました。彼女がいたから言ってもらえた言葉です。",
+  "test_use": "main"
+ },
+ {
+  "id": "0177",
+  "title": "大切なあなたに花束を",
+  "url": "https://lacrima.jp/heartwarming_story/taisetsu_na_anata_ni_hanataba_wo/",
+  "category": "work",
+  "sender_to_receiver": "介護職員→入居者のみなさん",
+  "direction": "up",
+  "receiver_alive": "yes",
+  "occasions": [
+   "thanks"
+  ],
+  "emotion": [
+   "grateful",
+   "tender"
+  ],
+  "themes": [
+   "介護",
+   "花束",
+   "笑顔"
+  ],
+  "key_moment_ja": "誰宛てかと皆で待った花束が、入居者全員から自分への贈り物だった。",
+  "test_story_ja": "介護施設で働いています。ご家族から花束が届くと、入居者さんたちは自分宛てかもと集まってきて、違うと分かるとさみしそうに部屋へ戻っていきます。ある日、大きな花束が届いて、いつものように私がカードを読みました。宛名は私でした。入居者さんみんなで用意してくれていて、あなたの笑顔でさみしさを忘れられたと書いてありました。毎日お世話をしているつもりが、私のほうが支えてもらっていたのだと気づきました。",
+  "test_use": "edge",
+  "note": "Multiple receivers (all residents)."
+ },
+ {
+  "id": "0178",
+  "title": "果物の命",
+  "url": "https://lacrima.jp/heartwarming_story/kudamono_no_inochi/",
+  "category": "partner",
+  "sender_to_receiver": "彼氏→彼女",
+  "direction": "across",
+  "receiver_alive": "yes",
+  "occasions": [
+   "anniversary",
+   "birthday"
+  ],
+  "emotion": [
+   "tender",
+   "playful"
+  ],
+  "themes": [
+   "優しさ",
+   "食べ物",
+   "二人暮らし"
+  ],
+  "key_moment_ja": "傷んで売れ残りそうな柿を見て、かわいそうだから全部買って帰ろうと言った。",
+  "test_story_ja": "彼女とはいつも仕事帰りにスーパーで待ち合わせて、その日の夕飯を一緒に決めます。料理は僕の担当です。ある秋の夜、彼女が柿の棚の前で「きれい」「立派だね」とずっとほめていて、手に取った一つが傷んでいました。すると、こういうのは誰にも買ってもらえないからと、傷んだ柿ばかり五つ選び、お金は自分が出すと言い張りました。正直少し困りましたが、その夜は二人で全部むいて食べました。小さなものにまで情をかける人です。",
+  "test_use": "edge",
+  "note": "Narrator is a store clerk bystander; reframed as boyfriend→girlfriend."
+ },
+ {
+  "id": "0179",
+  "title": "人生",
+  "url": "https://lacrima.jp/heartwarming_story/jinsei/",
+  "category": "children",
+  "sender_to_receiver": "父→養子の息子",
+  "direction": "down",
+  "receiver_alive": "yes",
+  "occasions": [
+   "birthday",
+   "new_start",
+   "thanks"
+  ],
+  "emotion": [
+   "grateful",
+   "tender"
+  ],
+  "themes": [
+   "養子縁組",
+   "真実告知",
+   "家族"
+  ],
+  "key_moment_ja": "生みの親ではないと伝えた後、息子のほうから「もらってくれてありがとう」と言われた。",
+  "test_story_ja": "妻と私には子どもができず、里親として迎えた男の子を、のちに正式に息子にしました。幼稚園を卒業するとき、私たちは生みの親ではないけれど、あなたはかけがえのない息子だと話しました。しばらくたって、息子のほうから「もらってくれてありがとう」と言われ、私は声を上げて泣きました。いろいろあった人生ですが、この子に出会えたことが一番の幸運です。来年はもっといい景色を一緒に見たいと思っています。",
+  "test_use": "edge",
+  "note": "Multi-receiver life story (dead father, dead mentor, sister's suicide); son chosen as receiver."
+ },
+ {
+  "id": "0180",
+  "title": "本当の豊かさ",
+  "url": "https://lacrima.jp/heartwarming_story/hontou_no_yutakasa/",
+  "category": "children",
+  "sender_to_receiver": "父→息子",
+  "direction": "down",
+  "receiver_alive": "yes",
+  "occasions": [
+   "birthday"
+  ],
+  "emotion": [
+   "proud",
+   "playful"
+  ],
+  "themes": [
+   "豊かさ",
+   "価値観",
+   "寓話"
+  ],
+  "key_moment_ja": "貧しさを学ばせようと田舎へ送った息子が、自分たちの方が貧しいと教えてくれた。",
+  "test_story_ja": "息子に少し不自由な暮らしを知ってほしくて、知り合いの田舎の家に数日預けました。帰ってきた息子に、向こうとうちは何が違ったかと聞くと、うれしそうに話し始めました。向こうには犬が何匹もいて、池には魚がいて、夜は星が庭を照らしてくれると。最後に「うちが本当はどれだけ貧しいか教えてくれてありがとう」と言われ、何も言えませんでした。教えるつもりが教えられた。そういう目を持った息子です。",
+  "test_use": "edge",
+  "note": "Well-known parable, not a true personal story."
+ },
+ {
+  "id": "0181",
+  "title": "笑顔でいるんだ",
+  "url": "https://lacrima.jp/heartwarming_story/egao_de_irunda/",
+  "category": "other",
+  "sender_to_receiver": "少年→近所のお好み焼き屋のおばあさん",
+  "direction": "up",
+  "receiver_alive": "no",
+  "occasions": [
+   "none"
+  ],
+  "emotion": [
+   "longing",
+   "grateful"
+  ],
+  "themes": [
+   "いじめ",
+   "居場所",
+   "笑顔"
+  ],
+  "key_moment_ja": "泣きはらした顔の少年に売り物のラムネを出し、黙って頭をなで続けた。",
+  "test_story_ja": "小学生のころ、学校でいじめられていて、家では言えずにいました。ある日泣きながら帰っていると、近所のお好み焼き屋のおばあちゃんが声をかけてくれて、店のラムネを出して、ただ頭をなでてくれました。それから毎日のように店に寄り、笑っている日も泣いている日も迎えてくれました。あるとき「笑って吹き飛ばせばいい」と真剣に言われました。おばあちゃんは施設に移り、十年後に亡くなったと知らせが来ました。笑って生きていけるようになったのは、あの店のおかげです。",
+  "test_use": "edge",
+  "note": "Receiver (neighbour) died; neighbour relationship."
+ },
+ {
+  "id": "0182",
+  "title": "親切の輪",
+  "url": "https://lacrima.jp/heartwarming_story/shinsetsu_no_wa/",
+  "category": "other",
+  "sender_to_receiver": "乗客→見知らぬ中年男性",
+  "direction": "across",
+  "receiver_alive": "unclear",
+  "occasions": [
+   "thanks"
+  ],
+  "emotion": [
+   "grateful"
+  ],
+  "themes": [
+   "親切の連鎖",
+   "恩送り",
+   "見知らぬ人"
+  ],
+  "key_moment_ja": "回数券をくれた男性は名前も告げず、自分も昔同じように助けられたと話した。",
+  "test_story_ja": "終電に財布を落としたまま乗ってしまい、車掌さんに次の駅で降りるよう言われました。北海道の冬の夜で、本当に困っていたら、隣に座っていた同年代の男性が黙って回数券をくれました。お礼をしたいから名前を教えてと頼んでも、笑って手を振るばかりでした。しつこく聞くと、自分も昔同じ目にあって、高校生の女の子に助けられたのだと話してくれました。返すなら次に困っている人に、と言われたそうです。あの方に直接お礼はできませんが、その分を誰かに回すつもりです。",
+  "test_use": "edge",
+  "note": "Anonymous stranger; one-off encounter."
+ },
+ {
+  "id": "0183",
+  "title": "天国の恩人",
+  "url": "https://lacrima.jp/heartwarming_story/tengoku_no_onjin/",
+  "category": "other",
+  "sender_to_receiver": "元ホステス→常連客",
+  "direction": "up",
+  "receiver_alive": "no",
+  "occasions": [
+   "none"
+  ],
+  "emotion": [
+   "longing",
+   "grateful"
+  ],
+  "themes": [
+   "見守り",
+   "応援",
+   "日記"
+  ],
+  "key_moment_ja": "亡くなった常連客の日記に、会わなくなった後も自分を応援する言葉が並んでいた。",
+  "test_story_ja": "学費のために夜の店で働いていたころ、最初についたお客さんが七十代のおじいさんでした。口数は少なく、毎週静かにお酒を飲んで、困ったときにはそっと助けてくれました。卒業の日、もう夜の世界とは関わるなとメールをくれ、それきりになりました。私は年に一度、誕生日にだけ近況を送り続けました。三年目に娘さんから亡くなったと連絡があり、日記を見せてもらうと、私のことを最後まで応援してくれていました。今、仕事が楽しいです。",
+  "test_use": "edge",
+  "note": "Receiver died; hostess/customer relationship."
+ },
+ {
+  "id": "0184",
+  "title": "素直な感謝の気持ち",
+  "url": "https://lacrima.jp/heartwarming_story/sunao_na_kansha_no_kimochi/",
+  "category": "other",
+  "sender_to_receiver": "運転手→見知らぬ男性",
+  "direction": "across",
+  "receiver_alive": "unclear",
+  "occasions": [
+   "thanks"
+  ],
+  "emotion": [
+   "grateful"
+  ],
+  "themes": [
+   "交通整理",
+   "とっさの機転",
+   "素直な感謝"
+  ],
+  "key_moment_ja": "車を降りて信号待ちの車列を止め、妊婦を乗せた車を先に曲がらせた。",
+  "test_story_ja": "交差点で信号待ちをしていたら、右折車がじりじり前に出ていて、私はいら立って絶対に譲るものかと思っていました。すると隣の車からおじさんが降りてきて、私の車の前に立って止まれと合図し、右折車を先に行かせました。その車の助手席には苦しそうな妊婦さんが乗っていました。私は窓を開けて「ありがとう」と叫びました。おじさんは仕事が交通整理だからと笑って戻っていきました。気持ちをそのまま口にすることを教えてもらいました。",
+  "test_use": "edge",
+  "note": "Anonymous stranger; one-off encounter."
+ },
+ {
+  "id": "0185",
+  "title": "チョコをくれたお姉さん",
+  "url": "https://lacrima.jp/heartwarming_story/choco_wo_kureta_oneesan/",
+  "category": "other",
+  "sender_to_receiver": "受験生→見知らぬお姉さん",
+  "direction": "up",
+  "receiver_alive": "unclear",
+  "occasions": [
+   "thanks"
+  ],
+  "emotion": [
+   "grateful",
+   "tender"
+  ],
+  "themes": [
+   "受験",
+   "励まし",
+   "チョコ"
+  ],
+  "key_moment_ja": "コンビニでコピーを譲った相手が、頑張ってとチョコを差し出してくれた。",
+  "test_story_ja": "高校受験の直前、成績が上がらずに落ち込んでいました。母は仕事で家におらず、ほめてくれる人もいませんでした。ある日コンビニで過去問をコピーしていて、後から来たお姉さんに順番を譲りました。するとお姉さんがチョコを持ってきて、自分も大学受験なんだ、たまには休んでいいよと言ってくれました。頑張ってと言われたのは初めてで、帰り道に少し泣きました。そこからもう一度踏ん張れて、志望校に入れました。",
+  "test_use": "edge",
+  "note": "Anonymous stranger; one-off encounter."
+ },
+ {
+  "id": "0186",
+  "title": "脳内共同ガールフレンド",
+  "url": "https://lacrima.jp/heartwarming_story/nounai_kyoudou_girl_friend/",
+  "category": "other",
+  "sender_to_receiver": "—",
+  "direction": "across",
+  "receiver_alive": "unclear",
+  "occasions": [
+   "none"
+  ],
+  "emotion": [
+   "playful"
+  ],
+  "themes": [
+   "捕虜",
+   "想像の少女"
+  ],
+  "key_moment_ja": "捕虜仲間が架空の少女の席を作り、無礼をしたらその席に謝る決まりにした。",
+  "test_story_ja": "戦争中、捕虜になった兵隊たちが部屋の隅に想像上の女の子の席を作ったという話を聞きました。けんかをした者はその子に頭を下げて謝る決まりで、食事も一人分取り分け、誕生日には手作りの贈り物をしたそうです。見張りの兵が本当に女の子を隠していると勘違いしたほどでした。厳しい暮らしの中で、その仲間たちは全員そろって故郷に帰れたそうです。",
+  "test_use": "exclude",
+  "note": "Historical anecdote about a group; no sender/receiver relationship."
+ },
+ {
+  "id": "0187",
+  "title": "モンロヴィアへ",
+  "url": "https://lacrima.jp/heartwarming_story/monrovia/",
+  "category": "other",
+  "sender_to_receiver": "留学生→列車の車掌と乗客たち",
+  "direction": "up",
+  "receiver_alive": "unclear",
+  "occasions": [
+   "thanks"
+  ],
+  "emotion": [
+   "grateful"
+  ],
+  "themes": [
+   "異国",
+   "病",
+   "見知らぬ人の善意"
+  ],
+  "key_moment_ja": "車掌が病気の留学生のため、列車を病院のある町に臨時停車させた。",
+  "test_story_ja": "戦後まもなく留学先のアメリカで重い病気になり、遠くの療養所まで何日も列車で向かいました。食べ物も尽き、ジュースを頼むと、車掌さんは私の様子を見てお金はいらないと言いました。翌日も食事を運んでくれ、最後には本来止まらない病院の町に列車を止めてくれました。降りるとき、窓から乗客たちが励ましの言葉や連絡先を投げてくれました。入院中もその人たちが見舞いに来てくれました。あの車掌さんへの恩は一生忘れません。",
+  "test_use": "edge",
+  "note": "Third-person account; multiple strangers as receivers."
+ },
+ {
+  "id": "0188",
+  "title": "痛みを知る者",
+  "url": "https://lacrima.jp/heartwarming_story/itami_wo_shiru_mono/",
+  "category": "mentor",
+  "sender_to_receiver": "部下→上司",
+  "direction": "up",
+  "receiver_alive": "yes",
+  "occasions": [
+   "thanks",
+   "retirement"
+  ],
+  "emotion": [
+   "grateful"
+  ],
+  "themes": [
+   "休む勇気",
+   "心の痛み",
+   "強面の優しさ"
+  ],
+  "key_moment_ja": "無断欠勤が続いた部下をバーに連れ出し、責めずに今は休めと言った。",
+  "test_story_ja": "何年か前、理由も分からないまま仕事へのやる気がなくなり、何日も会社を休みました。ある夜、怖い顔の上司が家まで来て、行きつけのバーに連れて行かれました。クビを言われると思っていたら、心が少し疲れているだけだから治るまで休め、と言われました。痛みを知った人間は、その分だけ人に優しくなれる、とも。最後に「俺が疲れたときは助けろよ」と笑っていました。あの夜があって、今も同じ会社で働けています。",
+  "test_use": "main"
+ },
+ {
+  "id": "0189",
+  "title": "絵馬に書かれた願い",
+  "url": "https://lacrima.jp/heartwarming_story/ema_ni_kakareta_negai/",
+  "category": "other",
+  "sender_to_receiver": "—",
+  "direction": "across",
+  "receiver_alive": "unclear",
+  "occasions": [
+   "none"
+  ],
+  "emotion": [
+   "tender"
+  ],
+  "themes": [
+   "絵馬",
+   "祈り"
+  ],
+  "key_moment_ja": "神社の小さな絵馬に、幼い字で母の病気が治るよう書かれていた。",
+  "test_story_ja": "近くの神社を散歩していて、たくさんの絵馬を眺めていました。その中に一番小さな絵馬があって、幼い子どもの字でお母さんの病気を治してくださいと書いてありました。どこの誰かも、どんな病気なのかも分かりません。それでも、その子の願いがかなうように、私も手を合わせてきました。帰り道、自分の母にも久しぶりに電話してみようと思いました。元気なうちに、ちゃんと声を聞いておきたいと思ったからです。",
+  "test_use": "exclude",
+  "note": "Narrator is a passer-by; no relationship."
+ },
+ {
+  "id": "0190",
+  "title": "本当のやさしさ",
+  "url": "https://lacrima.jp/heartwarming_story/hontou_no_yasashisa/",
+  "category": "mentor",
+  "sender_to_receiver": "元児童→他クラスの先生",
+  "direction": "up",
+  "receiver_alive": "unclear",
+  "occasions": [
+   "thanks",
+   "retirement"
+  ],
+  "emotion": [
+   "grateful",
+   "proud"
+  ],
+  "themes": [
+   "厳しさの奥",
+   "弁当",
+   "陰の支え"
+  ],
+  "key_moment_ja": "孤立した子の隣に座り、重箱の弁当を広げて周りの子を呼び寄せた。",
+  "test_story_ja": "小学六年の遠足で、クラスで孤立していた友達が、一人で弁当を開けられずにいました。そこへ、厳しくて誰もが怖がっていた隣のクラスの先生が来て、笑顔で一緒に食べようと声をかけました。先生は大きな重箱を広げて、私たちも呼んでくれて、その子の周りに輪ができました。大人になって、先生が陰でその子の家の費用を助け、休日に勉強まで見ていたと知りました。厳しさの裏にあんな優しさがある先生でした。私も教える仕事を目指しています。",
+  "test_use": "main",
+  "note": "Narrator was a bystander pupil, now aspiring teacher."
+ },
+ {
+  "id": "0191",
+  "title": "イチゴショートと女の子",
+  "url": "https://lacrima.jp/heartwarming_story/ichigo_short_to_onnnanoko/",
+  "category": "other",
+  "sender_to_receiver": "客の男性→見知らぬ女の子",
+  "direction": "down",
+  "receiver_alive": "unclear",
+  "occasions": [
+   "none"
+  ],
+  "emotion": [
+   "tender",
+   "playful"
+  ],
+  "themes": [
+   "小さな嘘",
+   "おつかい",
+   "ケーキ"
+  ],
+  "key_moment_ja": "女の子がこぼした小銭を拾うとき、そっと足りない分を足して数え直させた。",
+  "test_story_ja": "ケーキ屋で会計していると、幼稚園くらいの女の子が一人で入ってきました。お母さんの誕生日に内緒でケーキを買いに来たそうです。でもいちごのケーキには百円足りず、泣きそうな顔で出ていこうとして転び、小銭が床に散らばりました。拾うのを手伝って、もう一度数えてごらんと言うと、ちゃんと足りていました。うれしそうにありがとうと言って、ケーキを抱えていきました。あの子のお母さんはきっと喜んだと思います。",
+  "test_use": "edge",
+  "note": "Anonymous child; one-off encounter; humorous benevolent trick."
+ },
+ {
+  "id": "0192",
+  "title": "特別な千円札",
+  "url": "https://lacrima.jp/heartwarming_story/tokubetsu_na_senensatsu/",
+  "category": "other",
+  "sender_to_receiver": "学生→見知らぬお婆さん",
+  "direction": "up",
+  "receiver_alive": "unclear",
+  "occasions": [
+   "thanks"
+  ],
+  "emotion": [
+   "grateful",
+   "tender"
+  ],
+  "themes": [
+   "恩送り",
+   "旅",
+   "千円札"
+  ],
+  "key_moment_ja": "空腹の学生に卵と千円札を渡し、大人になったら同じことをしなさいと言った。",
+  "test_story_ja": "学生時代の貧乏旅行の帰り、寝台券を買ったら手元に八十円しか残りませんでした。ホームでしょんぼりしていると、知らないお婆さんがゆで卵を二つくれて、千円札まで握らせてくれました。大人になったら同じような若い人を助けなさい、と言われました。結局その千円は使わずに、十四年たった今もしまってあります。あのお婆さんの言葉を、いつか誰かに返したいと思っています。",
+  "test_use": "edge",
+  "note": "Anonymous stranger; one-off encounter."
+ },
+ {
+  "id": "0193",
+  "title": "ラグビーと恩師",
+  "url": "https://lacrima.jp/heartwarming_story/rugby_to_onshi/",
+  "category": "mentor",
+  "sender_to_receiver": "教え子→恩師",
+  "direction": "up",
+  "receiver_alive": "yes",
+  "occasions": [
+   "retirement",
+   "kanreki",
+   "thanks"
+  ],
+  "emotion": [
+   "grateful",
+   "proud"
+  ],
+  "themes": [
+   "恩師",
+   "ラグビー",
+   "立ち直り"
+  ],
+  "key_moment_ja": "退学を考えた生徒の胸ぐらをつかみ、三年間面倒を見ると言い切った。",
+  "test_story_ja": "高校一年で部活をさぼって問題を起こし、停学になりました。もう学校を辞めるつもりでいたら、話を聞いた別の部の先生に呼び止められ、辞めるなと強く言われました。母一人で入学金を用意してくれた気持ちを無駄にするな、俺が三年間面倒を見ると。母にもわざわざ電話をくれました。それからラグビーを始めて、最後は副キャプテンになりました。休んだのはあの一週間だけです。今の自分があるのは先生のおかげです。",
+  "test_use": "main"
+ },
+ {
+  "id": "0194",
+  "title": "みほちゃんという子",
+  "url": "https://lacrima.jp/heartwarming_story/mihochan_to_iu_ko/",
+  "category": "other",
+  "sender_to_receiver": "看護師→事故で亡くなった少女",
+  "direction": "down",
+  "receiver_alive": "no",
+  "occasions": [
+   "none"
+  ],
+  "emotion": [
+   "bittersweet",
+   "longing"
+  ],
+  "themes": [
+   "看護",
+   "霊",
+   "励まし"
+  ],
+  "key_moment_ja": "救えなかった少女が、つらい時ごとに病院で微笑んで現れたという。",
+  "test_story_ja": "看護学生のころ、交通事故にあった女の子に応急処置をしましたが、救急車の中で亡くなりました。看護師になるのを迷いましたが、周りに背中を押されて資格を取りました。働き始めてつらかった時期、病院のあちこちであの子が微笑んでいるのを見た気がしました。主任になった朝、ありがとう、おめでとうと言われた気がして、それきり見えなくなりました。今は小児科で働いています。あの子のことは一生忘れません。",
+  "test_use": "edge",
+  "note": "Receiver deceased; supernatural element."
+ },
+ {
+  "id": "0195",
+  "title": "かしま艦長の見事な対応",
+  "url": "https://lacrima.jp/heartwarming_story/kashima_kanchou_no_migoto_na_taiou/",
+  "category": "other",
+  "sender_to_receiver": "—",
+  "direction": "across",
+  "receiver_alive": "unclear",
+  "occasions": [
+   "none"
+  ],
+  "emotion": [
+   "playful",
+   "proud"
+  ],
+  "themes": [
+   "ユーモア",
+   "艦長"
+  ],
+  "key_moment_ja": "客船に艦をぶつけられた艦長が、女王にキスされて光栄だと返した。",
+  "test_story_ja": "海外の港で、自衛隊の艦に大きな客船がぶつかったときの話を聞いたことがあります。謝りに来た相手に、艦長は損傷も軽いし気にしていない、女王様にキスされて光栄だと答えたそうです。その返しが船乗りたちの間で評判になり、海外の新聞にも載ったそうです。怒っても当然の場面で、相手の顔を立てて笑いに変えられる人は、なかなかいないと思います。",
+  "test_use": "exclude",
+  "note": "Public anecdote; no personal relationship."
+ },
+ {
+  "id": "0196",
+  "title": "ドア裏の落書き",
+  "url": "https://lacrima.jp/heartwarming_story/door_ura_no_rakugaki/",
+  "category": "other",
+  "sender_to_receiver": "—",
+  "direction": "across",
+  "receiver_alive": "unclear",
+  "occasions": [
+   "none"
+  ],
+  "emotion": [
+   "tender"
+  ],
+  "themes": [
+   "落書き",
+   "励まし"
+  ],
+  "key_moment_ja": "弱音の落書きの周りが、見知らぬ人たちの励ましで埋め尽くされた。",
+  "test_story_ja": "通っていた病院のトイレのドアに、入院が長引いてもうだめだという小さな落書きがありました。二週間後に同じ場所に入ると、周りが頑張れ、きっと良くなる、という書き込みでいっぱいになっていました。ペンキの塗り直しのときも、そのドアだけはそのまま残されていました。誰が誰に書いたのかも分からないけれど、温かい気持ちになりました。",
+  "test_use": "exclude",
+  "note": "Anonymous; no relationship."
+ },
+ {
+  "id": "0197",
+  "title": "春一番と親切なカップル",
+  "url": "https://lacrima.jp/heartwarming_story/haruichiban_to_shinsetsu_na_couple/",
+  "category": "work",
+  "sender_to_receiver": "店員→客のカップル",
+  "direction": "across",
+  "receiver_alive": "unclear",
+  "occasions": [
+   "thanks"
+  ],
+  "emotion": [
+   "grateful",
+   "apologetic"
+  ],
+  "themes": [
+   "接客",
+   "手助け",
+   "恥じらい"
+  ],
+  "key_moment_ja": "苦情を言ったはずのカップルが、強風の中で段ボールを抱えて手伝いに来た。",
+  "test_story_ja": "春一番が吹いた日、店はトラブル続きで私はくたくたでした。若いカップルに駐車場の段ボールが散らかっていると言われ、内心いら立ちながら片付けに出ました。風の中で適当に集めていると、後ろからさっきの二人が、私よりたくさんの段ボールを抱えて立っていました。きれいな服も髪もぐしゃぐしゃでした。自分がとても恥ずかしくなって、深く頭を下げることしかできませんでした。",
+  "test_use": "edge",
+  "note": "Anonymous customers; one-off encounter."
+ },
+ {
+  "id": "0198",
+  "title": "きっと天国では",
+  "url": "https://lacrima.jp/heartwarming_story/kitto_tengoku_deha/",
+  "category": "other",
+  "sender_to_receiver": "旅行者→隣席の老人",
+  "direction": "up",
+  "receiver_alive": "unclear",
+  "occasions": [
+   "none"
+  ],
+  "emotion": [
+   "bittersweet"
+  ],
+  "themes": [
+   "戦争",
+   "平和"
+  ],
+  "key_moment_ja": "かつて爆撃で飛んだ空を見ながら、天国では皆仲良く飛んでいると言った。",
+  "test_story_ja": "二十歳でヨーロッパを旅したとき、飛行機で隣になったアメリカ人のおじいさんと話しました。若いころ戦争でこの空を飛び、この町を爆撃したことがあると、少し沈んだ顔で言いました。そして雲を見ながら、天国ではどの国の飛行機も仲良く飛んでいるよとつぶやきました。そのときは気まずさしか感じませんでしたが、今思い出すと胸にきます。",
+  "test_use": "exclude",
+  "note": "One-off stranger remark; no ongoing relationship."
+ },
+ {
+  "id": "0199",
+  "title": "道路に架かった虹",
+  "url": "https://lacrima.jp/heartwarming_story/douro_ni_kakatta_niji/",
+  "category": "other",
+  "sender_to_receiver": "—",
+  "direction": "down",
+  "receiver_alive": "unclear",
+  "occasions": [
+   "none"
+  ],
+  "emotion": [
+   "playful"
+  ],
+  "themes": [
+   "作業員",
+   "虹",
+   "見知らぬ人"
+  ],
+  "key_moment_ja": "泣いている中学生のために、作業員がマンホールから水を吹き上げ虹を見せた。",
+  "test_story_ja": "犬の散歩中、マンホールの点検をしていた作業着の若い男性二人が、泣きながら歩いてきた中学生の女の子に声をかけていました。女の子は大丈夫ですと言うだけでしたが、一人がいいもの見せてやると言って、マンホールから勢いよく水を噴き上げました。きれいな虹ができて、女の子はすっかり泣きやみ、最後は笑っていました。",
+  "test_use": "exclude",
+  "note": "Narrator is a bystander; no relationship."
+ },
+ {
+  "id": "0200",
+  "title": "自衛隊最大の任務",
+  "url": "https://lacrima.jp/heartwarming_story/jieitai_saidai_no_ninmu/",
+  "category": "other",
+  "sender_to_receiver": "被災した青年→自衛隊員",
+  "direction": "up",
+  "receiver_alive": "unclear",
+  "occasions": [
+   "thanks",
+   "farewell"
+  ],
+  "emotion": [
+   "grateful"
+  ],
+  "themes": [
+   "震災",
+   "復興",
+   "別れ"
+  ],
+  "key_moment_ja": "部隊撤収の日、青年が隊員の胸に飛び込み、二人で声を上げて泣いた。",
+  "test_story_ja": "震災で町が焼けてしまい、長いあいだ避難所で暮らしました。そのあいだ、自衛隊の人たちがずっと私たちを支えてくれました。部隊が引き上げる日、若い者を代表して、これからは自分たちが町を立て直すと話しました。話し終えて、一番近くにいた隊員さんに抱きついて泣いてしまいましたが、その人も一緒に泣いてくれました。あの日の背中の温かさを忘れません。",
+  "test_use": "edge",
+  "note": "Receiver is an institution/unnamed group; disaster context."
+ },
+ {
+  "id": "0201",
+  "title": "駄菓子屋に集結したヒーロー",
+  "url": "https://lacrima.jp/heartwarming_story/dagashiya_ni_shuuketsu_shita_otona_tachi/",
+  "category": "other",
+  "sender_to_receiver": "近所の子→駄菓子屋のお婆ちゃん",
+  "direction": "up",
+  "receiver_alive": "yes",
+  "occasions": [
+   "kanreki",
+   "birthday",
+   "thanks"
+  ],
+  "emotion": [
+   "grateful",
+   "tender"
+  ],
+  "themes": [
+   "駄菓子屋",
+   "町の人情",
+   "見守り"
+  ],
+  "key_moment_ja": "お金のない子にこっそり駄菓子を渡していた店主を、町中が守りに集まった。",
+  "test_story_ja": "近所に、お婆ちゃんが一人でやっている駄菓子屋があります。いつもにこにこしていて、お金を持っていない子にはこっそりお菓子をくれる人で、私も子どもの頃にもらいました。あるとき、亡くなったご主人の借金のことで怖い人たちに脅されていたら、町の大人が三十人以上集まって店の前に並び、追い返してくれました。お婆ちゃんは泣きながらありがとうと繰り返していました。今日も変わらず店先で笑っています。ずっと元気でいてほしい人です。",
+  "test_use": "main",
+  "note": "Neighbour relationship (category other)."
+ },
+ {
+  "id": "0202",
+  "title": "サンタさんから頼まれた",
+  "url": "https://lacrima.jp/heartwarming_story/santa_san_kara_tanomareta/",
+  "category": "other",
+  "sender_to_receiver": "—",
+  "direction": "down",
+  "receiver_alive": "unclear",
+  "occasions": [
+   "none"
+  ],
+  "emotion": [
+   "tender"
+  ],
+  "themes": [
+   "震災",
+   "思いやり",
+   "ゲーム機"
+  ],
+  "key_moment_ja": "壊れたゲーム機を泣く子に、中学生がサンタに頼まれたと自分の物を渡した。",
+  "test_story_ja": "震災の直後、スーパーの列に並んでいると、前の小さな男の子が壊れたゲーム機を大事そうに持って泣いていました。サンタさんにもらったものが壊れて、怒られないか心配していたのです。すると中学生くらいの男の子がやってきて、サンタさんに頼まれたと言って自分のゲーム機と交換してあげました。電気も水もない中で、気持ちがとても明るくなりました。",
+  "test_use": "exclude",
+  "note": "Narrator is a bystander; anonymous actors."
+ },
+ {
+  "id": "0203",
+  "title": "おばあちゃんが注いだ愛情",
+  "url": "https://lacrima.jp/heartwarming_story/obaachan_ga_sosoida_aijyou/",
+  "category": "grandparents",
+  "sender_to_receiver": "孫（里子）→祖母",
+  "direction": "up",
+  "receiver_alive": "yes",
+  "occasions": [
+   "thanks",
+   "birthday",
+   "parents_day"
+  ],
+  "emotion": [
+   "grateful",
+   "tender"
+  ],
+  "themes": [
+   "里親",
+   "育ての親",
+   "兄弟"
+  ],
+  "key_moment_ja": "里子の兄弟が、自分たちのお母さんはお婆ちゃんだと言い合っていた。",
+  "test_story_ja": "僕と弟は生まれた場所が違うけれど、兄弟です。二人ともおばあちゃんに育ててもらっています。この前、里親の集まりに行く途中で、よそのお母さんたちを見かけました。弟が「あれがお母さん？」と聞くので、僕たちのお母さんはおばあちゃんだよと答えました。弟もうなずいて、おばあちゃんが一番優しいと言いました。おばあちゃんは何も言わずに、僕たちの手をぎゅっとにぎって笑っていました。",
+  "test_use": "edge",
+  "note": "Narrator is a bystander; reframed as foster grandson→grandmother."
+ },
+ {
+  "id": "0204",
+  "title": "貴様飲め！",
+  "url": "https://lacrima.jp/heartwarming_story/kisama_nome/",
+  "category": "grandparents",
+  "sender_to_receiver": "孫→祖父",
+  "direction": "up",
+  "receiver_alive": "no",
+  "occasions": [
+   "none"
+  ],
+  "emotion": [
+   "proud",
+   "longing"
+  ],
+  "themes": [
+   "戦争",
+   "自己犠牲",
+   "部下"
+  ],
+  "key_moment_ja": "薬が一つしかない時、指揮官の祖父は部下に「お前が飲め」と命じた。",
+  "test_story_ja": "祖父は戦争中、南方のジャングルで部隊を率いていました。祖父と部下の一人が同じ病気にかかったとき、薬は一つしか残っていませんでした。部下は指揮官が飲むべきだと言ったそうですが、祖父はお前が飲めと一言で譲り、まもなく亡くなりました。生き延びたその方は、戦後ずっと祖母を助けてくれたそうです。祖母は毎日仏壇の祖父に話しかけていました。会ったことのない祖父ですが、誇りに思っています。",
+  "test_use": "edge",
+  "note": "Receiver died; war theme."
+ },
+ {
+  "id": "0205",
+  "title": "直立不動の敬礼",
+  "url": "https://lacrima.jp/heartwarming_story/chokuritsu_fudou_no_keirei/",
+  "category": "other",
+  "sender_to_receiver": "被災者の少女→自衛隊の部隊",
+  "direction": "up",
+  "receiver_alive": "unclear",
+  "occasions": [
+   "thanks"
+  ],
+  "emotion": [
+   "grateful"
+  ],
+  "themes": [
+   "震災",
+   "恩返し",
+   "敬礼"
+  ],
+  "key_moment_ja": "抗議団体に向かい、家族を救った部隊に礼を言いに来たのだと言い返した。",
+  "test_story_ja": "震災で家が崩れ、家族が埋まったとき、助けに来てくれたのは遠くの駐屯地の部隊の人たちでした。寒い中でご飯を作り、お風呂を沸かし、夜は見回りまでしてくれました。何年かたって、その駐屯地のお祭りに一人で電車でお礼を言いに行きました。門で守衛さんがまっすぐ立って敬礼してくれたとき、ようやく少し恩を返せた気がしました。",
+  "test_use": "edge",
+  "note": "Narrator is a bystander; reframed from the girl's view; receiver is a unit."
+ },
+ {
+  "id": "0206",
+  "title": "埃まみれのパンチパーマ",
+  "url": "https://lacrima.jp/heartwarming_story/hokori_mamire_no_punch_perm/",
+  "category": "other",
+  "sender_to_receiver": "店員→見知らぬ男性",
+  "direction": "up",
+  "receiver_alive": "unclear",
+  "occasions": [
+   "thanks"
+  ],
+  "emotion": [
+   "grateful",
+   "playful"
+  ],
+  "themes": [
+   "震災",
+   "義侠心",
+   "ユーモア"
+  ],
+  "key_moment_ja": "騒ぐ若者を一喝した男性が、けんかは店員の仕事じゃないと笑って帰った。",
+  "test_story_ja": "震災のあと、勤めていたファミレスで無料の食事を出していました。並んでいる人の中に、観光気分で騒いでわがままを言う若者たちがいて、私が出て行ってもらおうとしたときです。後ろから肩をたたいて前に出た男性が、腕の刺青を見せて一喝し、若者たちは黙って帰っていきました。男性は、店員さんはけんかしちゃいかん、ごちそうさまと笑って、足を引きずりながら帰っていきました。",
+  "test_use": "edge",
+  "note": "Anonymous stranger (implied yakuza); humour."
+ },
+ {
+  "id": "0207",
+  "title": "自衛隊の方への感謝",
+  "url": "https://lacrima.jp/heartwarming_story/jieitai_no_kata_he_no_kansha/",
+  "category": "other",
+  "sender_to_receiver": "被災者→自衛隊員",
+  "direction": "up",
+  "receiver_alive": "unclear",
+  "occasions": [
+   "thanks"
+  ],
+  "emotion": [
+   "grateful",
+   "bittersweet"
+  ],
+  "themes": [
+   "震災",
+   "喪失",
+   "感謝"
+  ],
+  "key_moment_ja": "瓦礫から妹を抱き出した隊員が、小さく「ごめんな」とつぶやいた。",
+  "test_story_ja": "中学生のとき震災で家がつぶれ、私は腕の骨折で済みましたが、奥の部屋の母と妹が下敷きになりました。近所の人と掘っても届かず、半日後に自衛隊の人を見つけて助けを求めました。何時間もかけて二人を出してくれましたが、もう息はありませんでした。妹を抱き出しながら謝ってくれた隊員さんの顔を忘れられません。そのあと私の手当てまでしてくれました。本当にありがとうございました。",
+  "test_use": "edge",
+  "note": "Very dark (family deaths); receiver unnamed soldiers."
+ },
+ {
+  "id": "0208",
+  "title": "店長さんの嘘",
+  "url": "https://lacrima.jp/heartwarming_story/tenchou_san_no_uso/",
+  "category": "other",
+  "sender_to_receiver": "元受験生→喫茶店の店長",
+  "direction": "up",
+  "receiver_alive": "yes",
+  "occasions": [
+   "thanks",
+   "kanreki",
+   "birthday"
+  ],
+  "emotion": [
+   "grateful",
+   "tender"
+  ],
+  "themes": [
+   "受験",
+   "見守り",
+   "やさしい嘘"
+  ],
+  "key_moment_ja": "家が近いからと言って遅くまで店を開けてくれた店長は、実は片道二時間だった。",
+  "test_story_ja": "受験生のころ、塾の自習室が苦手で、近くの喫茶店で勉強していました。店長さんと仲良くなり、家が近いから閉店後もいていいよと言ってもらい、夜遅くまで居座らせてもらいました。夜食を作ってくれた日もありました。合格を報告すると、自分のことのように喜んでくれました。あとでアルバイトの人から、店長さんの家は電車とバスを乗り継いで二時間以上かかると聞きました。三か月も毎晩、笑って付き合ってくれていたのです。",
+  "test_use": "main",
+  "note": "Shopkeeper relationship (category other)."
+ },
+ {
+  "id": "0209",
+  "title": "十円玉の価値",
+  "url": "https://lacrima.jp/heartwarming_story/jyuuendama_no_kachi/",
+  "category": "children",
+  "sender_to_receiver": "母→息子",
+  "direction": "down",
+  "receiver_alive": "yes",
+  "occasions": [
+   "birthday",
+   "new_start"
+  ],
+  "emotion": [
+   "tender",
+   "proud"
+  ],
+  "themes": [
+   "電話",
+   "母子",
+   "価値"
+  ],
+  "key_moment_ja": "一番大きなお金はと聞かれ、母の声が聞ける十円玉だと答え続けた。",
+  "test_story_ja": "息子は生まれつき知的な障害があり、四年生から寮のある学校に通っています。毎日、その日に習ったことを電話で教えてくれます。先日、先生から聞いた話です。五百円と百円と十円のどれが一番大きいかと聞かれて、息子は何度聞かれても十円だと答えたそうです。理由を聞くと、十円はお母さんの声が聞けるお金だから、と。電話の向こうの小さな声を、私も毎日待っています。",
+  "test_use": "edge",
+  "note": "Third-person anecdote reframed as mother→son."
+ },
+ {
+  "id": "0210",
+  "title": "結婚記念日おめでとう",
+  "url": "https://lacrima.jp/heartwarming_story/kekkon_kinenbi_omedetou/",
+  "category": "mentor",
+  "sender_to_receiver": "部下→元課長",
+  "direction": "up",
+  "receiver_alive": "yes",
+  "occasions": [
+   "retirement",
+   "thanks",
+   "farewell"
+  ],
+  "emotion": [
+   "grateful",
+   "playful"
+  ],
+  "themes": [
+   "粋な計らい",
+   "結婚記念日",
+   "照れ"
+  ],
+  "key_moment_ja": "修羅場の日に遠方へのお使いを命じた封筒の中身が、帰れという祝いの一言だった。",
+  "test_story_ja": "入社四年目、初めての結婚記念日に社内で大きなトラブルが起きて、とても帰りたいとは言えませんでした。夕方、課長に呼ばれて、隣の県の取引先へ封筒を届けろ、そのまま直帰していいと言われました。不満たっぷりで車に乗って封筒を開けると、結婚記念日おめでとう、今日はこのまま帰りなさいと書いた紙が一枚入っていました。会社で初めて泣きました。送別会でお礼を言うと、そんなことあったかとすっとぼけていました。",
+  "test_use": "main"
+ },
+ {
+  "id": "0211",
+  "title": "一生懸命に生きて",
+  "url": "https://lacrima.jp/heartwarming_story/isshoukenmei_ni_ikite/",
+  "category": "children",
+  "sender_to_receiver": "母→息子",
+  "direction": "down",
+  "receiver_alive": "yes",
+  "occasions": [
+   "birthday",
+   "thanks"
+  ],
+  "emotion": [
+   "tender",
+   "bittersweet"
+  ],
+  "themes": [
+   "病",
+   "贈り物",
+   "希望"
+  ],
+  "key_moment_ja": "わずかな小遣いで母に白い靴を選び、一緒に水族館へ行こうと励ました。",
+  "test_story_ja": "私は病気で入院していて、もう長くないと言われています。小学四年の息子にはまだ話せていませんでした。ある日、息子が知り合いの方とデパートに行き、白い靴を買ってきてくれました。少ないお小遣いで、一緒にいろんな所へ行きたいからと選んだそうです。思わず、もう履いて出かけられないかもしれないと言ってしまいました。すると息子は、一生懸命生きれば星になる、だからあきらめないでと言って、水族館に行こうと笑いました。",
+  "test_use": "edge",
+  "note": "Narrator is a third party; reframed mother→son; terminal illness."
+ },
+ {
+  "id": "0212",
+  "title": "苦手だった部長",
+  "url": "https://lacrima.jp/heartwarming_story/nigate_datta_buchou/",
+  "category": "mentor",
+  "sender_to_receiver": "部下→元部長",
+  "direction": "up",
+  "receiver_alive": "yes",
+  "occasions": [
+   "apology",
+   "thanks",
+   "retirement"
+  ],
+  "emotion": [
+   "apologetic",
+   "grateful"
+  ],
+  "themes": [
+   "身代わり",
+   "誤解",
+   "無言の責任"
+  ],
+  "key_moment_ja": "解雇された部長が、実は自分のミスの責任をすべてかぶっていたと知った。",
+  "test_story_ja": "前の部長は冷たくて近寄りがたく、よく叱られていたので、正直苦手でした。部長が辞めることになったと聞いたとき、内心ほっとしたほどです。最後の日、専務に呼ばれて、部長が辞めたのは私のミスの責任を全部引き受けたからだと聞かされました。急いで席に戻るともう部長はおらず、私の机の上の煙草が一本だけ減っていて、これくらいはもらっていいだろうとメモが残っていました。いつかちゃんと謝って、お礼を言いたい人です。",
+  "test_use": "main"
+ },
+ {
+  "id": "0213",
+  "title": "みんな同じ",
+  "url": "https://lacrima.jp/heartwarming_story/minna_onaji/",
+  "category": "children",
+  "sender_to_receiver": "父→娘",
+  "direction": "down",
+  "receiver_alive": "yes",
+  "occasions": [
+   "birthday"
+  ],
+  "emotion": [
+   "tender"
+  ],
+  "themes": [
+   "父子家庭",
+   "違い",
+   "子育て"
+  ],
+  "key_moment_ja": "電車で見知らぬ母親が娘に「みんな同じじゃない」と語るのを聞き、娘を思った。",
+  "test_story_ja": "娘は四歳になります。妻は娘が生まれてすぐ家を出ていったので、娘は母親を知りません。私はずっとその話題を避けてきました。先日電車で、ある母親が小さな娘に、人にはそれぞれ持っているものと持っていないものがある、それはその人のせいじゃないと話しているのを聞きました。うちの娘にも、いつかそう伝えたいと思いました。母親がいないことを恥じずに、まっすぐ育ってくれたらそれでいいです。",
+  "test_use": "edge",
+  "note": "Main action is between strangers; reframed father→daughter."
+ },
+ {
+  "id": "0214",
+  "title": "一身独立",
+  "url": "https://lacrima.jp/heartwarming_story/isshin_dokuritsu/",
+  "category": "work",
+  "sender_to_receiver": "上司→部下（取引先社長の息子）",
+  "direction": "down",
+  "receiver_alive": "yes",
+  "occasions": [
+   "new_start",
+   "farewell"
+  ],
+  "emotion": [
+   "proud",
+   "bittersweet"
+  ],
+  "themes": [
+   "継承",
+   "父を超える",
+   "縁"
+  ],
+  "key_moment_ja": "面接で聞き覚えのある声がし、亡き取引先社長の息子だとすぐに分かった。",
+  "test_story_ja": "若いころ営業で担当していた小さな会社の社長は、苦しい経営でもいつも前向きで、一緒に成長しようと言ってくれる人でした。息子さんの誕生日にと頼まれて野球のチケットを渡したのですが、社長はその月に事故で亡くなりました。八年後、私が面接官をしていたとき、そっくりの声の学生が来ました。その息子さんでした。夢は独立して父を超えることだと言いました。私が引き受けた彼は、今年トップの成績を取りました。巣立つ日は笑って送り出すつもりです。",
+  "test_use": "edge",
+  "note": "Two receivers (dead father, living son); son chosen."
+ },
+ {
+  "id": "0215",
+  "title": "乗客全員の拍手",
+  "url": "https://lacrima.jp/heartwarming_story/jyoukyaku_zennin_no_hakushu/",
+  "category": "other",
+  "sender_to_receiver": "—",
+  "direction": "across",
+  "receiver_alive": "unclear",
+  "occasions": [
+   "none"
+  ],
+  "emotion": [
+   "tender"
+  ],
+  "themes": [
+   "バス",
+   "拍手",
+   "子育て"
+  ],
+  "key_moment_ja": "運転手が泣く赤ん坊の母に降りなくていいと放送し、乗客が拍手で応えた。",
+  "test_story_ja": "冬の満員バスで赤ちゃんが泣き続け、お母さんが途中で降りようとしました。運転手さんは行き先を聞くと、マイクで、赤ちゃんは泣くのが仕事だから一緒に乗せていってあげてくださいと呼びかけました。一人が拍手をすると、乗客全員の拍手が返事になりました。お母さんは何度も頭を下げていました。私はどうしていいか分からず立っているだけでしたが、あの拍手の音は今でも覚えています。",
+  "test_use": "exclude",
+  "note": "Narrator is a bystander; anonymous actors."
+ },
+ {
+  "id": "0216",
+  "title": "天国のお父さんへ",
+  "url": "https://lacrima.jp/heartwarming_story/tengoku_no_otousan_he/",
+  "category": "parents",
+  "sender_to_receiver": "娘→亡き父",
+  "direction": "up",
+  "receiver_alive": "no",
+  "occasions": [
+   "none"
+  ],
+  "emotion": [
+   "longing",
+   "grateful"
+  ],
+  "themes": [
+   "天国への手紙",
+   "ランドセル",
+   "見えない支え"
+  ],
+  "key_moment_ja": "天国の父に宛てた葉書に、郵便局員たちがランドセルと返事を届けた。",
+  "test_story_ja": "父は私が小さいときに亡くなり、母が一人で育ててくれました。小学校に上がるとき、赤いランドセルがどうしても欲しかったけれど、母には言えませんでした。それで天国のお父さんに、ひらがなで手紙を書いてポストに入れました。何日かして、本当にランドセルと、お父さんからの手紙が届きました。あとで、郵便局の人たちがみんなで用意してくれたのだと知りました。それでも私には、父が届けてくれたように思えます。",
+  "test_use": "edge",
+  "note": "Receiver deceased; real givers are postal workers; third-person source."
+ },
+ {
+  "id": "0217",
+  "title": "女の子を庇うため",
+  "url": "https://lacrima.jp/heartwarming_story/onna_no_ko_wo_kabau_tame/",
+  "category": "partner",
+  "sender_to_receiver": "夫→妻",
+  "direction": "across",
+  "receiver_alive": "yes",
+  "occasions": [
+   "anniversary",
+   "wedding"
+  ],
+  "emotion": [
+   "playful",
+   "tender"
+  ],
+  "themes": [
+   "かばう",
+   "秘密",
+   "初恋"
+  ],
+  "key_moment_ja": "中学で隣の子の失敗を隠すため、黙ってバケツの水をかけ悪者になった。",
+  "test_story_ja": "中学一年のとき、授業中に隣の席の女の子が困った状況になっていて、まだ誰も気づいていませんでした。とっさに廊下でバケツに水をくんで、その子にかけました。教室は大騒ぎになり、親まで呼ばれましたが、理由は最後まで言いませんでした。その日の夜、彼女が親と一緒にお礼を言いに家まで来てくれました。あの子が、今の妻です。今でもときどき、あのときの話をして二人で笑っています。",
+  "test_use": "main",
+  "note": "Humorous."
+ },
+ {
+  "id": "0218",
+  "title": "才能の代わりに",
+  "url": "https://lacrima.jp/heartwarming_story/sainou_no_kawarini/",
+  "category": "mentor",
+  "sender_to_receiver": "教え子→小学校の恩師",
+  "direction": "up",
+  "receiver_alive": "yes",
+  "occasions": [
+   "retirement",
+   "thanks"
+  ],
+  "emotion": [
+   "grateful",
+   "proud"
+  ],
+  "themes": [
+   "恩師",
+   "絵",
+   "粘り強さ"
+  ],
+  "key_moment_ja": "厳しく見えた先生の送別会で、教え子が十分以上かけて感謝を述べた。",
+  "test_story_ja": "小学生のころ、計算や話すのがゆっくりな僕に、担任の先生は算数の答えが出るまで何度も言わせました。周りに笑われて、つらいと思ったこともあります。でも放課後はつきっきりでそろばんを教えてくれ、絵の具の色の作り方も教えてくれました。先生の転任のお別れ会で、普通の子と一緒に勉強させてくれてありがとうと伝えました。今は絵の仕事をしています。毎年夏、先生が教えてくれた緑色で空を描いて送っています。",
+  "test_use": "edge",
+  "note": "Narrator is a classmate; reframed as the pupil→teacher."
+ },
+ {
+  "id": "0219",
+  "title": "少年への優しい嘘",
+  "url": "https://lacrima.jp/heartwarming_story/shounen_he_no_yasashii_uso/",
+  "category": "other",
+  "sender_to_receiver": "—",
+  "direction": "across",
+  "receiver_alive": "unclear",
+  "occasions": [
+   "none"
+  ],
+  "emotion": [
+   "tender"
+  ],
+  "themes": [
+   "優しい嘘",
+   "野球"
+  ],
+  "key_moment_ja": "空振りの瞬間、実況がホームランだと伝えて少年に勇気を与えた。",
+  "test_story_ja": "目の見えない少年が、憧れの野球選手にホームランを打ったら手術を受けると約束した話を聞いたことがあります。最後の打席は空振りでしたが、ラジオの実況はホームランだと叫んだそうです。少年は放送を聞いていました。周りの大人たちが、一人の子どものために同じ嘘を守ったのだと思うと、胸が温かくなります。少年がその後手術を受けたかどうかは知りません。",
+  "test_use": "exclude",
+  "note": "Anecdote about public figures; no personal relationship."
+ },
+ {
+  "id": "0220",
+  "title": "強い意志",
+  "url": "https://lacrima.jp/heartwarming_story/tsuyoi_ishi/",
+  "category": "mentor",
+  "sender_to_receiver": "師範→弟子の少年",
+  "direction": "down",
+  "receiver_alive": "yes",
+  "occasions": [
+   "new_start",
+   "birthday"
+  ],
+  "emotion": [
+   "proud",
+   "tender"
+  ],
+  "themes": [
+   "相撲",
+   "母を守る",
+   "努力"
+  ],
+  "key_moment_ja": "倒されても額から血を流しても「もう一番」と立ち上がり続けた。",
+  "test_story_ja": "うちの相撲道場に、半年ほど前に自分で調べて入ってきた男の子がいます。体は細く運動も得意ではありませんが、お母さんを守れるくらい強くなりたいと言っていました。稽古では倒されても倒されても「もう一番お願いします」と立ち上がり、泣きそうになっても歯を食いしばっています。家でも毎日四股を踏み、お母さんのお皿洗いや肩もみもしているそうです。まだ勝てませんが、周りの子まで変わってきました。この子の成長が楽しみです。",
+  "test_use": "main",
+  "note": "Background of domestic abuse; keep light."
+ },
+ {
+  "id": "0221",
+  "title": "最高に幸せなこと",
+  "url": "https://lacrima.jp/heartwarming_story/saikou_ni_shiawase_na_koto/",
+  "category": "work",
+  "sender_to_receiver": "アルバイト→食堂の店長",
+  "direction": "up",
+  "receiver_alive": "yes",
+  "occasions": [
+   "thanks",
+   "farewell"
+  ],
+  "emotion": [
+   "grateful",
+   "tender"
+  ],
+  "themes": [
+   "料理",
+   "喜び",
+   "見守り"
+  ],
+  "key_moment_ja": "客にレシピを頼まれ泣いた自分に、店長は今のお前は最高に幸せだと言った。",
+  "test_story_ja": "小さな食堂でアルバイトをしています。付け合わせの人参のグラッセは私の担当です。ある晩、お客さんに作った人は誰かと聞かれ、怒られると思って震えていたら、人参嫌いの子がここのだけは食べるのでレシピを教えてほしいと言われました。厨房に戻ると、店長は話を聞いていて、もうレシピを用意してくれていました。泣いている私に、客にうまいと言われるのが一番の幸せだと言って、泣きやむまでそばにいてくれました。",
+  "test_use": "main"
+ },
+ {
+  "id": "0222",
+  "title": "ファーストクラス",
+  "url": "https://lacrima.jp/heartwarming_story/first_class/",
+  "category": "other",
+  "sender_to_receiver": "—",
+  "direction": "across",
+  "receiver_alive": "unclear",
+  "occasions": [
+   "none"
+  ],
+  "emotion": [
+   "playful"
+  ],
+  "themes": [
+   "差別",
+   "機転"
+  ],
+  "key_moment_ja": "差別した乗客ではなく、隣の男性のほうをファーストクラスへ案内した。",
+  "test_story_ja": "飛行機で、ある女性が隣の黒人男性の隣は嫌だと乗務員に席替えを求めたという話を聞きました。乗務員は空席を確認して戻ってくると、男性のほうをファーストクラスに案内したそうです。周りの乗客はにこやかに見送ったといいます。理屈で言い返すより、黙って正しい側に席を用意する。そういう機転に、私はずっと憧れています。",
+  "test_use": "exclude",
+  "note": "Anecdote; no personal relationship."
+ }
+]

@@ -13,8 +13,9 @@
 //   --resume             skip ids already in today's .jsonl (a long run can be continued)
 //   --price-in / --price-out   USD per million tokens (default 3 / 15 — an ASSUMPTION, override with the real rates)
 //
-// PRIVACY: the database is retellings of copyrighted stories, for internal testing only. This repo is PUBLIC, so the
-// data and every output live under test-data/ (git-ignored and docker-ignored) — never commit them, never publish them.
+// PRIVACY: the database is retellings of copyrighted stories, for internal testing only. It is committed in
+// test-data/private/ because this repo is PRIVATE (docker-ignored, never in the image); run outputs are git-ignored.
+// Never publish either.
 // The rows are never logged by the engine (it logs the referee/review lines without story text; this script silences them).
 //
 // What it runs: language ja; relationship / direction from the row's category, receiver and direction columns (metadata only);
@@ -263,7 +264,7 @@ async function runOne(row) {
 
 async function main() {
   if (!existsSync(DB)) {
-    console.error(`Story database not found: ${DB}\nPut ICHIREI_Story_Test_DB_v1.csv in test-data/private/ (git-ignored) or pass --db.`)
+    console.error(`Story database not found: ${DB}\nPut ICHIREI_Story_Test_DB_v1.csv in test-data/private/ or pass --db.`)
     process.exit(2)
   }
   let rows = selectRows(loadDb(DB), ONLY)

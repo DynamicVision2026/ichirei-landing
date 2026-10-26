@@ -30,7 +30,10 @@ dist-ssr
 .env
 .env.local
 
-# Internal test data and run results (retellings of copyrighted stories — never publish, never commit; this repo is PUBLIC)
-test-data/
+# Internal test data: the story database in test-data/private/ IS committed now that the repo is PRIVATE
+# (retellings of copyrighted stories — never publish; if the repo ever goes public again, remove it first).
+# test-data/ stays in .dockerignore so it never ships in the image. Run results stay out of git.
 story-run-*.csv
 story-run-*.json
+story-run-*.jsonl
+story-run-*.txt
