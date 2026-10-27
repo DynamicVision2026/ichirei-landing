@@ -26,7 +26,7 @@ const all = palette.values()
 const cp = (s: string) => [...s]
 
 // ---- size and spread ---------------------------------------------------------------------
-check('size: about 300 ja rows and about 300 zh rows', ja.length >= 280 && ja.length <= 350 && zh.length >= 280 && zh.length <= 350, `ja=${ja.length} zh=${zh.length}`)
+check('size: about 400 ja rows and about 400 zh rows (322 + the 86 classical-lexicon characters, each in both languages)', ja.length >= 380 && ja.length <= 450 && zh.length >= 380 && zh.length <= 450, `ja=${ja.length} zh=${zh.length}`)
 const count = (rows: PaletteRow[], st: string) => rows.filter((r) => r.status === st).length
 check('spread: every status (ok, context_required, hard_block) is used in both languages', PALETTE_ROW_STATUSES.every((st) => count(ja, st) > 0 && count(zh, st) > 0))
 console.log(`INFO  ja ${ja.length} rows: ok=${count(ja, 'ok')} context_required=${count(ja, 'context_required')} hard_block=${count(ja, 'hard_block')}`)

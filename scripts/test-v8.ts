@@ -103,6 +103,7 @@ const upstream = http.createServer(async (req, res) => {
 await new Promise<void>((r) => upstream.listen(0, '127.0.0.1', r))
 process.env.ANTHROPIC_BASE_URL = `http://127.0.0.1:${(upstream.address() as { port: number }).port}`
 process.env.ANTHROPIC_API_KEY = 'test-key-not-real'
+process.env.ICHIREI_LEXICON_MODE = 'off' // these suites pin the palette engine's own call sequence; the lexicon modes have their own suite (test-v9.ts)
 for (const k of ['ICHIREI_REVIEW', 'ICHIREI_REPLACE', 'ICHIREI_REPLACE_ATTEMPTS', 'REQUIRE_CLASSICAL_ECHO', 'ICHIREI_CALL_TIMEOUT_MS', 'ICHIREI_REVIEW_TIMEOUT_MS']) delete process.env[k]
 
 const logs: string[] = []

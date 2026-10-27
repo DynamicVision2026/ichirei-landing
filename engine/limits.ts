@@ -36,3 +36,6 @@ export class ModelTimeoutError extends Error {
     this.name = 'ModelTimeoutError'
   }
 }
+
+/** Shadow mode (ICHIREI_LEXICON_MODE=shadow): how long the customer's answer may wait for the lexicon's side call to finish so it can be logged (default 20 s). */
+export const shadowGraceMs = (env: NodeJS.ProcessEnv = process.env): number => ms(env.ICHIREI_SHADOW_GRACE_MS, 20_000)

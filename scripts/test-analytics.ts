@@ -131,6 +131,7 @@ const upstream = http.createServer(async (req, res) => {
 await new Promise<void>((r) => upstream.listen(0, '127.0.0.1', r))
 process.env.ANTHROPIC_BASE_URL = `http://127.0.0.1:${(upstream.address() as { port: number }).port}`
 process.env.ANTHROPIC_API_KEY = 'test-key-not-real'
+process.env.ICHIREI_LEXICON_MODE = 'off' // these suites pin the palette engine's own call sequence; the lexicon modes have their own suite (test-v9.ts)
 const STORY = '父は口下手で、盆に帰るたびに車で駅まで迎えに来て、「金は要るか」と封筒を押し付けてきた。相変わらず、ほとんど何も話さないけど。'
 const before = readLines().length
 const logq = console.log

@@ -125,6 +125,8 @@ export interface ReplaceOptions {
   log?: (line: string) => void
   onUsage?: (stage: 'replace' | 'review', usage: { model: string; input_tokens: number; output_tokens: number }) => void
   onStage?: (stage: 'replacing' | 'checking') => void
+  /** Lexicon mode: the replacement must be one of the lexicon characters open to this gift (same check as the selection's). */
+  inLexicon?: (c: Candidate) => boolean
 }
 
 /**
@@ -194,7 +196,7 @@ export async function completeMains(
     }
     // The same referee, then the same review, as any candidate: judged alone (the primary and the other slots are not touched).
     const mini: EngineResult = { ...current, candidates: [cand], primary_kanji: cand.kanji, runner_up_kanji: null, freestyle_kanji: null, referee: undefined, review: undefined }
-    const refereed = applyPalette(mini, palette, story)
+    const refereed = applyPalette(mini, palette, story, { inLexicon: opts.inLexicon })
     const reasonOf = (r: EngineResult) => r.referee?.actions.find((a) => a.kanji === cand!.kanji && /eliminated/.test(a.action))?.detail ?? r.candidates[0]?.eliminated_reason ?? 'refused'
     // (judged alone, the candidate is its own mini-result's primary: a refusal turns that result `insufficient`)
     if (refereed.status !== 'sufficient' || !refereed.candidates[0] || refereed.candidates[0].eliminated) {

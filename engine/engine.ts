@@ -13,8 +13,9 @@
 // Editing a prompt file changes the engine's behavior with no change to this code.
 
 import Anthropic from '@anthropic-ai/sdk'
-import { callSignal, callTimeoutMs, ModelTimeoutError, reviewTimeoutMs, runBudgetMs, timedOut } from './limits.ts'
+import { callSignal, callTimeoutMs, ModelTimeoutError, reviewTimeoutMs, runBudgetMs, shadowGraceMs, timedOut } from './limits.ts'
 import { finalizeResult } from './slots.ts'
+import { buildLexiconPrompt, eligibleFor, inEligible, lexiconEchoOf, lexiconModeFromEnv, loadLexicon, type EligibleSet, type Lexicon, type LexiconPromptParts } from './lexicon.ts'
 import { readFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -26,6 +27,7 @@ import {
   displayScriptOf,
   promptFamilyOf,
   parseContext,
+  type Candidate,
   type EngineContext,
   type EngineResult,
   type PromptFamily,
@@ -209,6 +211,24 @@ export interface RunEngineOptions {
    * writing the characters, 'checking' while the separate review runs, 'replacing' while a missing main card is replaced.
    */
   onStage?: (stage: 'reading' | 'choosing' | 'checking' | 'replacing') => void
+  /** How many follow-up answers the sender has already given (the API layer passes it). Lexicon mode: after one, a second "no lexicon character fits" falls back to the palette engine. */
+  followUpsUsed?: number
+  /** ICHIREI_LEXICON_MODE for this run (tests); default: the environment. */
+  lexiconMode?: 'off' | 'shadow' | 'on'
+  /** Injected in tests; defaults to the real lexicon file. */
+  lexicon?: Lexicon
+}
+
+/** The lexicon as one gift sees it: who is eligible, and the prompt blocks built from it. */
+interface LexView {
+  set: EligibleSet
+  parts: LexiconPromptParts
+}
+
+/** What one pass through the pipeline produced. `miss` is set when, in lexicon mode, no lexicon character could be used. */
+interface PipelineOut {
+  result: EngineResult
+  miss: null | { reason: 'model_no_fit' | 'no_valid_choice'; register: string[] | null }
 }
 
 /**
@@ -216,6 +236,10 @@ export interface RunEngineOptions {
  * `condition` (A/B/C) is accepted for the API contract but intentionally does NOT
  * affect generation — conditions only change presentation (build spec §5), so the
  * same story yields the same candidates regardless of condition.
+ *
+ * ICHIREI_LEXICON_MODE (engine/lexicon.ts): off = the palette engine as before; shadow (default) = the palette engine answers, and a
+ * second, selection-only call asks what the lexicon would have chosen, which is only logged; on = main and second characters come from
+ * engine/lexicon.csv, the palette engine is the fallback after a second "nothing fits".
  */
 export async function runEngine(
   story: string,
@@ -232,29 +256,105 @@ export async function runEngine(
   const prompt = fillPrompt(loadPrompt(context.language), trimmed, context)
   // Load the palette BEFORE spending a reasoning pass: no palette, no blocklist, no run.
   const palette = loadPalette()
-
   const client = new Anthropic(opts.apiKey ? { apiKey: opts.apiKey } : {})
   const tStart = Date.now()
-  opts.onStage?.('reading')
+  const base = { story: trimmed, context, palette, client, opts, tStart }
 
-  // Stream + finalMessage so reasoning doesn't hit an HTTP timeout; the function still returns one assembled JSON response.
-  // One call may take at most ICHIREI_CALL_TIMEOUT_MS (default 150 s). The selection gets ONE automatic retry — whichever comes first:
-  // the call hit that ceiling (same settings), or the model ran out of output room (max_tokens) before finishing its answer (the
-  // retry allows ICHIREI_MAX_TOKENS_RETRY, default 20000) — as long as the run budget still has room for it. Only then does the
-  // sender see an error.
+  const mode = opts.lexiconMode ?? lexiconModeFromEnv()
+  // The lexicon is a helper, never a single point of failure: if it cannot be loaded, the palette engine answers as before.
+  let view: LexView | null = null
+  if (mode !== 'off') {
+    try {
+      const lexicon = opts.lexicon ?? loadLexicon()
+      const set = eligibleFor(lexicon, palette, context)
+      view = { set, parts: buildLexiconPrompt(lexicon, set) }
+    } catch (err) {
+      console.log(`[ichirei-lexicon] unavailable ${JSON.stringify({ mode, error: (err instanceof Error ? err.message : String(err)).slice(0, 160) })}`)
+    }
+  }
+
+  if (mode === 'on' && view) {
+    if (view.set.chars.length === 0) {
+      logMiss(context, 'no_eligible_characters', null, 'fallback', opts.followUpsUsed ?? 0)
+      return flagFallback((await runPipeline({ ...base, prompt, view: null })).result, view)
+    }
+    const first = await runPipeline({ ...base, prompt, view })
+    if (!first.miss) return first.result
+    const asked = (opts.followUpsUsed ?? 0) > 0
+    logMiss(context, first.miss.reason, first.miss.register, asked ? 'fallback' : 'question', opts.followUpsUsed ?? 0)
+    // First time: the sender is asked ONE question (the insufficient result already carries it). After the answer, still no fit: the palette engine.
+    if (!asked) return first.result
+    return flagFallback((await runPipeline({ ...base, prompt, view: null })).result, view)
+  }
+
+  if (mode === 'shadow' && view) {
+    const shadow = startShadow({ ...base, prompt, view })
+    let main: PipelineOut
+    try {
+      main = await runPipeline({ ...base, prompt, view: null })
+    } catch (err) {
+      shadow.cancel()
+      throw err
+    }
+    await shadow.finish(main.result)
+    return main.result
+  }
+
+  return (await runPipeline({ ...base, prompt, view: null })).result
+}
+
+interface PipelineArgs {
+  story: string
+  context: EngineContext
+  palette: ReturnType<typeof loadPalette>
+  client: Anthropic
+  opts: RunEngineOptions
+  tStart: number
+  /** The filled language prompt. */
+  prompt: string
+  /** Lexicon mode only: the characters open to this gift and the prompt blocks. null = the palette engine. */
+  view: LexView | null
+}
+
+/** The user message: the palette engine sends the filled prompt as before; lexicon mode puts the static lexicon block first (cached), then the filled prompt and this gift's list. */
+function selectionContent(prompt: string, view: LexView | null): string | Anthropic.TextBlockParam[] {
+  if (!view) return prompt
+  return [
+    { type: 'text', text: view.parts.staticBlock, cache_control: { type: 'ephemeral' } },
+    { type: 'text', text: `${prompt}\n\n${view.parts.dynamicBlock}` },
+  ]
+}
+
+interface Selected {
+  message: Anthropic.Message
+  extracted: EngineResult
+  attempts: number
+  maxTokens: number
+}
+
+/**
+ * The selection call with its retries. One call may take at most ICHIREI_CALL_TIMEOUT_MS (default 150 s). It gets ONE automatic retry —
+ * whichever comes first: the call hit that ceiling (same settings), or the model ran out of output room (max_tokens) before finishing its
+ * answer (the retry allows ICHIREI_MAX_TOKENS_RETRY, default 20000) — as long as the run budget still has room for it. Only then does the
+ * sender see an error. `quiet` (the shadow call) sends no progress to the page.
+ */
+async function selectWithRetry(a: PipelineArgs, signal: AbortSignal | undefined, quiet: boolean, onUsage?: RunEngineOptions['onUsage']): Promise<Selected> {
+  const { client, opts, tStart, prompt, view } = a
+  const content = selectionContent(prompt, view)
   const callSelection = async (limitMs: number, maxTokens: number): Promise<Anthropic.Message> => {
-    const signal = callSignal(opts.signal, limitMs)
+    const callSig = callSignal(signal, limitMs)
     const stream = client.messages.stream(
       {
         model: MODEL,
         max_tokens: maxTokens,
         output_config: { effort: EFFORT },
-        messages: [{ role: 'user', content: prompt }],
+        messages: [{ role: 'user', content }],
       },
-      { signal },
+      { signal: callSig },
     )
     let firstDelta = true
     stream.on('text', (text) => {
+      if (quiet) return
       if (firstDelta) {
         firstDelta = false
         opts.onStage?.('choosing')
@@ -264,25 +364,25 @@ export async function runEngine(
     try {
       return await stream.finalMessage()
     } catch (err) {
-      if (timedOut(signal)) throw new ModelTimeoutError(Math.round(Math.min(limitMs, callTimeoutMs()) / 1000))
+      if (timedOut(callSig)) throw new ModelTimeoutError(Math.round(Math.min(limitMs, callTimeoutMs()) / 1000))
       throw err
     }
   }
   let maxTokens = MAX_TOKENS
   let attempts = 0
-  let message!: Anthropic.Message
-  let extracted!: EngineResult
   /** The time left for a retry, or null when there is none (or it was already used). Logs the decision. */
   const retryLimit = (why: 'selection_timeout' | 'max_tokens_hit', extra: Record<string, unknown>): number | null => {
     const spent = Date.now() - tStart
     const room = runBudgetMs() - spent - REVIEW_RESERVE_MS
     const retry = attempts < 2 && room >= MIN_RETRY_MS
-    console.log(`[ichirei-engine] ${why} ${JSON.stringify({ after_ms: spent, attempt: attempts, retry, retry_limit_ms: Math.max(0, Math.min(callTimeoutMs(), room)), ...extra })}`)
+    console.log(`[ichirei-engine] ${why} ${JSON.stringify({ after_ms: spent, attempt: attempts, retry, retry_limit_ms: Math.max(0, Math.min(callTimeoutMs(), room)), ...(view ? { lexicon: true } : {}), ...(quiet ? { shadow: true } : {}), ...extra })}`)
     return retry ? Math.min(callTimeoutMs(), room) : null
   }
-  let limitMs = callTimeoutMs()
+  // (a run that already spent time — the palette fallback after a lexicon miss — gets only what the budget still allows)
+  let limitMs = Math.max(MIN_RETRY_MS, Math.min(callTimeoutMs(), runBudgetMs() - (Date.now() - tStart) - REVIEW_RESERVE_MS))
   for (;;) {
     attempts++
+    let message: Anthropic.Message
     try {
       message = await callSelection(limitMs, maxTokens)
     } catch (err) {
@@ -293,10 +393,10 @@ export async function runEngine(
         throw err
       }
       limitMs = next
-      opts.onStage?.('reading')
+      if (!quiet) opts.onStage?.('reading')
       continue
     }
-    opts.onUsage?.('select', { model: MODEL, input_tokens: message.usage?.input_tokens ?? 0, output_tokens: message.usage?.output_tokens ?? 0 })
+    onUsage?.('select', { model: MODEL, input_tokens: message.usage?.input_tokens ?? 0, output_tokens: message.usage?.output_tokens ?? 0 })
     if (message.stop_reason === 'refusal') {
       throw new Error('Model refused the request')
     }
@@ -305,8 +405,7 @@ export async function runEngine(
       .map((b) => b.text)
       .join('')
     try {
-      extracted = extractJson(textOut)
-      break
+      return { message, extracted: extractJson(textOut), attempts, maxTokens }
     } catch (err) {
       if (message.stop_reason !== 'max_tokens') throw err
       // Reasoning + answer did not fit in max_tokens: try once more with more room instead of showing an error.
@@ -316,15 +415,16 @@ export async function runEngine(
       }
       maxTokens = MAX_TOKENS_RETRY
       limitMs = next
-      opts.onStage?.('reading')
+      if (!quiet) opts.onStage?.('reading')
     }
   }
-  const selectMs = Date.now() - tStart
+}
 
+/** The model's answer, normalised and stamped with the request's own context (so the echo can never disagree with what was sent). */
+function stampResult(extracted: EngineResult, context: EngineContext): EngineResult {
   // The slim output contract leaves out what only the code needs (the context echo, the internal notes, the empty
   // referee fields): fill them with their neutral values here. Plumbing — nothing about the candidates is touched.
   const normalized = normalizeModelOutput(extracted)
-  // The request's own context values are stamped on the result, so the echo can never disagree with what the caller actually sent.
   const stamped: EngineResult = {
     ...normalized,
     language: context.language,
@@ -338,34 +438,68 @@ export async function runEngine(
   // decides; this is plumbing): true or absent, never a stray value.
   if (context.occasion !== 'memorial' && (extracted as { suggest_memorial?: unknown }).suggest_memorial === true) stamped.suggest_memorial = true
   else delete stamped.suggest_memorial
+  return stamped
+}
+
+/** The emotional register the model wrote (top level or in the fingerprint), for the miss log. */
+function registerOf(extracted: EngineResult): string[] | null {
+  const top = (extracted as { emotional_register?: unknown }).emotional_register
+  const fp = (extracted.fingerprint as { emotional_register?: unknown } | undefined)?.emotional_register
+  const pick = Array.isArray(top) ? top : Array.isArray(fp) ? fp : null
+  return pick ? pick.filter((x): x is string => typeof x === 'string').slice(0, 3) : null
+}
+
+async function runPipeline(a: PipelineArgs): Promise<PipelineOut> {
+  const { story, context, palette, opts, tStart, prompt, view } = a
+  opts.onStage?.('reading')
+  const { message, extracted, attempts, maxTokens } = await selectWithRetry(a, opts.signal, false, opts.onUsage)
+  const selectMs = Date.now() - tStart
+  const stamped = stampResult(extracted, context)
+  const modelSaidMiss = view !== null && stamped.status === 'insufficient' && (extracted as { lexicon_miss?: unknown }).lexicon_miss === true
+  const inLexicon = view ? (c: Candidate) => inEligible(view.set, c) !== undefined : undefined
+  const timing = (t: { review_ms: number; replace_ms: number; status: string }) =>
+    logTiming({ attempts, max_tokens_used: maxTokens, select_ms: selectMs, ...t, total_ms: Date.now() - tStart, stop_reason: message.stop_reason, output_tokens: message.usage?.output_tokens ?? null, lexicon: view !== null })
+  /** Close a lexicon-mode result: the report, and the classical line from the lexicon (never from the palette). */
+  const finishLexicon = (r: EngineResult): EngineResult => {
+    if (!view) return r
+    const withLine: EngineResult = { ...r, candidates: r.candidates.map((c) => ({ ...c, classical_echo: c.slot !== 'freestyle' && !c.eliminated ? lexiconEchoOf(view.set, c) : null })) }
+    return { ...withLine, lexicon: { mode: 'on', outcome: r.status === 'sufficient' ? 'chosen' : 'question', eligible: view.set.chars.length } }
+  }
+
+  if (modelSaidMiss) {
+    const closed = finalizeResult(stamped)
+    timing({ review_ms: 0, replace_ms: 0, status: closed.status })
+    return { result: finishLexicon(closed), miss: { reason: 'model_no_fit', register: registerOf(extracted) } }
+  }
 
   // Palette referee (engine/palette.ts, data in engine/palette.csv): removes hard_block candidates and refuses an anchorless
   // context_required kanji as primary; promotes slot 2. When no main candidate survives, the result is held (deferInsufficient) so one
   // replacement can be tried before the sender is told there is nothing. A missing or malformed palette fails the request loudly
-  // (above), never silently skips the blocklist.
-  const refereed = applyPalette(stamped, palette, trimmed, { deferInsufficient: true })
+  // (above), never silently skips the blocklist. In lexicon mode the same pass also rejects any main or second character outside the list.
+  const refereed = applyPalette(stamped, palette, story, { deferInsufficient: true, inLexicon })
   if (refereed.status !== 'sufficient') {
     const closed = finalizeResult(refereed)
-    logTiming({ attempts, max_tokens_used: maxTokens, select_ms: selectMs, review_ms: 0, replace_ms: 0, total_ms: Date.now() - tStart, status: closed.status, stop_reason: message.stop_reason, output_tokens: message.usage?.output_tokens ?? null })
-    return closed
+    timing({ review_ms: 0, replace_ms: 0, status: closed.status })
+    return { result: finishLexicon(closed), miss: null }
   }
 
   // The separate review call (engine/review.ts): a fresh model call checks the survivors for SAFETY only. Its vetoes are applied by the
   // same referee code (a vetoed main → slot 2 is promoted; a failed or unreviewed freestyle → dropped). It never throws, and a review that
   // cannot be used (timeout, error) costs the customer nothing but the freestyle: the mains stand on the referee alone.
+  // Lexicon mode: the main and second characters are pre-vetted (they come from the classical lexicon, through the same palette), so only the freestyle is reviewed.
   opts.onStage?.('checking')
   const tReview = Date.now()
   // (No live main candidate left → nothing to review: a freestyle cannot be shown alone, so it is dropped and the replacement is tried at once.)
   const hasMain = refereed.candidates.some((c) => !c.eliminated && c.slot !== 'freestyle')
   const review = hasMain
-    ? await runReview(refereed, palette, trimmed, context, { apiKey: opts.apiKey, signal: opts.signal, model: REVIEW_MODEL, onUsage: opts.onUsage ? (u) => opts.onUsage!('review', u) : undefined })
+    ? await runReview(refereed, palette, story, context, { apiKey: opts.apiKey, signal: opts.signal, model: REVIEW_MODEL, slots: view ? ['freestyle'] : undefined, onUsage: opts.onUsage ? (u) => opts.onUsage!('review', u) : undefined })
     : { ran: false, skipped_reason: 'no main candidate left to review', verdicts: [] }
   const reviewMs = Date.now() - tReview
-  const reviewed = applyReviewVerdicts(refereed, palette, trimmed, review, { deferInsufficient: true })
+  const reviewed = applyReviewVerdicts(refereed, palette, story, review, { deferInsufficient: true })
 
   // A main slot that is EMPTY (never produced, or removed by the referee or the review) is replaced — never an extra card beside a filled one.
   const tReplace = Date.now()
-  const completed = await completeMains(reviewed, palette, trimmed, context, prompt, {
+  const completed = await completeMains(reviewed, palette, story, context, view ? `${view.parts.staticBlock}\n\n${prompt}\n\n${view.parts.dynamicBlock}` : prompt, {
     apiKey: opts.apiKey,
     signal: opts.signal,
     // the replacement is a selection (it must pass the person test): the selection model; only its review uses the review model
@@ -373,15 +507,92 @@ export async function runEngine(
     reviewModel: REVIEW_MODEL,
     onUsage: opts.onUsage,
     onStage: opts.onStage,
+    inLexicon,
   })
   // The last gate: at most one main, one second, one freestyle — and never zero cards without a question.
   const final = finalizeResult(completed)
-  logTiming({ attempts, max_tokens_used: maxTokens, select_ms: selectMs, review_ms: reviewMs, replace_ms: Date.now() - tReplace, total_ms: Date.now() - tStart, status: final.status, stop_reason: message.stop_reason, output_tokens: message.usage?.output_tokens ?? null })
-  return final
+  timing({ review_ms: reviewMs, replace_ms: Date.now() - tReplace, status: final.status })
+  // Lexicon mode: a sufficient answer that ended with no usable lexicon character (the model chose outside the list) is a miss like any other.
+  if (view && final.status === 'insufficient') return { result: finishLexicon(final), miss: { reason: 'no_valid_choice', register: registerOf(extracted) } }
+  return { result: finishLexicon(final), miss: null }
+}
+
+/** The palette engine answered after a lexicon miss: say so (`lexicon_miss`), and show no classical line. */
+function flagFallback(r: EngineResult, view: LexView): EngineResult {
+  return {
+    ...r,
+    candidates: r.candidates.map((c) => ({ ...c, classical_echo: null, flags: c.eliminated ? c.flags : [...new Set([...c.flags, 'lexicon_miss'])] })),
+    lexicon: { mode: 'on', outcome: 'fallback', eligible: view.set.chars.length },
+  }
+}
+
+/** One log line per miss so the lexicon can grow: relationship, occasion, direction and the story's emotional register — never story text. */
+function logMiss(context: EngineContext, reason: string, register: string[] | null, outcome: 'question' | 'fallback', followUpsUsed: number) {
+  console.log(`[ichirei-lexicon] miss ${JSON.stringify({ relationship: context.relationship, occasion: context.occasion, direction: context.direction, language: context.language, emotional_register: register, reason, outcome, follow_ups_used: followUpsUsed })}`)
+}
+
+/**
+ * Shadow mode: while the palette engine answers, ONE selection-only call (lexicon prompt, no streaming to the page, no review, no
+ * replacement) runs beside it. When the palette answer is ready, the lexicon's choice is logged next to it and the shadow call is given a
+ * short grace (ICHIREI_SHADOW_GRACE_MS) to finish. It can never change or delay the customer's result beyond that grace, and never throws.
+ */
+function startShadow(a: PipelineArgs) {
+  const view = a.view as LexView
+  const ac = new AbortController()
+  const onOuter = () => ac.abort()
+  a.opts.signal?.addEventListener('abort', onOuter)
+  const t0 = Date.now()
+  type Chosen = { main: string | null; second: string | null; freestyle: string | null; miss: boolean; note?: string }
+  const run = (async (): Promise<Chosen | { error: string }> => {
+    try {
+      const sel = await selectWithRetry(a, ac.signal, true, a.opts.onUsage)
+      const stamped = stampResult(sel.extracted, a.context)
+      if (stamped.status === 'insufficient') return { main: null, second: null, freestyle: null, miss: (sel.extracted as { lexicon_miss?: unknown }).lexicon_miss === true, note: 'insufficient' }
+      const inLexicon = (c: Candidate) => inEligible(view.set, c) !== undefined
+      const refereed = applyPalette(stamped, a.palette, a.story, { deferInsufficient: true, inLexicon, log: () => {} })
+      const live = refereed.candidates.filter((c) => !c.eliminated)
+      return {
+        main: live.find((c) => c.slot === 'main')?.kanji ?? null,
+        second: live.find((c) => c.slot === 'second')?.kanji ?? null,
+        freestyle: live.find((c) => c.slot === 'freestyle')?.kanji ?? null,
+        miss: false,
+        note: live.some((c) => c.slot !== 'freestyle') ? undefined : 'no_valid_choice',
+      }
+    } catch (err) {
+      return { error: (err instanceof Error ? err.message : String(err)).slice(0, 160) }
+    }
+  })()
+  const done = () => a.opts.signal?.removeEventListener('abort', onOuter)
+  return {
+    cancel() {
+      ac.abort()
+      done()
+    },
+    async finish(today: EngineResult) {
+      try {
+        let timer: NodeJS.Timeout | undefined
+        const outcome = await Promise.race([run, new Promise<'timeout'>((resolve) => (timer = setTimeout(() => resolve('timeout'), shadowGraceMs())))])
+        if (timer) clearTimeout(timer)
+        if (outcome === 'timeout') ac.abort()
+        const liveToday = (slot: string) => today.candidates.find((c) => !c.eliminated && c.slot === slot)?.kanji ?? null
+        const todayMain = today.status === 'sufficient' ? today.primary_kanji : null
+        const base = { relationship: a.context.relationship, occasion: a.context.occasion, direction: a.context.direction, language: a.context.language, eligible: view.set.chars.length, today_main: todayMain, today_second: liveToday('second') ?? today.runner_up_kanji, today_freestyle: today.freestyle_kanji, ms: Date.now() - t0 }
+        if (outcome === 'timeout') console.log(`[ichirei-lexicon] shadow ${JSON.stringify({ ...base, result: 'timeout' })}`)
+        else if ('error' in outcome) console.log(`[ichirei-lexicon] shadow ${JSON.stringify({ ...base, result: 'error', error: outcome.error })}`)
+        else {
+          console.log(
+            `[ichirei-lexicon] shadow ${JSON.stringify({ ...base, result: outcome.miss ? 'miss' : outcome.note ?? 'chosen', lexicon_main: outcome.main, lexicon_second: outcome.second, lexicon_freestyle: outcome.freestyle, same_main: outcome.main !== null && outcome.main === todayMain })}`,
+          )
+        }
+      } finally {
+        done()
+      }
+    },
+  }
 }
 
 /** One line per run: where the time went (no story text). Read it in the Cloud Run logs. */
-function logTiming(t: { attempts: number; max_tokens_used: number; select_ms: number; review_ms: number; replace_ms: number; total_ms: number; status: string; stop_reason: string | null; output_tokens: number | null }) {
+function logTiming(t: { attempts: number; max_tokens_used: number; select_ms: number; review_ms: number; replace_ms: number; total_ms: number; status: string; stop_reason: string | null; output_tokens: number | null; lexicon?: boolean }) {
   console.log(`[ichirei-timing] ${JSON.stringify({ ...t, model: MODEL, effort: EFFORT, max_tokens: MAX_TOKENS, review_model: REVIEW_MODEL })}`)
 }
 

@@ -50,6 +50,7 @@ import {
 
 export const HARD_BLOCK_REASON = 'palette: hard_block'
 export const BLOCKED_OCCASION_REASON = 'palette: blocked_occasion'
+export const NOT_IN_LEXICON_REASON = 'palette: not_in_lexicon'
 export const FREESTYLE_BLOCKED_REASON = 'palette: freestyle_blocked'
 export const FREESTYLE_NO_ANCHOR_REASON = 'freestyle: story_anchor is not a verbatim fragment of the story'
 export const FREESTYLE_DUPLICATE_REASON = 'freestyle: same character as a main slot'
@@ -258,7 +259,7 @@ export function parseMemorialBlock(text: string): Map<string, string> {
   return out
 }
 
-function resolveSiblingPath(file: string, override: string | undefined): string {
+export function resolveSiblingPath(file: string, override: string | undefined): string {
   if (override) return override
   const here = dirname(fileURLToPath(import.meta.url))
   const candidates = [join(here, file), join(process.cwd(), 'engine', file), join(process.cwd(), file)]
@@ -382,6 +383,11 @@ export interface RefereeOptions {
    * (engine/replace.ts). The engine always finishes such a result (a replacement, or toInsufficient).
    */
   deferInsufficient?: boolean
+  /**
+   * Lexicon mode (engine/lexicon.ts): a MAIN or SECOND candidate for which this returns false is removed with the reason
+   * "palette: not_in_lexicon" — the code rejects anything outside the list. The freestyle is never asked.
+   */
+  inLexicon?: (c: Candidate) => boolean
 }
 
 export const requireClassicalEchoFromEnv = (env: NodeJS.ProcessEnv = process.env): boolean => /^(1|true|on|yes)$/i.test((env.REQUIRE_CLASSICAL_ECHO ?? '').trim())
@@ -470,6 +476,13 @@ export function applyPalette(result: EngineResult, palette: Palette, story: stri
   //    (and, for en, the two-palette rules).
   const candidates: Candidate[] = result.candidates.map((orig) => {
     const c: Candidate = { ...orig, flags: [...(orig.flags ?? [])] }
+    if (opts.inLexicon && isMainSlot(c) && !c.eliminated && !opts.inLexicon(c)) {
+      c.flags = unique([...c.flags, 'not_in_lexicon'])
+      c.eliminated = true
+      c.eliminated_reason = NOT_IN_LEXICON_REASON
+      actions.push({ kanji: c.kanji, action: 'not_in_lexicon_eliminated', detail: NOT_IN_LEXICON_REASON })
+      return c
+    }
     const found = rowsFor(palette, families, c)
     const rows = found.filter((f): f is Found & { row: PaletteRow } => f.row !== undefined)
     // Remembrance: the default block (celebration / new-beginning characters) applies to every slot, row or no row.
@@ -695,6 +708,7 @@ export function applyReviewVerdicts(
     (c.eliminated_reason?.startsWith('review:') === true ||
       c.eliminated_reason === HARD_BLOCK_REASON ||
       c.eliminated_reason === BLOCKED_OCCASION_REASON ||
+      c.eliminated_reason === NOT_IN_LEXICON_REASON ||
       c.eliminated_reason === CLASSICAL_ECHO_REQUIRED_REASON)
   const originalPrimary = result.primary_kanji
   const { primary, promotedFrom } = settlePrimary(candidates, originalPrimary, anchorMissing, removedByReferee, actions)

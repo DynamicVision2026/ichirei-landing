@@ -1,0 +1,1529 @@
+{
+ "潤": {
+  "ja": [
+   "潤",
+   "潤",
+   "ジュン|うるお-う|うるお-す",
+   "moisten; enrich",
+   "潤い|潤沢|豊潤|潤色"
+  ],
+  "zh": [
+   "润",
+   "潤",
+   "rùn",
+   "moisten; enrich",
+   "滋润|润泽|湿润|润色"
+  ]
+ },
+ "撫": {
+  "ja": [
+   "撫",
+   "撫",
+   "ブ|な-でる",
+   "stroke gently; cherish",
+   "撫育|愛撫|撫でる|撫恤"
+  ],
+  "zh": [
+   "抚",
+   "撫",
+   "fǔ",
+   "stroke gently; cherish",
+   "抚养|抚慰|安抚|抚育"
+  ]
+ },
+ "養": {
+  "ja": [
+   "養",
+   "養",
+   "ヨウ|やしな-う",
+   "nourish; raise",
+   "養育|養う|涵養|教養"
+  ],
+  "zh": [
+   "养",
+   "養",
+   "yǎng",
+   "nourish; raise",
+   "养育|培养|涵养|教养"
+  ],
+  "ja_taboo": "fuyo_support_扶養_養生",
+  "zh_taboo": "none"
+ },
+ "護": {
+  "ja": [
+   "護",
+   "護",
+   "ゴ|まも-る",
+   "protect; shelter",
+   "守護|護る|加護|愛護"
+  ],
+  "zh": [
+   "护",
+   "護",
+   "hù",
+   "protect; shelter",
+   "守护|呵护|爱护|保护"
+  ],
+  "ja_status": "context_required",
+  "ja_taboo": "kaigo_nursing_care_介護",
+  "ja_anchor": "no",
+  "ja_reg": "protective",
+  "insc": "medium"
+ },
+ "扶": {
+  "ja": [
+   "扶",
+   "扶",
+   "フ|たす-ける",
+   "support; prop up",
+   "扶助|扶ける|扶育|扶持"
+  ],
+  "zh": [
+   "扶",
+   "扶",
+   "fú",
+   "support; prop up",
+   "扶持|扶助|扶植|扶养"
+  ],
+  "ja_taboo": "fuyo_扶養_bureaucratic"
+ },
+ "掬": {
+  "ja": [
+   "掬",
+   "掬",
+   "キク|すく-う|むす-ぶ",
+   "scoop up water",
+   "掬う|一掬|掬水|掬い取る"
+  ],
+  "zh": [
+   "掬",
+   "掬",
+   "jū",
+   "scoop up water",
+   "笑容可掬|掬水|一掬|掬取"
+  ],
+  "insc": "medium"
+ },
+ "容": {
+  "ja": [
+   "容",
+   "容",
+   "ヨウ|い-れる",
+   "embrace; make room for",
+   "容認|寛容|包容|受容"
+  ],
+  "zh": [
+   "容",
+   "容",
+   "róng",
+   "embrace; make room for",
+   "包容|宽容|从容|容纳"
+  ]
+ },
+ "恵": {
+  "ja": [
+   "恵",
+   "惠",
+   "ケイ|エ|めぐ-む",
+   "bless; bestow kindness",
+   "恵み|恩恵|知恵|慈恵"
+  ],
+  "zh": [
+   "惠",
+   "惠",
+   "huì",
+   "bless; bestow kindness",
+   "恩惠|惠泽|贤惠|惠及"
+  ]
+ },
+ "備": {
+  "ja": [
+   "備",
+   "備",
+   "ビ|そな-える|そな-わる",
+   "be prepared; be complete",
+   "備える|備わる|完備|準備"
+  ],
+  "zh": [
+   "备",
+   "備",
+   "bèi",
+   "be prepared; be complete",
+   "完备|具备|备至|兼备"
+  ]
+ },
+ "繕": {
+  "ja": [
+   "繕",
+   "繕",
+   "ゼン|つくろ-う",
+   "mend; tend",
+   "繕う|修繕|営繕"
+  ],
+  "zh": [
+   "缮",
+   "繕",
+   "shàn",
+   "mend; tend",
+   "修缮|缮写|营缮|补缮"
+  ],
+  "ja_status": "context_required",
+  "ja_taboo": "keeping_up_appearances_体裁を繕う",
+  "ja_anchor": "yes",
+  "insc": "medium"
+ },
+ "綴": {
+  "ja": [
+   "綴",
+   "綴",
+   "テイ|テツ|つづ-る",
+   "stitch together; compose",
+   "綴る|綴じる|点綴|綴り方"
+  ],
+  "zh": [
+   "缀",
+   "綴",
+   "zhuì",
+   "stitch together; compose",
+   "点缀|缀合|连缀|补缀"
+  ],
+  "insc": "medium"
+ },
+ "貞": {
+  "ja": [
+   "貞",
+   "貞",
+   "テイ|ジョウ|ただ-しい",
+   "upright; faithful to principle",
+   "貞節|貞潔|貞淑|貞観"
+  ],
+  "zh": [
+   "贞",
+   "貞",
+   "zhēn",
+   "upright; faithful to principle",
+   "贞节|忠贞|坚贞|贞洁"
+  ],
+  "ja_status": "context_required",
+  "ja_taboo": "chastity_貞操_貞淑",
+  "ja_anchor": "yes",
+  "ja_reg": "archaic",
+  "zh_status": "context_required",
+  "zh_taboo": "zhencao_chastity_贞操_贞洁",
+  "zh_anchor": "yes",
+  "zh_reg": "archaic"
+ },
+ "存": {
+  "ja": [
+   "存",
+   "存",
+   "ソン|ゾン|あ-る",
+   "remain; keep in the heart",
+   "存在|存じる|共存|保存"
+  ],
+  "zh": [
+   "存",
+   "存",
+   "cún",
+   "remain; keep in the heart",
+   "存在|长存|共存|心存"
+  ]
+ },
+ "偲": {
+  "ja": [
+   "偲",
+   "偲",
+   "サイ|しの-ぶ",
+   "remember fondly",
+   "偲ぶ|偲ばれる|偲ぶ会|偲び"
+  ],
+  "zh": [
+   "偲",
+   "偲",
+   "sī|cāi",
+   "remember fondly; talented and sincere",
+   "切切偲偲|偲偲"
+  ],
+  "insc": "medium"
+ },
+ "察": {
+  "ja": [
+   "察",
+   "察",
+   "サツ",
+   "sense; discern",
+   "察する|洞察|観察|賢察"
+  ],
+  "zh": [
+   "察",
+   "察",
+   "chá",
+   "sense; discern",
+   "明察|体察|洞察|观察"
+  ]
+ },
+ "恕": {
+  "ja": [
+   "恕",
+   "恕",
+   "ジョ|ショ|ゆる-す",
+   "forgive; empathize",
+   "寛恕|宥恕|恕す|忠恕"
+  ],
+  "zh": [
+   "恕",
+   "恕",
+   "shù",
+   "forgive; empathize",
+   "宽恕|忠恕|恕道|恕罪"
+  ]
+ },
+ "篤": {
+  "ja": [
+   "篤",
+   "篤",
+   "トク|あつ-い",
+   "sincere; deeply devoted",
+   "篤実|篤志|懇篤|篤い"
+  ],
+  "zh": [
+   "笃",
+   "篤",
+   "dǔ",
+   "sincere; deeply devoted",
+   "笃实|笃志|笃行|笃厚"
+  ],
+  "ja_status": "context_required",
+  "ja_taboo": "kitoku_critically_ill_危篤",
+  "ja_anchor": "yes",
+  "zh_status": "context_required",
+  "zh_taboo": "weidu_critically_ill_危笃_病笃",
+  "zh_anchor": "yes",
+  "insc": "medium"
+ },
+ "澄": {
+  "ja": [
+   "澄",
+   "澄",
+   "チョウ|す-む|す-ます",
+   "clear; serene",
+   "澄む|澄み切る|清澄|明澄"
+  ],
+  "zh": [
+   "澄",
+   "澄",
+   "chéng|dèng",
+   "clear; serene",
+   "澄清|澄澈|澄明|清澄"
+  ]
+ },
+ "知": {
+  "ja": [
+   "知",
+   "知",
+   "チ|し-る",
+   "know; understand the heart",
+   "知己|知恵|知性|知音"
+  ],
+  "zh": [
+   "知",
+   "知",
+   "zhī",
+   "know; understand the heart",
+   "知己|知音|知心|知恩"
+  ]
+ },
+ "剛": {
+  "ja": [
+   "剛",
+   "剛",
+   "ゴウ|つよ-い",
+   "firm; strong in spirit",
+   "剛健|剛毅|剛直|外柔内剛"
+  ],
+  "zh": [
+   "刚",
+   "剛",
+   "gāng",
+   "firm; strong in spirit",
+   "刚健|刚毅|刚直|刚强"
+  ]
+ },
+ "勁": {
+  "ja": [
+   "勁",
+   "勁",
+   "ケイ|つよ-い",
+   "sinewy; resilient",
+   "勁い|強勁|蒼勁|勁草"
+  ],
+  "zh": [
+   "劲",
+   "勁",
+   "jìn|jìng",
+   "sinewy; resilient",
+   "强劲|苍劲|刚劲|劲草"
+  ],
+  "insc": "medium"
+ },
+ "毅": {
+  "ja": [
+   "毅",
+   "毅",
+   "キ|ギ|つよ-い",
+   "resolute",
+   "毅然|剛毅|弘毅|強毅"
+  ],
+  "zh": [
+   "毅",
+   "毅",
+   "yì",
+   "resolute",
+   "坚毅|刚毅|毅然|弘毅"
+  ]
+ },
+ "樸": {
+  "ja": [
+   "朴",
+   "樸",
+   "ボク",
+   "plain; unadorned",
+   "素朴|朴訥|純朴|質朴"
+  ],
+  "zh": [
+   "朴",
+   "樸",
+   "pǔ",
+   "plain; unadorned",
+   "淳朴|朴素|质朴|朴实"
+  ],
+  "insc": "medium"
+ },
+ "泰": {
+  "ja": [
+   "泰",
+   "泰",
+   "タイ|やす-い",
+   "serene; at ease",
+   "泰然|安泰|泰平|泰山"
+  ],
+  "zh": [
+   "泰",
+   "泰",
+   "tài",
+   "serene; at ease",
+   "泰然|安泰|泰山|国泰民安"
+  ]
+ },
+ "敏": {
+  "ja": [
+   "敏",
+   "敏",
+   "ビン|さと-い",
+   "quick; nimble",
+   "敏捷|機敏|敏腕|敏速"
+  ],
+  "zh": [
+   "敏",
+   "敏",
+   "mǐn",
+   "quick; nimble",
+   "敏捷|机敏|敏锐|敏慧"
+  ],
+  "ja_status": "context_required",
+  "ja_taboo": "binkan_oversensitive_敏感_過敏",
+  "ja_anchor": "yes",
+  "zh_status": "context_required",
+  "zh_taboo": "guomin_allergy_过敏",
+  "zh_anchor": "yes"
+ },
+ "照": {
+  "ja": [
+   "照",
+   "照",
+   "ショウ|て-らす|て-る",
+   "shine on; illuminate",
+   "照らす|照明|日照|照り映える"
+  ],
+  "zh": [
+   "照",
+   "照",
+   "zhào",
+   "shine on; illuminate",
+   "照亮|光照|关照|照耀"
+  ]
+ },
+ "晴": {
+  "ja": [
+   "晴",
+   "晴",
+   "セイ|は-れる",
+   "clear sky; brighten",
+   "晴れ|晴朗|晴天|快晴"
+  ],
+  "zh": [
+   "晴",
+   "晴",
+   "qíng",
+   "clear sky; brighten",
+   "晴朗|晴天|放晴|晴和"
+  ]
+ },
+ "馨": {
+  "ja": [
+   "馨",
+   "馨",
+   "ケイ|キョウ|かお-り",
+   "fragrance of virtue",
+   "馨香|芳馨|馨しい"
+  ],
+  "zh": [
+   "馨",
+   "馨",
+   "xīn",
+   "fragrance of virtue",
+   "温馨|德馨|馨香|芳馨"
+  ],
+  "insc": "medium"
+ },
+ "嬉": {
+  "ja": [
+   "嬉",
+   "嬉",
+   "キ|うれ-しい",
+   "glad; joyful",
+   "嬉しい|嬉々|嬉し涙"
+  ],
+  "zh": [
+   "嬉",
+   "嬉",
+   "xī",
+   "glad; joyful",
+   "嬉戏|嬉笑|嬉闹"
+  ],
+  "zh_reg": "playful_in_zh",
+  "insc": "medium"
+ },
+ "磨": {
+  "ja": [
+   "磨",
+   "磨",
+   "マ|みが-く",
+   "polish; refine",
+   "磨く|研磨|琢磨|切磋琢磨"
+  ],
+  "zh": [
+   "磨",
+   "磨",
+   "mó|mò",
+   "polish; refine",
+   "琢磨|切磋琢磨|磨炼|研磨"
+  ]
+ },
+ "耕": {
+  "ja": [
+   "耕",
+   "耕",
+   "コウ|たがや-す",
+   "till; cultivate",
+   "耕す|耕作|晴耕雨読|農耕"
+  ],
+  "zh": [
+   "耕",
+   "耕",
+   "gēng",
+   "till; cultivate",
+   "耕耘|耕作|深耕|躬耕"
+  ]
+ },
+ "啓": {
+  "ja": [
+   "啓",
+   "啟",
+   "ケイ|ひら-く",
+   "open the mind; enlighten",
+   "啓発|啓蒙|啓く|拝啓"
+  ],
+  "zh": [
+   "启",
+   "啟",
+   "qǐ",
+   "open the mind; enlighten",
+   "启发|启迪|启蒙|开启"
+  ]
+ },
+ "培": {
+  "ja": [
+   "培",
+   "培",
+   "バイ|つちか-う",
+   "nurture from the roots",
+   "培う|培養|栽培|培土"
+  ],
+  "zh": [
+   "培",
+   "培",
+   "péi",
+   "nurture from the roots",
+   "培养|培育|栽培|培植"
+  ]
+ },
+ "綠": {
+  "ja": [
+   "緑",
+   "綠",
+   "リョク|ロク|みどり",
+   "green; fresh life",
+   "緑|新緑|緑風|緑陰"
+  ],
+  "zh": [
+   "绿",
+   "綠",
+   "lǜ",
+   "green; fresh life",
+   "绿意|新绿|绿荫|青绿"
+  ],
+  "zh_status": "context_required",
+  "zh_taboo": "daimao_cuckold_戴绿帽",
+  "zh_anchor": "yes",
+  "zh_fit_no_partner": true
+ },
+ "博": {
+  "ja": [
+   "博",
+   "博",
+   "ハク|バク",
+   "broad; wide in learning",
+   "博学|博愛|博識|広博"
+  ],
+  "zh": [
+   "博",
+   "博",
+   "bó",
+   "broad; wide in learning",
+   "博学|博爱|渊博|博大"
+  ]
+ },
+ "審": {
+  "ja": [
+   "審",
+   "審",
+   "シン|つまび-らか",
+   "discern carefully",
+   "審美|審議|審らか"
+  ],
+  "zh": [
+   "审",
+   "審",
+   "shěn",
+   "discern carefully",
+   "审美|审慎|审视|审思"
+  ],
+  "ja_status": "context_required",
+  "ja_taboo": "shinsa_judging_審査_不審",
+  "ja_anchor": "yes",
+  "zh_status": "context_required",
+  "zh_taboo": "shenpan_trial_审判_审查",
+  "zh_anchor": "yes"
+ },
+ "慎": {
+  "ja": [
+   "慎",
+   "愼",
+   "シン|つつし-む",
+   "mindful; careful",
+   "慎む|慎重|謹慎|慎ましい"
+  ],
+  "zh": [
+   "慎",
+   "愼",
+   "shèn",
+   "mindful; careful",
+   "慎重|谨慎|慎独|审慎"
+  ]
+ },
+ "咲": {
+  "ja": [
+   "咲",
+   "咲",
+   "ショウ|さ-く",
+   "bloom",
+   "咲く|咲き誇る|咲き乱れる|返り咲く"
+  ],
+  "zh": [
+   "咲",
+   "咲",
+   "xiào",
+   "smile (variant of 笑)",
+   "none"
+  ],
+  "zh_status": "context_required",
+  "zh_taboo": "rare_variant_of_笑",
+  "zh_anchor": "no",
+  "insc": "medium"
+ },
+ "仰": {
+  "ja": [
+   "仰",
+   "仰",
+   "ギョウ|コウ|あお-ぐ",
+   "look up to; revere",
+   "仰ぐ|信仰|敬仰|仰望"
+  ],
+  "zh": [
+   "仰",
+   "仰",
+   "yǎng",
+   "look up to; revere",
+   "景仰|敬仰|仰慕|仰望"
+  ]
+ },
+ "栄": {
+  "ja": [
+   "栄",
+   "榮",
+   "エイ|さか-える|は-え",
+   "flourish",
+   "栄える|栄光|繁栄|栄誉"
+  ],
+  "zh": [
+   "荣",
+   "榮",
+   "róng",
+   "flourish",
+   "光荣|繁荣|荣耀|欣欣向荣"
+  ]
+ },
+ "労": {
+  "ja": [
+   "労",
+   "勞",
+   "ロウ|ねぎら-う|いた-わる",
+   "thank for effort; care for",
+   "労う|労わる|慰労|功労"
+  ],
+  "zh": [
+   "劳",
+   "勞",
+   "láo",
+   "thank for effort; care for",
+   "慰劳|功劳|劳苦功高|犒劳"
+  ],
+  "ja_status": "context_required",
+  "ja_taboo": "rodo_labor_労働_疲労",
+  "ja_anchor": "yes",
+  "zh_status": "context_required",
+  "zh_taboo": "laolei_toil_劳累_劳动",
+  "zh_anchor": "yes"
+ },
+ "証": {
+  "ja": [
+   "証",
+   "證",
+   "ショウ|あかし",
+   "proof; testimony of the heart",
+   "証し|証明|保証|確証"
+  ],
+  "zh": [
+   "证",
+   "證",
+   "zhèng",
+   "proof; testimony of the heart",
+   "见证|印证|保证|证明"
+  ],
+  "ja_status": "context_required",
+  "ja_taboo": "shoko_evidence_証拠_証明書",
+  "ja_anchor": "yes",
+  "zh_status": "context_required",
+  "zh_taboo": "zhengju_evidence_证据",
+  "zh_anchor": "yes"
+ },
+ "庇": {
+  "ja": [
+   "庇",
+   "庇",
+   "ヒ|かば-う|ひさし",
+   "shelter; protect",
+   "庇う|庇護|庇い立て"
+  ],
+  "zh": [
+   "庇",
+   "庇",
+   "bì",
+   "shelter; protect",
+   "庇护|庇佑|荫庇|庇荫"
+  ],
+  "ja_taboo": "higo_paternalistic_庇護",
+  "zh_taboo": "none"
+ },
+ "許": {
+  "ja": [
+   "許",
+   "許",
+   "キョ|ゆる-す",
+   "allow; accept wholeheartedly",
+   "許す|許容|心を許す|免許"
+  ],
+  "zh": [
+   "许",
+   "許",
+   "xǔ",
+   "allow; accept wholeheartedly",
+   "期许|嘉许|允许|许诺"
+  ],
+  "ja_taboo": "yurusu_fault_許す"
+ },
+ "憶": {
+  "ja": [
+   "憶",
+   "憶",
+   "オク",
+   "remember fondly",
+   "記憶|追憶|憶う|憶念"
+  ],
+  "zh": [
+   "忆",
+   "憶",
+   "yì",
+   "remember fondly",
+   "回忆|追忆|记忆|忆念"
+  ]
+ },
+ "匂": {
+  "ja": [
+   "匂",
+   "匂",
+   "にお-う",
+   "glow; be fragrant",
+   "匂う|匂い|匂やか|匂い立つ"
+  ],
+  "zh": [
+   "匂",
+   "匂",
+   "xún",
+   "Japanese kokuji: glow; be fragrant (not a Chinese character)",
+   "none"
+  ],
+  "ja_status": "context_required",
+  "ja_taboo": "nioi_smell_匂い_匂わせ",
+  "ja_anchor": "yes",
+  "zh_status": "hard_block",
+  "zh_taboo": "kokuji_not_a_chinese_character",
+  "zh_anchor": "no"
+ },
+ "薫": {
+  "ja": [
+   "薫",
+   "薰",
+   "クン|かお-る",
+   "breathe forth fragrance; nurture",
+   "薫る|薫陶|薫風|余薫"
+  ],
+  "zh": [
+   "薰",
+   "薰",
+   "xūn",
+   "breathe forth fragrance; nurture",
+   "薰陶|薰香|薰风|薰衣草"
+  ]
+ },
+ "貴": {
+  "ja": [
+   "貴",
+   "貴",
+   "キ|とうと-い|たっと-い",
+   "precious; revered",
+   "貴い|尊貴|貴重|高貴"
+  ],
+  "zh": [
+   "贵",
+   "貴",
+   "guì",
+   "precious; revered",
+   "珍贵|高贵|尊贵|宝贵"
+  ]
+ },
+ "勝": {
+  "ja": [
+   "勝",
+   "勝",
+   "ショウ|か-つ|まさ-る",
+   "surpass in worth",
+   "勝る|優勝|勝利|殊勝"
+  ],
+  "zh": [
+   "胜",
+   "勝",
+   "shèng",
+   "surpass in worth",
+   "胜利|优胜|名胜|胜任"
+  ],
+  "ja_status": "context_required",
+  "ja_taboo": "shobu_win_lose_勝負",
+  "ja_anchor": "yes",
+  "zh_status": "context_required",
+  "zh_taboo": "shengfu_win_lose_胜负",
+  "zh_anchor": "yes"
+ },
+ "慰": {
+  "ja": [
+   "慰",
+   "慰",
+   "イ|なぐさ-める",
+   "comfort; solace",
+   "慰める|慰労|安慰|慰安"
+  ],
+  "zh": [
+   "慰",
+   "慰",
+   "wèi",
+   "comfort; solace",
+   "安慰|欣慰|慰藉|慰问"
+  ],
+  "ja_status": "context_required",
+  "ja_taboo": "irei_memorial_慰霊_慰謝料",
+  "ja_blocked": "wedding|new_baby",
+  "ja_anchor": "no",
+  "zh_status": "context_required",
+  "zh_taboo": "weianfu_comfort_women_慰安",
+  "zh_blocked": "wedding|new_baby",
+  "zh_anchor": "no"
+ },
+ "睦": {
+  "ja": [
+   "睦",
+   "睦",
+   "ボク|むつ-まじい",
+   "affectionate harmony",
+   "睦まじい|親睦|和睦|睦み合う"
+  ],
+  "zh": [
+   "睦",
+   "睦",
+   "mù",
+   "affectionate harmony",
+   "和睦|亲睦|睦邻|敦睦"
+  ]
+ },
+ "朗": {
+  "ja": [
+   "朗",
+   "朗",
+   "ロウ|ほが-らか",
+   "bright; cheerful",
+   "朗らか|明朗|晴朗|朗報"
+  ],
+  "zh": [
+   "朗",
+   "朗",
+   "lǎng",
+   "bright; cheerful",
+   "明朗|开朗|晴朗|朗朗"
+  ]
+ },
+ "重": {
+  "ja": [
+   "重",
+   "重",
+   "ジュウ|チョウ|おも-い|かさ-ねる",
+   "accumulate; value",
+   "重ねる|重んじる|尊重|慎重"
+  ],
+  "zh": [
+   "重",
+   "重",
+   "zhòng|chóng",
+   "accumulate; value",
+   "尊重|慎重|珍重|重逢"
+  ],
+  "ja_status": "context_required",
+  "ja_taboo": "omoi_heavy_burden_重い",
+  "ja_blocked": "birthday_milestone|parent_day|seasonal_thanks",
+  "ja_anchor": "yes",
+  "zh_status": "context_required",
+  "zh_taboo": "chenzhong_heavy_burden_沉重",
+  "zh_blocked": "birthday_milestone|parent_day|seasonal_thanks",
+  "zh_anchor": "yes"
+ },
+ "浄": {
+  "ja": [
+   "浄",
+   "淨",
+   "ジョウ|きよ-い",
+   "pure; clear",
+   "浄らか|清浄|浄土|洗浄"
+  ],
+  "zh": [
+   "净",
+   "淨",
+   "jìng",
+   "pure; clear",
+   "洁净|清净|净土|纯净"
+  ]
+ },
+ "整": {
+  "ja": [
+   "整",
+   "整",
+   "セイ|ととの-える|ととの-う",
+   "bring into harmonious order",
+   "整える|整う|調整|整然"
+  ],
+  "zh": [
+   "整",
+   "整",
+   "zhěng",
+   "bring into harmonious order",
+   "整齐|整洁|端整|整然"
+  ]
+ },
+ "輝": {
+  "ja": [
+   "輝",
+   "輝",
+   "キ|かがや-く",
+   "shine radiantly",
+   "輝く|輝き|光輝|輝かしい"
+  ],
+  "zh": [
+   "辉",
+   "輝",
+   "huī",
+   "shine radiantly",
+   "光辉|辉煌|辉映|生辉"
+  ]
+ },
+ "謹": {
+  "ja": [
+   "謹",
+   "謹",
+   "キン|つつし-む",
+   "be conscientious; reverent",
+   "謹む|謹厳|謹賀新年|恭謹"
+  ],
+  "zh": [
+   "谨",
+   "謹",
+   "jǐn",
+   "be conscientious; reverent",
+   "谨慎|恭谨|谨严|谨守"
+  ],
+  "ja_status": "context_required",
+  "ja_taboo": "kinshin_confinement_謹慎",
+  "ja_anchor": "no",
+  "insc": "medium"
+ },
+ "賢": {
+  "ja": [
+   "賢",
+   "賢",
+   "ケン|かしこ-い",
+   "wise",
+   "賢い|賢明|賢人|聖賢"
+  ],
+  "zh": [
+   "贤",
+   "賢",
+   "xián",
+   "wise",
+   "贤明|贤惠|贤达|圣贤"
+  ],
+  "insc": "medium"
+ },
+ "契": {
+  "ja": [
+   "契",
+   "契",
+   "ケイ|ちぎ-る",
+   "pledge; sacred bond",
+   "契り|契る|契機|契合"
+  ],
+  "zh": [
+   "契",
+   "契",
+   "qì",
+   "pledge; sacred bond",
+   "契合|默契|契友|投契"
+  ],
+  "ja_taboo": "keiyaku_contract_契約"
+ },
+ "惜": {
+  "ja": [
+   "惜",
+   "惜",
+   "セキ|お-しむ",
+   "treasure; hold dear",
+   "惜しむ|愛惜|惜別|惜春"
+  ],
+  "zh": [
+   "惜",
+   "惜",
+   "xī",
+   "treasure; hold dear",
+   "珍惜|爱惜|惜别|惜福"
+  ],
+  "ja_status": "context_required",
+  "ja_taboo": "oshii_regret_惜しい_惜別",
+  "ja_blocked": "wedding|new_baby",
+  "ja_anchor": "no",
+  "zh_status": "context_required",
+  "zh_taboo": "kexi_pity_可惜",
+  "zh_blocked": "wedding|new_baby",
+  "zh_anchor": "no"
+ },
+ "勧": {
+  "ja": [
+   "勧",
+   "勸",
+   "カン|すす-める",
+   "encourage; invite warmly",
+   "勧める|勧学|勧進|勧誘"
+  ],
+  "zh": [
+   "劝",
+   "勸",
+   "quàn",
+   "encourage; invite warmly",
+   "劝学|劝勉|劝慰|劝导"
+  ]
+ },
+ "瑩": {
+  "ja": [
+   "瑩",
+   "瑩",
+   "エイ|みが-く",
+   "polish gems",
+   "晶瑩|瑩然|瑩澄"
+  ],
+  "zh": [
+   "莹",
+   "瑩",
+   "yíng",
+   "polish gems",
+   "晶莹|莹洁|莹然|莹润"
+  ],
+  "insc": "medium"
+ },
+ "伝": {
+  "ja": [
+   "伝",
+   "傳",
+   "デン|つた-える",
+   "pass down; hand on",
+   "伝える|伝承|伝統|伝言"
+  ],
+  "zh": [
+   "传",
+   "傳",
+   "chuán",
+   "pass down; hand on",
+   "传承|传统|传达|传递"
+  ]
+ },
+ "盛": {
+  "ja": [
+   "盛",
+   "盛",
+   "セイ|ジョウ|さか-ん|も-る",
+   "flourish in full prime",
+   "盛り|盛大|繁盛|隆盛"
+  ],
+  "zh": [
+   "盛",
+   "盛",
+   "shèng|chéng",
+   "flourish in full prime",
+   "盛大|繁盛|昌盛|隆盛"
+  ],
+  "ja_taboo": "moru_exaggerate_盛る"
+ },
+ "験": {
+  "ja": [
+   "験",
+   "驗",
+   "ケン|ゲン|しるし",
+   "living proof; effect",
+   "効験|経験|験担ぎ"
+  ],
+  "zh": [
+   "验",
+   "驗",
+   "yàn",
+   "living proof; effect",
+   "经验|验证|体验|灵验"
+  ],
+  "ja_status": "context_required",
+  "ja_taboo": "shiken_exam_試験_実験",
+  "ja_anchor": "yes",
+  "zh_status": "context_required",
+  "zh_taboo": "kaoyan_exam_考验_试验",
+  "zh_anchor": "yes",
+  "insc": "medium"
+ },
+ "燿": {
+  "ja": [
+   "燿",
+   "燿",
+   "ヨウ|かがや-く",
+   "gleam like a gem",
+   "光燿|栄燿"
+  ],
+  "zh": [
+   "燿",
+   "燿",
+   "yào",
+   "gleam like a gem",
+   "光燿|燿目|照燿|荣燿"
+  ],
+  "insc": "medium"
+ },
+ "怡": {
+  "ja": [
+   "怡",
+   "怡",
+   "イ|よろこ-ぶ|やわ-らぐ",
+   "rejoice serenely",
+   "怡然|怡々|心怡"
+  ],
+  "zh": [
+   "怡",
+   "怡",
+   "yí",
+   "rejoice serenely",
+   "怡然|怡人|心旷神怡|怡悦"
+  ],
+  "insc": "medium"
+ },
+ "閑": {
+  "ja": [
+   "閑",
+   "閑",
+   "カン|しず-か|ひま",
+   "serenely unhurried",
+   "閑か|閑雅|閑静|安閑"
+  ],
+  "zh": [
+   "闲",
+   "閑",
+   "xián",
+   "serenely unhurried",
+   "闲雅|闲适|清闲|悠闲"
+  ],
+  "ja_status": "context_required",
+  "ja_taboo": "hima_idle_閑職_閑散",
+  "ja_blocked": "retirement_farewell",
+  "ja_anchor": "no",
+  "zh_status": "context_required",
+  "zh_taboo": "xianzhi_idle_闲置_闲人",
+  "zh_blocked": "retirement_farewell",
+  "zh_anchor": "no"
+ },
+ "修": {
+  "ja": [
+   "修",
+   "修",
+   "シュウ|シュ|おさ-める",
+   "cultivate oneself",
+   "修める|修養|修身|研修"
+  ],
+  "zh": [
+   "修",
+   "修",
+   "xiū",
+   "cultivate oneself",
+   "修养|修身|修行|修为"
+  ]
+ },
+ "良": {
+  "ja": [
+   "良",
+   "良",
+   "リョウ|よ-い",
+   "good-hearted",
+   "良い|善良|良心|良好"
+  ],
+  "zh": [
+   "良",
+   "良",
+   "liáng",
+   "good-hearted",
+   "善良|良心|良好|贤良"
+  ]
+ },
+ "恭": {
+  "ja": [
+   "恭",
+   "恭",
+   "キョウ|うやうや-しい",
+   "courteous; reverent",
+   "恭しい|恭敬|恭謙|恭賀"
+  ],
+  "zh": [
+   "恭",
+   "恭",
+   "gōng",
+   "courteous; reverent",
+   "恭敬|恭谦|恭贺|谦恭"
+  ]
+ },
+ "譲": {
+  "ja": [
+   "譲",
+   "讓",
+   "ジョウ|ゆず-る",
+   "yield graciously",
+   "譲る|謙譲|礼譲|譲り合い"
+  ],
+  "zh": [
+   "让",
+   "讓",
+   "ràng",
+   "yield graciously",
+   "谦让|礼让|辞让|让贤"
+  ],
+  "ja_taboo": "joho_concession_譲歩"
+ },
+ "輔": {
+  "ja": [
+   "輔",
+   "輔",
+   "ホ|フ|たす-ける",
+   "support; assist",
+   "輔佐|輔弼|相輔|輔車"
+  ],
+  "zh": [
+   "辅",
+   "輔",
+   "fǔ",
+   "support; assist",
+   "辅佐|辅助|相辅相成|辅导"
+  ]
+ },
+ "成": {
+  "ja": [
+   "成",
+   "成",
+   "セイ|ジョウ|な-る|な-す",
+   "bring to fruition",
+   "成す|成る|成長|大成"
+  ],
+  "zh": [
+   "成",
+   "成",
+   "chéng",
+   "bring to fruition",
+   "成长|大成|成就|成全"
+  ]
+ },
+ "順": {
+  "ja": [
+   "順",
+   "順",
+   "ジュン|したが-う",
+   "follow naturally; go smoothly",
+   "順調|順風|順序|順う"
+  ],
+  "zh": [
+   "顺",
+   "順",
+   "shùn",
+   "follow naturally; go smoothly",
+   "顺利|顺风|顺遂|和顺"
+  ],
+  "ja_status": "context_required",
+  "ja_taboo": "juju_submissive_従順",
+  "ja_anchor": "no"
+ },
+ "昭": {
+  "ja": [
+   "昭",
+   "昭",
+   "ショウ|あき-らか",
+   "shine forth brightly",
+   "昭和|昭然|昭らか|昭明"
+  ],
+  "zh": [
+   "昭",
+   "昭",
+   "zhāo",
+   "shine forth brightly",
+   "昭明|昭然|昭著|昭彰"
+  ]
+ },
+ "長": {
+  "ja": [
+   "長",
+   "長",
+   "チョウ|なが-い",
+   "grow; nurture strengths",
+   "成長|長寿|長所|長ずる"
+  ],
+  "zh": [
+   "长",
+   "長",
+   "cháng|zhǎng",
+   "grow; nurture strengths",
+   "成长|长寿|长久|增长"
+  ]
+ },
+ "報": {
+  "ja": [
+   "報",
+   "報",
+   "ホウ|むく-いる",
+   "repay kindness",
+   "報いる|報恩|報謝|恩報"
+  ],
+  "zh": [
+   "报",
+   "報",
+   "bào",
+   "repay kindness",
+   "报恩|报答|回报|报喜"
+  ],
+  "ja_taboo": "houfuku_retaliation_報復",
+  "zh_taboo": "baofu_retaliation_报复"
+ },
+ "好": {
+  "ja": [
+   "好",
+   "好",
+   "コウ|す-き|この-む",
+   "cherished affection",
+   "好意|友好|好む|良好"
+  ],
+  "zh": [
+   "好",
+   "好",
+   "hǎo|hào",
+   "cherished affection",
+   "友好|良好|好意|美好"
+  ],
+  "ja_reg": "romance_lean",
+  "zh_reg": "romance_lean"
+ },
+ "藏": {
+  "ja": [
+   "蔵",
+   "藏",
+   "ゾウ|くら",
+   "treasure in the heart",
+   "蔵する|所蔵|秘蔵|珍蔵"
+  ],
+  "zh": [
+   "藏",
+   "藏",
+   "cáng|zàng",
+   "treasure in the heart",
+   "珍藏|收藏|蕴藏|深藏"
+  ],
+  "ja_status": "context_required",
+  "ja_taboo": "kura_storehouse_蔵",
+  "ja_anchor": "yes",
+  "ja_reg": "romance_lean",
+  "ja_fit_partner_only": true,
+  "zh_status": "context_required",
+  "zh_taboo": "zang_tibetan_hide_藏族_藏匿",
+  "zh_anchor": "yes",
+  "zh_reg": "romance_lean",
+  "zh_fit_partner_only": true
+ },
+ "宜": {
+  "ja": [
+   "宜",
+   "宜",
+   "ギ|よろ-しい",
+   "bring harmony",
+   "宜しい|時宜|適宜|便宜"
+  ],
+  "zh": [
+   "宜",
+   "宜",
+   "yí",
+   "bring harmony",
+   "适宜|相宜|合宜|宜家"
+  ]
+ },
+ "湛": {
+  "ja": [
+   "湛",
+   "湛",
+   "タン|ジン|たた-える",
+   "brim with quiet depth",
+   "湛える|湛然|湛々|精湛"
+  ],
+  "zh": [
+   "湛",
+   "湛",
+   "zhàn",
+   "brim with quiet depth",
+   "精湛|湛蓝|湛然|湛湛"
+  ],
+  "insc": "medium"
+ },
+ "堅": {
+  "ja": [
+   "堅",
+   "堅",
+   "ケン|かた-い",
+   "firm; steadfast",
+   "堅実|堅固|中堅|堅い"
+  ],
+  "zh": [
+   "坚",
+   "堅",
+   "jiān",
+   "firm; steadfast",
+   "坚强|坚定|坚固|坚毅"
+  ],
+  "ja_taboo": "katakurushii_stiff_堅苦しい"
+ },
+ "共": {
+  "ja": [
+   "共",
+   "共",
+   "キョウ|とも",
+   "share together",
+   "共に|共感|共鳴|共生"
+  ],
+  "zh": [
+   "共",
+   "共",
+   "gòng",
+   "share together",
+   "共同|共鸣|共享|共度"
+  ]
+ },
+ "同": {
+  "ja": [
+   "同",
+   "同",
+   "ドウ|おな-じ",
+   "of one heart",
+   "同じ|同志|同心|共同"
+  ],
+  "zh": [
+   "同",
+   "同",
+   "tóng",
+   "of one heart",
+   "同心|同志|共同|同舟共济"
+  ]
+ },
+ "識": {
+  "ja": [
+   "識",
+   "識",
+   "シキ|し-る",
+   "discern true worth",
+   "識者|見識|良識|知識"
+  ],
+  "zh": [
+   "识",
+   "識",
+   "shí|zhì",
+   "discern true worth",
+   "见识|知识|识别|识见"
+  ]
+ }
+}

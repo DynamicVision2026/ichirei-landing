@@ -73,7 +73,7 @@ const dbRows = [
   ['T2', 'edge', 'parents', '娘→父', 'up', 'no', 'birthday', 'longing', '', '', FIX.story, '0', '', '', ''],
 ]
 writeFileSync(join(dir, 'db.csv'), toCsv([header, ...dbRows]))
-const env = { ...process.env, ANTHROPIC_BASE_URL: `http://127.0.0.1:${(upstream.address() as { port: number }).port}`, ANTHROPIC_API_KEY: 'test-key-not-real' }
+const env = { ...process.env, ANTHROPIC_BASE_URL: `http://127.0.0.1:${(upstream.address() as { port: number }).port}`, ANTHROPIC_API_KEY: 'test-key-not-real', ICHIREI_LEXICON_MODE: 'off' }
 let out = ''
 try {
   out = await new Promise<string>((resolve, reject) => {

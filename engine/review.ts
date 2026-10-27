@@ -153,6 +153,8 @@ export interface RunReviewOptions {
   /** Injected in tests; defaults to a real Anthropic client. */
   client?: Pick<Anthropic, 'messages'>
   log?: (line: string) => void
+  /** Review only these slots (lexicon mode: the main and second characters are pre-vetted, only the freestyle is checked). Default: all. */
+  slots?: Slot[]
   /** Token usage of the review call (cost accounting). */
   onUsage?: (usage: { model: string; input_tokens: number; output_tokens: number }) => void
 }
@@ -163,7 +165,7 @@ export interface RunReviewOptions {
  */
 export async function runReview(result: EngineResult, palette: Palette, story: string, context: EngineContext, opts: RunReviewOptions): Promise<ReviewReport> {
   const log = opts.log ?? ((l: string) => console.log(l))
-  const items = reviewItems(result, palette)
+  const items = reviewItems(result, palette).filter((it) => !opts.slots || opts.slots.includes(it.slot))
   if (items.length === 0) return { ran: false, skipped_reason: 'nothing to review', verdicts: [] }
   if (!reviewEnabled()) {
     log(`[ichirei-review] ${JSON.stringify({ ran: false, skipped_reason: 'disabled (ICHIREI_REVIEW=off)' })}`)

@@ -89,6 +89,7 @@ export async function POST(req: Request): Promise<Response> {
       try {
         const result = await runEngine(mergeStory(story, fu.followUps), cond, {
           context: parsed.context,
+          followUpsUsed: fu.followUps.length,
           onStage: (stage) => send({ type: 'stage', stage }),
           onDelta: (text) => {
             received += text.length

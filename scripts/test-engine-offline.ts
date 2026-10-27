@@ -63,6 +63,7 @@ const upstream = http.createServer(async (req, res) => {
 await new Promise<void>((r) => upstream.listen(0, '127.0.0.1', r))
 process.env.ANTHROPIC_BASE_URL = `http://127.0.0.1:${(upstream.address() as { port: number }).port}`
 process.env.ANTHROPIC_API_KEY = 'test-key-not-real'
+process.env.ICHIREI_LEXICON_MODE = 'off' // these suites pin the palette engine's own call sequence; the lexicon modes have their own suite (test-v9.ts)
 
 const lastSelect = () => seen.filter((x) => x.kind === 'select').at(-1)!
 const lastPrompt = () => lastSelect().body.messages[0].content as string

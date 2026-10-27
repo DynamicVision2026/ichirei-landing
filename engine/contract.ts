@@ -309,6 +309,7 @@ export interface RefereeAction {
     | 'replacement_added' // a main slot was empty after the referee and the review: a replacement call filled it
     | 'replacement_rejected' // a replacement candidate was refused (duplicate, anchor not in the story, referee or review)
     | 'insufficient_no_main' // no main candidate survived: the result became `insufficient` (or a last replacement was tried first)
+    | 'not_in_lexicon_eliminated' // lexicon mode: a main or second character is not in the lexicon list for this gift
     | 'slot_overflow_eliminated' // more live candidates than the slot allows (one main, one second, one freestyle): the extra one was removed
   detail: string
 }
@@ -452,6 +453,17 @@ export interface EngineResult {
   referee?: RefereeReport
   /** Set by the review call (engine/review.ts) when it ran. */
   review?: ReviewReport
+  /** v9: set when the classical lexicon took part in this answer (ICHIREI_LEXICON_MODE on); absent in off and shadow. */
+  lexicon?: LexiconReport
+}
+
+/** What the lexicon did to one answer (engine/lexicon.ts, engine/engine.ts). No story text. */
+export interface LexiconReport {
+  mode: 'on'
+  /** chosen = slots 1–2 come from the lexicon; question = no lexicon character fits yet, one follow-up question is asked; fallback = still no fit after the answer, the palette engine answered (`lexicon_miss`). */
+  outcome: 'chosen' | 'question' | 'fallback'
+  /** How many lexicon characters were open to this gift. */
+  eligible: number
 }
 
 export type Condition = 'A' | 'B' | 'C'

@@ -37,9 +37,9 @@ check('owner decision: 志 is context_required (the standard label on funeral re
 check('isAiReviewer: "Claude(AI一次確認)" and any "Claude…" is an AI pass; a person\'s name and draft markers are not', isAiReviewer('Claude(AI一次確認)') && isAiReviewer('claude-sonnet') && isAiReviewer(' Claude') && !isAiReviewer('田中 花子') && !isAiReviewer('draft-unreviewed') && !isAiReviewer(''))
 const jaRows = parseCsv(readFileSync(join(root, 'engine', 'palette.csv'), 'utf8')).slice(1).filter((r) => r[0] === 'ja')
 const aiRows = jaRows.filter((r) => /^Claude/.test(r[15]))
-check('the sheet records the AI pass on the ja rows (304 rows; the 18 hand-written interim rows keep their marker), dated 2026-10-26', aiRows.length === 304 && aiRows.every((r) => r[16] === '2026-10-26') && jaRows.filter((r) => r[15] === 'interim-unreviewed').length === 18)
+check('the sheet records the AI pass on the ja rows (304 rows dated 2026-10-26, plus the 86 rows added from the classical lexicon dated 2026-10-27; the 18 hand-written interim rows keep their marker)', aiRows.length === 390 && aiRows.filter((r) => r[16] === '2026-10-26').length === 304 && aiRows.filter((r) => r[16] === '2026-10-27').length === 86 && jaRows.filter((r) => r[15] === 'interim-unreviewed').length === 18)
 check('no row in the palette counts as reviewed: every ja row is `reviewed = false`', jaRows.every((r) => ja(r[1]).reviewed === false))
-check('classical lines: not one ja row yields a classical line (classicalEchoOf is null for all 322)', jaRows.every((r) => classicalEchoOf(ja(r[1])) === null))
+check('classical lines: not one ja row yields a classical line (classicalEchoOf is null for all 408)', jaRows.every((r) => classicalEchoOf(ja(r[1])) === null))
 
 // a synthetic palette: the same row reviewed by an AI vs by a person
 const header = parseCsv(readFileSync(join(root, 'engine', 'palette.csv'), 'utf8'))[0]

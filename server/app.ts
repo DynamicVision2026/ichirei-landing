@@ -20,6 +20,7 @@ import { loadShopifyConfig } from '../engine/shopify.ts'
 import explainHandler from '../api/explain.ts'
 import logHandler from '../api/log.ts'
 import { ENGINE_CONFIG } from '../engine/engine.ts'
+import { lexiconModeFromEnv } from '../engine/lexicon.ts'
 import { adaptVercelHandler } from './vercel-compat.ts'
 import { envRunLimiter } from '../engine/rate-limit.ts'
 import { withHeartbeat } from './heartbeat.ts'
@@ -101,6 +102,7 @@ export function createApp(config: ServerConfig): Hono {
       reviewEffort: ENGINE_CONFIG.REVIEW_EFFORT,
       callTimeoutMs: ENGINE_CONFIG.CALL_TIMEOUT_MS,
       reviewTimeoutMs: ENGINE_CONFIG.REVIEW_TIMEOUT_MS,
+      lexiconMode: lexiconModeFromEnv(),
       configured: config,
       applied: serverRef.current
         ? {
