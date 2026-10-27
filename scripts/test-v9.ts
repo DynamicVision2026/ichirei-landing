@@ -10,8 +10,9 @@ import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { runEngine } from '../engine/engine.ts'
 import { DECLINE_MESSAGE, REVIEW_VETO_RULES, validateEngineResult, type EngineResult } from '../engine/contract.ts'
-import { LEXICON_COLUMNS, buildLexiconPrompt, eligibleFor, lexiconEchoOf, lexiconModeFromEnv, lexiconRowIn, loadLexicon, parseLexicon, renderEligible, renderLexiconTable, rowReviewedByHuman, rowShowsLine } from '../engine/lexicon.ts'
+import { BROAD_VIRTUES, LEXICON_COLUMNS, buildLexiconPrompt, eligibleFor, lexiconEchoOf, lexiconModeFromEnv, lexiconRowIn, loadLexicon, parseLexicon, renderEligible, renderLexiconTable, rowReviewedByHuman, rowShowsLine } from '../engine/lexicon.ts'
 import { loadPalette, parseCsv } from '../engine/palette.ts'
+import { isJoyo } from '../engine/joyo.ts'
 import { logMainCharacter, logSafetyRemovals, resetMainTally } from '../engine/main-count.ts'
 import { attachStrokes, simpleMaxStrokes, strokesOf } from '../engine/strokes.ts'
 import { parseOrderRequest } from '../engine/order.ts'
@@ -44,7 +45,9 @@ check('(1) reviewed_by and reviewed_on are empty on every row: nothing is human-
 check('(1) the two benchmark rows (默, 迎) are marked DO NOT USE and are never offered', lexicon.rows.filter((r) => r.excluded).map((r) => r.kanji).sort().join('') === '默迎'.split('').sort().join(''))
 const unresolved = lexicon.distinct().filter((k) => !lexiconRowIn(palette, 'ja', k) || !lexiconRowIn(palette, 'zh', k))
 check('(1) every usable lexicon character has a palette row in BOTH ja and zh (the 恵/楽-type forms are found through the inscription form)', unresolved.length === 0, unresolved.join(' '))
-const paletteRows = parseCsv(read('engine/palette.csv')).slice(1)
+const paletteCsv = parseCsv(read('engine/palette.csv'))
+const headerIdx = Object.fromEntries(paletteCsv[0].map((h, i) => [h, i])) as Record<string, number>
+const paletteRows = paletteCsv.slice(1)
 const added = paletteRows.filter((r) => r[16] === '2026-10-27')
 check('(1) the palette rows added for the lexicon (86 ja + 86 zh) are AI first-pass rows: reviewed_by "Claude(AI一次確認)", never counted as reviewed', added.length === 172 && added.every((r) => r[15] === 'Claude(AI一次確認)') && palette.rows.filter((r) => r.raw.reviewed_on === '2026-10-27').every((r) => r.reviewed === false))
 const pal = (f: 'ja' | 'zh', k: string) => palette.lookup(f, k)!
@@ -94,7 +97,7 @@ check('(4) the benchmark rows are not in the prompt at all', !pa.staticBlock.inc
 const lp = read('engine/lexicon-prompt.md')
 check('(4) lexicon-prompt.md carries the reasoning: choose by the person not the tag, slots 1–2 only from the list, freestyle stays open, the no-fit answer (insufficient + lexicon_miss + one question), no classical line written by the model', ['Choose by the person, not the tag', 'must each be one of the characters in the list', 'NOT limited to the lexicon', '"lexicon_miss": true', 'ONE follow-up question', 'Do not write any classical line'].every((n) => lp.includes(n)))
 
-check('(4) the gentle variety rule is in the lexicon prompt: prefer the most story-specific character; a broad virtue (恕 誠 和 敬) is main only when the story is clearly about it; a preference, not a ban', ['Variety, gently', 'most story-specific', '恕, 誠, 和, 敬', 'clearly about that virtue', 'a preference, not a ban'].every((n) => lp.includes(n)) && lp.indexOf('Variety, gently') > lp.indexOf('<!-- ICHIREI:LEXICON-SPLIT -->'))
+check('(4) the variety rule is in the lexicon prompt (stronger, v9.2): the most story-specific character; a broad virtue (恕 誠 和 敬) is main ONLY when the key moment of the story is explicitly about that virtue, otherwise it is the second at most', ['8. Variety.', 'most story-specific', '恕, 誠, 和, 敬', 'key moment of the story is explicitly about that virtue', 'ONLY'].every((n) => lp.includes(n)) && !lp.includes('a preference, not a ban') && lp.indexOf('8. Variety.') > lp.indexOf('<!-- ICHIREI:LEXICON-SPLIT -->'))
 
 // ---- fake upstream ---------------------------------------------------------------------------------------------------------------------
 interface Seen { kind: 'select' | 'lexicon_select' | 'review' | 'replace'; prompt: string; cached: boolean; content: unknown }
@@ -318,7 +321,7 @@ process.env.ICHIREI_SHADOW_GRACE_MS = '1500'
   logMainCharacter(res('待'), new Date('2026-10-28T15:30:00Z'), (l) => lines.push(l)) // 00:30 JST next day: counter starts over
   const rows = lines.map((l) => JSON.parse(l.replace('[ichirei-main] ', '')))
   check('(8b) one line per shown main: the character, the JST day, and how many times it has been the main today on this instance', lines.every((l) => l.startsWith('[ichirei-main] ')) && rows.map((r) => `${r.kanji}${r.count_today_on_this_instance}`).join() === '待1,待2,守1,待3,待1' && rows[0].day === '2026-10-28' && rows[4].day === '2026-10-29', JSON.stringify(rows.map((r) => [r.day, r.kanji, r.count_today_on_this_instance])))
-  check('(8b) the line says where the main came from (palette / lexicon / palette after a lexicon miss) and carries codes only', rows.slice(0, 4).map((r) => r.source).join() === 'palette,lexicon,palette,palette_after_lexicon_miss' && Object.keys(rows[0]).sort().join() === 'count_today_on_this_instance,day,kanji,language,occasion,relationship,source')
+  check('(8b) the line says where the main came from (palette / lexicon / palette after a lexicon miss) and carries codes only', rows.slice(0, 4).map((r) => r.source).join() === 'palette,lexicon,palette,palette_after_lexicon_miss' && Object.keys(rows[0]).sort().join() === 'broad_virtue,count_today_on_this_instance,day,joyo,kanji,language,occasion,relationship,source')
   check('(8b) an insufficient result has no main and logs nothing', logMainCharacter({ ...res('待'), status: 'insufficient', primary_kanji: null } as EngineResult, at, (l) => lines.push(l)) === null && lines.length === 5)
   resetMainTally()
   const r = await run({ mode: 'on' })
@@ -362,7 +365,7 @@ process.env.ICHIREI_SHADOW_GRACE_MS = '1500'
   check('(C) level 1: the ending words stay hard blocks — 死 病 逝 葬 終 別 in ja, and 别 in zh too (it was context_required)', ['死', '病', '逝', '葬', '終', '別'].every((k) => status('ja', k) === 'hard_block') && ['死', '病', '逝', '葬', '终', '别'].every((k) => status('zh', k) === 'hard_block'))
   check('(C) level 2 (needs story support): 耐 渡 草 犬 梨 冷 寒 涙 and 切 are context_required with an anchor in ja AND zh (切 moved from level 1 by the owner)', ['耐', '渡', '草', '犬', '梨', '冷', '寒', '切'].every((k) => (['ja', 'zh'] as const).every((f) => status(f, k) === 'context_required' && pal(f, k).anchor_required)) && (['ja', 'zh'] as const).every((f) => status(f, f === 'zh' ? '泪' : '涙') === 'context_required'))
   check('(C) level 3 (milestone): 渡 冬 夕 影 菊 are blocked for birthday_milestone in ja and zh, 峠 in ja (迎 is level 1 now)', (['ja', 'zh'] as const).every((f) => ['渡', '冬', '夕', '影', '菊'].every((k) => pal(f, k).blocked_occasions.includes('birthday_milestone'))) && pal('ja', '峠').blocked_occasions.includes('birthday_milestone'))
-  check('(C) level 3 (wedding): 帰 秋 続 継 耐 are blocked for weddings in ja and zh (断 too: blocked for weddings in ja, a hard block in zh; 還 / 还 blocked too)', (['ja', 'zh'] as const).every((f) => (f === 'ja' ? ['帰', '秋', '続', '継', '耐', '還'] : ['归', '秋', '续', '继', '耐', '还']).every((k) => pal(f, k).blocked_occasions.includes('wedding'))) && pal('ja', '断').blocked_occasions.includes('wedding') && status('zh', '断') === 'hard_block')
+  check('(C) level 3 (wedding): 帰 秋 続 継 耐 還 断 are blocked for weddings in the JAPANESE palette only; for Chinese buyers only 断 is blocked (a hard block) — 归 秋 续 继 耐 are open, and there is no zh 还 row (owner decision: those are Japanese 忌み言葉)', ['帰', '秋', '続', '継', '耐', '還', '断'].every((k) => pal('ja', k).blocked_occasions.includes('wedding')) && ['归', '秋', '续', '继', '耐'].every((k) => !pal('zh', k).blocked_occasions.includes('wedding') && pal('zh', k).status !== 'hard_block') && status('zh', '断') === 'hard_block' && !paletteRows.some((r) => r[headerIdx.language] === 'zh' && (r[headerIdx.kanji] === '还' || r[headerIdx.inscription_form] === '還')))
   check('(C) level 3 (remembrance): the default block carries 祝 寿 喜 初 新 婚', ['祝', '寿', '喜', '初', '新', '婚'].every((k) => palette.memorialCategory([k]) !== undefined))
   const hardInLexicon: string[] = []
   for (const k of lexicon.distinct()) for (const f of ['ja', 'zh'] as const) { const row = lexiconRowIn(palette, f, k); if (row?.status === 'hard_block') hardInLexicon.push(`${f}:${row.kanji}`) }
@@ -483,6 +486,31 @@ process.env.ICHIREI_SHADOW_GRACE_MS = '1500'
   check('(9) the order form disables the Simple set with a note when the carved character is above the limit (the server re-checks)', orderForm.includes('data-simple-unavailable') && orderForm.includes('simpleUnavailable') && (['ja', 'zh-Hans', 'zh-Hant', 'en'] as const).every((l) => COPY[l].order.simpleUnavailable(20).includes('20')))
   const unknown = palette.rows.filter((r) => r.language === 'zh' && strokesOf(r.kanji, r.inscription_form) === null).map((r) => r.kanji)
   check('(9) engine/strokes.csv covers every Chinese form in the palette (the simplified ones through the cap rule)', unknown.length === 0, unknown.join(''))
+}
+
+// ---- 8f. v9.2 readability: a Japanese buyer's MAIN must be a 常用漢字 (恕, 馨 … may be the second or the freestyle only) ---------------------------------------
+{
+  const joyoText = read('engine/joyo.txt').replace(/\s+/g, '')
+  check('(R) the 常用漢字 list is the official 2,136 characters (and 恕 馨 毅 綴 撫 are not in it; 蔵 and 守 are)', [...joyoText].length === 2136 && new Set([...joyoText]).size === 2136 && ['恕', '馨', '毅', '綴', '撫', '藏'].every((c) => !isJoyo(c)) && ['蔵', '守', '待', '証'].every((c) => isJoyo(c)))
+  const jaSet = eligibleFor(lexicon, palette, gift('ja', 'parent_mother', 'up', 'parent_day'))
+  const zhSet = eligibleFor(lexicon, palette, gift('zh-Hant', 'parent_mother', 'up', 'parent_day'))
+  const jaText = renderEligible(jaSet, 'parent_mother', 'ja')
+  const lineOf = (text: string, k: string) => text.split('\n').find((l) => l.startsWith(k)) ?? ''
+  check('(R) the Japanese list marks every non-常用 character "second or freestyle only" (恕 is marked, 待 is not)', jaSet.chars.some((c) => c.kanji === '恕') && lineOf(jaText, '恕').includes('NOT 常用漢字') && !lineOf(jaText, '待').includes('NOT 常用漢字') && jaSet.chars.filter((c) => !isJoyo(c.kanji)).every((c) => lineOf(jaText, c.kanji).includes('NOT 常用漢字')))
+  check('(R) …and the Chinese and English lists carry no such mark (no change for Chinese buyers)', !renderEligible(zhSet, 'parent_mother', 'zh-Hant').includes('NOT 常用漢字') && !renderEligible(zhSet, 'parent_mother', 'en').includes('NOT 常用漢字') && !renderEligible(zhSet, 'parent_mother').includes('NOT 常用漢字'))
+  check('(R) the prompts say it: lexicon rule 10 (Japanese buyers: the main is a 常用漢字; non-常用 is second or freestyle only; zh/en unchanged) and gate 8 of prompt.ja.md', lp.includes('10. Readability') && lp.includes('常用漢字') && lp.includes('never the main') && read('engine/prompt.ja.md').includes('8. Readability (main slots only') && read('engine/replace-prompt.md').includes('gate 8, readability'))
+  const r1 = await run({ mode: 'on', lex: reply(cand('main', '恕', 'ゆるす', A1), cand('second', '守', 'まもる', A2), cand('freestyle', '詰', 'つめる', A2)) })
+  check('(R) a Japanese buyer: a non-常用 main (恕) is refused as the main — the readable second (守) is promoted, 恕 may stay as the second', r1.status === 'sufficient' && r1.primary_kanji === '守' && r1.referee!.actions.some((a) => a.action === 'primary_refused_not_readable' && a.kanji === '恕') && count('replace') === 0, JSON.stringify([r1.primary_kanji, r1.candidates.map((c) => [c.slot, c.kanji, c.eliminated]), r1.referee!.actions.map((a) => a.action)]))
+  check('(R) …and the cards are still at most three, all different characters', live(r1).length <= 3 && new Set(live(r1).map((c) => c.kanji)).size === live(r1).length)
+  const r2 = await run({ mode: 'on', lex: reply(cand('main', '待', 'まつ', A1), cand('second', '恕', 'ゆるす', A2), cand('freestyle', '詰', 'つめる', A2)) })
+  check('(R) a non-常用 character as the SECOND is fine (待 main, 恕 second)', r2.status === 'sufficient' && slotKanji(r2, 'main') === '待' && slotKanji(r2, 'second') === '恕' && count('replace') === 0)
+  const r3 = await run({ mode: 'on', lex: reply(cand('main', '恕', 'ゆるす', A1), cand('second', '馨', 'かおる', A2)), replacements: [cand('second', '待', 'まつ', A1)] })
+  check('(R) both main candidates non-常用: ONE replacement is asked for and it becomes the MAIN (待); a leftover non-常用 character stays as the second', r3.status === 'sufficient' && r3.primary_kanji === '待' && slotKanji(r3, 'main') === '待' && count('replace') === 1 && live(r3).filter((c) => c.slot === 'main').length === 1 && live(r3).filter((c) => c.slot === 'second').length <= 1 && live(r3).length <= 3, JSON.stringify([r3.primary_kanji, r3.candidates.map((c) => [c.slot, c.kanji, c.eliminated, c.eliminated_reason]), r3.referee!.actions.map((a) => a.action)]))
+  const r4 = await run({ mode: 'on', lex: reply(cand('main', '恕', 'ゆるす', A1), cand('second', '馨', 'かおる', A2)), replacements: [cand('second', '怡', 'よろこぶ', A1)] })
+  check('(R) a replacement that would become the main must be readable too: a non-常用 one (怡) is refused, the sender is not shown an unreadable main', r4.primary_kanji !== '怡' && (r4.primary_kanji === null || isJoyo(r4.primary_kanji)), JSON.stringify([r4.status, r4.primary_kanji]))
+  const r5 = await run({ mode: 'off', palette: reply(cand('main', '毅', 'つよい', A1), cand('second', '支', 'ささえる', A2)) })
+  check('(R) the palette engine (lexicon off) obeys the same rule: 毅 is not a main for a Japanese buyer, the readable second (支) is', r5.primary_kanji === '支', JSON.stringify([r5.primary_kanji]))
+  check('(R) the main-count log line says whether the main is a broad virtue and whether it is 常用 (codes only)', (() => { resetMainTally(); const out: string[] = []; const rr = logMainCharacter({ ...r2, primary_kanji: '恕' } as EngineResult, new Date(), (l) => out.push(l)); const rr2 = logMainCharacter({ ...r2, primary_kanji: '待' } as EngineResult, new Date(), (l) => out.push(l)); return rr?.broad_virtue === true && rr?.joyo === false && rr2?.broad_virtue === false && rr2?.joyo === true && BROAD_VIRTUES.join('') === '恕誠和敬' })())
 }
 
 // ---- 9. /api/health -------------------------------------------------------------------------------------------------------------------------

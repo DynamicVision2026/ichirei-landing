@@ -170,8 +170,8 @@ try {
   check('(2) normalizeModelOutput fills what the slim contract leaves out (particulars [], fingerprint with emotional_register, eliminated false, palette_status ok, flags []) and invents nothing', Array.isArray(norm.particulars) && norm.fingerprint.emotional_register?.length === 2 && norm.fingerprint.relationship_note === null && norm.candidates.every((c) => c.eliminated === false && c.eliminated_reason === null && c.palette_status === 'ok' && Array.isArray(c.flags) && c.suitability_flag === null) && norm.candidates.map((c) => c.kanji).join() === '労,寛,煙')
 
   // ---- 3. the review is a SAFETY check: a veto needs a named safety rule; taste is only a concern ------------------------------------
-  const taste = await run('s0004-mother-memorial', { vetoes: { 綴: { rule: null, reason: 'third-person gaze' }, 庇: { rule: 'voice', reason: 'consoles the sender' } } })
-  check('(3) 0004 (the dead end of the live test): the review "rejects" both for taste → neither is a veto, BOTH cards stand (綴 main, 庇 second), no replacement call', taste.status === 'sufficient' && taste.primary_kanji === '綴' && taste.runner_up_kanji === '庇' && count('replace') === 0 && taste.referee?.actions.filter((a) => a.action === 'review_veto_ignored').length === 2, JSON.stringify(taste.referee?.actions))
+  const taste = await run('s0004-mother-memorial', { vetoes: { 包: { rule: null, reason: 'third-person gaze' }, 庇: { rule: 'voice', reason: 'consoles the sender' } } })
+  check('(3) 0004 (the dead end of the live test): the review "rejects" both for taste → neither is a veto, BOTH cards stand (包 main, 庇 second), no replacement call', taste.status === 'sufficient' && taste.primary_kanji === '包' && taste.runner_up_kanji === '庇' && count('replace') === 0 && taste.referee?.actions.filter((a) => a.action === 'review_veto_ignored').length === 2, JSON.stringify(taste.referee?.actions))
   check('(3) …and the ignored vetoes are logged with their reason (the verdict line carries rule and concern, no story text)', logs.some((l) => l.startsWith('[ichirei-review]') && l.includes('third-person gaze')) && noStory('s0004-mother-memorial'))
   const scene = await run('s0032-friend-thanks', { vetoes: { 誓: { rule: null, reason: 'Scene noun' } } })
   check('(3) a "scene noun" fail is a concern, not a veto: the scene-noun test lives in the selection prompt (the main stays)', scene.primary_kanji === '誓' && scene.runner_up_kanji === '待' && count('replace') === 0)
@@ -203,7 +203,7 @@ try {
   }
 
   // ---- 5. never zero cards and no question ---------------------------------------------------------------------------------------
-  const both = { 綴: { rule: 'memorial', reason: 'death-talk' }, 庇: { rule: 'dignity', reason: 'verdict' } }
+  const both = { 包: { rule: 'memorial', reason: 'death-talk' }, 庇: { rule: 'dignity', reason: 'verdict' } }
   const rescued = await run('s0004-mother-memorial', { vetoes: both, replacements: [FIX['s0004-mother-memorial'].replacements[1]] })
   check('(5) every main vetoed → ONE replacement is tried first; if it passes, it is the main card (慈) and the sender has a result', rescued.status === 'sufficient' && rescued.primary_kanji === '慈' && count('replace') === 1 && rescued.candidates.find((c) => c.kanji === '慈')?.slot === 'main' && sound(rescued) === null && validateEngineResult(rescued).length === 0, `${rescued.status} ${rescued.primary_kanji} ${validateEngineResult(rescued).join('; ')}`)
   const none = await run('s0004-mother-memorial', { vetoes: both, replacements: [] })

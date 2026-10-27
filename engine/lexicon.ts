@@ -8,6 +8,7 @@
 
 import { readFileSync } from 'node:fs'
 import { familyOf, type PaletteRow, type Candidate, type ClassicalEcho, type Direction, type EngineContext, type Family, type Language, type Occasion, type Relationship } from './contract.ts'
+import { isJoyo } from './joyo.ts'
 import { isAiReviewer, parseCsv, refereeFamilies, resolveSiblingPath, type Palette } from './palette.ts'
 
 export const LEXICON_COLUMNS = [
@@ -308,9 +309,11 @@ export function renderLexiconTable(lexicon: Lexicon): string {
  * relationships each is listed for. The tags are GUIDANCE (spec v9.1 step 3): when the gift's relationship is known, the characters
  * listed for it come first and the rest follow under their own heading, still open to the AI if the relationship test passes.
  */
-export function renderEligible(set: EligibleSet, relationship: Relationship | null = null): string {
+export function renderEligible(set: EligibleSet, relationship: Relationship | null = null, language: string | null = null): string {
+  // Readability (spec v9.1 step 4): for a Japanese buyer a character outside the 常用漢字 may be the second or the freestyle only, never the main.
+  const note = (e: EligibleChar) => (language === 'ja' && !isJoyo(e.kanji) ? ' — NOT 常用漢字: second or freestyle only, never the main' : '')
   const line = (e: EligibleChar) =>
-    `${e.kanji}${e.inscription_form ? `（inscription form ${e.inscription_form}）` : ''}${e.readings.length ? ` [${e.readings.slice(0, 4).join(', ')}]` : ''} — listed for: ${e.suits.join(' / ') || 'general'}`
+    `${e.kanji}${e.inscription_form ? `（inscription form ${e.inscription_form}）` : ''}${e.readings.length ? ` [${e.readings.slice(0, 4).join(', ')}]` : ''} — listed for: ${e.suits.join(' / ') || 'general'}${note(e)}`
   if (relationship === null) return set.chars.map(line).join('\n')
   const listed = set.chars.filter((e) => e.suitsRelationship)
   const other = set.chars.filter((e) => !e.suitsRelationship)
@@ -322,6 +325,9 @@ export function renderEligible(set: EligibleSet, relationship: Relationship | nu
     other.map(line).join('\n'),
   ].join('\n')
 }
+
+/** The broad virtue characters (spec v9.1 step 4, variety): a main only when the story's key moment is explicitly about that virtue. Used for the log flag only. */
+export const BROAD_VIRTUES: readonly string[] = ['恕', '誠', '和', '敬']
 
 export const LEXICON_SLOTS = { table: '{{ LEXICON_TABLE }}', eligible: '{{ LEXICON_ELIGIBLE }}' } as const
 export const LEXICON_SPLIT = '<!-- ICHIREI:LEXICON-SPLIT -->'
@@ -348,10 +354,10 @@ export interface LexiconPromptParts {
   dynamicBlock: string
 }
 
-export function buildLexiconPrompt(lexicon: Lexicon, set: EligibleSet, relationship: Relationship | null = null): LexiconPromptParts {
+export function buildLexiconPrompt(lexicon: Lexicon, set: EligibleSet, relationship: Relationship | null = null, language: string | null = null): LexiconPromptParts {
   const { staticTemplate, dynamicTemplate } = loadLexiconPrompt()
   return {
     staticBlock: staticTemplate.split(LEXICON_SLOTS.table).join(renderLexiconTable(lexicon)),
-    dynamicBlock: dynamicTemplate.split(LEXICON_SLOTS.eligible).join(renderEligible(set, relationship)),
+    dynamicBlock: dynamicTemplate.split(LEXICON_SLOTS.eligible).join(renderEligible(set, relationship, language)),
   }
 }

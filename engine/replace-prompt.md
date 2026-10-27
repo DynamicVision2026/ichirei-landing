@@ -9,6 +9,6 @@ THE MAIN CANDIDATE THAT STANDS (do not repeat its truth; your candidate must be 
 CHARACTERS YOU MUST NOT USE (already offered, or refused — with the reason, so you do not walk into the same wall):
 {{ AVOID }}
 
-Do the work again from STEP 1's findings: find the strongest remaining LIVED finding the surviving candidate does not already own, name the quality of the person it proves, and check it against gates 1–7. If you honestly cannot find a candidate that passes, do not force one.
+Do the work again from STEP 1's findings: find the strongest remaining LIVED finding the surviving candidate does not already own, name the quality of the person it proves, and check it against gates 1–8 (gate 8, readability: for a Japanese buyer, when the list above is EMPTY your candidate becomes the main and must be a 常用漢字; when the list shows a main that stands, any character may be the second). If you honestly cannot find a candidate that passes, do not force one.
 
 OUTPUT. Reply with exactly one JSON object and nothing else — no prose, no code fence. It is ONE candidate with the same fields as one element of "candidates" in the selection prompt's shape, with "slot": "second", "eliminated": false and "eliminated_reason": null. If there is no honest candidate, reply exactly {"none": true}.

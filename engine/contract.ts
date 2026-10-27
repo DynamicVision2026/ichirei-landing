@@ -298,6 +298,7 @@ export interface RefereeAction {
     | 'blocked_occasion_eliminated' // the row lists this order's occasion in blocked_occasions: moved to eliminated
     | 'blocked_occasion_already_eliminated' // as above, but the model had already eliminated it
     | 'primary_refused_no_anchor' // context_required + anchor_required, no usable story anchor
+    | 'primary_refused_not_readable' // Japanese buyer: the primary is not a 常用漢字 (it can stay as the second or the freestyle)
     | 'freestyle_anchor_missing_eliminated' // the freestyle's story_anchor is not a verbatim fragment of the story
     | 'freestyle_blocked_eliminated' // the freestyle kanji is on the freestyle blocklist (body, money, illness …)
     | 'freestyle_duplicate_eliminated' // the freestyle is the same character as a main slot

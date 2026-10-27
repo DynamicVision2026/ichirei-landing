@@ -17,6 +17,7 @@ import { callSignal, callTimeoutMs, ModelTimeoutError, reviewTimeoutMs, runBudge
 import { finalizeResult } from './slots.ts'
 import { logMainCharacter, logSafetyRemovals } from './main-count.ts'
 import { attachStrokes } from './strokes.ts'
+import { isJoyo } from './joyo.ts'
 import { buildLexiconPrompt, eligibleFor, inEligible, inLexicon, lexiconEchoOf, lexiconModeFromEnv, loadLexicon, type EligibleSet, type Lexicon, type LexiconPromptParts } from './lexicon.ts'
 import { readFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
@@ -278,7 +279,7 @@ async function runEngineInner(
     try {
       const lexicon = opts.lexicon ?? loadLexicon()
       const set = eligibleFor(lexicon, palette, context)
-      view = { set, parts: buildLexiconPrompt(lexicon, set, context.relationship), lexicon }
+      view = { set, parts: buildLexiconPrompt(lexicon, set, context.relationship, context.language), lexicon }
     } catch (err) {
       console.log(`[ichirei-lexicon] unavailable ${JSON.stringify({ mode, error: (err instanceof Error ? err.message : String(err)).slice(0, 160) })}`)
     }
@@ -507,6 +508,8 @@ async function runPipeline(a: PipelineArgs): Promise<PipelineOut> {
   const stamped = stampResult(extracted, context)
   const modelSaidMiss = view !== null && stamped.status === 'insufficient' && (extracted as { lexicon_miss?: unknown }).lexicon_miss === true
   const onList = view ? (c: Candidate) => inEligible(view.set, c) !== undefined : undefined
+  // Readability (spec v9.1 step 4): for a Japanese buyer the MAIN must be a 常用漢字 the receiver can read; the others may be any character.
+  const canBeMain = context.language === 'ja' ? (c: Candidate) => isJoyo(c.kanji) : undefined
   const timing = (t: { review_ms: number; replace_ms: number; status: string }) =>
     logTiming({ attempts, max_tokens_used: maxTokens, select_ms: selectMs, ...t, total_ms: Date.now() - tStart, stop_reason: message.stop_reason, output_tokens: message.usage?.output_tokens ?? null, lexicon: view !== null })
   /** Close a lexicon-mode result: the report, and the classical line from the lexicon (never from the palette). */
@@ -534,7 +537,7 @@ async function runPipeline(a: PipelineArgs): Promise<PipelineOut> {
   // context_required kanji as primary; promotes slot 2. When no main candidate survives, the result is held (deferInsufficient) so one
   // replacement can be tried before the sender is told there is nothing. A missing or malformed palette fails the request loudly
   // (above), never silently skips the blocklist. In lexicon mode the same pass also rejects any main or second character outside the list.
-  const refereed = applyPalette(stamped, palette, story, { deferInsufficient: true, inLexicon: onList })
+  const refereed = applyPalette(stamped, palette, story, { deferInsufficient: true, inLexicon: onList, canBeMain })
   if (refereed.status !== 'sufficient') {
     const closed = finalizeResult(refereed)
     timing({ review_ms: 0, replace_ms: 0, status: closed.status })
@@ -559,7 +562,7 @@ async function runPipeline(a: PipelineArgs): Promise<PipelineOut> {
     timing({ review_ms: reviewMs, replace_ms: 0, status: 'declined' })
     return { result: finishLexicon(declinedResult({ ...refereed, review: { ran: review.ran, skipped_reason: review.skipped_reason, verdicts: review.verdicts } }, context)), miss: null }
   }
-  const reviewed = applyReviewVerdicts(refereed, palette, story, review, { deferInsufficient: true })
+  const reviewed = applyReviewVerdicts(refereed, palette, story, review, { deferInsufficient: true, canBeMain })
 
   // A main slot that is EMPTY (never produced, or removed by the referee or the review) is replaced — never an extra card beside a filled one.
   const tReplace = Date.now()
@@ -572,6 +575,7 @@ async function runPipeline(a: PipelineArgs): Promise<PipelineOut> {
     onUsage: opts.onUsage,
     onStage: opts.onStage,
     inLexicon: onList,
+    mainOk: canBeMain,
   })
   // The last gate: at most one main, one second, one freestyle — and never zero cards without a question.
   const final = finalizeResult(completed)

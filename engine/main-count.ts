@@ -7,6 +7,8 @@
 
 import type { EngineResult } from './contract.ts'
 import { analyticsDay } from './analytics.ts'
+import { BROAD_VIRTUES } from './lexicon.ts'
+import { isJoyo } from './joyo.ts'
 
 let tally = { day: '', counts: new Map<string, number>() }
 
@@ -22,7 +24,7 @@ export function logMainCharacter(result: EngineResult, now: Date = new Date(), l
     if (tally.day !== day) tally = { day, counts: new Map() }
     const count = (tally.counts.get(result.primary_kanji) ?? 0) + 1
     tally.counts.set(result.primary_kanji, count)
-    const line = { day, kanji: result.primary_kanji, count_today_on_this_instance: count, source: sourceOf(result), language: result.language, relationship: result.relationship, occasion: result.occasion }
+    const line = { day, kanji: result.primary_kanji, count_today_on_this_instance: count, source: sourceOf(result), broad_virtue: BROAD_VIRTUES.includes(result.primary_kanji), joyo: isJoyo(result.primary_kanji), language: result.language, relationship: result.relationship, occasion: result.occasion }
     log(`[ichirei-main] ${JSON.stringify(line)}`)
     return line
   } catch {

@@ -1,7 +1,7 @@
 {
   "name": "s0004-mother-memorial",
   "story_id": "0004",
-  "note": "Live test v8.1: the Haiku review rejected 綴 and 庇 for taste (\"third-person gaze\", \"consoles the sender\") and the sender hit a dead end. Taste is not a veto: both stand.",
+  "note": "Live test v8.1: the Haiku review rejected 綴 and 庇 for taste (\"third-person gaze\", \"consoles the sender\") and the sender hit a dead end. Taste is not a veto: both stand. (2026-10-28: the recorded main 綴 is not a 常用漢字, so it can no longer be a main for a Japanese buyer — see the readability rule; the main here is 包 so the replay keeps testing the taste-is-not-a-veto behaviour.)",
   "story": "母は和裁の仕立て直しを長く続けた人で、父を早くに亡くしてから一人で私と弟を育てました。私が介護の仕事を選んだとき、人の世話はいい仕事だと一言だけ言ってくれました。母が認知症で施設に入ってから、私は母が私をわからなくなるのが怖くて、だんだん会いに行かなくなりました。最期にも間に合いませんでした。遺品を整理していたら、私の名前で施設の職員さんに宛てた手紙が何十通も出てきました。母の字でした。来ない私の代わりに、母が娘のふりをして書いていたんです。最後の一枚にだけ、来てくれてありがとうと母自身の字で書かれていました。",
   "context": {
     "language": "ja",
@@ -36,8 +36,8 @@
     "candidates": [
       {
         "slot": "main",
-        "kanji": "綴",
-        "inscription_form": "綴",
+        "kanji": "包",
+        "inscription_form": "包",
         "reading": "つづる",
         "truth_type": "Private Symbol",
         "one_line_gaze": "私の名前で、何十通も手紙を書き続けてくれた人。",
@@ -55,7 +55,7 @@
         "unique_truth": "u"
       }
     ],
-    "primary_kanji": "綴",
+    "primary_kanji": "包",
     "runner_up_kanji": "庇",
     "freestyle_kanji": null,
     "fallback_follow_up_question": "いちばん思い出す、ちいさな場面をひとつ教えてください。"
@@ -94,7 +94,7 @@
     }
   ],
   "expect": {
-    "main": "綴",
+    "main": "包",
     "second": "庇",
     "freestyle": null,
     "cause": null,

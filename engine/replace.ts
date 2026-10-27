@@ -127,6 +127,8 @@ export interface ReplaceOptions {
   onStage?: (stage: 'replacing' | 'checking') => void
   /** Lexicon mode: the replacement must be one of the lexicon characters open to this gift (same check as the selection's). */
   inLexicon?: (c: Candidate) => boolean
+  /** Readability: when the replacement becomes the MAIN (no primary is left), it must pass this (Japanese buyers: a 常用漢字). */
+  mainOk?: (c: Candidate) => boolean
 }
 
 /**
@@ -146,7 +148,8 @@ export async function completeMains(
   const { live, gone } = missingMains(result)
   // Only an EMPTY slot is filled: with two live main candidates nothing is asked of the model. With none live (the referee and the
   // review removed every main candidate) ONE replacement is tried before the sender is told there is nothing.
-  if (live.length >= 2) return result
+  // (a result whose primary is gone although two mains are still live — both unreadable, both without an anchor — is also filled)
+  if (live.length >= 2 && result.primary_kanji !== null) return result
   log(`[ichirei-engine] main_slot_empty ${JSON.stringify({ live: live.map((c) => ({ slot: c.slot, kanji: c.kanji })), missing: gone, will_replace: replaceEnabled() })}`)
   if (!replaceEnabled()) return result
 
@@ -194,6 +197,11 @@ export async function completeMains(
       reject('story_anchor is not a verbatim fragment of the story')
       continue
     }
+    // Readability: a replacement that will be the MAIN (no primary is left) must pass the same test as any main — checked before the referee and the review spend a call.
+    if ((live.length === 0 || current.primary_kanji === null) && opts.mainOk && !opts.mainOk(cand)) {
+      reject('readability: the main character must be a 常用漢字 for a Japanese buyer')
+      continue
+    }
     // The same referee, then the same review, as any candidate: judged alone (the primary and the other slots are not touched).
     const mini: EngineResult = { ...current, candidates: [cand], primary_kanji: cand.kanji, runner_up_kanji: null, freestyle_kanji: null, referee: undefined, review: undefined }
     const refereed = applyPalette(mini, palette, story, { inLexicon: opts.inLexicon })
@@ -213,16 +221,19 @@ export async function completeMains(
       extraAvoid.push({ kanji: cand.kanji, reason: reasonOf(judged) })
       continue
     }
-    const wasEmpty = live.length === 0
+    // The replacement becomes the primary when no primary is left — nothing live at all, or the live ones cannot be the main (a missing anchor,
+    // a character a Japanese reader cannot read): those stay as the second.
+    const wasEmpty = live.length === 0 || current.primary_kanji === null
     const added: Candidate = { ...final, slot: wasEmpty ? 'main' : 'second' }
     actions.push({ kanji: added.kanji, action: 'replacement_added', detail: `slot ${added.slot} filled by a replacement (attempt ${attempt})` })
     log(`[ichirei-engine] replacement ${JSON.stringify({ attempt, ok: true, ms: Date.now() - t0, kanji: added.kanji })}`)
     const liveFreestyle = current.candidates.find((c) => c.slot === 'freestyle' && !c.eliminated)
+    const leftover = wasEmpty ? (live.find((c) => c.slot === 'second') ?? live[0]) : undefined // a live main that could not be primary: it becomes the second
     current = {
       ...current,
-      candidates: [...current.candidates, added],
+      candidates: [...current.candidates.map((c) => (wasEmpty && !c.eliminated && c.slot === 'main' ? { ...c, slot: 'second' as const } : c)), added],
       primary_kanji: wasEmpty ? added.kanji : current.primary_kanji,
-      runner_up_kanji: wasEmpty ? null : current.primary_kanji === added.kanji ? current.runner_up_kanji : added.kanji,
+      runner_up_kanji: wasEmpty ? (leftover?.kanji ?? null) : current.primary_kanji === added.kanji ? current.runner_up_kanji : added.kanji,
       freestyle_kanji: liveFreestyle ? liveFreestyle.kanji : null,
       referee: current.referee ? { ...current.referee, actions, ...(wasEmpty ? { no_eligible_primary: false, primary_changed: true } : {}) } : current.referee,
       review: current.review ? { ...current.review, verdicts: [...current.review.verdicts, ...(judged.review?.verdicts ?? [])] } : current.review,

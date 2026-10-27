@@ -21,11 +21,11 @@ The spec is the single source of truth. This file lists, step by step, what the 
 | Level 2: 耐 渡 草 犬 梨 冷 寒 涙 | ja context_required (no anchor on 耐 渡 草 犬 梨); zh ok for 耐 渡 犬 | **context_required + anchor in ja and zh** |
 | 切 | ja hard block | **level 2** (context_required + anchor); zh already was |
 | Level 3 milestone 迎 渡 冬 夕 影 菊 峠 | zh 渡 not blocked | **blocked in zh too** (迎 is level 1 now) |
-| Level 3 wedding 帰 秋 断 続 還 耐 継 | ja only | **both palettes** (zh 归 秋 续 继 耐, new row 还; 断 is a hard block in zh) |
+| Level 3 wedding 帰 秋 断 続 還 耐 継 | ja only | **Japanese palette only** (owner decision 2026-10-28: these are Japanese 忌み言葉; 归 is auspicious in Chinese weddings). Chinese buyers: only 断, already a hard block. The zh blocks first added for 归 秋 续 继 耐 and the zh 还 row are removed |
 | Level 3 remembrance | `memorial-block.csv` (27) | unchanged; 祝 寿 喜 初 新 婚 are in it (tested) |
 | English: both rows | already | unchanged; tested |
 
-Every changed field with its before / after / reason: `review/v9_1_section_c_changes.csv` (67 rows).
+Every changed field with its before / after / reason: `review/v9_1_section_c_changes.csv` (61 rows).
 
 ## Section D — the process
 | Step | Before | Now |
@@ -34,7 +34,7 @@ Every changed field with its before / after / reason: `review/v9_1_section_c_cha
 | 1 Understand; goodwill check | none | **goodwill check** in the selection prompts (hostile or mocking → `goodwill_declined`) and in the review (`goodwill`): a fixed polite decline in 4 languages, `declined: true`, no cards, nothing to answer; the page shows it |
 | 2 Truth sentence + ideal character | none | `engine/lexicon-prompt.md` asks for `truth` and `ideal_character` first; the engine logs `ideal_not_in_lexicon` (character + codes, no story text), strips both fields from the result |
 | 3 Eligible list | relationship tags and the memorial tag were **hard filters**; 恩 was "upward or partner" | tags are **guidance** (the prompt lists characters for the relationship first, the rest under their own heading); hard filters are only **藏 partner-only, 恩 upward-only, 綠 not for a zh/en partner**, plus the palette's levels 1 and 3 and (en) both rows |
-| 4 Choose main + second | person test, specificity, brightest form, illness rule | order now exactly: person → specificity → brightest true form → **relationship test** → illness rule; main and second must be different characters |
+| 4 Choose main + second | person test, specificity, brightest form, illness rule | order now exactly: person → specificity → brightest true form → **relationship test** → illness rule; main and second must be different characters. **Added 2026-10-28 (owner): readability** — for a Japanese buyer the main must be a 常用漢字 (non-常用 lexicon characters are second or freestyle only; enforced in code); and a broad virtue (恕 誠 和 敬) is main only when the story's key moment is explicitly about it |
 | 5 Playful card | open, anchored, must not repeat main | prompt now also says "no honest playful choice → no playful card"; duplicate of main **or second** is dropped by the referee |
 | 6 Referee | list check, levels 1 and 3, en both rows, ≤ 3 cards | + **all cards different characters** (a repeat is removed: `slots: same character as another card`) |
 | 7 Safety review | in `on` mode it checked **only the freestyle** | **all three cards** in every mode; new named rules `relationship` and `goodwill` (with `illness`, `palette`, `occasion`, `memorial`, `dignity`, `register`, `insult`) |
@@ -44,9 +44,9 @@ Every changed field with its before / after / reason: `review/v9_1_section_c_cha
 | 11 Logs | main count, lexicon misses, choices/orders (analytics) | + **`[ichirei-safety] removed`** (every card removed for safety with by / rule / reason), **`[ichirei-safety] goodwill_decline`**, **`[ichirei-lexicon] ideal_not_in_lexicon`** |
 
 ## Things for the owner to confirm
-1. **zh 匂** stays a hard block (above).
-2. **恩 is upward only** (spec step 3). Before, "or partner" was in the code but the lexicon row never listed partner, so the practical change is nil.
+1. **zh 匂** stays a hard block (above) — agreed 2026-10-28.
+2. **恩 is upward only** (spec step 3) — agreed 2026-10-28. Before, "or partner" was in the code but the lexicon row never listed partner, so the practical change is nil.
 3. **Relationship tags no longer filter.** parent → child now has the full list open (the prompt shows the 35 listed ones first). Whether the AI chooses well from the wider list is untested.
-4. **Wedding block now applies to Chinese buyers too** (spec lists the characters without a language). This is the more cautious reading.
-5. **Stroke counts**: the Simple limit is the default 20 until the workshop gives the real number. Counts come from KANJIDIC2 (via `kanji-data`, MIT, data CC BY-SA 4.0; `engine/strokes.csv`, 13,116 characters). Simplified Chinese glyphs missing from KANJIDIC use the traditional count **capped at 20**, so at the default limit they are never wrongly refused; with a lower limit they err towards Standard until exact counts are added. Unknown characters (some freestyle) → Standard only.
+4. **Wedding block: Japanese palette only** (owner decision 2026-10-28; the first reading, both palettes, is reversed). Chinese buyers: 断 only.
+5. **Stroke counts** (approximation agreed 2026-10-28): the Simple limit is the default 20 until the workshop gives the real number. Counts come from KANJIDIC2 (via `kanji-data`, MIT, data CC BY-SA 4.0; `engine/strokes.csv`, 13,116 characters). Simplified Chinese glyphs missing from KANJIDIC use the traditional count **capped at 20**, so at the default limit they are never wrongly refused; with a lower limit they err towards Standard until exact counts are added. Unknown characters (some freestyle) → Standard only.
 6. Fixtures that used 迎 / 黙 as the sample main (`golden-fixture.json`, v6 / v7 fixtures) now use 証 / 守: those two are on the do-not-use list.

@@ -6,7 +6,7 @@
 //
 // Level 1 (never, any slot): death / illness / ending words, and the expert's do-not-use list 黙/默 迎 執 忍 走  → hard_block.
 // Level 2 (needs story support): 耐 渡 草 犬 梨 冷 寒 涙 and 切 (moved from level 1 by the owner) → context_required + anchor_required.
-// Level 3 (one occasion): milestone 迎 渡 冬 夕 影 菊 峠; wedding 帰 秋 断 続 還 耐 継 (both palettes); remembrance = engine/memorial-block.csv.
+// Level 3 (one occasion): milestone 迎 渡 冬 夕 影 菊 峠; wedding 帰 秋 断 続 還 耐 継 (JAPANESE palette only — owner decision 2026-10-28: these are Japanese 忌み言葉; for Chinese buyers only 断 is blocked, and it is already a hard block; 归 is auspicious in a Chinese wedding, 之子于归); remembrance = engine/memorial-block.csv.
 // Rule: a character in the lexicon with a verified warm line is never level 1 (so 篤/笃 is NOT blocked) — except the do-not-use list.
 
 import { readFileSync, writeFileSync, existsSync } from 'node:fs'
@@ -110,9 +110,22 @@ patch('zh', '切', { status: 'context_required', anchor_required: 'yes' }, 'owne
 const L3M = 'level 3 (spec v9.1 section C): blocked for milestone birthdays (還暦)'
 for (const family of ['ja', 'zh']) for (const ch of ['渡', '冬', '夕', '影', '菊']) addOccasion(family, ch, 'birthday_milestone', L3M)
 addOccasion('ja', '峠', 'birthday_milestone', L3M)
-const L3W = 'level 3 (spec v9.1 section C): blocked for weddings (both palettes)'
-for (const family of ['ja', 'zh']) for (const ch of ['帰', '秋', '断', '続', '継', '耐']) addOccasion(family, ch, 'wedding', L3W)
-addRow({ language: 'zh', kanji: '还', inscription_form: '還', readings: 'hái|huán', core_meanings: 'still; return; give back', auspicious_compounds: '还是|还有|归还', status: 'context_required', taboo_flags: 'return_leaving', blocked_occasions: 'wedding', register_flags: 'none', anchor_required: 'yes', cross_language_note: 'Added for the wedding block (spec v9.1 C level 3: 還 for weddings). Japanese 還 is the same character (カン).', relationship_fit: 'none', inscription_fitness: 'medium', classical_echo: 'none', ...AI }, L3W)
+const L3W = 'level 3 (spec v9.1 section C): blocked for weddings (Japanese palette: 忌み言葉)'
+for (const ch of ['帰', '秋', '断', '続', '継', '耐']) addOccasion('ja', ch, 'wedding', L3W)
+// Owner decision (2026-10-28): the wedding block is NOT applied to Chinese buyers. An earlier run of this script had added it to zh 归 秋 续 继 耐 and a zh 还 row; undo that.
+for (const ch of ['归', '秋', '续', '继', '耐']) {
+  const row = find('zh', ch)
+  if (!row) throw new Error(`no zh row for ${ch}`)
+  const cur = row[col.blocked_occasions].split('|').filter((x) => x && x !== 'none' && x !== 'wedding')
+  const v = cur.length ? cur.join('|') : 'none'
+  if (row[col.blocked_occasions] !== v) {
+    record('zh', row[col.kanji], 'blocked_occasions', row[col.blocked_occasions], v, 'owner decision: wedding block removed for Chinese buyers')
+    row[col.blocked_occasions] = v
+  }
+}
+const zhHuan = body.findIndex((r) => r[col.language] === 'zh' && r[col.kanji] === '还' && r[col.cross_language_note].startsWith('Added for the wedding block'))
+if (zhHuan >= 0) body.splice(zhHuan, 1)
+changes.delete('zh|还|row')
 addOccasion('ja', '還', 'wedding', L3W)
 
 const text = [header, ...body].map((r) => r.map(q).join(',')).join('\n') + '\n'

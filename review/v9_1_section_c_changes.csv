@@ -60,9 +60,3 @@ zh,犬,anchor_required,no,yes,level 2 (spec v9.1 section C): allowed only when t
 ja,切,status,hard_block,context_required,owner decision (spec v9.1 section C): 切 (大切／切実) moves from level 1 to level 2
 ja,切,anchor_required,no,yes,owner decision (spec v9.1 section C): 切 (大切／切実) moves from level 1 to level 2
 zh,渡,blocked_occasions,none,birthday_milestone,level 3 (spec v9.1 section C): blocked for milestone birthdays (還暦)
-zh,归,blocked_occasions,none,wedding,level 3 (spec v9.1 section C): blocked for weddings (both palettes)
-zh,秋,blocked_occasions,none,wedding,level 3 (spec v9.1 section C): blocked for weddings (both palettes)
-zh,续,blocked_occasions,none,wedding,level 3 (spec v9.1 section C): blocked for weddings (both palettes)
-zh,继,blocked_occasions,none,wedding,level 3 (spec v9.1 section C): blocked for weddings (both palettes)
-zh,耐,blocked_occasions,none,wedding,level 3 (spec v9.1 section C): blocked for weddings (both palettes)
-zh,还,row,(none),context_required (new row),level 3 (spec v9.1 section C): blocked for weddings (both palettes)

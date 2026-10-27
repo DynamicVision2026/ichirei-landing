@@ -388,6 +388,11 @@ export interface RefereeOptions {
    * "palette: not_in_lexicon" — the code rejects anything outside the list. The freestyle is never asked.
    */
   inLexicon?: (c: Candidate) => boolean
+  /**
+   * Readability (spec v9.1 step 4): may this candidate be the MAIN (the primary)? Japanese buyers: only a 常用漢字. A candidate for which it
+   * returns false can still be shown as the second or the freestyle. Handled like a missing anchor: the primary is refused, the second is promoted.
+   */
+  canBeMain?: (c: Candidate) => boolean
 }
 
 export const requireClassicalEchoFromEnv = (env: NodeJS.ProcessEnv = process.env): boolean => /^(1|true|on|yes)$/i.test((env.REQUIRE_CLASSICAL_ECHO ?? '').trim())
@@ -405,8 +410,9 @@ function settlePrimary(
   anchorMissing: (c: Candidate) => boolean,
   removedByReferee: (c: Candidate) => boolean,
   actions: RefereeAction[],
+  canBeMain: (c: Candidate) => boolean = () => true,
 ): { primary: string | null; promotedFrom: 'second' | null } {
-  const eligible = (c: Candidate) => isMainSlot(c) && !c.eliminated && !c.flags.includes('no_heart_anchor') && !anchorMissing(c)
+  const eligible = (c: Candidate) => isMainSlot(c) && !c.eliminated && !c.flags.includes('no_heart_anchor') && !anchorMissing(c) && canBeMain(c)
   const refuse = (c: Candidate, detail: string) => {
     c.flags = unique([...c.flags, 'palette_anchor_missing'])
     actions.push({ kanji: c.kanji, action: 'primary_refused_no_anchor', detail })
@@ -416,8 +422,13 @@ function settlePrimary(
   // anchor). A primary the MODEL eliminated is the model's own inconsistency; validateEngineResult reports it.
   const removed = primaryCand ? removedByReferee(primaryCand) : false
   const noAnchor = primaryCand ? !removed && !primaryCand.eliminated && anchorMissing(primaryCand) : false
-  if (!primaryCand || (!removed && !noAnchor)) return { primary: originalPrimary, promotedFrom: null }
+  const unreadable = primaryCand ? !removed && !primaryCand.eliminated && !noAnchor && !canBeMain(primaryCand) : false
+  if (!primaryCand || (!removed && !noAnchor && !unreadable)) return { primary: originalPrimary, promotedFrom: null }
   if (noAnchor) refuse(primaryCand, 'context_required kanji needs a usable story anchor to be primary')
+  if (unreadable) {
+    primaryCand.flags = unique([...primaryCand.flags, 'not_joyo_main'])
+    actions.push({ kanji: primaryCand.kanji, action: 'primary_refused_not_readable', detail: 'readability: the main character must be a 常用漢字 for a Japanese buyer (it may stay as the second or the freestyle)' })
+  }
   // (a replacement call can leave an eliminated and a live `second`: the live one is the candidate)
   const second = candidates.find((c) => c.slot === 'second' && c.kanji !== originalPrimary && !c.eliminated) ?? candidates.find((c) => c.slot === 'second' && c.kanji !== originalPrimary)
   if (second && eligible(second)) return { primary: second.kanji, promotedFrom: 'second' }
@@ -583,7 +594,7 @@ export function applyPalette(result: EngineResult, palette: Palette, story: stri
     rowsFor(palette, families, c).some((f) => f.row?.status === 'hard_block' || (f.row !== undefined && result.occasion !== null && f.row.blocked_occasions.includes(result.occasion))) ||
     c.eliminated_reason?.startsWith('palette: ') === true
   const originalPrimary = result.primary_kanji
-  const { primary, promotedFrom } = settlePrimary(candidates, originalPrimary, anchorMissing, removedByReferee, actions)
+  const { primary, promotedFrom } = settlePrimary(candidates, originalPrimary, anchorMissing, removedByReferee, actions, opts.canBeMain)
 
   const referee: RefereeReport = {
     palette_rows: palette.size,
@@ -670,7 +681,7 @@ export function applyReviewVerdicts(
   palette: Palette,
   story: string,
   review: { ran: boolean; skipped_reason: string | null; verdicts: ReviewVerdict[] },
-  opts: { deferInsufficient?: boolean } = {},
+  opts: { deferInsufficient?: boolean; canBeMain?: (c: Candidate) => boolean } = {},
 ): EngineResult {
   if (result.status !== 'sufficient' || !result.referee) return result
   const language = familyOf(result.language)
@@ -711,7 +722,7 @@ export function applyReviewVerdicts(
       c.eliminated_reason === NOT_IN_LEXICON_REASON ||
       c.eliminated_reason === CLASSICAL_ECHO_REQUIRED_REASON)
   const originalPrimary = result.primary_kanji
-  const { primary, promotedFrom } = settlePrimary(candidates, originalPrimary, anchorMissing, removedByReferee, actions)
+  const { primary, promotedFrom } = settlePrimary(candidates, originalPrimary, anchorMissing, removedByReferee, actions, opts.canBeMain)
   const referee: RefereeReport = {
     ...result.referee,
     primary_changed: primary !== result.referee.original_primary,
