@@ -102,13 +102,14 @@ async function consumeEngineStream(
   throw new StreamCutError('stream cut')
 }
 
-// Spec §10 golden fixture — one tap to load for acceptance runs (story + its context).
+// Spec §10 golden fixture — one tap to load for acceptance runs (story + its context). The occasion is parent_day, as in the
+// automated tests (scripts/golden-fixture.json): the Japanese review blocks 迎 for birthday_milestone ("お迎えが来る"), the golden answer's main.
 const GOLDEN_CONTEXT: GiftContext = {
   ...DEFAULT_GIFT_CONTEXT,
   language: 'ja',
   relationship: 'parent_father',
   direction: 'up',
-  occasion: 'birthday_milestone',
+  occasion: 'parent_day',
   occasionDetail: '還暦',
 }
 const GOLDEN_FIXTURE =

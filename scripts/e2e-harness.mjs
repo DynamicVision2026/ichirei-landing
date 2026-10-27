@@ -396,8 +396,8 @@ const mockPage = async (browser, { onExplain, result, order, track } = {}) => {
   // golden fixture button loads story + context
   await page.click('text=もう一度試す')
   await page.click('text=golden fixture')
-  check('golden fixture button also sets the golden context (ja / 父 / 目上 / 誕生日・節目 / 還暦)',
-    (await page.inputValue('select[name=relationship]')) === 'parent_father' && (await page.inputValue('select[name=direction]')) === 'up' && (await page.inputValue('select[name=occasion]')) === 'birthday_milestone' && (await page.inputValue('input[name=occasion_detail]')) === '還暦')
+  check('golden fixture button also sets the golden context (ja / 父 / 目上 / 母の日・父の日 / 還暦)',
+    (await page.inputValue('select[name=relationship]')) === 'parent_father' && (await page.inputValue('select[name=direction]')) === 'up' && (await page.inputValue('select[name=occasion]')) === 'parent_day' && (await page.inputValue('input[name=occasion_detail]')) === '還暦')
   check('no page errors (run 6)', errors.length === 0)
   if (errors.length) console.log('page errors:', errors)
   await page.close()
