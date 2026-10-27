@@ -1,0 +1,124 @@
+/* The story animation page /a/<id> and the credits page. Everything inside the frame is sized in frame units (var(--u) = one hundredth of
+   the frame's width), so the finished frame is the same on any phone. */
+
+.an-page {
+  box-sizing: border-box;
+  min-height: 100vh;
+  min-height: 100svh;
+  height: 100svh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 10px 16px 6px;
+  background: #0b0806;
+  color: #eadfc8;
+  font-family: 'Zen Old Mincho', 'Hiragino Mincho ProN', 'Yu Mincho', 'Noto Serif TC', 'Noto Serif CJK JP', 'Cormorant Garamond', serif;
+}
+.an-page.an-memorial { background: #1a1813; }
+.an-page[lang='zh-Hant'] { font-family: 'Noto Serif TC', 'Songti TC', 'PMingLiU', 'Noto Serif CJK TC', 'Zen Old Mincho', serif; }
+.an-page[lang='en'] { font-family: 'Cormorant Garamond', 'Zen Old Mincho', 'Noto Serif TC', Georgia, serif; }
+
+.an-note { margin: auto; max-width: 28em; text-align: center; line-height: 1.8; font-size: 15px; opacity: 0.9; }
+.an-small { margin: 0 0 8px; font-size: 13px; }
+
+.an-wrap { flex: 1 1 auto; min-height: 0; width: 100%; display: flex; align-items: center; justify-content: center; }
+
+.an-stage {
+  --paper-a: #30261c;
+  --paper-b: #120d09;
+  --ink: #d9472e;
+  --text: #eadfc8;
+  --seal: #c23b27;
+  position: relative;
+  flex: none;
+  overflow: hidden;
+  color: var(--text);
+  border-radius: calc(var(--u) * 1.6);
+  box-shadow: 0 0 0 1px rgba(234, 223, 200, 0.08), 0 18px 50px rgba(0, 0, 0, 0.55);
+}
+.an-stage.an-memorial { --paper-a: #d2c9b5; --paper-b: #a49c88; --ink: #14110d; --text: #1d1913; --seal: transparent; box-shadow: 0 0 0 1px rgba(20, 17, 13, 0.18), 0 18px 50px rgba(0, 0, 0, 0.4); }
+
+.an-paper { position: absolute; inset: 0; background: radial-gradient(ellipse at 50% 36%, var(--paper-a) 0%, var(--paper-b) 82%); }
+.an-paper::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  opacity: 0.32;
+  mix-blend-mode: overlay;
+  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='240' height='240'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='2' stitchTiles='stitch'/><feColorMatrix values='0 0 0 0 .5  0 0 0 0 .45  0 0 0 0 .38  0 0 0 .55 0'/></filter><rect width='100%' height='100%' filter='url(%23n)'/></svg>");
+}
+.an-paper::before { content: ''; position: absolute; inset: 0; box-shadow: inset 0 0 calc(var(--u) * 18) rgba(0, 0, 0, 0.45); z-index: 1; pointer-events: none; }
+.an-memorial .an-paper::before { box-shadow: inset 0 0 calc(var(--u) * 16) rgba(40, 32, 20, 0.35); }
+
+/* everything that is revealed starts invisible; the Web Animations take it from there (the still frame shows it all) */
+.an-fx { opacity: 0; }
+.an-fx-wrap { opacity: 1; }
+
+.an-moment {
+  position: absolute; left: calc(var(--u) * 10); top: calc(var(--u) * 52); width: calc(var(--u) * 80); height: calc(var(--u) * 52); margin: 0;
+  display: flex; align-items: center; justify-content: center; text-align: center; line-height: 1.75; letter-spacing: 0.04em; text-wrap: balance;
+}
+
+.an-glyph-wrap { position: absolute; left: calc(var(--u) * 19); top: calc(var(--u) * 38); width: calc(var(--u) * 62); height: calc(var(--u) * 62); transform-origin: 50% 50%; }
+.an-glyph { display: block; width: 100%; height: 100%; color: var(--ink); overflow: visible; }
+.an-ink { font-family: 'Zen Old Mincho', 'Noto Serif TC', 'Noto Serif CJK JP', serif; font-weight: 700; }
+
+.an-reading {
+  position: absolute; left: calc(var(--u) * 10); top: calc(var(--u) * 104); width: calc(var(--u) * 80); text-align: center; line-height: 1.6;
+}
+.an-reading-main { display: block; font-size: calc(var(--u) * 4.8); letter-spacing: 0.12em; }
+.an-reading-sub { display: block; font-size: calc(var(--u) * 3.6); opacity: 0.75; margin-top: calc(var(--u) * 0.8); font-style: italic; }
+
+.an-poem {
+  position: absolute; left: calc(var(--u) * 7); top: calc(var(--u) * 50); width: calc(var(--u) * 86); height: calc(var(--u) * 90);
+  display: flex; flex-direction: column; justify-content: center; align-items: center; text-align: center;
+}
+.an-pline { margin: 0 0 0.5em; }
+.an-pline-main { display: block; line-height: 1.45; letter-spacing: 0.08em; }
+.an-pline-aid { display: block; line-height: 1.45; opacity: 0.72; letter-spacing: 0.02em; margin-top: 0.12em; }
+.an-poem-en .an-pline-main { font-family: 'Cormorant Garamond', 'Zen Old Mincho', serif; font-style: italic; letter-spacing: 0.01em; }
+.an-notes { margin-top: 0.4em; opacity: 0.78; line-height: 1.55; text-wrap: balance; }
+.an-notes p { margin: 0 0 0.3em; }
+
+.an-who {
+  position: absolute; left: calc(var(--u) * 8); top: calc(var(--u) * 143); width: calc(var(--u) * 84); height: calc(var(--u) * 19); margin: 0;
+  display: flex; align-items: center; justify-content: center; text-align: center; line-height: 1.6; letter-spacing: 0.05em; text-wrap: balance;
+}
+.an-nopoem .an-who { top: calc(var(--u) * 126); }
+
+.an-seal {
+  position: absolute; left: calc(50% - var(--u) * 4.2); top: calc(var(--u) * 164); width: calc(var(--u) * 8.4); height: calc(var(--u) * 11.6);
+  box-sizing: border-box; display: flex; flex-direction: column; align-items: center; justify-content: space-evenly;
+  border-radius: calc(var(--u) * 0.7); background: var(--seal); color: #f6e9d6; font-size: calc(var(--u) * 3.3); line-height: 1; font-weight: 700;
+  font-family: 'Zen Old Mincho', 'Noto Serif TC', 'Noto Serif CJK JP', serif;
+}
+.an-nopoem .an-seal { top: calc(var(--u) * 150); }
+.an-memorial .an-seal { color: var(--text); border: calc(var(--u) * 0.25) solid var(--text); font-weight: 400; }
+
+/* the finished frame as a still (reduced motion): the film's last frame, without the moment that has already faded away */
+.an-still .an-fx { opacity: 1; }
+.an-still .an-moment { opacity: 0; }
+.an-still .an-stroke { stroke-dashoffset: 0; }
+.an-still.an-haspoem .an-glyph-wrap { transform: translateY(-62.9%) scale(0.42); }
+.an-still.an-memorial .an-seal { opacity: 0.55; }
+
+.an-controls { flex: none; width: 100%; max-width: 480px; padding: 8px 0 4px; text-align: center; }
+.an-buttons { display: flex; gap: 10px; justify-content: center; flex-wrap: wrap; }
+.an-btn {
+  appearance: none; font: inherit; font-size: 14px; color: inherit; text-decoration: none; cursor: pointer;
+  background: transparent; border: 1px solid rgba(234, 223, 200, 0.35); border-radius: 999px; padding: 8px 16px; min-height: 40px; display: inline-flex; align-items: center;
+}
+.an-memorial .an-btn { border-color: rgba(234, 223, 200, 0.3); }
+.an-btn:hover, .an-btn-hot { border-color: rgba(234, 223, 200, 0.85); }
+.an-btn:focus-visible { outline: 2px solid #eadfc8; outline-offset: 2px; }
+.an-toast { min-height: 1.4em; margin: 4px 0 0; font-size: 13px; opacity: 0.8; }
+
+/* credits page */
+.an-credits { height: auto; min-height: 100svh; align-items: stretch; max-width: 720px; margin: 0 auto; padding: 24px 20px 48px; }
+.an-credits h1 { font-size: 22px; font-weight: 700; margin: 0 0 16px; letter-spacing: 0.06em; }
+.an-credits h2 { font-size: 16px; margin: 28px 0 6px; }
+.an-credits p, .an-credits li { font-size: 14px; line-height: 1.9; opacity: 0.92; }
+.an-credits a { color: #e8c98a; word-break: break-all; }
+.an-credits ul { padding-left: 1.2em; }
+
+@media (prefers-reduced-motion: reduce) { .an-btn { transition: none; } }

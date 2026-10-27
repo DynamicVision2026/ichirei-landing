@@ -6,11 +6,12 @@
 //      Shopify) — if that fails there is no checkout, we never sell what production cannot see;
 //   3. create a Shopify cart through the Storefront API, one line per package, with the line
 //      attributes kanji, inscription_form, reading, sender_name, receiver_name, delivery_date,
-//      language, order_ref;
+//      language, order_ref (and ichirei_animation_url, the private address of the story animation);
 //   4. answer { order_ref, checkout_url } and the browser redirects to Shopify checkout.
 //
 // Web-standard handler (like api/select.ts): mounted directly by server/app.ts and usable on Vercel.
 
+import { animationUrl, buildAnimationRecord, newAnimationId } from '../engine/animation.ts'
 import { cleanSession, cleanSource, recordEvent } from '../engine/analytics.ts'
 import { POEM_ID_PATTERN, buildRecord, lineAttributes, newOrderRef, parseOrderRequest, poemAttributes, type OrderRecord, type StoredPoem, type ValidOrder } from '../engine/order.ts'
 import { createOrderStore, type OrderStore } from '../engine/order-store.ts'
@@ -32,6 +33,8 @@ export interface OrderDeps {
   fetchImpl?: typeof fetch
   /** Tests inject a palette; production reads engine/palette.csv. */
   palette?: Palette
+  /** The site's public address for the animation link (ICHIREI_PUBLIC_URL); tests inject their own. */
+  env?: NodeJS.ProcessEnv
 }
 
 /**
@@ -94,6 +97,18 @@ export function createOrderHandler(deps: () => OrderDeps) {
     const orderRef = newOrderRef(now)
     const record: OrderRecord = buildRecord(order, orderRef, now, poems)
 
+    // The story animation of this order: a small record under a private id, built from what the engine already produced (no model call).
+    // It never blocks the order: without it there is simply no link.
+    let animationLink: string | null = null
+    try {
+      const animationId = newAnimationId()
+      await d.store.put(animationId, buildAnimationRecord(record, animationId, now))
+      record.animation_id = animationId
+      animationLink = animationUrl(animationId, d.env)
+    } catch (err) {
+      console.error('[ichirei-order] animation record failed', orderRef, err instanceof Error ? err.message : err)
+    }
+
     // 2. Keep the story and the result before anything is sold.
     try {
       await d.store.put(orderRef, record)
@@ -104,7 +119,7 @@ export function createOrderHandler(deps: () => OrderDeps) {
 
     // 3. The Shopify cart.
     try {
-      const cart = await createCart(d.shopify, order.package, lineAttributes(order, orderRef), orderRef, d.fetchImpl, poems.map((p) => ({ type: p.type, attributes: poemAttributes(p, orderRef) })))
+      const cart = await createCart(d.shopify, order.package, lineAttributes(order, orderRef, animationLink), orderRef, d.fetchImpl, poems.map((p) => ({ type: p.type, attributes: poemAttributes(p, orderRef) })))
       record.status = 'cart_created'
       record.updated_at = (d.now?.() ?? new Date()).toISOString()
       record.shopify = { cart_id: cart.cartId, checkout_url: cart.checkoutUrl, variant_id: cart.variantId }
@@ -129,6 +144,7 @@ export function createOrderHandler(deps: () => OrderDeps) {
         glyph: order.glyph,
         certificate_text: record.production.certificate_text,
         certificate: record.production.certificate,
+        animation_url: animationLink,
       })
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err)

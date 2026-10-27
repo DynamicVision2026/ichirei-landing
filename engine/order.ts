@@ -228,7 +228,7 @@ export interface Attribute {
  * form (ja: modern, zh: simplified); `inscription_form` is the glyph to CARVE (after the sender's
  * choice of kyūjitai/modern or traditional/simplified).
  */
-export function lineAttributes(order: ValidOrder, orderRef: string): Attribute[] {
+export function lineAttributes(order: ValidOrder, orderRef: string, animationLink?: string | null): Attribute[] {
   return [
     { key: 'kanji', value: order.candidate.kanji },
     { key: 'inscription_form', value: order.glyph },
@@ -241,6 +241,8 @@ export function lineAttributes(order: ValidOrder, orderRef: string): Attribute[]
     { key: 'order_ref', value: orderRef },
     // Remembrance: tells the workshop to carve in black or gold — no red seal, no red-and-white cord.
     ...(order.certificate.memorial ? [{ key: 'ichirei_memorial', value: 'yes' }] : []),
+    // The private address of the story animation (/a/<id>): for the confirmation e-mail and the QR code on the printed card.
+    ...(animationLink ? [{ key: 'ichirei_animation_url', value: animationLink }] : []),
   ]
 }
 
@@ -282,6 +284,8 @@ export interface OrderRecord {
   status: OrderStatus
   created_at: string
   updated_at: string
+  /** The private story animation of this order (AN-…): the page is /a/<id>. */
+  animation_id?: string | null
   /** What production needs at a glance (also derivable from the rest of the record). */
   production: {
     language: Language

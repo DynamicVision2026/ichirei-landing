@@ -25,7 +25,10 @@ ENV NODE_ENV=production
 WORKDIR /app
 
 COPY package.json package-lock.json ./
-RUN npm ci --omit=dev && npm cache clean --force
+# (the story animation reads only the minified stroke SVGs of KanjiVG, dist/main/*.svg: drop its variations and duplicate JSON, about 65 MB)
+RUN npm ci --omit=dev && npm cache clean --force \
+ && rm -rf node_modules/@madcat/kanjivg/dist/variations \
+ && find node_modules/@madcat/kanjivg/dist/main -name '*.json' -delete
 
 # Reasoning stays in engine/prompt.*.md and explain-prompt.*.md — plain text
 # files, read at request time. Editing them = a normal commit; Cloud Build

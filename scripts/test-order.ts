@@ -219,7 +219,7 @@ const stored1 = (await memory.get(j1.order_ref)) as any
 check('stored under that order_ref: the story, the full engine result, the gaze line and the anchor', stored1.story === STORY && stored1.engine_result.candidates.length === 3 && stored1.production.gaze_line === GOLDEN.candidates[0].one_line_gaze && stored1.production.story_anchor === GOLDEN.candidates[0].story_anchor)
 check('stored record: status cart_created, with the Shopify cart id, checkout URL and variant', stored1.status === 'cart_created' && stored1.shopify.cart_id === 'gid://shopify/Cart/fake-cart-key' && stored1.shopify.variant_id.endsWith('/2222'))
 check('certificate → Shopify: the cart line carries certificate_meaning_en ("proof") right after reading, and the stored record has the full certificate object', shopSeen[0].body.variables.input.lines[0].attributes.map((a: any) => a.key).slice(0, 4).join() === 'kanji,inscription_form,reading,certificate_meaning_en' && shopSeen[0].body.variables.input.lines[0].attributes[3].value === 'proof' && stored1.production.certificate.meaning_en === 'proof' && stored1.production.certificate.line_en === CERTIFICATE_LINE_EN && j1.certificate.meaning_en === 'proof')
-check('Shopify saw one cart with this order_ref on the line and the cart, and NOT the story', shopSeen.length === 1 && shopSeen[0].body.variables.input.lines[0].attributes.at(-1).value === j1.order_ref && shopSeen[0].body.variables.input.attributes[0].value === j1.order_ref && !JSON.stringify(shopSeen[0].body).includes('口下手'))
+check('Shopify saw one cart with this order_ref on the line and the cart, and NOT the story', shopSeen.length === 1 && shopSeen[0].body.variables.input.lines[0].attributes.find((a: any) => a.key === 'order_ref').value === j1.order_ref && shopSeen[0].body.variables.input.attributes[0].value === j1.order_ref && !JSON.stringify(shopSeen[0].body).includes('口下手'))
 shopSeen.length = 0
 const r2 = await call(base({ package: 'simple', language: 'zh-Hant', engine_result: ZH, selected_kanji: '灯', inscription_style: 'simplified', sender_name: '李明', receiver_name: '李華' }))
 const j2 = (await r2.json()) as any
@@ -228,14 +228,14 @@ check('every order gets its own order_ref', j1.order_ref !== j2.order_ref)
 
 shopSeen.length = 0
 const bad = await call(base({ delivery_date: '2020-01-01' }))
-check('invalid input → 400 naming the field, no record, no cart', bad.status === 400 && ((await bad.json()) as any).field === 'delivery_date' && shopSeen.length === 0 && memory.records.size === 2)
+check('invalid input → 400 naming the field, no record, no cart', bad.status === 400 && ((await bad.json()) as any).field === 'delivery_date' && shopSeen.length === 0 && memory.records.size === 4)
 check('malformed JSON → 400; oversized body → 413; GET → 405', (await call('{nope')).status === 400 && (await call('x'.repeat(300_001))).status === 413 && (await handler(new Request('http://x/api/order'))).status === 405)
 
 const noStore = await call(base(), createOrderHandler(mkDeps({ store: null })))
 check('no order store configured → 503 store_not_configured, and NO Shopify cart is created', noStore.status === 503 && ((await noStore.json()) as any).code === 'store_not_configured' && shopSeen.length === 0)
 const noShop = await call(base(), createOrderHandler(mkDeps({ shopify: null, shopifyMissing: ['SHOPIFY_STOREFRONT_TOKEN'] })))
 const noShopJ = (await noShop.json()) as any
-check('Shopify not configured → 503 naming the missing variable; nothing stored', noShop.status === 503 && noShopJ.code === 'shopify_not_configured' && noShopJ.missing.join() === 'SHOPIFY_STOREFRONT_TOKEN' && memory.records.size === 2)
+check('Shopify not configured → 503 naming the missing variable; nothing stored', noShop.status === 503 && noShopJ.code === 'shopify_not_configured' && noShopJ.missing.join() === 'SHOPIFY_STOREFRONT_TOKEN' && memory.records.size === 4)
 const brokenStore: any = { kind: 'memory', put: async () => { throw new Error('disk on fire') }, get: async () => null }
 shopSeen.length = 0
 const storeFail = await call(base(), createOrderHandler(mkDeps({ store: brokenStore })))
@@ -248,7 +248,8 @@ check('Shopify refuses the cart → 502 cart_failed with the order_ref; the reco
 check('the customer-facing error does not leak Shopify\'s message or the token', !JSON.stringify(cartFailJ).includes('merchandise') && !JSON.stringify(cartFailJ).includes('shpat_'))
 shopMode = 'ok'
 let writes = 0
-const flaky: any = { kind: 'memory', put: async (ref: string, rr: object) => { writes++; if (writes === 2) throw new Error('second write fails'); await memory.put(ref, rr) }, get: async (ref: string) => memory.get(ref) }
+// (the first write is the story animation's record, the second the order's first write, the third its status update)
+const flaky: any = { kind: 'memory', put: async (ref: string, rr: object) => { writes++; if (writes === 3) throw new Error('second write of the order fails'); await memory.put(ref, rr) }, get: async (ref: string) => memory.get(ref) }
 const survive = await call(base(), createOrderHandler(mkDeps({ store: flaky })))
 check('the status update after the cart fails → the customer still gets the checkout (the first write already holds the story)', survive.status === 200 && ((await survive.json()) as any).checkout_url.startsWith('https://'))
 const logged: string[] = []

@@ -14,6 +14,7 @@ import { POST as orderPost } from '../api/order.ts'
 import { POST as poemPost, TYPES_GET as poemTypesGet } from '../api/poem.ts'
 import { availablePoemTypes, poemPreviewOn } from '../engine/shopify.ts'
 import { POST as trackPost } from '../api/track.ts'
+import { handlers as animationHandlers, strokesGet } from '../api/animation.ts'
 import { POST as analyticsPost } from '../api/analytics.ts'
 import { GET as ratesGet } from '../api/rates.ts'
 import { loadTrackConfig } from '../engine/track.ts'
@@ -142,6 +143,12 @@ export function createApp(config: ServerConfig): Hono {
   // The poem add-on: one model call per poem (45 s ceiling), 20 per hour per IP; the types on offer are those with a Shopify variant.
   app.post('/api/poem', requireApiKey, limited(poemLimit), (c) => poemPost(c.req.raw))
   app.get('/api/poem-types', () => poemTypesGet())
+  // The story animation (/a/<id>): the private view of one order, a QR code of its address, and the open stroke-order data. Generous
+  // per-IP limit (ICHIREI_ANIMATION_LIMIT): a page load makes a handful of calls; this only stops scraping.
+  const animationLimit = envRunLimiter('ICHIREI_ANIMATION_LIMIT', { max: 120, minutes: 10 })
+  app.get('/api/animation/:id', limited(animationLimit), (c) => animationHandlers.view(c.req.param('id')))
+  app.get('/api/animation/:id/qr.svg', limited(animationLimit), (c) => animationHandlers.qr(c.req.param('id')))
+  app.get('/api/strokes', limited(animationLimit), (c) => strokesGet(new URL(c.req.url)))
   app.post('/api/log', adaptVercelHandler(logHandler))
   // Purchase hand-off: stores the story + result under order_ref, creates the Shopify cart.
   app.post('/api/order', (c) => orderPost(c.req.raw))
@@ -163,6 +170,12 @@ export function createApp(config: ServerConfig): Hono {
   app.all('/api/track', methodNotAllowed)
   app.all('/api/analytics', methodNotAllowed)
   app.all('/api/*', (c) => c.json({ error: 'Not found' }, 404))
+
+  // The private animation pages are never indexed.
+  app.use('/a/*', async (c, next) => {
+    await next()
+    c.header('X-Robots-Tag', 'noindex, nofollow')
+  })
 
   // The built bundle, stylesheet and pages are text: gzip them (Cloud Run does not). Never the API — the NDJSON
   // stream and its heartbeat must reach the browser byte by byte, so /api/* is left exactly as it was.
