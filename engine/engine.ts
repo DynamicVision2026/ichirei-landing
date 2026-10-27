@@ -15,6 +15,7 @@
 import Anthropic from '@anthropic-ai/sdk'
 import { callSignal, callTimeoutMs, ModelTimeoutError, reviewTimeoutMs, runBudgetMs, shadowGraceMs, timedOut } from './limits.ts'
 import { finalizeResult } from './slots.ts'
+import { logMainCharacter } from './main-count.ts'
 import { buildLexiconPrompt, eligibleFor, inEligible, lexiconEchoOf, lexiconModeFromEnv, loadLexicon, type EligibleSet, type Lexicon, type LexiconPromptParts } from './lexicon.ts'
 import { readFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
@@ -241,7 +242,13 @@ interface PipelineOut {
  * second, selection-only call asks what the lexicon would have chosen, which is only logged; on = main and second characters come from
  * engine/lexicon.csv, the palette engine is the fallback after a second "nothing fits".
  */
-export async function runEngine(
+export async function runEngine(story: string, condition: 'A' | 'B' | 'C', opts: RunEngineOptions = {}): Promise<EngineResult> {
+  const result = await runEngineInner(story, condition, opts)
+  logMainCharacter(result) // the day's repeats, visible in the logs (engine/main-count.ts)
+  return result
+}
+
+async function runEngineInner(
   story: string,
   _condition: 'A' | 'B' | 'C',
   opts: RunEngineOptions = {},

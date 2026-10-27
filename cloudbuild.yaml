@@ -35,8 +35,8 @@ substitutions:
   _REVIEW_MODEL: 'claude-haiku-5-5' # ICHIREI_REVIEW_MODEL — the fastest current model; the review only checks a short answer
   _REVIEW_EFFORT: 'low'             # ICHIREI_REVIEW_EFFORT
   _CALL_TIMEOUT_MS: '150000'        # ICHIREI_CALL_TIMEOUT_MS — the selection call may take at most this (one automatic retry); 90 s cut off slow-but-fine runs
-  _LEXICON_MODE: 'shadow'           # ICHIREI_LEXICON_MODE — off | shadow | on. shadow: the palette engine answers, the classical lexicon's choice is only logged.
-                                    # Switch to 'on' (edit here, or override _LEXICON_MODE on the Cloud Build trigger) after the live comparison.
+  _LEXICON_MODE: 'on'               # ICHIREI_LEXICON_MODE — off | shadow | on. on: main and second characters come from engine/lexicon.csv (switched on 2026-10-28
+                                    # after the live shadow comparison); shadow: the palette engine answers and the lexicon's choice is only logged; off: palette engine only.
   _REVIEW_TIMEOUT_MS: '60000'       # ICHIREI_REVIEW_TIMEOUT_MS — the review call; if it times out the selection is shown without it
   _TIMEOUT: '300'                   # Cloud Run request timeout (s). Keep in step with
                                     # the server (300s) and the frontend deadline (290s).

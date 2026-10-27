@@ -12,6 +12,7 @@ import { runEngine } from '../engine/engine.ts'
 import { validateEngineResult, type EngineResult } from '../engine/contract.ts'
 import { LEXICON_COLUMNS, buildLexiconPrompt, eligibleFor, lexiconEchoOf, lexiconModeFromEnv, lexiconRowIn, loadLexicon, parseLexicon, renderLexiconTable, rowReviewedByHuman, rowShowsLine } from '../engine/lexicon.ts'
 import { loadPalette, parseCsv } from '../engine/palette.ts'
+import { logMainCharacter, resetMainTally } from '../engine/main-count.ts'
 // @ts-expect-error untyped test helper
 import { startServer } from './server-fixtures.mjs'
 
@@ -75,7 +76,7 @@ check('(2) an unspecified relationship narrows nothing by relationship (but 藏 
 // ---- 3. the mode switch -----------------------------------------------------------------------------------------------------------
 check('(3) ICHIREI_LEXICON_MODE: default (unset, empty, unknown) = shadow; off / shadow / on in any case', lexiconModeFromEnv({}) === 'shadow' && lexiconModeFromEnv({ ICHIREI_LEXICON_MODE: '' }) === 'shadow' && lexiconModeFromEnv({ ICHIREI_LEXICON_MODE: 'banana' }) === 'shadow' && lexiconModeFromEnv({ ICHIREI_LEXICON_MODE: 'ON' }) === 'on' && lexiconModeFromEnv({ ICHIREI_LEXICON_MODE: ' off ' }) === 'off')
 const cloudbuild = read('cloudbuild.yaml')
-check('(3) cloudbuild.yaml ships shadow and passes it on every deploy', /_LEXICON_MODE: 'shadow'/.test(cloudbuild) && cloudbuild.includes('ICHIREI_LEXICON_MODE=${_LEXICON_MODE}'))
+check('(3) cloudbuild.yaml ships `on` (switched on 2026-10-28 after the live shadow comparison) and passes it on every deploy; the code default without any setting stays shadow', /_LEXICON_MODE: 'on'/.test(cloudbuild) && cloudbuild.includes('ICHIREI_LEXICON_MODE=${_LEXICON_MODE}') && lexiconModeFromEnv({}) === 'shadow')
 
 // ---- 4. the prompt ---------------------------------------------------------------------------------------------------------------------
 const setA = eligibleFor(lexicon, palette, gift('ja', 'parent_mother', 'up', 'parent_day'))
@@ -86,6 +87,8 @@ check('(4) the static block is the same for every gift (so it can be cached) and
 check('(4) the benchmark rows are not in the prompt at all', !pa.staticBlock.includes('- 默 |') && !pa.staticBlock.includes('- 迎 |') && renderLexiconTable(lexicon).split('\n').length === 165)
 const lp = read('engine/lexicon-prompt.md')
 check('(4) lexicon-prompt.md carries the reasoning: choose by the person not the tag, slots 1–2 only from the list, freestyle stays open, the no-fit answer (insufficient + lexicon_miss + one question), no classical line written by the model', ['Choose by the person, not the tag', 'must each be one of the characters in the list', 'NOT limited to the lexicon', '"lexicon_miss": true', 'ONE follow-up question', 'Do not write any classical line'].every((n) => lp.includes(n)))
+
+check('(4) the gentle variety rule is in the lexicon prompt: prefer the most story-specific character; a broad virtue (恕 誠 和 敬) is main only when the story is clearly about it; a preference, not a ban', ['Variety, gently', 'most story-specific', '恕, 誠, 和, 敬', 'clearly about that virtue', 'a preference, not a ban'].every((n) => lp.includes(n)) && lp.indexOf('Variety, gently') > lp.indexOf('<!-- ICHIREI:LEXICON-SPLIT -->'))
 
 // ---- fake upstream ---------------------------------------------------------------------------------------------------------------------
 interface Seen { kind: 'select' | 'lexicon_select' | 'review' | 'replace'; prompt: string; cached: boolean; content: unknown }
@@ -291,6 +294,27 @@ process.env.ICHIREI_SHADOW_GRACE_MS = '1500'
   const r = await run({ mode: 'on' })
   delete process.env.ICHIREI_LEXICON_PATH
   check('(8) a missing lexicon file: the engine falls back to the palette engine and logs it — it never fails the request', slotKanji(r, 'main') === '備' && count('lexicon_select') === 0 && logs.some((l) => l.startsWith('[ichirei-lexicon] unavailable')))
+}
+
+// ---- 8b. the daily count of main characters ----------------------------------------------------------------------------------------------
+{
+  resetMainTally()
+  const lines: string[] = []
+  const at = new Date('2026-10-28T03:00:00Z') // 12:00 JST
+  const res = (kanji: string, extra: Partial<EngineResult> = {}) => ({ status: 'sufficient', primary_kanji: kanji, language: 'ja', relationship: 'parent_mother', occasion: 'parent_day', candidates: [], ...extra }) as unknown as EngineResult
+  logMainCharacter(res('待'), at, (l) => lines.push(l))
+  logMainCharacter(res('待', { lexicon: { mode: 'on', outcome: 'chosen', eligible: 80 } }), at, (l) => lines.push(l))
+  logMainCharacter(res('守'), at, (l) => lines.push(l))
+  logMainCharacter(res('待', { lexicon: { mode: 'on', outcome: 'fallback', eligible: 80 } }), new Date('2026-10-28T14:00:00Z'), (l) => lines.push(l)) // 23:00 JST: same business day
+  logMainCharacter(res('待'), new Date('2026-10-28T15:30:00Z'), (l) => lines.push(l)) // 00:30 JST next day: counter starts over
+  const rows = lines.map((l) => JSON.parse(l.replace('[ichirei-main] ', '')))
+  check('(8b) one line per shown main: the character, the JST day, and how many times it has been the main today on this instance', lines.every((l) => l.startsWith('[ichirei-main] ')) && rows.map((r) => `${r.kanji}${r.count_today_on_this_instance}`).join() === '待1,待2,守1,待3,待1' && rows[0].day === '2026-10-28' && rows[4].day === '2026-10-29', JSON.stringify(rows.map((r) => [r.day, r.kanji, r.count_today_on_this_instance])))
+  check('(8b) the line says where the main came from (palette / lexicon / palette after a lexicon miss) and carries codes only', rows.slice(0, 4).map((r) => r.source).join() === 'palette,lexicon,palette,palette_after_lexicon_miss' && Object.keys(rows[0]).sort().join() === 'count_today_on_this_instance,day,kanji,language,occasion,relationship,source')
+  check('(8b) an insufficient result has no main and logs nothing', logMainCharacter({ ...res('待'), status: 'insufficient', primary_kanji: null } as EngineResult, at, (l) => lines.push(l)) === null && lines.length === 5)
+  resetMainTally()
+  const r = await run({ mode: 'on' })
+  const mains = logs.filter((l) => l.startsWith('[ichirei-main] '))
+  check('(8b) a real run logs its main exactly once, with no story text', mains.length === 1 && JSON.parse(mains[0].slice(15)).kanji === r.primary_kanji && JSON.parse(mains[0].slice(15)).source === 'lexicon' && noStory(), mains.join('|'))
 }
 
 // ---- 9. /api/health -------------------------------------------------------------------------------------------------------------------------

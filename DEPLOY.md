@@ -261,12 +261,12 @@ Recorded from the owner's report; nothing here is a secret value. Re-check with 
 
 **What it is.** `engine/lexicon.csv` (167 rows, 153 distinct characters, 149 rows with a verified line) holds the characters the classical masters made famous: what each means in its line, the person it names, the relationships it suits, the source and the stand-alone reading risk. In lexicon mode the **main and second characters come only from this list**; the AI still reads the story and decides which listed character is the truest compression of the person (`engine/lexicon-prompt.md` — the reasoning lives there, not in code). The freestyle stays open under the existing taboo rules. The palette engine is the fallback.
 
-**The switch: `ICHIREI_LEXICON_MODE` = `off` | `shadow` | `on`** (default and shipped value: **`shadow`**; `cloudbuild.yaml` passes it on every deploy as `_LEXICON_MODE`, so change it THERE or override the substitution on the Cloud Build trigger — a value set by hand on the console is overwritten by the next deploy). `/api/health` reports it as `lexiconMode`.
+**The switch: `ICHIREI_LEXICON_MODE` = `off` | `shadow` | `on`** (code default: `shadow`; **shipped value since 2026-10-28: `on`**, set in `cloudbuild.yaml` after the live shadow comparison; `cloudbuild.yaml` passes it on every deploy as `_LEXICON_MODE`, so change it THERE or override the substitution on the Cloud Build trigger — a value set by hand on the console is overwritten by the next deploy). `/api/health` reports it as `lexiconMode`.
 
 | Mode | What the customer gets | What else happens |
 |---|---|---|
 | `off` | the palette engine, exactly as before | nothing |
-| `shadow` (default) | the palette engine's answer, exactly as before | ONE extra selection-only call (the lexicon prompt; no review, no replacement; not streamed to the page) runs beside it; when the customer's answer is ready it gets up to `ICHIREI_SHADOW_GRACE_MS` (20 s) to finish, and `[ichirei-lexicon] shadow {…}` logs what lexicon mode would have chosen next to what the customer got (kanji, relationship, occasion, `same_main`; **never story text**). **It doubles the selection cost and raises the Anthropic rate use while it is on.** |
+| `shadow` (code default) | the palette engine's answer, exactly as before | ONE extra selection-only call (the lexicon prompt; no review, no replacement; not streamed to the page) runs beside it; when the customer's answer is ready it gets up to `ICHIREI_SHADOW_GRACE_MS` (20 s) to finish, and `[ichirei-lexicon] shadow {…}` logs what lexicon mode would have chosen next to what the customer got (kanji, relationship, occasion, `same_main`; **never story text**). **It doubles the selection cost and raises the Anthropic rate use while it is on.** |
 | `on` | slots 1–2 from the lexicon | see below |
 
 **`on` in detail.**
@@ -281,7 +281,11 @@ Recorded from the owner's report; nothing here is a secret value. Re-check with 
 
 **Palette rows for the lexicon.** 86 lexicon characters had no row in the palettes (the owner counted 92 rows/forms; 86 distinct characters, each missing in both languages): 86 `ja` + 86 `zh` rows were added by `scripts/add-lexicon-palette-rows.mjs` from `scripts/lexicon-palette-data.json` — readings, meanings, status, taboo flags, blocked occasions, register, inscription fitness, as an **AI first pass that only adds restrictions** (`reviewed_by: Claude(AI一次確認)`, `reviewed_on: 2026-10-27`; never counted as reviewed), carrying over each `standalone_reading_risk`. Re-run the script after editing the JSON (it is idempotent).
 
-**Before switching to `on`**: read the `[ichirei-lexicon] shadow` lines for a day of real stories (how often the lexicon's main differs, how often it misses), compare a few by eye, then set `_LEXICON_MODE: 'on'`. Not measured on the live model yet — nothing in this change was run against the real model.
+**Variety.** `engine/lexicon-prompt.md` rule 8 asks, gently, for the most story-specific eligible character; a broad virtue character (恕, 誠, 和, 敬 …) should be the main only when the story is clearly about that virtue. It is a preference in the prompt, not a code rule.
+
+**Daily count of main characters.** Every finished run that shows a main logs one line, no story text: `[ichirei-main] {"day":"2026-10-28","kanji":"待","count_today_on_this_instance":3,"source":"lexicon|palette|palette_after_lexicon_miss","language","relationship","occasion"}` (`engine/main-count.ts`; the day is the JST business day). The counter is per Cloud Run instance; the day's total per character is the number of lines in Cloud Logging, e.g. `gcloud logging read 'resource.type="cloud_run_revision" AND resource.labels.service_name="ichirei" AND textPayload:"[ichirei-main]"' --freshness=1d --format='value(textPayload)' | grep -o '"kanji":"[^"]*"' | sort | uniq -c | sort -rn`.
+
+**Switching back.** Set `_LEXICON_MODE` to `shadow` or `off` in `cloudbuild.yaml` (or on the trigger) and push. In `on` mode, read the `[ichirei-lexicon] miss` lines to see where the lexicon should grow. Not measured on the live model by this change — the shadow comparison (5 live stories) was the owner's.
 
 ## Japanese palette review (first pass, applied 2026-10-27)
 
