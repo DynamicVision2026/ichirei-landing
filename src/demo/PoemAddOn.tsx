@@ -35,6 +35,8 @@ export default function PoemAddOn({ result, story, followUps, candidate, copy, l
   const [status, setStatus] = useState<Partial<Record<PoemType, Status>>>({})
   const inflight = useRef<{ type: PoemType; ac: AbortController } | null>(null)
   const started = useRef<Set<PoemType>>(new Set())
+  const statusRef = useRef<Partial<Record<PoemType, Status>>>({})
+  statusRef.current = status
 
   const write = useCallback(
     async (type: PoemType) => {
@@ -86,7 +88,8 @@ export default function PoemAddOn({ result, story, followUps, candidate, copy, l
     if (started.current.has(selected)) return
     started.current.add(selected)
     const prev = inflight.current
-    if (prev && prev.type !== selected) {
+    if (prev && prev.type !== selected && statusRef.current[prev.type]?.state === 'loading') {
+      // (only a poem that is still being written is dropped; one that is finished stays, so going back to it costs nothing)
       prev.ac.abort()
       started.current.delete(prev.type)
       setStatus((s) => (s[prev.type]?.state === 'loading' ? { ...s, [prev.type]: undefined } : s))
