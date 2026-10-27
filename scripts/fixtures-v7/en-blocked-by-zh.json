@@ -5,14 +5,14 @@
     "language": "en",
     "relationship": "grandparent",
     "direction": "up",
-    "occasion": "birthday_milestone",
+    "occasion": "parent_day",
     "occasion_detail": "80th birthday"
   },
   "model_reply": {
     "language": "en",
     "relationship": "grandparent",
     "direction": "up",
-    "occasion": "birthday_milestone",
+    "occasion": "parent_day",
     "occasion_detail": "80th birthday",
     "inscription_script": null,
     "status": "sufficient",

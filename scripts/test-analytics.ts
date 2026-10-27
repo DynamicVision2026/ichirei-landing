@@ -76,7 +76,7 @@ gcs.close()
 
 // ---- what is recorded: codes and booleans, never text ----------------------------------------------------
 const shown = shownEvent(clone(GOLDEN), S1, 'customer', NOW)
-check('shown event: language, relationship, occasion, status, which slot was shown as main, whether a freestyle was offered', shown.event === 'shown' && shown.language === 'ja' && shown.relationship === 'parent_father' && shown.occasion === 'birthday_milestone' && shown.status === 'sufficient' && shown.main_slot === 'main' && shown.has_freestyle === true)
+check('shown event: language, relationship, occasion, status, which slot was shown as main, whether a freestyle was offered', shown.event === 'shown' && shown.language === 'ja' && shown.relationship === 'parent_father' && shown.occasion === 'parent_day' && shown.status === 'sufficient' && shown.main_slot === 'main' && shown.has_freestyle === true)
 const promotedResult = clone(GOLDEN)
 promotedResult.primary_kanji = '黙'
 check('shown event: when slot 2 was promoted, the slot shown as main is "second"', (shownEvent(promotedResult, S1, 'customer', NOW) as { main_slot: string }).main_slot === 'second')
@@ -135,12 +135,12 @@ const STORY = '父は口下手で、盆に帰るたびに車で駅まで迎え�
 const before = readLines().length
 const logq = console.log
 console.log = () => {}
-const sel = await selectPost(new Request('http://x/api/select', { method: 'POST', body: JSON.stringify({ story: STORY, session: 'Sess' + 'B'.repeat(20), source: 'customer', language: 'ja', relationship: 'parent_father', direction: 'up', occasion: 'birthday_milestone' }) }))
+const sel = await selectPost(new Request('http://x/api/select', { method: 'POST', body: JSON.stringify({ story: STORY, session: 'Sess' + 'B'.repeat(20), source: 'customer', language: 'ja', relationship: 'parent_father', direction: 'up', occasion: 'parent_day' }) }))
 await sel.text()
 await new Promise((r) => setTimeout(r, 150))
 console.log = logq
 const shownLine = readLines().slice(before).find((l) => l.event === 'shown')
-check('/api/select with a session id writes ONE "shown" event: language, relationship, occasion, main slot, freestyle offered', shownLine?.language === 'ja' && shownLine.relationship === 'parent_father' && shownLine.occasion === 'birthday_milestone' && shownLine.status === 'sufficient' && shownLine.main_slot === 'main' && shownLine.has_freestyle === true && shownLine.session === 'Sess' + 'B'.repeat(20), JSON.stringify(readLines().slice(before)))
+check('/api/select with a session id writes ONE "shown" event: language, relationship, occasion, main slot, freestyle offered', shownLine?.language === 'ja' && shownLine.relationship === 'parent_father' && shownLine.occasion === 'parent_day' && shownLine.status === 'sufficient' && shownLine.main_slot === 'main' && shownLine.has_freestyle === true && shownLine.session === 'Sess' + 'B'.repeat(20), JSON.stringify(readLines().slice(before)))
 check('privacy: nothing of the story, the gaze lines or the kanji is in the analytics files', !readdirSync(join(adir, 'analytics')).some((f) => /父|駅|封筒|迎|黙|あなた/.test(readFileSync(join(adir, 'analytics', f), 'utf8'))))
 const beforeNo = readLines().length
 console.log = () => {}

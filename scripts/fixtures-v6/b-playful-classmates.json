@@ -5,14 +5,14 @@
     "language": "ja",
     "relationship": "friend",
     "direction": "across",
-    "occasion": "birthday_milestone",
+    "occasion": "parent_day",
     "occasion_detail": "30歳"
   },
   "model_reply": {
     "language": "ja",
     "relationship": "friend",
     "direction": "across",
-    "occasion": "birthday_milestone",
+    "occasion": "parent_day",
     "occasion_detail": "30歳",
     "inscription_script": null,
     "status": "sufficient",

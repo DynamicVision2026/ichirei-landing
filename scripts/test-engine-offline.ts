@@ -77,9 +77,9 @@ const post = (body: unknown) =>
   POST(new Request('http://localhost/api/select', { method: 'POST', body: typeof body === 'string' ? body : JSON.stringify(body) }))
 
 try {
-  // ---- 1. The golden run: ja / parent_father / up / birthday_milestone ------
+  // ---- 1. The golden run: ja / parent_father / up / parent_day ------
   const golden = await runEngine(GOLDEN_STORY, 'A', {
-    context: { language: 'ja', relationship: 'parent_father', direction: 'up', occasion: 'birthday_milestone', occasion_detail: '還暦' },
+    context: { language: 'ja', relationship: 'parent_father', direction: 'up', occasion: 'parent_day', occasion_detail: '還暦' },
   })
   const p1 = lastPrompt()
   // The engine returns the model's answer after the palette referee; for the golden fixture
@@ -87,9 +87,9 @@ try {
   check('golden: result equals the golden fixture run through the palette referee', JSON.stringify(golden) === JSON.stringify(applyReviewVerdicts(applyPalette(GOLDEN, loadPalette(), GOLDEN_STORY), loadPalette(), GOLDEN_STORY, { ran: true, skipped_reason: null, verdicts: GOLDEN.candidates.map((c: { slot: string; kanji: string }) => ({ slot: c.slot, kanji: c.kanji, pass: true, reason: 'ok (fake reviewer)', rule: null })) })))
   check('golden: referee ran, kept 迎 as primary (verbatim anchor), changed no candidate set', golden.referee?.palette_rows === loadPalette().size && golden.referee.primary_changed === false && golden.candidates.map((c) => c.kanji).join('') === GOLDEN.candidates.map((c: { kanji: string }) => c.kanji).join(''))
   check('golden: result conforms to the v6 contract', validateEngineResult(golden).length === 0, validateEngineResult(golden).join('; '))
-  check('golden: primary is 迎 and the four context fields are echoed', golden.primary_kanji === '迎' && golden.language === 'ja' && golden.relationship === 'parent_father' && golden.direction === 'up' && golden.occasion === 'birthday_milestone' && golden.occasion_detail === '還暦')
+  check('golden: primary is 迎 and the four context fields are echoed', golden.primary_kanji === '迎' && golden.language === 'ja' && golden.relationship === 'parent_father' && golden.direction === 'up' && golden.occasion === 'parent_day' && golden.occasion_detail === '還暦')
   check('golden→model: prompt is prompt.ja.md (Japanese output rules)', p1.includes('Selection Prompt (v6, Japanese / ja)') && p1.includes('hiragana'))
-  check('golden→model: all four context values reached the prompt', ['language: ja', 'relationship: parent_father', 'direction: up', 'occasion: birthday_milestone', 'occasion_detail: 還暦'].every((l) => p1.includes(l)))
+  check('golden→model: all four context values reached the prompt', ['language: ja', 'relationship: parent_father', 'direction: up', 'occasion: parent_day', 'occasion_detail: 還暦'].every((l) => p1.includes(l)))
   check('golden→model: story injected, no slot left behind', p1.includes(GOLDEN_STORY) && !allSlots.some((s) => p1.includes(s)))
   check('golden→model: heart-anchor gate + widened substitution test are in what the model sees', p1.includes('6. Heart anchor.') && p1.includes('another family, couple, friendship or team'))
   // 還暦 is allowed to reach the model only as the sender's occasion_detail (and as the example in its definition).
@@ -189,7 +189,7 @@ try {
     茶: 'The kettle went on the moment you heard the gate.',
   }
   const enReply = {
-    ...GOLDEN, language: 'en', relationship: 'parent_mother', direction: 'up', occasion: 'birthday_milestone', occasion_detail: '70th birthday', inscription_script: null,
+    ...GOLDEN, language: 'en', relationship: 'parent_mother', direction: 'up', occasion: 'parent_day', occasion_detail: '70th birthday', inscription_script: null,
     fingerprint: { ...GOLDEN.fingerprint, emotional_register: ['grateful'] },
     candidates: [
       enCand('main', '送', '送', 'on: sō · kun: oku(ru)', 'to send; to see off', 'Role', 'until I got home', EN_GAZE.送),
@@ -202,10 +202,10 @@ try {
     fallback_follow_up_question: 'Could you tell me one small moment you actually shared with her?',
   }
   reply = enReply
-  const en = await runEngine(EN_STORY, 'A', { context: { language: 'en', relationship: 'parent_mother', direction: 'up', occasion: 'birthday_milestone', occasion_detail: '70th birthday', inscription_script: 'simplified' } })
+  const en = await runEngine(EN_STORY, 'A', { context: { language: 'en', relationship: 'parent_mother', direction: 'up', occasion: 'parent_day', occasion_detail: '70th birthday', inscription_script: 'simplified' } })
   const pEn = lastPrompt()
   check('en→model: prompt is prompt.en.md (English output, romaji reading, English meaning, tattoo-kanji guard) — not the ja or zh file', pEn.includes('Selection Prompt (v6, English / en)') && pEn.includes('romaji') && pEn.includes('tattoo kanji') && !pEn.includes('Selection Prompt (v6, Japanese') && !pEn.includes('Selection Prompt (v6, Chinese'))
-  check('en→model: the English story and all five context values reached the prompt; no slot left behind', pEn.includes(EN_STORY) && ['language: en', 'relationship: parent_mother', 'direction: up', 'occasion: birthday_milestone', 'occasion_detail: 70th birthday'].every((l) => pEn.includes(l)) && !allSlots.some((x) => pEn.includes(x)))
+  check('en→model: the English story and all five context values reached the prompt; no slot left behind', pEn.includes(EN_STORY) && ['language: en', 'relationship: parent_mother', 'direction: up', 'occasion: parent_day', 'occasion_detail: 70th birthday'].every((l) => pEn.includes(l)) && !allSlots.some((x) => pEn.includes(x)))
   check('en→model: HARD PROCESS RULE 6 (every gaze references the story) and the quarantine are in what the model sees', pEn.includes('6. Every `one_line_gaze` must visibly reference the sender\'s story') && /Quarantine rule:[^\n]*愛[^\n]*勇[^\n]*龍/.test(pEn))
   check('en: echo stamped (language en, inscription_script null even when the caller sent "simplified")', en.language === 'en' && en.inscription_script === null && en.relationship === 'parent_mother' && en.occasion_detail === '70th birthday')
   check('en referee uses the JA palette rows: slot 1 送 is hard_block-eliminated and slot 2 灯 is promoted; the freestyle 茶 is kept', en.candidates.find((c) => c.kanji === '送')?.eliminated_reason === 'palette: hard_block' && en.primary_kanji === '灯' && en.referee?.promoted_from === 'second' && en.referee.palette_rows === loadPalette().size && en.freestyle_kanji === '茶')
@@ -217,7 +217,7 @@ try {
   const cites = (g: string, st: string) => [...words(g)].some((w) => words(st).has(w))
   check('en fixture: every surviving candidate\'s gaze cites a detail of the story; the generic "You love me." does not', en.candidates.filter((c) => !c.eliminated).every((c) => cites(c.one_line_gaze, EN_STORY)) && !cites('You love me.', EN_STORY))
   check('en fixture: each story_anchor is a verbatim fragment of the English story', en.candidates.every((c) => EN_STORY.includes(c.story_anchor)))
-  const enApi = (await ndjson(await post({ story: EN_STORY, condition: 'A', language: 'en', relationship: 'parent_mother', direction: 'up', occasion: 'birthday_milestone' }))).at(-1)
+  const enApi = (await ndjson(await post({ story: EN_STORY, condition: 'A', language: 'en', relationship: 'parent_mother', direction: 'up', occasion: 'parent_day' }))).at(-1)
   check('api: language "en" is accepted and the NDJSON result is the refereed English result', enApi?.type === 'result' && enApi.result.language === 'en' && enApi.result.primary_kanji === '灯' && lastPrompt().includes('Selection Prompt (v6, English / en)'))
   check('api: "english" and "EN" are rejected — the code is exactly "en"', (await post({ story: EN_STORY, language: 'english' })).status === 400 && (await post({ story: EN_STORY, language: 'EN' })).status === 400)
   reply = GOLDEN
@@ -231,8 +231,8 @@ try {
 
   // ---- 4. The echo cannot disagree with the request ---------------------------
   reply = { ...GOLDEN, language: 'zh-Hant', inscription_script: 'simplified', relationship: 'spouse', direction: 'down', occasion: 'new_baby', occasion_detail: '滿月' }
-  const stamped = await runEngine(GOLDEN_STORY, 'A', { context: { language: 'ja', relationship: 'parent_father', direction: 'up', occasion: 'birthday_milestone', occasion_detail: '還暦' } })
-  check('stamping: a wrong model echo is overwritten with what the caller sent', stamped.language === 'ja' && stamped.inscription_script === null && stamped.relationship === 'parent_father' && stamped.direction === 'up' && stamped.occasion === 'birthday_milestone' && stamped.occasion_detail === '還暦')
+  const stamped = await runEngine(GOLDEN_STORY, 'A', { context: { language: 'ja', relationship: 'parent_father', direction: 'up', occasion: 'parent_day', occasion_detail: '還暦' } })
+  check('stamping: a wrong model echo is overwritten with what the caller sent', stamped.language === 'ja' && stamped.inscription_script === null && stamped.relationship === 'parent_father' && stamped.direction === 'up' && stamped.occasion === 'parent_day' && stamped.occasion_detail === '還暦')
   check('stamping: nothing else about the result is touched', stamped.primary_kanji === '迎' && JSON.stringify(stamped.candidates.map((c) => c.kanji)) === JSON.stringify(GOLDEN.candidates.map((c: { kanji: string }) => c.kanji)))
   reply = GOLDEN
 
@@ -243,21 +243,21 @@ try {
     ...GOLDEN.candidates[1], slot, kanji, truth_type: truth, eliminated: false, eliminated_reason: null, palette_status: 'ok', flags: [], inscription_form: null, ...over,
   })
   reply = { ...GOLDEN, candidates: [mk('main', '餞', 'Role', { story_anchor: '毎朝お弁当を作ってくれた' }), mk('second', '駅', 'Private Symbol', { story_anchor: '駅まで送ってくれて' }), mk('freestyle', '送', 'Play', { story_anchor: '帰りも必ず送ってくれる', unique_truth: '' })], primary_kanji: '餞', runner_up_kanji: '駅', freestyle_kanji: '送' }
-  const refereed = await runEngine(GOLDEN_STORY, 'A', { context: { language: 'ja', relationship: 'parent_father', direction: 'up', occasion: 'birthday_milestone', occasion_detail: '還暦' } })
+  const refereed = await runEngine(GOLDEN_STORY, 'A', { context: { language: 'ja', relationship: 'parent_father', direction: 'up', occasion: 'parent_day', occasion_detail: '還暦' } })
   const sou = refereed.candidates.find((c) => c.kanji === '送')!
   check('referee (engine): the freestyle 送 comes back eliminated with reason "palette: hard_block"', sou.eliminated === true && sou.eliminated_reason === 'palette: hard_block' && sou.palette_status === 'off_palette' && refereed.freestyle_kanji === null)
   check('referee (engine): anchorless 餞 is refused as primary; slot 2 (駅) is promoted', refereed.primary_kanji === '駅' && refereed.referee?.promoted_from === 'second' && refereed.referee?.original_primary === '餞' && refereed.referee.primary_changed === true && refereed.candidates.find((c) => c.kanji === '餞')?.eliminated === false)
   check('referee (engine): the refereed result still conforms to the contract', validateEngineResult(refereed).length === 0, validateEngineResult(refereed).join('; '))
-  const viaApi = (await ndjson(await post({ story: GOLDEN_STORY, condition: 'A', language: 'ja', relationship: 'parent_father', direction: 'up', occasion: 'birthday_milestone' }))).at(-1)
+  const viaApi = (await ndjson(await post({ story: GOLDEN_STORY, condition: 'A', language: 'ja', relationship: 'parent_father', direction: 'up', occasion: 'parent_day' }))).at(-1)
   check('referee (api): the NDJSON result line carries the refereed result', viaApi?.type === 'result' && viaApi.result.primary_kanji === '駅' && viaApi.result.referee?.actions.length >= 2)
   reply = GOLDEN
 
   // ---- 4c. blocked_occasions, end to end: the order's occasion removes a candidate ----------
-  reply = { ...GOLDEN, candidates: [mk('main', '寿', 'Role', { story_anchor: '盆に帰るたびに車で駅まで迎えに来て' }), mk('second', '灯', 'Private Symbol', { story_anchor: '駅まで送ってくれて' }), mk('freestyle', '駅', 'Play', { story_anchor: '駅まで送ってくれて', unique_truth: '' })], primary_kanji: '寿', runner_up_kanji: '灯', freestyle_kanji: '駅' }
+  reply = { ...GOLDEN, candidates: [mk('main', '星', 'Role', { story_anchor: '盆に帰るたびに車で駅まで迎えに来て' }), mk('second', '灯', 'Private Symbol', { story_anchor: '駅まで送ってくれて' }), mk('freestyle', '駅', 'Play', { story_anchor: '駅まで送ってくれて', unique_truth: '' })], primary_kanji: '星', runner_up_kanji: '灯', freestyle_kanji: '駅' }
   const babyOrder = await runEngine(GOLDEN_STORY, 'A', { context: { language: 'ja', relationship: 'child', direction: 'down', occasion: 'new_baby' } })
-  check('blocked_occasion (engine): 寿 is blocked for a new_baby order — eliminated "palette: blocked_occasion", slot 2 灯 promoted', babyOrder.candidates.find((c) => c.kanji === '寿')?.eliminated_reason === 'palette: blocked_occasion' && babyOrder.primary_kanji === '灯' && babyOrder.referee?.promoted_from === 'second')
+  check('blocked_occasion (engine): 星 ("星になる") is blocked for a new_baby order — eliminated "palette: blocked_occasion", slot 2 灯 promoted', babyOrder.candidates.find((c) => c.kanji === '星')?.eliminated_reason === 'palette: blocked_occasion' && babyOrder.primary_kanji === '灯' && babyOrder.referee?.promoted_from === 'second')
   const bdayOrder = await runEngine(GOLDEN_STORY, 'A', { context: { language: 'ja', relationship: 'grandparent', direction: 'up', occasion: 'birthday_milestone' } })
-  check('blocked_occasion (engine): the same answer for a birthday order keeps 寿 as primary', bdayOrder.primary_kanji === '寿' && bdayOrder.candidates.every((c) => !c.eliminated))
+  check('blocked_occasion (engine): the same answer for a birthday order keeps 星 as primary', bdayOrder.primary_kanji === '星' && bdayOrder.candidates.every((c) => !c.eliminated))
   reply = GOLDEN
 
   // ---- 5. Insufficient (STEP 0 or heart-anchor) still carries the context -----
@@ -287,11 +287,11 @@ try {
   check('api: unknown occasion → 400', (await post({ story: GOLDEN_STORY, occasion: 'kanreki' })).status === 400)
   check('api: unknown direction → 400', (await post({ story: GOLDEN_STORY, direction: 'sideways' })).status === 400)
   const n = selectCount()
-  const ok = await post({ story: GOLDEN_STORY, condition: 'A', language: 'ja', relationship: 'parent_father', direction: 'up', occasion: 'birthday_milestone', occasion_detail: '還暦' })
+  const ok = await post({ story: GOLDEN_STORY, condition: 'A', language: 'ja', relationship: 'parent_father', direction: 'up', occasion: 'parent_day', occasion_detail: '還暦' })
   const lines = await ndjson(ok)
   const result = lines.at(-1)
-  check('api: valid body streams NDJSON ending in a result with the echoed context', ok.status === 200 && result?.type === 'result' && result.result.relationship === 'parent_father' && result.result.occasion === 'birthday_milestone' && result.result.occasion_detail === '還暦')
-  check('api: context made it into the prompt via the handler', selectCount() === n + 1 && lastPrompt().includes('relationship: parent_father') && lastPrompt().includes('occasion: birthday_milestone') && lastPrompt().includes('occasion_detail: 還暦'))
+  check('api: valid body streams NDJSON ending in a result with the echoed context', ok.status === 200 && result?.type === 'result' && result.result.relationship === 'parent_father' && result.result.occasion === 'parent_day' && result.result.occasion_detail === '還暦')
+  check('api: context made it into the prompt via the handler', selectCount() === n + 1 && lastPrompt().includes('relationship: parent_father') && lastPrompt().includes('occasion: parent_day') && lastPrompt().includes('occasion_detail: 還暦'))
   const legacy = await post({ story: GOLDEN_STORY, condition: 'A' }) // exactly what the current /demo UI sends
   const legacyLines = await ndjson(legacy)
   check('api: the current UI payload ({story, condition} only) still works', legacy.status === 200 && legacyLines.at(-1)?.type === 'result' && legacyLines.at(-1).result.language === 'ja')

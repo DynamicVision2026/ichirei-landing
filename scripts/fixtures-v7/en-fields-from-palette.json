@@ -5,14 +5,14 @@
     "language": "en",
     "relationship": "parent_mother",
     "direction": "up",
-    "occasion": "birthday_milestone",
+    "occasion": "parent_day",
     "occasion_detail": "70th birthday"
   },
   "model_reply": {
     "language": "en",
     "relationship": "parent_mother",
     "direction": "up",
-    "occasion": "birthday_milestone",
+    "occasion": "parent_day",
     "occasion_detail": "70th birthday",
     "inscription_script": null,
     "status": "sufficient",

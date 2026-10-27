@@ -88,7 +88,7 @@ try {
   const prompt = sent?.body.messages?.[0]?.content ?? ''
   check('engine→model: model is claude-sonnet-5, streaming, effort medium', sent?.body.model === 'claude-sonnet-5' && sent?.body.stream === true && sent?.body.output_config?.effort === 'medium', JSON.stringify({ m: sent?.body.model, s: sent?.body.stream, e: sent?.body.output_config }))
   check('engine→model: max_tokens 14000 (default)', sent?.body.max_tokens === 14000)
-  check('engine→model: prompt.ja.md loaded (skeleton + runtime contract + golden context)', prompt.includes('YOUR ROLE') && prompt.includes('OUTPUT CONTRACT (runtime)') && prompt.includes('inscription_form') && ['language: ja', 'relationship: parent_father', 'direction: up', 'occasion: birthday_milestone', 'occasion_detail: 還暦'].every((l) => prompt.includes(l)))
+  check('engine→model: prompt.ja.md loaded (skeleton + runtime contract + golden context)', prompt.includes('YOUR ROLE') && prompt.includes('OUTPUT CONTRACT (runtime)') && prompt.includes('inscription_form') && ['language: ja', 'relationship: parent_father', 'direction: up', 'occasion: parent_day', 'occasion_detail: 還暦'].every((l) => prompt.includes(l)))
   check('engine→model: story injected at the slot, slot removed', prompt.includes(STORY) && !prompt.includes('{{ Paste the story here }}'))
   check('engine→model: API key comes from env (x-api-key header)', sent?.headers['x-api-key'] === 'test-key-not-real')
 
@@ -126,7 +126,7 @@ try {
   const exZh = await post(base, '/api/explain', { story: '他總是把玄關的燈留著。', candidate: { kanji: '灯', inscription_form: '燈', reading: 'dēng', one_line_gaze: '你把燈留著。', story_anchor: '把玄關的燈留著' }, language: 'zh-Hant', relationship: 'parent_father', direction: 'up', occasion: 'seasonal_thanks' })
   const exZhPrompt = upstream.state.requests.filter((r) => r.kind === 'explain').at(-1)?.body.messages?.[0]?.content ?? ''
   check('explain: zh-Hant → explain-prompt.zh.md, display_script traditional, context + both forms injected', exZh.status === 200 && exZhPrompt.includes('Chinese / zh') && exZhPrompt.includes('display_script: traditional') && exZhPrompt.includes('occasion: seasonal_thanks') && exZhPrompt.includes('TRADITIONAL_FORM: 燈') && exZhPrompt.includes('SIMPLIFIED_FORM: 灯') && !/\{\{ [A-Z_]+ \}\}/.test(exZhPrompt))
-  const exEn = await post(base, '/api/explain', { story: 'My mum left the porch light on every night until I got home.', candidate: { kanji: '灯', inscription_form: '燈', reading: 'on: tō · kun: hi, akari', meaning: 'lamp; a light kept lit', one_line_gaze: 'You left the porch light on every night.', story_anchor: 'left the porch light on' }, language: 'en', relationship: 'parent_mother', direction: 'up', occasion: 'birthday_milestone', inscription_script: 'simplified' })
+  const exEn = await post(base, '/api/explain', { story: 'My mum left the porch light on every night until I got home.', candidate: { kanji: '灯', inscription_form: '燈', reading: 'on: tō · kun: hi, akari', meaning: 'lamp; a light kept lit', one_line_gaze: 'You left the porch light on every night.', story_anchor: 'left the porch light on' }, language: 'en', relationship: 'parent_mother', direction: 'up', occasion: 'parent_day', inscription_script: 'simplified' })
   const exEnPrompt = upstream.state.requests.filter((r) => r.kind === 'explain').at(-1)?.body.messages?.[0]?.content ?? ''
   check('explain: en → explain-prompt.en.md, romaji reading + English meaning + carved form + context injected, no slot left', exEn.status === 200 && exEnPrompt.includes('English / en') && exEnPrompt.includes('reading: on: tō · kun: hi, akari') && exEnPrompt.includes('meaning: lamp; a light kept lit') && exEnPrompt.includes('carved old form 燈') && exEnPrompt.includes('relationship: parent_mother') && !/\{\{ [A-Z_]+ \}\}/.test(exEnPrompt))
   const exLong = await post(base, '/api/explain', { story: 'あ'.repeat(601), candidate: cand })
@@ -260,7 +260,7 @@ try {
       check('orders: invalid package → 400 and nothing more reaches Shopify', invalid.status === 400 && (await invalid.json()).field === 'package' && seen.length === 1)
       // learning loop through the real server: a session id → "shown" (select), two browser events, "ordered" — all in <store>/analytics/
       const sess = 'ServerSession' + 'Z'.repeat(10)
-      await readNdjson(await post(orders.url, '/api/select', { story: STORY, session: sess, source: 'customer', language: 'ja', relationship: 'parent_father', direction: 'up', occasion: 'birthday_milestone' }))
+      await readNdjson(await post(orders.url, '/api/select', { story: STORY, session: sess, source: 'customer', language: 'ja', relationship: 'parent_father', direction: 'up', occasion: 'parent_day' }))
       const an1 = await post(orders.url, '/api/analytics', { session: sess, source: 'customer', event: 'chosen', choice: 'main' })
       const an2 = await post(orders.url, '/api/analytics', { session: sess, source: 'customer', event: 'explain_opened', choice: 'main' })
       await post(orders.url, '/api/order', { ...orderBody, session: sess, source: 'customer', delivery_date: new Date(Date.now() + 31 * 86_400_000).toISOString().slice(0, 10) })

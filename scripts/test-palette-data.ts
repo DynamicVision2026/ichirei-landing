@@ -36,8 +36,9 @@ console.log(`INFO  zh ${zh.length} rows: ok=${count(zh, 'ok')} context_required=
 const emptyCells: string[] = []
 for (const r of all) for (const col of PALETTE_COLUMNS) if (col !== 'reviewed_on' && r.raw[col] === '') emptyCells.push(`${r.language}:${r.kanji}.${col}`)
 check('complete: no empty cell anywhere (reviewed_on aside) — "none" is used where nothing applies', emptyCells.length === 0, list(emptyCells))
-check('provenance: every row is draft-unreviewed or interim-unreviewed, and reviewed_on is empty (no human sign-off claimed)', bad(all, (r) => ['draft-unreviewed', 'interim-unreviewed'].includes(r.raw.reviewed_by) && r.raw.reviewed_on === '').length === 0)
-check('provenance: no row is "reviewed" yet', all.every((r) => !r.reviewed))
+const AI_PASS = /^Claude\(AI/
+check('provenance: every row is draft-unreviewed, interim-unreviewed or an AI first pass ("Claude(AI…)", dated) — no human sign-off is claimed anywhere', bad(all, (r) => ['draft-unreviewed', 'interim-unreviewed'].includes(r.raw.reviewed_by) ? r.raw.reviewed_on === '' : AI_PASS.test(r.raw.reviewed_by) && /^\d{4}-\d{2}-\d{2}$/.test(r.raw.reviewed_on)).length === 0)
+check('provenance: no row is "reviewed" yet — an AI pass is NOT a review (isReviewed is false for reviewed_by "Claude…")', all.every((r) => !r.reviewed) && all.some((r) => AI_PASS.test(r.raw.reviewed_by)))
 check('provenance: exactly the 27 shipped interim rows keep interim-unreviewed (18 ja + 9 zh)', ja.filter((r) => r.raw.reviewed_by === 'interim-unreviewed').length === 18 && zh.filter((r) => r.raw.reviewed_by === 'interim-unreviewed').length === 9)
 
 // ---- single characters, forms ------------------------------------------------------------
@@ -69,12 +70,16 @@ check('cross-language note: every row has a real note (>= 20 characters)', bad(a
 
 // ---- statuses, flags, anchors ------------------------------------------------------------
 const flagOk = /^(verify:)?[a-zA-Z0-9_ñǎ-ǜāáàēéěèīíìōóòūúùü぀-ヿ㐀-鿿]+$/
+// The AI first pass (2026-10-26) wrote plain-language notes such as 三途の川を渡る or 弔事表書き「志」(香典返し): one token, no spaces or separators.
+const aiFlagOk = /^[^\s|,;]+$/
 const flagsOf = (r: PaletteRow) => r.raw.taboo_flags.split('|').filter((f) => f && f !== 'none')
-check('flags: every taboo flag is one token (snake_case, or verify:… for anything uncertain)', bad(all, (r) => flagsOf(r).every((f) => flagOk.test(f))).length === 0, list(bad(all, (r) => flagsOf(r).every((f) => flagOk.test(f)))))
+const flagTokenOk = (r: PaletteRow) => flagsOf(r).every((f) => (AI_PASS.test(r.raw.reviewed_by) ? aiFlagOk : flagOk).test(f))
+check('flags: every taboo flag is one token (snake_case, or verify:… for anything uncertain; the AI first pass may use a plain-language note without spaces)', bad(all, flagTokenOk).length === 0, list(bad(all, flagTokenOk)))
 const verifyRows = all.filter((r) => flagsOf(r).some((f) => f.startsWith('verify:')))
 console.log(`INFO  ${verifyRows.length} rows carry a "verify:" flag (${verifyRows.filter((r) => r.language === 'ja').length} ja, ${verifyRows.filter((r) => r.language === 'zh').length} zh)`)
 check('flags: uncertainty is flagged — a good share of rows carry verify:', verifyRows.length >= 40)
-check('flags: an ok row carries no taboo other than verify: notes', bad(all.filter((r) => r.status === 'ok'), (r) => flagsOf(r).every((f) => f.startsWith('verify:'))).length === 0, list(bad(all.filter((r) => r.status === 'ok'), (r) => flagsOf(r).every((f) => f.startsWith('verify:')))))
+const okNotesOnly = (r: PaletteRow) => AI_PASS.test(r.raw.reviewed_by) || flagsOf(r).every((f) => f.startsWith('verify:'))
+check('flags: a draft ok row carries no taboo other than verify: notes (the AI pass may annotate an ok row; the review call sees those notes, and blocked_occasions still apply)', bad(all.filter((r) => r.status === 'ok'), okNotesOnly).length === 0, list(bad(all.filter((r) => r.status === 'ok'), okNotesOnly)))
 const concernOf = (r: PaletteRow) => [...flagsOf(r), ...r.register_flags]
 check('flags: every hard_block and context_required row names its concern (a taboo flag, or a register flag such as 餞\'s farewell_register)', bad(all.filter((r) => r.status !== 'ok'), (r) => concernOf(r).length > 0).length === 0, list(bad(all.filter((r) => r.status !== 'ok'), (r) => concernOf(r).length > 0)))
 check('hard_block: fits no relationship (relationship_fit = none), needs no anchor', bad(all.filter((r) => r.status === 'hard_block'), (r) => r.raw.relationship_fit === 'none' && !r.anchor_required).length === 0)

@@ -53,7 +53,7 @@ try {
   // the real composer on the served page posts to the real /api/select (streaming through the engine to the fake model)
   const posted = []
   page.on('request', (r) => { if (r.url().endsWith('/api/select') && r.method() === 'POST') posted.push(r.postDataJSON()) })
-  for (const c of ['relationship:parent_father', 'direction:up', 'occasion:birthday_milestone']) await page.click(`[data-chip="${c}"]`)
+  for (const c of ['relationship:parent_father', 'direction:up', 'occasion:parent_day']) await page.click(`[data-chip="${c}"]`)
   await page.locator('#moment').fill(STORY.slice(0, 200))
   await page.click('#write button[type=submit]')
   await page.waitForSelector('[data-testid=finalize]', { timeout: 30_000 })
@@ -66,7 +66,7 @@ try {
   // v5: relationship, direction and occasion are required (the golden fixture's context)
   await page.selectOption('select[name=relationship]', 'parent_father')
   await page.selectOption('select[name=direction]', 'up')
-  await page.selectOption('select[name=occasion]', 'birthday_milestone')
+  await page.selectOption('select[name=occasion]', 'parent_day')
   await page.click('text=その一字を、探しにいく')
   check('processing view shows while the model is silent', await page.locator('text=言葉を読んでいます').isVisible())
   await page.waitForTimeout(1800)

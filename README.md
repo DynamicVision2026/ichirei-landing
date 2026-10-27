@@ -70,6 +70,7 @@ node --experimental-strip-types scripts/test-order.ts      # purchase flow: vali
 node --experimental-strip-types scripts/test-memorial.ts    # remembrance: the occasion, prompts, default block, suggestion, certificate.memorial + ichirei_memorial (fixtures in scripts/fixtures-memorial/)
 node --experimental-strip-types scripts/test-v8.ts          # v8: person test in the prompts/review, the five golden stories (scripts/fixtures-v8/, private repo only), the replacement stage, notranslate
 ANTHROPIC_API_KEY=… node --experimental-strip-types scripts/bench-select.mjs   # time + quality of the five stories per config (effort, max tokens, review model); --url … times the live service
+node --experimental-strip-types scripts/test-ja-review.ts   # the Japanese AI first-pass review: what changed, owner decisions, AI review ≠ human review (no classical line shown, no native-speaker claim)
 node --experimental-strip-types scripts/test-story-run.ts   # the story-run script: mapping, flags, CSV, one end-to-end run against a fake model
 node --experimental-strip-types scripts/test-reveal.ts      # Reveal landing: copy = the reference word for word, honesty rules, approximate prices, daily-rate cache, photos, dead code gone
 node --experimental-strip-types scripts/test-landing-copy.ts  # the earlier landing copy (still used by /track): four languages, neutral, AI invisible

@@ -165,7 +165,13 @@ const split = (cell: string) =>
   cell.split('|').map((x) => x.trim()).filter((x) => x && x !== PALETTE_NONE)
 
 /** Who counts as a reviewer? Anyone but the machine placeholders. */
-const isReviewed = (reviewedBy: string) => reviewedBy !== '' && !/^(draft|interim)-/.test(reviewedBy)
+/**
+ * A row is reviewed when a HUMAN name is in `reviewed_by`. A draft/interim marker is not a review, and neither is an AI pass: a
+ * `reviewed_by` that starts with "Claude" (the first-pass Japanese review of 2026-10-26) counts as NOT reviewed — its classical lines are
+ * never shown on a card, an `ok` row stays unvouched for, and nothing may claim a native-speaker check.
+ */
+export const isAiReviewer = (reviewedBy: string) => /^claude/i.test(reviewedBy.trim())
+const isReviewed = (reviewedBy: string) => reviewedBy !== '' && !/^(draft|interim)-/.test(reviewedBy) && !isAiReviewer(reviewedBy)
 
 /** Parse and validate palette.csv text. Throws on anything malformed — a silently skipped row would be a silently missing block. */
 export function parsePalette(text: string): Palette {
