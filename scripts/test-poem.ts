@@ -7,7 +7,8 @@
 //   node --experimental-strip-types scripts/test-poem.ts
 
 import http from 'node:http'
-import { readFileSync } from 'node:fs'
+import { mkdtempSync, readFileSync, rmSync } from 'node:fs'
+import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { CI_PATTERNS, blockedCharacters, checkContainsCharacter, checkForm, checkPalette, moraCount } from '../engine/poem-check.ts'
 import { buyerAids, generatePoem, loadPoemPrompt, poemFamilies, type PoemInput } from '../engine/poem.ts'
@@ -15,7 +16,7 @@ import { createPoemHandler, TYPES_GET } from '../api/poem.ts'
 import { createOrderHandler } from '../api/order.ts'
 import { MemoryOrderStore } from '../engine/order-store.ts'
 import { loadPalette } from '../engine/palette.ts'
-import { availablePoemTypes, loadShopifyConfig, poemVariantsFromEnv } from '../engine/shopify.ts'
+import { availablePoemTypes, loadShopifyConfig, poemPreviewOn, poemTypesAccepted, poemVariantsFromEnv } from '../engine/shopify.ts'
 import { MAX_POEMS, POEM_PRICE_JPY, POEM_TYPES, formatYen, type PoemType } from '../src/order/packages.ts'
 import { COPY } from '../src/demo/i18n.ts'
 // @ts-expect-error untyped test helper
@@ -300,6 +301,48 @@ const postOrder = (h: (r: Request) => Promise<Response>, b: unknown) => h(new Re
   } finally {
     await withTypes.stop()
   }
+}
+
+// ---- 7b. ICHIREI_POEM_PREVIEW: internal testing of poem quality before the Shopify poem products exist ------------------------------------------
+{
+  check('(7b) preview switch: off by default, `on` only when set to on (anything else is off)', !poemPreviewOn({} as never) && !poemPreviewOn({ ICHIREI_POEM_PREVIEW: 'off' } as never) && !poemPreviewOn({ ICHIREI_POEM_PREVIEW: '1' } as never) && poemPreviewOn({ ICHIREI_POEM_PREVIEW: 'on' } as never) && poemPreviewOn({ ICHIREI_POEM_PREVIEW: ' ON ' } as never))
+  check('(7b) preview accepts all four types for POST /api/poem even with no variant; off accepts only the types with a variant', poemTypesAccepted({ ICHIREI_POEM_PREVIEW: 'on' } as never).join() === 'tanka,tang,ci,en' && poemTypesAccepted({} as never).length === 0 && poemTypesAccepted({ SHOPIFY_VARIANT_POEM_CI: '9' } as never).join() === 'ci')
+  check('(7b) …but what the page and the order flow read is unchanged: availablePoemTypes ignores the preview switch', availablePoemTypes({ ICHIREI_POEM_PREVIEW: 'on' } as never).length === 0)
+  check('(7b) cloudbuild.yaml sets it (temporarily) to on and passes it to the service', /_POEM_PREVIEW: 'on'/.test(read('cloudbuild.yaml')) && read('cloudbuild.yaml').includes('ICHIREI_POEM_PREVIEW=${_POEM_PREVIEW}'))
+  const dir = mkdtempSync(join(tmpdir(), 'ichirei-poem-preview-'))
+  const preview = await startServer({ upstreamUrl: process.env.ANTHROPIC_BASE_URL, env: { ICHIREI_POEM_PREVIEW: 'on', ICHIREI_POEM_LIMIT: '4/60', ICHIREI_LEXICON_MODE: 'off', ORDER_STORE_DIR: dir } })
+  try {
+    const h = (await (await fetch(`${preview.url}/api/health`)).json()) as any
+    check('(7b) /api/health reports poemPreview: true — and poemTypes still lists only the types with a variant (none here)', h.poemPreview === true && h.poemTypes.length === 0)
+    const t = (await (await fetch(`${preview.url}/api/poem-types`)).json()) as any
+    check('(7b) the page still gets NO poem chips: /api/poem-types is empty in preview mode (customers see nothing)', t.types.length === 0)
+    const statuses: number[] = []
+    for (const type of ['tanka', 'tang', 'ci', 'en'] as const) {
+      replies = [C20.poems[type]]
+      reviewReplies = []
+      statuses.push((await quiet(() => fetch(`${preview.url}/api/poem`, { method: 'POST', body: JSON.stringify(body(C20, type)) }))).status)
+    }
+    check('(7b) POST /api/poem works for all four types with no Shopify variant (200 each)', statuses.join() === '200,200,200,200', statuses.join())
+    const fifth = await fetch(`${preview.url}/api/poem`, { method: 'POST', body: JSON.stringify(body(C20, 'tanka')) })
+    check('(7b) the rate limit still applies in preview (here 4/60: the fifth request is 429)', fifth.status === 429 && ((await fifth.json()) as any).code === 'rate_limited')
+    const bad = await fetch(`${preview.url}/api/poem`, { method: 'POST', body: JSON.stringify(body(C20, 'tanka', { kanji: '死' })) })
+    check('(7b) the other poem rules still apply in preview (a hard-block character is refused; limit counted first so this is 429 or 400)', bad.status === 429 || bad.status === 400)
+  } finally {
+    await preview.stop()
+    rmSync(dir, { recursive: true, force: true })
+  }
+  // rules independent of the rate limit, through the handler with all four types accepted (what preview does)
+  const all = ['tanka', 'tang', 'ci', 'en'] as PoemType[]
+  const refused = await post(handler(all), body(C20, 'tanka', { kanji: '死' }))
+  check('(7b) preview: the palette block still refuses a hard-block character (400 character_not_allowed)', refused.status === 400 && ((await refused.json()) as any).code === 'character_not_allowed')
+  const memorial = await post(handler(all), body(C04, 'tanka', { kanji: '祝' }))
+  check('(7b) preview: the remembrance block still refuses a celebration character (400)', memorial.status === 400)
+  // the order flow still refuses a poem whose Shopify variant is missing, whatever the preview says
+  replies = [C20.poems.ci]
+  reviewReplies = []
+  const ci = (await (await quiet(() => post(handler(all), body(C20, 'ci')))).json()) as any
+  const refusedOrder = await postOrder(orderHandler({}), orderBody({ poems: [{ poem_id: ci.poem_id }] }))
+  check('(7b) the order flow still refuses a poem without a variant (400 poem_type_unavailable), even though the preview wrote it', typeof ci.poem_id === 'string' && refusedOrder.status === 400 && ((await refusedOrder.json()) as any).code === 'poem_type_unavailable')
 }
 
 // ---- 8. the page ------------------------------------------------------------------------------------------------------------------------------------

@@ -59,6 +59,16 @@ export function poemVariantsFromEnv(env: NodeJS.ProcessEnv = process.env): Parti
 /** The poem types the buyer may be offered: those with a configured variant. */
 export const availablePoemTypes = (env: NodeJS.ProcessEnv = process.env): PoemType[] => POEM_TYPES.filter((t) => poemVariantsFromEnv(env)[t] !== undefined)
 
+/**
+ * ICHIREI_POEM_PREVIEW (default off): internal testing of poem quality before the Shopify poem products exist. When `on`, POST /api/poem
+ * accepts all four types even with no Shopify variant. It changes NOTHING else: /api/poem-types (and so the page's chips) still lists only
+ * the types with a variant, and the order flow still refuses a poem whose variant is missing.
+ */
+export const poemPreviewOn = (env: NodeJS.ProcessEnv = process.env): boolean => env.ICHIREI_POEM_PREVIEW?.trim().toLowerCase() === 'on'
+
+/** The types POST /api/poem will write: the ones on offer, or all four in preview mode. */
+export const poemTypesAccepted = (env: NodeJS.ProcessEnv = process.env): PoemType[] => (poemPreviewOn(env) ? [...POEM_TYPES] : availablePoemTypes(env))
+
 /** Read the config; `missing` lists the env vars still to set (empty when ready). */
 export function loadShopifyConfig(env: NodeJS.ProcessEnv = process.env): { config: ShopifyConfig | null; missing: string[] } {
   const token = env.SHOPIFY_STOREFRONT_TOKEN_PUBLIC?.trim() || env.SHOPIFY_STOREFRONT_TOKEN?.trim() || ''

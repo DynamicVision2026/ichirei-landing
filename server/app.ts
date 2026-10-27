@@ -12,7 +12,7 @@ import { compress } from 'hono/compress'
 import { POST as selectPost } from '../api/select.ts'
 import { POST as orderPost } from '../api/order.ts'
 import { POST as poemPost, TYPES_GET as poemTypesGet } from '../api/poem.ts'
-import { availablePoemTypes } from '../engine/shopify.ts'
+import { availablePoemTypes, poemPreviewOn } from '../engine/shopify.ts'
 import { POST as trackPost } from '../api/track.ts'
 import { POST as analyticsPost } from '../api/analytics.ts'
 import { GET as ratesGet } from '../api/rates.ts'
@@ -108,6 +108,7 @@ export function createApp(config: ServerConfig): Hono {
       lexiconMode: lexiconModeFromEnv(),
       simpleMaxStrokes: simpleMaxStrokes(),
       poemTypes: availablePoemTypes(), // the poem add-on types with a configured Shopify variant (names only)
+      poemPreview: poemPreviewOn(), // ICHIREI_POEM_PREVIEW: POST /api/poem writes all four types for internal testing (the page and the order flow are unchanged)
       configured: config,
       applied: serverRef.current
         ? {
