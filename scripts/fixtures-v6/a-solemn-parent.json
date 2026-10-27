@@ -35,9 +35,9 @@
     },
     "candidates": [
       {
-        "kanji": "迎",
-        "reading": "むかえ",
-        "inscription_form": null,
+        "kanji": "証",
+        "reading": "しょう",
+        "inscription_form": "證",
         "truth_type": "Role",
         "one_line_gaze": "あなたは二十年、私の帰りをいつも駅で迎えてくれた。理由は、一度も言わずに。",
         "story_anchor": "盆に帰るたびに車で駅まで迎えに来て",
@@ -53,9 +53,9 @@
         "classical_echo": null
       },
       {
-        "kanji": "黙",
-        "reading": "もく",
-        "inscription_form": "默",
+        "kanji": "守",
+        "reading": "まもる",
+        "inscription_form": null,
         "truth_type": "Hidden Cost",
         "one_line_gaze": "あなたは言葉の代わりに、静けさのまま、そこにいてくれた。",
         "story_anchor": "相変わらず、ほとんど何も話さないけど",
@@ -87,8 +87,8 @@
         "classical_echo": null
       }
     ],
-    "primary_kanji": "迎",
-    "runner_up_kanji": "黙",
+    "primary_kanji": "証",
+    "runner_up_kanji": "守",
     "freestyle_kanji": "封",
     "fallback_follow_up_question": "お父さまと一緒に過ごした中で、忘れられない小さな場面をひとつ、教えてください。"
   },
@@ -96,13 +96,13 @@
     "verdicts": [
       {
         "slot": "main",
-        "kanji": "迎",
+        "kanji": "証",
         "pass": true,
         "reason": "Role anchored in the station pick-ups; no taboo for a milestone birthday."
       },
       {
         "slot": "second",
-        "kanji": "黙",
+        "kanji": "守",
         "pass": true,
         "reason": "Opens the father into a quiet presence, not a verdict."
       },
@@ -116,8 +116,8 @@
   },
   "expect": {
     "status": "sufficient",
-    "primary": "迎",
-    "second": "黙",
+    "primary": "証",
+    "second": "守",
     "freestyle": "封",
     "register": [
       "grateful",

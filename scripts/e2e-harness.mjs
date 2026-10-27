@@ -91,12 +91,12 @@ const browser = await chromium.launch({
   check('processing view shows', await page.locator('text=言葉を読んでいます').isVisible())
   await page.screenshot({ path: `${SHOTS}/e2e-processing.png` })
 
-  // Progressive reveal: 3 alive candidates at ~1.1s intervals, the main (迎) FIRST, then the second, then the freestyle
+  // Progressive reveal: 3 alive candidates at ~1.1s intervals, the main (証) FIRST, then the second, then the freestyle
   await page.waitForSelector('article', { timeout: 10000 })
   const afterFirst = await page.locator('article').count()
   check('reveal is progressive (starts with 1)', afterFirst === 1)
   const firstGlyph = await page.locator('article').first().locator('span').first().textContent()
-  check('v8: the main 迎 surfaces first', firstGlyph === '迎')
+  check('v8: the main 証 surfaces first', firstGlyph === '証')
   await page.waitForTimeout(2600) // let all three land
   check('all survivors revealed', (await page.locator('article').count()) === 3)
   const lastGlyph = await page.locator('article').last().locator('span').first().textContent()
@@ -105,11 +105,11 @@ const browser = await chromium.launch({
     .evaluate((el) => getComputedStyle(el).color)
   check('primary rendered in cinnabar', primaryColor === 'rgb(192, 57, 43)')
 
-  // Kyūjitai pairing: 黙 card shows 默 as glyph, paired with 黙 + もく
+  // Japanese buyers carve the modern form (新字体, spec v9.1 step 9): the card shows the glyph with its reading only — no old-form pairing or note
   const mokuCard = page.locator('article', { hasText: '静けさのまま' })
-  check('kyūjitai 默 used as inscription glyph', (await mokuCard.locator('span').first().textContent()) === '默')
-  check('kyūjitai paired with modern + reading', await mokuCard.locator('text=黙 ・ もく').isVisible())
-  check('kyūjitai pairing note shown', await mokuCard.locator('text=古体字（現代字：黙）').isVisible())
+  check('modern form used as the carved glyph (no old form)', (await mokuCard.locator('span').first().textContent()) === '守')
+  check('the reading is shown with the glyph, with no old-form pairing', await mokuCard.locator('text=まもる').first().isVisible() && (await mokuCard.locator('text=守 ・ まもる').count()) === 0)
+  check('no old-form (kyūjitai) note on a Japanese card', (await mokuCard.locator('text=古体字').count()) === 0)
 
   await page.screenshot({ path: `${SHOTS}/e2e-reveal-A.png` })
 
@@ -119,11 +119,11 @@ const browser = await chromium.launch({
   check('condition A: no deep-explain button', (await page.locator('text=この一字を、深く読む').count()) === 0)
   check('condition A: no preview button', (await page.locator('text=かたちを見る').count()) === 0)
 
-  // Dwell + return: open 迎, then re-open 黙 → candidate_returned
+  // Dwell + return: open 証, then re-open 守 → candidate_returned
   await page.waitForTimeout(700)
-  await page.locator('article[data-slot=main]').click() // opens 迎 (flushes 黙 dwell)
+  await page.locator('article[data-slot=main]').click() // opens 証 (flushes 守 dwell)
   await page.waitForTimeout(400)
-  await mokuCard.click() // re-open 黙 → returned
+  await mokuCard.click() // re-open 守 → returned
 
   // Condition toggle B — presentation only, engine NOT re-called
   await page.click('header >> text="B"')
@@ -144,14 +144,14 @@ const browser = await chromium.launch({
   await page.screenshot({ path: `${SHOTS}/e2e-preview-C.png` })
   await page.click('text=閉じる')
 
-  // Selection: select 黙 first, then 迎 (selection_changed x2), finalize
+  // Selection: select 守 first, then 証 (selection_changed x2), finalize
   await page.locator('article', { hasText: '静けさのまま' }).locator('text=この一字を選ぶ').click()
-  await page.locator('article[data-slot=main]').click() // open 迎
+  await page.locator('article[data-slot=main]').click() // open 証
   await page.waitForTimeout(400)
   await page.locator('article[data-slot=main]').locator('text=この一字を選ぶ').click()
   await page.click('text=この一字を、贈る')
   await page.waitForTimeout(300)
-  check('finalize confirms selection', await page.locator('text=「迎」に決めました').isVisible())
+  check('finalize confirms selection', await page.locator('text=「証」に決めました').isVisible())
 
   // v8: three cards — 本命 first, 次点, 遊び字 last (DOM order AND visual order) — each labelled; the freestyle is lighter and never cinnabar
   const cards = page.locator('article')
@@ -184,7 +184,7 @@ const browser = await chromium.launch({
     'final_selection', 'condition_changed']
   for (const ev of need) check(`event logged: ${ev}`, loggedEvents.includes(ev))
   const selChanges = loggedEvents.filter((e) => e === 'selection_changed').length
-  check('selection_changed fired twice (黙→迎)', selChanges === 2)
+  check('selection_changed fired twice (守→証)', selChanges === 2)
 
   check('no page errors (run 1)', errors.length === 0)
   if (errors.length) console.log('page errors:', errors)
@@ -224,7 +224,7 @@ const browser = await chromium.launch({
   await page.waitForSelector('text=その一字を、探しにいく', { timeout: 5000 })
   check('retry: returns to the story input (no result on screen)', (await page.locator('article').count()) === 0)
   check('retry: the current story text is kept in the textarea', (await page.locator('textarea').first().inputValue()) === storyBefore)
-  await page.locator('textarea').first().fill(storyBefore + '\nそして、いつも黙って頷いた。')
+  await page.locator('textarea').first().fill(storyBefore + '\nそして、いつも守って頷いた。')
   await pickContext(page)
   await page.click('text=その一字を、探しにいく')
   await page.waitForSelector('article', { timeout: 10000 })
@@ -259,7 +259,7 @@ const browser = await chromium.launch({
   await page.waitForSelector('article', { timeout: 10000 })
   await page.waitForTimeout(2600)
   check('stream: all survivors revealed after stream completes', (await page.locator('article').count()) === 3)
-  check('stream: the main 迎 comes first', (await page.locator('article').first().locator('span').first().textContent()) === '迎')
+  check('stream: the main 証 comes first', (await page.locator('article').first().locator('span').first().textContent()) === '証')
   check('no page errors (run 3)', errors.length === 0)
   if (errors.length) console.log('page errors:', errors)
   await page.close()
@@ -413,7 +413,7 @@ const mockPage = async (browser, { onExplain, result, order, track } = {}) => {
     r.runner_up_kanji = null
     r.candidates = r.candidates.slice(0, 3).map((c) => ({ ...c, eliminated: false, eliminated_reason: null }))
     r.candidates[0] = { ...r.candidates[0], kanji: '灯', inscription_form: '燈', reading: 'dēng', one_line_gaze: '你把玄关的灯一直留着。', story_anchor: '玄关的灯' }
-    r.candidates[1] = { ...r.candidates[1], kanji: '默', inscription_form: null, reading: 'mò' }
+    r.candidates[1] = { ...r.candidates[1], kanji: '守', inscription_form: null, reading: 'mò' }
     r.candidates[2] = { ...r.candidates[2], kanji: '桥', inscription_form: '橋', reading: 'qiáo' }
     return r
   }
@@ -533,7 +533,7 @@ const mockPage = async (browser, { onExplain, result, order, track } = {}) => {
     const r = clone(FIXTURE)
     r.candidates[0].eliminated = true; r.candidates[0].eliminated_reason = 'palette: hard_block'
     r.candidates[2].eliminated = true; r.candidates[2].eliminated_reason = 'review: Mocks social status'
-    r.primary_kanji = '黙'; r.runner_up_kanji = null; r.freestyle_kanji = null
+    r.primary_kanji = '守'; r.runner_up_kanji = null; r.freestyle_kanji = null
     return r
   }
   const { page, errors } = await mockPage(browser, { result: promoted })
@@ -542,7 +542,7 @@ const mockPage = async (browser, { onExplain, result, order, track } = {}) => {
   await pickContext(page)
   await page.click(`text=${SUBMIT.ja}`)
   await page.waitForSelector(`button:has-text("${FINALIZE.ja}")`, { timeout: 15000 })
-  check('v6 promotion: slot 1 removed and the freestyle dropped → ONE card, the promoted second slot (黙), labelled 本命 and cinnabar', (await page.locator('article').count()) === 1 && (await page.locator('article [data-slot-label]').innerText()) === '本命' && (await page.locator('article [data-glyph]').evaluate((el) => getComputedStyle(el).color)) === 'rgb(192, 57, 43)')
+  check('v6 promotion: slot 1 removed and the freestyle dropped → ONE card, the promoted second slot (守), labelled 本命 and cinnabar', (await page.locator('article').count()) === 1 && (await page.locator('article [data-slot-label]').innerText()) === '本命' && (await page.locator('article [data-glyph]').evaluate((el) => getComputedStyle(el).color)) === 'rgb(192, 57, 43)')
   check('v6 diagnostics (harness only): the removed cards are listed with their reasons', (await page.locator('details', { hasText: '見送った字' }).count()) === 1)
   check('no page errors (run 8b, promotion)', errors.length === 0)
   await page.close()
@@ -572,7 +572,7 @@ const mockPage = async (browser, { onExplain, result, order, track } = {}) => {
   // follow-up answers: 600 each, a separate field, their own counter from 450
   let n = 0
   const insufficient = { status: 'insufficient', follow_up_question: 'もうひとつ、小さな場面を教えてください。', particulars: [], fingerprint: { relationship_note: null, scarce_asset: null, unsaid_truth: null, dominant_truth_type: null, dignity_direction: null, emotional_register: null }, candidates: [], primary_kanji: null, runner_up_kanji: null, freestyle_kanji: null }
-  const f = await mockPage(browser, { order: () => ({ json: { order_ref: 'IC-20261023-FUREF222', checkout_url: 'http://localhost:5173/__checkout?cart=fu', glyph: '迎', certificate_text: 'x' } }), result: () => (++n <= 2 ? { ...clone(FIXTURE), ...insufficient, follow_up_question: `質問${n}` } : clone(FIXTURE)) })
+  const f = await mockPage(browser, { order: () => ({ json: { order_ref: 'IC-20261023-FUREF222', checkout_url: 'http://localhost:5173/__checkout?cart=fu', glyph: '証', certificate_text: 'x' } }), result: () => (++n <= 2 ? { ...clone(FIXTURE), ...insufficient, follow_up_question: `質問${n}` } : clone(FIXTURE)) })
   await f.page.goto('http://localhost:5173/', { waitUntil: 'networkidle' })
   await f.page.locator('#write [data-testid=story-input]').fill('あ'.repeat(600))
   await pickContext(f.page)
@@ -782,7 +782,7 @@ const SECTION_ORDER = ['.hero', '.strip', '.philo', '#shape', '#angles', '#write
 
 // ---------- Run 11: the customer flow at / — choose, order, redirect to Shopify checkout (ja) ----------
 {
-  const orderOk = () => ({ json: { order_ref: 'IC-20261023-TESTREF2', checkout_url: 'http://localhost:5173/__checkout?cart=fake', glyph: '默', certificate_text: 'x' } })
+  const orderOk = () => ({ json: { order_ref: 'IC-20261023-TESTREF2', checkout_url: 'http://localhost:5173/__checkout?cart=fake', glyph: '守', certificate_text: 'x' } })
   const { page, errors, calls } = await mockPage(browser, { order: orderOk })
   await page.goto('http://localhost:5173/', { waitUntil: 'networkidle' })
   await page.locator('#moment').fill(STORY)
@@ -796,7 +796,7 @@ const SECTION_ORDER = ['.hero', '.strip', '.philo', '#shape', '#angles', '#write
   const cardInfo = await page.evaluate(() => [...document.querySelectorAll('#write article[data-slot]')].map((a) => ({ slot: a.dataset.slot, label: a.querySelector('[data-slot-label]').innerText, glyph: getComputedStyle(a.querySelector('[data-glyph]')).color, border: getComputedStyle(a).borderStyle, choose: !!a.querySelector('[data-select]') })))
   check('three cards: main 本命 (cinnabar character), second 次点, freestyle 遊び字 (dashed, lighter, its character is NOT cinnabar); each has its own choose button', cardInfo.length === 3 && cardInfo.find((c) => c.slot === 'main').label === '本命' && cardInfo.find((c) => c.slot === 'main').glyph === 'rgb(200, 64, 45)' && cardInfo.find((c) => c.slot === 'second').label === '次点' && cardInfo.find((c) => c.slot === 'second').glyph !== 'rgb(200, 64, 45)' && cardInfo.find((c) => c.slot === 'freestyle').label === '遊び字' && cardInfo.find((c) => c.slot === 'freestyle').glyph !== 'rgb(200, 64, 45)' && cardInfo.find((c) => c.slot === 'freestyle').border === 'dashed' && cardInfo.every((c) => c.choose), JSON.stringify(cardInfo))
   check('finalize is disabled until a card is chosen, with the hint 「ひとつ選ぶと、先へ進めます。」', (await page.locator('[data-testid=finalize]').isDisabled()) && (await page.locator('text=ひとつ選ぶと、先へ進めます。').isVisible()))
-  // choose 黙 (it has a distinct old form 默)
+  // choose 守 (it has a distinct old form 默)
   await page.locator('article', { hasText: '静けさのまま' }).click()
   await page.locator('article', { hasText: '静けさのまま' }).locator('text=この一字を選ぶ').click()
   await page.click(`button:has-text("${FINALIZE.ja}")`)
@@ -805,7 +805,7 @@ const SECTION_ORDER = ['.hero', '.strip', '.philo', '#shape', '#angles', '#write
   check('order form appears after the character is chosen (the reveal stays mounted but hidden)', await form.isVisible() && (await page.locator('#write article').first().isHidden()))
   check('order form: sender, receiver, delivery date, inscription form, package', (await page.locator('input[name=sender_name]').count()) === 1 && (await page.locator('input[name=receiver_name]').count()) === 1 && (await page.locator('input[name=delivery_date]').count()) === 1 && (await page.locator('input[name=inscription_style]').count()) === 2 && (await page.locator('input[name=package]').count()) === 2)
   check('order form: Simple ¥9,800 and Standard ¥18,850, and the shipping line 「国内送料無料・海外送料 ¥6,000」', (await page.locator('#write [data-price=simple]').innerText()) === '¥9,800' && (await page.locator('#write [data-price=standard]').innerText()) === '¥18,850' && (await page.locator('[data-shipping]').innerText()) === '国内送料無料・海外送料 ¥6,000' && !(await form.innerText()).includes('送料別') && (await form.innerText()).includes('シンプル') && (await form.innerText()).includes('スタンダード'))
-  check('order form: the kyūjitai form (默) is pre-selected and shown on the slip; modern is 黙', (await page.locator('input[name=inscription_style][value=kyujitai]').isChecked()) && (await page.locator('[data-order-glyph]').innerText()) === '默' && (await form.locator('label:has(input[value=modern]) .optGlyph').innerText()) === '黙')
+  check('order form: the kyūjitai form (默) is pre-selected and shown on the slip; modern is 守', (await page.locator('input[name=inscription_style][value=kyujitai]').isChecked()) && (await page.locator('[data-order-glyph]').innerText()) === '守' && (await form.locator('label:has(input[value=modern]) .optGlyph').innerText()) === '守')
   check('certificate: 「この字は、あなたの目に映る、その人です。」 from the start', (await page.locator('[data-certificate]').innerText()) === 'この字は、あなたの目に映る、その人です。')
   await page.fill('input[name=sender_name]', '山田 太郎')
   check('certificate: typing a name does not change it (no name in the line any more)', (await page.locator('[data-certificate]').innerText()) === 'この字は、あなたの目に映る、その人です。')
@@ -820,7 +820,7 @@ const SECTION_ORDER = ['.hero', '.strip', '.philo', '#shape', '#angles', '#write
   await page.click('label:has(input[name=package][value=standard])')
   check('enabled once everything is filled', await submit.isEnabled())
   await page.click('label:has(input[value=modern])')
-  check('choosing the modern form changes the slip to 黙', (await page.locator('[data-order-glyph]').innerText()) === '黙')
+  check('choosing the modern form changes the slip to 守', (await page.locator('[data-order-glyph]').innerText()) === '守')
   await page.click('label:has(input[value=kyujitai])')
   await page.screenshot({ path: `${SHOTS}/e2e-order-form-ja.png`, fullPage: true })
   // back keeps the selection
@@ -838,7 +838,7 @@ const SECTION_ORDER = ['.hero', '.strip', '.philo', '#shape', '#angles', '#write
   await page.waitForSelector('#co', { timeout: 8000 })
   check('submit → redirected to the Shopify checkout URL the server returned', page.url().includes('/__checkout?cart=fake'))
   const body = calls.order[0]
-  check('POST /api/order: story, the engine result, the chosen kanji, language, names, date, inscription style and package', body.story === STORY && body.engine_result.candidates.length === 3 && body.selected_kanji === '黙' && body.language === 'ja' && body.sender_name === '山田 太郎' && body.receiver_name === '山田 一郎' && body.delivery_date === iso && body.inscription_style === 'kyujitai' && body.package === 'standard', JSON.stringify({ ...body, engine_result: '…', story: body.story?.slice(0, 10) }))
+  check('POST /api/order: story, the engine result, the chosen kanji, language, names, date, inscription style and package', body.story === STORY && body.engine_result.candidates.length === 3 && body.selected_kanji === '守' && body.language === 'ja' && body.sender_name === '山田 太郎' && body.receiver_name === '山田 一郎' && body.delivery_date === iso && body.inscription_style === 'kyujitai' && body.package === 'standard', JSON.stringify({ ...body, engine_result: '…', story: body.story?.slice(0, 10) }))
   check('POST /api/order carries no price and no glyph (the server derives both)', !('price' in body) && !('glyph' in body) && !('amount' in body))
   check('no page errors (run 11)', errors.length === 0)
   if (errors.length) console.log('page errors:', errors)
@@ -861,7 +861,7 @@ const SECTION_ORDER = ['.hero', '.strip', '.philo', '#shape', '#angles', '#write
     r.runner_up_kanji = null
     r.candidates = r.candidates.slice(0, 3).map((c) => ({ ...c, eliminated: false, eliminated_reason: null }))
     r.candidates[0] = { ...r.candidates[0], kanji: '灯', inscription_form: '燈', reading: 'dēng', one_line_gaze: '你把玄关的灯一直留着。', story_anchor: '玄关的灯' }
-    r.candidates[1] = { ...r.candidates[1], kanji: '默', inscription_form: null, reading: 'mò' }
+    r.candidates[1] = { ...r.candidates[1], kanji: '守', inscription_form: null, reading: 'mò' }
     r.candidates[2] = { ...r.candidates[2], kanji: '桥', inscription_form: '橋', reading: 'qiáo' }
     return r
   }
@@ -930,7 +930,7 @@ const SECTION_ORDER = ['.hero', '.strip', '.philo', '#shape', '#angles', '#write
     r.candidates = r.candidates.slice(0, 3).map((c, i) => ({ ...c, eliminated: false, eliminated_reason: null, meaning: ['lamp', 'wait', 'welcome'][i], why_this: ['Lamplight is the light you left on for me.', 'Waiting is what you did, and never mentioned.', 'Welcoming is what the door meant.'][i], reading_zh: ['dēng', 'dài', 'yíng'][i] }))
     r.candidates[0] = { ...r.candidates[0], kanji: '灯', inscription_form: '燈', reading: 'akari', one_line_gaze: 'You left the porch light on every night.', story_anchor: 'left the porch light on' }
     r.candidates[1] = { ...r.candidates[1], kanji: '待', inscription_form: null, reading: 'matsu' }
-    r.candidates[2] = { ...r.candidates[2], kanji: '迎', inscription_form: null, reading: 'mukaeru' }
+    r.candidates[2] = { ...r.candidates[2], kanji: '証', inscription_form: null, reading: 'mukaeru' }
     return r
   }
   const { page, errors, calls } = await mockPage(browser, { result: enResult, order, onExplain: 'She kept the porch light on, and that was all she said.' })
@@ -1060,7 +1060,7 @@ const SECTION_ORDER = ['.hero', '.strip', '.philo', '#shape', '#angles', '#write
     if (body.occasion !== 'memorial') r.suggest_memorial = true
     return r
   }
-  const orderOk = () => ({ json: { order_ref: 'IC-20261026-MEMREF22', checkout_url: 'http://localhost:5173/__checkout?cart=mem', glyph: '默', certificate_text: 'x', certificate: { memorial: true } } })
+  const orderOk = () => ({ json: { order_ref: 'IC-20261026-MEMREF22', checkout_url: 'http://localhost:5173/__checkout?cart=mem', glyph: '守', certificate_text: 'x', certificate: { memorial: true } } })
   const { page, errors, calls } = await mockPage(browser, { result: memResult, order: orderOk })
   await page.goto('http://localhost:5173/?lang=ja', { waitUntil: 'networkidle' })
   const chips = await page.locator('[data-chip^="occasion:"]').evaluateAll((els) => els.map((e) => e.dataset.chip))

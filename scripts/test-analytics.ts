@@ -78,11 +78,11 @@ gcs.close()
 const shown = shownEvent(clone(GOLDEN), S1, 'customer', NOW)
 check('shown event: language, relationship, occasion, status, which slot was shown as main, whether a freestyle was offered', shown.event === 'shown' && shown.language === 'ja' && shown.relationship === 'parent_father' && shown.occasion === 'parent_day' && shown.status === 'sufficient' && shown.main_slot === 'main' && shown.has_freestyle === true)
 const promotedResult = clone(GOLDEN)
-promotedResult.primary_kanji = '黙'
+promotedResult.primary_kanji = '守'
 check('shown event: when slot 2 was promoted, the slot shown as main is "second"', (shownEvent(promotedResult, S1, 'customer', NOW) as { main_slot: string }).main_slot === 'second')
 check('shown event: an insufficient result has no main slot and no freestyle', (() => { const r = { ...clone(GOLDEN), status: 'insufficient' as const, candidates: [], primary_kanji: null, freestyle_kanji: null }; const e = shownEvent(r, S1, 'customer', NOW) as { main_slot: unknown; has_freestyle: boolean; status: string }; return e.status === 'insufficient' && e.main_slot === null && e.has_freestyle === false })())
 const KEYS_OK = new Set(['ts', 'session', 'source', 'event', 'language', 'relationship', 'occasion', 'status', 'main_slot', 'has_freestyle', 'choice'])
-check('privacy: an event has ONLY whitelisted keys — no story, gaze, kanji, name, email, order_ref', Object.keys(shown).every((k) => KEYS_OK.has(k)) && !JSON.stringify(shown).includes('父') && !JSON.stringify(shown).includes('迎'))
+check('privacy: an event has ONLY whitelisted keys — no story, gaze, kanji, name, email, order_ref', Object.keys(shown).every((k) => KEYS_OK.has(k)) && !JSON.stringify(shown).includes('父') && !JSON.stringify(shown).includes('証'))
 check('client events: only "chosen" (with a valid choice) and "explain_opened" are accepted; extra fields are dropped; bad session / unknown event / bad choice are refused', (() => {
   const ok = parseClientEvent({ session: S1, event: 'chosen', choice: 'freestyle', source: 'harness', story: 'SECRET STORY', name: '山田', order_ref: 'IC-1' }, NOW)
   return ok?.event === 'chosen' && ok.choice === 'freestyle' && ok.source === 'harness' && !JSON.stringify(ok).includes('SECRET') && !JSON.stringify(ok).includes('山田') && !JSON.stringify(ok).includes('IC-1') &&
@@ -142,7 +142,7 @@ await new Promise((r) => setTimeout(r, 150))
 console.log = logq
 const shownLine = readLines().slice(before).find((l) => l.event === 'shown')
 check('/api/select with a session id writes ONE "shown" event: language, relationship, occasion, main slot, freestyle offered', shownLine?.language === 'ja' && shownLine.relationship === 'parent_father' && shownLine.occasion === 'parent_day' && shownLine.status === 'sufficient' && shownLine.main_slot === 'main' && shownLine.has_freestyle === true && shownLine.session === 'Sess' + 'B'.repeat(20), JSON.stringify(readLines().slice(before)))
-check('privacy: nothing of the story, the gaze lines or the kanji is in the analytics files', !readdirSync(join(adir, 'analytics')).some((f) => /父|駅|封筒|迎|黙|あなた/.test(readFileSync(join(adir, 'analytics', f), 'utf8'))))
+check('privacy: nothing of the story, the gaze lines or the kanji is in the analytics files', !readdirSync(join(adir, 'analytics')).some((f) => /父|駅|封筒|証|守|あなた/.test(readFileSync(join(adir, 'analytics', f), 'utf8'))))
 const beforeNo = readLines().length
 console.log = () => {}
 await (await selectPost(new Request('http://x/api/select', { method: 'POST', body: JSON.stringify({ story: STORY, language: 'ja' }) }))).text()
@@ -156,7 +156,7 @@ const ostore = new MemoryOrderStore()
 const fetchImpl = (async () => new Response(JSON.stringify({ data: { cartCreate: { cart: { id: 'gid://shopify/Cart/x', checkoutUrl: 'https://soul-id-2.myshopify.com/cart/c/x' }, userErrors: [] } } }), { status: 200, headers: { 'content-type': 'application/json' } })) as unknown as typeof fetch
 const shopify = { storeDomain: 'soul-id-2.myshopify.com', apiVersion: '2025-01', token: 't', apiBase: 'https://soul-id-2.myshopify.com', variants: { simple: 'gid://shopify/ProductVariant/1', standard: 'gid://shopify/ProductVariant/2' } }
 const handler = createOrderHandler(() => ({ store: ostore, shopify, shopifyMissing: [], now: () => new Date('2026-10-25T03:00:00Z'), fetchImpl }))
-const ob = { story: STORY, engine_result: clone(GOLDEN), selected_kanji: '迎', language: 'ja', sender_name: '山田 太郎', receiver_name: '山田 一郎', delivery_date: '2026-12-01', inscription_style: 'kyujitai', package: 'simple', session: S1, source: 'customer' }
+const ob = { story: STORY, engine_result: clone(GOLDEN), selected_kanji: '証', language: 'ja', sender_name: '山田 太郎', receiver_name: '山田 一郎', delivery_date: '2026-12-01', inscription_style: 'kyujitai', package: 'simple', session: S1, source: 'customer' }
 const orderRes = await handler(new Request('http://x/api/order', { method: 'POST', body: JSON.stringify(ob) }))
 await orderRes.json()
 await new Promise((r) => setTimeout(r, 50))

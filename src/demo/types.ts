@@ -36,6 +36,8 @@ export interface Candidate {
   suitability_flag: string | null
   palette_status?: 'ok' | 'context_required' | 'off_palette'
   flags?: string[]
+  /** v9.1: stroke counts of the two forms, attached by the server for the carving check (null = unknown). */
+  strokes?: { kanji: number | null; inscription_form: number | null }
 }
 
 export interface Fingerprint {
@@ -66,6 +68,10 @@ export interface EngineResult {
   runner_up_kanji?: string | null
   /** v6: the freestyle candidate's kanji, or null. */
   freestyle_kanji?: string | null
+  /** v9.1: the goodwill check declined — no cards, `follow_up_question` carries the polite message, nothing to answer. */
+  declined?: boolean
+  /** v9.1: the Simple set takes at most this many strokes. */
+  simple_max_strokes?: number
   referee?: {
     palette_rows: number
     original_primary: string | null

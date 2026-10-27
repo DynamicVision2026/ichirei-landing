@@ -85,10 +85,12 @@ try {
   const p1 = lastPrompt()
   // The engine returns the model's answer after the palette referee; for the golden fixture
   // that adds the referee block and the palette's verdicts, nothing else.
-  check('golden: result equals the golden fixture run through the palette referee', JSON.stringify(golden) === JSON.stringify(applyReviewVerdicts(applyPalette(GOLDEN, loadPalette(), GOLDEN_STORY), loadPalette(), GOLDEN_STORY, { ran: true, skipped_reason: null, verdicts: GOLDEN.candidates.map((c: { slot: string; kanji: string }) => ({ slot: c.slot, kanji: c.kanji, pass: true, reason: 'ok (fake reviewer)', rule: null })) })))
-  check('golden: referee ran, kept 迎 as primary (verbatim anchor), changed no candidate set', golden.referee?.palette_rows === loadPalette().size && golden.referee.primary_changed === false && golden.candidates.map((c) => c.kanji).join('') === GOLDEN.candidates.map((c: { kanji: string }) => c.kanji).join(''))
+  // (the carving check's stroke counts and the Simple limit are attached to a sufficient result by the engine — spec v9.1 step 9)
+  const withoutCarving = { ...golden, simple_max_strokes: undefined, candidates: golden.candidates.map((c) => ({ ...c, strokes: undefined })) }
+  check('golden: result equals the golden fixture run through the palette referee', JSON.stringify(withoutCarving) === JSON.stringify(applyReviewVerdicts(applyPalette(GOLDEN, loadPalette(), GOLDEN_STORY), loadPalette(), GOLDEN_STORY, { ran: true, skipped_reason: null, verdicts: GOLDEN.candidates.map((c: { slot: string; kanji: string }) => ({ slot: c.slot, kanji: c.kanji, pass: true, reason: 'ok (fake reviewer)', rule: null })) })))
+  check('golden: referee ran, kept 証 as primary (verbatim anchor), changed no candidate set', golden.referee?.palette_rows === loadPalette().size && golden.referee.primary_changed === false && golden.candidates.map((c) => c.kanji).join('') === GOLDEN.candidates.map((c: { kanji: string }) => c.kanji).join(''))
   check('golden: result conforms to the v6 contract', validateEngineResult(golden).length === 0, validateEngineResult(golden).join('; '))
-  check('golden: primary is 迎 and the four context fields are echoed', golden.primary_kanji === '迎' && golden.language === 'ja' && golden.relationship === 'parent_father' && golden.direction === 'up' && golden.occasion === 'parent_day' && golden.occasion_detail === '還暦')
+  check('golden: primary is 証 and the four context fields are echoed', golden.primary_kanji === '証' && golden.language === 'ja' && golden.relationship === 'parent_father' && golden.direction === 'up' && golden.occasion === 'parent_day' && golden.occasion_detail === '還暦')
   check('golden→model: prompt is prompt.ja.md (Japanese output rules)', p1.includes('Selection Prompt (v6, Japanese / ja)') && p1.includes('hiragana'))
   check('golden→model: all four context values reached the prompt', ['language: ja', 'relationship: parent_father', 'direction: up', 'occasion: parent_day', 'occasion_detail: 還暦'].every((l) => p1.includes(l)))
   check('golden→model: story injected, no slot left behind', p1.includes(GOLDEN_STORY) && !allSlots.some((s) => p1.includes(s)))
@@ -234,7 +236,7 @@ try {
   reply = { ...GOLDEN, language: 'zh-Hant', inscription_script: 'simplified', relationship: 'spouse', direction: 'down', occasion: 'new_baby', occasion_detail: '滿月' }
   const stamped = await runEngine(GOLDEN_STORY, 'A', { context: { language: 'ja', relationship: 'parent_father', direction: 'up', occasion: 'parent_day', occasion_detail: '還暦' } })
   check('stamping: a wrong model echo is overwritten with what the caller sent', stamped.language === 'ja' && stamped.inscription_script === null && stamped.relationship === 'parent_father' && stamped.direction === 'up' && stamped.occasion === 'parent_day' && stamped.occasion_detail === '還暦')
-  check('stamping: nothing else about the result is touched', stamped.primary_kanji === '迎' && JSON.stringify(stamped.candidates.map((c) => c.kanji)) === JSON.stringify(GOLDEN.candidates.map((c: { kanji: string }) => c.kanji)))
+  check('stamping: nothing else about the result is touched', stamped.primary_kanji === '証' && JSON.stringify(stamped.candidates.map((c) => c.kanji)) === JSON.stringify(GOLDEN.candidates.map((c: { kanji: string }) => c.kanji)))
   reply = GOLDEN
 
   // ---- 4b. The palette referee, end to end (the first real golden run's failure, in the v6 shape) ----

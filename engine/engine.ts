@@ -15,8 +15,9 @@
 import Anthropic from '@anthropic-ai/sdk'
 import { callSignal, callTimeoutMs, ModelTimeoutError, reviewTimeoutMs, runBudgetMs, shadowGraceMs, timedOut } from './limits.ts'
 import { finalizeResult } from './slots.ts'
-import { logMainCharacter } from './main-count.ts'
-import { buildLexiconPrompt, eligibleFor, inEligible, lexiconEchoOf, lexiconModeFromEnv, loadLexicon, type EligibleSet, type Lexicon, type LexiconPromptParts } from './lexicon.ts'
+import { logMainCharacter, logSafetyRemovals } from './main-count.ts'
+import { attachStrokes } from './strokes.ts'
+import { buildLexiconPrompt, eligibleFor, inEligible, inLexicon, lexiconEchoOf, lexiconModeFromEnv, loadLexicon, type EligibleSet, type Lexicon, type LexiconPromptParts } from './lexicon.ts'
 import { readFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -24,6 +25,7 @@ import { applyPalette, applyReviewVerdicts, loadPalette } from './palette.ts'
 import { runReview } from './review.ts'
 import { completeMains } from './replace.ts'
 import {
+  DECLINE_MESSAGE,
   DEFAULT_CONTEXT,
   displayScriptOf,
   promptFamilyOf,
@@ -224,6 +226,7 @@ export interface RunEngineOptions {
 interface LexView {
   set: EligibleSet
   parts: LexiconPromptParts
+  lexicon: Lexicon
 }
 
 /** What one pass through the pipeline produced. `miss` is set when, in lexicon mode, no lexicon character could be used. */
@@ -243,8 +246,9 @@ interface PipelineOut {
  * engine/lexicon.csv, the palette engine is the fallback after a second "nothing fits".
  */
 export async function runEngine(story: string, condition: 'A' | 'B' | 'C', opts: RunEngineOptions = {}): Promise<EngineResult> {
-  const result = await runEngineInner(story, condition, opts)
+  const result = attachStrokes(await runEngineInner(story, condition, opts)) // the carving check's stroke counts (engine/strokes.ts)
   logMainCharacter(result) // the day's repeats, visible in the logs (engine/main-count.ts)
+  logSafetyRemovals(result) // every card removed for safety, with the reason (no story text)
   return result
 }
 
@@ -274,7 +278,7 @@ async function runEngineInner(
     try {
       const lexicon = opts.lexicon ?? loadLexicon()
       const set = eligibleFor(lexicon, palette, context)
-      view = { set, parts: buildLexiconPrompt(lexicon, set) }
+      view = { set, parts: buildLexiconPrompt(lexicon, set, context.relationship), lexicon }
     } catch (err) {
       console.log(`[ichirei-lexicon] unavailable ${JSON.stringify({ mode, error: (err instanceof Error ? err.message : String(err)).slice(0, 160) })}`)
     }
@@ -445,6 +449,8 @@ function stampResult(extracted: EngineResult, context: EngineContext): EngineRes
   // decides; this is plumbing): true or absent, never a stray value.
   if (context.occasion !== 'memorial' && (extracted as { suggest_memorial?: unknown }).suggest_memorial === true) stamped.suggest_memorial = true
   else delete stamped.suggest_memorial
+  // Fields the engine reads from the model's answer for its own logs and flow — never passed on to the page.
+  for (const k of ['lexicon_miss', 'goodwill_declined', 'truth', 'ideal_character']) delete (stamped as unknown as Record<string, unknown>)[k]
   return stamped
 }
 
@@ -456,6 +462,43 @@ function registerOf(extracted: EngineResult): string[] | null {
   return pick ? pick.filter((x): x is string => typeof x === 'string').slice(0, 3) : null
 }
 
+/** The goodwill check declined (selection or review): no cards, a polite message, nothing to answer. */
+function declinedResult(r: EngineResult, context: EngineContext): EngineResult {
+  return {
+    ...r,
+    status: 'insufficient',
+    declined: true,
+    follow_up_question: DECLINE_MESSAGE[context.language],
+    particulars: [],
+    candidates: [],
+    primary_kanji: null,
+    runner_up_kanji: null,
+    freestyle_kanji: null,
+    fallback_follow_up_question: null,
+    suggest_memorial: undefined,
+  }
+}
+
+/**
+ * Spec v9.1 step 2: the model names the IDEAL character with no limits (before it chooses from the list). When that character is not on
+ * this gift's list, one log line says so — the character and codes only, never story text — so the lexicon can grow.
+ */
+function logIdeal(extracted: EngineResult, a: PipelineArgs, chosen: string | null, tag = '[ichirei-lexicon]') {
+  const raw = (extracted as { ideal_character?: unknown }).ideal_character
+  const ideal = typeof raw === 'string' ? [...raw.trim()][0] : undefined
+  if (!ideal || !a.view) return null
+  const onList = inEligible(a.view.set, { kanji: ideal, inscription_form: null }) !== undefined
+  if (onList) return { ideal, on_list: true }
+  let known = false
+  try {
+    known = inLexicon(a.view.lexicon, a.palette, ideal)
+  } catch {
+    // the log is best-effort
+  }
+  console.log(`${tag} ideal_not_in_lexicon ${JSON.stringify({ ideal, in_lexicon: known, reason: known ? 'in_lexicon_but_not_open_to_this_gift' : 'not_in_lexicon', relationship: a.context.relationship, occasion: a.context.occasion, direction: a.context.direction, language: a.context.language, chosen_main: chosen })}`)
+  return { ideal, on_list: false }
+}
+
 async function runPipeline(a: PipelineArgs): Promise<PipelineOut> {
   const { story, context, palette, opts, tStart, prompt, view } = a
   opts.onStage?.('reading')
@@ -463,15 +506,23 @@ async function runPipeline(a: PipelineArgs): Promise<PipelineOut> {
   const selectMs = Date.now() - tStart
   const stamped = stampResult(extracted, context)
   const modelSaidMiss = view !== null && stamped.status === 'insufficient' && (extracted as { lexicon_miss?: unknown }).lexicon_miss === true
-  const inLexicon = view ? (c: Candidate) => inEligible(view.set, c) !== undefined : undefined
+  const onList = view ? (c: Candidate) => inEligible(view.set, c) !== undefined : undefined
   const timing = (t: { review_ms: number; replace_ms: number; status: string }) =>
     logTiming({ attempts, max_tokens_used: maxTokens, select_ms: selectMs, ...t, total_ms: Date.now() - tStart, stop_reason: message.stop_reason, output_tokens: message.usage?.output_tokens ?? null, lexicon: view !== null })
   /** Close a lexicon-mode result: the report, and the classical line from the lexicon (never from the palette). */
   const finishLexicon = (r: EngineResult): EngineResult => {
-    if (!view) return r
+    if (!view || r.declined) return r
     const withLine: EngineResult = { ...r, candidates: r.candidates.map((c) => ({ ...c, classical_echo: c.slot !== 'freestyle' && !c.eliminated ? lexiconEchoOf(view.set, c) : null })) }
     return { ...withLine, lexicon: { mode: 'on', outcome: r.status === 'sufficient' ? 'chosen' : 'question', eligible: view.set.chars.length } }
   }
+
+  // Goodwill check (spec v9.1 step 1): a hostile or mocking story gets a polite decline, not a character.
+  if ((extracted as { goodwill_declined?: unknown }).goodwill_declined === true) {
+    console.log(`[ichirei-safety] goodwill_decline ${JSON.stringify({ stage: 'selection', language: context.language, relationship: context.relationship, occasion: context.occasion, direction: context.direction })}`)
+    timing({ review_ms: 0, replace_ms: 0, status: 'declined' })
+    return { result: finishLexicon(declinedResult(stamped, context)), miss: null }
+  }
+  logIdeal(extracted, a, stamped.primary_kanji ?? null)
 
   if (modelSaidMiss) {
     const closed = finalizeResult(stamped)
@@ -483,7 +534,7 @@ async function runPipeline(a: PipelineArgs): Promise<PipelineOut> {
   // context_required kanji as primary; promotes slot 2. When no main candidate survives, the result is held (deferInsufficient) so one
   // replacement can be tried before the sender is told there is nothing. A missing or malformed palette fails the request loudly
   // (above), never silently skips the blocklist. In lexicon mode the same pass also rejects any main or second character outside the list.
-  const refereed = applyPalette(stamped, palette, story, { deferInsufficient: true, inLexicon })
+  const refereed = applyPalette(stamped, palette, story, { deferInsufficient: true, inLexicon: onList })
   if (refereed.status !== 'sufficient') {
     const closed = finalizeResult(refereed)
     timing({ review_ms: 0, replace_ms: 0, status: closed.status })
@@ -493,15 +544,21 @@ async function runPipeline(a: PipelineArgs): Promise<PipelineOut> {
   // The separate review call (engine/review.ts): a fresh model call checks the survivors for SAFETY only. Its vetoes are applied by the
   // same referee code (a vetoed main → slot 2 is promoted; a failed or unreviewed freestyle → dropped). It never throws, and a review that
   // cannot be used (timeout, error) costs the customer nothing but the freestyle: the mains stand on the referee alone.
-  // Lexicon mode: the main and second characters are pre-vetted (they come from the classical lexicon, through the same palette), so only the freestyle is reviewed.
+  // The review checks ALL cards (spec v9.1 step 7) — lexicon characters included: the lexicon vouches for a character's classical sense, not for this gift.
   opts.onStage?.('checking')
   const tReview = Date.now()
   // (No live main candidate left → nothing to review: a freestyle cannot be shown alone, so it is dropped and the replacement is tried at once.)
   const hasMain = refereed.candidates.some((c) => !c.eliminated && c.slot !== 'freestyle')
   const review = hasMain
-    ? await runReview(refereed, palette, story, context, { apiKey: opts.apiKey, signal: opts.signal, model: REVIEW_MODEL, slots: view ? ['freestyle'] : undefined, onUsage: opts.onUsage ? (u) => opts.onUsage!('review', u) : undefined })
+    ? await runReview(refereed, palette, story, context, { apiKey: opts.apiKey, signal: opts.signal, model: REVIEW_MODEL, onUsage: opts.onUsage ? (u) => opts.onUsage!('review', u) : undefined })
     : { ran: false, skipped_reason: 'no main candidate left to review', verdicts: [] }
   const reviewMs = Date.now() - tReview
+  // Goodwill (spec v9.1 step 7): the review may also find the story hostile or mocking — then nothing is shown and the sender is politely declined.
+  if (review.verdicts.some((v) => !v.pass && v.rule === 'goodwill')) {
+    console.log(`[ichirei-safety] goodwill_decline ${JSON.stringify({ stage: 'review', language: context.language, relationship: context.relationship, occasion: context.occasion, direction: context.direction })}`)
+    timing({ review_ms: reviewMs, replace_ms: 0, status: 'declined' })
+    return { result: finishLexicon(declinedResult({ ...refereed, review: { ran: review.ran, skipped_reason: review.skipped_reason, verdicts: review.verdicts } }, context)), miss: null }
+  }
   const reviewed = applyReviewVerdicts(refereed, palette, story, review, { deferInsufficient: true })
 
   // A main slot that is EMPTY (never produced, or removed by the referee or the review) is replaced — never an extra card beside a filled one.
@@ -514,7 +571,7 @@ async function runPipeline(a: PipelineArgs): Promise<PipelineOut> {
     reviewModel: REVIEW_MODEL,
     onUsage: opts.onUsage,
     onStage: opts.onStage,
-    inLexicon,
+    inLexicon: onList,
   })
   // The last gate: at most one main, one second, one freestyle — and never zero cards without a question.
   const final = finalizeResult(completed)
@@ -555,8 +612,9 @@ function startShadow(a: PipelineArgs) {
       const sel = await selectWithRetry(a, ac.signal, true, a.opts.onUsage)
       const stamped = stampResult(sel.extracted, a.context)
       if (stamped.status === 'insufficient') return { main: null, second: null, freestyle: null, miss: (sel.extracted as { lexicon_miss?: unknown }).lexicon_miss === true, note: 'insufficient' }
-      const inLexicon = (c: Candidate) => inEligible(view.set, c) !== undefined
-      const refereed = applyPalette(stamped, a.palette, a.story, { deferInsufficient: true, inLexicon, log: () => {} })
+      const onList = (c: Candidate) => inEligible(view.set, c) !== undefined
+      logIdeal(sel.extracted, a, null)
+      const refereed = applyPalette(stamped, a.palette, a.story, { deferInsufficient: true, inLexicon: onList, log: () => {} })
       const live = refereed.candidates.filter((c) => !c.eliminated)
       return {
         main: live.find((c) => c.slot === 'main')?.kanji ?? null,

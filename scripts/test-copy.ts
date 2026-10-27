@@ -34,6 +34,7 @@ function check(name: string, cond: boolean, detail?: string) {
 // Every string a Copy can show, with sample arguments for the function-valued entries.
 const SAMPLE = { kanji: '灯', inscription_form: '燈', reading: 'dēng', meaning: 'lamp' }
 const CALLS: Record<string, unknown[]> = {
+  simpleUnavailable: [20],
   serverError: [500], timeout: [290], eliminatedSummary: [3], finalized: ['灯'],
   glyphReading: [SAMPLE, '燈'], storyCounter: [523, 600], inscriptionNote: [SAMPLE, 'traditional'], previewNote: [SAMPLE, 'traditional'], dateNotice: [7],
 }
@@ -66,7 +67,8 @@ check('v6 copy: the counter reads "n / 600" in every language; the too-long mess
 check('v6 copy: card labels — ja 本命/次点/遊び字, zh 本命/次选(次選)/趣字, en Main/Second/Freestyle; the old no-primary screen copy is gone', JSON.stringify(COPY.ja.slotLabels) === JSON.stringify({ main: '本命', second: '次点', freestyle: '遊び字' }) && JSON.stringify(COPY['zh-Hans'].slotLabels) === JSON.stringify({ main: '本命', second: '次选', freestyle: '趣字' }) && JSON.stringify(COPY['zh-Hant'].slotLabels) === JSON.stringify({ main: '本命', second: '次選', freestyle: '趣字' }) && JSON.stringify(COPY.en.slotLabels) === JSON.stringify({ main: 'Main', second: 'Second', freestyle: 'Freestyle' }) && UI_LANGUAGES.every((l) => !Object.keys(COPY[l]).some((k) => k.startsWith('noPrimary'))))
 
 // ---- same shape in all four languages ---------------------------------------------------
-const shape = (c: Copy) => strings(c).map(([k]) => k).join('|')
+// (ja and en carve the modern form and have no old-form notes any more: those two functions return null there, strings in zh)
+const shape = (c: Copy) => strings(c).map(([k]) => k).filter((k) => !/^(inscriptionNote|previewNote)\(\)$/.test(k)).join('|')
 check('copy: ja, zh-Hans, zh-Hant and en define exactly the same keys', UI_LANGUAGES.every((l) => shape(COPY[l]) === shape(COPY.ja)))
 check('copy: no string is empty or a placeholder', UI_LANGUAGES.every((l) => strings(COPY[l]).every(([, s]) => s.trim().length > 0 && !/TODO|FIXME|undefined/.test(s))))
 for (const l of UI_LANGUAGES) {
@@ -106,7 +108,7 @@ check('script: ja copy uses speech lang ja-JP; zh-Hans zh-CN; zh-Hant zh-TW', CO
 // ---- glyph and notes ---------------------------------------------------------------------
 const lamp = { kanji: '灯', inscription_form: '燈' }
 const lampEn = lamp
-const plain = { kanji: '迎', inscription_form: null }
+const plain = { kanji: '証', inscription_form: null }
 
 // ---- English ------------------------------------------------------------------------------
 const enStrings = strings(COPY.en)
@@ -115,16 +117,16 @@ check('en: the UI copy is English — no kana or hanzi in any string (the kanji 
 check('en: language name "English", speech lang en-US, form labels name kyūjitai / modern', COPY.en.languageName === 'English' && COPY.en.speechLang === 'en-US' && /kyūjitai/.test(COPY.en.order.inscriptionStyles.kyujitai) && /Modern/.test(COPY.en.order.inscriptionStyles.modern))
 check('en: dateNotice is grammatical for 1 day and many days', COPY.en.order.dateNotice(1).includes('1 day ') && COPY.en.order.dateNotice(12).includes('12 days'))
 check('en: the finalize button is the neutral "Give this character" and the occasion_detail placeholder gives several milestones', COPY.en.finalizeButton === 'Give this character' && /60th.*30.*10/.test(COPY.en.occasionDetailPlaceholder))
-check('en: the reading line shows romaji (on/kun) with the English meaning; the modern form is shown beside the kyūjitai it carves', COPY.en.glyphReading({ ...lampEn, reading: 'on: tō · kun: akari', meaning: 'lamp; a light kept lit' }, '燈') === '灯 · on: tō · kun: akari — lamp; a light kept lit' && COPY.en.glyphReading({ kanji: '迎', inscription_form: null, reading: 'on: gei · kun: mukae(ru)', meaning: 'to welcome' }, '迎') === 'on: gei · kun: mukae(ru) — to welcome' && COPY.en.glyphReading({ kanji: '迎', inscription_form: null, reading: 'r' }, '迎') === 'r')
-check('en: notes name kyūjitai only when a distinct form exists', COPY.en.inscriptionNote({ kanji: '黙', inscription_form: '默' }, null)?.includes('kyūjitai') === true && COPY.en.inscriptionNote(plain, null) === null && COPY.en.previewNote(plain, null) === null && COPY.en.previewNote({ inscription_form: '默' }, null) !== null)
-check('en: carvedGlyph treats en like ja (kyūjitai whatever the script field says), never like zh', carvedGlyph({ kanji: '黙', inscription_form: '默' }, 'en', 'simplified') === '默' && carvedGlyph(plain, 'en', null) === '迎')
+check('en: the reading line shows romaji (on/kun) with the English meaning; the modern form is shown beside the kyūjitai it carves', COPY.en.glyphReading({ ...lampEn, reading: 'on: tō · kun: akari', meaning: 'lamp; a light kept lit' }, '燈') === '灯 · on: tō · kun: akari — lamp; a light kept lit' && COPY.en.glyphReading({ kanji: '証', inscription_form: null, reading: 'on: gei · kun: mukae(ru)', meaning: 'to welcome' }, '証') === 'on: gei · kun: mukae(ru) — to welcome' && COPY.en.glyphReading({ kanji: '証', inscription_form: null, reading: 'r' }, '証') === 'r')
+check('en: the carved form is the modern Japanese one — no kyūjitai note, whatever the candidate (spec v9.1 step 9)', COPY.en.inscriptionNote({ kanji: '灯', inscription_form: '燈' }, null) === null && COPY.en.previewNote({ inscription_form: '燈' }, null) === null)
+check('en: carvedGlyph treats en like ja (kyūjitai whatever the script field says), never like zh', carvedGlyph({ kanji: '守', inscription_form: '守' }, 'en', 'simplified') === '守' && carvedGlyph(plain, 'en', null) === '証')
 check('en: payload carries language en and no inscription_script; the engine accepts it', (() => { const pl = contextToPayload({ ...DEFAULT_GIFT_CONTEXT, language: 'en', relationship: 'friend', direction: 'across', occasion: 'wedding', inscriptionScript: 'simplified' }); const r = parseContext(pl); return pl.language === 'en' && !('inscription_script' in pl) && r.ok && r.context.language === 'en' && r.context.inscription_script === null })())
 
-check('carvedGlyph: zh defaults to the traditional form, simplified inscription carves the simplified one', carvedGlyph(lamp, 'zh-Hans', 'traditional') === '燈' && carvedGlyph(lamp, 'zh-Hant', null) === '燈' && carvedGlyph(lamp, 'zh-Hans', 'simplified') === '灯' && carvedGlyph(plain, 'zh-Hant', 'traditional') === '迎')
-check('carvedGlyph: ja carves the kyūjitai whatever the script field says', carvedGlyph({ kanji: '黙', inscription_form: '默' }, 'ja', 'simplified') === '默' && carvedGlyph(plain, 'ja', null) === '迎')
+check('carvedGlyph: zh defaults to the traditional form, simplified inscription carves the simplified one', carvedGlyph(lamp, 'zh-Hans', 'traditional') === '燈' && carvedGlyph(lamp, 'zh-Hant', null) === '燈' && carvedGlyph(lamp, 'zh-Hans', 'simplified') === '灯' && carvedGlyph(plain, 'zh-Hant', 'traditional') === '証')
+check('carvedGlyph: ja carves the kyūjitai whatever the script field says', carvedGlyph({ kanji: '守', inscription_form: '守' }, 'ja', 'simplified') === '守' && carvedGlyph(plain, 'ja', null) === '証')
 check('notes: zh names what is carved and shows the other form', COPY['zh-Hans'].inscriptionNote(lamp, 'traditional') === '刻字：繁體（简体：灯）' && COPY['zh-Hans'].inscriptionNote(lamp, 'simplified') === '刻字：简体（繁體：燈）' && COPY['zh-Hant'].inscriptionNote(lamp, 'traditional') === '刻字：繁體（簡體：灯）')
-check('notes: ja shows the kyūjitai pairing only when a distinct form exists', COPY.ja.inscriptionNote({ kanji: '黙', inscription_form: '默' }, null) === '古体字（現代字：黙）' && COPY.ja.inscriptionNote(plain, null) === null)
-check('reading line pairs the carved form with the other form and the reading', COPY['zh-Hans'].glyphReading({ ...lamp, reading: 'dēng' }, '燈') === '灯 ・ dēng' && COPY['zh-Hans'].glyphReading({ ...lamp, reading: 'dēng' }, '灯') === '燈 ・ dēng' && COPY.ja.glyphReading({ kanji: '黙', inscription_form: '默', reading: 'もく' }, '默') === '黙 ・ もく')
+check('notes: ja carves the modern form (新字体) — no kyūjitai pairing or note any more (spec v9.1 step 9)', COPY.ja.inscriptionNote({ kanji: '灯', inscription_form: '燈' }, null) === null && COPY.ja.previewNote({ inscription_form: '燈' }, null) === null)
+check('reading line pairs the carved form with the other form and the reading', COPY['zh-Hans'].glyphReading({ ...lamp, reading: 'dēng' }, '燈') === '灯 ・ dēng' && COPY['zh-Hans'].glyphReading({ ...lamp, reading: 'dēng' }, '灯') === '燈 ・ dēng' && COPY.ja.glyphReading({ kanji: '灯', inscription_form: '燈', reading: 'ひ' }, '灯') === 'ひ')
 
 // ---- payload -----------------------------------------------------------------------------
 const full = { ...DEFAULT_GIFT_CONTEXT, language: 'zh-Hans' as const, relationship: 'friend' as const, direction: 'across' as const, occasion: 'wedding' as const, occasionDetail: '  結婚10年 \n', inscriptionScript: 'simplified' as const }

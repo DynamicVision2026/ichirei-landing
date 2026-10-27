@@ -54,19 +54,19 @@
       },
       {
         "slot": "second",
-        "kanji": "迎",
-        "inscription_form": "迎",
+        "kanji": "待",
+        "inscription_form": null,
         "truth_type": "Role",
-        "one_line_gaze": "You met me at the door with a pot of tea.",
+        "one_line_gaze": "You waited for me at the door with a pot of tea.",
         "story_anchor": "met me at the door with a pot of tea",
-        "why_this": "Welcoming me is what the door and the tea meant.",
+        "why_this": "Waiting for me is what the door and the tea meant.",
         "unique_truth": "u",
         "eliminated": false,
         "eliminated_reason": null,
         "suitability_flag": null,
-        "palette_status": "context_required",
+        "palette_status": "ok",
         "flags": [],
-        "reading": "mukaeru",
+        "reading": "MODEL-GUESS",
         "meaning": "MODEL-WRONG",
         "reading_zh": "MODEL-WRONG"
       },
@@ -89,7 +89,7 @@
       }
     ],
     "primary_kanji": "灯",
-    "runner_up_kanji": "迎",
+    "runner_up_kanji": "待",
     "freestyle_kanji": "遅",
     "fallback_follow_up_question": "Could you tell me one small moment you actually shared with her?"
   },
@@ -103,7 +103,7 @@
       },
       {
         "slot": "second",
-        "kanji": "迎",
+        "kanji": "待",
         "pass": true,
         "reason": "ok"
       },
@@ -117,7 +117,7 @@
   },
   "expect": {
     "primary": "灯",
-    "second": "迎",
+    "second": "証",
     "freestyle": "遅"
   }
 }

@@ -105,10 +105,10 @@ try {
   // =============================================================================================
   const f = await run('en-fields-from-palette')
   const lamp = get(f, '灯')
-  const welcome = get(f, '迎')
+  const welcome = get(f, '待')
   const late = get(f, '遅')
   check('(2) 灯: ONE reading — the model picked "akari" (a reading of the row) and it is kept; reading_zh "dēng" and meaning "lamp" come from the PALETTE — the model\'s MODEL-WRONG values are replaced; the full list stays internal', lamp.reading === 'akari' && JSON.stringify(lamp.reading_options) === '["tō","hi","akari"]' && lamp.reading_zh === 'dēng' && lamp.meaning === 'lamp', JSON.stringify(lamp))
-  check('(2) 迎 (the model picked "mukaeru"): one reading, and reading_zh and meaning filled from the palette too', welcome.reading === 'mukaeru' && welcome.reading_zh === 'yíng' && welcome.meaning === 'welcome', JSON.stringify(welcome))
+  check('(2) 待 (the model reading is not on the row): one reading, and reading_zh and meaning filled from the palette too', welcome.reading === 'matsu' && welcome.reading_zh === 'dài' && welcome.meaning === 'wait', JSON.stringify(welcome))
   check('(2) why_this is the model\'s one plain sentence and survives untouched; the gaze line too', lamp.why_this === 'Lamplight is the light you left on for me, every night.' && !lamp.why_this.includes('\n') && lamp.one_line_gaze === 'You left the porch light on every night until I got home.')
   check('(2) the freestyle 遅 has no palette row: it keeps the model\'s own reading and meaning, reading_zh is null (nothing invented)', loadPalette().lookup('ja', '遅') === undefined && late.reading === 'osoi' && late.meaning === 'late' && late.reading_zh === null && late.why_this !== undefined)
   check('(2) the result conforms to the v7 contract (reading, meaning, why_this on every live en candidate); freestyle kept', validateEngineResult(f).length === 0 && f.freestyle_kanji === '遅', validateEngineResult(f).join('; '))
@@ -141,12 +141,12 @@ try {
   const orderBody = (result: EngineResult, kanji: string, style: string) => ({ story: FIX['en-fields-from-palette'].story, engine_result: result, selected_kanji: kanji, language: 'en', sender_name: 'Emily Carter', receiver_name: 'Margaret Carter', delivery_date: '2026-12-01', inscription_style: style, package: 'standard' })
   const res = await handler(new Request('http://x/api/order', { method: 'POST', body: JSON.stringify(orderBody(f, '灯', 'kyujitai')) }))
   const body = (await res.json()) as any
-  check('(3) the order response carries the certificate object', res.status === 200 && body.certificate?.character === '燈' && body.certificate.meaning_en === 'lamp', JSON.stringify(body))
-  check('(3) certificate: character = the carved form (燈), reading in kana "トウ・ひ・あかり", romanization = the ONE reading "akari" (not the list), meaning_en "lamp"', body.certificate.character === '燈' && body.certificate.reading === 'トウ・ひ・あかり' && body.certificate.romanization === 'akari' && body.certificate.romanization === lamp.reading && body.certificate.meaning_en === 'lamp')
+  check('(3) the order response carries the certificate object', res.status === 200 && body.certificate?.character === '灯' && body.certificate.meaning_en === 'lamp', JSON.stringify(body))
+  check('(3) certificate: character = the carved form (灯 — the modern Japanese form, spec v9.1 step 9), reading in kana "トウ・ひ・あかり", romanization = the ONE reading "akari" (not the list), meaning_en "lamp"', body.certificate.character === '灯' && body.certificate.reading === 'トウ・ひ・あかり' && body.certificate.romanization === 'akari' && body.certificate.romanization === lamp.reading && body.certificate.meaning_en === 'lamp')
   check('(3) certificate: line (the buyer\'s language = English) and line_en (always) are the exact English line', body.certificate.line === CERTIFICATE_LINE_EN && body.certificate.line_en === 'This character is the person as seen through your eyes.')
   const ref = body.order_ref
   const rec = (await store.get(ref)) as any
-  check('(3) stored with the order (order store): production.certificate, next to certificate_text; story and follow_ups kept apart', rec.production.certificate.meaning_en === 'lamp' && rec.production.certificate.character === '燈' && rec.production.certificate_text === CERTIFICATE_LINE_EN && Array.isArray(rec.follow_ups))
+  check('(3) stored with the order (order store): production.certificate, next to certificate_text; story and follow_ups kept apart', rec.production.certificate.meaning_en === 'lamp' && rec.production.certificate.character === '灯' && rec.production.certificate_text === CERTIFICATE_LINE_EN && Array.isArray(rec.follow_ups))
   const attrs = carts[0].variables.input.lines[0].attributes as { key: string; value: string }[]
   check('(3) Shopify: certificate_meaning_en = "lamp" is a line attribute right next to kanji, inscription_form and reading', attrs.map((x) => x.key).slice(0, 4).join() === 'kanji,inscription_form,reading,certificate_meaning_en' && attrs[3].value === 'lamp' && attrs[2].value === 'akari', JSON.stringify(attrs))
   check('(3) …and the story, the gaze line and why_this are NOT in what Shopify sees', !JSON.stringify(carts[0]).includes('porch light') && !JSON.stringify(carts[0]).includes('Lamplight'))
@@ -154,7 +154,7 @@ try {
   check('(3) the sender\'s inscription choice changes the certificate character (modern 灯) but not the readings or meaning', ((await resModern.json()) as any).certificate.character === '灯')
   const free = await handler(new Request('http://x/api/order', { method: 'POST', body: JSON.stringify(orderBody(f, '遅', 'kyujitai')) }))
   const freeBody = (await free.json()) as any
-  check('(3) a freestyle with no palette row: the certificate falls back to the candidate\'s own reading/meaning ("late") — and still has both lines', freeBody.certificate.meaning_en === 'late' && freeBody.certificate.character === '遲' && freeBody.certificate.line_en === CERTIFICATE_LINE_EN)
+  check('(3) a freestyle with no palette row: the certificate falls back to the candidate\'s own reading/meaning ("late") — and still has both lines', freeBody.certificate.meaning_en === 'late' && freeBody.certificate.character === '遅' && freeBody.certificate.line_en === CERTIFICATE_LINE_EN)
 } finally {
   console.log = origLog
   upstream.close()

@@ -77,10 +77,14 @@ try {
   check('reveal begins once the stream completes', true)
   await page.waitForTimeout(3200)
   const survivors = await page.locator('article').count()
-  // v6 golden: three cards — second 黙, freestyle 封 (it passed the fake review), main 迎 — nothing eliminated.
+  // v6 golden: three cards — second 守, freestyle 封 (it passed the fake review), main 証 — nothing eliminated.
   const slots = await page.locator('article').evaluateAll((els) => els.map((e) => e.getAttribute('data-slot')).join())
   check('three cards rendered (main, second, freestyle) with the review verdicts applied', survivors === 3 && slots === 'main,second,freestyle', `survivors=${survivors} slots=${slots}`)
-  check('primary 迎 comes first, in cinnabar', (await page.locator('article').first().locator('span').first().textContent()) === '迎' &&
+  // Spec v9.1 step 9: every card shows how it matches in three short lines (who they are / your moment / the feeling) — never a percentage or a score.
+  const matchRows = await page.locator('article [data-match]').evaluateAll((els) => els.map((e) => ({ who: !!e.querySelector('[data-match-who]'), moment: !!e.querySelector('[data-match-moment]'), feeling: !!e.querySelector('[data-match-feeling]'), text: e.textContent ?? '' })))
+  check('each of the three cards shows the three "how it matches" lines (who they are, your moment, the feeling) and no percentage or score', matchRows.length === 3 && matchRows.every((r) => r.who && r.moment && r.feeling && !/[%％]|スコア|score/i.test(r.text)), JSON.stringify(matchRows).slice(0, 300))
+  check('the main card carries the single word 深く響く; the others do not', (await page.locator('article[data-slot=main] [data-resonates]').count()) === 1 && (await page.locator('article[data-slot=second] [data-resonates]').count()) === 0 && (await page.locator('article[data-slot=freestyle] [data-resonates]').count()) === 0)
+  check('primary 証 comes first, in cinnabar', (await page.locator('article').first().locator('span').first().textContent()) === '証' &&
     (await page.locator('article').first().locator('span').first().evaluate((el) => getComputedStyle(el).color)) === 'rgb(192, 57, 43)')
   await page.screenshot({ path: `${SHOTS}/cr-reveal.png` })
 

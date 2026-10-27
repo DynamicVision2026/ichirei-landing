@@ -18,6 +18,7 @@ export type LogEventName =
   | 'final_selection'
   | 'condition_changed'
   | 'follow_up_shown'
+  | 'declined_shown'
   | 'retry_clicked'
   | 'order_submitted'
   | 'order_failed'

@@ -50,9 +50,9 @@
       },
       {
         "slot": "second",
-        "kanji": "黙",
-        "reading": "もく",
-        "inscription_form": "默",
+        "kanji": "守",
+        "reading": "まもる",
+        "inscription_form": null,
         "truth_type": "Hidden Cost",
         "one_line_gaze": "何も言わずに、そこにいてくれた。",
         "story_anchor": "黙って夜食を買ってきてくれた",
@@ -82,7 +82,7 @@
       }
     ],
     "primary_kanji": "夜",
-    "runner_up_kanji": "黙",
+    "runner_up_kanji": "守",
     "freestyle_kanji": "太",
     "fallback_follow_up_question": "大学の同期と過ごした夜の場面をひとつ教えてください。"
   },
@@ -96,7 +96,7 @@
       },
       {
         "slot": "second",
-        "kanji": "黙",
+        "kanji": "守",
         "pass": true,
         "reason": "ok"
       },
@@ -111,7 +111,7 @@
   "expect": {
     "status": "sufficient",
     "primary": "夜",
-    "second": "黙",
+    "second": "守",
     "freestyle": null,
     "freestyle_reason": "palette: freestyle_blocked (weight)"
   }

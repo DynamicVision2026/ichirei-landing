@@ -17,17 +17,17 @@ const cand = (slot, kanji, form, reading, meaning, gaze, anchor, why, extra = {}
 const RESULTS = {
   en: [
     cand('main', '灯', '燈', 'akari', 'lamp', 'You left the porch light on every night until I got home.', 'left the porch light on every night', 'Lamplight is the light you left on for me.', { reading_zh: 'dēng' }),
-    cand('second', '迎', null, 'mukaeru', 'welcome', 'You met me at the door with a pot of tea.', 'met me at the door with a pot of tea', 'Welcoming is what the door and the tea meant.', { reading_zh: 'yíng' }),
+    cand('second', '証', null, 'mukaeru', 'welcome', 'You met me at the door with a pot of tea.', 'met me at the door with a pot of tea', 'Welcoming is what the door and the tea meant.', { reading_zh: 'yíng' }),
     cand('freestyle', '遅', '遲', 'osoi', 'late', 'You were never once on time for anything else.', 'never once on time', 'Late is the one word the whole family laughs about with you.', { truth_type: 'Play' }),
   ],
   ja: [
     cand('main', '灯', '燈', 'ひ', 'あかり', '帰るまで、毎晩玄関の灯りをつけていた人。', '毎晩玄関の灯りをつけていた', ''),
-    cand('second', '迎', null, 'むかえる', '', '駅まで、いつも迎えに来てくれた人。', '駅まで迎えに来て', ''),
+    cand('second', '証', null, 'むかえる', '', '駅まで、いつも迎えに来てくれた人。', '駅まで迎えに来て', ''),
     cand('freestyle', '遅', '遲', 'おそい', '', '二十年、一度も時間通りに来なかった人。', '一度も時間通りに来なかった', '', { truth_type: 'Play' }),
   ],
   'zh-Hant': [
     cand('main', '燈', null, 'dēng', '', '我回家之前，每晚都開著門口的燈。', '每晚都開著門口的燈', ''),
-    cand('second', '迎', null, 'yíng', '', '總是到車站來接我的人。', '到車站來接我', ''),
+    cand('second', '証', null, 'yíng', '', '總是到車站來接我的人。', '到車站來接我', ''),
     cand('freestyle', '遲', null, 'chí', '', '二十年來沒有一次準時的人。', '沒有一次準時', '', { truth_type: 'Play' }),
   ],
 }

@@ -11,7 +11,9 @@ import { CERTIFICATE_LINE_EN, certificateText } from '../src/order/certificate.t
 import { isMemorial } from '../src/order/memorial.ts'
 import { loadPalette, plainMeaning, type Palette } from './palette.ts'
 import { chooseReading, kanaToRomaji, romanizeReadings } from './romaji.ts'
-import { STYLES_BY_LANGUAGE, glyphFor, type InscriptionStyle } from '../src/order/inscription.ts'
+import { STYLES_BY_LANGUAGE, glyphFor, normalizeStyle, type InscriptionStyle } from '../src/order/inscription.ts'
+import { carvedStrokes, simpleAvailable } from '../src/order/strokes.ts'
+import { simpleMaxStrokes, strokeInfo } from './strokes.ts'
 
 export const NAME_MAX = 40
 /** Same cap as /api/select: a story that could not have been analysed cannot be ordered against. */
@@ -157,7 +159,7 @@ export function parseOrderRequest(body: unknown, now: Date = new Date(), palette
   const latest = new Date(new Date(`${today}T00:00:00Z`).getTime() + MAX_DAYS_AHEAD * 86_400_000).toISOString().slice(0, 10)
   if (date > latest) return fail('delivery_date', `"delivery_date" is more than ${MAX_DAYS_AHEAD} days ahead`)
 
-  const style = body.inscription_style
+  const style = typeof body.inscription_style === 'string' ? normalizeStyle(lang, body.inscription_style) : body.inscription_style
   if (typeof style !== 'string' || !(STYLES_BY_LANGUAGE[lang] as readonly string[]).includes(style)) {
     return fail('inscription_style', `Invalid "inscription_style" for ${lang}: expected one of ${STYLES_BY_LANGUAGE[lang].join(' | ')}`)
   }
@@ -168,6 +170,14 @@ export function parseOrderRequest(body: unknown, now: Date = new Date(), palette
   }
 
   const inscription_style = style as InscriptionStyle
+  const glyph = glyphFor(candidate, inscription_style)
+  // The carving check (spec v9.1 step 9): the Simple set takes only characters up to ICHIREI_SIMPLE_MAX_STROKES strokes (default 20). The count
+  // is the SERVER's own (engine/strokes.csv), never the browser's; an unknown count is not allowed on Simple (the Standard set always is).
+  if (pkg === 'simple') {
+    const max = simpleMaxStrokes()
+    const n = carvedStrokes({ kanji: candidate.kanji, inscription_form: candidate.inscription_form, strokes: strokeInfo(candidate) }, glyph)
+    if (!simpleAvailable(n, max)) return fail('package', `The Simple set carves at most ${max} strokes; "${glyph}" has ${n ?? 'an unknown number of'} — choose the Standard set`)
+  }
   return {
     ok: true,
     order: {
@@ -176,8 +186,8 @@ export function parseOrderRequest(body: unknown, now: Date = new Date(), palette
       engine_result: result as unknown as EngineResult,
       language: lang,
       candidate,
-      glyph: glyphFor(candidate, inscription_style),
-      certificate: buildCertificate(candidate, glyphFor(candidate, inscription_style), lang, palette ?? loadPalette(), isMemorial(result.occasion as string | null)),
+      glyph,
+      certificate: buildCertificate(candidate, glyph, lang, palette ?? loadPalette(), isMemorial(result.occasion as string | null)),
       sender_name: sender,
       receiver_name: receiver,
       delivery_date: date,

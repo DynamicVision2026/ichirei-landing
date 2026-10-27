@@ -118,7 +118,7 @@ const site = http.createServer(async (req, res) => {
   // T1 (living) gets a result split across two chunks; T2 (memorial) gets a terminal error line
   if (body.occasion === 'memorial') res.write(JSON.stringify({ type: 'error', error: 'Engine failed: overloaded' }) + '\n')
   else {
-    const line = JSON.stringify({ type: 'result', result: result('parent_day', [cand('main', '迎'), cand('second', '守'), cand('freestyle', '笑')], '迎') }) + '\n'
+    const line = JSON.stringify({ type: 'result', result: result('parent_day', [cand('main', '証'), cand('second', '守'), cand('freestyle', '笑')], '証') }) + '\n'
     res.write(line.slice(0, 40))
     await new Promise((r) => setTimeout(r, 10))
     res.write(line.slice(40))
@@ -149,7 +149,7 @@ if (csv2) {
   const rec = (id: string) => Object.fromEntries(h.map((k, i) => [k, b.find((r) => r[0] === id)?.[i] ?? ''])) as Record<string, string>
   const a1 = rec('T1')
   const a2 = rec('T2')
-  check('--target <url>: the streamed result becomes a normal row (three kanji, measured seconds), tokens and cost left blank', a1.status === 'sufficient' && a1.kanji_main === '迎' && a1.kanji_freestyle === '笑' && Number(a1.seconds) > 0 && a1.input_tokens === '' && a1.cost_usd_est === '', JSON.stringify(a1))
+  check('--target <url>: the streamed result becomes a normal row (three kanji, measured seconds), tokens and cost left blank', a1.status === 'sufficient' && a1.kanji_main === '証' && a1.kanji_freestyle === '笑' && Number(a1.seconds) > 0 && a1.input_tokens === '' && a1.cost_usd_est === '', JSON.stringify(a1))
   check('--target <url>: a terminal error line is reported as an error row with the server\'s message (never a made-up result)', a2.status === 'error' && a2.flags === 'error' && a2.error.includes('overloaded') && a2.kanji_main === '', JSON.stringify(a2))
   const sum2 = readFileSync(join(dir2, csv2.replace('.csv', '-summary.txt')), 'utf8')
   check('--target <url>: the summary says cost is not measured and lists the time per run', sum2.includes('Cost: not measured') && sum2.includes('T1 ') && sum2.includes('T2 '), sum2)

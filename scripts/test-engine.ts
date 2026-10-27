@@ -74,8 +74,8 @@ if (problems.length > 0) {
 console.error('contract: OK')
 if (isGolden) {
   console.error(
-    result.primary_kanji === '迎'
-      ? 'golden: primary is 迎 (matches spec §10)'
-      : `golden: primary is ${result.primary_kanji}, spec §10 expects 迎 — read the reasoning flags before judging`,
+    result.primary_kanji === '証'
+      ? 'golden: primary is 証 (matches spec §10)'
+      : `golden: primary is ${result.primary_kanji}, spec §10 expects 証 — read the reasoning flags before judging`,
   )
 }

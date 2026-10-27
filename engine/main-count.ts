@@ -34,3 +34,27 @@ export function logMainCharacter(result: EngineResult, now: Date = new Date(), l
 export const resetMainTally = () => {
   tally = { day: '', counts: new Map() }
 }
+
+/**
+ * Spec v9.1 step 11: every card removed for SAFETY, with the reason — one line per run, only when something was removed. Codes, characters
+ * and the rule names only, never story text. `by` says who removed it: the palette referee (levels 1 and 3, the lexicon list), the
+ * review call (the named safety rule), or the slot gate (a repeated character, a fourth card).
+ */
+export function logSafetyRemovals(result: EngineResult, log: (line: string) => void = (l) => console.log(l)) {
+  try {
+    const removed = (result.candidates ?? [])
+      .filter((c) => c.eliminated && typeof c.eliminated_reason === 'string' && /^(palette:|review:|slots:|freestyle:)/.test(c.eliminated_reason))
+      .map((c) => {
+        const reason = c.eliminated_reason as string
+        const by = reason.startsWith('review:') ? 'review' : reason.startsWith('slots:') ? 'slots' : 'referee'
+        const rule = by === 'review' ? (reason.match(/^review: ([a-z]+):/)?.[1] ?? null) : null
+        return { slot: c.slot, kanji: c.kanji, by, ...(rule ? { rule } : {}), reason: reason.slice(0, 120) }
+      })
+    if (removed.length === 0) return null
+    const line = { language: result.language, relationship: result.relationship, occasion: result.occasion, direction: result.direction, removed }
+    log(`[ichirei-safety] removed ${JSON.stringify(line)}`)
+    return line
+  } catch {
+    return null
+  }
+}

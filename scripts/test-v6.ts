@@ -92,12 +92,12 @@ try {
   // =============================================================================================
   const a = await run('a')
   check('(a) solemn parent: sufficient, conforms to the v6 contract', a.status === 'sufficient' && validateEngineResult(a).length === 0, validateEngineResult(a).join('; '))
-  check('(a) exactly three candidates in slots main, second, freestyle; primary 迎, second 黙, freestyle 封', a.candidates.map((c) => c.slot).join() === 'main,second,freestyle' && a.primary_kanji === '迎' && a.runner_up_kanji === '黙' && a.freestyle_kanji === '封' && live(a).length === 3)
+  check('(a) exactly three candidates in slots main, second, freestyle; primary 証, second 守, freestyle 封', a.candidates.map((c) => c.slot).join() === 'main,second,freestyle' && a.primary_kanji === '証' && a.runner_up_kanji === '守' && a.freestyle_kanji === '封' && live(a).length === 3)
   check('(a) the emotional register is read from the story and carried (grateful, tender)', a.fingerprint.emotional_register?.join() === 'grateful,tender')
   check('(a) main and second are different truth types; the freestyle is "Play" and never the primary', bySlot(a, 'main')!.truth_type !== bySlot(a, 'second')!.truth_type && bySlot(a, 'freestyle')!.truth_type === 'Play' && a.primary_kanji !== a.freestyle_kanji)
   check('(a) the review call ran once, with verdicts for all three, and the result records them', seen.filter((s) => s.kind === 'review').length === 1 && a.review?.ran === true && a.review.verdicts.length === 3 && a.review.verdicts.every((v) => v.pass))
   check('(a) the review is a FRESH call: it does not contain the selection prompt or its reasoning', !seen.find((s) => s.kind === 'review')!.prompt.includes('Abandonment Resistance') && !seen.find((s) => s.kind === 'review')!.prompt.includes('HARD PROCESS RULES') && seen.find((s) => s.kind === 'review')!.prompt.includes(FIX.a.story))
-  check('(a) the verdicts are logged on one [ichirei-review] line, and the story is NOT in the log', logLines.length === 1 && logLines[0].includes('"ran":true') && logLines[0].includes('迎') && !logLines[0].includes('口下手') && !logLines[0].includes(FIX.a.story.slice(0, 12)), logLines.join('\n'))
+  check('(a) the verdicts are logged on one [ichirei-review] line, and the story is NOT in the log', logLines.length === 1 && logLines[0].includes('"ran":true') && logLines[0].includes('証') && !logLines[0].includes('口下手') && !logLines[0].includes(FIX.a.story.slice(0, 12)), logLines.join('\n'))
   check('(a) no classical line anywhere: no palette row is reviewed yet, so nothing is shown', a.candidates.every((c) => c.classical_echo === null))
 
   const b = await run('b')
@@ -108,7 +108,7 @@ try {
   const c1 = await run('c1')
   const free1 = bySlot(c1, 'freestyle')!
   check('(c1) insult-type joke (また太ったな): the freestyle 太 is refused by the palette freestyle blocklist — eliminated, reason names the category', free1.eliminated === true && free1.eliminated_reason === 'palette: freestyle_blocked (weight)' && c1.freestyle_kanji === null && free1.flags.includes('freestyle_blocked'), JSON.stringify(free1))
-  check('(c1) the two main candidates are untouched and the result still conforms (2 live + the refused freestyle kept as eliminated)', c1.primary_kanji === '夜' && c1.runner_up_kanji === '黙' && live(c1).length === 2 && validateEngineResult(c1).length === 0, validateEngineResult(c1).join('; '))
+  check('(c1) the two main candidates are untouched and the result still conforms (2 live + the refused freestyle kept as eliminated)', c1.primary_kanji === '夜' && c1.runner_up_kanji === '守' && live(c1).length === 2 && validateEngineResult(c1).length === 0, validateEngineResult(c1).join('; '))
   check('(c1) the refused freestyle never reaches the reviewer', !seen.find((s) => s.kind === 'review')!.prompt.includes('また太ったな') || !JSON.stringify(reviewItems(c1, loadPalette())).includes('太'))
   check('(c1) a refusal is recorded in the referee actions', c1.referee?.actions.some((x) => x.kanji === '太' && x.action === 'freestyle_blocked_eliminated') === true)
 
@@ -125,14 +125,14 @@ try {
   // 2. Promotion: slot 2 replaces slot 1; the freestyle is never promoted
   // =============================================================================================
   const p1 = await run('a', (r) => { r.candidates[0].kanji = '送'; r.primary_kanji = '送' })
-  check('referee: slot 1 hard-blocked (送) → slot 2 (黙) is promoted, promoted_from "second", the freestyle stays a freestyle', p1.primary_kanji === '黙' && p1.referee?.promoted_from === 'second' && p1.referee.primary_changed === true && p1.freestyle_kanji === '封' && p1.runner_up_kanji === null && validateEngineResult(p1).length === 0, validateEngineResult(p1).join('; '))
+  check('referee: slot 1 hard-blocked (送) → slot 2 (守) is promoted, promoted_from "second", the freestyle stays a freestyle', p1.primary_kanji === '守' && p1.referee?.promoted_from === 'second' && p1.referee.primary_changed === true && p1.freestyle_kanji === '封' && p1.runner_up_kanji === null && validateEngineResult(p1).length === 0, validateEngineResult(p1).join('; '))
   check('referee: after a promotion the second slot is consumed — no backup remains', p1.runner_up_kanji === null)
   const p2 = await run('a', (r) => { r.candidates[0].kanji = '送'; r.candidates[1].kanji = '終'; r.primary_kanji = '送'; r.runner_up_kanji = '終' })
   check('referee: BOTH main slots removed → insufficient + fallback question; the freestyle (封) is never promoted to primary', p2.status === 'insufficient' && p2.primary_kanji === null && p2.freestyle_kanji === null && p2.follow_up_question === FIX.a.model_reply.fallback_follow_up_question)
-  const p3 = await run('a', (r) => { r.candidates[0].kanji = '送'; r.primary_kanji = '送'; r.candidates[1].kanji = '迎'; r.candidates[1].story_anchor = '作り話のアンカー'; r.runner_up_kanji = '迎' })
+  const p3 = await run('a', (r) => { r.candidates[0].kanji = '送'; r.primary_kanji = '送'; r.candidates[1].kanji = '証'; r.candidates[1].story_anchor = '作り話のアンカー'; r.runner_up_kanji = '証' })
   check('referee: slot 2 that is context_required with an invented anchor cannot be promoted → insufficient', p3.status === 'insufficient')
   const p4 = await run('a', (r) => { r.candidates[0].kanji = '送'; r.primary_kanji = '送' })
-  check('referee: the review ran on the PROMOTED main (黙), not on the removed slot 1', seen.filter((s) => s.kind === 'review').length === 1 && !JSON.stringify(reviewItems(p4, loadPalette()).map((i) => i.kanji)).includes('送') && p4.review?.verdicts.some((v) => v.slot === 'second' && v.kanji === '黙') === true)
+  check('referee: the review ran on the PROMOTED main (守), not on the removed slot 1', seen.filter((s) => s.kind === 'review').length === 1 && !JSON.stringify(reviewItems(p4, loadPalette()).map((i) => i.kanji)).includes('送') && p4.review?.verdicts.some((v) => v.slot === 'second' && v.kanji === '守') === true)
 
   // =============================================================================================
   // 3. The freestyle's rules enforced in code
@@ -161,33 +161,33 @@ try {
   const r1 = await run('a', undefined)
   void r1
   const rv1 = await run('a', (_r, review) => { review.verdicts[0].pass = false; review.verdicts[0].rule = 'occasion'; review.verdicts[0].reason = 'Occasion taboo: ends a celebration.' })
-  check('review: slot 1 fails → eliminated "review: …", slot 2 promoted, the freestyle kept', rv1.candidates[0].eliminated === true && rv1.candidates[0].eliminated_reason === 'review: occasion: Occasion taboo: ends a celebration.' && rv1.primary_kanji === '黙' && rv1.referee?.promoted_from === 'second' && rv1.freestyle_kanji === '封' && validateEngineResult(rv1).length === 0, validateEngineResult(rv1).join('; '))
+  check('review: slot 1 fails → eliminated "review: …", slot 2 promoted, the freestyle kept', rv1.candidates[0].eliminated === true && rv1.candidates[0].eliminated_reason === 'review: occasion: Occasion taboo: ends a celebration.' && rv1.primary_kanji === '守' && rv1.referee?.promoted_from === 'second' && rv1.freestyle_kanji === '封' && validateEngineResult(rv1).length === 0, validateEngineResult(rv1).join('; '))
   const rv2 = await run('a', (_r, review) => { review.verdicts[0].pass = false; review.verdicts[0].rule = 'dignity'; review.verdicts[1].pass = false; review.verdicts[1].rule = 'register' })
   check('review: both main slots fail → insufficient with the fallback question (the freestyle is not promoted)', rv2.status === 'insufficient' && rv2.follow_up_question === FIX.a.model_reply.fallback_follow_up_question && rv2.freestyle_kanji === null && rv2.review?.verdicts.length === 3)
   const rv3 = await run('a', (_r, review) => { review.verdicts[1].pass = false; review.verdicts[1].rule = 'palette' })
-  check('review: slot 2 fails (slot 1 stands) → slot 2 is eliminated and there is no backup', rv3.primary_kanji === '迎' && rv3.candidates[1].eliminated === true && rv3.runner_up_kanji === null && validateEngineResult(rv3).length === 0)
+  check('review: slot 2 fails (slot 1 stands) → slot 2 is eliminated and there is no backup', rv3.primary_kanji === '証' && rv3.candidates[1].eliminated === true && rv3.runner_up_kanji === null && validateEngineResult(rv3).length === 0)
   reviewMode = 'garbage'
   const rv4 = await run('a')
   reviewMode = 'ok'
-  check('review unusable (unparseable reply): the mains stand on the referee alone, the FREESTYLE is dropped, the skip is recorded and logged', rv4.primary_kanji === '迎' && rv4.runner_up_kanji === '黙' && rv4.freestyle_kanji === null && bySlot(rv4, 'freestyle')!.eliminated === true && rv4.review?.ran === false && /review call failed/.test(rv4.review?.skipped_reason ?? '') && logLines.length === 1 && logLines[0].includes('"ran":false'), JSON.stringify(rv4.review))
+  check('review unusable (unparseable reply): the mains stand on the referee alone, the FREESTYLE is dropped, the skip is recorded and logged', rv4.primary_kanji === '証' && rv4.runner_up_kanji === '守' && rv4.freestyle_kanji === null && bySlot(rv4, 'freestyle')!.eliminated === true && rv4.review?.ran === false && /review call failed/.test(rv4.review?.skipped_reason ?? '') && logLines.length === 1 && logLines[0].includes('"ran":false'), JSON.stringify(rv4.review))
   reviewMode = 'http500'
   const rv5 = await run('a')
   reviewMode = 'ok'
-  check('review unusable (the call errors): same fail-closed policy for the freestyle, the customer still gets their two mains', rv5.status === 'sufficient' && rv5.primary_kanji === '迎' && rv5.freestyle_kanji === null && rv5.review?.ran === false)
+  check('review unusable (the call errors): same fail-closed policy for the freestyle, the customer still gets their two mains', rv5.status === 'sufficient' && rv5.primary_kanji === '証' && rv5.freestyle_kanji === null && rv5.review?.ran === false)
   process.env.ICHIREI_REVIEW = 'off'
   const rv6 = await run('a')
   delete process.env.ICHIREI_REVIEW
-  check('review disabled (ICHIREI_REVIEW=off): no review call is made and the freestyle does not ship', seen.filter((s) => s.kind === 'review').length === 0 && rv6.freestyle_kanji === null && rv6.review?.ran === false && rv6.primary_kanji === '迎')
+  check('review disabled (ICHIREI_REVIEW=off): no review call is made and the freestyle does not ship', seen.filter((s) => s.kind === 'review').length === 0 && rv6.freestyle_kanji === null && rv6.review?.ran === false && rv6.primary_kanji === '証')
   const rv7 = await run('a', (_r, review) => { review.verdicts = review.verdicts.slice(0, 2) })
-  check('review: a missing verdict for the freestyle drops it (no PASS, no freestyle); missing main verdicts leave the mains standing', rv7.freestyle_kanji === null && rv7.primary_kanji === '迎' && rv7.runner_up_kanji === '黙')
+  check('review: a missing verdict for the freestyle drops it (no PASS, no freestyle); missing main verdicts leave the mains standing', rv7.freestyle_kanji === null && rv7.primary_kanji === '証' && rv7.runner_up_kanji === '守')
   check('review prompt: every slot is in the file, loads, and fills in one pass (slot-like text in the story is not re-substituted)', Object.values(REVIEW_SLOTS).every((s) => loadReviewPrompt().includes(s)) && (() => { const f = fillReviewPrompt(loadReviewPrompt(), 'x {{ CANDIDATES }} y', { language: 'ja', relationship: 'friend', direction: 'across', occasion: null, occasion_detail: null, inscription_script: null }, []); return f.includes('x {{ CANDIDATES }} y') && f.includes('occasion: unspecified') })())
   check('review prompt: the rules — palette, occasion taboos, dignity, invention, generic; the freestyle rules; vetoes only under a safety rule', ['SAFETY RULES', 'THE CONCERNS', '`palette`', '`occasion`', '`dignity`', '`register`', '`insult`', 'Invention', 'Generic', 'birthday_milestone', 'retirement_farewell'].every((k) => loadReviewPrompt().includes(k)))
-  check('review input: the reviewer sees the palette facts for each candidate (status, taboo flags) and null for a character with no row', (() => { const items = reviewItems(a, loadPalette()); return items.find((i) => i.kanji === '迎')?.palette?.status === 'context_required' && items.find((i) => i.kanji === '封')?.palette === null && items.map((i) => i.slot).join() === 'main,second,freestyle' })())
+  check('review input: the reviewer sees the palette facts for each candidate (status, taboo flags) and null for a character with no row', (() => { const items = reviewItems(a, loadPalette()); return items.find((i) => i.kanji === '証')?.palette?.status === 'context_required' && items.find((i) => i.kanji === '封')?.palette === null && items.map((i) => i.slot).join() === 'main,second,freestyle' })())
   check('review parser: fenced / prose-wrapped JSON accepted; verdicts for unasked candidates ignored; a non-boolean pass is not a verdict', (() => {
     const items = reviewItems(a, loadPalette())
-    const text = 'Here:\n```json\n' + JSON.stringify({ verdicts: [{ slot: 'main', kanji: '迎', pass: true, reason: 'ok' }, { slot: 'second', kanji: '黙', pass: 'yes', reason: 'x' }, { slot: 'main', kanji: '別', pass: false, reason: 'not asked' }] }) + '\n```'
+    const text = 'Here:\n```json\n' + JSON.stringify({ verdicts: [{ slot: 'main', kanji: '証', pass: true, reason: 'ok' }, { slot: 'second', kanji: '守', pass: 'yes', reason: 'x' }, { slot: 'main', kanji: '別', pass: false, reason: 'not asked' }] }) + '\n```'
     const v = parseVerdicts(text, items)
-    return v.length === 1 && v[0].kanji === '迎'
+    return v.length === 1 && v[0].kanji === '証'
   })())
 
   // =============================================================================================
@@ -198,34 +198,34 @@ try {
   const mini = (rows: Record<string, string>[]) => parsePalette(`${HEADER}\n${rows.map(csvRow).join('\n')}\n`)
   const echoLine = '慈母手中線，遊子身上衣 — 孟郊「遊子吟」'
   const reviewedPal = mini([
-    { language: 'ja', kanji: '迎', inscription_form: '迎', status: 'ok', classical_echo: echoLine, reviewed_by: 'Reviewer Name' },
-    { language: 'ja', kanji: '黙', inscription_form: '默', status: 'ok', classical_echo: '子曰「君子欲訥於言」— 論語・里仁', reviewed_by: 'draft-unreviewed' },
+    { language: 'ja', kanji: '証', inscription_form: '証', status: 'ok', classical_echo: echoLine, reviewed_by: 'Reviewer Name' },
+    { language: 'ja', kanji: '守', inscription_form: '守', status: 'ok', classical_echo: '子曰「君子欲訥於言」— 論語・里仁', reviewed_by: 'draft-unreviewed' },
     { language: 'ja', kanji: '封', inscription_form: '封', status: 'ok', classical_echo: '封 — どこか', reviewed_by: 'Reviewer Name' },
   ])
-  check('classical: the cell format is `text — source`; both parts are required, only a REVIEWED row yields a line', classicalEchoOf(reviewedPal.lookup('ja', '迎')!)?.text === '慈母手中線，遊子身上衣' && classicalEchoOf(reviewedPal.lookup('ja', '迎')!)?.source === '孟郊「遊子吟」' && classicalEchoOf(reviewedPal.lookup('ja', '黙')!) === null && classicalEchoOf(undefined) === null)
-  check('classical: a reviewed row whose cell has no " — source" part shows nothing; "none" and empty show nothing', classicalEchoOf(mini([{ language: 'ja', kanji: '迎', classical_echo: '孟郊「遊子吟」', reviewed_by: 'R' }]).lookup('ja', '迎')!) === null && classicalEchoOf(mini([{ language: 'ja', kanji: '迎', classical_echo: 'none', reviewed_by: 'R' }]).lookup('ja', '迎')!) === null)
+  check('classical: the cell format is `text — source`; both parts are required, only a REVIEWED row yields a line', classicalEchoOf(reviewedPal.lookup('ja', '証')!)?.text === '慈母手中線，遊子身上衣' && classicalEchoOf(reviewedPal.lookup('ja', '証')!)?.source === '孟郊「遊子吟」' && classicalEchoOf(reviewedPal.lookup('ja', '守')!) === null && classicalEchoOf(undefined) === null)
+  check('classical: a reviewed row whose cell has no " — source" part shows nothing; "none" and empty show nothing', classicalEchoOf(mini([{ language: 'ja', kanji: '証', classical_echo: '孟郊「遊子吟」', reviewed_by: 'R' }]).lookup('ja', '証')!) === null && classicalEchoOf(mini([{ language: 'ja', kanji: '証', classical_echo: 'none', reviewed_by: 'R' }]).lookup('ja', '証')!) === null)
   const withModelEcho = clone(FIX.a.model_reply)
   withModelEcho.candidates[0].classical_echo = { text: '我が作った名句', source: '架空集' }
   withModelEcho.candidates[2].classical_echo = { text: '我が作った名句', source: '架空集' }
   const out1 = applyPalette({ ...withModelEcho, language: 'ja' }, reviewedPal, FIX.a.story)
   const echoOf = (r: EngineResult, k: string) => r.candidates.find((c) => c.kanji === k)?.classical_echo
-  check('classical: attached from the reviewed row (迎); the unreviewed row (黙) gets none; the model\'s own invention on 迎 is overwritten', JSON.stringify(echoOf(out1, '迎')) === JSON.stringify({ text: '慈母手中線，遊子身上衣', source: '孟郊「遊子吟」' }) && echoOf(out1, '黙') === null)
+  check('classical: attached from the reviewed row (証); the unreviewed row (守) gets none; the model\'s own invention on 証 is overwritten', JSON.stringify(echoOf(out1, '証')) === JSON.stringify({ text: '慈母手中線，遊子身上衣', source: '孟郊「遊子吟」' }) && echoOf(out1, '守') === null)
   check('classical: the freestyle NEVER carries one, even from a reviewed row, even if the model wrote one', echoOf(out1, '封') === null && validateEngineResult({ ...out1, language: 'ja' }).every((p) => !p.includes('classical')))
   check('classical: with the real (all draft-unreviewed) palette nothing is attached, whatever the model wrote', applyPalette({ ...withModelEcho, language: 'ja' }, loadPalette(), FIX.a.story).candidates.every((c) => c.classical_echo === null))
   const reqOn = (res: EngineResult, pal = reviewedPal) => applyPalette({ ...res, language: 'ja' }, pal, FIX.a.story, { requireClassicalEcho: true })
   const req1 = reqOn(clone(FIX.a.model_reply))
-  check('REQUIRE_CLASSICAL_ECHO on: slot 1 with a reviewed line (迎) stays; slot 2 without one (黙, unreviewed row) is not eligible; no backup remains', req1.primary_kanji === '迎' && req1.candidates[1].eliminated === true && req1.candidates[1].eliminated_reason === 'palette: classical_echo_required' && req1.runner_up_kanji === null)
+  check('REQUIRE_CLASSICAL_ECHO on: slot 1 with a reviewed line (証) stays; slot 2 without one (守, unreviewed row) is not eligible; no backup remains', req1.primary_kanji === '証' && req1.candidates[1].eliminated === true && req1.candidates[1].eliminated_reason === 'palette: classical_echo_required' && req1.runner_up_kanji === null)
   const req2 = applyPalette({ ...clone(FIX.a.model_reply), language: 'ja' }, loadPalette(), FIX.a.story, { requireClassicalEcho: true })
   check('REQUIRE_CLASSICAL_ECHO on with the shipped (unreviewed) palette: no main is eligible → insufficient (why it ships OFF)', req2.status === 'insufficient' && req2.follow_up_question === FIX.a.model_reply.fallback_follow_up_question)
   const req3 = applyPalette({ ...clone(FIX.a.model_reply), language: 'ja' }, loadPalette(), FIX.a.story, { requireClassicalEcho: false })
-  check('REQUIRE_CLASSICAL_ECHO off (the default): unreviewed rows are fine', req3.status === 'sufficient' && req3.primary_kanji === '迎')
+  check('REQUIRE_CLASSICAL_ECHO off (the default): unreviewed rows are fine', req3.status === 'sufficient' && req3.primary_kanji === '証')
   process.env.REQUIRE_CLASSICAL_ECHO = '1'
   const req4 = await run('a')
   delete process.env.REQUIRE_CLASSICAL_ECHO
   const req5 = await run('a')
   check('REQUIRE_CLASSICAL_ECHO is read from the environment (1/true/on); off when unset', req4.status === 'insufficient' && req5.status === 'sufficient')
-  check('REQUIRE_CLASSICAL_ECHO: when slot 1 lacks a line and slot 2 has one, slot 2 is promoted', (() => { const pal = mini([{ language: 'ja', kanji: '黙', inscription_form: '默', classical_echo: '子曰「君子欲訥於言」 — 論語・里仁', reviewed_by: 'Reviewer Name' }]); const out = applyPalette({ ...clone(FIX.a.model_reply), language: 'ja' }, pal, FIX.a.story, { requireClassicalEcho: true }); return out.primary_kanji === '黙' && out.referee?.promoted_from === 'second' && out.candidates[1].classical_echo?.source === '論語・里仁' })())
-  check('review after referee: a classical line is attached to the surviving main after the review too', (() => { const stage1 = applyPalette({ ...clone(FIX.a.model_reply), language: 'ja' }, reviewedPal, FIX.a.story); const after = applyReviewVerdicts(stage1, reviewedPal, FIX.a.story, { ran: true, skipped_reason: null, verdicts: FIX.a.review_reply.verdicts }); return JSON.stringify(echoOf(after, '迎')) === JSON.stringify({ text: '慈母手中線，遊子身上衣', source: '孟郊「遊子吟」' }) })())
+  check('REQUIRE_CLASSICAL_ECHO: when slot 1 lacks a line and slot 2 has one, slot 2 is promoted', (() => { const pal = mini([{ language: 'ja', kanji: '守', inscription_form: '守', classical_echo: '子曰「君子欲訥於言」 — 論語・里仁', reviewed_by: 'Reviewer Name' }]); const out = applyPalette({ ...clone(FIX.a.model_reply), language: 'ja' }, pal, FIX.a.story, { requireClassicalEcho: true }); return out.primary_kanji === '守' && out.referee?.promoted_from === 'second' && out.candidates[1].classical_echo?.source === '論語・里仁' })())
+  check('review after referee: a classical line is attached to the surviving main after the review too', (() => { const stage1 = applyPalette({ ...clone(FIX.a.model_reply), language: 'ja' }, reviewedPal, FIX.a.story); const after = applyReviewVerdicts(stage1, reviewedPal, FIX.a.story, { ran: true, skipped_reason: null, verdicts: FIX.a.review_reply.verdicts }); return JSON.stringify(echoOf(after, '証')) === JSON.stringify({ text: '慈母手中線，遊子身上衣', source: '孟郊「遊子吟」' }) })())
 
   // =============================================================================================
   // 6. Contract validation of the new shape
@@ -239,9 +239,9 @@ try {
   check('contract: "Play" belongs to the freestyle only (and the freestyle must be "Play")', mut((r) => (r.candidates[1].truth_type = 'Play')).some((p) => p.includes('"Play"')) && mut((r) => (r.candidates[2].truth_type = 'Role')).some((p) => p.includes('"Play"')))
   check('contract: emotional_register must be 1–2 non-empty strings', mut((r) => (r.fingerprint.emotional_register = [])).some((p) => p.includes('emotional_register')) && mut((r) => (r.fingerprint.emotional_register = ['a', 'b', 'c'])).some((p) => p.includes('emotional_register')) && mut((r) => delete r.fingerprint.emotional_register).some((p) => p.includes('emotional_register')))
   check('contract: fallback_follow_up_question is required on a sufficient result', mut((r) => delete r.fallback_follow_up_question).some((p) => p.includes('fallback_follow_up_question')))
-  check('contract: freestyle_kanji must name the live freestyle (null while one is live, or a wrong kanji, are caught)', mut((r) => (r.freestyle_kanji = null)).some((p) => p.includes('freestyle')) && mut((r) => (r.freestyle_kanji = '迎')).some((p) => p.includes('freestyle')) && mut((r) => delete r.freestyle_kanji).some((p) => p.includes('freestyle_kanji missing')))
+  check('contract: freestyle_kanji must name the live freestyle (null while one is live, or a wrong kanji, are caught)', mut((r) => (r.freestyle_kanji = null)).some((p) => p.includes('freestyle')) && mut((r) => (r.freestyle_kanji = '証')).some((p) => p.includes('freestyle')) && mut((r) => delete r.freestyle_kanji).some((p) => p.includes('freestyle_kanji missing')))
   check('contract: the runner-up must be the second-slot candidate; the primary may not be the freestyle', mut((r) => (r.runner_up_kanji = '封')).some((p) => p.includes('second-slot')) && mut((r) => (r.primary_kanji = '封')).some((p) => p.includes('freestyle')))
-  check('contract: the freestyle repeating a main kanji is caught; the freestyle needs no unique_truth (it has none)', mut((r) => (r.candidates[2].kanji = '迎')).some((p) => p.includes('repeats a main kanji')) && base().candidates[2].unique_truth === '' && validateEngineResult(base()).length === 0)
+  check('contract: the freestyle repeating a main kanji is caught; the freestyle needs no unique_truth (it has none)', mut((r) => (r.candidates[2].kanji = '証')).some((p) => p.includes('repeats a main kanji')) && base().candidates[2].unique_truth === '' && validateEngineResult(base()).length === 0)
   check('contract: a classical_echo must be {text, source}; the freestyle may not carry one', mut((r) => (r.candidates[0].classical_echo = { text: 'x' })).some((p) => p.includes('classical_echo')) && mut((r) => (r.candidates[2].classical_echo = { text: 'x', source: 'y' })).some((p) => p.includes('freestyle never carries')))
   check('contract: an insufficient result has no freestyle and no runner-up', validateEngineResult({ ...e, freestyle_kanji: '封' }).some((p) => p.includes('freestyle_kanji not null')) && validateEngineResult(e).length === 0)
 
@@ -276,7 +276,7 @@ try {
   check('follow-ups: two answers of 600 characters each ride along with a 600-character story; the engine reads all three, in order', withFu.status === 200 && sentPrompt.includes('短'.repeat(600) + '\n\n' + fuA + '\n\n' + fuB))
   check('follow-ups: an answer of 601 characters → 400 follow_up_too_long (max 600); a third answer → 400 too_many_follow_ups; a non-array → 400', (await (async () => { const r = await post({ story: '父', follow_ups: ['甲'.repeat(601)] }); const b = (await r.json()) as { code: string; max: number }; return r.status === 400 && b.code === 'follow_up_too_long' && b.max === 600 })()) && (await (async () => { const r = await post({ story: '父', follow_ups: ['a', 'b', 'c'] }); return r.status === 400 && ((await r.json()) as { code: string }).code === 'too_many_follow_ups' })()) && (await post({ story: '父', follow_ups: 'さらに' })).status === 400 && (await post({ story: '父', follow_ups: [5] })).status === 400)
   check('follow-ups: blank answers are ignored; omitting the field is the same as an empty list', parseFollowUps(['  ', '本当の答え']).ok === true && (parseFollowUps(['  ', '本当の答え']) as { followUps: string[] }).followUps.join() === '本当の答え' && (parseFollowUps(undefined) as { followUps: string[] }).followUps.length === 0 && mergeStory('物語', ['答え']) === '物語\n\n答え' && mergeStory('物語') === '物語')
-  const orderBody = { story: long, engine_result: clone(a), selected_kanji: '迎', language: 'ja', sender_name: '山田', receiver_name: '父', delivery_date: '2099-01-01', inscription_style: 'kyujitai', package: 'simple' }
+  const orderBody = { story: long, engine_result: clone(a), selected_kanji: '証', language: 'ja', sender_name: '山田', receiver_name: '父', delivery_date: '2099-01-01', inscription_style: 'kyujitai', package: 'simple' }
   const NOW = new Date('2026-10-25T00:00:00Z')
   const ord = parseOrderRequest(orderBody, NOW)
   check('(d) the order endpoint rejects the 700-character story, naming the field (limit 600; it was 10,000)', ord.ok === false && ord.field === 'story' && ord.error.includes('600'))

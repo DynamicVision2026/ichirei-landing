@@ -143,16 +143,18 @@ export interface GiftFacts {
 }
 
 /**
- * Owner decisions of 2026-10-27. A function returns the reason a character is NOT offered for this gift, or null.
+ * The explicit restrictions (owner decisions; spec v9.1 step 3 — the ONLY hard filters besides the palette's levels 1 and 3).
+ * A function returns the reason a character is NOT offered for this gift, or null.
  *   藏 — partner only (the source poem is a love song).
- *   恩 — upward (child, student, junior → elder) or partner only.
+ *   恩 — upward only (child, student, junior → elder).
  *   綠 — not for a partner when the Chinese palette judges the gift (zh, and en).
+ * The relationship tags of lexicon.csv are guidance for the AI, not a filter: only 35 entries fit parent → child.
  */
 const inFamilies = (g: GiftFacts, f: Family) => refereeFamilies(g.language).includes(f)
 const isPartner = (g: GiftFacts) => g.relationship !== null && PARTNER_RELATIONSHIPS.includes(g.relationship)
 export const LEXICON_RESTRICTIONS: Record<string, (g: GiftFacts) => string | null> = {
   藏: (g) => (isPartner(g) ? null : 'partner only'),
-  恩: (g) => (g.direction === 'up' || isPartner(g) ? null : 'upward or partner only'),
+  恩: (g) => (g.direction === 'up' ? null : 'upward only'),
   綠: (g) => (isPartner(g) && inFamilies(g, 'zh') ? 'not for a partner in Chinese' : null),
 }
 
@@ -184,8 +186,12 @@ export interface EligibleChar {
   inscription_form: string | null
   /** Readings from the palette row of the order's family (ja: hiragana; zh: pinyin). */
   readings: string[]
-  /** The lexicon rows of this character that fit this gift, in file order. */
+  /** The lexicon rows of this character that are open to this gift, in file order. */
   rows: LexiconRow[]
+  /** The relationships its rows are listed for (guidance for the AI). */
+  suits: string[]
+  /** True when a row is listed for this gift's relationship (always false when the relationship is unspecified). */
+  suitsRelationship: boolean
 }
 
 export interface EligibleSet {
@@ -207,22 +213,6 @@ export function eligibleFor(lexicon: Lexicon, palette: Palette, context: Pick<En
   for (const row of lexicon.rows) {
     if (row.excluded) {
       drop('excluded')
-      continue
-    }
-    if (wantTags && !wantTags.some((t) => row.tags.has(t))) {
-      drop('relationship')
-      continue
-    }
-    if (context.occasion === 'memorial' && !row.tags.has('memorial')) {
-      drop('memorial')
-      continue
-    }
-    if (row.japanOnly && families.includes('zh')) {
-      drop('japan_only')
-      continue
-    }
-    if (row.noPartnerInZh && isPartner(gift) && families.includes('zh')) {
-      drop('no_partner_zh')
       continue
     }
     if (LEXICON_RESTRICTIONS[row.kanji]?.(gift)) {
@@ -251,11 +241,23 @@ export function eligibleFor(lexicon: Lexicon, palette: Palette, context: Pick<En
     }
     const own = lexiconRowIn(palette, primary, row.kanji)!
     const key = `${primary}:${own.kanji}`
+    const matches = wantTags !== null && wantTags.some((t) => row.tags.has(t))
     const existing = byKey.get(key)
-    if (existing) existing.rows.push(row)
-    else byKey.set(key, { kanji: own.kanji, inscription_form: own.inscription_form && own.inscription_form !== own.kanji ? own.inscription_form : null, readings: own.readings, rows: [row] })
+    if (existing) {
+      existing.rows.push(row)
+      existing.suits = [...new Set([...existing.suits, ...row.tags])]
+      existing.suitsRelationship ||= matches
+    } else byKey.set(key, { kanji: own.kanji, inscription_form: own.inscription_form && own.inscription_form !== own.kanji ? own.inscription_form : null, readings: own.readings, rows: [row], suits: [...row.tags], suitsRelationship: matches })
   }
   return { chars: [...byKey.values()], dropped }
+}
+
+/** Is this character anywhere in the lexicon (any usable row, in either family's form)? For the "ideal character" log. */
+export function inLexicon(lexicon: Lexicon, palette: Palette, character: string): boolean {
+  return lexicon.rows.some((r) => !r.excluded && (r.kanji === character || (['ja', 'zh'] as const).some((f) => {
+    const row = lexiconRowIn(palette, f, r.kanji)
+    return row !== undefined && (row.kanji === character || row.inscription_form === character)
+  })))
 }
 
 /** Is this candidate one of the eligible characters (in either of its forms)? */
@@ -301,11 +303,24 @@ export function renderLexiconTable(lexicon: Lexicon): string {
     .join('\n')
 }
 
-/** The DYNAMIC list: the characters eligible for this gift, in the form the candidate must carry, with the palette's readings. */
-export function renderEligible(set: EligibleSet): string {
-  return set.chars
-    .map((e) => `${e.kanji}${e.inscription_form ? `（inscription form ${e.inscription_form}）` : ''}${e.readings.length ? ` [${e.readings.slice(0, 4).join(', ')}]` : ''}`)
-    .join('\n')
+/**
+ * The DYNAMIC list: the characters open to this gift, in the form the candidate must carry, with the palette's readings and the
+ * relationships each is listed for. The tags are GUIDANCE (spec v9.1 step 3): when the gift's relationship is known, the characters
+ * listed for it come first and the rest follow under their own heading, still open to the AI if the relationship test passes.
+ */
+export function renderEligible(set: EligibleSet, relationship: Relationship | null = null): string {
+  const line = (e: EligibleChar) =>
+    `${e.kanji}${e.inscription_form ? `（inscription form ${e.inscription_form}）` : ''}${e.readings.length ? ` [${e.readings.slice(0, 4).join(', ')}]` : ''} — listed for: ${e.suits.join(' / ') || 'general'}`
+  if (relationship === null) return set.chars.map(line).join('\n')
+  const listed = set.chars.filter((e) => e.suitsRelationship)
+  const other = set.chars.filter((e) => !e.suitsRelationship)
+  return [
+    `Listed as suiting this relationship (${relationship}):`,
+    listed.length ? listed.map(line).join('\n') : '(none)',
+    '',
+    'Also open to this gift but not listed for this relationship — the tags are guidance, not a rule; choose one of these only when the relationship test passes and the story clearly supports it:',
+    other.map(line).join('\n'),
+  ].join('\n')
 }
 
 export const LEXICON_SLOTS = { table: '{{ LEXICON_TABLE }}', eligible: '{{ LEXICON_ELIGIBLE }}' } as const
@@ -333,10 +348,10 @@ export interface LexiconPromptParts {
   dynamicBlock: string
 }
 
-export function buildLexiconPrompt(lexicon: Lexicon, set: EligibleSet): LexiconPromptParts {
+export function buildLexiconPrompt(lexicon: Lexicon, set: EligibleSet, relationship: Relationship | null = null): LexiconPromptParts {
   const { staticTemplate, dynamicTemplate } = loadLexiconPrompt()
   return {
     staticBlock: staticTemplate.split(LEXICON_SLOTS.table).join(renderLexiconTable(lexicon)),
-    dynamicBlock: dynamicTemplate.split(LEXICON_SLOTS.eligible).join(renderEligible(set)),
+    dynamicBlock: dynamicTemplate.split(LEXICON_SLOTS.eligible).join(renderEligible(set, relationship)),
   }
 }

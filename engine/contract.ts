@@ -329,6 +329,8 @@ export interface RefereeReport {
 export interface Candidate {
   /** v6: which of the three places this candidate holds. */
   slot: Slot
+  /** v9.1: stroke counts of the two forms (kanji / inscription_form), attached by the server for the carving check; null = unknown. */
+  strokes?: { kanji: number | null; inscription_form: number | null }
   /** v6: set by CODE from a reviewed palette row (main and second only); the model's own value is always overwritten. */
   classical_echo?: ClassicalEcho | null
   /** ja: modern Japanese form. zh (both scripts): the SIMPLIFIED form — the palette key. */
@@ -401,7 +403,19 @@ export const DEFAULT_FOLLOW_UP: Record<Language, string> = {
   en: 'Could you tell us about one small moment with them that you often think back to?',
 }
 
-export const REVIEW_VETO_RULES = ['palette', 'occasion', 'memorial', 'dignity', 'register', 'insult', 'illness'] as const
+/**
+ * Goodwill check (spec v9.1 step 1): the story is hostile or mocking toward the person, or written to humiliate them. The engine
+ * politely declines to choose a character — this is the one answer that is neither cards nor a question to answer. Plain, kind, and in
+ * the sender's language; nothing is accused, nothing is quoted.
+ */
+export const DECLINE_MESSAGE: Record<Language, string> = {
+  ja: 'いただいたお話からは、お相手を大切に思う気持ちを読み取ることができませんでした。一字は、あなたがその方をどう見ているかを形にするものです。別のお話があれば、またお聞かせください。',
+  'zh-Hans': '从您写下的故事里，我们读不出您对对方的珍视。一个字，是把您眼中的那个人刻出来。如果您有别的故事，欢迎再告诉我们。',
+  'zh-Hant': '從您寫下的故事裡，我們讀不出您對對方的珍視。一個字，是把您眼中的那個人刻出來。如果您有別的故事，歡迎再告訴我們。',
+  en: 'We could not find in this story the regard for the person that a character is meant to carry. A character shows how you truly see someone. If you have another story to tell, we would be glad to read it.',
+}
+
+export const REVIEW_VETO_RULES = ['palette', 'occasion', 'memorial', 'dignity', 'register', 'insult', 'illness', 'relationship', 'goodwill'] as const
 export type ReviewVetoRule = (typeof REVIEW_VETO_RULES)[number]
 export interface ReviewVerdict {
   slot: Slot
@@ -453,6 +467,10 @@ export interface EngineResult {
   referee?: RefereeReport
   /** Set by the review call (engine/review.ts) when it ran. */
   review?: ReviewReport
+  /** v9.1: the goodwill check declined to choose (status is `insufficient`, `follow_up_question` carries the polite message, there is nothing to answer). */
+  declined?: boolean
+  /** v9.1: the Simple set takes at most this many strokes (ICHIREI_SIMPLE_MAX_STROKES, default 20); set with the stroke counts on a sufficient result. */
+  simple_max_strokes?: number
   /** v9: set when the classical lexicon took part in this answer (ICHIREI_LEXICON_MODE on); absent in off and shadow. */
   lexicon?: LexiconReport
 }

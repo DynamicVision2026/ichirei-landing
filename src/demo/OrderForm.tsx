@@ -7,7 +7,8 @@ import { sessionId } from './analytics'
 import { PACKAGES, PACKAGE_PRICE_JPY, formatYen } from '../order/packages.ts'
 import { isMemorial } from '../order/memorial.ts'
 import { certificateText } from '../order/certificate.ts'
-import { DEFAULT_STYLE, STYLES_BY_LANGUAGE, glyphFor, hasDistinctForm } from '../order/inscription.ts'
+import { DEFAULT_STYLE, STYLES_BY_LANGUAGE, glyphFor, hasFormChoice } from '../order/inscription.ts'
+import { DEFAULT_SIMPLE_MAX_STROKES, carvedStrokes, simpleAvailable } from '../order/strokes.ts'
 import { useCurrency } from '../reveal/useCurrency.ts'
 import { approxLine } from '../reveal/currency.ts'
 import { toRevealLang } from '../reveal/lang.ts'
@@ -50,7 +51,7 @@ export default function OrderForm({ result, story, followUps = [], candidate, co
   const o = copy.order
   // Remembrance: ink instead of cinnabar on the slip, and the receiver field is the person being remembered.
   const memorial = isMemorial(result.occasion)
-  const distinct = hasDistinctForm(candidate)
+  const distinct = hasFormChoice(language, candidate) // (ja and en carve the modern form only: no choice to show)
 
   const [sender, setSender] = useState('')
   const [receiver, setReceiver] = useState('')
@@ -62,11 +63,18 @@ export default function OrderForm({ result, story, followUps = [], candidate, co
 
   const today = useMemo(localToday, [])
   const glyph = glyphFor(candidate, style)
+  // The carving check (spec v9.1 step 9): the Simple set only takes up to N strokes; a character above it is offered with the Standard set only.
+  // The server re-checks with its own count; with no count at all (an old result) the form does not block and the server decides.
+  const maxStrokes = result.simple_max_strokes ?? DEFAULT_SIMPLE_MAX_STROKES
+  const strokes = carvedStrokes(candidate, glyph)
+  const simpleOk = candidate.strokes ? simpleAvailable(strokes, maxStrokes) : true
   const cert = certificateText(language)
   const senderOk = sender.trim() !== '' && [...sender.trim()].length <= NAME_MAX
   const receiverOk = receiver.trim() !== '' && [...receiver.trim()].length <= NAME_MAX
   const dateOk = /^\d{4}-\d{2}-\d{2}$/.test(date) && date >= today
-  const valid = senderOk && receiverOk && dateOk && pkg !== ''
+  // (switching the carved form can make Simple unavailable after it was picked: the Standard set is then the only choice)
+  if (pkg === 'simple' && !simpleOk) setTimeout(() => setPkg(''), 0)
+  const valid = senderOk && receiverOk && dateOk && pkg !== '' && !(pkg === 'simple' && !simpleOk)
 
   const submit = async () => {
     if (!valid || phase !== 'edit') return
@@ -213,13 +221,14 @@ export default function OrderForm({ result, story, followUps = [], candidate, co
             {PACKAGES.map((id) => {
               const approx = approxLine(PACKAGE_PRICE_JPY[id], currency, rates, pageLang)
               return (
-                <label key={id} className={`opt pkg${pkg === id ? ' on' : ''}`}>
-                  <input type="radio" name="package" value={id} checked={pkg === id} onChange={() => setPkg(id)} />
+                <label key={id} className={`opt pkg${pkg === id ? ' on' : ''}${id === 'simple' && !simpleOk ? ' off' : ''}`} data-simple-unavailable={id === 'simple' && !simpleOk ? 'yes' : undefined}>
+                  <input type="radio" name="package" value={id} checked={pkg === id} disabled={id === 'simple' && !simpleOk} onChange={() => setPkg(id)} />
                   <span className="pkgName">{o.packages[id]}</span>
                   <span className="pkgPrice" data-price={id}>
                     {formatYen(PACKAGE_PRICE_JPY[id])}
                   </span>
                   {approx && <span className="sent" data-approx>{approx}</span>}
+                  {id === 'simple' && !simpleOk && <span className="sent" data-stroke-note>{o.simpleUnavailable(maxStrokes)}</span>}
                 </label>
               )
             })}

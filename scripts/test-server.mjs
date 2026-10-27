@@ -73,8 +73,10 @@ try {
   const result = lines.find((l) => l.msg.type === 'result')
   check('select: progress delta lines streamed', deltas.length >= 3, `deltas=${deltas.length}`)
   check('select: first delta arrives well before the result (true streaming, not buffered)', result && deltas[0] && result.at - deltas[0].at > 800, `first=${deltas[0]?.at} result=${result?.at}`)
-  check('select: terminal result line equals the golden contract (after the palette referee)', JSON.stringify(result?.msg.result) === JSON.stringify(GOLDEN_REFEREED))
-  check('select: primary is 迎, three candidates (main, second, freestyle 封), and the review verdicts are on the result', result?.msg.result.primary_kanji === '迎' && result?.msg.result.candidates.length === 3 && result?.msg.result.freestyle_kanji === '封' && result?.msg.result.review?.ran === true)
+  // (the carving check's stroke counts and the Simple limit are attached by the engine — spec v9.1 step 9)
+  const withoutCarving = result?.msg.result && { ...result.msg.result, simple_max_strokes: undefined, candidates: result.msg.result.candidates.map((c) => ({ ...c, strokes: undefined })) }
+  check('select: terminal result line equals the golden contract (after the palette referee)', JSON.stringify(withoutCarving) === JSON.stringify(GOLDEN_REFEREED))
+  check('select: primary is 証, three candidates (main, second, freestyle 封), and the review verdicts are on the result', result?.msg.result.primary_kanji === '証' && result?.msg.result.candidates.length === 3 && result?.msg.result.freestyle_kanji === '封' && result?.msg.result.review?.ran === true)
   check('select: result is the last line', lines.at(-1)?.msg.type === 'result')
   // v8: honest progress — the server says what it is really doing, in order, before the result
   const stageLines = lines.filter((l) => l.msg.type === 'stage')
@@ -99,7 +101,7 @@ try {
   const firstReal = hb.find((l) => l.msg.type === 'delta' || l.msg.type === 'result')
   check('heartbeat: pings arrive during a silent model gap', pings.length >= 2, `pings=${pings.length}`)
   check('heartbeat: pings precede the first model output', pings[0] && firstReal && pings[0].at < firstReal.at)
-  check('heartbeat: result still delivered intact', hb.at(-1)?.msg.type === 'result' && hb.at(-1).msg.result.primary_kanji === '迎')
+  check('heartbeat: result still delivered intact', hb.at(-1)?.msg.type === 'result' && hb.at(-1).msg.result.primary_kanji === '証')
 
   // ---- E. Error surfacing ---------------------------------------------
   upstream.state.mode = { kind: 'badjson' }
@@ -117,18 +119,18 @@ try {
   // ---- F. /api/explain via the compat shim (api/explain.ts reused) ------
   upstream.state.mode = { kind: 'stream', gapMs: 0, totalMs: 300 }
   upstream.state.requests.length = 0
-  const cand = { kanji: '迎', reading: 'むかえ', one_line_gaze: 'あなたは二十年、私の帰りをいつも駅で迎えてくれた。', story_anchor: '盆に帰るたびに車で駅まで迎えに来て' }
+  const cand = { kanji: '証', reading: 'むかえ', one_line_gaze: 'あなたは二十年、私の帰りをいつも駅で迎えてくれた。', story_anchor: '盆に帰るたびに車で駅まで迎えに来て' }
   const ex = await post(base, '/api/explain', { story: STORY, candidate: cand })
   const exBody = await ex.json()
   check('explain: 200 {explanation}', ex.status === 200 && exBody.explanation === EXPLAIN_TEXT, JSON.stringify(exBody))
   const exPrompt = upstream.state.requests.filter((r) => r.kind === 'explain').at(-1)?.body.messages?.[0]?.content ?? ''
-  check('explain: explain-prompt.ja.md loaded (default language) + candidate/story injected', exPrompt.includes('Stage-B Deep Explanation Prompt') && exPrompt.includes('Japanese / ja') && exPrompt.includes('迎') && exPrompt.includes(STORY) && !/\{\{ [A-Z_]+ \}\}/.test(exPrompt))
+  check('explain: explain-prompt.ja.md loaded (default language) + candidate/story injected', exPrompt.includes('Stage-B Deep Explanation Prompt') && exPrompt.includes('Japanese / ja') && exPrompt.includes('証') && exPrompt.includes(STORY) && !/\{\{ [A-Z_]+ \}\}/.test(exPrompt))
   const exZh = await post(base, '/api/explain', { story: '他總是把玄關的燈留著。', candidate: { kanji: '灯', inscription_form: '燈', reading: 'dēng', one_line_gaze: '你把燈留著。', story_anchor: '把玄關的燈留著' }, language: 'zh-Hant', relationship: 'parent_father', direction: 'up', occasion: 'seasonal_thanks' })
   const exZhPrompt = upstream.state.requests.filter((r) => r.kind === 'explain').at(-1)?.body.messages?.[0]?.content ?? ''
   check('explain: zh-Hant → explain-prompt.zh.md, display_script traditional, context + both forms injected', exZh.status === 200 && exZhPrompt.includes('Chinese / zh') && exZhPrompt.includes('display_script: traditional') && exZhPrompt.includes('occasion: seasonal_thanks') && exZhPrompt.includes('TRADITIONAL_FORM: 燈') && exZhPrompt.includes('SIMPLIFIED_FORM: 灯') && !/\{\{ [A-Z_]+ \}\}/.test(exZhPrompt))
   const exEn = await post(base, '/api/explain', { story: 'My mum left the porch light on every night until I got home.', candidate: { kanji: '灯', inscription_form: '燈', reading: 'on: tō · kun: hi, akari', meaning: 'lamp; a light kept lit', one_line_gaze: 'You left the porch light on every night.', story_anchor: 'left the porch light on' }, language: 'en', relationship: 'parent_mother', direction: 'up', occasion: 'parent_day', inscription_script: 'simplified' })
   const exEnPrompt = upstream.state.requests.filter((r) => r.kind === 'explain').at(-1)?.body.messages?.[0]?.content ?? ''
-  check('explain: en → explain-prompt.en.md, romaji reading + English meaning + carved form + context injected, no slot left', exEn.status === 200 && exEnPrompt.includes('English / en') && exEnPrompt.includes('reading: on: tō · kun: hi, akari') && exEnPrompt.includes('meaning: lamp; a light kept lit') && exEnPrompt.includes('carved old form 燈') && exEnPrompt.includes('relationship: parent_mother') && !/\{\{ [A-Z_]+ \}\}/.test(exEnPrompt))
+  check('explain: en → explain-prompt.en.md, romaji reading + English meaning + older form + context injected, no slot left', exEn.status === 200 && exEnPrompt.includes('English / en') && exEnPrompt.includes('reading: on: tō · kun: hi, akari') && exEnPrompt.includes('meaning: lamp; a light kept lit') && exEnPrompt.includes('older form 燈; the piece itself is carved in the modern form') && exEnPrompt.includes('relationship: parent_mother') && !/\{\{ [A-Z_]+ \}\}/.test(exEnPrompt))
   const exLong = await post(base, '/api/explain', { story: 'あ'.repeat(601), candidate: cand })
   const exLongJ = await exLong.json()
   const exFu = await post(base, '/api/explain', { story: '父は無口だった。', follow_ups: ['毎朝、駅まで送ってくれた。'], candidate: cand })
@@ -148,7 +150,7 @@ try {
   check('explain: GET → 405', exGet.status === 405)
 
   // ---- G. /api/log -----------------------------------------------------
-  const lg = await post(base, '/api/log', { event: 'candidate_returned', kanji: '迎', session_id: 'test-session' })
+  const lg = await post(base, '/api/log', { event: 'candidate_returned', kanji: '証', session_id: 'test-session' })
   await sleep(200)
   check('log: 204 and event echoed to stdout (→ Cloud Logging)', lg.status === 204 && server.logs().includes('[ichirei-event]') && server.logs().includes('candidate_returned'))
 
@@ -224,7 +226,7 @@ try {
   // ---- I2. Purchase flow through the real server (fake Shopify, file store) -------
   {
     const orderBody = {
-      story: STORY, engine_result: GOLDEN_REFEREED, selected_kanji: '迎', language: 'ja', sender_name: '山田 太郎',
+      story: STORY, engine_result: GOLDEN_REFEREED, selected_kanji: '証', language: 'ja', sender_name: '山田 太郎',
       receiver_name: '山田 一郎', delivery_date: new Date(Date.now() + 30 * 86_400_000).toISOString().slice(0, 10), inscription_style: 'kyujitai', package: 'simple',
     }
     const noOrders = await post(base, '/api/order', orderBody)
@@ -251,11 +253,11 @@ try {
       check('orders: configured server → health.orders.ready, store "file", no secret values in the health output', h2.orders.ready === true && h2.orders.store === 'file' && h2.orders.missing.length === 0 && !JSON.stringify(h2).includes('shpat_server_test'), JSON.stringify(h2.orders))
       const ok = await post(orders.url, '/api/order', orderBody)
       const okJ = await ok.json()
-      check('orders: POST /api/order → 200 {order_ref, checkout_url, glyph, certificate_text}', ok.status === 200 && /^IC-\d{8}-[2-9A-Z]{8}$/.test(okJ.order_ref) && okJ.checkout_url === 'https://soul-id-2.myshopify.com/cart/c/k' && okJ.glyph === '迎' && okJ.certificate_text === 'この字は、あなたの目に映る、その人です。', JSON.stringify(okJ))
+      check('orders: POST /api/order → 200 {order_ref, checkout_url, glyph, certificate_text}', ok.status === 200 && /^IC-\d{8}-[2-9A-Z]{8}$/.test(okJ.order_ref) && okJ.checkout_url === 'https://soul-id-2.myshopify.com/cart/c/k' && okJ.glyph === '証' && okJ.certificate_text === 'この字は、あなたの目に映る、その人です。', JSON.stringify(okJ))
       const file = JSON.parse(readFileSync(join(dir, `${okJ.order_ref}.json`), 'utf8'))
       check('orders: the story and the engine result are stored server-side under that order_ref (gaze line and anchor included)', file.story === STORY && file.engine_result.candidates.length === 3 && file.production.gaze_line === GOLDEN.candidates[0].one_line_gaze && file.production.story_anchor === GOLDEN.candidates[0].story_anchor && file.status === 'cart_created')
       const line = seen[0].body.variables.input.lines[0]
-      check('orders: Shopify got the Simple variant, the token header, and the nine attributes (certificate_meaning_en next to the reading) — without the story', seen[0].url === '/api/2025-01/graphql.json' && seen[0].token === 'shpat_server_test' && line.merchandiseId.endsWith('/1111') && line.attributes.map((a) => a.key).join() === 'kanji,inscription_form,reading,certificate_meaning_en,sender_name,receiver_name,delivery_date,language,order_ref' && line.attributes[3].value === 'welcome' && okJ.certificate.meaning_en === 'welcome' && okJ.certificate.line_en === 'This character is the person as seen through your eyes.' && line.attributes.at(-1).value === okJ.order_ref && !JSON.stringify(seen[0].body).includes('口下手'))
+      check('orders: Shopify got the Simple variant, the token header, and the nine attributes (certificate_meaning_en next to the reading) — without the story', seen[0].url === '/api/2025-01/graphql.json' && seen[0].token === 'shpat_server_test' && line.merchandiseId.endsWith('/1111') && line.attributes.map((a) => a.key).join() === 'kanji,inscription_form,reading,certificate_meaning_en,sender_name,receiver_name,delivery_date,language,order_ref' && line.attributes[3].value === 'proof' && okJ.certificate.meaning_en === 'proof' && okJ.certificate.line_en === 'This character is the person as seen through your eyes.' && line.attributes.at(-1).value === okJ.order_ref && !JSON.stringify(seen[0].body).includes('口下手'))
       const invalid = await post(orders.url, '/api/order', { ...orderBody, package: 'gold' })
       check('orders: invalid package → 400 and nothing more reaches Shopify', invalid.status === 400 && (await invalid.json()).field === 'package' && seen.length === 1)
       // learning loop through the real server: a session id → "shown" (select), two browser events, "ordered" — all in <store>/analytics/
@@ -310,7 +312,7 @@ try {
     const tl = Date.now()
     const long = await readNdjson(await post(base, '/api/select', { story: STORY }))
     const secs = (Date.now() - tl) / 1000
-    check(`long: completed after ${secs.toFixed(0)}s (> 60s) with the full result`, secs > 70 && long.at(-1)?.msg.type === 'result' && long.at(-1).msg.result.primary_kanji === '迎', `secs=${secs}`)
+    check(`long: completed after ${secs.toFixed(0)}s (> 60s) with the full result`, secs > 70 && long.at(-1)?.msg.type === 'result' && long.at(-1).msg.result.primary_kanji === '証', `secs=${secs}`)
     check('long: heartbeat kept the silent opening alive', long.filter((l) => l.msg.type === 'ping').length >= 10)
   }
 } finally {

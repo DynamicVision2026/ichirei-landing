@@ -21,6 +21,7 @@ import explainHandler from '../api/explain.ts'
 import logHandler from '../api/log.ts'
 import { ENGINE_CONFIG } from '../engine/engine.ts'
 import { lexiconModeFromEnv } from '../engine/lexicon.ts'
+import { simpleMaxStrokes } from '../engine/strokes.ts'
 import { adaptVercelHandler } from './vercel-compat.ts'
 import { envRunLimiter } from '../engine/rate-limit.ts'
 import { withHeartbeat } from './heartbeat.ts'
@@ -103,6 +104,7 @@ export function createApp(config: ServerConfig): Hono {
       callTimeoutMs: ENGINE_CONFIG.CALL_TIMEOUT_MS,
       reviewTimeoutMs: ENGINE_CONFIG.REVIEW_TIMEOUT_MS,
       lexiconMode: lexiconModeFromEnv(),
+      simpleMaxStrokes: simpleMaxStrokes(),
       configured: config,
       applied: serverRef.current
         ? {

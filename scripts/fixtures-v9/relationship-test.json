@@ -1,0 +1,307 @@
+{
+ "note": "Spec v9.1 steps 4 and 7 — the relationship test. Stories are original (written for this test). The fake review vetoes the misfit character under the rule `relationship`; the code (not the review) already rejects 恩 going downward in lexicon mode. Plumbing only: whether the real model and review catch them is untested.",
+ "cases": [
+  {
+   "name": "oen-parent-to-child",
+   "kind": "misfit",
+   "note": "恩 from a parent to a child: gratitude flows upward; from a parent it reads as a claim.",
+   "story": "息子が二十歳になる。小さいころから、熱を出した夜は毎晩枕元で本を読んでやった。今は何も言わなくても、朝になると台所で黙って皿を洗っている。",
+   "context": {
+    "language": "ja",
+    "relationship": "child",
+    "direction": "down",
+    "occasion": "birthday_milestone"
+   },
+   "rejected": "恩",
+   "promoted": "守",
+   "code_rejects_in_on": true,
+   "model_reply": {
+    "status": "sufficient",
+    "follow_up_question": null,
+    "emotional_register": [
+     "grateful"
+    ],
+    "candidates": [
+     {
+      "slot": "main",
+      "kanji": "恩",
+      "inscription_form": null,
+      "reading": "おん",
+      "truth_type": "Hidden Cost",
+      "one_line_gaze": "熱を出した夜に、毎晩枕元にいた人。",
+      "story_anchor": "熱を出した夜は毎晩枕元で本を読んでやった",
+      "unique_truth": "u"
+     },
+     {
+      "slot": "second",
+      "kanji": "守",
+      "inscription_form": null,
+      "reading": "まもる",
+      "truth_type": "Role",
+      "one_line_gaze": "朝の台所で、黙って手を動かす人。",
+      "story_anchor": "朝になると台所で黙って皿を洗っている",
+      "unique_truth": "u"
+     }
+    ],
+    "fallback_follow_up_question": "いちばん思い出す場面を教えてください。",
+    "primary_kanji": "恩",
+    "runner_up_kanji": "守",
+    "freestyle_kanji": null
+   }
+  },
+  {
+   "name": "tai-husband-to-wife",
+   "kind": "misfit",
+   "note": "耐 from a husband to his wife: it tells her she was the one who had to put up with things. (耐 is not in the lexicon: it can only be the freestyle.)",
+   "story": "妻は結婚してからずっと、私の転勤についてきてくれた。見知らぬ町でも文句を言わず、毎朝おにぎりを握ってくれた。",
+   "context": {
+    "language": "ja",
+    "relationship": "spouse",
+    "direction": "across",
+    "occasion": "seasonal_thanks"
+   },
+   "rejected": "耐",
+   "promoted": null,
+   "code_rejects_in_on": false,
+   "model_reply": {
+    "status": "sufficient",
+    "follow_up_question": null,
+    "emotional_register": [
+     "grateful"
+    ],
+    "candidates": [
+     {
+      "slot": "main",
+      "kanji": "待",
+      "inscription_form": null,
+      "reading": "まつ",
+      "truth_type": "Essence",
+      "one_line_gaze": "毎朝、おにぎりを握って待つ人。",
+      "story_anchor": "毎朝おにぎりを握ってくれた",
+      "unique_truth": "u"
+     },
+     {
+      "slot": "second",
+      "kanji": "守",
+      "inscription_form": null,
+      "reading": "まもる",
+      "truth_type": "Role",
+      "one_line_gaze": "どの町にも、ついてきてくれた人。",
+      "story_anchor": "私の転勤についてきてくれた",
+      "unique_truth": "u"
+     },
+     {
+      "slot": "freestyle",
+      "kanji": "耐",
+      "inscription_form": null,
+      "reading": "たえる",
+      "truth_type": "Play",
+      "one_line_gaze": "知らない町でも、文句ひとつ言わなかった人。",
+      "story_anchor": "見知らぬ町でも文句を言わず",
+      "unique_truth": "u"
+     }
+    ],
+    "fallback_follow_up_question": "いちばん思い出す場面を教えてください。",
+    "primary_kanji": "待",
+    "runner_up_kanji": "守",
+    "freestyle_kanji": "耐"
+   }
+  },
+  {
+   "name": "bo-employee-to-boss",
+   "kind": "misfit",
+   "note": "慕 from an employee to a boss: flattery, or a romantic confession.",
+   "story": "入社したとき、課長は私の失敗を何度も黙って引き受けてくれた。今も、遅くまで残ってくれる背中を見ている。",
+   "context": {
+    "language": "ja",
+    "relationship": "work",
+    "direction": "up",
+    "occasion": "seasonal_thanks"
+   },
+   "rejected": "慕",
+   "promoted": "守",
+   "code_rejects_in_on": false,
+   "model_reply": {
+    "status": "sufficient",
+    "follow_up_question": null,
+    "emotional_register": [
+     "grateful"
+    ],
+    "candidates": [
+     {
+      "slot": "main",
+      "kanji": "慕",
+      "inscription_form": null,
+      "reading": "したう",
+      "truth_type": "Essence",
+      "one_line_gaze": "遅くまで残る背中を、見てきた。",
+      "story_anchor": "遅くまで残ってくれる背中を見ている",
+      "unique_truth": "u"
+     },
+     {
+      "slot": "second",
+      "kanji": "守",
+      "inscription_form": null,
+      "reading": "まもる",
+      "truth_type": "Hidden Cost",
+      "one_line_gaze": "私の失敗を、黙って引き受けてくれた人。",
+      "story_anchor": "私の失敗を何度も黙って引き受けてくれた",
+      "unique_truth": "u"
+     }
+    ],
+    "fallback_follow_up_question": "いちばん思い出す場面を教えてください。",
+    "primary_kanji": "慕",
+    "runner_up_kanji": "守",
+    "freestyle_kanji": null
+   }
+  },
+  {
+   "name": "oen-child-to-parent",
+   "kind": "fit",
+   "note": "The same 恩, from a child to a parent: right.",
+   "story": "母は夜勤の合間に、毎日お弁当を作ってくれた。大人になってやっとその重さがわかった。",
+   "context": {
+    "language": "ja",
+    "relationship": "parent_mother",
+    "direction": "up",
+    "occasion": "parent_day"
+   },
+   "kept": "恩",
+   "model_reply": {
+    "status": "sufficient",
+    "follow_up_question": null,
+    "emotional_register": [
+     "grateful"
+    ],
+    "candidates": [
+     {
+      "slot": "main",
+      "kanji": "恩",
+      "inscription_form": null,
+      "reading": "おん",
+      "truth_type": "Hidden Cost",
+      "one_line_gaze": "夜勤の合間にも、お弁当を作ってくれた人。",
+      "story_anchor": "夜勤の合間に、毎日お弁当を作ってくれた",
+      "unique_truth": "u"
+     },
+     {
+      "slot": "second",
+      "kanji": "守",
+      "inscription_form": null,
+      "reading": "まもる",
+      "truth_type": "Role",
+      "one_line_gaze": "その重さを、ずっと背負っていた人。",
+      "story_anchor": "やっとその重さがわかった",
+      "unique_truth": "u"
+     }
+    ],
+    "fallback_follow_up_question": "いちばん思い出す場面を教えてください。",
+    "primary_kanji": "恩",
+    "runner_up_kanji": "守",
+    "freestyle_kanji": null
+   }
+  },
+  {
+   "name": "tai-child-to-parent",
+   "kind": "fit",
+   "note": "The same 耐 (freestyle only), from a child about a parent who bore hardship for them and the story shows it: right.",
+   "story": "母は一人で三人の子を育てた。どんなに苦しい冬も、愚痴をこぼさず朝の台所に立っていた。",
+   "context": {
+    "language": "ja",
+    "relationship": "parent_mother",
+    "direction": "up",
+    "occasion": "parent_day"
+   },
+   "kept": "耐",
+   "model_reply": {
+    "status": "sufficient",
+    "follow_up_question": null,
+    "emotional_register": [
+     "grateful"
+    ],
+    "candidates": [
+     {
+      "slot": "main",
+      "kanji": "待",
+      "inscription_form": null,
+      "reading": "まつ",
+      "truth_type": "Essence",
+      "one_line_gaze": "朝の台所で、待っていてくれた人。",
+      "story_anchor": "朝の台所に立っていた",
+      "unique_truth": "u"
+     },
+     {
+      "slot": "second",
+      "kanji": "守",
+      "inscription_form": null,
+      "reading": "まもる",
+      "truth_type": "Role",
+      "one_line_gaze": "一人で三人を守った人。",
+      "story_anchor": "一人で三人の子を育てた",
+      "unique_truth": "u"
+     },
+     {
+      "slot": "freestyle",
+      "kanji": "耐",
+      "inscription_form": null,
+      "reading": "たえる",
+      "truth_type": "Play",
+      "one_line_gaze": "愚痴ひとつ、こぼさなかった人。",
+      "story_anchor": "愚痴をこぼさず朝の台所に立っていた",
+      "unique_truth": "u"
+     }
+    ],
+    "fallback_follow_up_question": "いちばん思い出す場面を教えてください。",
+    "primary_kanji": "待",
+    "runner_up_kanji": "守",
+    "freestyle_kanji": "耐"
+   }
+  },
+  {
+   "name": "bo-student-to-teacher",
+   "kind": "fit",
+   "note": "The same 慕, from a student to a teacher: right.",
+   "story": "先生は卒業してからも、私の手紙に必ず返事をくれた。その字を見るたび、まだ見守られていると思う。",
+   "context": {
+    "language": "ja",
+    "relationship": "mentor",
+    "direction": "up",
+    "occasion": "seasonal_thanks"
+   },
+   "kept": "慕",
+   "model_reply": {
+    "status": "sufficient",
+    "follow_up_question": null,
+    "emotional_register": [
+     "grateful"
+    ],
+    "candidates": [
+     {
+      "slot": "main",
+      "kanji": "慕",
+      "inscription_form": null,
+      "reading": "したう",
+      "truth_type": "Essence",
+      "one_line_gaze": "手紙に、必ず返事をくれた人。",
+      "story_anchor": "私の手紙に必ず返事をくれた",
+      "unique_truth": "u"
+     },
+     {
+      "slot": "second",
+      "kanji": "守",
+      "inscription_form": null,
+      "reading": "まもる",
+      "truth_type": "Role",
+      "one_line_gaze": "卒業した後も、見守ってくれる人。",
+      "story_anchor": "まだ見守られていると思う",
+      "unique_truth": "u"
+     }
+    ],
+    "fallback_follow_up_question": "いちばん思い出す場面を教えてください。",
+    "primary_kanji": "慕",
+    "runner_up_kanji": "守",
+    "freestyle_kanji": null
+   }
+  }
+ ]
+}

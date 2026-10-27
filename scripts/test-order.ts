@@ -32,13 +32,13 @@ const clone = <T,>(x: T): T => JSON.parse(JSON.stringify(x))
 const ZH = clone(GOLDEN)
 ZH.language = 'zh-Hant'
 ZH.inscription_script = 'traditional'
-ZH.candidates = ZH.candidates.map((c: any, i: number) => ({ ...c, eliminated: false, eliminated_reason: null, kanji: ['灯', '默', '桥', '迎', '待', '茶'][i], inscription_form: ['燈', null, '橋', null, null, null][i], reading: ['dēng', 'mò', 'qiáo', 'yíng', 'dài', 'chá'][i] }))
+ZH.candidates = ZH.candidates.map((c: any, i: number) => ({ ...c, eliminated: false, eliminated_reason: null, kanji: ['灯', '燈', '桥', '証', '待', '茶'][i], inscription_form: ['燈', null, '橋', null, null, null][i], reading: ['dēng', 'mò', 'qiáo', 'yíng', 'dài', 'chá'][i] }))
 ZH.primary_kanji = '灯'
 
 const base = (over: Record<string, unknown> = {}) => ({
   story: STORY,
   engine_result: clone(GOLDEN),
-  selected_kanji: '迎',
+  selected_kanji: '証',
   language: 'ja',
   sender_name: '山田 太郎',
   receiver_name: '山田 一郎',
@@ -55,28 +55,28 @@ check('packages: Simple ¥9,800 and Standard ¥18,850 (the Shopify variant price
 check('certificate ja: 「この字は、あなたの目に映る、その人です。」 — no name in it, no 〇〇 left', certificateText('ja') === 'この字は、あなたの目に映る、その人です。' && !certificateText('ja').includes('〇〇') && !certificateText('ja').includes('様'))
 check('certificate: the same line whatever the sender is called (the sender\'s name no longer appears in it)', (certificateText as (l: string, n: string) => string)('ja', '山田 太郎') === certificateText('ja') && certificateText.length === 1)
 check('certificate zh / en: the character is the person as seen through the sender\'s eyes', certificateText('zh-Hans') === '这个字，是你眼中的那个人。' && certificateText('zh-Hant') === '這個字，是你眼中的那個人。' && certificateText('en') === 'This character is the person as seen through your eyes.' && CERTIFICATE_LINE_EN === certificateText('en'))
-check('inscription styles: ja kyūjitai|modern, zh traditional|simplified; the brand default is the old/traditional form', STYLES_BY_LANGUAGE.ja.join() === 'kyujitai,modern' && STYLES_BY_LANGUAGE['zh-Hans'].join() === 'traditional,simplified' && STYLES_BY_LANGUAGE['zh-Hant'].join() === 'traditional,simplified' && DEFAULT_STYLE.ja === 'kyujitai' && DEFAULT_STYLE['zh-Hant'] === 'traditional')
-check('glyphFor: kyūjitai/traditional → inscription_form, modern/simplified → kanji; no distinct form → kanji either way', glyphFor({ kanji: '黙', inscription_form: '默' }, 'kyujitai') === '默' && glyphFor({ kanji: '黙', inscription_form: '默' }, 'modern') === '黙' && glyphFor({ kanji: '灯', inscription_form: '燈' }, 'traditional') === '燈' && glyphFor({ kanji: '灯', inscription_form: '燈' }, 'simplified') === '灯' && glyphFor({ kanji: '迎', inscription_form: null }, 'kyujitai') === '迎' && glyphFor({ kanji: '迎', inscription_form: null }, 'simplified') === '迎')
-check('hasDistinctForm: false for null / same character', hasDistinctForm({ kanji: '黙', inscription_form: '默' }) && !hasDistinctForm({ kanji: '迎', inscription_form: null }) && !hasDistinctForm({ kanji: '迎', inscription_form: '迎' }))
+check('inscription styles (spec v9.1 step 9, the buyer\'s local form): ja modern only (新字体), zh traditional|simplified; the defaults are modern / traditional', STYLES_BY_LANGUAGE.ja.join() === 'modern' && STYLES_BY_LANGUAGE['zh-Hans'].join() === 'traditional,simplified' && STYLES_BY_LANGUAGE['zh-Hant'].join() === 'traditional,simplified' && DEFAULT_STYLE.ja === 'modern' && DEFAULT_STYLE['zh-Hant'] === 'traditional')
+check('glyphFor: kyūjitai/traditional → inscription_form, modern/simplified → kanji; no distinct form → kanji either way', glyphFor({ kanji: '灯', inscription_form: '燈' }, 'kyujitai') === '燈' && glyphFor({ kanji: '灯', inscription_form: '燈' }, 'modern') === '灯' && glyphFor({ kanji: '灯', inscription_form: '燈' }, 'traditional') === '燈' && glyphFor({ kanji: '灯', inscription_form: '燈' }, 'simplified') === '灯' && glyphFor({ kanji: '証', inscription_form: null }, 'kyujitai') === '証' && glyphFor({ kanji: '証', inscription_form: null }, 'simplified') === '証')
+check('hasDistinctForm: false for null / same character', hasDistinctForm({ kanji: '灯', inscription_form: '燈' }) && !hasDistinctForm({ kanji: '証', inscription_form: null }) && !hasDistinctForm({ kanji: '証', inscription_form: '証' }))
 
 // ---- parseOrderRequest -------------------------------------------------------------------------
 const ok = parse(base())
-check('parse: a valid ja order is accepted; reading / glyph come from the ENGINE RESULT', ok.ok && ok.order.candidate.kanji === '迎' && ok.order.candidate.reading === GOLDEN.candidates[0].reading && ok.order.glyph === '迎' && ok.order.sender_name === '山田 太郎')
-const moku = parse(base({ selected_kanji: '黙', inscription_style: 'kyujitai' }))
-check('parse: kyūjitai picks the old form (黙 → 默), modern keeps 黙', moku.ok && moku.order.glyph === '默' && (() => { const m = parse(base({ selected_kanji: '黙', inscription_style: 'modern' })); return m.ok && m.order.glyph === '黙' })())
+check('parse: a valid ja order is accepted; reading / glyph come from the ENGINE RESULT', ok.ok && ok.order.candidate.kanji === '証' && ok.order.candidate.reading === GOLDEN.candidates[0].reading && ok.order.glyph === '証' && ok.order.sender_name === '山田 太郎')
+const moku = parse(base({ selected_kanji: '守', inscription_style: 'kyujitai' }))
+check('parse: Japanese buyers always get the modern form — an old client\'s "kyujitai" is read as modern (守 stays 守)', moku.ok && moku.order.glyph === '守' && moku.order.inscription_style === 'modern' && (() => { const m = parse(base({ selected_kanji: '守', inscription_style: 'modern' })); return m.ok && m.order.glyph === '守' })())
 const zhOk = parse({ ...base({ language: 'zh-Hant', engine_result: ZH, selected_kanji: '灯', inscription_style: 'traditional' }) })
 check('parse: a zh order — traditional carves 燈, simplified carves 灯', zhOk.ok && zhOk.order.glyph === '燈' && (() => { const m = parse(base({ language: 'zh-Hant', engine_result: ZH, selected_kanji: '灯', inscription_style: 'simplified' })); return m.ok && m.order.glyph === '灯' })())
-check('parse: a client-supplied reading / glyph / price field is ignored (only the engine result counts)', (() => { const r = parse({ ...base(), reading: 'EVIL', glyph: 'X', price: 1, kanji: 'Y' }); return r.ok && r.order.candidate.reading !== 'EVIL' && r.order.glyph === '迎' })())
+check('parse: a client-supplied reading / glyph / price field is ignored (only the engine result counts)', (() => { const r = parse({ ...base(), reading: 'EVIL', glyph: 'X', price: 1, kanji: 'Y' }); return r.ok && r.order.candidate.reading !== 'EVIL' && r.order.glyph === '証' })())
 check('parse: not an object / missing story / bad language', err(null) !== '' && err(base({ story: '   ' })).startsWith('story') && err(base({ language: 'zh' })).startsWith('language') && err(base({ language: 'english' })).startsWith('language'))
 // ---- English orders: the character is Japanese, carved in Japan, so en behaves like ja -------------
 const EN = clone(GOLDEN)
 EN.language = 'en'
 EN.inscription_script = null
 EN.candidates = EN.candidates.map((c: any, i: number) => ({ ...c, reading: i === 0 ? 'on: gei · kun: mukae(ru)' : `on: x${i} · kun: y${i}`, meaning: i === 0 ? 'to welcome; to meet' : `meaning ${i}` }))
-const enOk = parse(base({ language: 'en', engine_result: EN, selected_kanji: '迎', inscription_style: 'kyujitai', sender_name: 'Emily Carter', receiver_name: 'Margaret Carter' }))
+const enOk = parse(base({ language: 'en', engine_result: EN, selected_kanji: '証', inscription_style: 'kyujitai', sender_name: 'Emily Carter', receiver_name: 'Margaret Carter' }))
 check('certificate: the old lines are gone from every language (〇〇様の目に映る、あなたです / 眼中的你 / is you, as … sees you)', ['ja', 'zh-Hans', 'zh-Hant', 'en'].every((l) => !/あなたです|眼中的你|sees you|〇〇/.test(certificateText(l as 'ja'))))
-check('inscription styles: en is kyūjitai|modern with kyūjitai the default (like ja), never traditional|simplified', STYLES_BY_LANGUAGE.en.join() === 'kyujitai,modern' && DEFAULT_STYLE.en === 'kyujitai')
-check('parse: an en order is accepted; kyūjitai / modern choose the carved glyph from the Japanese candidate', enOk.ok && enOk.order.language === 'en' && enOk.order.glyph === (EN.candidates[0].inscription_form ?? EN.candidates[0].kanji) && (() => { const m = parse(base({ language: 'en', engine_result: EN, selected_kanji: '迎', inscription_style: 'modern' })); return m.ok && m.order.glyph === '迎' })())
+check('inscription styles: en is modern only (like ja: the character is Japanese, carved in the modern form), never traditional|simplified', STYLES_BY_LANGUAGE.en.join() === 'modern' && DEFAULT_STYLE.en === 'modern')
+check('parse: an en order is accepted; the carved glyph is the modern Japanese form (an old "kyujitai" is read as modern)', enOk.ok && enOk.order.language === 'en' && enOk.order.glyph === EN.candidates[0].kanji && (() => { const m = parse(base({ language: 'en', engine_result: EN, selected_kanji: '証', inscription_style: 'modern' })); return m.ok && m.order.glyph === '証' })())
 check('parse: an en order refuses the Chinese styles (traditional|simplified) and a ja result', err(base({ language: 'en', engine_result: EN, inscription_style: 'traditional' })).startsWith('inscription_style') && err(base({ language: 'en', engine_result: clone(GOLDEN) })).startsWith('engine_result'))
 check('record: an en order keeps the romaji reading AND the English meaning for production, and the en certificate', enOk.ok && (() => { const rec = buildRecord(enOk.order, 'IC-20261023-ABCDEFGH', NOW); return rec.production.reading === 'on: gei · kun: mukae(ru)' && rec.production.meaning === 'to welcome; to meet' && rec.production.certificate_text === 'This character is the person as seen through your eyes.' && rec.production.language === 'en' })() && (() => { const ja = parse(base()); return ja.ok && buildRecord(ja.order, 'IC-20261023-ABCDEFGH', NOW).production.meaning === null })())
 check('Shopify attributes: en carries the nine keys (kanji, inscription_form, reading, certificate_meaning_en, sender_name, receiver_name, delivery_date, language, order_ref) with language "en"', enOk.ok && (() => { const a = lineAttributes(enOk.order, 'IC-20261023-ABCDEFGH'); return a.map((x) => x.key).join() === 'kanji,inscription_form,reading,certificate_meaning_en,sender_name,receiver_name,delivery_date,language,order_ref' && a.find((x) => x.key === 'language')!.value === 'en' && a.find((x) => x.key === 'reading')!.value === 'on: gei · kun: mukae(ru)' })())
@@ -101,7 +101,7 @@ const certFree = buildCertificate({ slot: 'freestyle', kanji: '遅', inscription
 check('certificate: a character with no palette row (a freestyle) falls back to the candidate\'s own reading and meaning; romaji is computed from the kana', certFree.reading === 'おそ' && certFree.romanization === 'oso' && certFree.meaning_en === 'late')
 check('certificate: no row and no meaning → meaning_en is null (never invented)', buildCertificate({ slot: 'freestyle', kanji: '遅', inscription_form: null, reading: 'おそ', story_anchor: 'a', one_line_gaze: 'g', unique_truth: '' } as never, '遅', 'ja', PAL).meaning_en === null)
 const certOrder = parse(base())
-check('the certificate is part of the validated order and of the production record (stored with the order), next to the old certificate_text', certOrder.ok && certOrder.order.certificate.meaning_en === 'welcome' && certOrder.order.certificate.character === '迎' && buildRecord(certOrder.order, 'IC-20261023-ABCDEFGH', NOW).production.certificate.line_en === CERTIFICATE_LINE_EN && buildRecord(certOrder.order, 'IC-20261023-ABCDEFGH', NOW).production.certificate_text === certOrder.order.certificate.line)
+check('the certificate is part of the validated order and of the production record (stored with the order), next to the old certificate_text', certOrder.ok && certOrder.order.certificate.meaning_en === 'proof' && certOrder.order.certificate.character === '証' && buildRecord(certOrder.order, 'IC-20261023-ABCDEFGH', NOW).production.certificate.line_en === CERTIFICATE_LINE_EN && buildRecord(certOrder.order, 'IC-20261023-ABCDEFGH', NOW).production.certificate_text === certOrder.order.certificate.line)
 
 // ---- order_ref and the attributes ---------------------------------------------------------------
 const refs = new Set(Array.from({ length: 500 }, () => newOrderRef(NOW)))
@@ -110,10 +110,10 @@ check('order_ref: deterministic for a given random source', newOrderRef(NOW, () 
 if (!ok.ok) throw new Error('fixture order did not parse')
 const attrs = lineAttributes(ok.order, 'IC-20261023-ABCDEFGH')
 check('attributes: exactly kanji, inscription_form, reading, certificate_meaning_en, sender_name, receiver_name, delivery_date, language, order_ref — in that order (the meaning sits next to kanji and reading)', attrs.map((a) => a.key).join() === 'kanji,inscription_form,reading,certificate_meaning_en,sender_name,receiver_name,delivery_date,language,order_ref')
-check('attributes: values (inscription_form is the glyph to carve)', Object.fromEntries(attrs.map((a) => [a.key, a.value])).kanji === '迎' && attrs[3].value === 'welcome' && attrs[4].value === '山田 太郎' && attrs[5].value === '山田 一郎' && attrs[6].value === '2026-12-01' && attrs[7].value === 'ja' && attrs[8].value === 'IC-20261023-ABCDEFGH' && attrs.every((a) => typeof a.value === 'string' && a.value !== ''))
+check('attributes: values (inscription_form is the glyph to carve)', Object.fromEntries(attrs.map((a) => [a.key, a.value])).kanji === '証' && attrs[3].value === 'proof' && attrs[4].value === '山田 太郎' && attrs[5].value === '山田 一郎' && attrs[6].value === '2026-12-01' && attrs[7].value === 'ja' && attrs[8].value === 'IC-20261023-ABCDEFGH' && attrs.every((a) => typeof a.value === 'string' && a.value !== ''))
 check('attributes: the story and the gaze line are NOT in them (they stay server-side)', !attrs.some((a) => a.value.includes('駅まで') || a.value.includes(GOLDEN.candidates[0].one_line_gaze)))
 const rec = buildRecord(ok.order, 'IC-20261023-ABCDEFGH', NOW)
-check('record: story, engine result, gaze line, anchor and certificate text are kept for production', rec.story === STORY && rec.engine_result.primary_kanji === '迎' && rec.production.gaze_line === GOLDEN.candidates[0].one_line_gaze && rec.production.story_anchor === GOLDEN.candidates[0].story_anchor && rec.production.certificate_text === 'この字は、あなたの目に映る、その人です。' && rec.production.price_jpy === 18850 && rec.status === 'pending' && rec.shopify === null)
+check('record: story, engine result, gaze line, anchor and certificate text are kept for production', rec.story === STORY && rec.engine_result.primary_kanji === '証' && rec.production.gaze_line === GOLDEN.candidates[0].one_line_gaze && rec.production.story_anchor === GOLDEN.candidates[0].story_anchor && rec.production.certificate_text === 'この字は、あなたの目に映る、その人です。' && rec.production.price_jpy === 18850 && rec.status === 'pending' && rec.shopify === null)
 
 // ---- fake Shopify ---------------------------------------------------------------------------------
 type Seen = { headers: http.IncomingHttpHeaders; url: string; body: any }
@@ -162,7 +162,7 @@ const dir = mkdtempSync(join(tmpdir(), 'ichirei-orders-'))
 const fileStore = new FileOrderStore(dir)
 await fileStore.put('IC-20261023-ABCDEFGH', rec)
 const back = (await fileStore.get('IC-20261023-ABCDEFGH')) as typeof rec
-check('file store: a record round-trips with the story and the engine result', back.story === STORY && back.engine_result.primary_kanji === '迎' && (await fileStore.get('IC-20261023-NOPE2222')) === null)
+check('file store: a record round-trips with the story and the engine result', back.story === STORY && back.engine_result.primary_kanji === '証' && (await fileStore.get('IC-20261023-NOPE2222')) === null)
 await fileStore.put('IC-20261023-ABCDEFGH', { ...rec, status: 'cart_created' })
 check('file store: rewriting replaces the record atomically (one file, no temp files)', readdirSync(dir).join() === 'IC-20261023-ABCDEFGH.json' && ((await fileStore.get('IC-20261023-ABCDEFGH')) as typeof rec).status === 'cart_created')
 check('stores refuse a path-like order_ref', await fileStore.put('../../etc/passwd', {}).then(() => false, () => true) && await new MemoryOrderStore().get('a/b').then(() => false, () => true))
@@ -214,11 +214,11 @@ const call = (b: unknown, h = handler) => h(new Request('http://x/api/order', { 
 shopSeen.length = 0
 const r1 = await call(base())
 const j1 = (await r1.json()) as any
-check('POST /api/order: 200 with order_ref, the Shopify checkout URL, the glyph and the certificate text', r1.status === 200 && ORDER_REF_PATTERN.test(j1.order_ref) && j1.checkout_url.startsWith('https://soul-id-2.myshopify.com/') && j1.glyph === '迎' && j1.certificate_text === 'この字は、あなたの目に映る、その人です。')
+check('POST /api/order: 200 with order_ref, the Shopify checkout URL, the glyph and the certificate text', r1.status === 200 && ORDER_REF_PATTERN.test(j1.order_ref) && j1.checkout_url.startsWith('https://soul-id-2.myshopify.com/') && j1.glyph === '証' && j1.certificate_text === 'この字は、あなたの目に映る、その人です。')
 const stored1 = (await memory.get(j1.order_ref)) as any
 check('stored under that order_ref: the story, the full engine result, the gaze line and the anchor', stored1.story === STORY && stored1.engine_result.candidates.length === 3 && stored1.production.gaze_line === GOLDEN.candidates[0].one_line_gaze && stored1.production.story_anchor === GOLDEN.candidates[0].story_anchor)
 check('stored record: status cart_created, with the Shopify cart id, checkout URL and variant', stored1.status === 'cart_created' && stored1.shopify.cart_id === 'gid://shopify/Cart/fake-cart-key' && stored1.shopify.variant_id.endsWith('/2222'))
-check('certificate → Shopify: the cart line carries certificate_meaning_en ("welcome") right after reading, and the stored record has the full certificate object', shopSeen[0].body.variables.input.lines[0].attributes.map((a: any) => a.key).slice(0, 4).join() === 'kanji,inscription_form,reading,certificate_meaning_en' && shopSeen[0].body.variables.input.lines[0].attributes[3].value === 'welcome' && stored1.production.certificate.meaning_en === 'welcome' && stored1.production.certificate.line_en === CERTIFICATE_LINE_EN && j1.certificate.meaning_en === 'welcome')
+check('certificate → Shopify: the cart line carries certificate_meaning_en ("proof") right after reading, and the stored record has the full certificate object', shopSeen[0].body.variables.input.lines[0].attributes.map((a: any) => a.key).slice(0, 4).join() === 'kanji,inscription_form,reading,certificate_meaning_en' && shopSeen[0].body.variables.input.lines[0].attributes[3].value === 'proof' && stored1.production.certificate.meaning_en === 'proof' && stored1.production.certificate.line_en === CERTIFICATE_LINE_EN && j1.certificate.meaning_en === 'proof')
 check('Shopify saw one cart with this order_ref on the line and the cart, and NOT the story', shopSeen.length === 1 && shopSeen[0].body.variables.input.lines[0].attributes.at(-1).value === j1.order_ref && shopSeen[0].body.variables.input.attributes[0].value === j1.order_ref && !JSON.stringify(shopSeen[0].body).includes('口下手'))
 shopSeen.length = 0
 const r2 = await call(base({ package: 'simple', language: 'zh-Hant', engine_result: ZH, selected_kanji: '灯', inscription_style: 'simplified', sender_name: '李明', receiver_name: '李華' }))

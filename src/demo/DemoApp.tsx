@@ -115,7 +115,7 @@ const GOLDEN_CONTEXT: GiftContext = {
 const GOLDEN_FIXTURE =
   '父は口下手で厳しくて、ほめられた記憶なんてほとんどない。進路のことでも何度もぶつかった。ただ、私が東京に出るとき駅まで送ってくれて、改札で「金は要るか」って、それだけ言って封筒を押し付けてきた。あれから二十年、盆に帰るたびに車で駅まで迎えに来て、帰りも必ず送ってくれる。相変わらず、ほとんど何も話さないけど。'
 
-type Phase = 'elicit' | 'processing' | 'followup' | 'suggest' | 'reveal' | 'order' | 'thin'
+type Phase = 'elicit' | 'processing' | 'followup' | 'suggest' | 'reveal' | 'order' | 'thin' | 'declined'
 
 /**
  * harness  — /demo: the internal validation harness (A/B/C conditions, log export, golden fixture,
@@ -286,7 +286,11 @@ export default function DemoApp({ mode = 'harness', aside }: { mode?: Mode; asid
         has_occasion_detail: ctx.occasionDetail.trim() !== '',
         follow_ups_used: followUpsUsed.current,
       })
-      if (engineResult.status === 'insufficient') {
+      if (engineResult.status === 'insufficient' && engineResult.declined === true) {
+        // The goodwill check: a polite decline. Nothing to answer, nothing to choose.
+        log('declined_shown', {})
+        setPhase('declined')
+      } else if (engineResult.status === 'insufficient') {
         if (followUpsUsed.current < MAX_FOLLOW_UPS && engineResult.follow_up_question) {
           followUpsUsed.current += 1
           setFollowUpQuestion(engineResult.follow_up_question)
@@ -474,6 +478,19 @@ export default function DemoApp({ mode = 'harness', aside }: { mode?: Mode; asid
               {copy.memorial.suggestNo}
             </button>
           </div>
+        </div>
+      )}
+
+      {phase === 'declined' && (
+        <div className="py-12 text-center" data-declined>
+          <p className="font-serif-jp mx-auto max-w-xl text-sm leading-loose text-fg">{result?.follow_up_question}</p>
+          <button
+            type="button"
+            onClick={() => setPhase('elicit')}
+            className={customer ? 'btn ghost mt-8' : 'font-label mt-8 rounded-full border border-accent/40 px-6 py-2.5 text-sm text-fg transition-colors hover:border-accent hover:bg-accent/10'}
+          >
+            {copy.thinBack}
+          </button>
         </div>
       )}
 

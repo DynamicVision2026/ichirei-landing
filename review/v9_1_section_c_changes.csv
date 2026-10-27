@@ -1,0 +1,68 @@
+family,character,field,before,after,reason
+ja,篤,status,hard_block,context_required,"spec v9.1 section C: a lexicon character with a verified line is never level 1 (only the do-not-use list is); the 2026-10-28 hard block is reverted. The illness rule (level 4, per gift) keeps 篤 away from an ill receiver."
+ja,篤,taboo_flags,kitoku_critically_ill_危篤|illness_death,kitoku_critically_ill_危篤,"spec v9.1 section C: a lexicon character with a verified line is never level 1 (only the do-not-use list is); the 2026-10-28 hard block is reverted. The illness rule (level 4, per gift) keeps 篤 away from an ill receiver."
+ja,篤,anchor_required,no,yes,"spec v9.1 section C: a lexicon character with a verified line is never level 1 (only the do-not-use list is); the 2026-10-28 hard block is reverted. The illness rule (level 4, per gift) keeps 篤 away from an ill receiver."
+ja,篤,relationship_fit,none,parent_mother|parent_father|grandparent|spouse|romance|friend|work|mentor,"spec v9.1 section C: a lexicon character with a verified line is never level 1 (only the do-not-use list is); the 2026-10-28 hard block is reverted. The illness rule (level 4, per gift) keeps 篤 away from an ill receiver."
+ja,篤,inscription_fitness,low,medium,"spec v9.1 section C: a lexicon character with a verified line is never level 1 (only the do-not-use list is); the 2026-10-28 hard block is reverted. The illness rule (level 4, per gift) keeps 篤 away from an ill receiver."
+ja,篤,cross_language_note,"HARD BLOCK for Japanese buyers (owner decision 2026-10-28, after a live stroke-recipient story returned it): 篤 evokes 危篤 (critically ill), too risky on its own for any recipient of 60+ and for anyone ill. The Chinese row 笃 is unchanged. Added from the classical lexicon (engine/lexicon.csv, 2026-10-27).","Same character and core meaning in Chinese (笃, dǔ). Added from the classical lexicon (engine/lexicon.csv, 2026-10-27); AI first pass, not human-reviewed.","spec v9.1 section C: a lexicon character with a verified line is never level 1 (only the do-not-use list is); the 2026-10-28 hard block is reverted. The illness rule (level 4, per gift) keeps 篤 away from an ill receiver."
+ja,黙,status,context_required,hard_block,level 1 (spec v9.1 section C): on the expert's do-not-use list (黙/默 迎 執 忍 走) — never used in any slot
+ja,黙,relationship_fit,parent_father|mentor,none,level 1 (spec v9.1 section C): on the expert's do-not-use list (黙/默 迎 執 忍 走) — never used in any slot
+ja,黙,cross_language_note,"Same character and core meaning in Chinese (默, mò). 黙々 (mokumoku) = working quietly and steadily, a positive image of a taciturn father. 黙祷 is a silent prayer for the dead.","Same character and core meaning in Chinese (默, mò). 黙々 (mokumoku) = working quietly and steadily, a positive image of a taciturn father. 黙祷 is a silent prayer for the dead. Level 1 (spec v9.1 C): expert do-not-use list — never used in any slot.",level 1 (spec v9.1 section C): on the expert's do-not-use list (黙/默 迎 執 忍 走) — never used in any slot
+ja,黙,taboo_flags,imperative_黙れ|mourning_黙祷,imperative_黙れ|mourning_黙祷|do_not_use_expert_list,level 1 (spec v9.1 section C): on the expert's do-not-use list (黙/默 迎 執 忍 走) — never used in any slot
+ja,迎,status,context_required,hard_block,level 1 (spec v9.1 section C): on the expert's do-not-use list (黙/默 迎 執 忍 走) — never used in any slot
+ja,迎,anchor_required,yes,no,level 1 (spec v9.1 section C): on the expert's do-not-use list (黙/默 迎 執 忍 走) — never used in any slot
+ja,迎,relationship_fit,parent_mother|parent_father|grandparent|sibling|friend,none,level 1 (spec v9.1 section C): on the expert's do-not-use list (黙/默 迎 執 忍 走) — never used in any slot
+ja,迎,cross_language_note,Same character and core meaning in Chinese (yíng). In Japanese お迎え (o-mukae) is also the euphemism for death 'coming to fetch' an elderly person; needs a story anchor.,Same character and core meaning in Chinese (yíng). In Japanese お迎え (o-mukae) is also the euphemism for death 'coming to fetch' an elderly person; needs a story anchor. Level 1 (spec v9.1 C): expert do-not-use list — never used in any slot.,level 1 (spec v9.1 section C): on the expert's do-not-use list (黙/默 迎 執 忍 走) — never used in any slot
+ja,迎,taboo_flags,okaeri_death_euphemism,okaeri_death_euphemism|do_not_use_expert_list,level 1 (spec v9.1 section C): on the expert's do-not-use list (黙/默 迎 執 忍 走) — never used in any slot
+ja,忍,status,context_required,hard_block,level 1 (spec v9.1 section C): on the expert's do-not-use list (黙/默 迎 執 忍 走) — never used in any slot
+ja,忍,anchor_required,yes,no,level 1 (spec v9.1 section C): on the expert's do-not-use list (黙/默 迎 執 忍 走) — never used in any slot
+ja,忍,relationship_fit,parent_father|parent_mother,none,level 1 (spec v9.1 section C): on the expert's do-not-use list (黙/默 迎 執 忍 走) — never used in any slot
+ja,忍,cross_language_note,"Same character and core meaning in Chinese (rěn). 忍 (shinobu) is also 'to conceal' (忍者). It can read as praise for silent suffering, so anchor it in a specific act.","Same character and core meaning in Chinese (rěn). 忍 (shinobu) is also 'to conceal' (忍者). It can read as praise for silent suffering, so anchor it in a specific act. Level 1 (spec v9.1 C): expert do-not-use list — never used in any slot.",level 1 (spec v9.1 section C): on the expert's do-not-use list (黙/默 迎 執 忍 走) — never used in any slot
+ja,忍,taboo_flags,suppression_or_sacrifice_connotation,suppression_or_sacrifice_connotation|do_not_use_expert_list,level 1 (spec v9.1 section C): on the expert's do-not-use list (黙/默 迎 執 忍 走) — never used in any slot
+ja,走,status,ok,hard_block,level 1 (spec v9.1 section C): on the expert's do-not-use list (黙/默 迎 執 忍 走) — never used in any slot
+ja,走,relationship_fit,all,none,level 1 (spec v9.1 section C): on the expert's do-not-use list (黙/默 迎 執 忍 走) — never used in any slot
+ja,走,cross_language_note,"FALSE FRIEND. Chinese 走 means 'walk' or 'leave', not 'run'; 走了 can euphemise a death.","FALSE FRIEND. Chinese 走 means 'walk' or 'leave', not 'run'; 走了 can euphemise a death. Level 1 (spec v9.1 C): expert do-not-use list — never used in any slot.",level 1 (spec v9.1 section C): on the expert's do-not-use list (黙/默 迎 執 忍 走) — never used in any slot
+ja,走,taboo_flags,none,do_not_use_expert_list,level 1 (spec v9.1 section C): on the expert's do-not-use list (黙/默 迎 執 忍 走) — never used in any slot
+zh,默,status,ok,hard_block,level 1 (spec v9.1 section C): on the expert's do-not-use list (黙/默 迎 執 忍 走) — never used in any slot
+zh,默,relationship_fit,parent_father|mentor,none,level 1 (spec v9.1 section C): on the expert's do-not-use list (黙/默 迎 執 忍 走) — never used in any slot
+zh,默,cross_language_note,"Same character and core meaning in Japanese (黙, モク/だま-る). 默契 (mòqì) is silent mutual understanding, a lovely word. 默哀 is silent mourning.","Same character and core meaning in Japanese (黙, モク/だま-る). 默契 (mòqì) is silent mutual understanding, a lovely word. 默哀 is silent mourning. Level 1 (spec v9.1 C): expert do-not-use list — never used in any slot.",level 1 (spec v9.1 section C): on the expert's do-not-use list (黙/默 迎 執 忍 走) — never used in any slot
+zh,默,taboo_flags,verify:silence_as_mourning_黙祷_默哀,verify:silence_as_mourning_黙祷_默哀|do_not_use_expert_list,level 1 (spec v9.1 section C): on the expert's do-not-use list (黙/默 迎 執 忍 走) — never used in any slot
+zh,迎,status,ok,hard_block,level 1 (spec v9.1 section C): on the expert's do-not-use list (黙/默 迎 執 忍 走) — never used in any slot
+zh,迎,relationship_fit,parent_mother|parent_father|grandparent|sibling|friend,none,level 1 (spec v9.1 section C): on the expert's do-not-use list (黙/默 迎 執 忍 走) — never used in any slot
+zh,迎,cross_language_note,"Same character and core meaning in Japanese (迎, ゲイ/むか-える). 迎 is plainly 'welcome' in Chinese, with no death euphemism.","Same character and core meaning in Japanese (迎, ゲイ/むか-える). 迎 is plainly 'welcome' in Chinese, with no death euphemism. Level 1 (spec v9.1 C): expert do-not-use list — never used in any slot.",level 1 (spec v9.1 section C): on the expert's do-not-use list (黙/默 迎 執 忍 走) — never used in any slot
+zh,迎,taboo_flags,none,do_not_use_expert_list,level 1 (spec v9.1 section C): on the expert's do-not-use list (黙/默 迎 執 忍 走) — never used in any slot
+zh,忍,status,context_required,hard_block,level 1 (spec v9.1 section C): on the expert's do-not-use list (黙/默 迎 執 忍 走) — never used in any slot
+zh,忍,anchor_required,yes,no,level 1 (spec v9.1 section C): on the expert's do-not-use list (黙/默 迎 執 忍 走) — never used in any slot
+zh,忍,relationship_fit,parent_father|parent_mother,none,level 1 (spec v9.1 section C): on the expert's do-not-use list (黙/默 迎 執 忍 走) — never used in any slot
+zh,忍,cross_language_note,"Same character and core meaning in Japanese (忍, ニン/しの-ぶ). 忍 can read as 'bear without complaint', and 残忍 means cruel; pair with a clear anchor.","Same character and core meaning in Japanese (忍, ニン/しの-ぶ). 忍 can read as 'bear without complaint', and 残忍 means cruel; pair with a clear anchor. Level 1 (spec v9.1 C): expert do-not-use list — never used in any slot.",level 1 (spec v9.1 section C): on the expert's do-not-use list (黙/默 迎 執 忍 走) — never used in any slot
+zh,忍,taboo_flags,suppression_or_sacrifice_connotation,suppression_or_sacrifice_connotation|do_not_use_expert_list,level 1 (spec v9.1 section C): on the expert's do-not-use list (黙/默 迎 執 忍 走) — never used in any slot
+zh,走,status,context_required,hard_block,level 1 (spec v9.1 section C): on the expert's do-not-use list (黙/默 迎 執 忍 走) — never used in any slot
+zh,走,anchor_required,yes,no,level 1 (spec v9.1 section C): on the expert's do-not-use list (黙/默 迎 執 忍 走) — never used in any slot
+zh,走,relationship_fit,all,none,level 1 (spec v9.1 section C): on the expert's do-not-use list (黙/默 迎 執 忍 走) — never used in any slot
+zh,走,cross_language_note,FALSE FRIEND. Japanese 走 (hashiru) means 'run'.,FALSE FRIEND. Japanese 走 (hashiru) means 'run'. Level 1 (spec v9.1 C): expert do-not-use list — never used in any slot.,level 1 (spec v9.1 section C): on the expert's do-not-use list (黙/默 迎 執 忍 走) — never used in any slot
+zh,走,taboo_flags,verify:euphemism_for_dying_他走了,verify:euphemism_for_dying_他走了|do_not_use_expert_list,level 1 (spec v9.1 section C): on the expert's do-not-use list (黙/默 迎 執 忍 走) — never used in any slot
+ja,迎,blocked_occasions,birthday_milestone,none,level 1 hard block already covers every occasion (the palette keeps blocked_occasions empty on hard_block rows); the milestone block it had is now implied
+ja,執,row,(none),hard_block (new row),level 1 (spec v9.1 section C): on the expert's do-not-use list (黙/默 迎 執 忍 走) — never used in any slot
+zh,执,row,(none),hard_block (new row),level 1 (spec v9.1 section C): on the expert's do-not-use list (黙/默 迎 執 忍 走) — never used in any slot
+zh,别,status,context_required,hard_block,level 1 (spec v9.1 section C): ending word 別 — hard block in the Chinese palette too (it already was in the Japanese one)
+zh,别,anchor_required,yes,no,level 1 (spec v9.1 section C): ending word 別 — hard block in the Chinese palette too (it already was in the Japanese one)
+ja,耐,anchor_required,no,yes,level 2 (spec v9.1 section C): allowed only when the story clearly shows it in a warm sense
+ja,渡,anchor_required,no,yes,level 2 (spec v9.1 section C): allowed only when the story clearly shows it in a warm sense
+ja,草,anchor_required,no,yes,level 2 (spec v9.1 section C): allowed only when the story clearly shows it in a warm sense
+ja,犬,anchor_required,no,yes,level 2 (spec v9.1 section C): allowed only when the story clearly shows it in a warm sense
+ja,梨,anchor_required,no,yes,level 2 (spec v9.1 section C): allowed only when the story clearly shows it in a warm sense
+zh,耐,status,ok,context_required,level 2 (spec v9.1 section C): allowed only when the story clearly shows it in a warm sense
+zh,耐,anchor_required,no,yes,level 2 (spec v9.1 section C): allowed only when the story clearly shows it in a warm sense
+zh,渡,status,ok,context_required,level 2 (spec v9.1 section C): allowed only when the story clearly shows it in a warm sense
+zh,渡,anchor_required,no,yes,level 2 (spec v9.1 section C): allowed only when the story clearly shows it in a warm sense
+zh,犬,status,ok,context_required,level 2 (spec v9.1 section C): allowed only when the story clearly shows it in a warm sense
+zh,犬,anchor_required,no,yes,level 2 (spec v9.1 section C): allowed only when the story clearly shows it in a warm sense
+ja,切,status,hard_block,context_required,owner decision (spec v9.1 section C): 切 (大切／切実) moves from level 1 to level 2
+ja,切,anchor_required,no,yes,owner decision (spec v9.1 section C): 切 (大切／切実) moves from level 1 to level 2
+zh,渡,blocked_occasions,none,birthday_milestone,level 3 (spec v9.1 section C): blocked for milestone birthdays (還暦)
+zh,归,blocked_occasions,none,wedding,level 3 (spec v9.1 section C): blocked for weddings (both palettes)
+zh,秋,blocked_occasions,none,wedding,level 3 (spec v9.1 section C): blocked for weddings (both palettes)
+zh,续,blocked_occasions,none,wedding,level 3 (spec v9.1 section C): blocked for weddings (both palettes)
+zh,继,blocked_occasions,none,wedding,level 3 (spec v9.1 section C): blocked for weddings (both palettes)
+zh,耐,blocked_occasions,none,wedding,level 3 (spec v9.1 section C): blocked for weddings (both palettes)
+zh,还,row,(none),context_required (new row),level 3 (spec v9.1 section C): blocked for weddings (both palettes)

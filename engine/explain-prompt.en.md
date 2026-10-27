@@ -34,7 +34,7 @@ Rules:
 - The character is Japanese. Explain what it means in Japan, using the Japanese reading
   and meaning supplied (romaji and English); never explain it as a Chinese character
   and never invent an etymology. Only touch the character's form (its parts, or the
-  carved old form {{ INSCRIPTION_FORM }}) where it directly deepens THIS story's truth.
+  older form {{ INSCRIPTION_FORM }}; the piece itself is carved in the modern form) where it directly deepens THIS story's truth.
 - Do not turn the character into a generic virtue ("a symbol of strength", "the spirit
   of love", "the way of the warrior"), and do not describe it as a motto, a blessing or
   a good-luck charm. It shows how the sender sees this one person; nothing more

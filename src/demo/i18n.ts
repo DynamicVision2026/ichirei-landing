@@ -156,6 +156,16 @@ export interface Copy {
   previewNote: (c: { inscription_form: string | null }, script: InscriptionScript | null) => string | null
   // v6: the three cards
   slotLabels: { main: string; second: string; freestyle: string }
+  /** Spec v9.1 step 9: how the card matches the story — three short lines, never a percentage or a score. */
+  match: {
+    who: string
+    moment: string
+    feeling: string
+    /** The single word the main card may carry. */
+    resonates: string
+    /** The emotional-register words the engine writes (English), in this language. */
+    registers: Record<string, string>
+  }
   // purchase (customer flow, after a character is chosen)
   order: {
     heading: string
@@ -169,6 +179,8 @@ export interface Copy {
     inscriptionLabel: string
     inscriptionStyles: Record<InscriptionStyle, string>
     inscriptionSame: string
+    /** Shown beside the Simple set when the carved character has more strokes than the Simple set can carry. */
+    simpleUnavailable: (maxStrokes: number) => string
     packageLabel: string
     packages: Record<PackageId, string>
     shippingNote: string
@@ -291,10 +303,11 @@ const ja: Copy = {
   finalized: (k) => `「${k}」に決めました`,
   chooseHint: '字を開いて「この一字を選ぶ」を押すと決定できます',
   chooseHintCustomer: 'ひとつ選ぶと、先へ進めます。',
-  glyphReading: (c) => `${c.inscription_form ? `${c.kanji} ・ ` : ''}${c.reading}`,
-  inscriptionNote: (c) => (c.inscription_form ? `古体字（現代字：${c.kanji}）` : null),
-  previewNote: (c) => (c.inscription_form ? '刻印は古体字を用います' : null),
+  glyphReading: (c) => c.reading,
+  inscriptionNote: () => null, // Japanese buyers: the carved form is the modern one (新字体) — nothing to explain
+  previewNote: () => null,
   slotLabels: { main: '本命', second: '次点', freestyle: '遊び字' },
+  match: { who: 'どんな人か', moment: 'あなたの場面', feeling: '気持ち', resonates: '深く響く', registers: { grateful: '感謝', proud: '誇り', longing: '恋しさ', nostalgic: '懐かしさ', playful: '遊び心', apologetic: '詫びる気持ち', bittersweet: 'ほろ苦さ', tender: 'やさしさ', admiring: '憧れ', relieved: '安堵', loving: '愛情', respectful: '敬意', warm: 'あたたかさ', regretful: '悔い', hopeful: '願い', affectionate: 'いとおしさ', solemn: 'おごそかさ', joyful: 'よろこび', missing: '恋しさ', devoted: 'ひたむきさ' } },
   order: {
     heading: 'ご注文',
     chosenLabel: 'あなたが選んだ一字',
@@ -306,7 +319,8 @@ const ja: Copy = {
     dateNotice: (n) => `お届け希望日まで${n}日です。`,
     inscriptionLabel: '刻印の字体',
     inscriptionStyles: { kyujitai: '古体字（旧字体）', modern: '現代字', traditional: '繁体字', simplified: '簡体字' },
-    inscriptionSame: 'この字は、古体字と現代字で同じ形です。',
+    inscriptionSame: 'この字は、現代の字体（新字体）で刻みます。',
+    simpleUnavailable: (n) => `この字は画数が${n}画を超えるため、スタンダードのみお選びいただけます。`,
     packageLabel: 'パッケージ',
     packages: { simple: 'シンプル', standard: 'スタンダード' },
     shippingNote: '国内送料無料・海外送料 ¥6,000',
@@ -441,6 +455,7 @@ const zhHans: Copy = {
       : null,
   previewNote: (c, script) => (c.inscription_form ? (script === 'simplified' ? '刻字使用简体字' : '刻字使用繁體字') : null),
   slotLabels: { main: '本命', second: '次选', freestyle: '趣字' },
+  match: { who: '对方是怎样的人', moment: '你的那一刻', feeling: '心情', resonates: '深深共鸣', registers: { grateful: '感谢', proud: '骄傲', longing: '思念', nostalgic: '怀念', playful: '玩笑的心情', apologetic: '歉意', bittersweet: '苦中带甜', tender: '温柔', admiring: '敬佩', relieved: '安心', loving: '爱', respectful: '敬意', warm: '温暖', regretful: '遗憾', hopeful: '期盼', affectionate: '疼惜', solemn: '庄重', joyful: '喜悦', missing: '思念', devoted: '专注' } },
   order: {
     heading: '下单',
     chosenLabel: '你选定的这个字',
@@ -453,6 +468,7 @@ const zhHans: Copy = {
     inscriptionLabel: '刻字字体',
     inscriptionStyles: { kyujitai: '古体字', modern: '现代字', traditional: '繁體字', simplified: '简体字' },
     inscriptionSame: '这个字的繁体与简体写法相同。',
+    simpleUnavailable: (n) => `这个字的笔画超过${n}画，仅能选择标准款。`,
     packageLabel: '套餐',
     packages: { simple: '简约款', standard: '标准款' },
     shippingNote: '日本国内免运费・海外运费 ¥6,000',
@@ -587,6 +603,7 @@ const zhHant: Copy = {
       : null,
   previewNote: (c, script) => (c.inscription_form ? (script === 'simplified' ? '刻字使用簡體字' : '刻字使用繁體字') : null),
   slotLabels: { main: '本命', second: '次選', freestyle: '趣字' },
+  match: { who: '對方是怎樣的人', moment: '你的那一刻', feeling: '心情', resonates: '深深共鳴', registers: { grateful: '感謝', proud: '驕傲', longing: '思念', nostalgic: '懷念', playful: '玩笑的心情', apologetic: '歉意', bittersweet: '苦中帶甜', tender: '溫柔', admiring: '敬佩', relieved: '安心', loving: '愛', respectful: '敬意', warm: '溫暖', regretful: '遺憾', hopeful: '期盼', affectionate: '疼惜', solemn: '莊重', joyful: '喜悅', missing: '思念', devoted: '專注' } },
   order: {
     heading: '下單',
     chosenLabel: '你選定的這個字',
@@ -599,6 +616,7 @@ const zhHant: Copy = {
     inscriptionLabel: '刻字字體',
     inscriptionStyles: { kyujitai: '古體字', modern: '現代字', traditional: '繁體字', simplified: '簡體字' },
     inscriptionSame: '這個字的繁體與簡體寫法相同。',
+    simpleUnavailable: (n) => `這個字的筆畫超過${n}畫，僅能選擇標準款。`,
     packageLabel: '方案',
     packages: { simple: '簡約款', standard: '標準款' },
     shippingNote: '日本國內免運費・海外運費 ¥6,000',
@@ -731,9 +749,10 @@ const en: Copy = {
   chooseHintCustomer: 'Choose one of the characters to continue.',
   glyphReading: (c, carved) =>
     `${c.inscription_form && carved !== c.kanji ? `${c.kanji} · ` : ''}${c.reading}${c.reading_zh ? ` · pinyin ${c.reading_zh}` : ''}${c.meaning ? ` — ${c.meaning}` : ''}`,
-  inscriptionNote: (c) => (c.inscription_form ? `Carved in the old form, kyūjitai (modern form: ${c.kanji})` : null),
-  previewNote: (c) => (c.inscription_form ? 'Carved in the old form, kyūjitai' : null),
+  inscriptionNote: () => null, // the character is carved in its modern Japanese form
+  previewNote: () => null,
   slotLabels: { main: 'Main', second: 'Second', freestyle: 'Freestyle' },
+  match: { who: 'Who they are', moment: 'Your moment', feeling: 'The feeling', resonates: 'Resonates deeply', registers: { grateful: 'Grateful', proud: 'Proud', longing: 'Longing', nostalgic: 'Nostalgic', playful: 'Playful', apologetic: 'Apologetic', bittersweet: 'Bittersweet', tender: 'Tender', admiring: 'Admiring', relieved: 'Relieved', loving: 'Loving', respectful: 'Respectful', warm: 'Warm', regretful: 'Regretful', hopeful: 'Hopeful', affectionate: 'Affectionate', solemn: 'Solemn', joyful: 'Joyful', missing: 'Missing', devoted: 'Devoted' } },
   order: {
     heading: 'Your order',
     chosenLabel: 'The character you chose',
@@ -750,7 +769,8 @@ const en: Copy = {
       traditional: 'Traditional',
       simplified: 'Simplified',
     },
-    inscriptionSame: 'This character is written the same in its old and modern forms.',
+    inscriptionSame: 'This character is carved in its modern Japanese form.',
+    simpleUnavailable: (n) => `This character has more than ${n} strokes, so only the Standard set can carve it.`,
     packageLabel: 'Package',
     packages: { simple: 'Simple', standard: 'Standard' },
     shippingNote: 'Free shipping in Japan · ¥6,000 international shipping',
@@ -775,15 +795,16 @@ export const COPY: Record<UiLanguage, Copy> = { ja, 'zh-Hans': zhHans, 'zh-Hant'
 export const EXAMPLE_KEYS: readonly (keyof Copy)[] = ['occasionDetailPlaceholder']
 
 /**
- * The glyph to carve for a candidate, given the language and the chosen inscription script.
- * ja and en: the kyūjitai form when one exists. zh: `inscription_form` is TRADITIONAL, `kanji` SIMPLIFIED.
+ * The glyph to carve for a candidate, given the language and the chosen inscription script (spec v9.1 step 9: the buyer's local form).
+ * ja and en: the modern Japanese form (新字体, e.g. 温 静 灯) — `kanji`. zh: `inscription_form` is TRADITIONAL (the default), `kanji` SIMPLIFIED.
  */
 export function carvedGlyph(
   c: { kanji: string; inscription_form: string | null },
   language: UiLanguage | undefined,
   script: InscriptionScript | null | undefined,
 ): string {
-  if (isChineseUi(language) && script === 'simplified') return c.kanji
+  if (!isChineseUi(language)) return c.kanji
+  if (script === 'simplified') return c.kanji
   return c.inscription_form ?? c.kanji
 }
 

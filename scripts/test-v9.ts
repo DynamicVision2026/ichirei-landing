@@ -9,10 +9,15 @@ import http from 'node:http'
 import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { runEngine } from '../engine/engine.ts'
-import { REVIEW_VETO_RULES, validateEngineResult, type EngineResult } from '../engine/contract.ts'
-import { LEXICON_COLUMNS, buildLexiconPrompt, eligibleFor, lexiconEchoOf, lexiconModeFromEnv, lexiconRowIn, loadLexicon, parseLexicon, renderLexiconTable, rowReviewedByHuman, rowShowsLine } from '../engine/lexicon.ts'
+import { DECLINE_MESSAGE, REVIEW_VETO_RULES, validateEngineResult, type EngineResult } from '../engine/contract.ts'
+import { LEXICON_COLUMNS, buildLexiconPrompt, eligibleFor, lexiconEchoOf, lexiconModeFromEnv, lexiconRowIn, loadLexicon, parseLexicon, renderEligible, renderLexiconTable, rowReviewedByHuman, rowShowsLine } from '../engine/lexicon.ts'
 import { loadPalette, parseCsv } from '../engine/palette.ts'
-import { logMainCharacter, resetMainTally } from '../engine/main-count.ts'
+import { logMainCharacter, logSafetyRemovals, resetMainTally } from '../engine/main-count.ts'
+import { attachStrokes, simpleMaxStrokes, strokesOf } from '../engine/strokes.ts'
+import { parseOrderRequest } from '../engine/order.ts'
+import { DEFAULT_STYLE, STYLES_BY_LANGUAGE, glyphFor, hasFormChoice, normalizeStyle } from '../src/order/inscription.ts'
+import { simpleAvailable } from '../src/order/strokes.ts'
+import { COPY, carvedGlyph } from '../src/demo/i18n.ts'
 // @ts-expect-error untyped test helper
 import { startServer } from './server-fixtures.mjs'
 
@@ -57,13 +62,13 @@ const synth = (kanji: string, fits: string, extra: Record<string, string> = {}) 
 }
 const synthLex = (...rows: string[]) => parseLexicon(`${LEXICON_COLUMNS.join(',')}\n${rows.join('\n')}\n`)
 const grat = synthLex(synth('恩', 'parent / partner / mentor'))
-check('(2) 恩 is upward or partner only: offered up and to a partner, never down, across, or with no direction', has(kanjiOf('ja', 'parent_mother', 'up', null), '恩') && has(kanjiOf('ja', 'spouse', 'across', null, grat), '恩') && none(kanjiOf('ja', 'parent_mother', 'down', null), '恩') && none(kanjiOf('ja', 'mentor', 'across', null), '恩') && none(kanjiOf('ja', 'parent_mother', null, null), '恩'))
-check('(2) …(the real 恩 row carries no partner tag, so for a spouse it is not offered at all: the restriction only narrows)', none(kanjiOf('ja', 'spouse', 'across', null), '恩'))
+check('(2) 恩 is upward only (spec v9.1 step 3): offered up, never down, across, to a partner or with no direction — even if its row said partner', has(kanjiOf('ja', 'parent_mother', 'up', null), '恩') && none(kanjiOf('ja', 'spouse', 'across', null, grat), '恩') && none(kanjiOf('ja', 'parent_mother', 'down', null), '恩') && none(kanjiOf('ja', 'mentor', 'across', null), '恩') && none(kanjiOf('ja', 'parent_mother', null, null), '恩') && has(kanjiOf('ja', 'spouse', 'up', null, grat), '恩'))
+check('(2) …and the real 恩 row is listed for parent / mentor / work / memorial, so a child receiving it from a parent (direction down) never sees it', none(kanjiOf('ja', 'child', 'down', 'birthday_milestone'), '恩'))
 const green = synthLex(synth('綠', 'friend / partner / parent'))
 check('(2) 綠 is not for a partner in Chinese (zh and en), even if its row said partner; fine for a partner in Japanese and for a friend in Chinese', none(kanjiOf('zh-Hant', 'spouse', 'across', null, green), '绿') && none(kanjiOf('zh-Hans', 'romance', 'across', null, green), '绿') && none(kanjiOf('en', 'spouse', 'across', null, green), '緑') && has(kanjiOf('ja', 'spouse', 'across', null, green), '緑') && has(kanjiOf('zh-Hant', 'friend', 'across', null, green), '绿'), JSON.stringify([kanjiOf('zh-Hant', 'spouse', 'across', null, green), kanjiOf('ja', 'spouse', 'across', null, green), kanjiOf('zh-Hant', 'friend', 'across', null, green)]))
 check('(2) the real 綠 row: friend / mentor / work / parent only, so a Chinese partner never gets it', none(kanjiOf('zh-Hant', 'spouse', 'across', null), '绿') && has(kanjiOf('zh-Hant', 'friend', 'across', null), '绿'))
 const mem = kanjiOf('ja', 'parent_mother', 'up', 'memorial')
-check('(2) memorial: only characters the lexicon tags memorial, and none of the palette\'s celebration / new-beginning blocks', mem.length > 20 && mem.length < mother.length && has(mem, '偲', '憶') && none(mem, '祝', '寿', '嬉', '笑'), `${mem.length}`)
+check('(2) memorial: the "memorial" tag is guidance only (spec v9.1 step 3) — the remembrance default block (祝 寿 喜 初 新 婚 …) is what removes characters', mem.length > 100 && has(mem, '偲', '憶') && none(mem, '祝', '寿', '喜', '初', '新', '婚'), `${mem.length}`)
 check('(2) palette blocks apply: a hard_block row, or a row blocked for the occasion, is never offered (zh 匂; ja 慰 for a wedding)', none(kanjiOf('zh-Hant', 'spouse', 'across', null), '匂') && none(kanjiOf('ja', 'spouse', 'across', 'wedding'), '慰') && has(kanjiOf('ja', 'spouse', 'across', null), '匂'))
 check('(2) "JP only" rows (匂) are offered in Japanese only — not in Chinese, and not in English (judged by both palettes)', has(kanjiOf('ja', 'parent_mother', 'up', null), '匂') && none(kanjiOf('en', 'parent_mother', 'up', null), '匂') && none(kanjiOf('zh-Hans', 'parent_mother', 'up', null), '匂'))
 check('(2) the candidate form follows the language: ja 蔵 (inscription 藏), zh 藏 (simplified key)… and the zh key of 楽 is 乐', (() => {
@@ -71,7 +76,8 @@ check('(2) the candidate form follows the language: ja 蔵 (inscription 藏), zh
   const zh = eligibleFor(lexicon, palette, gift('zh-Hans', 'spouse', 'across', null)).chars
   return ja?.inscription_form === '藏' && zh.some((c) => c.kanji === '乐' && c.inscription_form === '樂')
 })())
-check('(2) an unspecified relationship narrows nothing by relationship (but 藏 and 恩 still hold)', kanjiOf('ja', null, null, null).length > mother.length && none(kanjiOf('ja', null, null, null), '蔵', '恩'))
+check('(2) relationship tags are GUIDANCE, not a filter (spec v9.1 step 3): the open list is the same for a mother, a friend and a child — only which characters are listed for the relationship differs', JSON.stringify(kanjiOf('ja', 'parent_mother', 'up', null)) === JSON.stringify(kanjiOf('ja', 'friend', 'up', null)) && JSON.stringify(kanjiOf('ja', 'child', 'up', null)) === JSON.stringify(kanjiOf('ja', 'friend', 'up', null)) && none(kanjiOf('ja', null, null, null), '蔵', '恩'))
+check('(2) …the listing: with a known relationship the characters listed for it come first and the rest follow under their own heading, still open', (() => { const set = eligibleFor(lexicon, palette, gift('ja', 'child', 'down', null)); const listed = set.chars.filter((c) => c.suitsRelationship).length; const text = renderEligible(set, 'child'); return listed > 20 && listed < 80 && set.chars.length > 120 && text.includes('Listed as suiting this relationship (child)') && text.includes('Also open to this gift but not listed') && text.includes('guidance, not a rule') })())
 
 // ---- 3. the mode switch -----------------------------------------------------------------------------------------------------------
 check('(3) ICHIREI_LEXICON_MODE: default (unset, empty, unknown) = shadow; off / shadow / on in any case', lexiconModeFromEnv({}) === 'shadow' && lexiconModeFromEnv({ ICHIREI_LEXICON_MODE: '' }) === 'shadow' && lexiconModeFromEnv({ ICHIREI_LEXICON_MODE: 'banana' }) === 'shadow' && lexiconModeFromEnv({ ICHIREI_LEXICON_MODE: 'ON' }) === 'on' && lexiconModeFromEnv({ ICHIREI_LEXICON_MODE: ' off ' }) === 'off')
@@ -159,6 +165,7 @@ const MISS = () => ({ status: 'insufficient', lexicon_miss: true, follow_up_ques
 const PALETTE_ANSWER = () => reply(cand('main', '備', 'そなえる', A1), cand('second', '支', 'ささえる', A2))
 
 const logs: string[] = []
+const lines11: string[] = []
 const origLog = console.log
 const run = async (o: { mode?: 'off' | 'shadow' | 'on'; palette?: any; lex?: any; followUps?: number; replacements?: any[]; lexicon?: any; vetoes?: Record<string, boolean>; lexBehavior?: 'ok' | 'hang' | 'error'; context?: any; story?: string; rule?: string } = {}) => {
   reviewRule = o.rule ?? 'dignity'
@@ -191,7 +198,7 @@ const noStory = () => !logs.some((l) => STORY.split(/[。、\n]/).filter((p) => 
   const blocks = sel.content as { text: string; cache_control?: unknown }[]
   check('(5) on: the request has the static lexicon block FIRST with prompt caching, then the filled prompt and this gift\'s list', Array.isArray(blocks) && blocks.length === 2 && sel.cached && blocks[0].text.includes('THE LEXICON') && !blocks[1].cache_control && blocks[1].text.includes('CLASSICAL LEXICON — THIS GIFT') && blocks[1].text.indexOf(STORY.slice(0, 20)) < blocks[1].text.indexOf('CLASSICAL LEXICON — THIS GIFT'))
   check('(5) on: the list in the request is this gift\'s (待 is in it, 重 and the benchmark 黙 are not)', (() => { const list = (sel.content as any)[1].text.split('CLASSICAL LEXICON — THIS GIFT')[1]; return list.includes('待') && !list.includes('重 ') && !/^黙/m.test(list) })())
-  check('(5) on: the review is kept for the freestyle only (the lexicon characters are pre-vetted): one review call, asking about 詰 alone', count('review') === 1 && (() => { const p = seen.find((s) => s.kind === 'review')!.prompt; return p.includes('"kanji": "詰"') && !p.includes('"kanji": "待"') && !p.includes('"kanji": "守"') })())
+  check('(5) on: the review checks ALL three cards (spec v9.1 step 7) — lexicon characters included: one review call asking about 待, 守 and 詰', count('review') === 1 && (() => { const p = seen.find((s) => s.kind === 'review')!.prompt; return p.includes('"kanji": "詰"') && p.includes('"kanji": "待"') && p.includes('"kanji": "守"') })())
   check('(5) on: the result carries the lexicon report (chosen, eligible > 0) and no problems against the contract', r.lexicon?.mode === 'on' && r.lexicon.outcome === 'chosen' && r.lexicon.eligible > 80 && validateEngineResult(r).length === 0, validateEngineResult(r).join('; '))
   check('(5) on: the shown freestyle is the model\'s own; a vetoed freestyle is dropped as before, the lexicon cards stay', (await run({ mode: 'on', vetoes: { 詰: true } })).candidates.filter((c) => !c.eliminated).map((c) => c.slot).join() === 'main,second')
 }
@@ -319,17 +326,13 @@ process.env.ICHIREI_SHADOW_GRACE_MS = '1500'
   check('(8b) a real run logs its main exactly once, with no story text', mains.length === 1 && JSON.parse(mains[0].slice(15)).kanji === r.primary_kanji && JSON.parse(mains[0].slice(15)).source === 'lexicon' && noStory(), mains.join('|'))
 }
 
-// ---- 8c. illness and frailty: 篤 is gone for Japanese buyers; the prompts and the review carry the illness rule -------------------------------------------
+// ---- 8c. illness and frailty (level 4: judged per gift by the AI) ----------------------------------------------------------------------
 {
   const fx = JSON.parse(read('scripts/fixtures-v9/s0005-teacher-stroke-illness.json'))
-  check('(8c) palette: ja 篤 is a hard block (危篤); the Chinese row 笃 is unchanged', pal('ja', '篤').status === 'hard_block' && pal('ja', '篤').raw.relationship_fit === 'none' && pal('zh', '笃').status === 'context_required')
-  const ever: string[] = []
-  for (const language of ['ja', 'zh-Hans', 'en'] as const) for (const relationship of [null, 'parent_mother', 'parent_father', 'grandparent', 'spouse', 'romance', 'friend', 'work', 'mentor', 'child', 'sibling', 'in_law', 'pet', 'community'] as const) for (const occasion of [null, 'birthday_milestone', 'wedding', 'seasonal_thanks', 'parent_day', 'memorial'] as const) ever.push(...kanjiOf(language, relationship, 'up', occasion).filter((k) => k === '篤'))
-  check('(8c) the lexicon never offers 篤 for Japanese (ja) or English (judged by the Japanese palette too) — any relationship, occasion or direction', ever.length === 0, String(ever.length))
-  check('(8c) …but the Chinese list still has 笃 where its row allows (the owner decision was for Japanese buyers)', kanjiOf('zh-Hans', 'mentor', 'up', 'seasonal_thanks').includes('笃'))
+  check('(8c) 篤 is NOT blocked by the palette (spec v9.1 section C: a lexicon character with a verified line is never level 1): context_required + anchor in ja and zh', pal('ja', '篤').status === 'context_required' && pal('ja', '篤').anchor_required && pal('zh', '笃').status === 'context_required')
   for (const fam of ['ja', 'zh', 'en']) {
     const t = read(`engine/prompt.${fam}.md`)
-    const block = t.slice(t.indexOf('ILLNESS AND FRAILTY'), t.indexOf('STEP 0 — Input sufficiency'))
+    const block = t.slice(t.indexOf('ILLNESS AND FRAILTY'), t.indexOf('RELATIONSHIP TEST'))
     check(`(8c) prompt.${fam}.md: the illness rule — every slot incl. the freestyle, illness / hospital / stroke / dementia / frailty, illness-or-death associations in the buyer's language, examples, "when in doubt do not choose it", the review may veto`, block.length > 300 && ['EVERY slot', 'stroke', 'dementia', 'frail', 'NEVER choose', 'when in doubt', 'may veto'].every((n) => block.includes(n)) && (fam === 'zh' ? block.includes('笃') && block.includes('逝') : ['篤', '峠', '迎', '渡', '逝', '終', '静'].every((k) => block.includes(k))), fam)
   }
   const rp = read('engine/review-prompt.md')
@@ -337,30 +340,149 @@ process.env.ICHIREI_SHADOW_GRACE_MS = '1500'
   check('(8c) `illness` is in REVIEW_VETO_RULES (a veto under it is applied, not ignored)', (REVIEW_VETO_RULES as readonly string[]).includes('illness'))
   check('(8c) lexicon-prompt.md: the illness rule applies to the list too', lp.includes('ILLNESS AND FRAILTY') && lp.includes('lexicon_miss'))
 
-  const sendFx = (o: { mode: 'off' | 'on' | 'shadow'; reply?: any }) => {
-    const slim = clone(fx.model_reply)
-    return run({ mode: o.mode, story: fx.story, context: fx.context, palette: o.reply ?? slim, lex: o.reply ?? slim })
-  }
+  const slim = () => clone(fx.model_reply)
   for (const mode of ['off', 'on'] as const) {
-    const r = await sendFx({ mode })
-    const shown = live(r).map((c) => c.kanji)
-    const seen篤 = r.candidates.find((c) => c.kanji === '篤')
-    check(`(8c) fixture teacher-stroke (${mode}): the live answer 存 / 篤 / 綴 comes back WITHOUT 篤 — never a main, second or freestyle`, !shown.includes('篤') && r.primary_kanji !== '篤' && r.runner_up_kanji !== '篤' && r.freestyle_kanji !== '篤' && Boolean(seen篤?.eliminated), JSON.stringify(r.candidates.map((c) => [c.slot, c.kanji, c.eliminated_reason])))
-    check(`(8c) fixture teacher-stroke (${mode}): 存 stays the main and the freestyle 綴 is untouched`, r.primary_kanji === '存' && slotKanji(r, 'freestyle') === '綴')
+    const pass = await run({ mode, story: fx.story, context: fx.context, palette: slim(), lex: slim() })
+    check(`(8c) fixture teacher-stroke (${mode}): the palette alone does not remove 篤 any more — keeping it away from an ill receiver is the AI rule's job (prompt + review)`, live(pass).some((c) => c.kanji === '篤'))
+    const r = await run({ mode, story: fx.story, context: fx.context, palette: slim(), lex: slim(), vetoes: { 篤: true }, rule: 'illness' })
+    check(`(8c) fixture teacher-stroke (${mode}): the review vetoes 篤 under \`illness\` (applied, not ignored): 篤 is gone from every slot, 存 stays the main, 綴 the freestyle`, !live(r).some((c) => c.kanji === '篤') && r.primary_kanji === '存' && slotKanji(r, 'freestyle') === '綴' && r.candidates.find((c) => c.kanji === '篤')?.eliminated_reason?.startsWith('review: illness') === true, JSON.stringify(r.candidates.map((c) => [c.slot, c.kanji, c.eliminated_reason])))
   }
-  // 篤 as the FREESTYLE or as the main is removed too (palette hard block, whatever the slot)
-  const asFree = clone(fx.model_reply); asFree.candidates[1].kanji = '守'; asFree.candidates[1].reading = 'まもる'; asFree.runner_up_kanji = '守'; asFree.candidates[2].kanji = '篤'; asFree.candidates[2].reading = 'あつい'; asFree.freestyle_kanji = '篤'
-  const rf = await sendFx({ mode: 'off', reply: asFree })
-  check('(8c) 篤 offered as the freestyle is dropped as well', !live(rf).some((c) => c.kanji === '篤') && rf.freestyle_kanji === null)
-  const asMain = clone(fx.model_reply); asMain.candidates[0].kanji = '篤'; asMain.candidates[0].reading = 'あつい'; asMain.primary_kanji = '篤'; asMain.candidates[1].kanji = '守'; asMain.candidates[1].reading = 'まもる'; asMain.runner_up_kanji = '守'
-  const rm = await sendFx({ mode: 'off', reply: asMain })
-  check('(8c) 篤 offered as the main is removed and the second is promoted', rm.primary_kanji === '守' && !live(rm).some((c) => c.kanji === '篤'))
-  // the review may veto under the illness rule (a safety rule): a main is removed, and the second promoted
-  const ill = clone(fx.model_reply); ill.candidates[1].kanji = '守'; ill.candidates[1].reading = 'まもる'; ill.runner_up_kanji = '守'
+  const ill = slim(); ill.candidates[1].kanji = '守'; ill.candidates[1].reading = 'まもる'; ill.runner_up_kanji = '守'
   const rv = await run({ mode: 'off', story: fx.story, context: fx.context, palette: ill, vetoes: { 存: true }, rule: 'illness' })
-  check('(8c) the review vetoes a main under `illness` (applied, not ignored): 存 is out and 守 is promoted', rv.primary_kanji === '守' && rv.candidates.find((c) => c.kanji === '存')?.eliminated_reason?.startsWith('review: illness') === true, JSON.stringify(rv.candidates.map((c) => [c.kanji, c.eliminated_reason])))
+  check('(8c) the review vetoes a MAIN under `illness`: 存 is out and 守 is promoted', rv.primary_kanji === '守' && rv.candidates.find((c) => c.kanji === '存')?.eliminated_reason?.startsWith('review: illness') === true)
   const rfv = await run({ mode: 'off', story: fx.story, context: fx.context, palette: ill, vetoes: { 綴: true }, rule: 'illness' })
   check('(8c) …and a freestyle under `illness` is dropped', rfv.freestyle_kanji === null && rfv.primary_kanji === '存')
+}
+
+// ---- 8d. spec v9.1 — section C and steps 1–7, 9, 11 ---------------------------------------------------------------------------------------
+{
+  // section C
+  const status = (f: 'ja' | 'zh', k: string) => pal(f, k).status
+  check('(C) level 1: the expert\'s do-not-use list 黙/默 迎 執 忍 走 is a hard block in BOTH palettes (never used in any slot)', (['ja', 'zh'] as const).every((f) => (f === 'ja' ? ['黙', '迎', '執', '忍', '走'] : ['默', '迎', '执', '忍', '走']).every((k) => status(f, k) === 'hard_block')))
+  check('(C) level 1: the ending words stay hard blocks — 死 病 逝 葬 終 別 in ja, and 别 in zh too (it was context_required)', ['死', '病', '逝', '葬', '終', '別'].every((k) => status('ja', k) === 'hard_block') && ['死', '病', '逝', '葬', '终', '别'].every((k) => status('zh', k) === 'hard_block'))
+  check('(C) level 2 (needs story support): 耐 渡 草 犬 梨 冷 寒 涙 and 切 are context_required with an anchor in ja AND zh (切 moved from level 1 by the owner)', ['耐', '渡', '草', '犬', '梨', '冷', '寒', '切'].every((k) => (['ja', 'zh'] as const).every((f) => status(f, k) === 'context_required' && pal(f, k).anchor_required)) && (['ja', 'zh'] as const).every((f) => status(f, f === 'zh' ? '泪' : '涙') === 'context_required'))
+  check('(C) level 3 (milestone): 渡 冬 夕 影 菊 are blocked for birthday_milestone in ja and zh, 峠 in ja (迎 is level 1 now)', (['ja', 'zh'] as const).every((f) => ['渡', '冬', '夕', '影', '菊'].every((k) => pal(f, k).blocked_occasions.includes('birthday_milestone'))) && pal('ja', '峠').blocked_occasions.includes('birthday_milestone'))
+  check('(C) level 3 (wedding): 帰 秋 続 継 耐 are blocked for weddings in ja and zh (断 too: blocked for weddings in ja, a hard block in zh; 還 / 还 blocked too)', (['ja', 'zh'] as const).every((f) => (f === 'ja' ? ['帰', '秋', '続', '継', '耐', '還'] : ['归', '秋', '续', '继', '耐', '还']).every((k) => pal(f, k).blocked_occasions.includes('wedding'))) && pal('ja', '断').blocked_occasions.includes('wedding') && status('zh', '断') === 'hard_block')
+  check('(C) level 3 (remembrance): the default block carries 祝 寿 喜 初 新 婚', ['祝', '寿', '喜', '初', '新', '婚'].every((k) => palette.memorialCategory([k]) !== undefined))
+  const hardInLexicon: string[] = []
+  for (const k of lexicon.distinct()) for (const f of ['ja', 'zh'] as const) { const row = lexiconRowIn(palette, f, k); if (row?.status === 'hard_block') hardInLexicon.push(`${f}:${row.kanji}`) }
+  check('(C) a lexicon character with a verified line is never level 1 — the ONLY lexicon character that is a hard block anywhere is zh 匂 (a Japanese-made character that does not exist in Chinese; reported to the owner as a deliberate exception)', hardInLexicon.join() === 'zh:匂', hardInLexicon.join())
+  const changes = parseCsv(read('review/v9_1_section_c_changes.csv'))
+  check('(C) review/v9_1_section_c_changes.csv lists every changed status / flag with its before, after and reason', changes[0].join() === 'family,character,field,before,after,reason' && changes.length > 50 && changes.slice(1).every((r) => r.length === 6 && r[5] !== '') && changes.some((r) => r[0] === 'ja' && r[1] === '篤' && r[2] === 'status' && r[3] === 'hard_block' && r[4] === 'context_required'))
+  check('(C) English buyers: blocked in EITHER row blocks it — 匂 (ja fine, zh hard block) and the level-1 characters are not offered to en', none(kanjiOf('en', 'parent_mother', 'up', null), '匂', '迎', '黙', '死'))
+
+  // step 1: goodwill
+  const hostile = { status: 'insufficient', goodwill_declined: true, follow_up_question: null, candidates: [], primary_kanji: null, runner_up_kanji: null, freestyle_kanji: null, emotional_register: ['contempt'] }
+  const gd = await run({ mode: 'on', lex: hostile })
+  check('(1) goodwill (selection): a hostile story gets a polite decline — insufficient, declined: true, the fixed polite message, no cards, no question to answer, nothing else called', gd.status === 'insufficient' && gd.declined === true && gd.follow_up_question === DECLINE_MESSAGE.ja && gd.candidates.length === 0 && count('review') === 0 && count('replace') === 0 && gd.lexicon === undefined && !('goodwill_declined' in gd))
+  check('(1) …the decline is logged as [ichirei-safety] goodwill_decline with codes only (no story text) and is not a lexicon miss', logs.some((l) => l.startsWith('[ichirei-safety] goodwill_decline')) && noStory() && logJson('miss').length === 0)
+  check('(1) …the decline message exists in all four languages and accuses nobody', (['ja', 'zh-Hans', 'zh-Hant', 'en'] as const).every((l) => DECLINE_MESSAGE[l].length > 40))
+  const gr = await run({ mode: 'off', vetoes: { 備: true }, rule: 'goodwill' })
+  check('(1) goodwill (review): a verdict under the rule `goodwill` on any card declines the whole result politely', gr.declined === true && gr.status === 'insufficient' && gr.candidates.length === 0 && logs.some((l) => l.includes('"stage":"review"')))
+  const notHostile = await run({ mode: 'off' })
+  check('(1) an ordinary story is not declined', notHostile.declined === undefined && notHostile.status === 'sufficient')
+  for (const fam of ['ja', 'zh', 'en']) {
+    const t = read(`engine/prompt.${fam}.md`)
+    check(`(1) prompt.${fam}.md carries the goodwill check (hostile or mocking → decline; critical-but-loving is answered) and the output contract field`, t.includes('GOODWILL CHECK') && t.includes('goodwill_declined') && t.includes('NOT hostile'), fam)
+  }
+
+  // step 2: truth + ideal character
+  const withIdeal = (ideal: string) => ({ truth: 'she was always ready, without ever being asked', ideal_character: ideal, ...GOOD() })
+  await run({ mode: 'on', lex: withIdeal('伴') })
+  const miss1 = logJson('ideal_not_in_lexicon')
+  check('(2) the ideal character (no limits) is logged when it is not on the list: ideal_not_in_lexicon with the character, whether it is in the lexicon at all, and codes — never story text or the truth sentence', miss1.length === 1 && miss1[0].ideal === '伴' && miss1[0].in_lexicon === false && miss1[0].relationship === 'parent_mother' && miss1[0].occasion === 'parent_day' && noStory() && !logs.some((l) => l.includes('ready, without')), JSON.stringify(miss1))
+  await run({ mode: 'on', lex: withIdeal('待') })
+  check('(2) an ideal character that IS on the list is not logged', logJson('ideal_not_in_lexicon').length === 0)
+  await run({ mode: 'on', lex: withIdeal('恩'), context: { ...CONTEXT, relationship: 'child', direction: 'down', occasion: null } })
+  const miss2 = logJson('ideal_not_in_lexicon')
+  check('(2) an ideal that is in the lexicon but not open to this gift (恩 going downward) is logged with in_lexicon true', miss2.length === 1 && miss2[0].ideal === '恩' && miss2[0].in_lexicon === true && miss2[0].reason === 'in_lexicon_but_not_open_to_this_gift', JSON.stringify(miss2))
+  const rr = await run({ mode: 'on', lex: withIdeal('待') })
+  check('(2) `truth` and `ideal_character` are read by the engine and never passed on to the page', !('truth' in rr) && !('ideal_character' in rr))
+  const sel = seen.find((s) => s.kind === 'lexicon_select')!.prompt
+  check('(2) the lexicon prompt asks for them FIRST: a one-sentence truth, then the ideal character with no limits, then the choice from the list', sel.includes('`truth`') && sel.includes('`ideal_character`') && sel.includes('Order of work') && sel.includes('if the ideal character is on the list, use it'))
+
+  // step 4 + 7: relationship test
+  for (const fam of ['ja', 'zh', 'en']) {
+    const t = read(`engine/prompt.${fam}.md`)
+    check(`(4) prompt.${fam}.md: the RELATIONSHIP TEST — read relationship and direction together; reject 恩 parent→child, 耐 husband→wife, 慕 employee→boss; the same characters are right in a fitting relationship; applies to every slot; the review may veto`, ['RELATIONSHIP TEST', 'EVERY slot', 'in front of their family', 'seen and honoured', 'judged, owed, pitied, embarrassed, romantically misread', '恩', '耐', '慕', 'may veto'].every((n) => t.includes(n)), fam)
+  }
+  const rp2 = read('engine/review-prompt.md')
+  check('(7) review-prompt.md: `relationship` and `goodwill` are named safety rules for the main / second AND the freestyle; the veto rules list them', rp2.includes('7. `relationship`') && rp2.includes('8. `goodwill`') && rp2.includes('5. `relationship`') && rp2.includes('6. `goodwill`') && (['relationship', 'goodwill'] as string[]).every((r) => (REVIEW_VETO_RULES as readonly string[]).includes(r)))
+  const rel = JSON.parse(read('scripts/fixtures-v9/relationship-test.json')).cases as any[]
+  for (const mode of ['off', 'on'] as const) {
+    for (const c of rel) {
+      const reply = { ...clone(c.model_reply) }
+      if (c.kind === 'misfit') {
+        const r = await run({ mode, story: c.story, context: c.context, palette: reply, lex: reply, vetoes: { [c.rejected]: true }, rule: 'relationship' })
+        const card = r.candidates.find((x) => x.kanji === c.rejected)
+        check(`(4/7) misfit ${c.name} (${mode}): ${c.rejected} never reaches the sender${c.promoted ? `; ${c.promoted} is promoted` : ''}`, !live(r).some((x) => x.kanji === c.rejected) && (c.promoted ? r.primary_kanji === c.promoted : r.status === 'sufficient') && Boolean(card?.eliminated || !card), JSON.stringify(r.candidates.map((x) => [x.slot, x.kanji, x.eliminated_reason])))
+        if (mode === 'on' && c.code_rejects_in_on) check(`(4/7) …${c.name}: in lexicon mode the CODE rejects it before the review (恩 going downward is not on the list)`, card?.eliminated_reason === 'palette: not_in_lexicon', String(card?.eliminated_reason))
+        else check(`(4/7) …${c.name} (${mode}): removed by the review under the rule \`relationship\``, card?.eliminated_reason?.startsWith('review: relationship') === true, String(card?.eliminated_reason))
+      } else {
+        const r = await run({ mode, story: c.story, context: c.context, palette: reply, lex: reply })
+        check(`(4/7) fit ${c.name} (${mode}): the same character ${c.kept} is kept in a fitting relationship`, live(r).some((x) => x.kanji === c.kept), JSON.stringify(r.candidates.map((x) => [x.slot, x.kanji, x.eliminated_reason])))
+      }
+    }
+  }
+
+  // step 5/6: all cards are different characters
+  const dup = reply(cand('main', '待', 'まつ', A1), cand('second', '待', 'まつ', A2), cand('freestyle', '詰', 'つめる', A2))
+  const rd = await run({ mode: 'on', lex: dup })
+  check('(6) all cards are different characters: a second card that repeats the main is removed (slots: same character as another card)', rd.candidates.filter((c) => !c.eliminated).map((c) => c.kanji).join() === '待,詰' && rd.candidates.some((c) => c.slot === 'second' && c.eliminated_reason === 'slots: same character as another card'), JSON.stringify(rd.candidates.map((c) => [c.slot, c.kanji, c.eliminated_reason])))
+  const fdup = reply(cand('main', '待', 'まつ', A1), cand('second', '守', 'まもる', A2), cand('freestyle', '守', 'まもる', A2))
+  const rfd = await run({ mode: 'on', lex: fdup })
+  check('(5) the playful card never repeats the main or the second: dropped by the referee; the prompt says so and allows "no playful card"', rfd.freestyle_kanji === null && live(rfd).map((c) => c.kanji).join() === '待,守' && lp.includes('It must NOT repeat the main or the second') && lp.includes('give no freestyle at all'))
+
+  // step 11: logs
+  const safety = logSafetyRemovals(rd, (l) => lines11.push(l))
+  check('(11) safety removals are logged with the reason: [ichirei-safety] removed {slot, kanji, by, rule, reason} — codes only', safety !== null && lines11.length === 1 && lines11[0].startsWith('[ichirei-safety] removed ') && JSON.parse(lines11[0].slice('[ichirei-safety] removed '.length)).removed[0].by === 'slots')
+  await run({ mode: 'off', vetoes: { 備: true }, rule: 'dignity' })
+  const rem = logs.filter((l) => l.startsWith('[ichirei-safety] removed '))
+  check('(11) …a review veto is logged with its rule (by review, rule dignity)', rem.length === 1 && JSON.parse(rem[0].slice('[ichirei-safety] removed '.length)).removed.some((x: any) => x.by === 'review' && x.rule === 'dignity' && x.kanji === '備'), rem.join('|'))
+  await run({ mode: 'off' })
+  check('(11) …and a clean run logs no removal line', logs.filter((l) => l.startsWith('[ichirei-safety] removed ')).length === 0)
+}
+
+// ---- 8e. step 9: the card, the carved form, the carving check ---------------------------------------------------------------------------------
+{
+  const reveal = read('src/demo/Reveal.tsx')
+  check('(9) the card shows "how it matches" as three short lines — who they are (the gaze), your moment (the exact words from the story), the feeling (the emotional register) — in all four languages', ['data-match-who', 'data-match-moment', 'data-match-feeling', 'copy.match.who', 'copy.match.moment', 'copy.match.feeling'].every((n) => reveal.includes(n)) && (['ja', 'zh-Hans', 'zh-Hant', 'en'] as const).every((l) => COPY[l].match.who.length > 0 && COPY[l].match.moment.length > 0 && COPY[l].match.feeling.length > 0))
+  check('(9) the main card may carry the single word 深く響く (and its zh / en equivalents)', reveal.includes('data-resonates') && COPY.ja.match.resonates === '深く響く' && COPY['zh-Hant'].match.resonates.length > 0 && COPY.en.match.resonates === 'Resonates deeply')
+  check('(9) the feeling words are shown in the page language (grateful → 感謝 / 感谢 / 感謝 / Grateful)', COPY.ja.match.registers.grateful === '感謝' && COPY['zh-Hans'].match.registers.grateful === '感谢' && COPY['zh-Hant'].match.registers.grateful === '感謝' && COPY.en.match.registers.grateful === 'Grateful')
+  const scoreWords = /\d\s*%|％|percent|score|スコア|パーセント|マッチ率|一致度|相合度|匹配度|分數|分数/i
+  const cardCopy = [reveal, ...(['ja', 'zh-Hans', 'zh-Hant', 'en'] as const).map((l) => JSON.stringify(COPY[l].match) + COPY[l].slotLabels.main + COPY[l].revealIntro)].join('\n')
+  check('(9) no percentages or scores anywhere on the card (the Reveal component and its copy)', !scoreWords.test(cardCopy), cardCopy.match(scoreWords)?.[0])
+  const prompts = ['engine/prompt.ja.md', 'engine/prompt.zh.md', 'engine/prompt.en.md', 'engine/lexicon-prompt.md'].map(read).join('\n')
+  check('(9) …and the model is never asked for one: no "score" / "percent" / "match rate" field in the selection prompts or their output contracts', !/"?(score|percent|percentage|match_rate|confidence_pct)"?\s*:/i.test(prompts))
+
+  // the carved form
+  const lamp = { kanji: '灯', inscription_form: '燈' }
+  check('(9) Japanese buyers: the carved glyph is the modern form 新字体 (温 静 灯), never the old form — on the card, in the order and for en buyers too', carvedGlyph(lamp, 'ja', null) === '灯' && carvedGlyph({ kanji: '温', inscription_form: '溫' }, 'ja', null) === '温' && carvedGlyph({ kanji: '静', inscription_form: '靜' }, 'en', null) === '静' && glyphFor(lamp, normalizeStyle('ja', 'kyujitai') as never) === '灯' && DEFAULT_STYLE.ja === 'modern' && STYLES_BY_LANGUAGE.ja.length === 1 && !hasFormChoice('ja', lamp))
+  check('(9) Chinese buyers: traditional by default (燈), simplified when chosen (灯)', carvedGlyph(lamp, 'zh-Hant', 'traditional') === '燈' && carvedGlyph(lamp, 'zh-Hans', 'simplified') === '灯' && hasFormChoice('zh-Hant', lamp))
+
+  // the stroke check
+  check('(9) stroke data: 温 12, 溫 14, 護 20, 響 20, 譲 20, 讓 24, 驗 23 (KANJIDIC2 via engine/strokes.csv)', strokesOf('温') === 12 && strokesOf('溫') === 14 && strokesOf('護') === 20 && strokesOf('響') === 20 && strokesOf('譲') === 20 && strokesOf('讓') === 24 && strokesOf('驗') === 23)
+  check('(9) a simplified glyph KANJIDIC does not hold (让 欢) takes the traditional count but never more than the cap 20 — so it is never wrongly refused at the default limit; an unknown character is unknown (Standard only)', strokesOf('让', '讓') === 20 && strokesOf('欢', '歡') === 20 && strokesOf('𰻞') === null && simpleMaxStrokes({}) === 20 && simpleMaxStrokes({ ICHIREI_SIMPLE_MAX_STROKES: '18' }) === 18 && simpleMaxStrokes({ ICHIREI_SIMPLE_MAX_STROKES: 'x' }) === 20)
+  check('(9) simpleAvailable: at most the limit; an unknown count is not allowed on Simple', simpleAvailable(20, 20) && !simpleAvailable(21, 20) && !simpleAvailable(null, 20) && simpleAvailable(12))
+  const attached = attachStrokes(await run({ mode: 'off' }))
+  check('(9) the engine attaches stroke counts to every live card and the limit to the result', attached.simple_max_strokes === 20 && live(attached).every((c) => typeof c.strokes?.kanji === 'number'))
+  const zhResult = (kanji: string, trad: string) => ({ ...clone(attached), language: 'zh-Hant', status: 'sufficient', candidates: [{ ...clone(live(attached)[0]), kanji, inscription_form: trad, reading: 'ràng' }], primary_kanji: kanji }) as unknown as EngineResult
+  const order = (language: string, result: EngineResult, kanji: string, style: string, pkg: string) => ({ story: STORY, engine_result: result, selected_kanji: kanji, language, sender_name: 'A', receiver_name: 'B', delivery_date: '2027-01-01', inscription_style: style, package: pkg })
+  const tooMany = parseOrderRequest(order('zh-Hant', zhResult('読', '讀'), '読', 'traditional', 'simple'), new Date('2026-10-28'), palette)
+  check('(9) the SERVER refuses the Simple set for a character above the limit (讀 traditional = 22 strokes) and names the field', !tooMany.ok && tooMany.field === 'package' && /Standard/.test(tooMany.error), JSON.stringify(tooMany).slice(0, 200))
+  const std = parseOrderRequest(order('zh-Hant', zhResult('読', '讀'), '読', 'traditional', 'standard'), new Date('2026-10-28'), palette)
+  const simp = parseOrderRequest(order('zh-Hant', zhResult('读', '讀'), '读', 'simplified', 'simple'), new Date('2026-10-28'), palette)
+  check('(9) …the Standard set is always possible, and the simplified glyph (读, 10 strokes) fits the Simple set at the default limit', std.ok && simp.ok, JSON.stringify([std, simp]).slice(0, 300))
+  process.env.ICHIREI_SIMPLE_MAX_STROKES = '10'
+  const main = live(attached)[0]
+  const lowLimit = parseOrderRequest(order('ja', clone(attached), main.kanji, 'modern', 'simple'), new Date('2026-10-28'), palette)
+  delete process.env.ICHIREI_SIMPLE_MAX_STROKES
+  const mainStrokes = strokesOf(main.kanji, main.inscription_form)!
+  check(`(9) ICHIREI_SIMPLE_MAX_STROKES moves the limit (10: ${main.kanji} has ${mainStrokes} strokes → ${mainStrokes > 10 ? 'Standard only' : 'still Simple'})`, mainStrokes > 10 ? !lowLimit.ok : lowLimit.ok)
+  const orderForm = read('src/demo/OrderForm.tsx')
+  check('(9) the order form disables the Simple set with a note when the carved character is above the limit (the server re-checks)', orderForm.includes('data-simple-unavailable') && orderForm.includes('simpleUnavailable') && (['ja', 'zh-Hans', 'zh-Hant', 'en'] as const).every((l) => COPY[l].order.simpleUnavailable(20).includes('20')))
+  const unknown = palette.rows.filter((r) => r.language === 'zh' && strokesOf(r.kanji, r.inscription_form) === null).map((r) => r.kanji)
+  check('(9) engine/strokes.csv covers every Chinese form in the palette (the simplified ones through the cap rule)', unknown.length === 0, unknown.join(''))
 }
 
 // ---- 9. /api/health -------------------------------------------------------------------------------------------------------------------------

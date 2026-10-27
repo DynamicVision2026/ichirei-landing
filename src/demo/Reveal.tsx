@@ -215,6 +215,11 @@ export default function Reveal({ result, story, followUps = [], condition, copy,
     }
   }
 
+  // The feeling line: the emotional register of the story, in the page language (the engine writes English words; unknown ones show as written).
+  const feelingText = (result.fingerprint?.emotional_register ?? [])
+    .map((w) => copy.match.registers[String(w).toLowerCase()] ?? String(w))
+    .filter(Boolean)
+    .join(language === 'en' ? ' · ' : '・')
   const allRevealed = revealedCount >= revealOrder.length
   const primaryBtn = diagnostics
     ? 'font-label rounded-full bg-seal px-10 py-4 text-sm tracking-[0.15em] text-white transition-all disabled:cursor-not-allowed disabled:opacity-40'
@@ -268,12 +273,30 @@ export default function Reveal({ result, story, followUps = [], condition, copy,
                   />
                 </div>
                 <div className="w-full min-w-0 flex-1 text-left">
-                  <p className="font-label text-base font-semibold leading-relaxed text-fg">
-                    {c.one_line_gaze}
-                  </p>
-                  <p className="font-serif-jp mt-3 border-l-2 border-accent/60 pl-3 text-sm text-mute" data-anchor>
-                    「{c.story_anchor}」
-                  </p>
+                  {isPrimary && (
+                    <p className="font-label mb-2 inline-block text-[12px] tracking-[0.18em] text-seal" data-resonates>
+                      {copy.match.resonates}
+                    </p>
+                  )}
+                  {/* How it matches (spec v9.1 step 9): three short lines — who they are, your moment, the feeling. No numbers of any kind. */}
+                  <dl className="space-y-2" data-match>
+                    <div data-match-who>
+                      <dt className="font-label text-[11px] tracking-[0.12em] text-mute">{copy.match.who}</dt>
+                      <dd className="font-label text-base font-semibold leading-relaxed text-fg">{c.one_line_gaze}</dd>
+                    </div>
+                    <div data-match-moment>
+                      <dt className="font-label text-[11px] tracking-[0.12em] text-mute">{copy.match.moment}</dt>
+                      <dd className="font-serif-jp border-l-2 border-accent/60 pl-3 text-sm text-mute" data-anchor>
+                        「{c.story_anchor}」
+                      </dd>
+                    </div>
+                    {feelingText && (
+                      <div data-match-feeling>
+                        <dt className="font-label text-[11px] tracking-[0.12em] text-mute">{copy.match.feeling}</dt>
+                        <dd className="font-serif-jp text-sm text-fg">{feelingText}</dd>
+                      </div>
+                    )}
+                  </dl>
                   {c.why_this && (
                     <p className="font-serif-jp mt-3 text-sm leading-relaxed text-fg" data-why-this>
                       {c.why_this}
