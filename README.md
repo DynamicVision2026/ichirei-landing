@@ -45,7 +45,7 @@ Behavioral events accumulate in the browser (export via the ログ書き出し b
 2. Add environment variable **`ANTHROPIC_API_KEY`** (server-side; never exposed to the browser).
 3. Deploy, open `/demo`, paste a story (or use the golden fixture below), run.
 
-Optional env overrides: `ICHIREI_MODEL` (default `claude-sonnet-5`), `ICHIREI_EFFORT` (default `medium`), `ICHIREI_MAX_TOKENS` (default `8000`), `ICHIREI_REVIEW_MODEL` (default `claude-haiku-5-5`), `ICHIREI_REVIEW_EFFORT` (default `low`), `ICHIREI_CALL_TIMEOUT_MS` (default `90000`, the longest one model call may take). `cloudbuild.yaml` sets them on every deploy.
+Optional env overrides: `ICHIREI_MODEL` (default `claude-sonnet-5`), `ICHIREI_EFFORT` (default `medium`), `ICHIREI_MAX_TOKENS` (default `8000`), `ICHIREI_REVIEW_MODEL` (default `claude-haiku-5-5`), `ICHIREI_REVIEW_EFFORT` (default `low`), `ICHIREI_CALL_TIMEOUT_MS` (default `150000`, the selection call; one automatic retry), `ICHIREI_REVIEW_TIMEOUT_MS` (default `60000`). `cloudbuild.yaml` sets them on every deploy.
 
 `/api/select` **streams** its response (NDJSON: `delta` progress lines, then one terminal `result`/`error` line) so the connection carries bytes throughout the model's reasoning pass, and both functions export `maxDuration = 60` (the Hobby ceiling). The client enforces a hard 90s deadline — on timeout or any server/parse error the UI shows the reason instead of spinning. If runs still hit the 60s function ceiling, set `ICHIREI_EFFORT=medium`, or enable Fluid Compute on the Vercel project and raise `maxDuration` (one number in `api/select.ts` + `vercel.json`).
 

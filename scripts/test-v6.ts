@@ -159,11 +159,11 @@ try {
   // =============================================================================================
   const r1 = await run('a', undefined)
   void r1
-  const rv1 = await run('a', (_r, review) => { review.verdicts[0].pass = false; review.verdicts[0].reason = 'Occasion taboo: ends a celebration.' })
-  check('review: slot 1 fails → eliminated "review: …", slot 2 promoted, the freestyle kept', rv1.candidates[0].eliminated === true && rv1.candidates[0].eliminated_reason === 'review: Occasion taboo: ends a celebration.' && rv1.primary_kanji === '黙' && rv1.referee?.promoted_from === 'second' && rv1.freestyle_kanji === '封' && validateEngineResult(rv1).length === 0, validateEngineResult(rv1).join('; '))
-  const rv2 = await run('a', (_r, review) => { review.verdicts[0].pass = false; review.verdicts[1].pass = false })
+  const rv1 = await run('a', (_r, review) => { review.verdicts[0].pass = false; review.verdicts[0].rule = 'occasion'; review.verdicts[0].reason = 'Occasion taboo: ends a celebration.' })
+  check('review: slot 1 fails → eliminated "review: …", slot 2 promoted, the freestyle kept', rv1.candidates[0].eliminated === true && rv1.candidates[0].eliminated_reason === 'review: occasion: Occasion taboo: ends a celebration.' && rv1.primary_kanji === '黙' && rv1.referee?.promoted_from === 'second' && rv1.freestyle_kanji === '封' && validateEngineResult(rv1).length === 0, validateEngineResult(rv1).join('; '))
+  const rv2 = await run('a', (_r, review) => { review.verdicts[0].pass = false; review.verdicts[0].rule = 'dignity'; review.verdicts[1].pass = false; review.verdicts[1].rule = 'register' })
   check('review: both main slots fail → insufficient with the fallback question (the freestyle is not promoted)', rv2.status === 'insufficient' && rv2.follow_up_question === FIX.a.model_reply.fallback_follow_up_question && rv2.freestyle_kanji === null && rv2.review?.verdicts.length === 3)
-  const rv3 = await run('a', (_r, review) => { review.verdicts[1].pass = false })
+  const rv3 = await run('a', (_r, review) => { review.verdicts[1].pass = false; review.verdicts[1].rule = 'palette' })
   check('review: slot 2 fails (slot 1 stands) → slot 2 is eliminated and there is no backup', rv3.primary_kanji === '迎' && rv3.candidates[1].eliminated === true && rv3.runner_up_kanji === null && validateEngineResult(rv3).length === 0)
   reviewMode = 'garbage'
   const rv4 = await run('a')
@@ -180,7 +180,7 @@ try {
   const rv7 = await run('a', (_r, review) => { review.verdicts = review.verdicts.slice(0, 2) })
   check('review: a missing verdict for the freestyle drops it (no PASS, no freestyle); missing main verdicts leave the mains standing', rv7.freestyle_kanji === null && rv7.primary_kanji === '迎' && rv7.runner_up_kanji === '黙')
   check('review prompt: every slot is in the file, loads, and fills in one pass (slot-like text in the story is not re-substituted)', Object.values(REVIEW_SLOTS).every((s) => loadReviewPrompt().includes(s)) && (() => { const f = fillReviewPrompt(loadReviewPrompt(), 'x {{ CANDIDATES }} y', { language: 'ja', relationship: 'friend', direction: 'across', occasion: null, occasion_detail: null, inscription_script: null }, []); return f.includes('x {{ CANDIDATES }} y') && f.includes('occasion: unspecified') })())
-  check('review prompt: the rules — palette, occasion taboos, dignity, invention, generic; the freestyle rules; "when in doubt, FAIL"', ['Palette.', 'Occasion taboo.', 'Dignity.', 'Invention.', 'Generic.', 'Insulting.', 'Not anchored.', 'When in doubt, FAIL', 'birthday_milestone', 'retirement_farewell'].every((k) => loadReviewPrompt().includes(k)))
+  check('review prompt: the rules — palette, occasion taboos, dignity, invention, generic; the freestyle rules; vetoes only under a safety rule', ['SAFETY RULES', 'THE CONCERNS', '`palette`', '`occasion`', '`dignity`', '`register`', '`insult`', 'Invention', 'Generic', 'birthday_milestone', 'retirement_farewell'].every((k) => loadReviewPrompt().includes(k)))
   check('review input: the reviewer sees the palette facts for each candidate (status, taboo flags) and null for a character with no row', (() => { const items = reviewItems(a, loadPalette()); return items.find((i) => i.kanji === '迎')?.palette?.status === 'context_required' && items.find((i) => i.kanji === '封')?.palette === null && items.map((i) => i.slot).join() === 'main,second,freestyle' })())
   check('review parser: fenced / prose-wrapped JSON accepted; verdicts for unasked candidates ignored; a non-boolean pass is not a verdict', (() => {
     const items = reviewItems(a, loadPalette())

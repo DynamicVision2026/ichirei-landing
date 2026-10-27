@@ -42,7 +42,13 @@ type EngineStage = 'reading' | 'choosing' | 'checking' | 'replacing'
 const STEP_ORDER: EngineStage[] = ['reading', 'choosing', 'checking', 'replacing']
 
 /** The server reported that a model call hit its ceiling (code model_timeout). */
-class ModelTimeoutStreamError extends Error {}
+class ModelTimeoutStreamError extends Error {
+  seconds: number
+  constructor(message: string, seconds: number) {
+    super(message)
+    this.seconds = seconds
+  }
+}
 
 /** The engine stream ended without a terminal line (shown with the sender's UI language). */
 class StreamCutError extends Error {}
@@ -63,14 +69,14 @@ async function consumeEngineStream(
       | { type: 'stage'; stage: EngineStage }
       | { type: 'ping' } // server heartbeat during silent reasoning — ignore
       | { type: 'result'; result: EngineResult }
-      | { type: 'error'; error: string; code?: string }
+      | { type: 'error'; error: string; code?: string; seconds?: number }
     if (msg.type === 'ping') return null
     if (msg.type === 'delta') return null
     if (msg.type === 'stage') {
       onStage(msg.stage)
       return null
     }
-    if (msg.type === 'error') throw msg.code === 'model_timeout' ? new ModelTimeoutStreamError(msg.error) : new Error(msg.error)
+    if (msg.type === 'error') throw msg.code === 'model_timeout' ? new ModelTimeoutStreamError(msg.error, msg.seconds ?? 150) : new Error(msg.error)
     return msg.result
   }
   // Remember the terminal result but keep reading until the server closes the
@@ -298,7 +304,7 @@ export default function DemoApp({ mode = 'harness', aside }: { mode?: Mode; asid
       }
     } catch (e) {
       const message = e instanceof ModelTimeoutStreamError
-        ? copy.timeout(90)
+        ? copy.timeout(e.seconds)
         : timedOut
         ? copy.timeout(Math.round(ENGINE_TIMEOUT_MS / 1000))
         : e instanceof StreamCutError

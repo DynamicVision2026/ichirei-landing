@@ -99,6 +99,7 @@ export function createApp(config: ServerConfig): Hono {
       reviewModel: ENGINE_CONFIG.REVIEW_MODEL,
       reviewEffort: ENGINE_CONFIG.REVIEW_EFFORT,
       callTimeoutMs: ENGINE_CONFIG.CALL_TIMEOUT_MS,
+      reviewTimeoutMs: ENGINE_CONFIG.REVIEW_TIMEOUT_MS,
       configured: config,
       applied: serverRef.current
         ? {

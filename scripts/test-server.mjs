@@ -83,7 +83,7 @@ try {
   // What did the real engine actually send the model?
   const sent = upstream.state.requests.filter((r) => r.kind === 'select').at(-1)
   check('review: the review call runs on claude-haiku-5-5 at low effort', upstream.state.requests.some((r) => r.kind === 'review' && r.body.model === 'claude-haiku-5-5' && r.body.output_config?.effort === 'low'))
-  check('health: reports the speed settings the server runs with', health.effort === 'medium' && health.maxTokens === 8000 && health.reviewModel === 'claude-haiku-5-5' && health.reviewEffort === 'low' && health.callTimeoutMs === 90000, JSON.stringify(health))
+  check('health: reports the speed settings the server runs with', health.effort === 'medium' && health.maxTokens === 8000 && health.reviewModel === 'claude-haiku-5-5' && health.reviewEffort === 'low' && health.callTimeoutMs === 150000 && health.reviewTimeoutMs === 60000, JSON.stringify(health))
   check('review: the engine made a SECOND, separate model call (the review) after the selection call, with no selection reasoning in it', upstream.state.requests.some((r) => r.kind === 'review' && !String(r.body.messages[0].content).includes('Abandonment Resistance')))
   const prompt = sent?.body.messages?.[0]?.content ?? ''
   check('engine→model: model is claude-sonnet-5, streaming, effort medium', sent?.body.model === 'claude-sonnet-5' && sent?.body.stream === true && sent?.body.output_config?.effort === 'medium', JSON.stringify({ m: sent?.body.model, s: sent?.body.stream, e: sent?.body.output_config }))

@@ -33,7 +33,8 @@ substitutions:
   _MAX_TOKENS: '8000'               # ICHIREI_MAX_TOKENS — reasoning + answer, per selection call (was 20000)
   _REVIEW_MODEL: 'claude-haiku-5-5' # ICHIREI_REVIEW_MODEL — the fastest current model; the review only checks a short answer
   _REVIEW_EFFORT: 'low'             # ICHIREI_REVIEW_EFFORT
-  _CALL_TIMEOUT_MS: '90000'         # ICHIREI_CALL_TIMEOUT_MS — no single model call may take longer than this
+  _CALL_TIMEOUT_MS: '150000'        # ICHIREI_CALL_TIMEOUT_MS — the selection call may take at most this (one automatic retry); 90 s cut off slow-but-fine runs
+  _REVIEW_TIMEOUT_MS: '60000'       # ICHIREI_REVIEW_TIMEOUT_MS — the review call; if it times out the selection is shown without it
   _TIMEOUT: '300'                   # Cloud Run request timeout (s). Keep in step with
                                     # the server (300s) and the frontend deadline (290s).
 
@@ -76,7 +77,7 @@ steps:
       # Mount the Secret Manager secrets as env vars of the same name.
       - --set-secrets=ANTHROPIC_API_KEY=ANTHROPIC_API_KEY:latest,SHOPIFY_STOREFRONT_TOKEN=SHOPIFY_STOREFRONT_TOKEN:latest
       # Non-secret settings: the purchase settings and the engine speed settings. --update-env-vars leaves any other variable alone.
-      - --update-env-vars=ICHIREI_EFFORT=${_EFFORT},ICHIREI_MAX_TOKENS=${_MAX_TOKENS},ICHIREI_REVIEW_MODEL=${_REVIEW_MODEL},ICHIREI_REVIEW_EFFORT=${_REVIEW_EFFORT},ICHIREI_CALL_TIMEOUT_MS=${_CALL_TIMEOUT_MS},SHOPIFY_VARIANT_SIMPLE=${_SHOPIFY_VARIANT_SIMPLE},SHOPIFY_VARIANT_STANDARD=${_SHOPIFY_VARIANT_STANDARD},SHOPIFY_STOREFRONT_TOKEN_PUBLIC=${_SHOPIFY_STOREFRONT_TOKEN},SHOPIFY_ADMIN_CLIENT_ID=${_SHOPIFY_ADMIN_CLIENT_ID},ORDER_BUCKET=${_ORDER_BUCKET}
+      - --update-env-vars=ICHIREI_EFFORT=${_EFFORT},ICHIREI_MAX_TOKENS=${_MAX_TOKENS},ICHIREI_REVIEW_MODEL=${_REVIEW_MODEL},ICHIREI_REVIEW_EFFORT=${_REVIEW_EFFORT},ICHIREI_CALL_TIMEOUT_MS=${_CALL_TIMEOUT_MS},ICHIREI_REVIEW_TIMEOUT_MS=${_REVIEW_TIMEOUT_MS},SHOPIFY_VARIANT_SIMPLE=${_SHOPIFY_VARIANT_SIMPLE},SHOPIFY_VARIANT_STANDARD=${_SHOPIFY_VARIANT_STANDARD},SHOPIFY_STOREFRONT_TOKEN_PUBLIC=${_SHOPIFY_STOREFRONT_TOKEN},SHOPIFY_ADMIN_CLIENT_ID=${_SHOPIFY_ADMIN_CLIENT_ID},ORDER_BUCKET=${_ORDER_BUCKET}
 
 images:
   - ${_REGION}-docker.pkg.dev/$PROJECT_ID/${_REPO}/${_SERVICE}:$BUILD_ID

@@ -10,10 +10,10 @@
 //   {"type":"stage","stage":"reading|choosing|checking|replacing"}  ...as the engine moves on (honest progress steps)
 //   {"type":"delta","chars":<cumulative model output chars>}   ...repeated
 //   {"type":"result","result":<engine JSON contract>}          ...terminal
-//   {"type":"error","error":"<message>","code"?:"model_timeout"}  ...terminal
+//   {"type":"error","error":"<message>","code"?:"model_timeout","seconds"?:<n>}  ...terminal
 
 import { runEngine } from '../engine/engine.ts'
-import { ModelTimeoutError } from '../engine/limits.ts'
+import { ModelTimeoutError, callTimeoutMs } from '../engine/limits.ts'
 import { cleanSession, cleanSource, recordEvent, shownEvent } from '../engine/analytics.ts'
 import { FOLLOW_UP_MAX, STORY_MAX, countChars, mergeStory, parseContext, parseFollowUps, type Condition } from '../engine/contract.ts'
 
@@ -105,7 +105,7 @@ export async function POST(req: Request): Promise<Response> {
         send({ type: 'result', result })
       } catch (err) {
         const message = err instanceof Error ? err.message : String(err)
-        send({ type: 'error', error: `Engine failed: ${message}`, ...(err instanceof ModelTimeoutError ? { code: 'model_timeout' } : {}) })
+        send({ type: 'error', error: `Engine failed: ${message}`, ...(err instanceof ModelTimeoutError ? { code: 'model_timeout', seconds: Math.round(callTimeoutMs() / 1000) } : {}) })
       } finally {
         controller.close()
       }

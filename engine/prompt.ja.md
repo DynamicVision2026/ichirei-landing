@@ -196,7 +196,7 @@ STORY
 
 The section above (down to and including the STORY block) is the ICHIREI reasoning
 skeleton (v6). This appendix does not change the reasoning — it only fixes how you
-return it at runtime, and adds the kyūjitai inscription field, the context echo and the
+return it at runtime, and adds the kyūjitai inscription field and the
 palette fields. When the two
 differ on FORM (STEP 6 asks for legible prose; this asks for JSON), THIS APPENDIX
 WINS. When they differ on REASONING, the skeleton above wins — nothing here relaxes a
@@ -210,29 +210,24 @@ The very first character of your output must be `{` and the very last must be `}
 All customer-facing string values (kanji, reading, one_line_gaze, story_anchor,
 follow_up_question) are Japanese. reading is hiragana. story_anchor must be a verbatim
 fragment quoted from the story. Field values map to the skeleton like this:
-particulars ← STEP 1, fingerprint ← STEP 2, candidates ← STEP 5 (main, second) + STEP 5b (freestyle),
-primary_kanji / runner_up_kanji ← STEP 5, freestyle_kanji ← STEP 5b, emotional_register ← STEP 2.
+candidates ← STEP 5 (main, second) + STEP 5b (freestyle), primary_kanji / runner_up_kanji ← STEP 5,
+freestyle_kanji ← STEP 5b, emotional_register ← STEP 2. Keep every string SHORT: the answer is
+written out token by token and every extra word is waiting time for the sender.
 
-Palette status and flags — every candidate you output:
-The curated palette is not attached yet, so `palette_status` is your own provisional
-judgement; a later palette check will overwrite it. Be conservative.
-* ok — you judge it a sound, dignified inscription for THIS relationship and occasion,
-  with no taboo or register concern you can name.
-* context_required — sound in some contexts, but it carries a connotation, reading,
-  register or occasion concern that depends on the relationship or occasion here. Name
-  the concern in `flags`.
-* off_palette — you cannot vouch for it as a standard, dignified inscription (rare,
-  obscure, awkward, or you are unsure). When in doubt, use this.
-`flags` is an array of short snake_case tags (0–6) naming anything a human or the later
-palette check should look at, e.g. funeral_connotation, register_mismatch,
-occasion_mismatch, verdict_risk, obscure_form, no_heart_anchor, thin_evidence. The
-vocabulary is open for now; reuse a tag rather than inventing a synonym.
-`suitability_flag` stays as the one-sentence human-readable doubt; `flags` are the
-machine-readable tags.
+Palette status and flags — only when there is something to say:
+The curated palette decides the real status; `palette_status` is your own provisional judgement and
+a later palette check overwrites it. LEAVE OUT `palette_status` and `flags` for a candidate you judge
+a sound, dignified inscription for THIS relationship and occasion with no concern you can name
+(the system reads that as "ok" and no flags). Include them only for a concern:
+* "context_required" — sound in some contexts, but it carries a connotation, reading, register or
+  occasion concern that depends on the relationship or occasion here; name it in `flags`.
+* "off_palette" — you cannot vouch for it as a standard, dignified inscription (rare, obscure,
+  awkward, or you are unsure). When in doubt, use this.
+`flags` are short snake_case tags (at most 3), e.g. funeral_connotation, register_mismatch,
+occasion_mismatch, verdict_risk, obscure_form, no_heart_anchor, thin_evidence. `suitability_flag`
+is the one-sentence human-readable doubt; LEAVE IT OUT when there is none.
 
-Context echo: set `language`, `relationship`, `direction`, `occasion` and `occasion_detail` at the top of
-the JSON to exactly the values supplied in CONTEXT (JSON null where a value was
-`unspecified`).
+Do NOT echo the context: leave out `language`, `relationship`, `direction`, `occasion`, `occasion_detail` and `inscription_script`. The system stamps the request's own values on the result.
 
 Kyūjitai (古体字) inscription rule — brand standard, not a per-story choice:
 ICHIREI's physical inscriptions use the ancient kyūjitai form of a character whenever
@@ -249,23 +244,10 @@ you are not confident the kyūjitai form is correct, say so in that candidate's
 Return this exact shape:
 
 {
-  "language": "ja" | "zh",              // echo of CONTEXT.language
-  "relationship": string | null,         // echo of CONTEXT.relationship (the code), null if unspecified
-  "direction": "up" | "down" | "across" | null,  // echo of CONTEXT.direction
-  "occasion": string | null,             // echo of CONTEXT.occasion (the code)
-  "occasion_detail": string | null,      // echo of CONTEXT.occasion_detail verbatim, null if unspecified
   "suggest_memorial": boolean,           // true only when occasion is not memorial AND the story clearly says the person has died; otherwise false
   "status": "sufficient" | "insufficient",
   "follow_up_question": string | null,   // Japanese; non-null ONLY when status is "insufficient"; otherwise null
-  "particulars": string[],               // concrete particulars from STEP 1; [] when insufficient
-  "fingerprint": {                        // from STEP 2; all null when insufficient
-    "relationship_note": string | null,
-    "scarce_asset": string | null,
-    "unsaid_truth": string | null,
-    "dominant_truth_type": string | null,
-    "dignity_direction": string | null,
-    "emotional_register": string[]        // 1–2 words, e.g. ["playful"] or ["grateful", "proud"]; null when insufficient
-  },
+  "emotional_register": string[],        // from STEP 2: 1–2 words, e.g. ["playful"] or ["grateful", "proud"]; omit when insufficient
   "candidates": [                         // 2 or 3 when sufficient (main, second, optional freestyle); [] when insufficient
     {
       "slot": "main" | "second" | "freestyle",
@@ -273,14 +255,12 @@ Return this exact shape:
       "reading": string,                  // hiragana
       "inscription_form": string | null,     // old-form variant, or null if none exists
       "truth_type": "Essence" | "Turning Point" | "Role" | "Hidden Cost" | "Private Symbol" | "Forward Blessing" | "Play",  // "Play" for the freestyle only
-      "one_line_gaze": string,            // Japanese, ONE sentence; only details stated in the story
-      "story_anchor": string,             // verbatim fragment from the story
-      "unique_truth": string,             // the non-substitutable truth it preserves ("" for the freestyle)
-      "eliminated": boolean,              // always false in your output (the referee or the review may set it later)
-      "eliminated_reason": string | null, // always null in your output
-      "suitability_flag": string | null,  // honest doubt about Japanese suitability or kyūjitai; else null
-      "palette_status": "ok" | "context_required" | "off_palette",  // provisional — see above
-      "flags": string[]                   // snake_case tags, 0–6; [] if none
+      "one_line_gaze": string,            // Japanese, ONE short sentence; only details stated in the story
+      "story_anchor": string,             // a SHORT verbatim fragment of the story (about 6–20 characters / 3–8 words), exactly as written
+      "unique_truth": string,             // main and second only: the non-substitutable truth it preserves, in at most 15 words; omit for the freestyle
+      "suitability_flag": string,         // only when you have a real doubt about Japanese suitability or kyūjitai; else omit
+      "palette_status": "context_required" | "off_palette",  // OMIT when you judge it ok — see above
+      "flags": string[]                   // OMIT when there are none — see above
     }
   ],
   "primary_kanji": string | null,         // the STEP 5 primary's `kanji` (the cinnabar one); null when insufficient
@@ -289,9 +269,9 @@ Return this exact shape:
   "fallback_follow_up_question": string | null  // see below; null when insufficient
 }
 
-When status is "insufficient" (STEP 0, or fewer than two main candidates passed the gates and the heart-anchor gate): set follow_up_question to the single tailored question (Japanese), particulars to [], every fingerprint field to null, candidates to [], primary_kanji, runner_up_kanji and freestyle_kanji to null, and fallback_follow_up_question to null. Do not fabricate particulars or candidates to fill the shape.
+When status is "insufficient" (STEP 0, or fewer than two main candidates passed the gates and the heart-anchor gate): set follow_up_question to the single tailored question (Japanese), candidates to [], primary_kanji, runner_up_kanji and freestyle_kanji to null, and fallback_follow_up_question to null. Do not fabricate candidates to fill the shape.
 
-When status is "sufficient": return the candidates in this order — slot "main" (the primary), slot "second", then slot "freestyle" if there is one (2 or 3 candidates in all; never more). Only surviving candidates are output, so every one has eliminated=false and eliminated_reason=null (the palette referee and a later review may set them). `primary_kanji` is the main candidate's `kanji`; `runner_up_kanji` is the second candidate's `kanji`; `freestyle_kanji` is the freestyle's `kanji`, or null when you output no freestyle. The two main candidates must have different truth types; the freestyle has truth_type "Play" and nothing else does. For the freestyle, give `unique_truth` as an empty string and keep one_line_gaze to one light line.
+When status is "sufficient": return the candidates in this order — slot "main" (the primary), slot "second", then slot "freestyle" if there is one (2 or 3 candidates in all; never more). Only surviving candidates are output (the palette referee and a later review may still remove one). `primary_kanji` is the main candidate's `kanji`; `runner_up_kanji` is the second candidate's `kanji`; `freestyle_kanji` is the freestyle's `kanji`, or null when you output no freestyle. The two main candidates must have different truth types; the freestyle has truth_type "Play" and nothing else does. For the freestyle, leave out `unique_truth` and keep one_line_gaze to one light line.
 
 Also write `fallback_follow_up_question`: one warm, specific question (Japanese), in the same form as the STEP 0 question, that asks for a moment the sender actually lived with the receiver. It is shown only if BOTH main candidates are later removed by the checks that follow your answer; write it as if it were the only thing the sender will see.
 

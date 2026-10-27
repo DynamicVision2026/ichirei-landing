@@ -82,7 +82,8 @@ export default function Reveal({ result, story, followUps = [], condition, copy,
     const alive = result.candidates.filter((c) => !c.eliminated)
     const primary = alive.find((c) => c.kanji === result.primary_kanji)
     const freestyle = alive.find((c) => c.slot === 'freestyle')
-    const rest = alive.filter((c) => c.kanji !== result.primary_kanji && c.slot !== 'freestyle')
+    // (the engine already guarantees one second and one freestyle at most; the page shows no more than that even so)
+    const rest = alive.filter((c) => c.kanji !== result.primary_kanji && c.slot !== 'freestyle').slice(0, 1)
     // main → second → freestyle: the reading order, the tab order and the visual order are all the same.
     return {
       revealOrder: [...(primary ? [primary] : []), ...rest, ...(freestyle ? [freestyle] : [])],

@@ -80,7 +80,7 @@ try {
   const p1 = lastPrompt()
   // The engine returns the model's answer after the palette referee; for the golden fixture
   // that adds the referee block and the palette's verdicts, nothing else.
-  check('golden: result equals the golden fixture run through the palette referee', JSON.stringify(golden) === JSON.stringify(applyReviewVerdicts(applyPalette(GOLDEN, loadPalette(), GOLDEN_STORY), loadPalette(), GOLDEN_STORY, { ran: true, skipped_reason: null, verdicts: GOLDEN.candidates.map((c: { slot: string; kanji: string }) => ({ slot: c.slot, kanji: c.kanji, pass: true, reason: 'ok (fake reviewer)' })) })))
+  check('golden: result equals the golden fixture run through the palette referee', JSON.stringify(golden) === JSON.stringify(applyReviewVerdicts(applyPalette(GOLDEN, loadPalette(), GOLDEN_STORY), loadPalette(), GOLDEN_STORY, { ran: true, skipped_reason: null, verdicts: GOLDEN.candidates.map((c: { slot: string; kanji: string }) => ({ slot: c.slot, kanji: c.kanji, pass: true, reason: 'ok (fake reviewer)', rule: null })) })))
   check('golden: referee ran, kept 迎 as primary (verbatim anchor), changed no candidate set', golden.referee?.palette_rows === loadPalette().size && golden.referee.primary_changed === false && golden.candidates.map((c) => c.kanji).join('') === GOLDEN.candidates.map((c: { kanji: string }) => c.kanji).join(''))
   check('golden: result conforms to the v6 contract', validateEngineResult(golden).length === 0, validateEngineResult(golden).join('; '))
   check('golden: primary is 迎 and the four context fields are echoed', golden.primary_kanji === '迎' && golden.language === 'ja' && golden.relationship === 'parent_father' && golden.direction === 'up' && golden.occasion === 'birthday_milestone' && golden.occasion_detail === '還暦')
@@ -95,21 +95,21 @@ try {
   check('speed defaults: the review call runs on the fastest current model (claude-haiku-5-5) at low effort', lastReview.body.model === 'claude-haiku-5-5' && lastReview.body.output_config?.effort === 'low' && lastReview.body.max_tokens === 2500, JSON.stringify({ m: lastReview.body.model, e: lastReview.body.output_config, t: lastReview.body.max_tokens }))
   check('speed defaults: the longest valid answer in the fixtures fits max_tokens 8000 with room for the reasoning (≈ 1.5 tokens per character is a generous bound)', JSON.stringify(GOLDEN).length * 1.5 < 8000 / 2, String(JSON.stringify(GOLDEN).length))
   const { ENGINE_CONFIG } = await import('../engine/engine.ts')
-  check('speed defaults: ENGINE_CONFIG (what /api/health reports) says the same', ENGINE_CONFIG.EFFORT === 'medium' && ENGINE_CONFIG.MAX_TOKENS === 8000 && ENGINE_CONFIG.REVIEW_MODEL === 'claude-haiku-5-5' && ENGINE_CONFIG.CALL_TIMEOUT_MS === 90_000)
+  check('speed defaults: ENGINE_CONFIG (what /api/health reports) says the same', ENGINE_CONFIG.EFFORT === 'medium' && ENGINE_CONFIG.MAX_TOKENS === 8000 && ENGINE_CONFIG.REVIEW_MODEL === 'claude-haiku-5-5' && ENGINE_CONFIG.CALL_TIMEOUT_MS === 150_000 && ENGINE_CONFIG.REVIEW_TIMEOUT_MS === 60_000)
 
   // cloudbuild.yaml must carry the SAME settings and pass them on every deploy (--update-env-vars), or a deploy could reset them
   {
     const cb = readFileSync(join(process.cwd(), 'cloudbuild.yaml'), 'utf8')
     const sub = (k: string) => new RegExp(`^\\s*${k}:\\s*'([^']*)'`, 'm').exec(cb)?.[1]
-    check('cloudbuild.yaml: substitutions equal the code defaults (medium / 8000 / claude-haiku-5-5 / low / 90000)', sub('_EFFORT') === String(ENGINE_CONFIG.EFFORT) && sub('_MAX_TOKENS') === String(ENGINE_CONFIG.MAX_TOKENS) && sub('_REVIEW_MODEL') === ENGINE_CONFIG.REVIEW_MODEL && sub('_REVIEW_EFFORT') === ENGINE_CONFIG.REVIEW_EFFORT && sub('_CALL_TIMEOUT_MS') === String(ENGINE_CONFIG.CALL_TIMEOUT_MS), JSON.stringify(['_EFFORT', '_MAX_TOKENS', '_REVIEW_MODEL', '_REVIEW_EFFORT', '_CALL_TIMEOUT_MS'].map(sub)))
+    check('cloudbuild.yaml: substitutions equal the code defaults (medium / 8000 / claude-haiku-5-5 / low / 150000 / 60000)', sub('_EFFORT') === String(ENGINE_CONFIG.EFFORT) && sub('_MAX_TOKENS') === String(ENGINE_CONFIG.MAX_TOKENS) && sub('_REVIEW_MODEL') === ENGINE_CONFIG.REVIEW_MODEL && sub('_REVIEW_EFFORT') === ENGINE_CONFIG.REVIEW_EFFORT && sub('_CALL_TIMEOUT_MS') === String(ENGINE_CONFIG.CALL_TIMEOUT_MS) && sub('_REVIEW_TIMEOUT_MS') === String(ENGINE_CONFIG.REVIEW_TIMEOUT_MS), JSON.stringify(['_EFFORT', '_MAX_TOKENS', '_REVIEW_MODEL', '_REVIEW_EFFORT', '_CALL_TIMEOUT_MS', '_REVIEW_TIMEOUT_MS'].map(sub)))
     const upd = /--update-env-vars=(\S+)/.exec(cb)?.[1] ?? ''
-    check('cloudbuild.yaml: every deploy sets ICHIREI_EFFORT, ICHIREI_MAX_TOKENS, ICHIREI_REVIEW_MODEL, ICHIREI_REVIEW_EFFORT and ICHIREI_CALL_TIMEOUT_MS from those substitutions', ['ICHIREI_EFFORT=${_EFFORT}', 'ICHIREI_MAX_TOKENS=${_MAX_TOKENS}', 'ICHIREI_REVIEW_MODEL=${_REVIEW_MODEL}', 'ICHIREI_REVIEW_EFFORT=${_REVIEW_EFFORT}', 'ICHIREI_CALL_TIMEOUT_MS=${_CALL_TIMEOUT_MS}'].every((x) => upd.includes(x)), upd)
+    check('cloudbuild.yaml: every deploy sets ICHIREI_EFFORT, ICHIREI_MAX_TOKENS, ICHIREI_REVIEW_MODEL, ICHIREI_REVIEW_EFFORT ICHIREI_CALL_TIMEOUT_MS and ICHIREI_REVIEW_TIMEOUT_MS from those substitutions', ['ICHIREI_EFFORT=${_EFFORT}', 'ICHIREI_MAX_TOKENS=${_MAX_TOKENS}', 'ICHIREI_REVIEW_MODEL=${_REVIEW_MODEL}', 'ICHIREI_REVIEW_EFFORT=${_REVIEW_EFFORT}', 'ICHIREI_CALL_TIMEOUT_MS=${_CALL_TIMEOUT_MS}', 'ICHIREI_REVIEW_TIMEOUT_MS=${_REVIEW_TIMEOUT_MS}'].every((x) => upd.includes(x)), upd)
   }
 
   // ---- 1b. one model call may take at most ICHIREI_CALL_TIMEOUT_MS (default 90 s) ---------------------------------------
   {
     const { callTimeoutMs, ModelTimeoutError } = await import('../engine/limits.ts')
-    check('call timeout: 90 s by default; ICHIREI_CALL_TIMEOUT_MS lowers or raises it; junk falls back to 90 s', callTimeoutMs({}) === 90_000 && callTimeoutMs({ ICHIREI_CALL_TIMEOUT_MS: '30000' }) === 30_000 && callTimeoutMs({ ICHIREI_CALL_TIMEOUT_MS: 'abc' }) === 90_000 && callTimeoutMs({ ICHIREI_CALL_TIMEOUT_MS: '-5' }) === 90_000)
+    check('call timeout: 150 s by default; ICHIREI_CALL_TIMEOUT_MS lowers or raises it; junk falls back to 150 s', callTimeoutMs({}) === 150_000 && callTimeoutMs({ ICHIREI_CALL_TIMEOUT_MS: '30000' }) === 30_000 && callTimeoutMs({ ICHIREI_CALL_TIMEOUT_MS: 'abc' }) === 150_000 && callTimeoutMs({ ICHIREI_CALL_TIMEOUT_MS: '-5' }) === 150_000)
     process.env.ICHIREI_CALL_TIMEOUT_MS = '400'
     mode = 'hang'
     const t0 = Date.now()

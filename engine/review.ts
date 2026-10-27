@@ -10,15 +10,15 @@
 // ships only after a PASS.
 //
 // Env: ICHIREI_REVIEW=off disables the call; ICHIREI_REVIEW_MODEL, ICHIREI_REVIEW_EFFORT (default
-// low), ICHIREI_REVIEW_MAX_TOKENS (default 2500; the reasoning counts against it), ICHIREI_REVIEW_PROMPT_PATH.
+// low), ICHIREI_REVIEW_MAX_TOKENS (default 2500; the reasoning counts against it), ICHIREI_REVIEW_TIMEOUT_MS (default 60000), ICHIREI_REVIEW_PROMPT_PATH.
 
 import Anthropic from '@anthropic-ai/sdk'
 import { readFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { familyOf, type Candidate, type EngineContext, type EngineResult, type ReviewReport, type Slot } from './contract.ts'
+import { familyOf, type ReviewVerdict, type Candidate, type EngineContext, type EngineResult, type ReviewReport, type Slot } from './contract.ts'
 import type { Palette } from './palette.ts'
-import { callSignal } from './limits.ts'
+import { callSignal, reviewTimeoutMs } from './limits.ts'
 
 export const REVIEW_SLOTS = {
   language: '{{ LANGUAGE }}',
@@ -116,7 +116,7 @@ export function fillReviewPrompt(template: string, story: string, context: Engin
   return template.replace(pattern, (slot) => values.get(slot) as string)
 }
 
-export type Verdict = { slot: Slot; kanji: string; pass: boolean; reason: string }
+export type Verdict = ReviewVerdict
 
 /** Parse the reviewer's reply. Only verdicts for items that were actually asked about are kept; anything else is ignored. */
 export function parseVerdicts(raw: string, items: ReviewItem[]): Verdict[] {
@@ -129,8 +129,17 @@ export function parseVerdicts(raw: string, items: ReviewItem[]): Verdict[] {
   if (!Array.isArray(parsed.verdicts)) throw new Error('review reply has no verdicts array')
   const out: Verdict[] = []
   for (const it of items) {
-    const v = (parsed.verdicts as { slot?: unknown; kanji?: unknown; pass?: unknown; reason?: unknown }[]).find((x) => x && x.slot === it.slot && x.kanji === it.kanji)
-    if (v && typeof v.pass === 'boolean') out.push({ slot: it.slot, kanji: it.kanji, pass: v.pass, reason: typeof v.reason === 'string' ? v.reason.slice(0, 200) : '' })
+    const v = (parsed.verdicts as { slot?: unknown; kanji?: unknown; pass?: unknown; reason?: unknown; rule?: unknown; concern?: unknown }[]).find((x) => x && x.slot === it.slot && x.kanji === it.kanji)
+    if (v && typeof v.pass === 'boolean') {
+      out.push({
+        slot: it.slot,
+        kanji: it.kanji,
+        pass: v.pass,
+        reason: typeof v.reason === 'string' ? v.reason.slice(0, 200) : '',
+        rule: typeof v.rule === 'string' && v.rule.trim() ? v.rule.trim().toLowerCase() : null,
+        ...(typeof v.concern === 'string' && v.concern.trim() ? { concern: v.concern.trim().slice(0, 200) } : {}),
+      })
+    }
   }
   return out
 }
@@ -165,7 +174,7 @@ export async function runReview(result: EngineResult, palette: Palette, story: s
     const prompt = fillReviewPrompt(loadReviewPrompt(), story, context, items)
     const client = opts.client ?? new Anthropic(opts.apiKey ? { apiKey: opts.apiKey } : {})
     const effort = (process.env.ICHIREI_REVIEW_EFFORT ?? 'low') as 'low' | 'medium' | 'high'
-    const signal = callSignal(opts.signal, 60_000)
+    const signal = callSignal(opts.signal, reviewTimeoutMs())
     const stream = client.messages.stream(
       { model: opts.model, max_tokens: Number(process.env.ICHIREI_REVIEW_MAX_TOKENS ?? 2500), output_config: { effort }, messages: [{ role: 'user', content: prompt }] },
       { signal },
@@ -175,7 +184,7 @@ export async function runReview(result: EngineResult, palette: Palette, story: s
     if (message.stop_reason === 'refusal') throw new Error('reviewer refused the request')
     const text = message.content.filter((b): b is Anthropic.TextBlock => b.type === 'text').map((b) => b.text).join('')
     const verdicts = parseVerdicts(text, items)
-    log(`[ichirei-review] ${JSON.stringify({ ran: true, ms: Date.now() - t0, verdicts: verdicts.map((v) => ({ slot: v.slot, kanji: v.kanji, pass: v.pass, reason: v.reason })) })}`)
+    log(`[ichirei-review] ${JSON.stringify({ ran: true, ms: Date.now() - t0, verdicts: verdicts.map((v) => ({ slot: v.slot, kanji: v.kanji, pass: v.pass, ...(v.rule ? { rule: v.rule } : {}), reason: v.reason, ...(v.concern ? { concern: v.concern } : {}) })) })}`)
     return { ran: true, skipped_reason: null, verdicts }
   } catch (err) {
     const reason = `review call failed: ${err instanceof Error ? err.message : String(err)}`.slice(0, 200)

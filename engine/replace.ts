@@ -5,7 +5,7 @@
 // through the SAME referee and the SAME review as any candidate; a refused replacement is tried once more, then we stop and
 // the sender sees two cards (never a bad third).
 //
-// Env: ICHIREI_REPLACE=off disables it; ICHIREI_REPLACE_ATTEMPTS (default 2), ICHIREI_REPLACE_MODEL, ICHIREI_REPLACE_EFFORT
+// Env: ICHIREI_REPLACE=off disables it; ICHIREI_REPLACE_ATTEMPTS (default 1), ICHIREI_REPLACE_MODEL, ICHIREI_REPLACE_EFFORT
 // (default medium), ICHIREI_REPLACE_MAX_TOKENS (default 6000), ICHIREI_REPLACE_PROMPT_PATH.
 
 import Anthropic from '@anthropic-ai/sdk'
@@ -14,7 +14,7 @@ import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { anchorPresent, applyPalette, applyReviewVerdicts, type Palette } from './palette.ts'
 import { runReview } from './review.ts'
-import { callSignal } from './limits.ts'
+import { callSignal, replaceTimeoutMs } from './limits.ts'
 import type { Candidate, EngineContext, EngineResult, RefereeAction } from './contract.ts'
 
 export const REPLACE_SLOTS = { surviving: '{{ SURVIVING }}', avoid: '{{ AVOID }}' } as const
@@ -142,11 +142,14 @@ export async function completeMains(
   const log = opts.log ?? ((l: string) => console.log(l))
   if (result.status !== 'sufficient') return result
   const { live, gone } = missingMains(result)
-  if (live.length >= 2 || live.length === 0) return result
+  // Only an EMPTY slot is filled: with two live main candidates nothing is asked of the model. With none live (the referee and the
+  // review removed every main candidate) ONE replacement is tried before the sender is told there is nothing.
+  if (live.length >= 2) return result
   log(`[ichirei-engine] main_slot_empty ${JSON.stringify({ live: live.map((c) => ({ slot: c.slot, kanji: c.kanji })), missing: gone, will_replace: replaceEnabled() })}`)
   if (!replaceEnabled()) return result
 
-  const attemptsMax = Math.max(0, Number(process.env.ICHIREI_REPLACE_ATTEMPTS ?? 2) || 0)
+  // one attempt by default: a failed attempt costs a model call and a review (≈ 40 s) and the sender still gets a valid result
+  const attemptsMax = live.length === 0 ? 1 : Math.max(0, Number(process.env.ICHIREI_REPLACE_ATTEMPTS ?? 1) || 0)
   const extraAvoid: { kanji: string; reason: string }[] = []
   const actions: RefereeAction[] = [...(result.referee?.actions ?? [])]
   let current = result
@@ -158,7 +161,7 @@ export async function completeMains(
       const prompt = fillReplacePrompt(selectionFilled, loadReplacePrompt(), current, extraAvoid)
       const client = opts.client ?? new Anthropic(opts.apiKey ? { apiKey: opts.apiKey } : {})
       const effort = (process.env.ICHIREI_REPLACE_EFFORT ?? 'medium') as 'low' | 'medium' | 'high'
-      const signal = callSignal(opts.signal)
+      const signal = callSignal(opts.signal, replaceTimeoutMs())
       const stream = client.messages.stream(
         { model: opts.model, max_tokens: Number(process.env.ICHIREI_REPLACE_MAX_TOKENS ?? 6000), output_config: { effort }, messages: [{ role: 'user', content: prompt }] },
         { signal },
@@ -208,14 +211,18 @@ export async function completeMains(
       extraAvoid.push({ kanji: cand.kanji, reason: reasonOf(judged) })
       continue
     }
-    const added: Candidate = { ...final, slot: 'second' }
-    actions.push({ kanji: added.kanji, action: 'replacement_added', detail: `slot second filled by a replacement (attempt ${attempt})` })
+    const wasEmpty = live.length === 0
+    const added: Candidate = { ...final, slot: wasEmpty ? 'main' : 'second' }
+    actions.push({ kanji: added.kanji, action: 'replacement_added', detail: `slot ${added.slot} filled by a replacement (attempt ${attempt})` })
     log(`[ichirei-engine] replacement ${JSON.stringify({ attempt, ok: true, ms: Date.now() - t0, kanji: added.kanji })}`)
+    const liveFreestyle = current.candidates.find((c) => c.slot === 'freestyle' && !c.eliminated)
     current = {
       ...current,
       candidates: [...current.candidates, added],
-      runner_up_kanji: current.primary_kanji === added.kanji ? current.runner_up_kanji : added.kanji,
-      referee: current.referee ? { ...current.referee, actions } : current.referee,
+      primary_kanji: wasEmpty ? added.kanji : current.primary_kanji,
+      runner_up_kanji: wasEmpty ? null : current.primary_kanji === added.kanji ? current.runner_up_kanji : added.kanji,
+      freestyle_kanji: liveFreestyle ? liveFreestyle.kanji : null,
+      referee: current.referee ? { ...current.referee, actions, ...(wasEmpty ? { no_eligible_primary: false, primary_changed: true } : {}) } : current.referee,
       review: current.review ? { ...current.review, verdicts: [...current.review.verdicts, ...(judged.review?.verdicts ?? [])] } : current.review,
     }
     return current

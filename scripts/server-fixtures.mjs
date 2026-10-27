@@ -28,7 +28,7 @@ export const STORY =
   '父は口下手で厳しくて、ほめられた記憶なんてほとんどない。進路のことでも何度もぶつかった。ただ、私が東京に出るとき駅まで送ってくれて、改札で「金は要るか」って、それだけ言って封筒を押し付けてきた。あれから二十年、盆に帰るたびに車で駅まで迎えに来て、帰りも必ず送ってくれる。相変わらず、ほとんど何も話さないけど。'
 
 // What the fake reviewer answers: every candidate in the golden answer passes.
-export const REVIEW_VERDICTS = GOLDEN.candidates.map((c) => ({ slot: c.slot, kanji: c.kanji, pass: true, reason: 'ok (fake reviewer)' }))
+export const REVIEW_VERDICTS = GOLDEN.candidates.map((c) => ({ slot: c.slot, kanji: c.kanji, pass: true, reason: 'ok (fake reviewer)', rule: null }))
 
 // What the engine returns for the golden model answer: the same JSON after the palette referee
 // and the review call (the fake reviewer passes everything).

@@ -302,12 +302,14 @@ export interface RefereeAction {
     | 'freestyle_blocked_eliminated' // the freestyle kanji is on the freestyle blocklist (body, money, illness …)
     | 'freestyle_duplicate_eliminated' // the freestyle is the same character as a main slot
     | 'classical_echo_required_eliminated' // REQUIRE_CLASSICAL_ECHO is on and a main candidate has no reviewed classical line
-    | 'review_eliminated' // the separate review call failed this candidate
+    | 'review_eliminated' // the separate review call failed this candidate (under a safety rule)
+    | 'review_veto_ignored' // the review failed a main candidate without naming a safety rule: not a veto, the candidate stands
     | 'missing_row_eliminated' // en: a main candidate has no row in one of the two palettes (ja, zh)
     | 'missing_row_already_eliminated' // as above, but the model had already eliminated it
     | 'replacement_added' // a main slot was empty after the referee and the review: a replacement call filled it
     | 'replacement_rejected' // a replacement candidate was refused (duplicate, anchor not in the story, referee or review)
-    | 'insufficient_no_main' // no main candidate survived: the result became `insufficient`
+    | 'insufficient_no_main' // no main candidate survived: the result became `insufficient` (or a last replacement was tried first)
+    | 'slot_overflow_eliminated' // more live candidates than the slot allows (one main, one second, one freestyle): the extra one was removed
   detail: string
 }
 
@@ -383,7 +385,32 @@ export interface ReviewReport {
   ran: boolean
   /** Why the call did not run or could not be used (the freestyle is dropped then; the main slots stand on the referee alone). */
   skipped_reason: string | null
-  verdicts: { slot: Slot; kanji: string; pass: boolean; reason: string }[]
+  verdicts: ReviewVerdict[]
+}
+
+/** The review may veto (pass: false) only under a SAFETY rule; anything else it notices is a `concern`, logged, never a veto. */
+/**
+ * The sender is NEVER left with nothing: if every main candidate is gone and the model gave no fallback question either, this
+ * last-resort question is asked (one per language; warm, specific, answerable in a sentence).
+ */
+export const DEFAULT_FOLLOW_UP: Record<Language, string> = {
+  ja: 'その方との間で、いちばん思い出す小さな場面をひとつ、教えてください。',
+  'zh-Hans': '能说说你和对方之间，最常想起的一个小场景吗？',
+  'zh-Hant': '能說說你和對方之間，最常想起的一個小場景嗎？',
+  en: 'Could you tell us about one small moment with them that you often think back to?',
+}
+
+export const REVIEW_VETO_RULES = ['palette', 'occasion', 'memorial', 'dignity', 'register', 'insult'] as const
+export type ReviewVetoRule = (typeof REVIEW_VETO_RULES)[number]
+export interface ReviewVerdict {
+  slot: Slot
+  kanji: string
+  pass: boolean
+  reason: string
+  /** Required for a veto of a main candidate (one of REVIEW_VETO_RULES); a veto without it is ignored. */
+  rule?: string | null
+  /** A worry that is not a reason to fail (voice, invention, scene noun …): for engineers, logged only. */
+  concern?: string
 }
 
 export interface EngineResult {
@@ -480,7 +507,7 @@ export function validateEngineResult(raw: unknown): string[] {
   }
 
   if (r.follow_up_question !== null) problems.push('sufficient but follow_up_question not null')
-  if (!Array.isArray(r.particulars) || r.particulars.length === 0) problems.push('particulars empty')
+  if (!Array.isArray(r.particulars)) problems.push('particulars must be an array')
   const register = r.fingerprint?.emotional_register
   if (!Array.isArray(register) || register.length < 1 || register.length > 2 || register.some((x) => typeof x !== 'string' || !x.trim())) {
     problems.push('fingerprint.emotional_register must be 1–2 non-empty strings')
@@ -495,10 +522,12 @@ export function validateEngineResult(raw: unknown): string[] {
   const bySlot = (slot: Slot) => cands.filter((c) => c?.slot === slot)
   for (const slot of ['main', 'second'] as const) {
     // one per slot — except that a replacement (engine/replace.ts) may sit next to the candidate it replaced, which is then eliminated
-    const live = bySlot(slot).filter((c) => !c.eliminated)
     if (bySlot(slot).length < 1 || bySlot(slot).length > 2 || (bySlot(slot).length === 2 && !bySlot(slot).some((c) => c.eliminated) && slot === 'main')) problems.push(`expected exactly one "${slot}" candidate, got ${bySlot(slot).length}`)
-    if (live.length > 2) problems.push(`more than two live "${slot}" candidates`)
   }
+  // The sender sees at most three cards: one main (the primary), one second, one freestyle.
+  const liveMains = cands.filter((c) => c?.slot !== 'freestyle' && !c?.eliminated)
+  if (liveMains.length > 2) problems.push(`more than two live main candidates (${liveMains.length}): at most one main and one second`)
+  if (cands.filter((c) => !c?.eliminated).length > 3) problems.push('more than three live candidates')
   if (bySlot('freestyle').length > 1) problems.push('more than one freestyle candidate')
   cands.forEach((c, i) => {
     const at = `candidates[${i}]${c?.kanji ? ` (${c.kanji})` : ''}`

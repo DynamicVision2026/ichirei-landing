@@ -1,7 +1,7 @@
 {
   "name": "s0032-friend-thanks",
   "story_id": "0032",
-  "note": "Live test: main 靴 (an object), 誓 should have been main. Review fails 靴, 誓 is promoted, a replacement fills the second slot.",
+  "note": "Live test v8: main 靴 (an object) moved to the freestyle by the person test; 誓 / 待 are the mains.",
   "story": "中学のころの親友は陸上部で一番足が速く、二人でよく海沿いを走っていました。おそろいのシューズを買って、いつか一緒にマラソンを走ろうと話していました。高校に入ってすぐ彼が事故にあって膝を痛めたとき、私はどう声をかけていいかわからず、病院の入口まで行って帰ってしまいました。それきり二十年会いませんでした。去年、私の勤める整備工場に彼が車検で来ました。トランクに、あのときと同じ型の新品のシューズが入っていて、私と走る日のために持っていたと言われました。来春、一緒にハーフを走ります。",
   "context": {
     "language": "ja",
@@ -36,81 +36,58 @@
     "candidates": [
       {
         "slot": "main",
-        "kanji": "靴",
-        "inscription_form": null,
-        "reading": "くつ",
-        "truth_type": "Private Symbol",
-        "one_line_gaze": "二十年たっても、おそろいのシューズを手放さなかった人。",
-        "story_anchor": "同じ型の新品のシューズ",
-        "unique_truth": "u",
-        "eliminated": false,
-        "eliminated_reason": null,
-        "suitability_flag": null,
-        "palette_status": "ok",
-        "flags": []
-      },
-      {
-        "slot": "second",
         "kanji": "誓",
         "inscription_form": null,
         "reading": "ちかう",
         "truth_type": "Turning Point",
         "one_line_gaze": "いつか一緒に走ると話した約束を、二十年持ち続けた人。",
         "story_anchor": "私と走る日のために持っていた",
-        "unique_truth": "u",
-        "eliminated": false,
-        "eliminated_reason": null,
-        "suitability_flag": null,
-        "palette_status": "ok",
-        "flags": []
+        "unique_truth": "u"
+      },
+      {
+        "slot": "second",
+        "kanji": "待",
+        "inscription_form": null,
+        "reading": "まつ",
+        "truth_type": "Hidden Cost",
+        "one_line_gaze": "何も言わずに、私と走る日を待ち続けてくれた人。",
+        "story_anchor": "私と走る日のために持っていた",
+        "unique_truth": "u"
       },
       {
         "slot": "freestyle",
-        "kanji": "速",
+        "kanji": "靴",
         "inscription_form": null,
-        "reading": "はやい",
+        "reading": "くつ",
         "truth_type": "Play",
-        "one_line_gaze": "陸上部で、いつも一番足が速かった人。",
-        "story_anchor": "陸上部で一番足が速く",
-        "unique_truth": "",
-        "eliminated": false,
-        "eliminated_reason": null,
-        "suitability_flag": null,
-        "palette_status": "ok",
-        "flags": []
+        "one_line_gaze": "おそろいのシューズを手放さなかった人。",
+        "story_anchor": "同じ型の新品のシューズ",
+        "unique_truth": ""
       }
     ],
-    "primary_kanji": "靴",
-    "runner_up_kanji": "誓",
-    "freestyle_kanji": "速",
+    "primary_kanji": "誓",
+    "runner_up_kanji": "待",
+    "freestyle_kanji": "靴",
     "fallback_follow_up_question": "いちばん思い出す、ちいさな場面をひとつ教えてください。"
   },
-  "review_fail": {
-    "靴": "Scene noun: names the shoes in the story, not the person"
-  },
+  "review_fail": {},
   "replacements": [
     {
       "slot": "second",
-      "kanji": "待",
+      "kanji": "信",
       "inscription_form": null,
-      "reading": "まつ",
-      "truth_type": "Hidden Cost",
-      "one_line_gaze": "何も言わずに、私と走る日を待ち続けてくれた人。",
+      "reading": "しんじる",
+      "truth_type": "Forward Blessing",
+      "one_line_gaze": "二十年、いつか一緒に走る日を信じて持ち続けた人。",
       "story_anchor": "私と走る日のために持っていた",
-      "unique_truth": "u",
-      "eliminated": false,
-      "eliminated_reason": null,
-      "suitability_flag": null,
-      "palette_status": "ok",
-      "flags": []
+      "unique_truth": "u"
     }
   ],
   "expect": {
     "main": "誓",
     "second": "待",
-    "freestyle": "速",
-    "cause": "review",
-    "replacement": true,
-    "promoted": true
+    "freestyle": "靴",
+    "cause": null,
+    "replacement": false
   }
 }

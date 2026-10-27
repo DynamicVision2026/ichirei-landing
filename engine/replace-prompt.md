@@ -3,7 +3,7 @@ This text is appended to the filled SELECTION PROMPT above (same story, same con
 
 Ignore the selection prompt's instruction to return the full JSON shape. Everything else in it still applies to this one candidate, without exception: the PERSON TEST (a main candidate names a quality, a stance or a way of loving that belongs to the person, proved by the scene — never an object or an action that merely appears in it), all gates, the quarantine rule, the story-anchor rule (a short VERBATIM fragment of the story), the language of the output, and every occasion rule, including REMEMBRANCE when the occasion is memorial.
 
-THE MAIN CANDIDATE THAT STANDS (do not repeat its truth; your candidate must be a DIFFERENT truth type and say something it does not):
+THE MAIN CANDIDATE THAT STANDS (do not repeat its truth; your candidate must be a DIFFERENT truth type and say something it does not). If this list is EMPTY, both main slots are empty: then produce the single best MAIN candidate for this story, the one you would put first:
 {{ SURVIVING }}
 
 CHARACTERS YOU MUST NOT USE (already offered, or refused — with the reason, so you do not walk into the same wall):

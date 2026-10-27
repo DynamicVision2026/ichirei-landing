@@ -27,6 +27,7 @@ import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { chooseReading } from './romaji.ts'
 import {
+  DEFAULT_FOLLOW_UP,
   FAMILIES,
   INSCRIPTION_FITNESS,
   OCCASIONS,
@@ -34,6 +35,7 @@ import {
   PALETTE_NONE,
   PALETTE_ROW_STATUSES,
   RELATIONSHIPS,
+  REVIEW_VETO_RULES,
   familyOf,
   type Candidate,
   type ClassicalEcho,
@@ -43,6 +45,7 @@ import {
   type PaletteRow,
   type RefereeAction,
   type RefereeReport,
+  type ReviewVerdict,
 } from './contract.ts'
 
 export const HARD_BLOCK_REASON = 'palette: hard_block'
@@ -367,6 +370,12 @@ export interface RefereeOptions {
   log?: (line: string) => void
   /** REQUIRE_CLASSICAL_ECHO: main candidates need a reviewed classical line. Default: the environment (off). */
   requireClassicalEcho?: boolean
+  /**
+   * When no main candidate survives, return the result as it stands (status `sufficient`, no primary, the removed candidates still
+   * listed) instead of `insufficient`, so the engine can try ONE replacement before it tells the sender there is nothing
+   * (engine/replace.ts). The engine always finishes such a result (a replacement, or toInsufficient).
+   */
+  deferInsufficient?: boolean
 }
 
 export const requireClassicalEchoFromEnv = (env: NodeJS.ProcessEnv = process.env): boolean => /^(1|true|on|yes)$/i.test((env.REQUIRE_CLASSICAL_ECHO ?? '').trim())
@@ -404,14 +413,19 @@ function settlePrimary(
   return { primary: null, promotedFrom: null }
 }
 
-/** The result a sender gets when both main slots are gone: `insufficient` with the model's own fallback question. */
-function toInsufficient(result: EngineResult, referee: RefereeReport): EngineResult {
-  const question = typeof result.fallback_follow_up_question === 'string' && result.fallback_follow_up_question.trim() ? result.fallback_follow_up_question.trim() : null
+/** The question a sender gets when no main candidate is left: the model's own fallback question, else the per-language last resort. Never empty. */
+export function questionFor(result: Pick<EngineResult, 'language' | 'follow_up_question' | 'fallback_follow_up_question'>): string {
+  const clean = (q: unknown) => (typeof q === 'string' && q.trim() ? q.trim() : null)
+  return clean(result.follow_up_question) ?? clean(result.fallback_follow_up_question) ?? DEFAULT_FOLLOW_UP[result.language] ?? DEFAULT_FOLLOW_UP.ja
+}
+
+/** The result a sender gets when both main slots are gone: `insufficient` with the model's own fallback question (or the last-resort one — never none). */
+export function toInsufficient(result: EngineResult, referee?: RefereeReport): EngineResult {
+  const ref = referee ?? result.referee
   return {
     ...result,
     status: 'insufficient',
-    // No question from the model → still `insufficient`, but the contract validator will say so (a live run shows the gap).
-    follow_up_question: question,
+    follow_up_question: questionFor(result),
     particulars: [],
     fingerprint: { relationship_note: null, scarce_asset: null, unsaid_truth: null, dominant_truth_type: null, dignity_direction: null, emotional_register: null },
     candidates: [],
@@ -419,8 +433,13 @@ function toInsufficient(result: EngineResult, referee: RefereeReport): EngineRes
     runner_up_kanji: null,
     freestyle_kanji: null,
     fallback_follow_up_question: null,
-    referee: { ...referee, no_eligible_primary: true },
+    ...(ref ? { referee: { ...ref, no_eligible_primary: true } } : {}),
   }
+}
+
+/** No main candidate is live yet, but the engine has one more thing to try (see RefereeOptions.deferInsufficient). */
+function deferred(result: EngineResult, referee: RefereeReport): EngineResult {
+  return { ...result, primary_kanji: null, runner_up_kanji: null, freestyle_kanji: null, referee: { ...referee, no_eligible_primary: true } }
 }
 
 /**
@@ -557,6 +576,7 @@ export function applyPalette(result: EngineResult, palette: Palette, story: stri
   }
   if (originalPrimary !== null && primary === null) {
     actions.push({ kanji: originalPrimary, action: 'insufficient_no_main', detail: 'no main candidate survived the referee' })
+    if (opts.deferInsufficient) return deferred({ ...result, candidates }, referee)
     return toInsufficient({ ...result, candidates }, referee)
   }
   return finish(result, candidates, primary, referee, palette, language, anchorMissing)
@@ -630,7 +650,8 @@ export function applyReviewVerdicts(
   result: EngineResult,
   palette: Palette,
   story: string,
-  review: { ran: boolean; skipped_reason: string | null; verdicts: { slot: 'main' | 'second' | 'freestyle'; kanji: string; pass: boolean; reason: string }[] },
+  review: { ran: boolean; skipped_reason: string | null; verdicts: ReviewVerdict[] },
+  opts: { deferInsufficient?: boolean } = {},
 ): EngineResult {
   if (result.status !== 'sufficient' || !result.referee) return result
   const language = familyOf(result.language)
@@ -644,7 +665,15 @@ export function applyReviewVerdicts(
   }
   for (const v of review.verdicts) {
     const c = candidates.find((x) => x.kanji === v.kanji && x.slot === v.slot)
-    if (c && !c.eliminated && !v.pass) failFlag(c, v.reason || 'did not pass the review')
+    if (!c || c.eliminated || v.pass) continue
+    // The review is a SAFETY check: a main candidate is vetoed only under a named safety rule. A "fail" for taste, voice, evidence or
+    // the scene-noun test (those live in the selection prompt) is not a veto — the candidate stands and the concern is in the log.
+    // (The freestyle is the risky optional slot: any fail drops it.)
+    if (c.slot !== 'freestyle' && !(REVIEW_VETO_RULES as readonly string[]).includes(v.rule ?? '')) {
+      actions.push({ kanji: c.kanji, action: 'review_veto_ignored', detail: `no safety rule named (${v.rule ?? 'none'}): ${v.reason || 'no reason'}`.slice(0, 200) })
+      continue
+    }
+    failFlag(c, `${v.rule ? `${v.rule}: ` : ''}${v.reason || 'did not pass the review'}`)
   }
   // The freestyle is the risky slot: without a usable review it does not ship.
   const live = candidates.find((c) => c.slot === 'freestyle' && !c.eliminated)
@@ -672,7 +701,9 @@ export function applyReviewVerdicts(
   }
   const reviewed = { ...result, review: { ran: review.ran, skipped_reason: review.skipped_reason, verdicts: review.verdicts } }
   if (primary === null) {
-    actions.push({ kanji: originalPrimary ?? '', action: 'insufficient_no_main', detail: 'no main candidate survived the review' })
+    if (!actions.some((a) => a.action === 'insufficient_no_main')) actions.push({ kanji: originalPrimary ?? '', action: 'insufficient_no_main', detail: 'no main candidate survived the review' })
+    // The engine may still try ONE replacement before the sender is told there is nothing (engine/replace.ts).
+    if (opts.deferInsufficient) return deferred({ ...reviewed, candidates }, referee)
     return toInsufficient({ ...reviewed, candidates }, referee)
   }
   return finish(reviewed, candidates, primary, referee, palette, language, anchorMissing)

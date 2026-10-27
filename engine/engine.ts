@@ -13,7 +13,8 @@
 // Editing a prompt file changes the engine's behavior with no change to this code.
 
 import Anthropic from '@anthropic-ai/sdk'
-import { callSignal, callTimeoutMs, ModelTimeoutError, timedOut } from './limits.ts'
+import { callSignal, callTimeoutMs, ModelTimeoutError, reviewTimeoutMs, runBudgetMs, timedOut } from './limits.ts'
+import { finalizeResult } from './slots.ts'
 import { readFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -148,6 +149,48 @@ export function extractJson(raw: string): EngineResult {
   return JSON.parse(slice) as EngineResult
 }
 
+/**
+ * The slim output contract (prompt.*.md, "OUTPUT CONTRACT") no longer asks the model for the context echo, the particulars, the
+ * fingerprint's notes, or the always-false `eliminated` fields: they cost output tokens, which cost time. This fills them with
+ * neutral values so every later stage (referee, review, contract, order records) sees the same shape as before. It never
+ * invents or alters a candidate's kanji, reading, gaze, anchor or truth type. Old-shape answers pass through unchanged.
+ */
+export function normalizeModelOutput(raw: EngineResult): EngineResult {
+  const r = raw as EngineResult & { emotional_register?: unknown }
+  const fp = (r.fingerprint ?? {}) as Partial<EngineResult['fingerprint']>
+  const register = Array.isArray(fp.emotional_register) ? fp.emotional_register : Array.isArray(r.emotional_register) ? (r.emotional_register as string[]) : null
+  const sufficient = r.status === 'sufficient'
+  const out: EngineResult = {
+    ...r,
+    particulars: Array.isArray(r.particulars) ? r.particulars : [],
+    fingerprint: {
+      relationship_note: fp.relationship_note ?? null,
+      scarce_asset: fp.scarce_asset ?? null,
+      unsaid_truth: fp.unsaid_truth ?? null,
+      dominant_truth_type: fp.dominant_truth_type ?? null,
+      dignity_direction: fp.dignity_direction ?? null,
+      emotional_register: sufficient ? register : null,
+    },
+    follow_up_question: r.follow_up_question ?? null,
+    candidates: (Array.isArray(r.candidates) ? r.candidates : []).map((c) => ({
+      ...c,
+      inscription_form: c.inscription_form ?? null,
+      unique_truth: c.unique_truth ?? '',
+      eliminated: c.eliminated === true,
+      eliminated_reason: c.eliminated === true ? (c.eliminated_reason ?? 'eliminated by the model') : null,
+      suitability_flag: c.suitability_flag ?? null,
+      palette_status: c.palette_status ?? 'ok',
+      flags: Array.isArray(c.flags) ? c.flags : [],
+    })),
+    primary_kanji: r.primary_kanji ?? null,
+    runner_up_kanji: r.runner_up_kanji ?? null,
+    freestyle_kanji: r.freestyle_kanji ?? null,
+    fallback_follow_up_question: r.fallback_follow_up_question ?? null,
+  }
+  delete (out as { emotional_register?: unknown }).emotional_register
+  return out
+}
+
 export interface RunEngineOptions {
   apiKey?: string
   signal?: AbortSignal
@@ -192,36 +235,54 @@ export async function runEngine(
   const tStart = Date.now()
   opts.onStage?.('reading')
 
-  // Stream + finalMessage so heavy reasoning at high effort doesn't hit an HTTP
-  // timeout; the function still returns one assembled JSON response to the caller.
-  // One call may take at most ICHIREI_CALL_TIMEOUT_MS (default 90 s) — a slow call fails clearly instead of holding the sender for minutes.
-  const signal = callSignal(opts.signal)
-  const stream = client.messages.stream(
-    {
-      model: MODEL,
-      max_tokens: MAX_TOKENS,
-      output_config: { effort: EFFORT },
-      messages: [{ role: 'user', content: prompt }],
-    },
-    { signal },
-  )
-  let firstDelta = true
-  stream.on('text', (text) => {
-    if (firstDelta) {
-      firstDelta = false
-      opts.onStage?.('choosing')
+  // Stream + finalMessage so reasoning doesn't hit an HTTP timeout; the function still returns one assembled JSON response.
+  // One call may take at most ICHIREI_CALL_TIMEOUT_MS (default 150 s). A selection that hits the ceiling is retried ONCE (as long as
+  // the run budget allows it) before the sender sees an error.
+  const callSelection = async (limitMs: number): Promise<Anthropic.Message> => {
+    const signal = callSignal(opts.signal, limitMs)
+    const stream = client.messages.stream(
+      {
+        model: MODEL,
+        max_tokens: MAX_TOKENS,
+        output_config: { effort: EFFORT },
+        messages: [{ role: 'user', content: prompt }],
+      },
+      { signal },
+    )
+    let firstDelta = true
+    stream.on('text', (text) => {
+      if (firstDelta) {
+        firstDelta = false
+        opts.onStage?.('choosing')
+      }
+      opts.onDelta?.(text)
+    })
+    try {
+      return await stream.finalMessage()
+    } catch (err) {
+      if (timedOut(signal)) throw new ModelTimeoutError(Math.round(Math.min(limitMs, callTimeoutMs()) / 1000))
+      throw err
     }
-    opts.onDelta?.(text)
-  })
+  }
   let message: Anthropic.Message
   try {
-    message = await stream.finalMessage()
+    message = await callSelection(callTimeoutMs())
   } catch (err) {
-    if (timedOut(signal)) {
-      console.log(`[ichirei-timing] ${JSON.stringify({ select_ms: Date.now() - tStart, status: 'timeout', model: MODEL, effort: EFFORT, max_tokens: MAX_TOKENS })}`)
-      throw new ModelTimeoutError(Math.round(callTimeoutMs() / 1000))
+    if (!(err instanceof ModelTimeoutError)) throw err
+    const spent = Date.now() - tStart
+    const room = runBudgetMs() - spent - REVIEW_RESERVE_MS
+    console.log(`[ichirei-engine] selection_timeout ${JSON.stringify({ after_ms: spent, retry: room >= MIN_RETRY_MS, retry_limit_ms: Math.max(0, Math.min(callTimeoutMs(), room)) })}`)
+    if (room < MIN_RETRY_MS) {
+      console.log(`[ichirei-timing] ${JSON.stringify({ select_ms: spent, status: 'timeout', model: MODEL, effort: EFFORT, max_tokens: MAX_TOKENS })}`)
+      throw err
     }
-    throw err
+    opts.onStage?.('reading')
+    try {
+      message = await callSelection(Math.min(callTimeoutMs(), room))
+    } catch (err2) {
+      if (err2 instanceof ModelTimeoutError) console.log(`[ichirei-timing] ${JSON.stringify({ select_ms: Date.now() - tStart, status: 'timeout_after_retry', model: MODEL, effort: EFFORT, max_tokens: MAX_TOKENS })}`)
+      throw err2
+    }
   }
   const selectMs = Date.now() - tStart
   opts.onUsage?.('select', { model: MODEL, input_tokens: message.usage?.input_tokens ?? 0, output_tokens: message.usage?.output_tokens ?? 0 })
@@ -235,9 +296,6 @@ export async function runEngine(
     throw new Error('Model refused the request')
   }
 
-  // The prompt asks the model to echo the context; stamp the request's own values
-  // so the echo can never disagree with what the caller actually sent. (Plumbing,
-  // not selection: nothing about the candidates is touched.)
   let extracted: EngineResult
   try {
     extracted = extractJson(textOut)
@@ -249,8 +307,12 @@ export async function runEngine(
     }
     throw err
   }
+  // The slim output contract leaves out what only the code needs (the context echo, the internal notes, the empty
+  // referee fields): fill them with their neutral values here. Plumbing — nothing about the candidates is touched.
+  const normalized = normalizeModelOutput(extracted)
+  // The request's own context values are stamped on the result, so the echo can never disagree with what the caller actually sent.
   const stamped: EngineResult = {
-    ...extracted,
+    ...normalized,
     language: context.language,
     relationship: context.relationship,
     direction: context.direction,
@@ -263,26 +325,31 @@ export async function runEngine(
   if (context.occasion !== 'memorial' && (extracted as { suggest_memorial?: unknown }).suggest_memorial === true) stamped.suggest_memorial = true
   else delete stamped.suggest_memorial
 
-  // Palette referee (engine/palette.ts, data in engine/palette.csv): removes hard_block
-  // candidates and refuses an anchorless context_required kanji as primary; promotes slot 2, or
-  // returns `insufficient` when no main candidate survives. A missing or malformed palette fails the
-  // request loudly (above), never silently skips the blocklist.
-  const refereed = applyPalette(stamped, palette, trimmed)
+  // Palette referee (engine/palette.ts, data in engine/palette.csv): removes hard_block candidates and refuses an anchorless
+  // context_required kanji as primary; promotes slot 2. When no main candidate survives, the result is held (deferInsufficient) so one
+  // replacement can be tried before the sender is told there is nothing. A missing or malformed palette fails the request loudly
+  // (above), never silently skips the blocklist.
+  const refereed = applyPalette(stamped, palette, trimmed, { deferInsufficient: true })
   if (refereed.status !== 'sufficient') {
-    logTiming({ select_ms: selectMs, review_ms: 0, replace_ms: 0, total_ms: Date.now() - tStart, status: refereed.status, stop_reason: message.stop_reason, output_tokens: message.usage?.output_tokens ?? null })
-    return refereed
+    const closed = finalizeResult(refereed)
+    logTiming({ select_ms: selectMs, review_ms: 0, replace_ms: 0, total_ms: Date.now() - tStart, status: closed.status, stop_reason: message.stop_reason, output_tokens: message.usage?.output_tokens ?? null })
+    return closed
   }
 
-  // The separate review call (engine/review.ts): a fresh model call checks the survivors again.
-  // Its verdicts are applied by the same referee code (a failed main → slot 2; a failed or
-  // unreviewed freestyle → dropped). It never throws; it never costs the customer their result.
+  // The separate review call (engine/review.ts): a fresh model call checks the survivors for SAFETY only. Its vetoes are applied by the
+  // same referee code (a vetoed main → slot 2 is promoted; a failed or unreviewed freestyle → dropped). It never throws, and a review that
+  // cannot be used (timeout, error) costs the customer nothing but the freestyle: the mains stand on the referee alone.
   opts.onStage?.('checking')
   const tReview = Date.now()
-  const review = await runReview(refereed, palette, trimmed, context, { apiKey: opts.apiKey, signal: opts.signal, model: REVIEW_MODEL, onUsage: opts.onUsage ? (u) => opts.onUsage!('review', u) : undefined })
+  // (No live main candidate left → nothing to review: a freestyle cannot be shown alone, so it is dropped and the replacement is tried at once.)
+  const hasMain = refereed.candidates.some((c) => !c.eliminated && c.slot !== 'freestyle')
+  const review = hasMain
+    ? await runReview(refereed, palette, trimmed, context, { apiKey: opts.apiKey, signal: opts.signal, model: REVIEW_MODEL, onUsage: opts.onUsage ? (u) => opts.onUsage!('review', u) : undefined })
+    : { ran: false, skipped_reason: 'no main candidate left to review', verdicts: [] }
   const reviewMs = Date.now() - tReview
-  const reviewed = applyReviewVerdicts(refereed, palette, trimmed, review)
+  const reviewed = applyReviewVerdicts(refereed, palette, trimmed, review, { deferInsufficient: true })
 
-  // A main slot that ended up empty (never produced, or removed by the referee or the review) is replaced, not shown as two cards.
+  // A main slot that is EMPTY (never produced, or removed by the referee or the review) is replaced — never an extra card beside a filled one.
   const tReplace = Date.now()
   const completed = await completeMains(reviewed, palette, trimmed, context, prompt, {
     apiKey: opts.apiKey,
@@ -293,8 +360,10 @@ export async function runEngine(
     onUsage: opts.onUsage,
     onStage: opts.onStage,
   })
-  logTiming({ select_ms: selectMs, review_ms: reviewMs, replace_ms: Date.now() - tReplace, total_ms: Date.now() - tStart, status: completed.status, stop_reason: message.stop_reason, output_tokens: message.usage?.output_tokens ?? null })
-  return completed
+  // The last gate: at most one main, one second, one freestyle — and never zero cards without a question.
+  const final = finalizeResult(completed)
+  logTiming({ select_ms: selectMs, review_ms: reviewMs, replace_ms: Date.now() - tReplace, total_ms: Date.now() - tStart, status: final.status, stop_reason: message.stop_reason, output_tokens: message.usage?.output_tokens ?? null })
+  return final
 }
 
 /** One line per run: where the time went (no story text). Read it in the Cloud Run logs. */
@@ -302,4 +371,7 @@ function logTiming(t: { select_ms: number; review_ms: number; replace_ms: number
   console.log(`[ichirei-timing] ${JSON.stringify({ ...t, model: MODEL, effort: EFFORT, max_tokens: MAX_TOKENS, review_model: REVIEW_MODEL })}`)
 }
 
-export const ENGINE_CONFIG = { MODEL, EFFORT, MAX_TOKENS, REVIEW_MODEL, REVIEW_EFFORT: process.env.ICHIREI_REVIEW_EFFORT ?? 'low', CALL_TIMEOUT_MS: callTimeoutMs() }
+const REVIEW_RESERVE_MS = 20_000 // time kept for the review after a retried selection
+const MIN_RETRY_MS = 30_000 // a retry with less than this left would only time out again
+
+export const ENGINE_CONFIG = { MODEL, EFFORT, MAX_TOKENS, REVIEW_MODEL, REVIEW_EFFORT: process.env.ICHIREI_REVIEW_EFFORT ?? 'low', CALL_TIMEOUT_MS: callTimeoutMs(), REVIEW_TIMEOUT_MS: reviewTimeoutMs() }

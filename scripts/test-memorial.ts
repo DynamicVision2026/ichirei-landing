@@ -92,7 +92,7 @@ try {
     check(`explain-prompt.${l}.md: the memorial-only remembering-voice bullet`, exp.includes('REMEMBRANCE (only when `occasion` is `memorial`') && exp.includes('never write about death, loss, grief, the funeral or the afterlife as such') && exp.includes('gently affectionate, never teasing'))
   }
   const rv = readFileSync('engine/review-prompt.md', 'utf8')
-  check('review-prompt.md: the memorial occasion rule (no celebration characters, no talk of death as such) and no teasing for the freestyle', rv.includes('memorial (remembrance') && rv.includes('For occasion `memorial` it teases at all'))
+  check('review-prompt.md: the memorial occasion rule (no celebration characters, no talk of death as such) and no teasing for the freestyle', rv.includes('only for occasion `memorial` (remembrance') && rv.includes('celebration character') && rv.includes('death, loss, grief, the funeral or the afterlife as such') && rv.includes('For occasion `memorial` it teases at all'))
 
   // ---- 3. palette: the default block ----------------------------------------------------------------------------------
   const palette = loadPalette()
