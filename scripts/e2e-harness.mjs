@@ -622,17 +622,17 @@ const mockPage = async (browser, { onExplain, result, order, track } = {}) => {
   await p2.close()
 }
 
-// ---------- Run 8d: the poem add-on (歌の添え書き) on the order form ----------
+// ---------- Run 8d: the included poem (歌の添え書き) on the order form: one format, shown in full, free ----------
 {
   const poemCalls = []
   const f = await mockPage(browser, { order: () => ({ json: { order_ref: 'IC-20261023-POEM2222', checkout_url: 'http://localhost:5173/__checkout?cart=poem', glyph: '証', certificate_text: 'x' } }) })
   let n = 0
-  await f.page.route('**/api/poem-types', (route) => route.fulfill({ json: { types: ['tanka', 'tang', 'en'], price_jpy: 1980, max: 2 } }))
   await f.page.route('**/api/poem', async (route) => {
     const b = JSON.parse(route.request().postData() ?? '{}')
     poemCalls.push(b)
     n++
-    await route.fulfill({ json: { poem_id: `PM-20261028-abcdefghj${n}`, type: b.type, lines: ['一行目です', '二行目です', '三行目です'], preview: b.type === 'tanka' ? '朝ごとに' : b.type === 'tang' ? '晨起折庭花' : 'Every morning', price_jpy: 1980, max: 2 } })
+    if (b.type === 'en') await new Promise((r) => setTimeout(r, 1500)) // slow: the order button must wait for it
+    await route.fulfill({ json: { poem_id: `PM-20261028-abcdefghj${n}`, type: b.type, lines: [`${b.type} 一行目です`, `${b.type} 二行目です`, `${b.type} 三行目です`], reading: b.type === 'tang' ? '書き下しです' : '', aids: {}, preview: 'x' } })
   })
   await f.page.goto('http://localhost:5173/', { waitUntil: 'networkidle' })
   await f.page.locator('#write [data-testid=story-input]').fill(STORY)
@@ -645,16 +645,21 @@ const mockPage = async (browser, { onExplain, result, order, track } = {}) => {
   await f.page.locator('[data-testid=order-form]').waitFor()
   const addon = f.page.locator('[data-testid=poem-addon]')
   await addon.waitFor({ timeout: 5000 })
-  check('poem add-on: the question 「この一字に、歌を添えますか？」 and only the types on offer (3 of 4: the one with no variant is hidden), each with ¥1,980', (await addon.locator('legend').innerText()) === 'この一字に、歌を添えますか？' && (await addon.locator('[data-poem-type]').count()) === 3 && (await addon.locator('[data-poem-type=ci]').count()) === 0 && (await addon.locator('[data-poem-price]').first().innerText()) === '¥1,980')
-  await addon.locator('[data-poem-type=tanka]').click()
+  const addonText = await addon.innerText()
+  check('included poem: the step is visible to every customer — heading, four formats as radio buttons, and no price', (await addon.locator('legend').innerText()).includes('歌を一首添えます') && (await addon.locator('input[name=poem_type]').count()) === 4 && !/[¥￥]|円/.test(addonText) && addonText.includes('追加料金はありません'))
+  check('included poem: the Japanese site starts with the tanka (the default format) and writes it at once', await addon.locator('input[data-poem-type=tanka]').isChecked() && poemCalls.length === 1 && poemCalls[0].type === 'tanka')
   await addon.locator('[data-poem-result=tanka][data-state=ready]').waitFor({ timeout: 5000 })
-  check('poem add-on: choosing a type shows ONLY the first line and "the full poem is printed on your card"', (await addon.locator('[data-poem-result=tanka] [data-poem-preview]').innerText()) === '朝ごとに' && (await addon.innerText()).includes('全文はカードに印刷されます') && !(await addon.innerText()).includes('二行目'))
-  check('poem add-on: /api/poem got the story, the context, the chosen character, its card line and the type — and the session', poemCalls[0].type === 'tanka' && poemCalls[0].story === STORY && poemCalls[0].kanji === '証' && typeof poemCalls[0].gaze === 'string' && poemCalls[0].language === 'ja' && poemCalls[0].relationship && poemCalls[0].session.length >= 16)
-  await addon.locator('[data-poem-type=en]').click()
-  await addon.locator('[data-poem-result=en][data-state=ready]').waitFor({ timeout: 5000 })
-  check('poem add-on: at most 2 — the third chip is disabled; the total ¥3,960 is shown', await addon.locator('[data-poem-type=tang]').isDisabled() && (await addon.locator('[data-poem-total]').innerText()).includes('3,960'))
-  await addon.locator('[data-poem-result=tanka] button').click()
-  check('poem add-on: removing one poem frees a chip and the total drops to ¥1,980', !(await addon.locator('[data-poem-type=tang]').isDisabled()) && (await addon.locator('[data-poem-total]').innerText()).includes('1,980') && !(await addon.locator('[data-poem-total]').innerText()).includes('3,960'))
+  const full = await addon.locator('[data-poem-full]').innerText()
+  check('included poem: the WHOLE poem is shown before checkout (all three lines), with "this poem is printed on your card"', full.includes('tanka 一行目です') && full.includes('tanka 三行目です') && addonText !== (await addon.innerText()) && (await addon.innerText()).includes('カードに印刷されます'))
+  check('included poem: /api/poem got the story, the context, the chosen character, its card line and the type — and the session', poemCalls[0].story === STORY && poemCalls[0].kanji === '証' && typeof poemCalls[0].gaze === 'string' && poemCalls[0].gaze.length > 0 && poemCalls[0].relationship === 'parent_father' && typeof poemCalls[0].session === 'string')
+  await addon.locator('input[data-poem-type=en]').click()
+  const waited = await f.page.evaluate(() => document.querySelector('[data-testid=order-submit]').disabled)
+  check('included poem: while a poem is being written the order button waits (the buyer sees the poem before paying)', waited === true)
+  await addon.locator('[data-poem-result=en][data-state=ready]').waitFor({ timeout: 6000 })
+  check('included poem: choosing another format writes that one; the order button is back', poemCalls.length === 2 && poemCalls[1].type === 'en' && (await addon.locator('[data-poem-full]').innerText()).includes('en 一行目です'))
+  await addon.locator('input[data-poem-type=tanka]').click()
+  await f.page.waitForTimeout(300)
+  check('included poem: going back to a format already written shows it again without another call', poemCalls.length === 2 && (await addon.locator('[data-poem-full]').innerText()).includes('tanka 一行目です'))
   await f.page.fill('input[name=sender_name]', '山田 太郎')
   await f.page.fill('input[name=receiver_name]', '山田 一郎')
   const od8 = new Date(); od8.setDate(od8.getDate() + 20)
@@ -662,12 +667,16 @@ const mockPage = async (browser, { onExplain, result, order, track } = {}) => {
   await f.page.click('label:has(input[name=package][value=standard])')
   await f.page.click('[data-testid=order-submit]')
   await f.page.waitForSelector('#co', { timeout: 8000 })
-  check('poem add-on: the order carries only the poem_id of the poem that stayed (no poem text)', f.calls.order[0].poems?.length === 1 && f.calls.order[0].poems[0].poem_id === 'PM-20261028-abcdefghj2' && !JSON.stringify(f.calls.order[0]).includes('一行目'))
-  check('no page errors (run 8d, poem add-on)', f.errors.length === 0, JSON.stringify(f.errors))
+  check('included poem: the order carries only the poem_id of the format on screen (one poem, no poem text)', f.calls.order[0].poems?.length === 1 && f.calls.order[0].poems[0].poem_id === 'PM-20261028-abcdefghj1' && !JSON.stringify(f.calls.order[0]).includes('一行目です'))
+  check('no page errors (run 8d, included poem)', f.errors.length === 0, JSON.stringify(f.errors))
   await f.page.close()
-  // with no poem type on offer (no Shopify variant) the whole step is hidden and the order form works as before
+  // a poem that fails twice: a polite note, and the order goes ahead without one
   const g = await mockPage(browser, { order: () => ({ json: { order_ref: 'IC-20261023-POEM3333', checkout_url: 'http://localhost:5173/__checkout?cart=nop', glyph: '証', certificate_text: 'x' } }) })
-  await g.page.route('**/api/poem-types', (route) => route.fulfill({ json: { types: [], price_jpy: 1980, max: 2 } }))
+  let failCalls = 0
+  await g.page.route('**/api/poem', async (route) => {
+    failCalls++
+    await route.fulfill({ status: 502, json: { error: 'x', code: 'poem_failed', type: 'tanka', reasons: ['form'] } })
+  })
   await g.page.goto('http://localhost:5173/', { waitUntil: 'networkidle' })
   await g.page.locator('#write [data-testid=story-input]').fill(STORY)
   await pickContext(g.page)
@@ -677,8 +686,16 @@ const mockPage = async (browser, { onExplain, result, order, track } = {}) => {
   await g.page.locator('article[data-slot=main]').locator('text=この一字を選ぶ').click()
   await g.page.click(`button:has-text("${FINALIZE.ja}")`)
   await g.page.locator('[data-testid=order-form]').waitFor()
-  await g.page.waitForTimeout(600)
-  check('poem add-on: with no type on offer the poem step is hidden (nothing fails)', (await g.page.locator('[data-testid=poem-addon]').count()) === 0 && g.errors.length === 0)
+  await g.page.locator('[data-poem-result=tanka][data-state=failed]').waitFor({ timeout: 6000 })
+  check('included poem: it is tried twice, then given up politely — the note says the order goes ahead without a poem, with a "try again" button', failCalls === 2 && (await g.page.locator('[data-poem-failed]').innerText()).includes('歌なしで、そのままご注文いただけます') && (await g.page.locator('[data-testid=poem-addon] button:has-text("もう一度試す")').count()) === 1)
+  await g.page.fill('input[name=sender_name]', '山田 太郎')
+  await g.page.fill('input[name=receiver_name]', '山田 一郎')
+  const od9 = new Date(); od9.setDate(od9.getDate() + 20)
+  await g.page.fill('input[name=delivery_date]', `${od9.getFullYear()}-${String(od9.getMonth() + 1).padStart(2, '0')}-${String(od9.getDate()).padStart(2, '0')}`)
+  await g.page.click('label:has(input[name=package][value=standard])')
+  await g.page.click('[data-testid=order-submit]')
+  await g.page.waitForSelector('#co', { timeout: 8000 })
+  check('included poem: the order went through without a poem (no "poems" in the request), nothing failed', g.calls.order.length === 1 && g.calls.order[0].poems === undefined && g.errors.length === 0, JSON.stringify(g.errors))
   await g.page.close()
 }
 

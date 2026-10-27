@@ -13,7 +13,7 @@
 
 import { animationUrl, buildAnimationRecord, newAnimationId } from '../engine/animation.ts'
 import { cleanSession, cleanSource, recordEvent } from '../engine/analytics.ts'
-import { POEM_ID_PATTERN, buildRecord, lineAttributes, newOrderRef, parseOrderRequest, poemAttributes, type OrderRecord, type StoredPoem, type ValidOrder } from '../engine/order.ts'
+import { POEM_ID_PATTERN, buildRecord, lineAttributes, newOrderRef, parseOrderRequest, type OrderRecord, type StoredPoem, type ValidOrder } from '../engine/order.ts'
 import { createOrderStore, type OrderStore } from '../engine/order-store.ts'
 import type { Palette } from '../engine/palette.ts'
 import { ShopifyError, createCart, loadShopifyConfig, type ShopifyConfig } from '../engine/shopify.ts'
@@ -38,13 +38,13 @@ export interface OrderDeps {
 }
 
 /**
- * The poem add-ons of an order: the browser sends only poem_ids; each poem is read back from the store (what /api/poem wrote), must belong
- * to the chosen character and language, be of a type with a configured Shopify variant, and no type may repeat. At most MAX_POEMS.
+ * The poem of an order (one is included, free): the browser sends only a poem_id; the poem is read back from the store (what /api/poem wrote)
+ * and must belong to the chosen character and language. At most MAX_POEMS. It goes on the main line item as attributes and into the certificate.
  */
-async function resolvePoems(raw: unknown, store: OrderStore, shopify: ShopifyConfig, order: ValidOrder): Promise<{ ok: true; poems: StoredPoem[] } | { ok: false; error: string; code: string }> {
+async function resolvePoems(raw: unknown, store: OrderStore, order: ValidOrder): Promise<{ ok: true; poems: StoredPoem[] } | { ok: false; error: string; code: string }> {
   if (raw === undefined || raw === null) return { ok: true, poems: [] }
   if (!Array.isArray(raw)) return { ok: false, code: 'bad_poems', error: '"poems" must be an array' }
-  if (raw.length > MAX_POEMS) return { ok: false, code: 'too_many_poems', error: `At most ${MAX_POEMS} poems can be added` }
+  if (raw.length > MAX_POEMS) return { ok: false, code: 'too_many_poems', error: `At most ${MAX_POEMS} poem can be included` }
   const poems: StoredPoem[] = []
   for (const item of raw) {
     const id = (item as { poem_id?: unknown } | null)?.poem_id
@@ -57,8 +57,6 @@ async function resolvePoems(raw: unknown, store: OrderStore, shopify: ShopifyCon
     }
     if (!rec || rec.schema !== 'poem' || !Array.isArray(rec.lines) || !(POEM_TYPES as readonly string[]).includes(rec.type)) return { ok: false, code: 'poem_not_found', error: 'A poem in the order was not found; please make it again.' }
     if (rec.language !== order.language || !rec.forms.some((f) => f === order.candidate.kanji || f === order.candidate.inscription_form)) return { ok: false, code: 'poem_mismatch', error: 'A poem does not belong to the chosen character.' }
-    if (!shopify.poemVariants?.[rec.type]) return { ok: false, code: 'poem_type_unavailable', error: 'This kind of poem is not on offer.' }
-    if (poems.some((p) => p.type === rec!.type)) return { ok: false, code: 'duplicate_poem_type', error: 'Each kind of poem can be added once.' }
     poems.push(rec)
   }
   return { ok: true, poems }
@@ -90,7 +88,7 @@ export function createOrderHandler(deps: () => OrderDeps) {
     }
 
     const order = parsed.order
-    const resolved = await resolvePoems((body as { poems?: unknown } | null)?.poems, d.store, d.shopify, order)
+    const resolved = await resolvePoems((body as { poems?: unknown } | null)?.poems, d.store, order)
     if (!resolved.ok) return json(400, { error: resolved.error, code: resolved.code, field: 'poems' })
     const poems = resolved.poems
     order.certificate.poems = poems.map((p) => ({ type: p.type, lines: p.lines, reading: p.reading }))
@@ -119,7 +117,7 @@ export function createOrderHandler(deps: () => OrderDeps) {
 
     // 3. The Shopify cart.
     try {
-      const cart = await createCart(d.shopify, order.package, lineAttributes(order, orderRef, animationLink), orderRef, d.fetchImpl, poems.map((p) => ({ type: p.type, attributes: poemAttributes(p, orderRef) })))
+      const cart = await createCart(d.shopify, order.package, lineAttributes(order, orderRef, animationLink), orderRef, d.fetchImpl)
       record.status = 'cart_created'
       record.updated_at = (d.now?.() ?? new Date()).toISOString()
       record.shopify = { cart_id: cart.cartId, checkout_url: cart.checkoutUrl, variant_id: cart.variantId }

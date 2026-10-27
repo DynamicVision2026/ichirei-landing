@@ -6,7 +6,7 @@
 
 import { randomBytes } from 'node:crypto'
 import { LANGUAGES, STORY_MAX as ENGINE_STORY_MAX, countChars, parseFollowUps, type Candidate, type EngineResult, type Language } from './contract.ts'
-import { PACKAGES, PACKAGE_PRICE_JPY, POEM_PRICE_JPY, type PackageId, type PoemType } from '../src/order/packages.ts'
+import { PACKAGES, PACKAGE_PRICE_JPY, type PackageId, type PoemType } from '../src/order/packages.ts'
 import { CERTIFICATE_LINE_EN, certificateText } from '../src/order/certificate.ts'
 import { isMemorial } from '../src/order/memorial.ts'
 import { loadPalette, plainMeaning, type Palette } from './palette.ts'
@@ -241,6 +241,8 @@ export function lineAttributes(order: ValidOrder, orderRef: string, animationLin
     { key: 'order_ref', value: orderRef },
     // Remembrance: tells the workshop to carve in black or gold — no red seal, no red-and-white cord.
     ...(order.certificate.memorial ? [{ key: 'ichirei_memorial', value: 'yes' }] : []),
+    // The poem included with the gift (when there is one): type, the lines (one per row) and the reading aids.
+    ...(order.certificate.poems[0] ? poemAttributes(order.certificate.poems[0]) : []),
     // The private address of the story animation (/a/<id>): for the confirmation e-mail and the QR code on the printed card.
     ...(animationLink ? [{ key: 'ichirei_animation_url', value: animationLink }] : []),
   ]
@@ -264,13 +266,12 @@ export interface StoredPoem {
 
 export const POEM_ID_PATTERN = /^PM-\d{8}-[A-Za-z0-9]{10,40}$/
 
-/** The line-item attributes of one poem add-on, so the workshop can print it on the card. */
-export function poemAttributes(p: StoredPoem, orderRef: string): Attribute[] {
+/** The attributes of the chosen poem on the main line item, so the workshop can print it on the card (the poem is included, free: no line item of its own). */
+export function poemAttributes(p: { type: PoemType; lines: string[]; reading: string }): Attribute[] {
   return [
     { key: 'ichirei_poem_type', value: p.type },
     { key: 'ichirei_poem_text', value: p.lines.join('\n') },
     { key: 'ichirei_poem_reading', value: p.reading || '-' },
-    { key: 'order_ref', value: orderRef },
   ]
 }
 
@@ -307,7 +308,7 @@ export interface OrderRecord {
     certificate_text: string
     certificate: Certificate
     /** The poem add-ons (empty when none): the poem as printed, and the price shown. */
-    poems: { poem_id: string; type: PoemType; lines: string[]; pattern: string | null; reading: string; price_jpy: number }[]
+    poems: { poem_id: string; type: PoemType; lines: string[]; pattern: string | null; reading: string }[]
   }
   /** Kept here, never sent to Shopify. `story` is what the sender wrote first; `follow_ups` are their answers to the engine's questions. */
   story: string
@@ -344,7 +345,7 @@ export function buildRecord(order: ValidOrder, orderRef: string, now: Date = new
       certificate_text: certificateText(order.language),
       /** The bilingual certificate data (character, reading, romanization, English meaning, both lines). */
       certificate: order.certificate,
-      poems: poems.map((p) => ({ poem_id: p.poem_id, type: p.type, lines: p.lines, pattern: p.pattern, reading: p.reading, price_jpy: POEM_PRICE_JPY })),
+      poems: poems.map((p) => ({ poem_id: p.poem_id, type: p.type, lines: p.lines, pattern: p.pattern, reading: p.reading })),
     },
     story: order.story,
     follow_ups: order.follow_ups,

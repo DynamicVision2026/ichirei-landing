@@ -11,8 +11,7 @@ import { serveStatic } from '@hono/node-server/serve-static'
 import { compress } from 'hono/compress'
 import { POST as selectPost } from '../api/select.ts'
 import { POST as orderPost } from '../api/order.ts'
-import { POST as poemPost, TYPES_GET as poemTypesGet } from '../api/poem.ts'
-import { availablePoemTypes, poemPreviewOn } from '../engine/shopify.ts'
+import { POST as poemPost } from '../api/poem.ts'
 import { POST as trackPost } from '../api/track.ts'
 import { handlers as animationHandlers, strokesGet } from '../api/animation.ts'
 import { POST as analyticsPost } from '../api/analytics.ts'
@@ -108,8 +107,6 @@ export function createApp(config: ServerConfig): Hono {
       reviewTimeoutMs: ENGINE_CONFIG.REVIEW_TIMEOUT_MS,
       lexiconMode: lexiconModeFromEnv(),
       simpleMaxStrokes: simpleMaxStrokes(),
-      poemTypes: availablePoemTypes(), // the poem add-on types with a configured Shopify variant (names only)
-      poemPreview: poemPreviewOn(), // ICHIREI_POEM_PREVIEW: POST /api/poem writes all four types for internal testing (the page and the order flow are unchanged)
       configured: config,
       applied: serverRef.current
         ? {
@@ -140,9 +137,8 @@ export function createApp(config: ServerConfig): Hono {
     withHeartbeat(await selectPost(c.req.raw), config.heartbeatMs),
   )
   app.post('/api/explain', requireApiKey, limited(explainLimit), adaptVercelHandler(explainHandler))
-  // The poem add-on: one model call per poem (45 s ceiling), 20 per hour per IP; the types on offer are those with a Shopify variant.
+  // The included poem: one model call per poem (45 s ceiling), 20 per hour per IP; all four formats are always available.
   app.post('/api/poem', requireApiKey, limited(poemLimit), (c) => poemPost(c.req.raw))
-  app.get('/api/poem-types', () => poemTypesGet())
   // The story animation (/a/<id>): the private view of one order, a QR code of its address, and the open stroke-order data. Generous
   // per-IP limit (ICHIREI_ANIMATION_LIMIT): a page load makes a handful of calls; this only stops scraping.
   const animationLimit = envRunLimiter('ICHIREI_ANIMATION_LIMIT', { max: 120, minutes: 10 })

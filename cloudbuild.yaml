@@ -19,13 +19,6 @@ substitutions:
   # Variant ids are identifiers, not secrets (product 一字礼 ICHIREI, option セット).
   _SHOPIFY_VARIANT_SIMPLE: '67789502447864'    # シンプル ¥9,800  — SKU ICHIREI-SIMPLE
   _SHOPIFY_VARIANT_STANDARD: '67789502480632'  # スタンダード ¥18,850 — SKU ICHIREI-STANDARD
-  # The poem add-on (歌の添え書き, ¥1,980 each): the four Shopify variant ids, once the owner has created the product. EMPTY = that type is
-  # hidden on the site (nothing fails). Set them here (or override on the trigger) — a value set by hand on the console is overwritten by the next deploy.
-  _SHOPIFY_VARIANT_POEM_TANKA: ''
-  _SHOPIFY_VARIANT_POEM_TANG: ''
-  _SHOPIFY_VARIANT_POEM_CI: ''
-  _SHOPIFY_VARIANT_POEM_EN: ''
-  _POEM_PREVIEW: 'on'              # ICHIREI_POEM_PREVIEW — off | on. TEMPORARY (internal poem-quality testing): on lets POST /api/poem write all four types with no Shopify variant; the page shows no chips and the order flow still refuses poems. Set back to 'off' after testing.
   # The Storefront token is PUBLIC by design (it ships in every storefront). Set it on the trigger;
   # when empty the server falls back to the SHOPIFY_STOREFRONT_TOKEN secret mounted below.
   _SHOPIFY_STOREFRONT_TOKEN: ''
@@ -34,6 +27,7 @@ substitutions:
   # (secret SHOPIFY_ADMIN_CLIENT_SECRET), so a missing secret can never break a deploy.
   _SHOPIFY_ADMIN_CLIENT_ID: '394a8e955f7e28104f3e2089630bb3a5'
   _ORDER_BUCKET: ''                 # e.g. ichirei-orders
+  _ANIMATION_SAMPLES: 'on'          # ICHIREI_ANIMATION_SAMPLES — off | on. TEMPORARY: four reserved sample films (/a/AN-sampleja222222222222 …) for testing the story animation on real phones; set to 'off' when done
   # Engine settings (v9 speed). Passed to the service on EVERY deploy (--update-env-vars below), so a value set earlier by hand
   # (ICHIREI_EFFORT=high …) can never silently outlive a deploy. Change them here, or per trigger, not on the console.
   _EFFORT: 'medium'                 # ICHIREI_EFFORT — selection call reasoning depth (was high)
@@ -88,7 +82,7 @@ steps:
       # Mount the Secret Manager secrets as env vars of the same name.
       - --set-secrets=ANTHROPIC_API_KEY=ANTHROPIC_API_KEY:latest,SHOPIFY_STOREFRONT_TOKEN=SHOPIFY_STOREFRONT_TOKEN:latest
       # Non-secret settings: the purchase settings and the engine speed settings. --update-env-vars leaves any other variable alone.
-      - --update-env-vars=ICHIREI_EFFORT=${_EFFORT},ICHIREI_MAX_TOKENS=${_MAX_TOKENS},ICHIREI_MAX_TOKENS_RETRY=${_MAX_TOKENS_RETRY},ICHIREI_REVIEW_MODEL=${_REVIEW_MODEL},ICHIREI_REVIEW_EFFORT=${_REVIEW_EFFORT},ICHIREI_CALL_TIMEOUT_MS=${_CALL_TIMEOUT_MS},ICHIREI_REVIEW_TIMEOUT_MS=${_REVIEW_TIMEOUT_MS},ICHIREI_LEXICON_MODE=${_LEXICON_MODE},ICHIREI_SIMPLE_MAX_STROKES=${_SIMPLE_MAX_STROKES},ICHIREI_POEM_PREVIEW=${_POEM_PREVIEW},SHOPIFY_VARIANT_POEM_TANKA=${_SHOPIFY_VARIANT_POEM_TANKA},SHOPIFY_VARIANT_POEM_TANG=${_SHOPIFY_VARIANT_POEM_TANG},SHOPIFY_VARIANT_POEM_CI=${_SHOPIFY_VARIANT_POEM_CI},SHOPIFY_VARIANT_POEM_EN=${_SHOPIFY_VARIANT_POEM_EN},SHOPIFY_VARIANT_SIMPLE=${_SHOPIFY_VARIANT_SIMPLE},SHOPIFY_VARIANT_STANDARD=${_SHOPIFY_VARIANT_STANDARD},SHOPIFY_STOREFRONT_TOKEN_PUBLIC=${_SHOPIFY_STOREFRONT_TOKEN},SHOPIFY_ADMIN_CLIENT_ID=${_SHOPIFY_ADMIN_CLIENT_ID},ORDER_BUCKET=${_ORDER_BUCKET}
+      - --update-env-vars=ICHIREI_EFFORT=${_EFFORT},ICHIREI_MAX_TOKENS=${_MAX_TOKENS},ICHIREI_MAX_TOKENS_RETRY=${_MAX_TOKENS_RETRY},ICHIREI_REVIEW_MODEL=${_REVIEW_MODEL},ICHIREI_REVIEW_EFFORT=${_REVIEW_EFFORT},ICHIREI_CALL_TIMEOUT_MS=${_CALL_TIMEOUT_MS},ICHIREI_REVIEW_TIMEOUT_MS=${_REVIEW_TIMEOUT_MS},ICHIREI_LEXICON_MODE=${_LEXICON_MODE},ICHIREI_SIMPLE_MAX_STROKES=${_SIMPLE_MAX_STROKES},ICHIREI_ANIMATION_SAMPLES=${_ANIMATION_SAMPLES},SHOPIFY_VARIANT_SIMPLE=${_SHOPIFY_VARIANT_SIMPLE},SHOPIFY_VARIANT_STANDARD=${_SHOPIFY_VARIANT_STANDARD},SHOPIFY_STOREFRONT_TOKEN_PUBLIC=${_SHOPIFY_STOREFRONT_TOKEN},SHOPIFY_ADMIN_CLIENT_ID=${_SHOPIFY_ADMIN_CLIENT_ID},ORDER_BUCKET=${_ORDER_BUCKET}
 
 images:
   - ${_REGION}-docker.pkg.dev/$PROJECT_ID/${_REPO}/${_SERVICE}:$BUILD_ID

@@ -6,7 +6,7 @@
 import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { ANIMATION_ID_PATTERN, animationUrl, animationView, buildAnimationRecord, isAnimationRecord, newAnimationId, publicUrl, splitAids, type AnimationRecord } from '../engine/animation.ts'
+import { ANIMATION_ID_PATTERN, SAMPLE_IDS, SAMPLE_RECORDS, animationSamplesOn, animationUrl, animationView, buildAnimationRecord, isAnimationRecord, newAnimationId, publicUrl, splitAids, type AnimationRecord } from '../engine/animation.ts'
 import { createAnimationHandlers, strokesGet } from '../api/animation.ts'
 import { createOrderHandler } from '../api/order.ts'
 import { MemoryOrderStore } from '../engine/order-store.ts'
@@ -75,7 +75,7 @@ const rec = buildAnimationRecord(orderRec, ID, NOW)
   let missing: string[] = []
   for (const r of palette.rows) for (const c of [r.kanji, r.inscription_form]) if (c && !strokesFor(c, r.language === 'ja' ? 'ja' : 'zh')) missing.push(`${r.language}:${c}`)
   check('(2) EVERY character and form in the palette (1,646 of them) has stroke data — the ink-fade fallback is only for freestyle characters outside it', missing.length === 0, missing.slice(0, 10).join(' '))
-  check('(2) parsers: KanjiVG paths are read in stroke order whatever the file order; a file with no strokes, or a Hanzi entry whose strokes and medians disagree, is refused', parseKanjivg('<svg><path id="kvg:00001-s2" d="M1,1"/><path id="kvg:00001-s1" d="M0,0"/></svg>')?.strokes.map((s) => s.d).join('|') === 'M0,0|M1,1' && parseKanjivg('<svg></svg>') === null && parseHanzi({ strokes: ['M0 0'], medians: [] }) === null && parseHanzi({ strokes: ['M0 0'], medians: [[[0, 0], [1, 1]]] })?.strokes[0].median === 'M0 0 L1 1')
+  check('(2) parsers: KanjiVG paths are read in stroke order whatever the file order; a file with no strokes, or a Hanzi entry whose strokes and medians disagree, is refused', parseKanjivg('<svg><path id="kvg:00001-s2" d="M1,1"/><path id="kvg:00001-s1" d="M0,0"/></svg>')?.strokes.map((s) => s.d).join('|') === 'M0,0|M1,1' && parseKanjivg('<svg></svg>') === null && parseHanzi({ strokes: ['M0 0'], medians: [] }) === null && (parseHanzi({ strokes: ['M0 0'], medians: [[[0, 0], [1, 1]]] })?.strokes[0] as { median?: string } | undefined)?.median === 'M0 0 L1 1')
 }
 
 // ---- 3. the timeline ------------------------------------------------------------------------------------------------------------------------------------
@@ -141,6 +141,17 @@ const rec = buildAnimationRecord(orderRec, ID, NOW)
   check('(5) GET /api/strokes: 200 with the strokes (cached for a year: open data that never changes); two characters or a Latin letter → 400; a character with no data → 404', s1.status === 200 && ((await s1.json()) as any).strokes.length === 12 && s1.headers.get('cache-control')?.includes('immutable') === true && s2.status === 200 && ((await s2.json()) as any).source === 'hanzi' && s3.status === 400 && s4.status === 400 && s5.status === 404)
 }
 
+// ---- 5b. the sample films (for the owner's phone tests) -----------------------------------------------------------------------------------------------
+{
+  const store = new MemoryOrderStore()
+  const off = createAnimationHandlers(() => ({ store, env: {} as never }))
+  const on = createAnimationHandlers(() => ({ store, env: { ICHIREI_ANIMATION_SAMPLES: 'on' } as never }))
+  check('(5b) the four sample ids are valid ids (AN- + 20 characters) and each has a valid record: Japanese tanka, Chinese ci, English poem, memorial', Object.values(SAMPLE_IDS).length === 4 && Object.values(SAMPLE_IDS).every((i) => ANIMATION_ID_PATTERN.test(i) && isAnimationRecord(SAMPLE_RECORDS[i])) && SAMPLE_RECORDS[SAMPLE_IDS.memorial].memorial === true && SAMPLE_RECORDS[SAMPLE_IDS.zh].script === 'zh' && SAMPLE_RECORDS[SAMPLE_IDS.en].poem?.type === 'en' && SAMPLE_RECORDS[SAMPLE_IDS.ja].poem?.type === 'tanka')
+  check('(5b) off by default (and for anything but "on"): a sample id is a plain 404; on: it plays without any order behind it', !animationSamplesOn({} as never) && !animationSamplesOn({ ICHIREI_ANIMATION_SAMPLES: 'off' } as never) && animationSamplesOn({ ICHIREI_ANIMATION_SAMPLES: 'on' } as never) && (await off.view(SAMPLE_IDS.ja)).status === 404 && (await on.view(SAMPLE_IDS.ja)).status === 200)
+  const v = (await (await on.view(SAMPLE_IDS.ja)).json()) as any
+  check('(5b) the sample view is the same shape as a real one (glyph, moment, who, the poem with its lines) and holds no order data', v.glyph === '備' && v.poem.lines.length === 5 && !('order_ref' in v) && (await on.qr(SAMPLE_IDS.ja)).status === 200 && (await on.view('AN-sample' + 'x'.repeat(11))).status === 404)
+}
+
 // ---- 6. the order wiring --------------------------------------------------------------------------------------------------------------------------------
 {
   const store = new MemoryOrderStore()
@@ -204,6 +215,22 @@ const rec = buildAnimationRecord(orderRec, ID, NOW)
     check('(7) …429 carries Retry-After and the standard body', rl.status === 429 && rl.headers.get('retry-after') !== null && ((await rl.json()) as any).code === 'rate_limited')
   } finally {
     await server.stop()
+    rmSync(dir, { recursive: true, force: true })
+  }
+}
+
+{
+  const dir = mkdtempSync(join(tmpdir(), 'ichirei-anim-samples-'))
+  const sampled = await startServer({ upstreamUrl: 'http://127.0.0.1:9', env: { ORDER_STORE_DIR: dir, ICHIREI_ANIMATION_SAMPLES: 'on' } })
+  const plain = await startServer({ upstreamUrl: 'http://127.0.0.1:9', env: { ORDER_STORE_DIR: dir } })
+  try {
+    const a = await fetch(`${sampled.url}/api/animation/${SAMPLE_IDS.ja}`)
+    const b = await fetch(`${plain.url}/api/animation/${SAMPLE_IDS.ja}`)
+    const page = await fetch(`${sampled.url}/a/${SAMPLE_IDS.memorial}`)
+    check('(7b) the real server: with ICHIREI_ANIMATION_SAMPLES=on the sample film answers 200 and its page is served; without it the same id is a 404', a.status === 200 && ((await a.json()) as any).poem.type === 'tanka' && page.status === 200 && b.status === 404)
+  } finally {
+    await sampled.stop()
+    await plain.stop()
     rmSync(dir, { recursive: true, force: true })
   }
 }

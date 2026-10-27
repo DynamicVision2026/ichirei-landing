@@ -9,7 +9,7 @@ import { isMemorial } from '../order/memorial.ts'
 import { certificateText } from '../order/certificate.ts'
 import { DEFAULT_STYLE, STYLES_BY_LANGUAGE, glyphFor, hasFormChoice } from '../order/inscription.ts'
 import { DEFAULT_SIMPLE_MAX_STROKES, carvedStrokes, simpleAvailable } from '../order/strokes.ts'
-import PoemAddOn from './PoemAddOn'
+import PoemAddOn, { type PoemStep } from './PoemAddOn'
 import { useCurrency } from '../reveal/useCurrency.ts'
 import { approxLine } from '../reveal/currency.ts'
 import { toRevealLang } from '../reveal/lang.ts'
@@ -59,7 +59,8 @@ export default function OrderForm({ result, story, followUps = [], candidate, co
   const [date, setDate] = useState('')
   const [style, setStyle] = useState<InscriptionStyle>(DEFAULT_STYLE[language])
   const [pkg, setPkg] = useState<PackageId | ''>('')
-  const [poemIds, setPoemIds] = useState<string[]>([]) // the poems added to this order (the add-on); the server reads them back by id
+  const [poemIds, setPoemIds] = useState<string[]>([]) // the included poem of this order (zero or one); the server reads it back by id
+  const [poemStep, setPoemStep] = useState<PoemStep>('loading') // the buyer sees the whole poem before paying: the order waits while it is being written
   const [phase, setPhase] = useState<'edit' | 'submitting' | 'redirecting'>('edit')
   const [error, setError] = useState<string | null>(null)
 
@@ -76,7 +77,7 @@ export default function OrderForm({ result, story, followUps = [], candidate, co
   const dateOk = /^\d{4}-\d{2}-\d{2}$/.test(date) && date >= today
   // (switching the carved form can make Simple unavailable after it was picked: the Standard set is then the only choice)
   if (pkg === 'simple' && !simpleOk) setTimeout(() => setPkg(''), 0)
-  const valid = senderOk && receiverOk && dateOk && pkg !== '' && !(pkg === 'simple' && !simpleOk)
+  const valid = senderOk && receiverOk && dateOk && pkg !== '' && !(pkg === 'simple' && !simpleOk) && poemStep !== 'loading'
 
   const submit = async () => {
     if (!valid || phase !== 'edit') return
@@ -218,8 +219,8 @@ export default function OrderForm({ result, story, followUps = [], candidate, co
           )}
         </fieldset>
 
-        {/* The poem add-on (hidden when no poem type is on offer) */}
-        <PoemAddOn result={result} story={story} followUps={followUps} candidate={candidate} copy={copy} language={language} onChange={setPoemIds} disabled={busy} />
+        {/* The included poem: one format, shown in full before checkout */}
+        <PoemAddOn result={result} story={story} followUps={followUps} candidate={candidate} copy={copy} language={language} onChange={(ids, step) => { setPoemIds(ids); setPoemStep(step) }} disabled={busy} />
 
         <fieldset className="cgroup">
           <legend className="clab">{o.packageLabel}</legend>

@@ -7,18 +7,17 @@
 //   node --experimental-strip-types scripts/test-poem.ts
 
 import http from 'node:http'
-import { mkdtempSync, readFileSync, rmSync } from 'node:fs'
-import { tmpdir } from 'node:os'
+import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { CI_PATTERNS, blockedCharacters, checkContainsCharacter, checkCraft, checkForm, checkPalette, moraCount } from '../engine/poem-check.ts'
 import { buyerAids, generatePoem, loadPoemPrompt, loadPoemReviewPrompt, poemFamilies, reasonCode, type PoemInput } from '../engine/poem.ts'
-import { createPoemHandler, TYPES_GET } from '../api/poem.ts'
+import { createPoemHandler } from '../api/poem.ts'
 import { createOrderHandler } from '../api/order.ts'
 import { MemoryOrderStore } from '../engine/order-store.ts'
 import { loadPalette } from '../engine/palette.ts'
 import { checkRhyme, lineRhyme } from '../engine/rhyme.ts'
-import { availablePoemTypes, loadShopifyConfig, poemPreviewOn, poemTypesAccepted, poemVariantsFromEnv } from '../engine/shopify.ts'
-import { MAX_POEMS, POEM_PRICE_JPY, POEM_TYPES, formatYen, type PoemType } from '../src/order/packages.ts'
+import { loadShopifyConfig } from '../engine/shopify.ts'
+import { DEFAULT_POEM_TYPE, MAX_POEMS, POEM_TYPES, type PoemType } from '../src/order/packages.ts'
 import { COPY } from '../src/demo/i18n.ts'
 // @ts-expect-error untyped test helper
 import { startServer } from './server-fixtures.mjs'
@@ -236,9 +235,9 @@ function count(k: 'poem' | 'review') { return seen.filter((s) => s.kind === k).l
   check('(4b) failure reasons are short codes: call / parse / form / character_missing / rhyme / palette / review:<rule> / gendaigo', ['call: boom', 'the reply was not a JSON object', 'the reply has no lines array', 'a tanka has 5 lines (got 4)', 'the chosen character (備) does not appear in the poem', 'lines 2 and 4 must rhyme: …', '死: hard block (never used)', '祝: blocked in remembrance (x)', 'review (relationship): x', 'gendaigo is missing: …'].map(reasonCode).join() === 'call,parse,parse,form,character_missing,rhyme,palette,palette,review:relationship,gendaigo')
 }
 
-// ---- 5. /api/poem and /api/poem-types ------------------------------------------------------------------------------------------------------
+// ---- 5. /api/poem: the included poem ------------------------------------------------------------------------------------------------------------
 const store = new MemoryOrderStore()
-const handler = (types: PoemType[], extra: object = {}) => createPoemHandler(() => ({ store, types, palette, now: () => new Date('2026-10-28T03:00:00Z'), ...extra }))
+const handler = (extra: object = {}) => createPoemHandler(() => ({ store, palette, now: () => new Date('2026-10-28T03:00:00Z'), ...extra }))
 const body = (c: typeof C20, type: string, more: object = {}) => ({ session: 'abcdefghijklmnop1234', story: c.story, language: c.context.language, relationship: c.context.relationship, direction: c.context.direction, occasion: c.context.occasion, kanji: c.kanji, gaze: c.gaze, type, ...more })
 const post = (h: (r: Request) => Promise<Response>, b: unknown) => h(new Request('http://x/api/poem', { method: 'POST', body: JSON.stringify(b) }))
 let poemId20 = ''
@@ -246,86 +245,81 @@ let poemIdEn = ''
 {
   replies = [C20.poems.tanka]
   reviewReplies = []
-  const res = await quiet(() => post(handler(['tanka', 'tang', 'ci', 'en']), body(C20, 'tanka')))
+  const res = await quiet(() => post(handler(), body(C20, 'tanka')))
   const j = (await res.json()) as any
   poemId20 = j.poem_id
-  check('(5) /api/poem: 200 with the poem lines, the reading aids and a preview that is the FIRST LINE only', res.status === 200 && j.lines.length === 5 && j.preview === j.lines[0] && j.preview === '朝ごとに' && j.price_jpy === POEM_PRICE_JPY && typeof j.reading === 'string' && /^PM-20261028-[a-z2-9]{10}$/.test(j.poem_id), JSON.stringify(j).slice(0, 200))
+  check('(5) /api/poem: 200 with the FULL poem (every line), the reading aids and the poem_id — and no price anywhere', res.status === 200 && j.lines.length === 5 && j.lines.join() === C20.poems.tanka.lines.join() && typeof j.reading === 'string' && /^PM-20261028-[a-z2-9]{10}$/.test(j.poem_id) && !('price_jpy' in j) && !('max' in j), JSON.stringify(j).slice(0, 200))
   check('(5) …the poem is stored on the server under poem_id (the order reads it back); the stored record has the character forms', (store.records.get(j.poem_id) as any)?.lines?.length === 5 && (store.records.get(j.poem_id) as any)?.kanji === '備')
   replies = [C20.poems.en]
-  const en = await quiet(() => post(handler(['tanka', 'en']), body(C20, 'en')))
+  const en = await quiet(() => post(handler(), body(C20, 'en')))
   poemIdEn = ((await en.json()) as any).poem_id
-  check('(5) the page shows only the preview: PoemAddOn renders `preview`, never the full lines, and says the full poem is printed on the card', (() => { const src = read('src/demo/PoemAddOn.tsx'); return src.includes('st.preview') && !src.includes('.lines') && src.includes('p.printedOnCard') && COPY.ja.order.poem.printedOnCard.includes('カード') && COPY.en.order.poem.printedOnCard.includes('printed on your card') })())
-  const hidden = await post(handler(['tanka']), body(C20, 'ci'))
-  check('(5) a type with no Shopify variant is not offered: 404 poem_type_unavailable', hidden.status === 404 && ((await hidden.json()) as any).code === 'poem_type_unavailable')
+  const all4: number[] = []
+  for (const t of POEM_TYPES) { replies = [C20.poems[t]]; all4.push((await quiet(() => post(handler(), body(C20, t)))).status) }
+  check('(5) all four formats are always available (no variant, no switch): tanka, tang, ci and en each answer 200', all4.join() === '200,200,200,200', all4.join())
   const results = await Promise.all([
-    post(handler(['tanka']), body(C20, 'sonnet')),
-    post(handler(['tanka']), { ...body(C20, 'tanka'), story: '' }),
-    post(handler(['tanka']), { ...body(C20, 'tanka'), kanji: 'ab' }),
-    post(handler(['tanka']), { ...body(C20, 'tanka'), gaze: '' }),
-    post(handler(['tanka']), { ...body(C20, 'tanka'), language: 'fr' }),
-    post(handler(['tanka']), body(C20, 'tanka', { kanji: '死' })),
-    post(handler(['tanka'], { store: null }), body(C20, 'tanka')),
+    post(handler(), body(C20, 'sonnet')),
+    post(handler(), { ...body(C20, 'tanka'), story: '' }),
+    post(handler(), { ...body(C20, 'tanka'), kanji: 'ab' }),
+    post(handler(), { ...body(C20, 'tanka'), gaze: '' }),
+    post(handler(), { ...body(C20, 'tanka'), language: 'fr' }),
+    post(handler(), body(C20, 'tanka', { kanji: '死' })),
+    post(handler({ store: null }), body(C20, 'tanka')),
   ])
   check('(5) bad input: unknown type / empty story / not one character / empty gaze / unknown language → 400; a hard-block character (死) → 400 character_not_allowed; no store → 503', results.slice(0, 5).every((r) => r.status === 400) && results[5].status === 400 && ((await results[5].json()) as any).code === 'character_not_allowed' && results[6].status === 503)
-  const mem = await post(handler(['tanka']), body(C04, 'tanka', { kanji: '祝' }))
+  const mem = await post(handler(), body(C04, 'tanka', { kanji: '祝' }))
   check('(5) remembrance: a celebration character cannot carry a poem (400 character_not_allowed)', mem.status === 400 && ((await mem.json()) as any).code === 'character_not_allowed')
   replies = [{ ...C20.poems.tanka, reading_kana: ['あ', 'い', 'う', 'え', 'お'] }]
-  const failed = await quiet(() => post(handler(['tanka']), body(C20, 'tanka')))
-  check('(5) a type that fails its checks twice answers 502 poem_failed for that type only (the page can still order the character and the other poem)', failed.status === 502 && ((await failed.json()) as any).code === 'poem_failed')
+  const failed = await quiet(() => post(handler(), body(C20, 'tanka')))
+  const failedJ = (await failed.json()) as any
+  check('(5) a poem that fails its checks twice answers 502 poem_failed with the reason codes (and never the failed checks in words) — the page then lets the order go ahead without a poem', failed.status === 502 && failedJ.code === 'poem_failed' && Array.isArray(failedJ.reasons) && !('problems' in failedJ))
   const lines = (store.lines.get('analytics/2026-10-28.jsonl') ?? []).map((l) => JSON.parse(l))
-  check('(5) analytics: poem_previewed per preview — session, source and the type only; no story, no poem text', lines.filter((e) => e.event === 'poem_previewed').map((e) => e.poem_type).join() === 'tanka,en' && lines.every((e) => !JSON.stringify(e).includes('朝ごとに')))
-}
-{
-  const t = (await TYPES_GET().json()) as any
-  check('(5) /api/poem-types answers with the types on offer (those with a variant), the price and the maximum', Array.isArray(t.types) && t.price_jpy === 1980 && t.max === 2)
-  const env = (o: Record<string, string>) => availablePoemTypes(o as NodeJS.ProcessEnv)
-  check('(5) a missing variant env var hides that type (not a failure): none → none; two set → those two', env({}).length === 0 && env({ SHOPIFY_VARIANT_POEM_TANKA: '123', SHOPIFY_VARIANT_POEM_EN: ' 456 ' }).join() === 'tanka,en' && poemVariantsFromEnv({ SHOPIFY_VARIANT_POEM_CI: '9' } as never).ci === 'gid://shopify/ProductVariant/9' && env({ SHOPIFY_VARIANT_POEM_TANG: '  ' }).length === 0)
+  check('(5) analytics: poem_previewed per poem written — session, source and the type only; no story, no poem text', lines.filter((e) => e.event === 'poem_previewed').length >= 2 && lines.every((e) => !JSON.stringify(e).includes('朝ごとに')))
 }
 
-// ---- 6. the order: max 2, separate line items, attributes, certificate -------------------------------------------------------------------------
+// ---- 6. the order: ONE poem, on the main line item, free ------------------------------------------------------------------------------------------
 const shopSeen: any[] = []
 const fakeShopify = (async (_url: string, init: RequestInit) => {
   shopSeen.push(JSON.parse(String(init.body)))
   return new Response(JSON.stringify({ data: { cartCreate: { cart: { id: 'gid://shopify/Cart/1', checkoutUrl: 'https://soul-id-2.myshopify.com/cart/c/x' }, userErrors: [] } } }), { status: 200 })
 }) as unknown as typeof fetch
-const shop = (poemVariants: Partial<Record<PoemType, string>>) => ({ ...loadShopifyConfig({ SHOPIFY_STOREFRONT_TOKEN_PUBLIC: 't', SHOPIFY_VARIANT_SIMPLE: '1', SHOPIFY_VARIANT_STANDARD: '2' } as never).config!, poemVariants })
-const orderHandler = (poemVariants: Partial<Record<PoemType, string>>) => createOrderHandler(() => ({ store, shopify: shop(poemVariants), shopifyMissing: [], now: () => new Date('2026-10-28T03:00:00Z'), fetchImpl: fakeShopify, palette }))
+const shop = () => loadShopifyConfig({ SHOPIFY_STOREFRONT_TOKEN_PUBLIC: 't', SHOPIFY_VARIANT_SIMPLE: '1', SHOPIFY_VARIANT_STANDARD: '2' } as never).config!
+const orderHandler = () => createOrderHandler(() => ({ store, shopify: shop(), shopifyMissing: [], now: () => new Date('2026-10-28T03:00:00Z'), fetchImpl: fakeShopify, palette }))
 const GOLD = JSON.parse(read('scripts/golden-fixture.json'))
 const orderBody = (more: object = {}) => ({ story: C20.story, engine_result: { ...clone(GOLD), language: 'ja', candidates: GOLD.candidates.map((c: any, i: number) => (i === 0 ? { ...c, kanji: '備', inscription_form: null, reading: 'そなえる' } : c)), primary_kanji: '備' }, selected_kanji: '備', language: 'ja', sender_name: '山田 太郎', receiver_name: '山田 花子', delivery_date: '2026-12-01', inscription_style: 'modern', package: 'standard', session: 'abcdefghijklmnop1234', source: 'customer', ...more })
-const VARS = { tanka: 'gid://shopify/ProductVariant/501', tang: 'gid://shopify/ProductVariant/502', ci: 'gid://shopify/ProductVariant/503', en: 'gid://shopify/ProductVariant/504' }
 const postOrder = (h: (r: Request) => Promise<Response>, b: unknown) => h(new Request('http://x/api/order', { method: 'POST', body: JSON.stringify(b) }))
 {
   shopSeen.length = 0
-  const res = await quiet(() => postOrder(orderHandler(VARS), orderBody({ poems: [{ poem_id: poemId20, lines: ['EVIL'] }, { poem_id: poemIdEn }] })))
+  const res = await quiet(() => postOrder(orderHandler(), orderBody({ poems: [{ poem_id: poemId20, lines: ['EVIL'] }] })))
   const j = (await res.json()) as any
   const lines = shopSeen[0].variables.input.lines
-  check('(6) an order with 2 poems: ONE cart with three line items — the package and one separate line item per poem, each on its own variant', res.status === 200 && lines.length === 3 && lines[0].merchandiseId.endsWith('/2') && lines[1].merchandiseId === VARS.tanka && lines[2].merchandiseId === VARS.en, JSON.stringify(j).slice(0, 200))
   const attr = (l: any, k: string) => l.attributes.find((a: any) => a.key === k)?.value
-  check('(6) each poem line carries ichirei_poem_type, ichirei_poem_text (the lines, one per row), ichirei_poem_reading and order_ref', attr(lines[1], 'ichirei_poem_type') === 'tanka' && attr(lines[1], 'ichirei_poem_text') === C20.poems.tanka.lines.join('\n') && attr(lines[1], 'ichirei_poem_reading') === '-' && attr(lines[1], 'order_ref') === j.order_ref && attr(lines[2], 'ichirei_poem_type') === 'en' && attr(lines[2], 'ichirei_poem_text') === C20.poems.en.lines.join('\n'))
+  check('(6) an order with the included poem: ONE cart with ONE line item (the package) — no poem line item, no poem product, no variant', res.status === 200 && lines.length === 1 && lines[0].merchandiseId.endsWith('/2'), JSON.stringify(j).slice(0, 200))
+  check('(6) the poem goes on that main line as ichirei_poem_type, ichirei_poem_text (the lines, one per row) and ichirei_poem_reading', attr(lines[0], 'ichirei_poem_type') === 'tanka' && attr(lines[0], 'ichirei_poem_text') === C20.poems.tanka.lines.join('\n') && attr(lines[0], 'ichirei_poem_reading') === '-')
   check('(6) poem text comes from the server\'s store, never from the browser: the "EVIL" lines sent with the poem_id are ignored', !JSON.stringify(shopSeen[0]).includes('EVIL'))
-  check('(6) the certificate object carries poems: [{type, lines, reading}] (response and stored record) and the record lists the price shown', j.certificate.poems.length === 2 && j.certificate.poems[0].type === 'tanka' && j.certificate.poems[0].lines.length === 5 && j.certificate.poems[1].type === 'en' && (store.records.get(j.order_ref) as any).production.certificate.poems.length === 2 && (store.records.get(j.order_ref) as any).production.poems.map((p: any) => p.price_jpy).join() === '1980,1980' && (store.records.get(j.order_ref) as any).production.poems[0].poem_id === poemId20)
-  check('(6) the main line is unchanged: the nine attributes and the animation link, no poem keys', lines[0].attributes.map((a: any) => a.key).join() === 'kanji,inscription_form,reading,certificate_meaning_en,sender_name,receiver_name,delivery_date,language,order_ref,ichirei_animation_url')
+  check('(6) the attribute order: the nine usual ones, then the poem (type, text, reading), then the animation link last', lines[0].attributes.map((a: any) => a.key).join() === 'kanji,inscription_form,reading,certificate_meaning_en,sender_name,receiver_name,delivery_date,language,order_ref,ichirei_poem_type,ichirei_poem_text,ichirei_poem_reading,ichirei_animation_url')
+  const rec = store.records.get(j.order_ref) as any
+  check('(6) the certificate object carries poems: [{type, lines, reading}] (response and stored record); the record has no price for it', j.certificate.poems.length === 1 && j.certificate.poems[0].type === 'tanka' && j.certificate.poems[0].lines.length === 5 && rec.production.certificate.poems.length === 1 && rec.production.poems.length === 1 && !('price_jpy' in rec.production.poems[0]))
+  const anim = store.records.get(j.animation_url.split('/').pop()) as any
+  check('(6) the story animation uses THAT poem: its record holds the chosen poem (type, lines) — the film plays what the buyer chose', anim.poem?.type === 'tanka' && anim.poem.lines.join() === C20.poems.tanka.lines.join())
   const ev = (store.lines.get('analytics/2026-10-28.jsonl') ?? []).map((l) => JSON.parse(l))
-  check('(6) analytics: the order is recorded with the poem types; a poem_added event per poem — types only', ev.some((e) => e.event === 'ordered' && e.poem_types?.join() === 'tanka,en') && ev.filter((e) => e.event === 'poem_added').map((e) => e.poem_type).join() === 'tanka,en')
-  const none = await quiet(() => postOrder(orderHandler(VARS), orderBody()))
+  check('(6) analytics: the order is recorded with the poem type, and a poem_added event — type only', ev.some((e) => e.event === 'ordered' && e.poem_types?.join() === 'tanka') && ev.filter((e) => e.event === 'poem_added').map((e) => e.poem_type).join() === 'tanka')
+  const none = await quiet(() => postOrder(orderHandler(), orderBody()))
   const jn = (await none.json()) as any
-  check('(6) an order with no poem is exactly as before: one line item, certificate.poems = []', none.status === 200 && shopSeen.at(-1).variables.input.lines.length === 1 && jn.certificate.poems.length === 0)
+  const noAttrs = shopSeen.at(-1).variables.input.lines[0].attributes.map((a: any) => a.key)
+  const noAnim = store.records.get(jn.animation_url.split('/').pop()) as any
+  check('(6) an order with no poem (the buyer\'s poem failed twice) goes through: one line item, no poem attributes, certificate.poems = [], and the film has no poem part', none.status === 200 && shopSeen.at(-1).variables.input.lines.length === 1 && !noAttrs.some((k: string) => k.startsWith('ichirei_poem')) && jn.certificate.poems.length === 0 && noAnim.poem === null)
+  const en = await quiet(() => postOrder(orderHandler(), orderBody({ language: 'en', inscription_style: 'modern', engine_result: { ...orderBody().engine_result, language: 'en' }, poems: [{ poem_id: poemIdEn }] })))
+  check('(6) …and an English poem is refused for a Japanese gift (the poem belongs to a language), so the page asks for the poem again', en.status === 400 && ((await en.json()) as any).code === 'poem_mismatch')
 }
 {
-  const r1 = await postOrder(orderHandler(VARS), orderBody({ poems: [{ poem_id: poemId20 }, { poem_id: poemIdEn }, { poem_id: poemId20 }] }))
-  check(`(6) at most ${MAX_POEMS} poems: a third is refused (400 too_many_poems)`, r1.status === 400 && ((await r1.json()) as any).code === 'too_many_poems')
-  const r2 = await postOrder(orderHandler(VARS), orderBody({ poems: [{ poem_id: poemId20 }, { poem_id: poemId20 }] }))
-  check('(6) the same kind twice is refused (400 duplicate_poem_type)', r2.status === 400 && ((await r2.json()) as any).code === 'duplicate_poem_type')
-  const r3 = await postOrder(orderHandler({ en: VARS.en }), orderBody({ poems: [{ poem_id: poemId20 }] }))
-  check('(6) a poem whose type has no variant (tanka here) is refused — the order does not go through with it (400 poem_type_unavailable)', r3.status === 400 && ((await r3.json()) as any).code === 'poem_type_unavailable')
-  const r4 = await postOrder(orderHandler(VARS), orderBody({ poems: [{ poem_id: 'PM-20261028-zzzzzzzzzz' }] }))
-  const r5 = await postOrder(orderHandler(VARS), orderBody({ poems: [{ poem_id: 'nope' }] }))
-  const r6 = await postOrder(orderHandler(VARS), orderBody({ poems: 'x' }))
+  const r1 = await postOrder(orderHandler(), orderBody({ poems: [{ poem_id: poemId20 }, { poem_id: poemIdEn }] }))
+  check(`(6) one poem only (MAX_POEMS = ${MAX_POEMS}): a second is refused (400 too_many_poems)`, MAX_POEMS === 1 && r1.status === 400 && ((await r1.json()) as any).code === 'too_many_poems')
+  const r4 = await postOrder(orderHandler(), orderBody({ poems: [{ poem_id: 'PM-20261028-zzzzzzzzzz' }] }))
+  const r5 = await postOrder(orderHandler(), orderBody({ poems: [{ poem_id: 'nope' }] }))
+  const r6 = await postOrder(orderHandler(), orderBody({ poems: 'x' }))
   check('(6) an unknown poem_id (poem_not_found), a malformed one and a non-array are refused (400)', r4.status === 400 && ((await r4.json()) as any).code === 'poem_not_found' && r5.status === 400 && r6.status === 400)
-  const r7 = await postOrder(orderHandler(VARS), orderBody({ selected_kanji: '守', poems: [{ poem_id: poemId20 }] }))
+  const r7 = await postOrder(orderHandler(), orderBody({ selected_kanji: '守', poems: [{ poem_id: poemId20 }] }))
   check('(6) a poem belongs to ONE character: ordering it with another character is refused (400 poem_mismatch)', r7.status === 400 && ((await r7.json()) as any).code === 'poem_mismatch')
-  const r8 = await postOrder(orderHandler(VARS), orderBody({ language: 'en', engine_result: { ...orderBody().engine_result, language: 'en' }, poems: [{ poem_id: poemId20 }] }))
-  check('(6) …nor in another language', r8.status === 400)
 }
 
 {
@@ -333,18 +327,18 @@ const postOrder = (h: (r: Request) => Promise<Response>, b: unknown) => h(new Re
   const { summarizePoems, formatPoems } = await import('./report-choices.mjs')
   const evs = (store.lines.get('analytics/2026-10-28.jsonl') ?? []).map((l) => JSON.parse(l))
   const rows = summarizePoems(evs, { source: 'customer' })
-  check('(6) the report counts poem previews and additions per type (sessions, no text) and prints a poem block', rows.some((r: any) => r.type === 'tanka' && r.previewed === 1 && r.added === 1) && rows.some((r: any) => r.type === 'en' && r.previewed === 1 && r.added === 1) && formatPoems(rows).includes('previewed') && formatPoems([]).includes('no poem add-on events'))
+  check('(6) the report counts poems written and ordered per type (sessions, no text) and prints a poem block', rows.some((r: any) => r.type === 'tanka' && r.previewed >= 1 && r.added === 1) && formatPoems(rows).includes('previewed') && formatPoems([]).includes('no poem add-on'))
 }
 
-// ---- 7. the server: rate limit 20 per hour, the page ------------------------------------------------------------------------------------------------
+// ---- 7. the server: rate limit 20 per hour; nothing of the old add-on is left --------------------------------------------------------------------------
 {
   const server = await startServer({ upstreamUrl: process.env.ANTHROPIC_BASE_URL, env: { ICHIREI_POEM_LIMIT: '2/60', ICHIREI_LEXICON_MODE: 'off' } })
   try {
-    const types = (await (await fetch(`${server.url}/api/poem-types`)).json()) as any
-    check('(7) the server answers /api/poem-types: no variant env → no types (the page hides the poem step); /api/health lists poemTypes', types.types.length === 0 && ((await (await fetch(`${server.url}/api/health`)).json()) as any).poemTypes?.length === 0)
+    const h = (await (await fetch(`${server.url}/api/health`)).json()) as any
+    check('(7) /api/poem-types is gone (every format is always on offer) and /api/health no longer lists poem types or a preview switch', (await fetch(`${server.url}/api/poem-types`)).status === 404 && !('poemTypes' in h) && !('poemPreview' in h))
     const statuses: number[] = []
     for (let i = 0; i < 3; i++) statuses.push((await fetch(`${server.url}/api/poem`, { method: 'POST', body: JSON.stringify(body(C20, 'tanka')) })).status)
-    check('(7) /api/poem is rate limited per IP (here 2/60): the third request is 429 with Retry-After; the first two reach the handler (404: no types on offer)', statuses.join() === '404,404,429', statuses.join())
+    check('(7) /api/poem is rate limited per IP (here 2/60): the third request is 429 with Retry-After; the first two reach the handler (503: no order store in this test server)', statuses.join() === '503,503,429', statuses.join())
     const rl = await fetch(`${server.url}/api/poem`, { method: 'POST', body: '{}' })
     check('(7) …429 carries the standard body and header', rl.status === 429 && rl.headers.get('retry-after') !== null && ((await rl.json()) as any).code === 'rate_limited')
   } finally {
@@ -352,77 +346,20 @@ const postOrder = (h: (r: Request) => Promise<Response>, b: unknown) => h(new Re
   }
   const dflt = read('server/app.ts')
   check('(7) the default limit is 20 per hour per IP', dflt.includes("envRunLimiter('ICHIREI_POEM_LIMIT', { max: 20, minutes: 60 })"))
-  const withTypes = await startServer({ upstreamUrl: process.env.ANTHROPIC_BASE_URL, env: { SHOPIFY_VARIANT_POEM_TANKA: '501', SHOPIFY_VARIANT_POEM_EN: '504', ICHIREI_LEXICON_MODE: 'off' } })
-  try {
-    const t = (await (await fetch(`${withTypes.url}/api/poem-types`)).json()) as any
-    check('(7) with two variants set the server offers exactly those two types', t.types.join() === 'tanka,en' && t.price_jpy === 1980)
-  } finally {
-    await withTypes.stop()
-  }
-}
-
-// ---- 7b. ICHIREI_POEM_PREVIEW: internal testing of poem quality before the Shopify poem products exist ------------------------------------------
-{
-  check('(7b) preview switch: off by default, `on` only when set to on (anything else is off)', !poemPreviewOn({} as never) && !poemPreviewOn({ ICHIREI_POEM_PREVIEW: 'off' } as never) && !poemPreviewOn({ ICHIREI_POEM_PREVIEW: '1' } as never) && poemPreviewOn({ ICHIREI_POEM_PREVIEW: 'on' } as never) && poemPreviewOn({ ICHIREI_POEM_PREVIEW: ' ON ' } as never))
-  check('(7b) preview accepts all four types for POST /api/poem even with no variant; off accepts only the types with a variant', poemTypesAccepted({ ICHIREI_POEM_PREVIEW: 'on' } as never).join() === 'tanka,tang,ci,en' && poemTypesAccepted({} as never).length === 0 && poemTypesAccepted({ SHOPIFY_VARIANT_POEM_CI: '9' } as never).join() === 'ci')
-  check('(7b) …but what the page and the order flow read is unchanged: availablePoemTypes ignores the preview switch', availablePoemTypes({ ICHIREI_POEM_PREVIEW: 'on' } as never).length === 0)
-  check('(7b) cloudbuild.yaml sets it (temporarily) to on and passes it to the service', /_POEM_PREVIEW: 'on'/.test(read('cloudbuild.yaml')) && read('cloudbuild.yaml').includes('ICHIREI_POEM_PREVIEW=${_POEM_PREVIEW}'))
-  const dir = mkdtempSync(join(tmpdir(), 'ichirei-poem-preview-'))
-  const preview = await startServer({ upstreamUrl: process.env.ANTHROPIC_BASE_URL, env: { ICHIREI_POEM_PREVIEW: 'on', ICHIREI_POEM_LIMIT: '4/60', ICHIREI_LEXICON_MODE: 'off', ORDER_STORE_DIR: dir } })
-  try {
-    const h = (await (await fetch(`${preview.url}/api/health`)).json()) as any
-    check('(7b) /api/health reports poemPreview: true — and poemTypes still lists only the types with a variant (none here)', h.poemPreview === true && h.poemTypes.length === 0)
-    const t = (await (await fetch(`${preview.url}/api/poem-types`)).json()) as any
-    check('(7b) the page still gets NO poem chips: /api/poem-types is empty in preview mode (customers see nothing)', t.types.length === 0)
-    const statuses: number[] = []
-    for (const type of ['tanka', 'tang', 'ci', 'en'] as const) {
-      replies = [C20.poems[type]]
-      reviewReplies = []
-      statuses.push((await quiet(() => fetch(`${preview.url}/api/poem`, { method: 'POST', body: JSON.stringify(body(C20, type)) }))).status)
-    }
-    check('(7b) POST /api/poem works for all four types with no Shopify variant (200 each)', statuses.join() === '200,200,200,200', statuses.join())
-    const fifth = await fetch(`${preview.url}/api/poem`, { method: 'POST', body: JSON.stringify(body(C20, 'tanka')) })
-    check('(7b) the rate limit still applies in preview (here 4/60: the fifth request is 429)', fifth.status === 429 && ((await fifth.json()) as any).code === 'rate_limited')
-    const bad = await fetch(`${preview.url}/api/poem`, { method: 'POST', body: JSON.stringify(body(C20, 'tanka', { kanji: '死' })) })
-    check('(7b) the other poem rules still apply in preview (a hard-block character is refused; limit counted first so this is 429 or 400)', bad.status === 429 || bad.status === 400)
-  } finally {
-    await preview.stop()
-    rmSync(dir, { recursive: true, force: true })
-  }
-  // rules independent of the rate limit, through the handler with all four types accepted (what preview does)
-  const all = ['tanka', 'tang', 'ci', 'en'] as PoemType[]
-  const refused = await post(handler(all), body(C20, 'tanka', { kanji: '死' }))
-  check('(7b) preview: the palette block still refuses a hard-block character (400 character_not_allowed)', refused.status === 400 && ((await refused.json()) as any).code === 'character_not_allowed')
-  const memorial = await post(handler(all), body(C04, 'tanka', { kanji: '祝' }))
-  check('(7b) preview: the remembrance block still refuses a celebration character (400)', memorial.status === 400)
-  replies = [C20.poems.tang]
-  reviewReplies = []
-  const tangRes = await quiet(() => post(handler(all), body(C20, 'tang')))
-  const tangJ = (await tangRes.json()) as any
-  check('(7b) POST /api/poem for a Japanese buyer\'s tang returns the 現代語訳: `aids.gendaigo`, and `reading` = 書き下し then 現代語訳 (and the stored poem has the same reading)', tangRes.status === 200 && tangJ.aids?.kakikudashi?.length === 4 && tangJ.aids?.gendaigo?.includes('二十年') && tangJ.reading.includes('晨に起きて') && tangJ.reading.includes(tangJ.aids.gendaigo) && (store.records.get(tangJ.poem_id) as any)?.reading === tangJ.reading)
-  // failure reasons through the API: codes always, the words only in preview mode
-  const failing = { ok: false as const, code: 'poem_failed' as const, error: 'x', reasons: ['character_missing'], problems: ['the chosen character (待) does not appear in the poem'] }
-  const rOff = await post(handler(all, { generate: async () => failing }), body(C20, 'en'))
-  const jOff = (await rOff.json()) as any
-  const rOn = await post(handler(all, { generate: async () => failing, detail: true }), body(C20, 'en'))
-  const jOn = (await rOn.json()) as any
-  check('(7b) a failed poem answers 502 with `reasons` (short codes); the failed checks in words (`problems`) only in preview mode', rOff.status === 502 && jOff.code === 'poem_failed' && jOff.reasons?.join() === 'character_missing' && jOff.problems === undefined && jOn.problems?.length === 1 && jOn.reasons?.join() === 'character_missing')
-  // the order flow still refuses a poem whose Shopify variant is missing, whatever the preview says
-  replies = [C20.poems.ci]
-  reviewReplies = []
-  const ci = (await (await quiet(() => post(handler(all), body(C20, 'ci')))).json()) as any
-  const refusedOrder = await postOrder(orderHandler({}), orderBody({ poems: [{ poem_id: ci.poem_id }] }))
-  check('(7b) the order flow still refuses a poem without a variant (400 poem_type_unavailable), even though the preview wrote it', typeof ci.poem_id === 'string' && refusedOrder.status === 400 && ((await refusedOrder.json()) as any).code === 'poem_type_unavailable')
+  const gone = ['cloudbuild.yaml', 'engine/shopify.ts', 'api/poem.ts', 'api/order.ts', 'server/app.ts', 'src/demo/PoemAddOn.tsx', 'src/order/packages.ts'].map((f) => [f, read(f)] as const)
+  check('(7) the preview switch and the poem products are gone from the code and the deploy file: no ICHIREI_POEM_PREVIEW, no SHOPIFY_VARIANT_POEM_*, no poem price, no poem variant', gone.every(([, t]) => !/ICHIREI_POEM_PREVIEW|SHOPIFY_VARIANT_POEM|POEM_PRICE_JPY|poemVariants|poemPreviewOn|_POEM_PREVIEW/.test(t)), gone.filter(([, t]) => /ICHIREI_POEM_PREVIEW|SHOPIFY_VARIANT_POEM|POEM_PRICE_JPY|poemVariants|poemPreviewOn/.test(t)).map(([f]) => f).join())
 }
 
 // ---- 8. the page ------------------------------------------------------------------------------------------------------------------------------------
 {
   const form = read('src/demo/OrderForm.tsx')
   const addon = read('src/demo/PoemAddOn.tsx')
-  check('(8) the order form mounts the add-on and sends only poem_ids with the order', form.includes('<PoemAddOn') && form.includes("poems: poemIds.map((poem_id) => ({ poem_id }))") && !/poems:.*lines/.test(form))
-  check('(8) the add-on: four chips from /api/poem-types, at most 2 selectable, each showing ¥1,980, hidden when no type is on offer', addon.includes('/api/poem-types') && addon.includes('MAX_POEMS') && addon.includes('POEM_PRICE_JPY') && addon.includes('offered.length === 0') && addon.includes('return null'))
-  check('(8) the add-on copy exists in all four languages: the question, the four type names, the price and the "printed on the card" line', (['ja', 'zh-Hans', 'zh-Hant', 'en'] as const).every((l) => { const p = COPY[l].order.poem; return p.heading.length > 0 && POEM_TYPES.every((t) => p.types[t].length > 0) && p.note(formatYen(1980), 2).includes('1,980') && p.printedOnCard.length > 0 && p.total(2, '¥3,960').includes('3,960') }) && COPY.ja.order.poem.heading === 'この一字に、歌を添えますか？')
-  check('(8) price display comes from packages.ts (POEM_PRICE_JPY = 1980, MAX_POEMS = 2); the charge is the Shopify variant\'s', POEM_PRICE_JPY === 1980 && MAX_POEMS === 2 && read('src/order/packages.ts').includes('POEM_PRICE_JPY = 1980'))
+  check('(8) the order form mounts the step, sends only the poem_id with the order, and waits while the poem is being written', form.includes('<PoemAddOn') && form.includes("poems: poemIds.map((poem_id) => ({ poem_id }))") && !/poems:.*lines/.test(form) && form.includes("poemStep !== 'loading'"))
+  check('(8) the step is always visible: four formats as radio buttons, no call to a type list, no price', addon.includes('POEM_TYPES.map') && addon.includes('type="radio"') && !addon.includes('/api/poem-types') && !addon.includes('formatYen'))
+  check('(8) the default format follows the site language: ja → tanka, zh → ci (both scripts), en → en', DEFAULT_POEM_TYPE.ja === 'tanka' && DEFAULT_POEM_TYPE['zh-Hans'] === 'ci' && DEFAULT_POEM_TYPE['zh-Hant'] === 'ci' && DEFAULT_POEM_TYPE.en === 'en' && addon.includes('DEFAULT_POEM_TYPE[language]'))
+  check('(8) the whole poem is shown before checkout (every line, then the reading aids), not just a first line', addon.includes('data-poem-full') && addon.includes('st.lines.join') && !addon.includes('.preview') && addon.includes('data-poem-reading'))
+  check('(8) a poem that fails is tried twice, then given up politely and the order goes ahead without one (the step reports "none", not "loading")', addon.includes('const TRIES = 2') && addon.includes("'none'") && addon.includes('failedFinal'))
+  check('(8) the copy exists in all four languages: the heading, "included, no extra charge", the four format names, the failure note and the retry button — and mentions no price', (['ja', 'zh-Hans', 'zh-Hant', 'en'] as const).every((l) => { const c = COPY[l].order.poem; return c.heading.length > 3 && c.note.length > 10 && POEM_TYPES.every((t) => c.types[t].length > 1) && c.loading.length > 2 && c.printedOnCard.length > 3 && c.failedFinal.length > 15 && c.tryAgain.length > 1 && !/[¥￥]|円|\d{3,}|yen/i.test(c.note + c.heading) }))
   check('(8) the prompts are all in place (one file per type) and load', POEM_TYPES.every((t) => loadPoemPrompt(t).length > 1500))
 }
 

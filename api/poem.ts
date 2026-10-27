@@ -1,10 +1,10 @@
-// POST /api/poem — one poem for the chosen character (the paid add-on, 歌の添え書き), and GET /api/poem-types — which types are on offer.
+// POST /api/poem — one poem for the chosen character (歌の添え書き: ONE poem is included free in every order; the buyer picks the format).
 //
 //   body  { session?, story, follow_ups?, language, relationship?, direction?, occasion?, occasion_detail?, kanji, gaze, type }
-//   200   { poem_id, type, lines, pattern, reading, aids, preview, price_jpy }   `preview` is the FIRST LINE only
-//   502   { error, code: 'poem_failed', type, reasons: [codes] }   (+ `problems`: the failed checks in words, only in ICHIREI_POEM_PREVIEW mode)
-//   The poem is stored under poem_id on the server; /api/order takes the poem_id (never poem text from the browser) and the Shopify
-//   line item + attributes are built from the stored poem. A type whose Shopify variant is not configured is not offered (unless ICHIREI_POEM_PREVIEW=on, which only lets this endpoint write it).
+//   200   { poem_id, type, lines, pattern, reading, aids, preview }   the page shows the FULL poem before checkout (`preview` is the first line)
+//   502   { error, code: 'poem_failed', type, reasons: [codes] }   (the failed checks in words are in the server log only)
+//   The poem is stored under poem_id on the server; /api/order takes the poem_id (never poem text from the browser) and the attributes on the
+//   main Shopify line item are built from the stored poem. All four types are always available.
 //
 // Web-standard handler like api/order.ts. Cost brake: the server mounts it behind ICHIREI_POEM_LIMIT (20 per hour per IP).
 
@@ -15,8 +15,7 @@ import { POEM_ID_PATTERN, todayJst, type StoredPoem } from '../engine/order.ts'
 import { createOrderStore, type OrderStore } from '../engine/order-store.ts'
 import { loadPalette, type Palette } from '../engine/palette.ts'
 import { generatePoem, type GenerateOptions } from '../engine/poem.ts'
-import { availablePoemTypes, poemPreviewOn, poemTypesAccepted } from '../engine/shopify.ts'
-import { MAX_POEMS, POEM_PRICE_JPY, POEM_TYPES, type PoemType } from '../src/order/packages.ts'
+import { POEM_TYPES, type PoemType } from '../src/order/packages.ts'
 
 const MAX_BODY_BYTES = 40_000
 const GAZE_MAX = 300
@@ -26,13 +25,9 @@ const json = (status: number, body: unknown) =>
 
 export interface PoemDeps {
   store: OrderStore | null
-  /** The types POST /api/poem accepts: those with a configured Shopify variant — all four when ICHIREI_POEM_PREVIEW is on (testing only). */
-  types: PoemType[]
   palette?: Palette
   generate?: typeof generatePoem
   generateOptions?: GenerateOptions
-  /** ICHIREI_POEM_PREVIEW: a failed poem also answers with the failed checks in words (`problems`), for the owner's testing. */
-  detail?: boolean
   now?: () => Date
 }
 
@@ -61,7 +56,6 @@ export function createPoemHandler(deps: () => PoemDeps) {
 
     const type = body.type
     if (typeof type !== 'string' || !(POEM_TYPES as readonly string[]).includes(type)) return json(400, { error: `Invalid "type": expected one of ${POEM_TYPES.join(' | ')}`, field: 'type' })
-    if (!d.types.includes(type as PoemType)) return json(404, { error: 'This kind of poem is not on offer.', code: 'poem_type_unavailable', field: 'type' })
     if (typeof body.story !== 'string' || !body.story.trim()) return json(400, { error: 'Missing "story"', field: 'story' })
     if (countChars(body.story) > STORY_MAX) return json(400, { error: `"story" is longer than ${STORY_MAX} characters`, field: 'story' })
     const fu = parseFollowUps(body.follow_ups)
@@ -92,7 +86,7 @@ export function createPoemHandler(deps: () => PoemDeps) {
     )
     if (!result.ok) {
       const status = result.code === 'poem_timeout' ? 504 : result.code === 'declined' ? 422 : 502
-      return json(status, { error: result.error, code: result.code, type, ...(result.reasons?.length ? { reasons: result.reasons } : {}), ...(d.detail && result.problems?.length ? { problems: result.problems } : {}) })
+      return json(status, { error: result.error, code: result.code, type, ...(result.reasons?.length ? { reasons: result.reasons } : {}) })
     }
 
     const poem = result.poem
@@ -107,14 +101,11 @@ export function createPoemHandler(deps: () => PoemDeps) {
     // Learning loop: which types were previewed — the session id and the type only, never the poem or the story.
     const sessionId = cleanSession(body.session)
     if (sessionId) void recordEvent({ ts: now.toISOString(), session: sessionId, source: cleanSource(body.source), event: 'poem_previewed', poem_type: poem.type }, d.store, now)
-    return json(200, { poem_id: poemId, type: poem.type, lines: poem.lines, pattern: poem.pattern, reading: poem.reading, aids: poem.aids, preview: poem.lines[0], price_jpy: POEM_PRICE_JPY, max: MAX_POEMS })
+    return json(200, { poem_id: poemId, type: poem.type, lines: poem.lines, pattern: poem.pattern, reading: poem.reading, aids: poem.aids, preview: poem.lines[0] })
   }
 }
 
 export const poemIdValid = (id: unknown): id is string => typeof id === 'string' && POEM_ID_PATTERN.test(id)
 
-export const POST = createPoemHandler(() => ({ store: createOrderStore(), types: poemTypesAccepted(), detail: poemPreviewOn() }))
+export const POST = createPoemHandler(() => ({ store: createOrderStore() }))
 export const GET = () => json(405, { error: 'Method not allowed' })
-
-/** GET /api/poem-types — the types on offer and the price shown (the charge is the Shopify variant's). Empty list → the page hides the poem step. */
-export const TYPES_GET = () => json(200, { types: availablePoemTypes(), price_jpy: POEM_PRICE_JPY, max: MAX_POEMS })

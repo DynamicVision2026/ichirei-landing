@@ -1,16 +1,18 @@
-import { useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import type { Candidate, EngineResult } from './types'
 import type { Copy, UiLanguage } from './i18n'
 import { log } from './logging'
 import { sessionId } from './analytics'
-import { MAX_POEMS, POEM_PRICE_JPY, POEM_TYPES, formatYen, type PoemType } from '../order/packages.ts'
+import { DEFAULT_POEM_TYPE, POEM_TYPES, type PoemType } from '../order/packages.ts'
 
-// The poem add-on (歌の添え書き), spec v9.1 step 10: after choosing a character the buyer may add up to MAX_POEMS poems, each ¥1,980.
-// Selecting a chip asks /api/poem for that poem and shows ONLY ITS FIRST LINE ("the full poem is printed on your card"). The page keeps
-// the poem_id only; /api/order reads the poem back from the server — poem text is never sent by the browser. A type with no Shopify
-// variant is not offered (/api/poem-types lists the types on offer); with none on offer the whole step is hidden.
+// The poem (歌の添え書き): ONE poem is included free in every order. After the character is chosen the buyer picks a format (the first one
+// shown follows the site language: ja → tanka, zh → ci, en → en), the poem is written at once and shown IN FULL before checkout; another
+// format can be tried (each one is written once and kept). The page keeps only the poem_id: /api/order reads the poem back from the server —
+// poem text is never sent by the browser. A poem that cannot be written after two tries is given up politely and the order goes ahead without
+// one. While a poem is being written the order button waits (the buyer sees the poem before paying).
 
-type Status = { state: 'loading' } | { state: 'ready'; poemId: string; preview: string } | { state: 'error'; message: string }
+type Status = { state: 'loading'; attempt: number } | { state: 'ready'; poemId: string; lines: string[]; reading: string } | { state: 'failed' }
+export type PoemStep = 'loading' | 'ready' | 'none'
 
 type Props = {
   result: EngineResult
@@ -19,147 +21,136 @@ type Props = {
   candidate: Candidate
   copy: Copy
   language: UiLanguage
-  /** Called with the poem_ids of the poems that are ready and chosen, in the order they were added. */
-  onChange: (poemIds: string[]) => void
+  /** The poem_ids to send with the order (zero or one) and whether the step is still working. */
+  onChange: (poemIds: string[], step: PoemStep) => void
   disabled?: boolean
 }
 
+const TRIES = 2
+const CALL_TIMEOUT_MS = 60_000
+
 export default function PoemAddOn({ result, story, followUps, candidate, copy, language, onChange, disabled }: Props) {
   const p = copy.order.poem
-  const [offered, setOffered] = useState<PoemType[] | null>(null)
+  const [selected, setSelected] = useState<PoemType>(DEFAULT_POEM_TYPE[language])
   const [status, setStatus] = useState<Partial<Record<PoemType, Status>>>({})
-  const [order, setOrder] = useState<PoemType[]>([])
-  const aborts = useRef<Partial<Record<PoemType, AbortController>>>({})
+  const inflight = useRef<{ type: PoemType; ac: AbortController } | null>(null)
+  const started = useRef<Set<PoemType>>(new Set())
 
+  const write = useCallback(
+    async (type: PoemType) => {
+      for (let attempt = 1; attempt <= TRIES; attempt++) {
+        const ac = new AbortController()
+        inflight.current = { type, ac }
+        setStatus((s) => ({ ...s, [type]: { state: 'loading', attempt } }))
+        log('poem_requested', { type, attempt })
+        try {
+          const res = await fetch('/api/poem', {
+            method: 'POST',
+            headers: { 'content-type': 'application/json' },
+            signal: AbortSignal.any ? AbortSignal.any([ac.signal, AbortSignal.timeout(CALL_TIMEOUT_MS)]) : ac.signal,
+            body: JSON.stringify({
+              session: sessionId,
+              source: 'customer',
+              story,
+              ...(followUps.length ? { follow_ups: followUps } : {}),
+              language,
+              ...(result.relationship ? { relationship: result.relationship } : {}),
+              ...(result.direction ? { direction: result.direction } : {}),
+              ...(result.occasion ? { occasion: result.occasion } : {}),
+              ...(result.occasion_detail ? { occasion_detail: result.occasion_detail } : {}),
+              kanji: candidate.kanji,
+              gaze: candidate.one_line_gaze,
+              type,
+            }),
+          })
+          const data = (await res.json().catch(() => null)) as { poem_id?: string; lines?: string[]; reading?: string; code?: string } | null
+          if (res.ok && data?.poem_id && Array.isArray(data.lines) && data.lines.length > 0) {
+            setStatus((s) => ({ ...s, [type]: { state: 'ready', poemId: data.poem_id!, lines: data.lines!, reading: data.reading ?? '' } }))
+            log('poem_ready', { type, attempt })
+            return
+          }
+          log('poem_failed', { type, attempt, code: data?.code ?? res.status })
+          if (res.status === 429 || data?.code === 'declined') break // nothing to gain from asking again right away
+        } catch {
+          if (ac.signal.aborted) return // the buyer chose another format: this one is dropped quietly
+          log('poem_failed', { type, attempt, code: 'network' })
+        }
+      }
+      setStatus((s) => ({ ...s, [type]: { state: 'failed' } }))
+    },
+    [candidate.kanji, candidate.one_line_gaze, followUps, language, result, story],
+  )
+
+  // write the selected format (once) as soon as it is selected; leave an unfinished one if the buyer moves on
   useEffect(() => {
-    let alive = true
-    const pending = aborts.current
-    fetch('/api/poem-types')
-      .then((r) => (r.ok ? r.json() : { types: [] }))
-      .then((j: { types?: unknown }) => alive && setOffered(Array.isArray(j.types) ? (POEM_TYPES.filter((t) => (j.types as unknown[]).includes(t)) as PoemType[]) : []))
-      .catch(() => alive && setOffered([]))
-    return () => {
-      alive = false
-      Object.values(pending).forEach((a) => a?.abort())
+    if (started.current.has(selected)) return
+    started.current.add(selected)
+    const prev = inflight.current
+    if (prev && prev.type !== selected) {
+      prev.ac.abort()
+      started.current.delete(prev.type)
+      setStatus((s) => (s[prev.type]?.state === 'loading' ? { ...s, [prev.type]: undefined } : s))
     }
-  }, [])
+    void write(selected)
+  }, [selected, write])
+  useEffect(
+    () => () => {
+      inflight.current?.ac.abort()
+      started.current.clear() // (a remount, as React's strict mode does in development, writes the poem again)
+    },
+    [],
+  )
 
-  const readyIds = order.flatMap((t) => (status[t]?.state === 'ready' ? [(status[t] as { poemId: string }).poemId] : []))
-  const readyKey = readyIds.join('|')
+  const st = status[selected]
+  const step: PoemStep = !st || st.state === 'loading' ? 'loading' : st.state === 'ready' ? 'ready' : 'none'
+  const poemId = st?.state === 'ready' ? st.poemId : ''
   useEffect(() => {
-    onChange(readyKey ? readyKey.split('|') : [])
-  }, [readyKey]) // eslint-disable-line react-hooks/exhaustive-deps
+    onChange(poemId ? [poemId] : [], step)
+  }, [poemId, step]) // eslint-disable-line react-hooks/exhaustive-deps
 
-  if (!offered || offered.length === 0) return null
-
-  const chosen = order.filter((t) => status[t]?.state === 'ready' || status[t]?.state === 'loading')
-  const remove = (t: PoemType) => {
-    aborts.current[t]?.abort()
-    setStatus((s) => ({ ...s, [t]: undefined }))
-    setOrder((o) => o.filter((x) => x !== t))
-  }
-  const choose = async (t: PoemType) => {
-    if (disabled) return
-    if (status[t]) return remove(t)
-    if (chosen.length >= MAX_POEMS) return
-    const ac = new AbortController()
-    aborts.current[t] = ac
-    setStatus((s) => ({ ...s, [t]: { state: 'loading' } }))
-    setOrder((o) => [...o, t])
-    log('poem_requested', { type: t })
-    try {
-      const res = await fetch('/api/poem', {
-        method: 'POST',
-        headers: { 'content-type': 'application/json' },
-        signal: ac.signal,
-        body: JSON.stringify({
-          session: sessionId,
-          source: 'customer',
-          story,
-          ...(followUps.length ? { follow_ups: followUps } : {}),
-          language,
-          ...(result.relationship ? { relationship: result.relationship } : {}),
-          ...(result.direction ? { direction: result.direction } : {}),
-          ...(result.occasion ? { occasion: result.occasion } : {}),
-          ...(result.occasion_detail ? { occasion_detail: result.occasion_detail } : {}),
-          kanji: candidate.kanji,
-          gaze: candidate.one_line_gaze,
-          type: t,
-        }),
-      })
-      const data = (await res.json().catch(() => null)) as { poem_id?: string; preview?: string } | null
-      if (!res.ok || !data?.poem_id || typeof data.preview !== 'string') throw new Error('poem failed')
-      setStatus((s) => ({ ...s, [t]: { state: 'ready', poemId: data.poem_id!, preview: data.preview! } }))
-      log('poem_ready', { type: t })
-    } catch (err) {
-      if (ac.signal.aborted) return
-      log('poem_failed', { type: t, reason: err instanceof Error ? err.message : 'error' })
-      setStatus((s) => ({ ...s, [t]: { state: 'error', message: p.failed } }))
-    }
+  const tryAgain = () => {
+    started.current.delete(selected)
+    setStatus((s) => ({ ...s, [selected]: undefined }))
+    started.current.add(selected)
+    void write(selected)
   }
 
-  const addedCount = readyIds.length
   return (
-    <fieldset className="cgroup" data-testid="poem-addon">
+    <fieldset className="cgroup" data-testid="poem-addon" data-step={step}>
       <legend className="clab">{p.heading}</legend>
-      <p className="sent">{p.note(formatYen(POEM_PRICE_JPY), MAX_POEMS)}</p>
+      <p className="sent">{p.note}</p>
       <div className="optRow">
-        {offered.map((t) => {
-          const st = status[t]
-          const on = st?.state === 'ready' || st?.state === 'loading'
-          const blocked = !st && chosen.length >= MAX_POEMS
-          return (
-            <button
-              key={t}
-              type="button"
-              className={`opt${on ? ' on' : ''}`}
-              data-poem-type={t}
-              aria-pressed={on}
-              disabled={disabled || blocked || st?.state === 'loading'}
-              onClick={() => choose(t)}
-            >
-              <span>{p.types[t]}</span>
-              <span className="pkgPrice" data-poem-price>
-                {formatYen(POEM_PRICE_JPY)}
-              </span>
-            </button>
-          )
-        })}
+        {POEM_TYPES.map((t) => (
+          <label key={t} className={`opt${selected === t ? ' on' : ''}`}>
+            <input type="radio" name="poem_type" value={t} data-poem-type={t} checked={selected === t} disabled={disabled} onChange={() => setSelected(t)} />
+            <span>{p.types[t]}</span>
+          </label>
+        ))}
       </div>
-      {order.map((t) => {
-        const st = status[t]
-        if (!st) return null
-        return (
-          <div key={t} className="sent" data-poem-result={t} data-state={st.state}>
-            <strong>{p.types[t]}</strong>{' '}
-            {st.state === 'loading' && <span>{p.loading}</span>}
-            {st.state === 'ready' && (
-              <>
-                <span className="notranslate" data-poem-preview>
-                  {st.preview}
-                </span>{' '}
-                <span>{p.printedOnCard}</span>{' '}
-                <button type="button" className="backLink" onClick={() => remove(t)} disabled={disabled}>
-                  {p.remove}
-                </button>
-              </>
+      <div className="sent" data-poem-result={selected} data-state={st?.state ?? 'loading'} aria-live="polite">
+        {(!st || st.state === 'loading') && <span>{p.loading}</span>}
+        {st?.state === 'ready' && (
+          <>
+            <span className="notranslate" data-poem-full style={{ display: 'block', whiteSpace: 'pre-line', lineHeight: 1.9, fontSize: '1.05em' }}>
+              {st.lines.join('\n')}
+            </span>
+            {st.reading && (
+              <span className="notranslate" data-poem-reading style={{ display: 'block', whiteSpace: 'pre-line', lineHeight: 1.7, fontSize: '0.85em', opacity: 0.75, marginTop: '0.5em' }}>
+                {st.reading}
+              </span>
             )}
-            {st.state === 'error' && (
-              <>
-                <span role="alert">{st.message}</span>{' '}
-                <button type="button" className="backLink" onClick={() => remove(t)}>
-                  {p.remove}
-                </button>
-              </>
-            )}
-          </div>
-        )
-      })}
-      {addedCount > 0 && (
-        <p className="sent" data-poem-total>
-          {p.total(addedCount, formatYen(POEM_PRICE_JPY * addedCount))}
-        </p>
-      )}
+            <span style={{ display: 'block', marginTop: '0.5em' }}>{p.printedOnCard}</span>
+          </>
+        )}
+        {st?.state === 'failed' && (
+          <>
+            <span role="status" data-poem-failed>{p.failedFinal}</span>{' '}
+            <button type="button" className="backLink" onClick={tryAgain} disabled={disabled}>
+              {p.tryAgain}
+            </button>
+          </>
+        )}
+      </div>
     </fieldset>
   )
 }

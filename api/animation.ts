@@ -6,7 +6,7 @@
 // are never cached by shared caches and never indexed. Web-standard handlers like api/order.ts; mounted by server/app.ts.
 
 import QRCode from 'qrcode'
-import { ANIMATION_ID_PATTERN, animationUrl, animationView, isAnimationRecord } from '../engine/animation.ts'
+import { ANIMATION_ID_PATTERN, animationUrl, animationView, isAnimationRecord, sampleRecord } from '../engine/animation.ts'
 import { createOrderStore, type OrderStore } from '../engine/order-store.ts'
 import { isOneIdeograph, strokesFor, type StrokeScript } from '../engine/stroke-data.ts'
 
@@ -21,6 +21,8 @@ export interface AnimationDeps {
 
 async function load(id: string, d: AnimationDeps) {
   if (!ANIMATION_ID_PATTERN.test(id)) return { status: 404 as const }
+  const sample = sampleRecord(id, d.env)
+  if (sample) return { status: 200 as const, rec: sample } // a reserved sample film (ICHIREI_ANIMATION_SAMPLES=on): no order behind it
   if (!d.store) return { status: 503 as const }
   let rec: object | null
   try {
