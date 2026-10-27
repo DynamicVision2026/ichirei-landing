@@ -30,7 +30,8 @@ substitutions:
   # Engine settings (v9 speed). Passed to the service on EVERY deploy (--update-env-vars below), so a value set earlier by hand
   # (ICHIREI_EFFORT=high …) can never silently outlive a deploy. Change them here, or per trigger, not on the console.
   _EFFORT: 'medium'                 # ICHIREI_EFFORT — selection call reasoning depth (was high)
-  _MAX_TOKENS: '8000'               # ICHIREI_MAX_TOKENS — reasoning + answer, per selection call (was 20000)
+  _MAX_TOKENS: '14000'              # ICHIREI_MAX_TOKENS — reasoning + answer, per selection call (was 20000, then 8000: too tight for long stories)
+  _MAX_TOKENS_RETRY: '20000'        # ICHIREI_MAX_TOKENS_RETRY — the one automatic retry when a run still hits the limit
   _REVIEW_MODEL: 'claude-haiku-5-5' # ICHIREI_REVIEW_MODEL — the fastest current model; the review only checks a short answer
   _REVIEW_EFFORT: 'low'             # ICHIREI_REVIEW_EFFORT
   _CALL_TIMEOUT_MS: '150000'        # ICHIREI_CALL_TIMEOUT_MS — the selection call may take at most this (one automatic retry); 90 s cut off slow-but-fine runs
@@ -77,7 +78,7 @@ steps:
       # Mount the Secret Manager secrets as env vars of the same name.
       - --set-secrets=ANTHROPIC_API_KEY=ANTHROPIC_API_KEY:latest,SHOPIFY_STOREFRONT_TOKEN=SHOPIFY_STOREFRONT_TOKEN:latest
       # Non-secret settings: the purchase settings and the engine speed settings. --update-env-vars leaves any other variable alone.
-      - --update-env-vars=ICHIREI_EFFORT=${_EFFORT},ICHIREI_MAX_TOKENS=${_MAX_TOKENS},ICHIREI_REVIEW_MODEL=${_REVIEW_MODEL},ICHIREI_REVIEW_EFFORT=${_REVIEW_EFFORT},ICHIREI_CALL_TIMEOUT_MS=${_CALL_TIMEOUT_MS},ICHIREI_REVIEW_TIMEOUT_MS=${_REVIEW_TIMEOUT_MS},SHOPIFY_VARIANT_SIMPLE=${_SHOPIFY_VARIANT_SIMPLE},SHOPIFY_VARIANT_STANDARD=${_SHOPIFY_VARIANT_STANDARD},SHOPIFY_STOREFRONT_TOKEN_PUBLIC=${_SHOPIFY_STOREFRONT_TOKEN},SHOPIFY_ADMIN_CLIENT_ID=${_SHOPIFY_ADMIN_CLIENT_ID},ORDER_BUCKET=${_ORDER_BUCKET}
+      - --update-env-vars=ICHIREI_EFFORT=${_EFFORT},ICHIREI_MAX_TOKENS=${_MAX_TOKENS},ICHIREI_MAX_TOKENS_RETRY=${_MAX_TOKENS_RETRY},ICHIREI_REVIEW_MODEL=${_REVIEW_MODEL},ICHIREI_REVIEW_EFFORT=${_REVIEW_EFFORT},ICHIREI_CALL_TIMEOUT_MS=${_CALL_TIMEOUT_MS},ICHIREI_REVIEW_TIMEOUT_MS=${_REVIEW_TIMEOUT_MS},SHOPIFY_VARIANT_SIMPLE=${_SHOPIFY_VARIANT_SIMPLE},SHOPIFY_VARIANT_STANDARD=${_SHOPIFY_VARIANT_STANDARD},SHOPIFY_STOREFRONT_TOKEN_PUBLIC=${_SHOPIFY_STOREFRONT_TOKEN},SHOPIFY_ADMIN_CLIENT_ID=${_SHOPIFY_ADMIN_CLIENT_ID},ORDER_BUCKET=${_ORDER_BUCKET}
 
 images:
   - ${_REGION}-docker.pkg.dev/$PROJECT_ID/${_REPO}/${_SERVICE}:$BUILD_ID

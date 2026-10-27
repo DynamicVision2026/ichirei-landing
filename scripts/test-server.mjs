@@ -83,11 +83,11 @@ try {
   // What did the real engine actually send the model?
   const sent = upstream.state.requests.filter((r) => r.kind === 'select').at(-1)
   check('review: the review call runs on claude-haiku-5-5 at low effort', upstream.state.requests.some((r) => r.kind === 'review' && r.body.model === 'claude-haiku-5-5' && r.body.output_config?.effort === 'low'))
-  check('health: reports the speed settings the server runs with', health.effort === 'medium' && health.maxTokens === 8000 && health.reviewModel === 'claude-haiku-5-5' && health.reviewEffort === 'low' && health.callTimeoutMs === 150000 && health.reviewTimeoutMs === 60000, JSON.stringify(health))
+  check('health: reports the speed settings the server runs with', health.effort === 'medium' && health.maxTokens === 14000 && health.maxTokensRetry === 20000 && health.reviewModel === 'claude-haiku-5-5' && health.reviewEffort === 'low' && health.callTimeoutMs === 150000 && health.reviewTimeoutMs === 60000, JSON.stringify(health))
   check('review: the engine made a SECOND, separate model call (the review) after the selection call, with no selection reasoning in it', upstream.state.requests.some((r) => r.kind === 'review' && !String(r.body.messages[0].content).includes('Abandonment Resistance')))
   const prompt = sent?.body.messages?.[0]?.content ?? ''
   check('engine→model: model is claude-sonnet-5, streaming, effort medium', sent?.body.model === 'claude-sonnet-5' && sent?.body.stream === true && sent?.body.output_config?.effort === 'medium', JSON.stringify({ m: sent?.body.model, s: sent?.body.stream, e: sent?.body.output_config }))
-  check('engine→model: max_tokens 8000 (speed default)', sent?.body.max_tokens === 8000)
+  check('engine→model: max_tokens 14000 (default)', sent?.body.max_tokens === 14000)
   check('engine→model: prompt.ja.md loaded (skeleton + runtime contract + golden context)', prompt.includes('YOUR ROLE') && prompt.includes('OUTPUT CONTRACT (runtime)') && prompt.includes('inscription_form') && ['language: ja', 'relationship: parent_father', 'direction: up', 'occasion: birthday_milestone', 'occasion_detail: 還暦'].every((l) => prompt.includes(l)))
   check('engine→model: story injected at the slot, slot removed', prompt.includes(STORY) && !prompt.includes('{{ Paste the story here }}'))
   check('engine→model: API key comes from env (x-api-key header)', sent?.headers['x-api-key'] === 'test-key-not-real')

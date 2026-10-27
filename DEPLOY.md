@@ -262,14 +262,14 @@ Recorded from the owner's report; nothing here is a secret value. Re-check with 
 | Setting | Env | Was | Now |
 |---|---|---|---|
 | Selection reasoning depth | `ICHIREI_EFFORT` | `high` | **`medium`** |
-| Selection output limit (reasoning **and** answer) | `ICHIREI_MAX_TOKENS` | 20000 | **8000** — the longest valid answer in the fixtures is ≈ 2,100 characters (≈ 2–3k tokens); the rest is room for the reasoning. A run that still hits the limit fails with a clear message and a `[ichirei-engine] max_tokens_hit` log line (watch for it; raise the value if it appears) |
+| Selection output limit (reasoning **and** answer) | `ICHIREI_MAX_TOKENS` | 20000 (8000 for one day) | **14000**. The answer itself is only ≈ 1–2k tokens; the rest is room for the model's reasoning, which a long remembrance story used up (a live run hit 8000 after 105 s). A run that still hits the limit is **retried once automatically with `ICHIREI_MAX_TOKENS_RETRY` (20000)**, inside the run budget; only a second hit shows an error. Logged as `[ichirei-engine] max_tokens_hit {…, retry}`; the `[ichirei-timing]` line carries `attempts` and `max_tokens_used` |
 | Review call (it only checks a short answer) | `ICHIREI_REVIEW_MODEL` / `ICHIREI_REVIEW_EFFORT` | the selection model, `low` | **`claude-haiku-5-5`**, `low` (its output limit is 2,500 tokens) |
 | Replacement (a missing main card) | `ICHIREI_REPLACE_MODEL` | the review model | the selection model (it must pass the person test); its review uses the review model |
 | Longest the selection call (and the replacement's ceiling) may take | `ICHIREI_CALL_TIMEOUT_MS` | — (90000 for one day: it cut off slow-but-fine runs) | **150000** (150 s). A selection that hits it is **retried once automatically** (if the run budget `ICHIREI_RUN_BUDGET_MS`, 270 s, still has room); two timeouts → the page shows its timeout message (`code: model_timeout`) |
 | Longest the review call may take | `ICHIREI_REVIEW_TIMEOUT_MS` | — | **60000**. A review that times out (or fails) never fails the run: the selection is shown without it — the mains stand, the unreviewed freestyle is dropped — and it is logged |
 | Longest a replacement call may take | `ICHIREI_REPLACE_TIMEOUT_MS` | — | **75000** (it is optional: on timeout the sender simply gets the cards that exist) |
 
-`/api/health` reports the running values (`effort`, `maxTokens`, `reviewModel`, `reviewEffort`, `callTimeoutMs`, `reviewTimeoutMs`). **Quality has not been measured on the live model** — compare against the five stories with `scripts/bench-select.mjs` and, if the main characters get shallower, raise `_EFFORT` back to `high` in `cloudbuild.yaml` (one line).
+`/api/health` reports the running values (`effort`, `maxTokens`, `maxTokensRetry`, `reviewModel`, `reviewEffort`, `callTimeoutMs`, `reviewTimeoutMs`). **Quality has not been measured on the live model** — compare against the five stories with `scripts/bench-select.mjs` and, if the main characters get shallower, raise `_EFFORT` back to `high` in `cloudbuild.yaml` (one line).
 
 ## Editing the engine prompt
 

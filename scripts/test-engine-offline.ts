@@ -27,7 +27,9 @@ const ZH_STORY = '他總是把玄關的燈留著，不管我多晚回家。二�
 // ---- fake Anthropic upstream ---------------------------------------------
 const seen: { body: any; headers: http.IncomingHttpHeaders; kind: 'select' | 'review' }[] = []
 let reply: unknown = GOLDEN
-let mode: 'normal' | 'hang' | 'truncate' = 'normal'
+let mode: 'normal' | 'hang' | 'truncate' | 'truncate-once' = 'normal'
+let truncateLeft = 0
+const selectMaxTokens: number[] = []
 const hung: http.ServerResponse[] = []
 const upstream = http.createServer(async (req, res) => {
   let raw = ''
@@ -43,7 +45,9 @@ const upstream = http.createServer(async (req, res) => {
     return
   }
   const passAll = { verdicts: ((reply as { candidates?: { slot: string; kanji: string }[] })?.candidates ?? []).map((c) => ({ slot: c.slot, kanji: c.kanji, pass: true, reason: 'ok (fake reviewer)' })) }
-  const text = kind === 'review' ? JSON.stringify(passAll) : typeof reply === 'string' ? reply : mode === 'truncate' ? JSON.stringify(reply).slice(0, 300) : JSON.stringify(reply)
+  const cutThis = kind === 'select' && (mode === 'truncate' || (mode === 'truncate-once' && truncateLeft-- > 0))
+  if (kind === 'select') selectMaxTokens.push(body.max_tokens)
+  const text = kind === 'review' ? JSON.stringify(passAll) : typeof reply === 'string' ? reply : cutThis ? JSON.stringify(reply).slice(0, 300) : JSON.stringify(reply)
   res.writeHead(200, { 'content-type': 'text/event-stream' })
   const sse = (event: string, data: unknown) => res.write(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`)
   sse('message_start', { type: 'message_start', message: { id: 'msg_fake', type: 'message', role: 'assistant', model: 'claude-sonnet-5', content: [], stop_reason: null, stop_sequence: null, usage: { input_tokens: 10, output_tokens: 1 } } })
@@ -52,7 +56,7 @@ const upstream = http.createServer(async (req, res) => {
     sse('content_block_delta', { type: 'content_block_delta', index: 0, delta: { type: 'text_delta', text: text.slice(i, i + 200) } })
   }
   sse('content_block_stop', { type: 'content_block_stop', index: 0 })
-  sse('message_delta', { type: 'message_delta', delta: { stop_reason: mode === 'truncate' && kind === 'select' ? 'max_tokens' : 'end_turn', stop_sequence: null }, usage: { output_tokens: 99 } })
+  sse('message_delta', { type: 'message_delta', delta: { stop_reason: cutThis ? 'max_tokens' : 'end_turn', stop_sequence: null }, usage: { output_tokens: 99 } })
   sse('message_stop', { type: 'message_stop' })
   res.end()
 })
@@ -90,20 +94,20 @@ try {
   check('golden→model: heart-anchor gate + widened substitution test are in what the model sees', p1.includes('6. Heart anchor.') && p1.includes('another family, couple, friendship or team'))
   // 還暦 is allowed to reach the model only as the sender's occasion_detail (and as the example in its definition).
   check('golden→model: no 還暦-only wording reaches the model beyond occasion_detail', !/還暦|Kanreki|sixty/.test(p1.split('\n').filter((l) => !l.startsWith('occasion_detail:') && !l.startsWith('`occasion_detail` is optional')).join('\n')))
-  check('speed defaults: selection call is claude-sonnet-5, streaming, effort medium, max_tokens 8000', lastSelect().body.model === 'claude-sonnet-5' && lastSelect().body.stream === true && lastSelect().body.output_config?.effort === 'medium' && lastSelect().body.max_tokens === 8000, JSON.stringify({ m: lastSelect().body.model, e: lastSelect().body.output_config, t: lastSelect().body.max_tokens }))
+  check('speed defaults: selection call is claude-sonnet-5, streaming, effort medium, max_tokens 14000', lastSelect().body.model === 'claude-sonnet-5' && lastSelect().body.stream === true && lastSelect().body.output_config?.effort === 'medium' && lastSelect().body.max_tokens === 14000, JSON.stringify({ m: lastSelect().body.model, e: lastSelect().body.output_config, t: lastSelect().body.max_tokens }))
   const lastReview = seen.filter((x) => x.kind === 'review').at(-1)!
   check('speed defaults: the review call runs on the fastest current model (claude-haiku-5-5) at low effort', lastReview.body.model === 'claude-haiku-5-5' && lastReview.body.output_config?.effort === 'low' && lastReview.body.max_tokens === 2500, JSON.stringify({ m: lastReview.body.model, e: lastReview.body.output_config, t: lastReview.body.max_tokens }))
-  check('speed defaults: the longest valid answer in the fixtures fits max_tokens 8000 with room for the reasoning (≈ 1.5 tokens per character is a generous bound)', JSON.stringify(GOLDEN).length * 1.5 < 8000 / 2, String(JSON.stringify(GOLDEN).length))
+  check('speed defaults: the longest valid answer in the fixtures fits max_tokens 14000 with plenty of room for the reasoning (≈ 1.5 tokens per character is a generous bound)', JSON.stringify(GOLDEN).length * 1.5 < 14000 / 4, String(JSON.stringify(GOLDEN).length))
   const { ENGINE_CONFIG } = await import('../engine/engine.ts')
-  check('speed defaults: ENGINE_CONFIG (what /api/health reports) says the same', ENGINE_CONFIG.EFFORT === 'medium' && ENGINE_CONFIG.MAX_TOKENS === 8000 && ENGINE_CONFIG.REVIEW_MODEL === 'claude-haiku-5-5' && ENGINE_CONFIG.CALL_TIMEOUT_MS === 150_000 && ENGINE_CONFIG.REVIEW_TIMEOUT_MS === 60_000)
+  check('speed defaults: ENGINE_CONFIG (what /api/health reports) says the same', ENGINE_CONFIG.EFFORT === 'medium' && ENGINE_CONFIG.MAX_TOKENS === 14000 && ENGINE_CONFIG.MAX_TOKENS_RETRY === 20000 && ENGINE_CONFIG.REVIEW_MODEL === 'claude-haiku-5-5' && ENGINE_CONFIG.CALL_TIMEOUT_MS === 150_000 && ENGINE_CONFIG.REVIEW_TIMEOUT_MS === 60_000)
 
   // cloudbuild.yaml must carry the SAME settings and pass them on every deploy (--update-env-vars), or a deploy could reset them
   {
     const cb = readFileSync(join(process.cwd(), 'cloudbuild.yaml'), 'utf8')
     const sub = (k: string) => new RegExp(`^\\s*${k}:\\s*'([^']*)'`, 'm').exec(cb)?.[1]
-    check('cloudbuild.yaml: substitutions equal the code defaults (medium / 8000 / claude-haiku-5-5 / low / 150000 / 60000)', sub('_EFFORT') === String(ENGINE_CONFIG.EFFORT) && sub('_MAX_TOKENS') === String(ENGINE_CONFIG.MAX_TOKENS) && sub('_REVIEW_MODEL') === ENGINE_CONFIG.REVIEW_MODEL && sub('_REVIEW_EFFORT') === ENGINE_CONFIG.REVIEW_EFFORT && sub('_CALL_TIMEOUT_MS') === String(ENGINE_CONFIG.CALL_TIMEOUT_MS) && sub('_REVIEW_TIMEOUT_MS') === String(ENGINE_CONFIG.REVIEW_TIMEOUT_MS), JSON.stringify(['_EFFORT', '_MAX_TOKENS', '_REVIEW_MODEL', '_REVIEW_EFFORT', '_CALL_TIMEOUT_MS', '_REVIEW_TIMEOUT_MS'].map(sub)))
+    check('cloudbuild.yaml: substitutions equal the code defaults (medium / 14000 / claude-haiku-5-5 / low / 150000 / 60000)', sub('_EFFORT') === String(ENGINE_CONFIG.EFFORT) && sub('_MAX_TOKENS') === String(ENGINE_CONFIG.MAX_TOKENS) && sub('_MAX_TOKENS_RETRY') === String(ENGINE_CONFIG.MAX_TOKENS_RETRY) && sub('_REVIEW_MODEL') === ENGINE_CONFIG.REVIEW_MODEL && sub('_REVIEW_EFFORT') === ENGINE_CONFIG.REVIEW_EFFORT && sub('_CALL_TIMEOUT_MS') === String(ENGINE_CONFIG.CALL_TIMEOUT_MS) && sub('_REVIEW_TIMEOUT_MS') === String(ENGINE_CONFIG.REVIEW_TIMEOUT_MS), JSON.stringify(['_EFFORT', '_MAX_TOKENS', '_MAX_TOKENS_RETRY', '_REVIEW_MODEL', '_REVIEW_EFFORT', '_CALL_TIMEOUT_MS', '_REVIEW_TIMEOUT_MS'].map(sub)))
     const upd = /--update-env-vars=(\S+)/.exec(cb)?.[1] ?? ''
-    check('cloudbuild.yaml: every deploy sets ICHIREI_EFFORT, ICHIREI_MAX_TOKENS, ICHIREI_REVIEW_MODEL, ICHIREI_REVIEW_EFFORT ICHIREI_CALL_TIMEOUT_MS and ICHIREI_REVIEW_TIMEOUT_MS from those substitutions', ['ICHIREI_EFFORT=${_EFFORT}', 'ICHIREI_MAX_TOKENS=${_MAX_TOKENS}', 'ICHIREI_REVIEW_MODEL=${_REVIEW_MODEL}', 'ICHIREI_REVIEW_EFFORT=${_REVIEW_EFFORT}', 'ICHIREI_CALL_TIMEOUT_MS=${_CALL_TIMEOUT_MS}', 'ICHIREI_REVIEW_TIMEOUT_MS=${_REVIEW_TIMEOUT_MS}'].every((x) => upd.includes(x)), upd)
+    check('cloudbuild.yaml: every deploy sets ICHIREI_EFFORT, ICHIREI_MAX_TOKENS, ICHIREI_REVIEW_MODEL, ICHIREI_REVIEW_EFFORT ICHIREI_CALL_TIMEOUT_MS and ICHIREI_REVIEW_TIMEOUT_MS from those substitutions', ['ICHIREI_EFFORT=${_EFFORT}', 'ICHIREI_MAX_TOKENS=${_MAX_TOKENS}', 'ICHIREI_MAX_TOKENS_RETRY=${_MAX_TOKENS_RETRY}', 'ICHIREI_REVIEW_MODEL=${_REVIEW_MODEL}', 'ICHIREI_REVIEW_EFFORT=${_REVIEW_EFFORT}', 'ICHIREI_CALL_TIMEOUT_MS=${_CALL_TIMEOUT_MS}', 'ICHIREI_REVIEW_TIMEOUT_MS=${_REVIEW_TIMEOUT_MS}'].every((x) => upd.includes(x)), upd)
   }
 
   // ---- 1b. one model call may take at most ICHIREI_CALL_TIMEOUT_MS (default 90 s) ---------------------------------------
@@ -125,14 +129,31 @@ try {
     for (const r of hung) r.destroy()
     delete process.env.ICHIREI_CALL_TIMEOUT_MS
 
+    // a run that hits max_tokens is retried ONCE automatically with 20000; only a second hit is an error
+    mode = 'truncate-once'
+    truncateLeft = 1
+    selectMaxTokens.length = 0
+    const rescued = await runEngine(GOLDEN_STORY, 'A')
+    check('max_tokens: the first answer is cut off by the 14000 limit → ONE automatic retry with 20000 → the sender gets a normal result, no error', rescued.status === 'sufficient' && selectMaxTokens.join() === '14000,20000', `${rescued.status} ${selectMaxTokens.join()}`)
     mode = 'truncate'
+    selectMaxTokens.length = 0
     let cut: unknown = null
     try {
       await runEngine(GOLDEN_STORY, 'A')
     } catch (e) {
       cut = e
     }
-    check('max_tokens: an answer cut off by the output limit is reported as exactly that (not as a JSON parse error)', cut instanceof Error && /ran out of output room/.test(cut.message) && /8000/.test(cut.message), String(cut))
+    check('max_tokens: cut off again at 20000 → exactly two attempts, then a clear message (not a JSON parse error)', cut instanceof Error && /ran out of output room/.test(cut.message) && /20000/.test(cut.message) && selectMaxTokens.join() === '14000,20000', `${String(cut)} ${selectMaxTokens.join()}`)
+    process.env.ICHIREI_RUN_BUDGET_MS = '20000' // no room left for a retry
+    selectMaxTokens.length = 0
+    let cut2: unknown = null
+    try {
+      await runEngine(GOLDEN_STORY, 'A')
+    } catch (e) {
+      cut2 = e
+    }
+    delete process.env.ICHIREI_RUN_BUDGET_MS
+    check('max_tokens: with no room left in the run budget there is no retry (one attempt, a clear message)', cut2 instanceof Error && /14000/.test(cut2.message) && selectMaxTokens.join() === '14000', `${String(cut2)} ${selectMaxTokens.join()}`)
     mode = 'normal'
   }
 

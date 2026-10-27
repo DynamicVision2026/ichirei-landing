@@ -40,9 +40,11 @@ const EFFORT = (process.env.ICHIREI_EFFORT ?? 'medium') as
   | 'high'
   | 'xhigh'
   | 'max'
-// 8000 covers the longest valid answer (three candidates + fingerprint, ≈ 2–3k tokens; the longest fixture is ~2,100 characters)
-// with room left for the reasoning, which counts against this limit too. A run that still hits it is reported as such, not as a parse error.
-const MAX_TOKENS = Number(process.env.ICHIREI_MAX_TOKENS ?? 8000)
+// The answer itself is short (≈ 1–2k tokens in the slim contract); the limit is mostly room for the REASONING, which counts against it
+// too. 8000 was too tight for a long remembrance story (a live run hit it after 105 s), so 14000, and a hit is retried once with 20000.
+const MAX_TOKENS = Number(process.env.ICHIREI_MAX_TOKENS ?? 14000)
+// One automatic retry when the answer was cut off by the limit above (the reasoning ran long, e.g. on a remembrance story).
+const MAX_TOKENS_RETRY = Number(process.env.ICHIREI_MAX_TOKENS_RETRY ?? 20000)
 // The review only checks a short answer: the fastest current model at low effort (ICHIREI_REVIEW_MODEL / ICHIREI_REVIEW_EFFORT override).
 export const DEFAULT_REVIEW_MODEL = 'claude-haiku-5-5'
 const REVIEW_MODEL = process.env.ICHIREI_REVIEW_MODEL ?? DEFAULT_REVIEW_MODEL
@@ -236,14 +238,16 @@ export async function runEngine(
   opts.onStage?.('reading')
 
   // Stream + finalMessage so reasoning doesn't hit an HTTP timeout; the function still returns one assembled JSON response.
-  // One call may take at most ICHIREI_CALL_TIMEOUT_MS (default 150 s). A selection that hits the ceiling is retried ONCE (as long as
-  // the run budget allows it) before the sender sees an error.
-  const callSelection = async (limitMs: number): Promise<Anthropic.Message> => {
+  // One call may take at most ICHIREI_CALL_TIMEOUT_MS (default 150 s). The selection gets ONE automatic retry — whichever comes first:
+  // the call hit that ceiling (same settings), or the model ran out of output room (max_tokens) before finishing its answer (the
+  // retry allows ICHIREI_MAX_TOKENS_RETRY, default 20000) — as long as the run budget still has room for it. Only then does the
+  // sender see an error.
+  const callSelection = async (limitMs: number, maxTokens: number): Promise<Anthropic.Message> => {
     const signal = callSignal(opts.signal, limitMs)
     const stream = client.messages.stream(
       {
         model: MODEL,
-        max_tokens: MAX_TOKENS,
+        max_tokens: maxTokens,
         output_config: { effort: EFFORT },
         messages: [{ role: 'user', content: prompt }],
       },
@@ -264,49 +268,59 @@ export async function runEngine(
       throw err
     }
   }
-  let message: Anthropic.Message
-  try {
-    message = await callSelection(callTimeoutMs())
-  } catch (err) {
-    if (!(err instanceof ModelTimeoutError)) throw err
+  let maxTokens = MAX_TOKENS
+  let attempts = 0
+  let message!: Anthropic.Message
+  let extracted!: EngineResult
+  /** The time left for a retry, or null when there is none (or it was already used). Logs the decision. */
+  const retryLimit = (why: 'selection_timeout' | 'max_tokens_hit', extra: Record<string, unknown>): number | null => {
     const spent = Date.now() - tStart
     const room = runBudgetMs() - spent - REVIEW_RESERVE_MS
-    console.log(`[ichirei-engine] selection_timeout ${JSON.stringify({ after_ms: spent, retry: room >= MIN_RETRY_MS, retry_limit_ms: Math.max(0, Math.min(callTimeoutMs(), room)) })}`)
-    if (room < MIN_RETRY_MS) {
-      console.log(`[ichirei-timing] ${JSON.stringify({ select_ms: spent, status: 'timeout', model: MODEL, effort: EFFORT, max_tokens: MAX_TOKENS })}`)
-      throw err
-    }
-    opts.onStage?.('reading')
+    const retry = attempts < 2 && room >= MIN_RETRY_MS
+    console.log(`[ichirei-engine] ${why} ${JSON.stringify({ after_ms: spent, attempt: attempts, retry, retry_limit_ms: Math.max(0, Math.min(callTimeoutMs(), room)), ...extra })}`)
+    return retry ? Math.min(callTimeoutMs(), room) : null
+  }
+  let limitMs = callTimeoutMs()
+  for (;;) {
+    attempts++
     try {
-      message = await callSelection(Math.min(callTimeoutMs(), room))
-    } catch (err2) {
-      if (err2 instanceof ModelTimeoutError) console.log(`[ichirei-timing] ${JSON.stringify({ select_ms: Date.now() - tStart, status: 'timeout_after_retry', model: MODEL, effort: EFFORT, max_tokens: MAX_TOKENS })}`)
-      throw err2
+      message = await callSelection(limitMs, maxTokens)
+    } catch (err) {
+      if (!(err instanceof ModelTimeoutError)) throw err
+      const next = retryLimit('selection_timeout', {})
+      if (next === null) {
+        console.log(`[ichirei-timing] ${JSON.stringify({ select_ms: Date.now() - tStart, status: attempts > 1 ? 'timeout_after_retry' : 'timeout', attempts, model: MODEL, effort: EFFORT, max_tokens: maxTokens })}`)
+        throw err
+      }
+      limitMs = next
+      opts.onStage?.('reading')
+      continue
+    }
+    opts.onUsage?.('select', { model: MODEL, input_tokens: message.usage?.input_tokens ?? 0, output_tokens: message.usage?.output_tokens ?? 0 })
+    if (message.stop_reason === 'refusal') {
+      throw new Error('Model refused the request')
+    }
+    const textOut = message.content
+      .filter((b): b is Anthropic.TextBlock => b.type === 'text')
+      .map((b) => b.text)
+      .join('')
+    try {
+      extracted = extractJson(textOut)
+      break
+    } catch (err) {
+      if (message.stop_reason !== 'max_tokens') throw err
+      // Reasoning + answer did not fit in max_tokens: try once more with more room instead of showing an error.
+      const next = retryLimit('max_tokens_hit', { max_tokens: maxTokens, output_tokens: message.usage?.output_tokens ?? null, effort: EFFORT, retry_max_tokens: MAX_TOKENS_RETRY })
+      if (next === null || MAX_TOKENS_RETRY <= maxTokens) {
+        throw new Error(`The model ran out of output room (max_tokens ${maxTokens}) before finishing its answer`)
+      }
+      maxTokens = MAX_TOKENS_RETRY
+      limitMs = next
+      opts.onStage?.('reading')
     }
   }
   const selectMs = Date.now() - tStart
-  opts.onUsage?.('select', { model: MODEL, input_tokens: message.usage?.input_tokens ?? 0, output_tokens: message.usage?.output_tokens ?? 0 })
 
-  const textOut = message.content
-    .filter((b): b is Anthropic.TextBlock => b.type === 'text')
-    .map((b) => b.text)
-    .join('')
-
-  if (message.stop_reason === 'refusal') {
-    throw new Error('Model refused the request')
-  }
-
-  let extracted: EngineResult
-  try {
-    extracted = extractJson(textOut)
-  } catch (err) {
-    // Reasoning + answer did not fit in max_tokens: say so (and log it), instead of a bare parse error.
-    if (message.stop_reason === 'max_tokens') {
-      console.log(`[ichirei-engine] max_tokens_hit ${JSON.stringify({ max_tokens: MAX_TOKENS, output_tokens: message.usage?.output_tokens ?? null, effort: EFFORT })}`)
-      throw new Error(`The model ran out of output room (max_tokens ${MAX_TOKENS}) before finishing its answer`)
-    }
-    throw err
-  }
   // The slim output contract leaves out what only the code needs (the context echo, the internal notes, the empty
   // referee fields): fill them with their neutral values here. Plumbing — nothing about the candidates is touched.
   const normalized = normalizeModelOutput(extracted)
@@ -332,7 +346,7 @@ export async function runEngine(
   const refereed = applyPalette(stamped, palette, trimmed, { deferInsufficient: true })
   if (refereed.status !== 'sufficient') {
     const closed = finalizeResult(refereed)
-    logTiming({ select_ms: selectMs, review_ms: 0, replace_ms: 0, total_ms: Date.now() - tStart, status: closed.status, stop_reason: message.stop_reason, output_tokens: message.usage?.output_tokens ?? null })
+    logTiming({ attempts, max_tokens_used: maxTokens, select_ms: selectMs, review_ms: 0, replace_ms: 0, total_ms: Date.now() - tStart, status: closed.status, stop_reason: message.stop_reason, output_tokens: message.usage?.output_tokens ?? null })
     return closed
   }
 
@@ -362,16 +376,16 @@ export async function runEngine(
   })
   // The last gate: at most one main, one second, one freestyle — and never zero cards without a question.
   const final = finalizeResult(completed)
-  logTiming({ select_ms: selectMs, review_ms: reviewMs, replace_ms: Date.now() - tReplace, total_ms: Date.now() - tStart, status: final.status, stop_reason: message.stop_reason, output_tokens: message.usage?.output_tokens ?? null })
+  logTiming({ attempts, max_tokens_used: maxTokens, select_ms: selectMs, review_ms: reviewMs, replace_ms: Date.now() - tReplace, total_ms: Date.now() - tStart, status: final.status, stop_reason: message.stop_reason, output_tokens: message.usage?.output_tokens ?? null })
   return final
 }
 
 /** One line per run: where the time went (no story text). Read it in the Cloud Run logs. */
-function logTiming(t: { select_ms: number; review_ms: number; replace_ms: number; total_ms: number; status: string; stop_reason: string | null; output_tokens: number | null }) {
+function logTiming(t: { attempts: number; max_tokens_used: number; select_ms: number; review_ms: number; replace_ms: number; total_ms: number; status: string; stop_reason: string | null; output_tokens: number | null }) {
   console.log(`[ichirei-timing] ${JSON.stringify({ ...t, model: MODEL, effort: EFFORT, max_tokens: MAX_TOKENS, review_model: REVIEW_MODEL })}`)
 }
 
 const REVIEW_RESERVE_MS = 20_000 // time kept for the review after a retried selection
 const MIN_RETRY_MS = 30_000 // a retry with less than this left would only time out again
 
-export const ENGINE_CONFIG = { MODEL, EFFORT, MAX_TOKENS, REVIEW_MODEL, REVIEW_EFFORT: process.env.ICHIREI_REVIEW_EFFORT ?? 'low', CALL_TIMEOUT_MS: callTimeoutMs(), REVIEW_TIMEOUT_MS: reviewTimeoutMs() }
+export const ENGINE_CONFIG = { MODEL, EFFORT, MAX_TOKENS, MAX_TOKENS_RETRY, REVIEW_MODEL, REVIEW_EFFORT: process.env.ICHIREI_REVIEW_EFFORT ?? 'low', CALL_TIMEOUT_MS: callTimeoutMs(), REVIEW_TIMEOUT_MS: reviewTimeoutMs() }
