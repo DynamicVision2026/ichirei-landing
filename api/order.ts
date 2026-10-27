@@ -12,10 +12,11 @@
 // Web-standard handler (like api/select.ts): mounted directly by server/app.ts and usable on Vercel.
 
 import { cleanSession, cleanSource, recordEvent } from '../engine/analytics.ts'
-import { buildRecord, lineAttributes, newOrderRef, parseOrderRequest, type OrderRecord } from '../engine/order.ts'
+import { POEM_ID_PATTERN, buildRecord, lineAttributes, newOrderRef, parseOrderRequest, poemAttributes, type OrderRecord, type StoredPoem, type ValidOrder } from '../engine/order.ts'
 import { createOrderStore, type OrderStore } from '../engine/order-store.ts'
 import type { Palette } from '../engine/palette.ts'
 import { ShopifyError, createCart, loadShopifyConfig, type ShopifyConfig } from '../engine/shopify.ts'
+import { MAX_POEMS, POEM_TYPES } from '../src/order/packages.ts'
 
 const MAX_BODY_BYTES = 300_000
 
@@ -31,6 +32,33 @@ export interface OrderDeps {
   fetchImpl?: typeof fetch
   /** Tests inject a palette; production reads engine/palette.csv. */
   palette?: Palette
+}
+
+/**
+ * The poem add-ons of an order: the browser sends only poem_ids; each poem is read back from the store (what /api/poem wrote), must belong
+ * to the chosen character and language, be of a type with a configured Shopify variant, and no type may repeat. At most MAX_POEMS.
+ */
+async function resolvePoems(raw: unknown, store: OrderStore, shopify: ShopifyConfig, order: ValidOrder): Promise<{ ok: true; poems: StoredPoem[] } | { ok: false; error: string; code: string }> {
+  if (raw === undefined || raw === null) return { ok: true, poems: [] }
+  if (!Array.isArray(raw)) return { ok: false, code: 'bad_poems', error: '"poems" must be an array' }
+  if (raw.length > MAX_POEMS) return { ok: false, code: 'too_many_poems', error: `At most ${MAX_POEMS} poems can be added` }
+  const poems: StoredPoem[] = []
+  for (const item of raw) {
+    const id = (item as { poem_id?: unknown } | null)?.poem_id
+    if (typeof id !== 'string' || !POEM_ID_PATTERN.test(id)) return { ok: false, code: 'bad_poems', error: 'Each poem needs a valid "poem_id"' }
+    let rec: StoredPoem | null = null
+    try {
+      rec = (await store.get(id)) as StoredPoem | null
+    } catch {
+      return { ok: false, code: 'store_failed', error: 'Could not read the poem. Please try again.' }
+    }
+    if (!rec || rec.schema !== 'poem' || !Array.isArray(rec.lines) || !(POEM_TYPES as readonly string[]).includes(rec.type)) return { ok: false, code: 'poem_not_found', error: 'A poem in the order was not found; please make it again.' }
+    if (rec.language !== order.language || !rec.forms.some((f) => f === order.candidate.kanji || f === order.candidate.inscription_form)) return { ok: false, code: 'poem_mismatch', error: 'A poem does not belong to the chosen character.' }
+    if (!shopify.poemVariants?.[rec.type]) return { ok: false, code: 'poem_type_unavailable', error: 'This kind of poem is not on offer.' }
+    if (poems.some((p) => p.type === rec!.type)) return { ok: false, code: 'duplicate_poem_type', error: 'Each kind of poem can be added once.' }
+    poems.push(rec)
+  }
+  return { ok: true, poems }
 }
 
 export function createOrderHandler(deps: () => OrderDeps) {
@@ -59,8 +87,12 @@ export function createOrderHandler(deps: () => OrderDeps) {
     }
 
     const order = parsed.order
+    const resolved = await resolvePoems((body as { poems?: unknown } | null)?.poems, d.store, d.shopify, order)
+    if (!resolved.ok) return json(400, { error: resolved.error, code: resolved.code, field: 'poems' })
+    const poems = resolved.poems
+    order.certificate.poems = poems.map((p) => ({ type: p.type, lines: p.lines, reading: p.reading }))
     const orderRef = newOrderRef(now)
-    const record: OrderRecord = buildRecord(order, orderRef, now)
+    const record: OrderRecord = buildRecord(order, orderRef, now, poems)
 
     // 2. Keep the story and the result before anything is sold.
     try {
@@ -72,7 +104,7 @@ export function createOrderHandler(deps: () => OrderDeps) {
 
     // 3. The Shopify cart.
     try {
-      const cart = await createCart(d.shopify, order.package, lineAttributes(order, orderRef), orderRef, d.fetchImpl)
+      const cart = await createCart(d.shopify, order.package, lineAttributes(order, orderRef), orderRef, d.fetchImpl, poems.map((p) => ({ type: p.type, attributes: poemAttributes(p, orderRef) })))
       record.status = 'cart_created'
       record.updated_at = (d.now?.() ?? new Date()).toISOString()
       record.shopify = { cart_id: cart.cartId, checkout_url: cart.checkoutUrl, variant_id: cart.variantId }
@@ -82,10 +114,15 @@ export function createOrderHandler(deps: () => OrderDeps) {
         // The first write already holds the story and result; the status update is a convenience.
         console.error('[ichirei-order] status update failed', orderRef, err instanceof Error ? err.message : err)
       }
-      console.log('[ichirei-order]', JSON.stringify({ order_ref: orderRef, status: record.status, package: order.package, language: order.language }))
+      console.log('[ichirei-order]', JSON.stringify({ order_ref: orderRef, status: record.status, package: order.package, language: order.language, poems: poems.map((p) => p.type) }))
       // Learning loop: "ordered" — the session id only, never the order_ref or anything the buyer typed.
       const sessionId = cleanSession((body as { session?: unknown } | null)?.session)
-      if (sessionId) void recordEvent({ ts: (d.now?.() ?? new Date()).toISOString(), session: sessionId, source: cleanSource((body as { source?: unknown } | null)?.source), event: 'ordered' }, d.store, d.now?.() ?? new Date())
+      if (sessionId) {
+        const ts = (d.now?.() ?? new Date()).toISOString()
+        const source = cleanSource((body as { source?: unknown } | null)?.source)
+        void recordEvent({ ts, session: sessionId, source, event: 'ordered', ...(poems.length ? { poem_types: poems.map((p) => p.type) } : {}) }, d.store, d.now?.() ?? new Date())
+        for (const p of poems) void recordEvent({ ts, session: sessionId, source, event: 'poem_added', poem_type: p.type }, d.store, d.now?.() ?? new Date())
+      }
       return json(200, {
         order_ref: orderRef,
         checkout_url: cart.checkoutUrl,

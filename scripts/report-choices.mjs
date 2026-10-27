@@ -49,6 +49,29 @@ export function summarize(events, { source = 'customer', from = null, to = null 
     .map((r) => ({ ...r, pct_main: pct(r.main, r.chose), pct_second: pct(r.second, r.chose), pct_freestyle: pct(r.freestyle, r.chose), pct_ordered: pct(r.ordered, r.shown), pct_explained: pct(r.explained, r.shown) }))
 }
 
+/** The poem add-on per type: sessions that previewed it, sessions that added it to an order, and orders completed with it. Pure. */
+export function summarizePoems(events, { source = 'customer', from = null, to = null } = {}) {
+  const byType = new Map()
+  const row = (t) => byType.get(t) ?? { type: t, previewed: new Set(), added: new Set() }
+  for (const e of events) {
+    if (!e || typeof e.session !== 'string' || typeof e.event !== 'string') continue
+    if (source !== 'all' && e.source !== source) continue
+    const day = typeof e.ts === 'string' ? e.ts.slice(0, 10) : ''
+    if ((from && day < from) || (to && day > to)) continue
+    if ((e.event === 'poem_previewed' || e.event === 'poem_added') && typeof e.poem_type === 'string') {
+      const r = row(e.poem_type)
+      ;(e.event === 'poem_previewed' ? r.previewed : r.added).add(e.session)
+      byType.set(e.poem_type, r)
+    }
+  }
+  return [...byType.values()].sort((a, b) => a.type.localeCompare(b.type)).map((r) => ({ type: r.type, previewed: r.previewed.size, added: r.added.size }))
+}
+
+export function formatPoems(rows) {
+  if (rows.length === 0) return '(no poem add-on events in this range)'
+  return ['poem type  previewed   added', ...rows.map((r) => `${r.type.padEnd(10)} ${String(r.previewed).padStart(9)} ${String(r.added).padStart(7)}`)].join('\n')
+}
+
 export function format(rows) {
   const f = (v) => (v === null ? '   —' : `${v.toFixed(1)}%`.padStart(6))
   const head = ['language', 'shown', 'chose', '% main', '% second', '% freestyle', '% ordered', '% explained']
@@ -91,5 +114,7 @@ if (process.argv[1] === import.meta.filename) {
     process.exit(2)
   }
   const events = dir ? readDir(dir) : readBucket(bucket)
-  console.log(format(summarize(events, { source: opt('source') ?? 'customer', from: opt('from'), to: opt('to') })))
+  const range = { source: opt('source') ?? 'customer', from: opt('from'), to: opt('to') }
+  console.log(format(summarize(events, range)))
+  console.log('\n' + formatPoems(summarizePoems(events, range)))
 }

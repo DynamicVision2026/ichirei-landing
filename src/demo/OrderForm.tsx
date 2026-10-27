@@ -9,6 +9,7 @@ import { isMemorial } from '../order/memorial.ts'
 import { certificateText } from '../order/certificate.ts'
 import { DEFAULT_STYLE, STYLES_BY_LANGUAGE, glyphFor, hasFormChoice } from '../order/inscription.ts'
 import { DEFAULT_SIMPLE_MAX_STROKES, carvedStrokes, simpleAvailable } from '../order/strokes.ts'
+import PoemAddOn from './PoemAddOn'
 import { useCurrency } from '../reveal/useCurrency.ts'
 import { approxLine } from '../reveal/currency.ts'
 import { toRevealLang } from '../reveal/lang.ts'
@@ -58,6 +59,7 @@ export default function OrderForm({ result, story, followUps = [], candidate, co
   const [date, setDate] = useState('')
   const [style, setStyle] = useState<InscriptionStyle>(DEFAULT_STYLE[language])
   const [pkg, setPkg] = useState<PackageId | ''>('')
+  const [poemIds, setPoemIds] = useState<string[]>([]) // the poems added to this order (the add-on); the server reads them back by id
   const [phase, setPhase] = useState<'edit' | 'submitting' | 'redirecting'>('edit')
   const [error, setError] = useState<string | null>(null)
 
@@ -95,6 +97,7 @@ export default function OrderForm({ result, story, followUps = [], candidate, co
           delivery_date: date,
           inscription_style: style,
           package: pkg,
+          ...(poemIds.length ? { poems: poemIds.map((poem_id) => ({ poem_id })) } : {}),
           session: sessionId,
           source: 'customer',
         }),
@@ -214,6 +217,9 @@ export default function OrderForm({ result, story, followUps = [], candidate, co
             <p className="sent">{o.inscriptionSame}</p>
           )}
         </fieldset>
+
+        {/* The poem add-on (hidden when no poem type is on offer) */}
+        <PoemAddOn result={result} story={story} followUps={followUps} candidate={candidate} copy={copy} language={language} onChange={setPoemIds} disabled={busy} />
 
         <fieldset className="cgroup">
           <legend className="clab">{o.packageLabel}</legend>

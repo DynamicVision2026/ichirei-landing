@@ -6,7 +6,7 @@
 
 import { randomBytes } from 'node:crypto'
 import { LANGUAGES, STORY_MAX as ENGINE_STORY_MAX, countChars, parseFollowUps, type Candidate, type EngineResult, type Language } from './contract.ts'
-import { PACKAGES, PACKAGE_PRICE_JPY, type PackageId } from '../src/order/packages.ts'
+import { PACKAGES, PACKAGE_PRICE_JPY, POEM_PRICE_JPY, type PackageId, type PoemType } from '../src/order/packages.ts'
 import { CERTIFICATE_LINE_EN, certificateText } from '../src/order/certificate.ts'
 import { isMemorial } from '../src/order/memorial.ts'
 import { loadPalette, plainMeaning, type Palette } from './palette.ts'
@@ -43,6 +43,8 @@ export interface Certificate {
    * carves in black or gold — no red seal, no red-and-white cord (in Japan a red name on a grave means a living person).
    */
   memorial: boolean
+  /** The poems bought with this character (the add-on), printed on the card: type, lines, reading aids. Empty when none. */
+  poems: { type: PoemType; lines: string[]; reading: string }[]
 }
 
 export function buildCertificate(candidate: Candidate, glyph: string, language: Language, palette: Palette, memorial = false): Certificate {
@@ -69,6 +71,7 @@ export function buildCertificate(candidate: Candidate, glyph: string, language: 
     line: certificateText(language),
     line_en: CERTIFICATE_LINE_EN,
     memorial,
+    poems: [],
   }
 }
 
@@ -241,6 +244,34 @@ export function lineAttributes(order: ValidOrder, orderRef: string): Attribute[]
   ]
 }
 
+// ---- the poem add-on ----------------------------------------------------------------------------
+
+/** A generated poem as /api/poem stores it (under its poem_id) and /api/order reads it back: the buyer never sends poem text. */
+export interface StoredPoem {
+  schema: 'poem'
+  poem_id: string
+  type: PoemType
+  lines: string[]
+  pattern: string | null
+  reading: string
+  kanji: string
+  forms: string[]
+  language: Language
+  created_at: string
+}
+
+export const POEM_ID_PATTERN = /^PM-\d{8}-[A-Za-z0-9]{10,40}$/
+
+/** The line-item attributes of one poem add-on, so the workshop can print it on the card. */
+export function poemAttributes(p: StoredPoem, orderRef: string): Attribute[] {
+  return [
+    { key: 'ichirei_poem_type', value: p.type },
+    { key: 'ichirei_poem_text', value: p.lines.join('\n') },
+    { key: 'ichirei_poem_reading', value: p.reading || '-' },
+    { key: 'order_ref', value: orderRef },
+  ]
+}
+
 // ---- the server-side record -----------------------------------------------------------------
 
 export type OrderStatus = 'pending' | 'cart_created' | 'cart_failed'
@@ -271,6 +302,8 @@ export interface OrderRecord {
     price_jpy: number
     certificate_text: string
     certificate: Certificate
+    /** The poem add-ons (empty when none): the poem as printed, and the price shown. */
+    poems: { poem_id: string; type: PoemType; lines: string[]; pattern: string | null; reading: string; price_jpy: number }[]
   }
   /** Kept here, never sent to Shopify. `story` is what the sender wrote first; `follow_ups` are their answers to the engine's questions. */
   story: string
@@ -280,7 +313,7 @@ export interface OrderRecord {
   error: string | null
 }
 
-export function buildRecord(order: ValidOrder, orderRef: string, now: Date = new Date()): OrderRecord {
+export function buildRecord(order: ValidOrder, orderRef: string, now: Date = new Date(), poems: StoredPoem[] = []): OrderRecord {
   const iso = now.toISOString()
   return {
     schema: 1,
@@ -307,6 +340,7 @@ export function buildRecord(order: ValidOrder, orderRef: string, now: Date = new
       certificate_text: certificateText(order.language),
       /** The bilingual certificate data (character, reading, romanization, English meaning, both lines). */
       certificate: order.certificate,
+      poems: poems.map((p) => ({ poem_id: p.poem_id, type: p.type, lines: p.lines, pattern: p.pattern, reading: p.reading, price_jpy: POEM_PRICE_JPY })),
     },
     story: order.story,
     follow_ups: order.follow_ups,

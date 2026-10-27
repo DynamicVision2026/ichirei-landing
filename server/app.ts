@@ -11,6 +11,8 @@ import { serveStatic } from '@hono/node-server/serve-static'
 import { compress } from 'hono/compress'
 import { POST as selectPost } from '../api/select.ts'
 import { POST as orderPost } from '../api/order.ts'
+import { POST as poemPost, TYPES_GET as poemTypesGet } from '../api/poem.ts'
+import { availablePoemTypes } from '../engine/shopify.ts'
 import { POST as trackPost } from '../api/track.ts'
 import { POST as analyticsPost } from '../api/analytics.ts'
 import { GET as ratesGet } from '../api/rates.ts'
@@ -105,6 +107,7 @@ export function createApp(config: ServerConfig): Hono {
       reviewTimeoutMs: ENGINE_CONFIG.REVIEW_TIMEOUT_MS,
       lexiconMode: lexiconModeFromEnv(),
       simpleMaxStrokes: simpleMaxStrokes(),
+      poemTypes: availablePoemTypes(), // the poem add-on types with a configured Shopify variant (names only)
       configured: config,
       applied: serverRef.current
         ? {
@@ -122,6 +125,7 @@ export function createApp(config: ServerConfig): Hono {
   // that reaches the route counts (before the body is read), so a refused one never costs a model call.
   const selectLimit = envRunLimiter('ICHIREI_SELECT_LIMIT', { max: 12, minutes: 60 })
   const explainLimit = envRunLimiter('ICHIREI_EXPLAIN_LIMIT', { max: 40, minutes: 60 })
+  const poemLimit = envRunLimiter('ICHIREI_POEM_LIMIT', { max: 20, minutes: 60 })
   const limited = (limiter: typeof selectLimit): MiddlewareHandler => async (c, next) => {
     const r = limiter.check(c.req.raw)
     if (r.ok) return next()
@@ -134,6 +138,9 @@ export function createApp(config: ServerConfig): Hono {
     withHeartbeat(await selectPost(c.req.raw), config.heartbeatMs),
   )
   app.post('/api/explain', requireApiKey, limited(explainLimit), adaptVercelHandler(explainHandler))
+  // The poem add-on: one model call per poem (45 s ceiling), 20 per hour per IP; the types on offer are those with a Shopify variant.
+  app.post('/api/poem', requireApiKey, limited(poemLimit), (c) => poemPost(c.req.raw))
+  app.get('/api/poem-types', () => poemTypesGet())
   app.post('/api/log', adaptVercelHandler(logHandler))
   // Purchase hand-off: stores the story + result under order_ref, creates the Shopify cart.
   app.post('/api/order', (c) => orderPost(c.req.raw))
@@ -151,6 +158,7 @@ export function createApp(config: ServerConfig): Hono {
   app.all('/api/explain', methodNotAllowed)
   app.all('/api/log', methodNotAllowed)
   app.all('/api/order', methodNotAllowed)
+  app.all('/api/poem', methodNotAllowed)
   app.all('/api/track', methodNotAllowed)
   app.all('/api/analytics', methodNotAllowed)
   app.all('/api/*', (c) => c.json({ error: 'Not found' }, 404))

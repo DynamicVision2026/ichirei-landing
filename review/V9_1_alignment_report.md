@@ -40,7 +40,7 @@ Every changed field with its before / after / reason: `review/v9_1_section_c_cha
 | 7 Safety review | in `on` mode it checked **only the freestyle** | **all three cards** in every mode; new named rules `relationship` and `goodwill` (with `illness`, `palette`, `occasion`, `memorial`, `dignity`, `register`, `insult`) |
 | 8 If something is missing | already | unchanged |
 | 9 Output | gaze + quoted anchor; ja carved the **old form (kyūjitai)** | **three "how it matches" lines** (who they are = the gaze, your moment = the exact words, the feeling = the register in the page language); **no percentages or scores**; main may carry 深く響く; **Japanese buyers carve 新字体** (the old-form choice, notes and pairing are gone; an old client's `kyujitai` is read as `modern`); Chinese buyers traditional by default; **stroke check**: `ICHIREI_SIMPLE_MAX_STROKES` (default 20) — above it the Simple set is disabled on the form **and refused by the server** |
-| 10 Poems | — | Job 2 |
+| 10 Poems | — | **built** (DEPLOY.md, "The poem add-on"): the same safety rules (palette blocks given to the model and checked in code, a poem review under the named rules), the chosen character in every poem; hidden until the owner sends the four Shopify variant ids |
 | 11 Logs | main count, lexicon misses, choices/orders (analytics) | + **`[ichirei-safety] removed`** (every card removed for safety with by / rule / reason), **`[ichirei-safety] goodwill_decline`**, **`[ichirei-lexicon] ideal_not_in_lexicon`** |
 
 ## Things for the owner to confirm

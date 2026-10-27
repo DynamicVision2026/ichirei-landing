@@ -8,6 +8,7 @@
 
 import { LANGUAGES, OCCASIONS, RELATIONSHIPS, type EngineResult, type Language, type Occasion, type Relationship } from './contract.ts'
 import { createOrderStore, type OrderStore } from './order-store.ts'
+import type { PoemType } from '../src/order/packages.ts'
 
 export const SESSION_PATTERN = /^[A-Za-z0-9_-]{16,64}$/
 export const SOURCES = ['customer', 'harness'] as const
@@ -22,7 +23,9 @@ export type AnalyticsEvent =
   | { ts: string; session: string; source: Source; event: 'shown'; language: Language; relationship: Relationship | null; occasion: Occasion | null; status: 'sufficient' | 'insufficient'; main_slot: 'main' | 'second' | null; has_freestyle: boolean }
   | { ts: string; session: string; source: Source; event: 'chosen'; choice: Choice }
   | { ts: string; session: string; source: Source; event: 'explain_opened'; choice: Choice | null }
-  | { ts: string; session: string; source: Source; event: 'ordered' }
+  | { ts: string; session: string; source: Source; event: 'ordered'; poem_types?: PoemType[] }
+  /** The poem add-on (no story or poem text): which types were previewed, which were added to an order. */
+  | { ts: string; session: string; source: Source; event: 'poem_previewed' | 'poem_added'; poem_type: PoemType }
 
 /** JST date (the business day) of a timestamp, YYYY-MM-DD. */
 export const analyticsDay = (now: Date): string => new Date(now.getTime() + 9 * 3_600_000).toISOString().slice(0, 10)

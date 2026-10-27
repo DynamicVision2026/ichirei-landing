@@ -1,0 +1,139 @@
+{
+ "note": "Poem add-on fixtures (spec v9.1 step 10 / ICHIREI_Poem_AddOn_Ticket.md). Stories 0020 (a mother's lunch boxes, parent_day) and 0004 (letters written in the daughter's name, memorial) come from the private test database; the poems are original, written for these tests, and prove the PLUMBING (form checks, character present, palette blocks) with a fake model. Whether the real model passes the form checks is for the owner's live test. Keep the repository private.",
+ "cases": [
+  {
+   "name": "s0020-parent-day",
+   "story": "母は小中学校の頃、毎朝お弁当を作ってくれました。春には庭の花を一輪のせてくれるような人で、私は恥ずかしいような誇らしいような気持ちでした。中学に上がったとき「もういらない」と断ってしまい、母は何も言わずに台所に戻りました。それから二十年以上、ちゃんとお礼を言ったことがありません。教師になって、お弁当のない生徒に自分の分を分けるようになって、母のことを思い出しました。先日思い切って電話で「帰るときお弁当作って」と頼んだら、母は「ちょうど今詰めてたところ」と言いました。来月帰ります。",
+   "context": {
+    "language": "ja",
+    "relationship": "parent_mother",
+    "direction": "up",
+    "occasion": "parent_day"
+   },
+   "kanji": "備",
+   "gaze": "毎朝、お弁当に庭の花をのせて、黙って備えてくれた人。",
+   "poems": {
+    "tanka": {
+     "lines": [
+      "朝ごとに",
+      "蓋の花添え",
+      "備へたる",
+      "母の背中を",
+      "今も思える"
+     ],
+     "reading_kana": [
+      "あさごとに",
+      "ふたのはなそえ",
+      "そなえたる",
+      "ははのせなかを",
+      "いまもおもえる"
+     ]
+    },
+    "tang": {
+     "lines": [
+      "晨起折庭花",
+      "盒中春色輕",
+      "廿載備朝飯",
+      "不言我始知"
+     ],
+     "kakikudashi": [
+      "晨に起きて庭の花を折り",
+      "盒の中に春の色軽し",
+      "廿載備ふ朝の飯",
+      "言はずして我始めて知る"
+     ]
+    },
+    "ci": {
+     "pattern": "憶江南",
+     "lines": [
+      "朝復朝",
+      "盒底一枝花",
+      "廿載不言唯備飯",
+      "一朝謝語欲啟口",
+      "我立舊廚前"
+     ],
+     "kakikudashi": [
+      "朝また朝",
+      "盒の底に一枝の花",
+      "廿載言はず唯だ飯を備ふ",
+      "一朝謝語口を啟かんと欲す",
+      "我は立つ旧き廚の前"
+     ]
+    },
+    "en": {
+     "lines": [
+      "Every morning, a lid, a flower from the yard.",
+      "She never asked to be thanked.",
+      "備 — to be ready before anyone asks —",
+      "twenty years late, I am learning to say it."
+     ]
+    }
+   }
+  },
+  {
+   "name": "s0004-memorial",
+   "story": "母は和裁の仕立て直しを長く続けた人で、父を早くに亡くしてから一人で私と弟を育てました。私が介護の仕事を選んだとき、人の世話はいい仕事だと一言だけ言ってくれました。母が認知症で施設に入ってから、私は母が私をわからなくなるのが怖くて、だんだん会いに行かなくなりました。最期にも間に合いませんでした。遺品を整理していたら、私の名前で施設の職員さんに宛てた手紙が何十通も出てきました。母の字でした。来ない私の代わりに、母が娘のふりをして書いていたんです。最後の一枚にだけ、来てくれてありがとうと母自身の字で書かれていました。",
+   "context": {
+    "language": "ja",
+    "relationship": "parent_mother",
+    "direction": "up",
+    "occasion": "memorial"
+   },
+   "kanji": "綴",
+   "gaze": "私の名前で、何十通も手紙を書き続けてくれた人。",
+   "poems": {
+    "tanka": {
+     "lines": [
+      "幾十の",
+      "手紙を綴る",
+      "母の文字",
+      "私の名にて",
+      "いまも読みおり"
+     ],
+     "reading_kana": [
+      "いくじゅうの",
+      "てがみをつづる",
+      "ははのもじ",
+      "わたしのなにて",
+      "いまもよみおり"
+     ]
+    },
+    "tang": {
+     "lines": [
+      "舊箋幾十通",
+      "皆是母手跡",
+      "綴我名而寄",
+      "燈前讀至明"
+     ],
+     "kakikudashi": [
+      "旧き箋は幾十通",
+      "皆是れ母の手跡",
+      "我が名を綴りて寄す",
+      "燈前に読みて明に至る"
+     ]
+    },
+    "ci": {
+     "pattern": "如夢令",
+     "lines": [
+      "幾十封信舊紙",
+      "每一行皆母字",
+      "綴我名而寄",
+      "不曾言說之意",
+      "燈下",
+      "再讀",
+      "字字溫如昔日"
+     ],
+     "kakikudashi": null
+    },
+    "en": {
+     "lines": [
+      "Dozens of letters, written in my name.",
+      "綴 — to stitch a daughter's words by hand —",
+      "She spoke for me, and never said so.",
+      "I read them again tonight, slowly."
+     ]
+    }
+   }
+  }
+ ]
+}
