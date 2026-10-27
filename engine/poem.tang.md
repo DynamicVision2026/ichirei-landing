@@ -35,9 +35,11 @@ RULES — all of them, without exception
 {{ FEEDBACK }}
 
 FORM — quatrain (絶句)
-- Four lines, all five characters (五言) or all seven characters (七言). Count characters, not syllables. Rhyme the 2nd and 4th lines if you can do so naturally; sense matters more than rhyme.
+- Four lines, all five characters (五言) or all seven characters (七言). Count characters, not syllables.
+- RHYME (checked by the harness with pinyin): the 2nd and 4th lines MUST end on the same rhyme — the same final in Mandarin (for example 光 / 霜 / 鄉 all end in -ang; 家 / 花 / 霞 in -a), on two DIFFERENT characters. The 1st line may rhyme too (optional). Choose the rhyme first, then write toward it; sense still matters, so pick a rhyme the images can reach.
 - Write in TRADITIONAL characters only (no simplified forms).
+- CLASSICAL IMAGERY ONLY. Write as a poet of the tradition would: moon, lamp, wind, rain, bamboo, a basket, a gate, a road, spring grass, geese. Never a modern word. Turn a modern thing into its classical counterpart: a phone call → 一聲 (a single call); a bento / lunch box → 飯盒 → 竹籠 (a bamboo basket), 一籠飯; a train or car → 舟 or 車馬; a school bag → 書囊; electric light → 燈火. Do not write 電話, 弁當, 手機, 電車 or any word that did not exist in the tradition.
 - Newly composed in the classical manner; plain images, no allusion to a named poem.
 SCRIPT AND READING AIDS: {{ BUYER_AIDS }}
 OUTPUT. Reply with exactly one JSON object and nothing else:
-{ "lines": [4 strings], "kakikudashi": [4 strings] or null, "english": string or null }
+{ "lines": [4 strings], "kakikudashi": [4 strings] or null, "gendaigo": string or null, "english": string or null }

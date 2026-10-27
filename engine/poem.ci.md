@@ -39,7 +39,8 @@ FORM — ci (詞), ONE of exactly three patterns; the harness checks the line le
 - 如夢令: 6-6-5-6-2-2-6 (7 lines)
 - 長相思: 3-3-7-5 then 3-3-7-5 (8 lines, two stanzas of four)
 Choose the one that best carries this story; name it in `pattern` exactly as above.
-- Write in TRADITIONAL characters only. Newly composed; plain images; no allusion to a named poem.
+- Write in TRADITIONAL characters only. Newly composed; no allusion to a named poem.
+- CLASSICAL IMAGERY ONLY. Write as a poet of the tradition would: moon, lamp, wind, rain, bamboo, a basket, a gate, a road, spring grass, geese. Never a modern word. Turn a modern thing into its classical counterpart: a phone call → 一聲; a bento / lunch box → 飯盒 → 竹籠; a train or car → 舟 or 車馬; electric light → 燈火. Do not write 電話, 弁當, 手機, 電車 or any word that did not exist in the tradition.
 SCRIPT AND READING AIDS: {{ BUYER_AIDS }}
 OUTPUT. Reply with exactly one JSON object and nothing else:
-{ "pattern": "憶江南" | "如夢令" | "長相思", "lines": [strings], "kakikudashi": [strings] or null, "english": string or null }
+{ "pattern": "憶江南" | "如夢令" | "長相思", "lines": [strings], "kakikudashi": [strings] or null, "gendaigo": string or null, "english": string or null }

@@ -16,7 +16,7 @@ import { ENGINE_CONFIG, DEFAULT_REVIEW_MODEL } from './engine.ts'
 import { REVIEW_VETO_RULES, familyOf, type Language, type Occasion, type Relationship, type Direction } from './contract.ts'
 import { plainMeaning, type Palette } from './palette.ts'
 import { reviewEnabled } from './review.ts'
-import { blockedCharacters, checkContainsCharacter, checkForm, checkPalette, type PoemDraft } from './poem-check.ts'
+import { blockedCharacters, checkContainsCharacter, checkCraft, checkForm, checkPalette, type PoemDraft } from './poem-check.ts'
 
 export const POEM_TIMEOUT_MS = 45_000
 export const poemTimeoutMs = (env: NodeJS.ProcessEnv = process.env): number => {
@@ -46,12 +46,34 @@ export interface Poem {
   /** ci only. */
   pattern: string | null
   /** The reading aids the buyer's language gets (rule 6 of the ticket). */
-  aids: { kakikudashi: string[] | null; romaji: string[] | null; english: string | null }
+  aids: { kakikudashi: string[] | null; romaji: string[] | null; english: string | null; /** tang / ci for a Japanese buyer: a short modern Japanese rendering (現代語訳), besides the 書き下し. */ gendaigo: string | null }
   /** The aids as one printable text (stored in the order and sent to Shopify as ichirei_poem_reading). */
   reading: string
 }
 
-export type PoemResult = { ok: true; poem: Poem } | { ok: false; code: 'declined' | 'poem_failed' | 'poem_timeout' | 'poem_error'; error: string }
+export type PoemResult =
+  | { ok: true; poem: Poem }
+  | {
+      ok: false
+      code: 'declined' | 'poem_failed' | 'poem_timeout' | 'poem_error'
+      error: string
+      /** poem_failed: why, as short codes (form, character_missing, rhyme, palette, review:<rule>, parse, call, gendaigo) — no poem, no story. */
+      reasons?: string[]
+      /** poem_failed: the failed checks in words (what was fed back to the model; may quote a rule or a character). For logs and the preview mode only. */
+      problems?: string[]
+    }
+
+/** A failed check, as a short code. */
+export function reasonCode(problem: string): string {
+  if (problem.startsWith('call:')) return 'call'
+  if (/^the reply (was not|has no)/.test(problem)) return 'parse'
+  if (problem.startsWith('review (')) return `review:${problem.slice(8, problem.indexOf(')'))}`
+  if (problem.includes('does not appear in the poem')) return 'character_missing'
+  if (problem.startsWith('lines 2 and 4')) return 'rhyme'
+  if (problem.startsWith('gendaigo')) return 'gendaigo'
+  if (/hard block|blocked in remembrance|blocked for|not allowed for/.test(problem)) return 'palette'
+  return 'form'
+}
 
 export const POEM_SLOTS = ['LANGUAGE', 'RELATIONSHIP', 'DIRECTION', 'OCCASION', 'OCCASION_DETAIL', 'KANJI', 'KANJI_FORMS', 'READING', 'MEANING', 'GAZE', 'STORY', 'AVOID_CHARACTERS', 'BUYER_AIDS', 'FEEDBACK'] as const
 const REVIEW_SLOTS = ['LANGUAGE', 'RELATIONSHIP', 'DIRECTION', 'OCCASION', 'OCCASION_DETAIL', 'KANJI', 'STORY', 'TYPE', 'POEM'] as const
@@ -101,12 +123,24 @@ export function buyerAids(type: PoemType, language: Language): string {
   const zh = language === 'zh-Hans' || language === 'zh-Hant'
   if (type === 'tanka') return ja ? 'The buyer reads Japanese: `romaji` and `english` are null.' : 'The buyer does not read Japanese: also give `romaji` (the reading of each line in Latin letters, one string per line) and `english` (a short English rendering, one string).'
   if (type === 'en') return 'No reading aids.'
-  if (ja) return 'The buyer reads Japanese: also give `kakikudashi` — the 書き下し文 (Japanese reading), one string per line of the poem; `english` is null.'
-  if (zh) return 'The buyer reads Chinese: `kakikudashi` and `english` are null.'
-  return 'The buyer reads English: also give `english` — a short English rendering of the whole poem, one string; `kakikudashi` is null.'
+  if (ja) return 'The buyer reads Japanese: also give `kakikudashi` — the 書き下し文 (Japanese reading), one string per line of the poem — and `gendaigo` — a short modern Japanese 現代語訳 of the whole poem (one or two plain sentences in today\'s everyday Japanese, not a word-for-word gloss), one string; `english` is null.'
+  if (zh) return 'The buyer reads Chinese: `kakikudashi`, `gendaigo` and `english` are null.'
+  return 'The buyer reads English: also give `english` — a short English rendering of the whole poem, one string; `kakikudashi` and `gendaigo` are null.'
 }
 
 const strArray = (v: unknown): string[] | null => (Array.isArray(v) && v.every((x) => typeof x === 'string') ? (v as string[]).map((s) => s.trim()) : null)
+
+/** The poem lines of a reply: `lines` as an array (the contract), or — for a reply that wandered a little — one string with line breaks, or `poem`. */
+function linesOf(raw: Record<string, unknown>): string[] | null {
+  const direct = strArray(raw.lines)
+  if (direct) return direct
+  for (const v of [raw.lines, raw.poem]) {
+    if (typeof v === 'string' && v.includes('\n')) return v.split(/\r?\n/).map((l) => l.trim()).filter(Boolean)
+    const arr = strArray(v)
+    if (arr) return arr
+  }
+  return null
+}
 
 function parseJson(raw: string): Record<string, unknown> | null {
   let text = raw.trim()
@@ -126,6 +160,7 @@ function readingText(type: PoemType, language: Language, aids: Poem['aids']): st
   const parts: string[] = []
   if (aids.kakikudashi) parts.push(aids.kakikudashi.join('\n'))
   if (aids.romaji) parts.push(aids.romaji.join('\n'))
+  if (aids.gendaigo) parts.push(aids.gendaigo)
   if (aids.english) parts.push(aids.english)
   void type
   void language
@@ -180,8 +215,23 @@ export async function generatePoem(input: PoemInput, palette: Palette, opts: Gen
     return message.content.filter((b): b is Anthropic.TextBlock => b.type === 'text').map((b) => b.text).join('')
   }
 
+  // The aids this buyer is meant to get (only those are kept).
+  const wantsK = input.type !== 'tanka' && input.type !== 'en' && input.language === 'ja'
+  const wantsG = wantsK
+  const wantsR = input.type === 'tanka' && input.language !== 'ja'
+  const wantsE = (input.type === 'tanka' && input.language !== 'ja') || ((input.type === 'tang' || input.type === 'ci') && input.language === 'en')
+  const build = (raw: Record<string, unknown>, draft: PoemDraft): Poem => {
+    const text = (v: unknown) => (typeof v === 'string' && v.trim() ? v.trim() : null)
+    const kept = { kakikudashi: wantsK ? strArray(raw.kakikudashi) : null, romaji: wantsR ? strArray(raw.romaji) : null, english: wantsE ? text(raw.english) : null, gendaigo: wantsG ? text(raw.gendaigo) : null }
+    return { type: input.type, lines: draft.lines, pattern: draft.pattern ?? null, aids: kept, reading: readingText(input.type, input.language, kept) }
+  }
+  const logOk = (attempts: number, soft: string[]) =>
+    log(`[ichirei-poem] ${JSON.stringify({ type: input.type, ok: true, attempts, language: input.language, occasion: input.occasion, ...(soft.length ? { craft_notes: soft.map((x) => x.slice(0, 100)) } : {}), ms: Date.now() - t0 })}`)
+
   let feedback = ''
-  const failures: string[] = []
+  const failures: string[] = [] // every failed check of every attempt (in words)
+  let spare: Poem | null = null // a poem that passed every hard check but had craft notes: used if the second try fails
+  let spareSoft: string[] = []
   for (let attempt = 1; attempt <= 2; attempt++) {
     try {
       const prompt = fill(template, { ...base, FEEDBACK: feedback })
@@ -191,47 +241,62 @@ export async function generatePoem(input: PoemInput, palette: Palette, opts: Gen
         log(`[ichirei-poem] ${JSON.stringify({ type: input.type, ok: false, code: 'declined', language: input.language, ms: Date.now() - t0 })}`)
         return { ok: false, code: 'declined', error: 'No poem for this story.' }
       }
-      const lines = strArray(raw.lines)
+      const lines = linesOf(raw)
       if (!lines) throw new Error('the reply has no lines array')
       const draft: PoemDraft = { type: input.type, lines, reading_kana: strArray(raw.reading_kana) ?? undefined, pattern: typeof raw.pattern === 'string' ? raw.pattern : undefined }
       const problems = [
         ...checkForm(draft, palette),
         ...[checkContainsCharacter(draft, forms)].filter((x): x is string => x !== null),
         ...checkPalette(draft, palette, input.occasion, families, [...exempt, ...forms.flatMap((f) => [...f])]),
+        ...(wantsG && !(typeof raw.gendaigo === 'string' && raw.gendaigo.trim()) ? ['gendaigo is missing: add a short modern Japanese 現代語訳 of the whole poem'] : []),
       ]
       if (problems.length === 0 && reviewEnabled()) {
         const verdict = await review(draft, input, callText)
         if (verdict) problems.push(verdict)
       }
       if (problems.length === 0) {
-        const aids = { kakikudashi: strArray(raw.kakikudashi), romaji: strArray(raw.romaji), english: typeof raw.english === 'string' && raw.english.trim() ? raw.english.trim() : null }
-        // only the aids this buyer is meant to get are kept
-        const wantsK = input.type !== 'tanka' && input.type !== 'en' && input.language === 'ja'
-        const wantsR = input.type === 'tanka' && input.language !== 'ja'
-        const wantsE = (input.type === 'tanka' && input.language !== 'ja') || ((input.type === 'tang' || input.type === 'ci') && input.language === 'en')
-        const kept = { kakikudashi: wantsK ? aids.kakikudashi : null, romaji: wantsR ? aids.romaji : null, english: wantsE ? aids.english : null }
-        const poem: Poem = { type: input.type, lines, pattern: draft.pattern ?? null, aids: kept, reading: readingText(input.type, input.language, kept) }
-        log(`[ichirei-poem] ${JSON.stringify({ type: input.type, ok: true, attempts: attempt, language: input.language, occasion: input.occasion, ms: Date.now() - t0 })}`)
-        return { ok: true, poem }
+        const soft = checkCraft(draft, forms)
+        const poem = build(raw, draft)
+        if (soft.length === 0 || attempt === 2) {
+          logOk(attempt, soft)
+          return { ok: true, poem }
+        }
+        // craft notes only: one more try if there is time; the poem in hand ships if the try fails
+        spare = poem
+        spareSoft = soft
+        feedback = `\nYOUR PREVIOUS POEM PASSED THE CHECKS BUT HAS CRAFT PROBLEMS — write a new one that fixes them:\n${soft.map((x) => `- ${x}`).join('\n')}\n`
+        if (Date.now() - t0 > poemTimeoutMs() * 0.55) break
+        continue
       }
-      failures.push(...problems.map((p) => p.slice(0, 120)))
+      failures.push(...problems.map((p) => p.slice(0, 160)))
       feedback = `\nYOUR PREVIOUS POEM FAILED THESE CHECKS — write a new one that fixes every one of them:\n${problems.map((p) => `- ${p}`).join('\n')}\n`
       // a retry needs time: the whole generation shares one 45 s ceiling
       if (Date.now() - t0 > poemTimeoutMs() * 0.55) break
     } catch (err) {
       if (timedOut(signal)) {
+        if (spare) {
+          logOk(attempt, spareSoft)
+          return { ok: true, poem: spare }
+        }
         log(`[ichirei-poem] ${JSON.stringify({ type: input.type, ok: false, code: 'poem_timeout', attempts: attempt, ms: Date.now() - t0 })}`)
         return { ok: false, code: 'poem_timeout', error: 'The poem took too long. Please try again.' }
       }
       const message = (err instanceof Error ? err.message : String(err)).slice(0, 160)
-      failures.push(`call: ${message}`)
-      feedback = ''
+      const kind = /^the reply (was not|has no)/.test(message) ? message : `call: ${message}`
+      failures.push(kind)
+      feedback = /^the reply (was not|has no)/.test(message) ? '\nYOUR PREVIOUS REPLY COULD NOT BE READ: reply with exactly one JSON object in the shape given under OUTPUT, and nothing else.\n' : ''
       if (attempt === 2) break
     }
   }
-  // the checks and rule names only — never the poem or the story
-  log(`[ichirei-poem] ${JSON.stringify({ type: input.type, ok: false, code: 'poem_failed', language: input.language, occasion: input.occasion, problems: failures.slice(0, 6), ms: Date.now() - t0 })}`)
-  return { ok: false, code: 'poem_failed', error: 'A poem that passes the form and safety checks could not be made for this type. The order and the other poem are unaffected.' }
+  // a poem that passed every hard check but kept a craft note beats no poem
+  if (spare) {
+    logOk(2, spareSoft)
+    return { ok: true, poem: spare }
+  }
+  // the failed checks, one log line per failed poem: the type, the codes and the checks in words — never the poem or the story
+  const reasons = [...new Set(failures.map(reasonCode))]
+  log(`[ichirei-poem] ${JSON.stringify({ type: input.type, ok: false, code: 'poem_failed', language: input.language, occasion: input.occasion, reasons, problems: failures.slice(0, 8), ms: Date.now() - t0 })}`)
+  return { ok: false, code: 'poem_failed', error: 'A poem that passes the form and safety checks could not be made for this type. The order and the other poem are unaffected.', reasons, problems: failures.slice(0, 8) }
 }
 
 /** The safety review: a failure under a named safety rule is a problem string; an unusable review passes (logged by the caller's checks). */

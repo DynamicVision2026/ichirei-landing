@@ -2,7 +2,7 @@
 // characters up. A poem that fails any of them is a form error, exactly like a wrong syllable count.
 //
 //   tanka  5 lines of 5-7-5-7-7 morae, counted from the kana reading the model returns
-//   tang   4 lines, all 5 or all 7 characters, traditional characters
+//   tang   4 lines, all 5 or all 7 characters, traditional characters, lines 2 and 4 rhyme (engine/rhyme.ts, pinyin-pro)
 //   ci     one of three patterns only (憶江南 3-5-7-7-5, 如夢令 6-6-5-6-2-2-6, 長相思 3-3-7-5 ×2), line lengths of the chosen pattern
 //   en     4–6 short lines of free verse
 //   all    the chosen character (or its traditional / modern variant) appears in the poem; no character that the palette blocks for this
@@ -12,6 +12,7 @@
 import type { PoemType } from '../src/order/packages.ts'
 import type { Occasion } from './contract.ts'
 import type { Palette } from './palette.ts'
+import { checkRhyme } from './rhyme.ts'
 
 export interface PoemDraft {
   type: PoemType
@@ -28,7 +29,9 @@ export const CI_PATTERNS: Record<string, number[]> = {
   長相思: [3, 3, 7, 5, 3, 3, 7, 5],
 }
 export const TANKA_MORAE = [5, 7, 5, 7, 7]
+/** The English poem's lines are meant to be short (12 words); 13–16 is only a craft note (checkCraft), more than 16 is a form error. */
 export const EN_MAX_WORDS_PER_LINE = 12
+export const EN_MAX_HARD_WORDS_PER_LINE = 16
 
 const PUNCT = /[\s　、。，．,.;；:：!！?？「」『』（）()〔〕［］[\]・〜~…—–-]/gu
 const SMALL_KANA = new Set([...'ゃゅょぁぃぅぇぉゎ'])
@@ -84,6 +87,7 @@ export function checkForm(d: PoemDraft, palette?: Palette): string[] {
       const counts = lines.map(hanCount)
       const first = counts[0]
       if (!(first === 5 || first === 7) || counts.some((c) => c !== first)) p.push(`all lines must have 5 characters or all 7 (got ${counts.join('-')})`)
+      p.push(...checkRhyme(lines)) // lines 2 and 4 must end on the same rhyme; line 1 is free
       break
     }
     case 'ci': {
@@ -100,7 +104,7 @@ export function checkForm(d: PoemDraft, palette?: Palette): string[] {
       if (lines.length < 4 || lines.length > 6) p.push(`an English poem has 4–6 lines (got ${lines.length})`)
       lines.forEach((l, i) => {
         const words = l.trim().split(/\s+/).filter((w) => /[\p{L}\p{N}]/u.test(w)).length
-        if (words > EN_MAX_WORDS_PER_LINE) p.push(`line ${i + 1} is not short (${words} words)`)
+        if (words > EN_MAX_HARD_WORDS_PER_LINE) p.push(`line ${i + 1} is not short (${words} words; at most ${EN_MAX_WORDS_PER_LINE})`)
       })
       break
     }
@@ -170,4 +174,40 @@ export function blockedCharacters(palette: Palette, occasion: Occasion | null, f
   }
   if (occasion === 'memorial') for (const k of palette.memorialBlocked.keys()) out.add(k)
   return [...out]
+}
+
+/** Modern things that do not belong in a classical poem (tang / ci): a craft note, never a failure on its own. */
+const MODERN_WORDS = ['電話', '电话', '手機', '手机', '電腦', '电脑', '電視', '电视', '電車', '电车', '汽車', '汽车', '飛機', '飞机', '弁當', '弁当', '便當', '便当', '飯盒', '饭盒', '咖啡', '手錶', '手表', '網絡', '网络']
+
+/**
+ * CRAFT notes: problems worth one regeneration but never worth failing the poem for. If the second try still has only these, it ships.
+ *   tanka  the same kanji twice (母 … 母) — a word repeated in five short lines reads as a slip (the chosen character may repeat)
+ *   tang   lines 2 and 4 ending on the very same character (a rhyme on one character is no rhyme); modern things (電話, 弁当 …)
+ *   ci     modern things
+ *   en     a line of 13–16 words (the form error starts above 16)
+ */
+export function checkCraft(d: PoemDraft, forms: string[]): string[] {
+  const out: string[] = []
+  const text = d.lines.join('')
+  if (d.type === 'tanka') {
+    const counts = new Map<string, number>()
+    for (const ch of [...text]) if (/[㐀-鿿豈-﫿]/u.test(ch) && !forms.includes(ch)) counts.set(ch, (counts.get(ch) ?? 0) + 1)
+    const twice = [...counts].filter(([, n]) => n >= 2).map(([c]) => c)
+    if (twice.length > 0) out.push(`the word ${twice.join(' ')} is used more than once — use each word once (vary it: a different word, a pronoun, or leave it unsaid)`)
+  }
+  if (d.type === 'tang' && d.lines.length === 4) {
+    const last = (l: string) => [...l.replace(PUNCT, '')].pop()
+    if (last(d.lines[1]) !== undefined && last(d.lines[1]) === last(d.lines[3])) out.push('lines 2 and 4 end on the same character — rhyme on two different characters')
+  }
+  if (d.type === 'tang' || d.type === 'ci') {
+    const modern = MODERN_WORDS.filter((w) => text.includes(w))
+    if (modern.length > 0) out.push(`modern word(s) ${modern.join(' ')} — use classical imagery instead (e.g. 一聲 for a call, 竹籠 for a lunch box)`)
+  }
+  if (d.type === 'en') {
+    d.lines.forEach((l, i) => {
+      const words = l.trim().split(/\s+/).filter((w) => /[\p{L}\p{N}]/u.test(w)).length
+      if (words > EN_MAX_WORDS_PER_LINE && words <= EN_MAX_HARD_WORDS_PER_LINE) out.push(`line ${i + 1} has ${words} words — keep every line to ${EN_MAX_WORDS_PER_LINE} words or fewer`)
+    })
+  }
+  return out
 }

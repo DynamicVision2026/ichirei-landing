@@ -38,6 +38,7 @@ FORM — tanka (短歌)
 - Five lines, 5-7-5-7-7 morae. Write the poem in natural Japanese (kanji and kana).
 - Also give `reading_kana`: the kana reading of each line, hiragana only, exactly as it would be read aloud. The harness counts morae from it: every kana is one mora, ゃゅょ (and small ぁぃぅぇぉ) join the kana before them, ッ and ー and ん count one.
 - Plain, concrete, in the sender's voice; no archaic filler to fit the count.
+- CRAFT: never use the same word twice in the five lines (母 … 母, 朝 … 朝). Say it once, where it counts; elsewhere vary the word, use a pronoun, or leave it unsaid — in five short lines a repeated word reads as a slip. (Only the chosen character may return, and only when the turn of the poem needs it.)
 SCRIPT AND READING AIDS: the poem is Japanese. {{ BUYER_AIDS }}
 OUTPUT. Reply with exactly one JSON object and nothing else:
 { "lines": [5 strings], "reading_kana": [5 strings], "romaji": [5 strings] or null, "english": string or null }

@@ -35,8 +35,9 @@ RULES — all of them, without exception
 {{ FEEDBACK }}
 
 FORM — English poem
-- Four to six SHORT lines of free verse (each line a few words, never more than twelve). No rhyme needed; plain words, concrete images.
-- The chosen character is written into the poem as the character itself (for example on its own line, or inside a line), at the turning point, with the English sense around it. The harness checks that it appears.
+- Four to six SHORT lines of free verse. Every line is at most TWELVE words (count them; most lines should be five to nine). No rhyme needed; plain words, concrete images.
+- The chosen character is written into the poem AS THE CHARACTER ITSELF — copy it exactly as given above ({{ KANJI }}), never translate it away and never write only its English meaning. Put it on its own line or inside a line, at the turning point, with the English sense around it. For example (the shape only — this is not your poem): a short line, then a line holding the character, for instance `the quiet word 待 —`, then a short line giving its sense. The harness checks that the character appears.
+- Do not copy this prompt's wording into the poem; write only the poem.
 SCRIPT AND READING AIDS: {{ BUYER_AIDS }}
-OUTPUT. Reply with exactly one JSON object and nothing else:
+OUTPUT. Reply with exactly one JSON object and nothing else (no code fence, no commentary):
 { "lines": [4 to 6 strings] }

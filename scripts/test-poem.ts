@@ -10,12 +10,13 @@ import http from 'node:http'
 import { mkdtempSync, readFileSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { CI_PATTERNS, blockedCharacters, checkContainsCharacter, checkForm, checkPalette, moraCount } from '../engine/poem-check.ts'
-import { buyerAids, generatePoem, loadPoemPrompt, poemFamilies, type PoemInput } from '../engine/poem.ts'
+import { CI_PATTERNS, blockedCharacters, checkContainsCharacter, checkCraft, checkForm, checkPalette, moraCount } from '../engine/poem-check.ts'
+import { buyerAids, generatePoem, loadPoemPrompt, loadPoemReviewPrompt, poemFamilies, reasonCode, type PoemInput } from '../engine/poem.ts'
 import { createPoemHandler, TYPES_GET } from '../api/poem.ts'
 import { createOrderHandler } from '../api/order.ts'
 import { MemoryOrderStore } from '../engine/order-store.ts'
 import { loadPalette } from '../engine/palette.ts'
+import { checkRhyme, lineRhyme } from '../engine/rhyme.ts'
 import { availablePoemTypes, loadShopifyConfig, poemPreviewOn, poemTypesAccepted, poemVariantsFromEnv } from '../engine/shopify.ts'
 import { MAX_POEMS, POEM_PRICE_JPY, POEM_TYPES, formatYen, type PoemType } from '../src/order/packages.ts'
 import { COPY } from '../src/demo/i18n.ts'
@@ -48,14 +49,14 @@ check('(1) ci: three patterns only, line lengths checked — 憶江南 3-5-7-7-5
 check('(1) ci: an unknown pattern, the wrong lengths for the chosen pattern, and a missing pattern are form errors', checkForm(ci('水調歌頭', C20.poems.ci.lines)).some((p) => p.includes('pattern')) && checkForm(ci('如夢令', C20.poems.ci.lines)).some((p) => p.includes('如夢令 needs line lengths 6-6-5-6-2-2-6')) && checkForm({ type: 'ci', lines: C20.poems.ci.lines }).some((p) => p.includes('pattern')))
 const en = (lines: string[]) => ({ type: 'en' as const, lines })
 check('(1) en: 4–6 short lines — valid', checkForm(en(C20.poems.en.lines)).length === 0 && checkForm(en(['a', 'b', 'c', 'd', 'e', 'f'])).length === 0)
-check('(1) en: 3 lines, 7 lines, or a line of more than 12 words are form errors', checkForm(en(['a', 'b', 'c'])).some((p) => p.includes('4–6')) && checkForm(en(['a', 'b', 'c', 'd', 'e', 'f', 'g'])).some((p) => p.includes('4–6')) && checkForm(en(['one two three four five six seven eight nine ten eleven twelve thirteen', 'b', 'c', 'd'])).some((p) => p.includes('not short')))
+check('(1) en: 3 lines, 7 lines, or a line of more than 12 words are form errors', checkForm(en(['a', 'b', 'c'])).some((p) => p.includes('4–6')) && checkForm(en(['a', 'b', 'c', 'd', 'e', 'f', 'g'])).some((p) => p.includes('4–6')) && checkForm(en(['one two three four five six seven eight nine ten eleven twelve thirteen fourteen fifteen sixteen seventeen', 'b', 'c', 'd'])).some((p) => p.includes('not short')) && checkForm(en(['one two three four five six seven eight nine ten eleven twelve thirteen', 'b', 'c', 'd'])).length === 0)
 check('(1) an empty line is a form error for every type', POEM_TYPES.every((t) => checkForm({ type: t, lines: ['', 'x', 'y', 'z'], reading_kana: ['a', 'b', 'c', 'd'] }).some((p) => p.includes('empty'))))
 check('(1) the chosen character must appear (its other form counts); if missing it fails like a form error', checkContainsCharacter(en(C20.poems.en.lines), ['備']) === null && checkContainsCharacter(en(C20.poems.en.lines), ['温', '溫']) !== null && checkContainsCharacter(tang(['晨起折庭花', '盒中春色輕', '溫載備朝飯', '不言我始知']), ['温', '溫']) === null)
 
 // ---- 2. the palette's blocks and the occasion rules for poems --------------------------------------------------------------------------------
 const bad = (type: PoemType, lines: string[], occasion: any, families: ('ja' | 'zh')[]) => checkPalette({ type, lines }, palette, occasion, families)
 check('(2) level 1: a hard-block character (死 病 無) anywhere in the poem fails, for every occasion', bad('tang', ['晨起折庭花', '盒中春色死', '廿載備朝飯', '不言我始知'], 'parent_day', ['zh']).some((p) => p.includes('死')) && bad('tanka', ['無きものを', 'a', 'b', 'c', 'd'], null, ['ja']).some((p) => p.includes('無')))
-check('(2) level 3, kanreki / milestone: 冬 夕 影 菊 渡 are blocked for birthday_milestone (rebirth, never decline) — and fine on another occasion', bad('tang', ['晨起折庭冬', '盒中春色輕', '廿載備朝飯', '不言我始知'], 'birthday_milestone', ['zh']).some((p) => p.includes('冬')) && !bad('tang', ['晨起折庭冬', '盒中春色輕', '廿載備朝飯', '不言我始知'], 'parent_day', ['zh']).some((p) => p.includes('冬')))
+check('(2) level 3, kanreki / milestone: 冬 夕 影 菊 渡 are blocked for birthday_milestone (rebirth, never decline) — and fine on another occasion', bad('tang', ['晨起折庭冬', '盒中春色華', '廿載備朝飯', '不言惟在家'], 'birthday_milestone', ['zh']).some((p) => p.includes('冬')) && !bad('tang', ['晨起折庭冬', '盒中春色華', '廿載備朝飯', '不言惟在家'], 'parent_day', ['zh']).some((p) => p.includes('冬')))
 check('(2) level 3, wedding: 帰 秋 続 継 耐 are blocked; English goodbye / farewell / parting too', bad('tanka', ['帰る日は', 'a', 'b', 'c', 'd'], 'wedding', ['ja']).some((p) => p.includes('帰')) && bad('en', ['Goodbye is not the word', 'b', 'c', 'd'], 'wedding', []).some((p) => p.includes('Goodbye')))
 check('(2) remembrance: the celebration / new-beginning characters (祝 寿 喜 初 新 婚) are blocked in every script; English death / grave / heaven / loss words too — the remembering voice has none of them', ['祝', '寿', '喜', '初', '新', '婚'].every((k) => bad('tang', ['晨起折庭花', `盒中春色${k}`, '廿載備朝飯', '不言我始知'], 'memorial', ['zh']).length > 0) && bad('en', ['She died last spring.', 'b', 'c', 'd'], 'memorial', []).length > 0 && bad('en', ['Her grave is quiet.', 'b', 'c', 'd'], 'memorial', []).length > 0 && bad('en', ['In heaven now.', 'b', 'c', 'd'], 'memorial', []).length > 0)
 check('(2) kanreki English: old age / decline / twilight are refused (the prompt asks for rebirth)', bad('en', ['In your old age, still kind.', 'b', 'c', 'd'], 'birthday_milestone', []).length > 0 && bad('en', ['A fresh start at sixty.', 'b', 'c', 'd'], 'birthday_milestone', []).length === 0)
@@ -151,12 +152,12 @@ function count(k: 'poem' | 'review') { return seen.filter((s) => s.kind === k).l
   const noChar = { lines: ['Every morning, a lid.', 'A flower from the yard.', 'She never asked.', 'I am learning to say it.'] }
   const r3 = await gen(C20, 'en', [noChar, C20.poems.en])
   check('(4) the chosen character missing from the poem is a failure like a form error (then regenerated)', r3.ok && seen[1].prompt.includes('does not appear in the poem'))
-  const blockedMem = { ...C04.poems.tang, lines: ['舊箋幾十通', '皆是母手跡', '綴我名而祝', '燈前讀至明'] }
+  const blockedMem = { ...C04.poems.tang, lines: ['舊箋幾十通', '皆是母手跡', '綴我名而祝', '燈前讀不已'] }
   const r4 = await gen(C04, 'tang', [blockedMem])
   check('(4) memorial: a celebration character (祝) in the poem fails the palette check, twice → error for that type', !r4.ok && r4.code === 'poem_failed' && logs.some((l) => l.includes('blocked in remembrance')))
   const r5 = await gen(C04, 'en', [{ lines: ['She died last spring.', '綴 — to stitch a daughter\'s words —', 'b', 'c'] }])
   check('(4) memorial, English: death words fail the check (no talk of death or loss)', !r5.ok && r5.code === 'poem_failed')
-  const kan = { ...C20.poems.tang, lines: ['晨起折庭冬', '盒中春色輕', '廿載備朝飯', '不言我始知'] }
+  const kan = { ...C20.poems.tang, lines: ['晨起折庭冬', '盒中春色華', '廿載備朝飯', '不言惟在家'] }
   const r6 = await gen({ ...C20, context: { ...C20.context, occasion: 'birthday_milestone' } }, 'tang', [kan])
   check('(4) kanreki / milestone: 冬 (decline) in the poem fails the palette check; the same poem is fine for parent_day', !r6.ok && (await gen(C20, 'tang', [kan])).ok === true)
   const rv = await gen(C20, 'en', [C20.poems.en], [{ pass: false, rule: 'relationship', reason: 'reads as a debt' }, { pass: true, rule: null, reason: 'ok' }])
@@ -176,6 +177,59 @@ function count(k: 'poem' | 'review') { return seen.filter((s) => s.kind === k).l
   hang = false
   delete process.env.ICHIREI_POEM_TIMEOUT_MS
   check('(4) the hard cap (default 45 s, here 0.4 s): a poem that takes too long ends with poem_timeout, quickly', !to.ok && to.code === 'poem_timeout' && Date.now() - t0 < 5000)
+}
+
+// ---- 4b. v9.3: the rhyme of the 漢詩, craft notes, 現代語訳, the English path, the failure reasons ------------------------------------------------
+{
+  const q = (lines: string[]) => ({ type: 'tang' as const, lines })
+  check('(4b) tang rhyme: lines 2 and 4 on the same rhyme pass (光/霜, 家/花, 輕 vs 雲 do not match but 雲/恩 do); line 1 is free', checkRhyme(['床前明月光', '疑是地上霜', '舉頭望明月', '低頭思故鄉']).length === 0 && checkRhyme(['x', '盒中春色華', 'y', '不言惟在家']).length === 0 && checkRhyme(['x', '輕如雲', 'y', '始知恩']).length === 0 && checkRhyme(['a', 'bb霜', 'c', 'dd光']).length === 0)
+  check('(4b) tang rhyme: lines 2 and 4 that do not rhyme are a form error naming both characters and their pinyin (輕 qing vs 知 zhi)', (() => { const p = checkForm(q(['晨起折庭花', '盒中春色輕', '廿載備朝飯', '不言我始知'])); return p.length === 1 && p[0].startsWith('lines 2 and 4 must rhyme') && p[0].includes('輕 (qing)') && p[0].includes('知 (zhi)') })())
+  check('(4b) rhyme uses the modern rhyme groups (中華新韻): ü and u are different (魚 vs 母), -i after zh/ch/sh/r/z/c/s is its own group (詩 shi vs 地 di), 夜 ye is 三皆 not 二波', checkRhyme(['x', '魚', 'y', '女']).length === 0 && checkRhyme(['x', '魚', 'y', '母']).length === 1 && checkRhyme(['x', '詩', 'y', '思']).length === 0 && checkRhyme(['x', '詩', 'y', '地']).length === 1 && lineRhyme('夜')?.group === '三皆' && lineRhyme('歌')?.group === '二波')
+  check('(4b) a polyphonic character takes the reading its line implies (the library is given the whole line)', lineRhyme('樂聲悠揚')?.pinyin === 'yang' && lineRhyme('行路難')?.char === '難')
+  check('(4b) a tang that fails only the rhyme is regenerated once with the pinyin of both line ends fed back — then ok', await (async () => { const bad = { ...C20.poems.tang, lines: ['晨起折庭花', '盒中春色輕', '廿載備朝飯', '不言我始知'] }; const r = await gen(C20, 'tang', [bad, C20.poems.tang]); return r.ok && count('poem') === 2 && seen.filter((x) => x.kind === 'poem')[1].prompt.includes('輕 (qing)') && seen.filter((x) => x.kind === 'poem')[1].prompt.includes('must rhyme') })())
+  const rr = await gen(C20, 'tang', [{ ...C20.poems.tang, lines: ['晨起折庭花', '盒中春色輕', '廿載備朝飯', '不言我始知'] }])
+  check('(4b) …still no rhyme the second time → poem_failed with the reason code `rhyme` (and the words in `problems`), logged without the poem or story', !rr.ok && rr.code === 'poem_failed' && rr.reasons?.join() === 'rhyme' && (rr.problems?.length ?? 0) === 2 && logs.some((l) => l.includes('"reasons":["rhyme"]')) && noText())
+  check('(4b) the tang and ci prompts require the rhyme (tang) and classical imagery with no modern words, with the 一聲 / 竹籠 examples', ['MUST end on the same rhyme', 'CLASSICAL IMAGERY ONLY', '一聲', '竹籠', '電話', '弁當'].every((n) => loadPoemPrompt('tang').includes(n)) && ['CLASSICAL IMAGERY ONLY', '一聲', '竹籠', '電話', '弁當'].every((n) => loadPoemPrompt('ci').includes(n)))
+  check('(4b) craft notes: a tanka that uses the same kanji twice (母 … 母) is flagged; the chosen character may repeat; a tanka with no repeat is clean', checkCraft({ type: 'tanka', lines: ['母の背に', '朝の光や', '母の声', 'いまも聞こえる', '今ありがとう'] }, ['備']).some((x) => x.includes('母')) && checkCraft({ type: 'tanka', lines: ['備えゆく', '朝の光や', '備えたる', 'いまも聞こえる', 'ありがとう'] }, ['備']).length === 0 && checkCraft({ type: 'tanka', lines: C20.poems.tanka.lines }, ['備']).length === 0)
+  check('(4b) craft notes: modern words in a tang / ci (電話, 弁當 …) are flagged; the tanka prompt forbids a repeated word', checkCraft({ type: 'tang', lines: ['一通電話來', 'a', 'b', 'c'] }, []).some((x) => x.includes('電話')) && checkCraft({ type: 'ci', lines: ['弁當'] }, []).some((x) => x.includes('弁當')) && loadPoemPrompt('tanka').includes('never use the same word twice'))
+  const rep = { ...C20.poems.tanka, lines: ['母の背で', '備えた朝や', '母の声', 'いまも聞こえる', '今ありがとう'], reading_kana: ['ははのせで', 'そなえたあさや', 'ははのこえ', 'いまもきこえる', 'いまありがとう'] }
+  const dv = await gen(C20, 'tanka', [rep, C20.poems.tanka])
+  check('(4b) a craft note costs one regeneration, with the note fed back — and the second poem ships', dv.ok && count('poem') === 2 && seen.filter((x) => x.kind === 'poem')[1].prompt.includes('CRAFT PROBLEMS') && dv.poem.lines.join() === C20.poems.tanka.lines.join())
+  const dv2 = await gen(C20, 'tanka', [rep])
+  check('(4b) …if the second try repeats the word too, it still ships (a craft note never fails a poem)', dv2.ok && count('poem') === 2 && logs.some((l) => l.includes('"craft_notes"')))
+  const dv3 = await gen(C20, 'tanka', [rep, { ...C20.poems.tanka, reading_kana: ['あ', 'い', 'う', 'え', 'お'] }])
+  check('(4b) …and if the second try fails a HARD check, the first poem (hard checks passed) ships instead of an error', dv3.ok && dv3.poem.lines.join() === rep.lines.join())
+  // 現代語訳
+  const g = await gen(C20, 'tang', [C20.poems.tang])
+  check('(4b) a Japanese buyer of a tang gets 書き下し + 現代語訳: both are kept and both are in the stored reading text (書き下し first)', g.ok && typeof g.poem.aids.gendaigo === 'string' && g.poem.aids.gendaigo.includes('二十年') && g.poem.reading.includes('晨に起きて') && g.poem.reading.indexOf('晨に起きて') < g.poem.reading.indexOf('二十年'))
+  const gc = await gen(C20, 'ci', [C20.poems.ci])
+  check('(4b) …and of a ci too', gc.ok && typeof gc.poem.aids.gendaigo === 'string' && gc.poem.reading.includes('朝また朝') && gc.poem.reading.includes('弁当箱'))
+  const noG = await gen(C20, 'tang', [{ ...C20.poems.tang, gendaigo: undefined }, { ...C20.poems.tang, gendaigo: undefined }])
+  check('(4b) a Japanese tang without a 現代語訳 is regenerated once, then fails with the reason `gendaigo`', !noG.ok && noG.reasons?.join() === 'gendaigo' && count('poem') === 2)
+  const ge = await gen(C20, 'tang', [{ ...C20.poems.tang, english: 'At dawn I pick a flower.' }], [], 'en')
+  const gz = await gen(C20, 'tang', [C20.poems.tang], [], 'zh-Hant')
+  check('(4b) English and Chinese buyers get no 現代語訳 (and a Chinese buyer needs none)', ge.ok && ge.poem.aids.gendaigo === null && gz.ok && gz.poem.aids.gendaigo === null && gz.poem.aids.kakikudashi === null && buyerAids('tang', 'ja').includes('現代語訳') && buyerAids('ci', 'ja').includes('gendaigo') && !buyerAids('tang', 'en').includes('gendaigo is'))
+  check('(4b) tang / ci prompts ask for `gendaigo` in the output shape', loadPoemPrompt('tang').includes('"gendaigo"') && loadPoemPrompt('ci').includes('"gendaigo"'))
+  // the English path
+  const enOk = await gen(C20, 'en', [C20.poems.en])
+  check('(4b) English poem: a good reply passes (4 lines, 備 present, one poem call + one review call)', enOk.ok && count('poem') === 1 && count('review') === 1)
+  const enLong = { lines: ['Every morning a lid, and a small flower from the yard, laid on rice', 'She never asked to be thanked.', '備 — to be ready before anyone asks —', 'twenty years late, I am learning to say it.'] }
+  const enSoft = await gen(C20, 'en', [enLong, C20.poems.en])
+  check('(4b) English poem: a line of 13–16 words is a craft note (one regeneration, then ships), only more than 16 is a form error', enSoft.ok && count('poem') === 2 && seen.filter((x) => x.kind === 'poem')[1].prompt.includes('CRAFT PROBLEMS'))
+  const fenced = '```json\n' + JSON.stringify(C20.poems.en) + '\n```'
+  const enFence = await gen(C20, 'en', [fenced])
+  const enText = await gen(C20, 'en', [{ poem: C20.poems.en.lines.join('\n') }])
+  const enPlain = await gen(C20, 'en', ['Here is your poem: ' + JSON.stringify(C20.poems.en) + ' I hope you like it.'])
+  check('(4b) English poem: the reply may come in a code fence, with chatter around it, or as `poem` text with line breaks — all are read', enFence.ok && enText.ok && enPlain.ok)
+  const enNoChar = await gen(C20, 'en', [{ lines: ['Every morning, a lid.', 'A flower from the yard.', 'She never asked.', 'I am learning to say it.'] }])
+  check('(4b) English poem: the reason `character_missing` is reported when the character is left out (twice), in the log and in `reasons`', !enNoChar.ok && enNoChar.reasons?.join() === 'character_missing' && logs.some((l) => l.includes('"reasons":["character_missing"]')))
+  const enBad = await gen(C20, 'en', ['I could not write that.'])
+  check('(4b) English poem: an unreadable reply is reported as the reason `parse` (not a silent failure)', !enBad.ok && enBad.reasons?.join() === 'parse' && logs.some((l) => l.includes('"reasons":["parse"]')))
+  const enVeto = await gen(C20, 'en', [C20.poems.en], [{ pass: false, rule: 'palette', reason: 'uses a parting word' }])
+  check('(4b) English poem: a review veto is reported as `review:palette` with its reason in the problems', !enVeto.ok && enVeto.reasons?.join() === 'review:palette' && (enVeto.problems ?? []).some((p) => p.includes('uses a parting word')))
+  check('(4b) the review prompt says the chosen character in the poem is intended (a Chinese character inside an English poem is not a taboo)', loadPoemReviewPrompt().includes('was already judged') && loadPoemReviewPrompt().includes('inside an English poem'))
+  check('(4b) the English prompt tells the model to copy the character itself, gives the word limit and the shape', (() => { const t = loadPoemPrompt('en'); return t.includes('AS THE CHARACTER ITSELF') && t.includes('TWELVE words') && t.includes('never translate it away') })())
+  check('(4b) failure reasons are short codes: call / parse / form / character_missing / rhyme / palette / review:<rule> / gendaigo', ['call: boom', 'the reply was not a JSON object', 'the reply has no lines array', 'a tanka has 5 lines (got 4)', 'the chosen character (備) does not appear in the poem', 'lines 2 and 4 must rhyme: …', '死: hard block (never used)', '祝: blocked in remembrance (x)', 'review (relationship): x', 'gendaigo is missing: …'].map(reasonCode).join() === 'call,parse,parse,form,character_missing,rhyme,palette,palette,review:relationship,gendaigo')
 }
 
 // ---- 5. /api/poem and /api/poem-types ------------------------------------------------------------------------------------------------------
@@ -337,6 +391,13 @@ const postOrder = (h: (r: Request) => Promise<Response>, b: unknown) => h(new Re
   check('(7b) preview: the palette block still refuses a hard-block character (400 character_not_allowed)', refused.status === 400 && ((await refused.json()) as any).code === 'character_not_allowed')
   const memorial = await post(handler(all), body(C04, 'tanka', { kanji: '祝' }))
   check('(7b) preview: the remembrance block still refuses a celebration character (400)', memorial.status === 400)
+  // failure reasons through the API: codes always, the words only in preview mode
+  const failing = { ok: false as const, code: 'poem_failed' as const, error: 'x', reasons: ['character_missing'], problems: ['the chosen character (待) does not appear in the poem'] }
+  const rOff = await post(handler(all, { generate: async () => failing }), body(C20, 'en'))
+  const jOff = (await rOff.json()) as any
+  const rOn = await post(handler(all, { generate: async () => failing, detail: true }), body(C20, 'en'))
+  const jOn = (await rOn.json()) as any
+  check('(7b) a failed poem answers 502 with `reasons` (short codes); the failed checks in words (`problems`) only in preview mode', rOff.status === 502 && jOff.code === 'poem_failed' && jOff.reasons?.join() === 'character_missing' && jOff.problems === undefined && jOn.problems?.length === 1 && jOn.reasons?.join() === 'character_missing')
   // the order flow still refuses a poem whose Shopify variant is missing, whatever the preview says
   replies = [C20.poems.ci]
   reviewReplies = []

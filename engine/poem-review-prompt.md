@@ -18,6 +18,8 @@ THE STORY
 THE POEM ({{ TYPE }})
 {{ POEM }}
 
+The chosen character ({{ KANJI }}) was already judged when it was offered: its presence in the poem, in any form, is intended and is never a reason to fail — including a single Chinese character set inside an English poem. A word that merely TRANSLATES or glosses it is not a taboo either.
+
 FAIL only if one of these clearly holds, and name it in `rule`:
 1. `palette` — The poem uses a death, illness, parting, severing or ending word, or a word that is a level-1/level-3 taboo for this occasion.
 2. `occasion` — It evokes what this occasion must never evoke: birthday_milestone (kanreki): decline, old age as a burden, ending (rebirth is right); wedding: parting, leaving, breaking, returning; new_baby: death, illness, pain; school_career: failure, falling away; retirement_farewell: death, decline, "finished"; parent_day / seasonal_thanks: debt, burden, obligation.
