@@ -27,11 +27,13 @@ For slots `main` and `second` (the two main candidates), FAIL only if one of the
 3. `memorial` — only for occasion `memorial` (remembrance of someone who has died; nothing is being given): the character is a celebration character (祝, 寿, 喜, 慶, 賀, 婚 and the like) or its main sense is birth or a fresh start, or the gaze line speaks of death, loss, grief, the funeral or the afterlife as such. Nothing else is a reason to fail a memorial candidate: a gaze in the third person, a gaze that comforts, a quiet or sad character are all fine.
 4. `dignity` — The character, with its gaze line, closes the receiver into a verdict on who they are (stubborn, cold, weak, difficult) instead of opening them into a fuller person; or it speaks of a LIVING receiver as if they were already gone, declining or a burden.
 5. `register` — The register is wrong for the direction or the relationship: romantic or sexual meaning toward a parent, child, relative, teacher or colleague; mockery, teasing or irony toward someone the sender honours (direction `up`) or in a solemn occasion; anything that would be heard as insulting.
+6. `illness` — The story says or clearly implies that the RECEIVER is ill, in hospital, recovering from an illness (a stroke, cancer …), living with dementia, or frail, and the character (or its gaze line) carries an illness, death or ending association in the buyer's language: for Japanese 篤 (危篤), 峠, 迎 (お迎えが来る), 渡, 逝, 終, 静 as in 静養, 還, 眠, 臨, 往, 去, 別, 送, 病, 弱, 衰; for Chinese 笃, 逝, 终, 殁, 眠, 超渡, 归 (归天), 弱, 衰, 病; for en, either list. The list is illustrative — judge by the associations the character carries for a Japanese / Chinese reader. This holds however well the character fits the story and whatever the palette row says. If the story gives no sign of illness or frailty, this rule does not apply.
 
 For slot `freestyle` (the playful candidate), FAIL only if one of these holds (and, because the freestyle is optional, when you are genuinely unsure whether it mocks the receiver, FAIL it as `insult`):
 1. `insult` — It teases about — or would be heard as mocking — the receiver's body, appearance, weight, intelligence, money or status, sexual meaning, illness, disability, or anything cruel. Teasing must be WITH the receiver, never AT them. A joke the receiver would only laugh at because they are being polite is a FAIL.
 2. `palette` — It carries a death / illness / parting / severing connotation, or the occasion taboo above applies to it.
 3. `register` — For occasion `memorial` it teases at all (gentle affection is fine, teasing is not); for a bittersweet or longing story it jokes; for an `up` direction it is anything but gentle and affectionate; it speaks for the receiver instead of the sender.
+4. `illness` — Same as rule 6 above: the story signals illness, hospital, stroke, dementia or frailty of the receiver, and the freestyle carries an illness, death or ending association (or jokes about it).
 
 The freestyle does NOT need a palette row and may be an ordinary or even unlovely character — that alone is never a reason to fail it.
 
@@ -43,13 +45,13 @@ THE CONCERNS — never a reason to FAIL; write them in `concern` (at most 20 wor
 - Thin evidence, an obscure character, awkward wording, a weaker choice than another candidate.
 Do not let a concern change your verdict. A candidate with only concerns is a PASS.
 
-THE REASON. For every candidate give a `reason` of at most 20 words, in English, naming what decided it (for a PASS, say what makes it safe). It is read by engineers, not shown to customers. When `pass` is false, `rule` is REQUIRED and must be exactly one of the rule names above (`palette`, `occasion`, `memorial`, `dignity`, `register`, `insult`); a FAIL without one of those names is ignored. When `pass` is true, `rule` is null.
+THE REASON. For every candidate give a `reason` of at most 20 words, in English, naming what decided it (for a PASS, say what makes it safe). It is read by engineers, not shown to customers. When `pass` is false, `rule` is REQUIRED and must be exactly one of the rule names above (`palette`, `occasion`, `memorial`, `dignity`, `register`, `insult`, `illness`); a FAIL without one of those names is ignored. When `pass` is true, `rule` is null.
 
 OUTPUT. Reply with exactly one JSON object and nothing else — no prose, no code fence:
 
 {
   "verdicts": [
-    { "slot": "main" | "second" | "freestyle", "kanji": "<the kanji exactly as given>", "pass": true | false, "rule": null | "palette" | "occasion" | "memorial" | "dignity" | "register" | "insult", "reason": "<≤ 20 words>", "concern": "<≤ 20 words, or empty>" }
+    { "slot": "main" | "second" | "freestyle", "kanji": "<the kanji exactly as given>", "pass": true | false, "rule": null | "palette" | "occasion" | "memorial" | "dignity" | "register" | "insult" | "illness", "reason": "<≤ 20 words>", "concern": "<≤ 20 words, or empty>" }
   ]
 }
 

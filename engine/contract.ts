@@ -401,7 +401,7 @@ export const DEFAULT_FOLLOW_UP: Record<Language, string> = {
   en: 'Could you tell us about one small moment with them that you often think back to?',
 }
 
-export const REVIEW_VETO_RULES = ['palette', 'occasion', 'memorial', 'dignity', 'register', 'insult'] as const
+export const REVIEW_VETO_RULES = ['palette', 'occasion', 'memorial', 'dignity', 'register', 'insult', 'illness'] as const
 export type ReviewVetoRule = (typeof REVIEW_VETO_RULES)[number]
 export interface ReviewVerdict {
   slot: Slot

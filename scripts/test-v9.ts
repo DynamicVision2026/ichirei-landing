@@ -9,7 +9,7 @@ import http from 'node:http'
 import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { runEngine } from '../engine/engine.ts'
-import { validateEngineResult, type EngineResult } from '../engine/contract.ts'
+import { REVIEW_VETO_RULES, validateEngineResult, type EngineResult } from '../engine/contract.ts'
 import { LEXICON_COLUMNS, buildLexiconPrompt, eligibleFor, lexiconEchoOf, lexiconModeFromEnv, lexiconRowIn, loadLexicon, parseLexicon, renderLexiconTable, rowReviewedByHuman, rowShowsLine } from '../engine/lexicon.ts'
 import { loadPalette, parseCsv } from '../engine/palette.ts'
 import { logMainCharacter, resetMainTally } from '../engine/main-count.ts'
@@ -98,6 +98,7 @@ let lexiconReply: any = null
 let replaceQueue: any[] = []
 let lexiconBehavior: 'ok' | 'hang' | 'error' = 'ok'
 let reviewVetoes: Record<string, boolean> = {}
+let reviewRule = 'dignity'
 const hung: http.ServerResponse[] = []
 const upstream = http.createServer(async (req, res) => {
   let raw = ''
@@ -130,7 +131,7 @@ const upstream = http.createServer(async (req, res) => {
   else if (kind === 'replace') reply = replaceQueue.length === 0 ? { none: true } : replaceQueue.shift()
   else {
     const items = [...prompt.matchAll(/"slot": "(main|second|freestyle)",\s*"kanji": "([^"]+)"/g)].map((m) => ({ slot: m[1], kanji: m[2] }))
-    reply = { verdicts: items.map((i) => ({ slot: i.slot, kanji: i.kanji, pass: !reviewVetoes[i.kanji], rule: reviewVetoes[i.kanji] ? 'dignity' : null, reason: 'ok' })) }
+    reply = { verdicts: items.map((i) => ({ slot: i.slot, kanji: i.kanji, pass: !reviewVetoes[i.kanji], rule: reviewVetoes[i.kanji] ? reviewRule : null, reason: 'ok' })) }
   }
   start()
   sse('content_block_start', { type: 'content_block_start', index: 0, content_block: { type: 'text', text: '' } })
@@ -159,7 +160,8 @@ const PALETTE_ANSWER = () => reply(cand('main', '備', 'そなえる', A1), cand
 
 const logs: string[] = []
 const origLog = console.log
-const run = async (o: { mode?: 'off' | 'shadow' | 'on'; palette?: any; lex?: any; followUps?: number; replacements?: any[]; lexicon?: any; vetoes?: Record<string, boolean>; lexBehavior?: 'ok' | 'hang' | 'error'; context?: any } = {}) => {
+const run = async (o: { mode?: 'off' | 'shadow' | 'on'; palette?: any; lex?: any; followUps?: number; replacements?: any[]; lexicon?: any; vetoes?: Record<string, boolean>; lexBehavior?: 'ok' | 'hang' | 'error'; context?: any; story?: string; rule?: string } = {}) => {
+  reviewRule = o.rule ?? 'dignity'
   paletteReply = o.palette ?? PALETTE_ANSWER()
   lexiconReply = o.lex ?? GOOD()
   replaceQueue = clone(o.replacements ?? [])
@@ -169,7 +171,7 @@ const run = async (o: { mode?: 'off' | 'shadow' | 'on'; palette?: any; lex?: any
   logs.length = 0
   console.log = (...a: unknown[]) => { const l = a.map(String).join(' '); if (l.startsWith('[ichirei-')) logs.push(l); else origLog(...a) }
   try {
-    return await runEngine(STORY, 'A', { context: o.context ?? CONTEXT, lexiconMode: o.mode ?? 'on', followUpsUsed: o.followUps ?? 0, lexicon: o.lexicon })
+    return await runEngine(o.story ?? STORY, 'A', { context: o.context ?? CONTEXT, lexiconMode: o.mode ?? 'on', followUpsUsed: o.followUps ?? 0, lexicon: o.lexicon })
   } finally {
     console.log = origLog
   }
@@ -315,6 +317,50 @@ process.env.ICHIREI_SHADOW_GRACE_MS = '1500'
   const r = await run({ mode: 'on' })
   const mains = logs.filter((l) => l.startsWith('[ichirei-main] '))
   check('(8b) a real run logs its main exactly once, with no story text', mains.length === 1 && JSON.parse(mains[0].slice(15)).kanji === r.primary_kanji && JSON.parse(mains[0].slice(15)).source === 'lexicon' && noStory(), mains.join('|'))
+}
+
+// ---- 8c. illness and frailty: 篤 is gone for Japanese buyers; the prompts and the review carry the illness rule -------------------------------------------
+{
+  const fx = JSON.parse(read('scripts/fixtures-v9/s0005-teacher-stroke-illness.json'))
+  check('(8c) palette: ja 篤 is a hard block (危篤); the Chinese row 笃 is unchanged', pal('ja', '篤').status === 'hard_block' && pal('ja', '篤').raw.relationship_fit === 'none' && pal('zh', '笃').status === 'context_required')
+  const ever: string[] = []
+  for (const language of ['ja', 'zh-Hans', 'en'] as const) for (const relationship of [null, 'parent_mother', 'parent_father', 'grandparent', 'spouse', 'romance', 'friend', 'work', 'mentor', 'child', 'sibling', 'in_law', 'pet', 'community'] as const) for (const occasion of [null, 'birthday_milestone', 'wedding', 'seasonal_thanks', 'parent_day', 'memorial'] as const) ever.push(...kanjiOf(language, relationship, 'up', occasion).filter((k) => k === '篤'))
+  check('(8c) the lexicon never offers 篤 for Japanese (ja) or English (judged by the Japanese palette too) — any relationship, occasion or direction', ever.length === 0, String(ever.length))
+  check('(8c) …but the Chinese list still has 笃 where its row allows (the owner decision was for Japanese buyers)', kanjiOf('zh-Hans', 'mentor', 'up', 'seasonal_thanks').includes('笃'))
+  for (const fam of ['ja', 'zh', 'en']) {
+    const t = read(`engine/prompt.${fam}.md`)
+    const block = t.slice(t.indexOf('ILLNESS AND FRAILTY'), t.indexOf('STEP 0 — Input sufficiency'))
+    check(`(8c) prompt.${fam}.md: the illness rule — every slot incl. the freestyle, illness / hospital / stroke / dementia / frailty, illness-or-death associations in the buyer's language, examples, "when in doubt do not choose it", the review may veto`, block.length > 300 && ['EVERY slot', 'stroke', 'dementia', 'frail', 'NEVER choose', 'when in doubt', 'may veto'].every((n) => block.includes(n)) && (fam === 'zh' ? block.includes('笃') && block.includes('逝') : ['篤', '峠', '迎', '渡', '逝', '終', '静'].every((k) => block.includes(k))), fam)
+  }
+  const rp = read('engine/review-prompt.md')
+  check('(8c) review-prompt.md: `illness` is a named safety rule for main, second and freestyle, with the Japanese and Chinese examples; the output shape lists it', rp.includes('6. `illness`') && rp.includes('4. `illness`') && ['篤', '峠', '迎', '渡', '逝', '終', '静'].every((k) => rp.includes(k)) && rp.includes('| "illness"') && rp.includes('`insult`, `illness`'))
+  check('(8c) `illness` is in REVIEW_VETO_RULES (a veto under it is applied, not ignored)', (REVIEW_VETO_RULES as readonly string[]).includes('illness'))
+  check('(8c) lexicon-prompt.md: the illness rule applies to the list too', lp.includes('ILLNESS AND FRAILTY') && lp.includes('lexicon_miss'))
+
+  const sendFx = (o: { mode: 'off' | 'on' | 'shadow'; reply?: any }) => {
+    const slim = clone(fx.model_reply)
+    return run({ mode: o.mode, story: fx.story, context: fx.context, palette: o.reply ?? slim, lex: o.reply ?? slim })
+  }
+  for (const mode of ['off', 'on'] as const) {
+    const r = await sendFx({ mode })
+    const shown = live(r).map((c) => c.kanji)
+    const seen篤 = r.candidates.find((c) => c.kanji === '篤')
+    check(`(8c) fixture teacher-stroke (${mode}): the live answer 存 / 篤 / 綴 comes back WITHOUT 篤 — never a main, second or freestyle`, !shown.includes('篤') && r.primary_kanji !== '篤' && r.runner_up_kanji !== '篤' && r.freestyle_kanji !== '篤' && Boolean(seen篤?.eliminated), JSON.stringify(r.candidates.map((c) => [c.slot, c.kanji, c.eliminated_reason])))
+    check(`(8c) fixture teacher-stroke (${mode}): 存 stays the main and the freestyle 綴 is untouched`, r.primary_kanji === '存' && slotKanji(r, 'freestyle') === '綴')
+  }
+  // 篤 as the FREESTYLE or as the main is removed too (palette hard block, whatever the slot)
+  const asFree = clone(fx.model_reply); asFree.candidates[1].kanji = '守'; asFree.candidates[1].reading = 'まもる'; asFree.runner_up_kanji = '守'; asFree.candidates[2].kanji = '篤'; asFree.candidates[2].reading = 'あつい'; asFree.freestyle_kanji = '篤'
+  const rf = await sendFx({ mode: 'off', reply: asFree })
+  check('(8c) 篤 offered as the freestyle is dropped as well', !live(rf).some((c) => c.kanji === '篤') && rf.freestyle_kanji === null)
+  const asMain = clone(fx.model_reply); asMain.candidates[0].kanji = '篤'; asMain.candidates[0].reading = 'あつい'; asMain.primary_kanji = '篤'; asMain.candidates[1].kanji = '守'; asMain.candidates[1].reading = 'まもる'; asMain.runner_up_kanji = '守'
+  const rm = await sendFx({ mode: 'off', reply: asMain })
+  check('(8c) 篤 offered as the main is removed and the second is promoted', rm.primary_kanji === '守' && !live(rm).some((c) => c.kanji === '篤'))
+  // the review may veto under the illness rule (a safety rule): a main is removed, and the second promoted
+  const ill = clone(fx.model_reply); ill.candidates[1].kanji = '守'; ill.candidates[1].reading = 'まもる'; ill.runner_up_kanji = '守'
+  const rv = await run({ mode: 'off', story: fx.story, context: fx.context, palette: ill, vetoes: { 存: true }, rule: 'illness' })
+  check('(8c) the review vetoes a main under `illness` (applied, not ignored): 存 is out and 守 is promoted', rv.primary_kanji === '守' && rv.candidates.find((c) => c.kanji === '存')?.eliminated_reason?.startsWith('review: illness') === true, JSON.stringify(rv.candidates.map((c) => [c.kanji, c.eliminated_reason])))
+  const rfv = await run({ mode: 'off', story: fx.story, context: fx.context, palette: ill, vetoes: { 綴: true }, rule: 'illness' })
+  check('(8c) …and a freestyle under `illness` is dropped', rfv.freestyle_kanji === null && rfv.primary_kanji === '存')
 }
 
 // ---- 9. /api/health -------------------------------------------------------------------------------------------------------------------------

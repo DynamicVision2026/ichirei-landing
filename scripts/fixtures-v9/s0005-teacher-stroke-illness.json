@@ -1,0 +1,59 @@
+{
+ "name": "teacher-stroke-illness",
+ "story_id": "s0005",
+ "note": "Live check after 2ab6fb4 (lexicon on, 2026-10-28): this story (the recipient had a stroke) returned 存 / 篤 / 綴. 篤 evokes 危篤 and must NEVER appear — not as main, second or freestyle — for a Japanese buyer. model_reply reproduces that live answer. The story is a retelling of a private test-database story: keep the repository private.",
+ "story": "中学のときの国語の先生のことです。私は二年の冬に父の転勤で引っ越し、それきり会っていませんでした。五十を過ぎたころ、先生から短い手紙が届き、会いに行きました。先生は脳梗塞の後で、字を書くのも大変そうでした。そこで渡されたのは一枚の細長い紙で、私が転校した日から、就職、子どもの誕生、父の死まで、先生が知るたびに一行ずつ書き足してくれていました。私は先生のことをほとんど思い出しもしなかったのに、先生はずっと私の人生を見ていてくれたんです。先生には、まだ元気でいてほしいと思っています。",
+ "context": {
+  "language": "ja",
+  "relationship": "mentor",
+  "direction": "up",
+  "occasion": "seasonal_thanks"
+ },
+ "model_reply": {
+  "status": "sufficient",
+  "follow_up_question": null,
+  "emotional_register": [
+   "grateful",
+   "tender"
+  ],
+  "candidates": [
+   {
+    "slot": "main",
+    "kanji": "存",
+    "inscription_form": null,
+    "reading": "そんざい",
+    "truth_type": "Essence",
+    "one_line_gaze": "離れていても、私の人生にいてくれた人。",
+    "story_anchor": "ずっと私の人生を見ていてくれた",
+    "unique_truth": "u"
+   },
+   {
+    "slot": "second",
+    "kanji": "篤",
+    "inscription_form": null,
+    "reading": "あつい",
+    "truth_type": "Hidden Cost",
+    "one_line_gaze": "私の人生を、手間を惜しまず書き足してくれた人。",
+    "story_anchor": "先生が知るたびに一行ずつ書き足してくれていました",
+    "unique_truth": "u"
+   },
+   {
+    "slot": "freestyle",
+    "kanji": "綴",
+    "inscription_form": null,
+    "reading": "つづる",
+    "truth_type": "Play",
+    "one_line_gaze": "私のことを、一行ずつ綴ってくれた人。",
+    "story_anchor": "先生が知るたびに一行ずつ書き足してくれていました",
+    "unique_truth": "u"
+   }
+  ],
+  "primary_kanji": "存",
+  "runner_up_kanji": "篤",
+  "freestyle_kanji": "綴",
+  "fallback_follow_up_question": "いちばん思い出す、ちいさな場面をひとつ教えてください。"
+ },
+ "forbidden": [
+  "篤"
+ ]
+}
