@@ -130,6 +130,13 @@ export function buyerAids(type: PoemType, language: Language): string {
 
 const strArray = (v: unknown): string[] | null => (Array.isArray(v) && v.every((x) => typeof x === 'string') ? (v as string[]).map((s) => s.trim()) : null)
 
+/** A free-text aid (現代語訳, English): a string, or — for a reply that returned it line by line — an array of strings, joined. */
+function freeText(v: unknown): string | null {
+  if (typeof v === 'string') return v.trim() || null
+  const arr = strArray(v)
+  return arr && arr.length > 0 ? arr.join(' ').trim() || null : null
+}
+
 /** The poem lines of a reply: `lines` as an array (the contract), or — for a reply that wandered a little — one string with line breaks, or `poem`. */
 function linesOf(raw: Record<string, unknown>): string[] | null {
   const direct = strArray(raw.lines)
@@ -221,12 +228,12 @@ export async function generatePoem(input: PoemInput, palette: Palette, opts: Gen
   const wantsR = input.type === 'tanka' && input.language !== 'ja'
   const wantsE = (input.type === 'tanka' && input.language !== 'ja') || ((input.type === 'tang' || input.type === 'ci') && input.language === 'en')
   const build = (raw: Record<string, unknown>, draft: PoemDraft): Poem => {
-    const text = (v: unknown) => (typeof v === 'string' && v.trim() ? v.trim() : null)
+    const text = freeText
     const kept = { kakikudashi: wantsK ? strArray(raw.kakikudashi) : null, romaji: wantsR ? strArray(raw.romaji) : null, english: wantsE ? text(raw.english) : null, gendaigo: wantsG ? text(raw.gendaigo) : null }
     return { type: input.type, lines: draft.lines, pattern: draft.pattern ?? null, aids: kept, reading: readingText(input.type, input.language, kept) }
   }
-  const logOk = (attempts: number, soft: string[]) =>
-    log(`[ichirei-poem] ${JSON.stringify({ type: input.type, ok: true, attempts, language: input.language, occasion: input.occasion, ...(soft.length ? { craft_notes: soft.map((x) => x.slice(0, 100)) } : {}), ms: Date.now() - t0 })}`)
+  const logOk = (attempts: number, soft: string[], poem: Poem) =>
+    log(`[ichirei-poem] ${JSON.stringify({ type: input.type, ok: true, attempts, language: input.language, occasion: input.occasion, aids: { kakikudashi: poem.aids.kakikudashi?.length ?? 0, gendaigo: poem.aids.gendaigo !== null, english: poem.aids.english !== null, romaji: poem.aids.romaji?.length ?? 0 }, ...(soft.length ? { craft_notes: soft.map((x) => x.slice(0, 100)) } : {}), ms: Date.now() - t0 })}`)
 
   let feedback = ''
   const failures: string[] = [] // every failed check of every attempt (in words)
@@ -248,7 +255,7 @@ export async function generatePoem(input: PoemInput, palette: Palette, opts: Gen
         ...checkForm(draft, palette),
         ...[checkContainsCharacter(draft, forms)].filter((x): x is string => x !== null),
         ...checkPalette(draft, palette, input.occasion, families, [...exempt, ...forms.flatMap((f) => [...f])]),
-        ...(wantsG && !(typeof raw.gendaigo === 'string' && raw.gendaigo.trim()) ? ['gendaigo is missing: add a short modern Japanese 現代語訳 of the whole poem'] : []),
+        ...(wantsG && !freeText(raw.gendaigo) ? ['gendaigo is missing: add a short modern Japanese 現代語訳 of the whole poem'] : []),
       ]
       if (problems.length === 0 && reviewEnabled()) {
         const verdict = await review(draft, input, callText)
@@ -258,7 +265,7 @@ export async function generatePoem(input: PoemInput, palette: Palette, opts: Gen
         const soft = checkCraft(draft, forms)
         const poem = build(raw, draft)
         if (soft.length === 0 || attempt === 2) {
-          logOk(attempt, soft)
+          logOk(attempt, soft, poem)
           return { ok: true, poem }
         }
         // craft notes only: one more try if there is time; the poem in hand ships if the try fails
@@ -275,7 +282,7 @@ export async function generatePoem(input: PoemInput, palette: Palette, opts: Gen
     } catch (err) {
       if (timedOut(signal)) {
         if (spare) {
-          logOk(attempt, spareSoft)
+          logOk(attempt, spareSoft, spare)
           return { ok: true, poem: spare }
         }
         log(`[ichirei-poem] ${JSON.stringify({ type: input.type, ok: false, code: 'poem_timeout', attempts: attempt, ms: Date.now() - t0 })}`)
@@ -290,7 +297,7 @@ export async function generatePoem(input: PoemInput, palette: Palette, opts: Gen
   }
   // a poem that passed every hard check but kept a craft note beats no poem
   if (spare) {
-    logOk(2, spareSoft)
+    logOk(2, spareSoft, spare)
     return { ok: true, poem: spare }
   }
   // the failed checks, one log line per failed poem: the type, the codes and the checks in words — never the poem or the story

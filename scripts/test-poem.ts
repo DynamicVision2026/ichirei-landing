@@ -210,6 +210,10 @@ function count(k: 'poem' | 'review') { return seen.filter((s) => s.kind === k).l
   const gz = await gen(C20, 'tang', [C20.poems.tang], [], 'zh-Hant')
   check('(4b) English and Chinese buyers get no 現代語訳 (and a Chinese buyer needs none)', ge.ok && ge.poem.aids.gendaigo === null && gz.ok && gz.poem.aids.gendaigo === null && gz.poem.aids.kakikudashi === null && buyerAids('tang', 'ja').includes('現代語訳') && buyerAids('ci', 'ja').includes('gendaigo') && !buyerAids('tang', 'en').includes('gendaigo is'))
   check('(4b) tang / ci prompts ask for `gendaigo` in the output shape', loadPoemPrompt('tang').includes('"gendaigo"') && loadPoemPrompt('ci').includes('"gendaigo"'))
+  const gArr = await gen(C20, 'tang', [{ ...C20.poems.tang, gendaigo: ['毎朝早く起きて庭の花を折り、', '二十年、何も言わずに朝のご飯を用意してくれた。'] }])
+  check('(4b) a 現代語訳 returned line by line (an array) is joined, not dropped — and the ok log says whether the aids are there (counts only)', gArr.ok && gArr.poem.aids.gendaigo === '毎朝早く起きて庭の花を折り、 二十年、何も言わずに朝のご飯を用意してくれた。' && logs.some((l) => l.includes('"ok":true') && l.includes('"gendaigo":true') && l.includes('"kakikudashi":4')) && noText())
+  // the story's time stays as the story has it
+  check('(4b) all four poem prompts carry the truth-of-events rule: no event the story does not contain; a later visit stays in the future (the tang / ci prompts name 將 待 擬 期 and forbid 今日 for it)', POEM_TYPES.every((t) => { const x = loadPoemPrompt(t); return x.includes('3b. TRUTH OF EVENTS') && x.includes('Never write an event the story does not contain') && x.includes('stays in the future') }) && ['tang', 'ci'].every((t) => { const x = loadPoemPrompt(t as PoemType); return x.includes('將, 待, 擬, 期') && x.includes('今日') }))
   // the English path
   const enOk = await gen(C20, 'en', [C20.poems.en])
   check('(4b) English poem: a good reply passes (4 lines, 備 present, one poem call + one review call)', enOk.ok && count('poem') === 1 && count('review') === 1)
@@ -391,6 +395,11 @@ const postOrder = (h: (r: Request) => Promise<Response>, b: unknown) => h(new Re
   check('(7b) preview: the palette block still refuses a hard-block character (400 character_not_allowed)', refused.status === 400 && ((await refused.json()) as any).code === 'character_not_allowed')
   const memorial = await post(handler(all), body(C04, 'tanka', { kanji: '祝' }))
   check('(7b) preview: the remembrance block still refuses a celebration character (400)', memorial.status === 400)
+  replies = [C20.poems.tang]
+  reviewReplies = []
+  const tangRes = await quiet(() => post(handler(all), body(C20, 'tang')))
+  const tangJ = (await tangRes.json()) as any
+  check('(7b) POST /api/poem for a Japanese buyer\'s tang returns the 現代語訳: `aids.gendaigo`, and `reading` = 書き下し then 現代語訳 (and the stored poem has the same reading)', tangRes.status === 200 && tangJ.aids?.kakikudashi?.length === 4 && tangJ.aids?.gendaigo?.includes('二十年') && tangJ.reading.includes('晨に起きて') && tangJ.reading.includes(tangJ.aids.gendaigo) && (store.records.get(tangJ.poem_id) as any)?.reading === tangJ.reading)
   // failure reasons through the API: codes always, the words only in preview mode
   const failing = { ok: false as const, code: 'poem_failed' as const, error: 'x', reasons: ['character_missing'], problems: ['the chosen character (待) does not appear in the poem'] }
   const rOff = await post(handler(all, { generate: async () => failing }), body(C20, 'en'))
