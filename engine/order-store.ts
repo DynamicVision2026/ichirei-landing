@@ -27,7 +27,7 @@ export interface OrderStore {
   getObject(path: string): Promise<Buffer | null>
 }
 
-const SAFE_OBJECT = /^films\/(AN-[a-z2-9]{20}\/(art\.json|[1-4]\.webp)|renders-\d{4}-\d{2}-\d{2}\.jsonl)$/
+const SAFE_OBJECT = /^films\/(AN-[a-z2-9]{20}\/(art\.json|[1-4](\.unchecked)?\.webp)|renders-\d{4}-\d{2}-\d{2}\.jsonl)$/
 export function assertObjectPath(path: string): void {
   if (!SAFE_OBJECT.test(path)) throw new Error(`Unsafe object path: ${path.slice(0, 40)}`)
 }

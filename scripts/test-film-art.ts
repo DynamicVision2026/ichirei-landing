@@ -5,9 +5,10 @@
 //   node --experimental-strip-types scripts/test-film-art.ts
 
 import http from 'node:http'
+import { readFileSync } from 'node:fs'
 import sharp from 'sharp'
 import { SAMPLE_IDS, SAMPLE_RECORDS, animationView } from '../engine/animation.ts'
-import { IMAGE_STYLE, IMAGE_STYLE_MEMORIAL, ImageError, artPath, buildCheckPrompt, buildImagePrompt, checkPictures, dailyMax, ensureArt, parseVerdicts, picturePath, readArt, rendersPath, toFilmWebp, vertexImageClient, type ArtDeps, type ImageClient, type Verdict } from '../engine/film-art.ts'
+import { IMAGE_STYLE, IMAGE_STYLE_MEMORIAL, ImageError, artPath, buildCheckPrompt, buildImagePrompt, checkPictures, dailyMax, ensureArt, parseVerdicts, picturePath, readArt, rendersPath, toFilmWebp, uncheckedPath, vertexImageClient, type ArtDeps, type ImageClient, type Verdict } from '../engine/film-art.ts'
 import { GcsOrderStore, MemoryOrderStore, assertObjectPath } from '../engine/order-store.ts'
 
 let failures = 0
@@ -119,18 +120,20 @@ const sig = () => AbortSignal.timeout(5000)
 
 // ---- 3. the picture check ---------------------------------------------------------------------------------------------------------------------------------
 type Call = { content: any[]; model: string }
-function fakeVision(plan: (call: number, n: number) => Verdict[] | string | Error) {
-  const calls: Call[] = []
+function fakeVision(plan: (call: number, n: number) => Verdict[] | string | Error | { text: string; stop_reason: string } | 'HANG') {
+  const calls: (Call & { params: any })[] = []
   const client = {
     messages: {
-      stream: (params: any) => ({
+      stream: (params: any, opts?: { signal?: AbortSignal }) => ({
         finalMessage: async () => {
           const n = params.messages[0].content.filter((b: any) => b.type === 'image').length
-          calls.push({ content: params.messages[0].content, model: params.model })
+          calls.push({ content: params.messages[0].content, model: params.model, params })
           const out = plan(calls.length, n)
+          if (out === 'HANG') await new Promise((_, rej) => opts?.signal?.addEventListener('abort', () => rej(new Error('aborted'))))
           if (out instanceof Error) throw out
-          const text = typeof out === 'string' ? out : JSON.stringify({ pictures: out })
-          return { content: [{ type: 'text', text }], usage: { input_tokens: 1000, output_tokens: 50 }, stop_reason: 'end_turn' }
+          const o = out as Verdict[] | string | { text: string; stop_reason: string }
+          const text = typeof o === 'string' ? o : Array.isArray(o) ? JSON.stringify({ pictures: o }) : o.text
+          return { content: [{ type: 'text', text }], usage: { input_tokens: 1000, output_tokens: 50 }, stop_reason: typeof o === 'object' && !Array.isArray(o) ? o.stop_reason : 'end_turn' }
         },
       }),
     },
@@ -148,17 +151,28 @@ function FAIL(reason: string): Verdict {
   const jpeg = await sharp(PNG).jpeg().toBuffer()
   const r = await checkPictures(vis.client, [jpeg, jpeg], ['d one', 'd two'], false, { ICHIREI_FILM_CHECK_MODEL: '' } as never)
   const blocks = vis.calls[0].content
-  check('(3) ONE call to claude-haiku-5-5 sees all the pictures together with their descriptions (prompt first, then "Picture n:" and the image)', vis.calls.length === 1 && vis.calls[0].model === 'claude-haiku-5-5' && blocks[0].type === 'text' && blocks[0].text.includes('Picture 2: d two') && blocks.filter((b: any) => b.type === 'image').length === 2 && blocks.find((b: any) => b.type === 'image').source.media_type === 'image/jpeg' && r.verdicts[1].reason === 'text' && r.input_tokens === 1000)
-  const bad = fakeVision((n) => (n === 1 ? 'I think they are fine' : [OK, OK]))
+  check('(3) ONE call to claude-haiku-5-5 sees all the pictures together with their descriptions (prompt first, then "Picture n:" and the image)', vis.calls.length === 1 && vis.calls[0].model === 'claude-haiku-5-5' && blocks[0].type === 'text' && blocks[0].text.includes('Picture 2: d two') && blocks.filter((b: any) => b.type === 'image').length === 2 && blocks.find((b: any) => b.type === 'image').source.media_type === 'image/jpeg' && r.verdicts[1]?.reason === 'text' && r.input_tokens === 1000)
+  const bad = fakeVision((call, k) => (call === 1 ? 'I think they are fine' : Array(k).fill(OK)))
   const r2 = await checkPictures(bad.client, [jpeg, jpeg], ['a', 'b'], false)
-  const dead = fakeVision(() => new Error('overloaded'))
-  const e = await checkPictures(dead.client, [jpeg], ['a'], false).catch((x) => x)
-  check('(3) an unreadable answer is asked for once more; a check that cannot run in two tries throws (the caller then shows no unchecked picture)', bad.calls.length === 2 && r2.verdicts.every((x) => x.ok) && dead.calls.length === 2 && e instanceof ImageError && e.code === 'check')
+  check('(3) the check call asks for room and low effort (max_tokens 4000, effort low): the answer is a few dozen tokens but the model may think first', bad.calls[0].params.max_tokens === 4000 && bad.calls[0].params.output_config?.effort === 'low')
+  check('(3) an answer that cannot be read over all pictures falls back to ONE CALL PER PICTURE: here 1 batch + 2 singles, both pictures checked; the cause is recorded with the first 200 characters of the reply', bad.calls.length === 3 && r2.verdicts.every((x) => x?.ok === true) && r2.causes[0].kind === 'parse' && r2.causes[0].reply === 'I think they are fine' && r2.causes[0].stop_reason === 'end_turn')
+  const cut = fakeVision(() => ({ text: '', stop_reason: 'max_tokens' }))
+  const rc = await checkPictures(cut.client, [jpeg], ['a'], false)
+  const long = fakeVision(() => 'x'.repeat(500))
+  const rl = await checkPictures(long.client, [jpeg], ['a'], false)
+  const dead = fakeVision(() => Object.assign(new Error('529 overloaded_error: Overloaded'), { status: 529 }))
+  const rd = await checkPictures(dead.client, [jpeg], ['a'], false)
+  const hang = fakeVision(() => 'HANG')
+  const rh = await checkPictures(hang.client, [jpeg], ['a'], false, { ICHIREI_FILM_CHECK_TIMEOUT_MS: '40' } as never)
+  check('(3) the REAL cause is kept for the log: max_tokens (stop reason + empty reply), parse (reply cut to 200 characters), http (the status), timeout — each as a cause, never thrown; a picture that cannot be checked is null (unchecked)', rc.verdicts[0] === null && rc.causes[0].kind === 'max_tokens' && rc.causes[0].stop_reason === 'max_tokens' && rl.causes[0].kind === 'parse' && rl.causes[0].reply!.length === 200 && rd.verdicts[0] === null && rd.causes[0].kind === 'http' && rd.causes[0].status === 529 && rh.causes[0].kind === 'timeout' && dead.calls.length === 1)
+  const dead2 = fakeVision(() => new Error('overloaded'))
+  const rd2 = await checkPictures(dead2.client, [jpeg, jpeg], ['a', 'b'], false)
+  check('(3) two pictures, the check down: one batch call and one single call each (3), every verdict null, three causes (the singles are numbered) — nothing thrown', dead2.calls.length === 3 && rd2.verdicts.every((x) => x === null) && rd2.causes.length === 3 && rd2.causes.filter((c) => c.single).length === 2)
 }
 
 // ---- 4. drawing a set -----------------------------------------------------------------------------------------------------------------------------------------
 interface Rig { deps: ArtDeps; store: MemoryOrderStore; prompts: string[]; logs: string[]; imageCalls: () => number; maxParallel: () => number; vis: ReturnType<typeof fakeVision> }
-function rig(opts: { image?: (prompt: string, n: number) => Promise<void> | void; vision?: (call: number, n: number) => Verdict[] | string | Error; env?: Record<string, string>; store?: MemoryOrderStore } = {}): Rig {
+function rig(opts: { image?: (prompt: string, n: number) => Promise<void> | void; vision?: Parameters<typeof fakeVision>[0]; env?: Record<string, string>; store?: MemoryOrderStore } = {}): Rig {
   const store = opts.store ?? mem()
   const prompts: string[] = []
   let n = 0
@@ -221,15 +235,54 @@ const eventsOf = (logs: string[]) => logs.map((l) => JSON.parse(l.replace('[ichi
   const dart = await ensureArt(down.deps, input(mkId('downdowndowndowndo22')))
   const soon = await ensureArt(down.deps, input(mkId('downdowndowndowndo22')))
   check('(4) the image model is down (every call fails, twice): the film STILL PLAYS with washi, but it is INCOMPLETE — every slot is pending, not final; at most 4 + 4 calls were made; an open straight after makes no new call (retry_after)', dart.status === 'incomplete' && dart.slots.join() === 'pending,pending,pending,pending' && down.imageCalls() === 8 && down.vis.calls.length === 0 && eventsOf(down.logs).filter((e) => e.event === 'film_image_error').length === 8 && !!dart.retry_after && soon.status === 'incomplete' && down.imageCalls() === 8)
-  const later = rig({ store: down.store })
+  // our own errors never count toward the cap and never make washi final: every open tries again
+  const later = rig({ store: down.store, image: () => { throw new ImageError('http') }, env: { ICHIREI_FILM_RETRY_MS: '0', ICHIREI_FILM_BG_RETRY_MS: '0' } })
   later.deps.now = () => new Date(NOW.getTime() + 5 * 60_000)
   const lart = await ensureArt(later.deps, input(mkId('downdowndowndowndo22')))
-  check('(4) the order\'s limit holds: after 8 billable calls nothing more is drawn for that film — the pending slots become final washi (done), no image call', later.imageCalls() === 0 && lart.status === 'done' && lart.slots.join() === 'washi,washi,washi,washi')
+  check('(4) our own errors (an error answer, a timeout) never count toward the order\'s cap and never make washi final: the saved count of successful draws is 0, and the next open tries all four again (eight more calls here, all failing again) — still pending, never washi', dart.calls === 0 && later.imageCalls() === 8 && lart.status === 'incomplete' && lart.slots.join() === 'pending,pending,pending,pending')
+  const t = rig({ image: () => { throw new ImageError('timeout') }, env: { ICHIREI_FILM_RETRY_MS: '0', ICHIREI_FILM_BG_RETRY_MS: '0' } })
+  const tart = await ensureArt(t.deps, input(mkId('timeouttimeouttimeou')))
+  check('(4) image timeouts are not final either (pending, calls 0)', tart.slots.join() === 'pending,pending,pending,pending' && tart.calls === 0)
+  const ci = mkId('capreachedcapreached')
+  const cstore = mem()
+  await cstore.putObject(artPath(ci), JSON.stringify({ schema: 'film-art', id: ci, status: 'incomplete', started_at: NOW.toISOString(), made_at: NOW.toISOString(), slots: ['ai', 'ai', 'pending', 'pending'], reasons: ['ok', 'ok', 'quota', 'quota'], check_fails: [0, 0, 0, 0], calls: 8, retry_after: NOW.toISOString() }), 'application/json')
+  const cr = rig({ store: cstore, env: { ICHIREI_FILM_RETRY_MS: '0', ICHIREI_FILM_BG_RETRY_MS: '0' } })
+  cr.deps.now = () => new Date(NOW.getTime() + 1000)
+  const cart = await ensureArt(cr.deps, input(ci))
+  check('(4) the order\'s cap (8 SUCCESSFUL draws) stops drawing but does not turn a pending slot into washi: no image call, the slots stay pending, the film is incomplete', cr.imageCalls() === 0 && cart.status === 'incomplete' && cart.slots.join() === 'ai,ai,pending,pending')
+  const f = rig({ vision: (_c, k) => Array(k).fill(FAIL('face')) })
+  const fart = await ensureArt(f.deps, input(mkId('twofailuresfinalwash')))
+  check('(4) ONLY two safety-check failures of the same slot make washi final: every picture fails twice → four final washi (done), 8 successful draws', fart.status === 'done' && fart.slots.join() === 'washi,washi,washi,washi' && fart.calls === 8 && f.imageCalls() === 8)
 }
 {
-  const r = rig({ vision: () => new Error('overloaded') })
-  const art = await ensureArt(r.deps, input(mkId('checkdowncheckdown22')))
-  check('(4) the picture check cannot run: NO unchecked picture is shown — washi for now, the slots stay pending (an outage is not final), nothing saved but the state, film_check_error logged; the film plays', art.status === 'incomplete' && art.slots.join() === 'pending,pending,pending,pending' && r.store.objects.size === 1 && eventsOf(r.logs).some((e) => e.event === 'film_check_error') && r.imageCalls() === 4)
+  const id = mkId('checkdowncheckdown22')
+  let up = false
+  const CK = { ICHIREI_FILM_CHECK_WAITS_MS: '5,5,5', ICHIREI_FILM_RETRY_MS: '0', ICHIREI_FILM_BG_RETRY_MS: '0' }
+  const r = rig({ env: CK, vision: (_c, k) => (up ? Array(k).fill(OK) : { text: '', stop_reason: 'max_tokens' }) })
+  const art = await ensureArt(r.deps, input(id))
+  const ev = eventsOf(r.logs)
+  const stored = [1, 2, 3, 4].every((i) => r.store.objects.has(uncheckedPath(id, i)))
+  const shown = [1, 2, 3, 4].some((i) => r.store.objects.has(picturePath(id, i)))
+  check('(4) the picture check cannot run (every call fails): the four drawn pictures are KEPT, stored as unchecked (films/<id>/<n>.unchecked.webp), the slots are `unchecked`, none is public (no <n>.webp), the film is incomplete and shows washi — and nothing was drawn again', art.status === 'incomplete' && art.slots.join() === 'unchecked,unchecked,unchecked,unchecked' && stored && !shown && r.imageCalls() === 4 && art.calls === 4)
+  const ce = ev.filter((e) => e.event === 'film_check_error')
+  check('(4) …the check is retried after 5 s, 15 s, 30 s (here 5 ms each: four tries in all, each logged with the REAL cause — kind, stop reason, reply) before giving up for now; film_check_error carries no story text', ce.length === 4 && ce[0].causes[0].kind === 'max_tokens' && ce[0].causes[0].stop_reason === 'max_tokens' && ev.filter((e) => e.event === 'film_check_wait').length === 3 && ce.every((e) => e.slots.length === 4) && !r.logs.join('\n').includes('bento'))
+  up = true
+  const again = rig({ store: r.store, env: CK, vision: (_c, k) => Array(k).fill(OK) })
+  again.deps.now = () => new Date(NOW.getTime() + 2 * 60_000)
+  const done = await ensureArt(again.deps, input(id))
+  check('(4) the next open does ONLY the check (no image call at all): the stored pictures pass and become public (<n>.webp), the film is done', done.status === 'done' && done.slots.join() === 'ai,ai,ai,ai' && again.imageCalls() === 0 && again.vis.calls.length === 1 && [1, 2, 3, 4].every((i) => r.store.objects.has(picturePath(id, i))))
+  const half = mkId('halfunchecked22222')
+  const hs = mem()
+  await hs.putObject(uncheckedPath(half, 2), Buffer.from(await toFilmWebp(PNG)), 'image/webp')
+  await hs.putObject(picturePath(half, 1), Buffer.from('p1'), 'image/webp')
+  await hs.putObject(artPath(half), JSON.stringify({ schema: 'film-art', id: half, status: 'incomplete', started_at: NOW.toISOString(), made_at: NOW.toISOString(), slots: ['ai', 'unchecked', 'pending', 'pending'], reasons: ['ok', 'unchecked', 'quota', 'quota'], check_fails: [0, 0, 0, 0], calls: 2, retry_after: NOW.toISOString() }), 'application/json')
+  const hr = rig({ store: hs, env: CK })
+  hr.deps.now = () => new Date(NOW.getTime() + 1000)
+  const hart = await ensureArt(hr.deps, input(half))
+  check('(4) a retry with one unchecked and two pending slots: the unchecked one is only checked (not redrawn), the two pending ones are drawn — two image calls, slot 1 untouched', hart.slots.join() === 'ai,ai,ai,ai' && hr.imageCalls() === 2 && hr.prompts.every((p) => !p.includes(FILM.pictures[1])) && hs.objects.get(picturePath(half, 1))!.body.toString() === 'p1')
+  const e = rig({ vision: () => new Error('overloaded'), env: CK })
+  const eart = await ensureArt(e.deps, input(mkId('checkdownnotdiscarded')))
+  check('(4) a check outage never costs a drawing (the first live failure drew three sets for one film): one set drawn, four calls, nothing discarded', eart.slots.every((x) => x === 'unchecked') && e.imageCalls() === 4)
 }
 {
   const r = rig()
@@ -358,6 +411,11 @@ const eventsOf = (logs: string[]) => logs.map((l) => JSON.parse(l.replace('[ichi
   const r = rig({ vision: (call, k) => (call === 1 ? [OK, FAIL('religious'), OK, FAIL('clothing')] : Array(k).fill(OK)) })
   const art = await ensureArt(r.deps, { ...input(mkId('languagesettingcheck')), language: 'zh-Hant' })
   check('(4) the buyer\'s language reaches the picture check (a Chinese film is judged against a Chinese home); a picture that fails for a cross or for a kimono is drawn again with a hint that names the rule', r.vis.calls[0].content[0].text.includes('the film\'s language is zh-Hant') && art.slots.join() === 'ai,ai,ai,ai' && r.prompts.some((p) => p.includes('No religious symbol of any kind: no cross (not even one made by a window frame)')) && r.prompts.some((p) => p.includes('no kimono or traditional dress')))
+}
+
+{
+  const src = readFileSync(new URL('../engine/film-art.ts', import.meta.url), 'utf8')
+  check('(4) an image call may take 90 s (the default of ICHIREI_FILM_IMAGE_TIMEOUT_MS; slots 1 and 2 timed out at 60 s in the live log), the picture check 60 s, and the render may keep going for 200 s while a request is held for 120 s', /ICHIREI_FILM_IMAGE_TIMEOUT_MS, 90_000/.test(src) && /ICHIREI_FILM_CHECK_TIMEOUT_MS, 60_000/.test(src) && /ICHIREI_FILM_RENDER_DEADLINE_MS, 200_000/.test(src) && /ICHIREI_FILM_RENDER_MS, 120_000/.test(src))
 }
 
 // ---- 5. the lock ------------------------------------------------------------------------------------------------------------------------------------------------

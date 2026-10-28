@@ -95,7 +95,7 @@ export function animationView(r: AnimationRecord, art: ArtRecord | null = null):
     if (f.status === 'fallback') film = { status: 'fallback', lines: f.lines, pictures: f.lines.map((_, i) => washiPictureUrl(i)) }
     else if (art && art.status !== 'deferred' && art.slots.length === f.lines.length) {
       // done, incomplete, or being drawn again (a lease still shows what was there): a picture where there is one, washi elsewhere
-      film = { status: 'ready', lines: f.lines, pictures: f.lines.map((_, i) => (art.slots[i] === 'ai' ? pictureUrl(r.id, i + 1, art.made_at) : washiPictureUrl(i))), ...(art.slots.includes('pending') ? { incomplete: true } : {}) }
+      film = { status: 'ready', lines: f.lines, pictures: f.lines.map((_, i) => (art.slots[i] === 'ai' ? pictureUrl(r.id, i + 1, art.made_at) : washiPictureUrl(i))), ...(art.slots.includes('pending') || art.slots.includes('unchecked') ? { incomplete: true } : {}) }
     } else film = { status: 'ready', lines: f.lines, pictures: null, ...(art?.status === 'deferred' ? { deferred: true } : {}) }
   }
   return { id: r.id, language: r.language, glyph: r.glyph, reading: r.reading, romanization: r.romanization, meaning_en: r.meaning_en, who: r.who, memorial: r.memorial, film }
@@ -115,13 +115,13 @@ export function isAnimationRecord(x: unknown): x is AnimationRecord {
 /**
  * The revision of a sample's pictures. An art record saved under another revision is ignored, so changing a number here makes that sample draw its
  * pictures AGAIN on its next open (no access to the bucket needed). 2: ja / zh / memorial redrawn after the quota fixes; 3: zh / en / memorial redrawn
- * after the clothes-and-setting and no-religious-symbol rules (ja stays on 2).
+ * after the clothes-and-setting and no-religious-symbol rules; 4: zh / en / memorial redrawn again after the picture-check fix (ja stays on 2).
  */
 export const SAMPLE_ART_REV: Record<string, string> = {
   'AN-sampleja222222222222': '2',
-  'AN-samplezh222222222222': '3',
-  'AN-sampleen222222222222': '3',
-  'AN-samplemem22222222222': '3',
+  'AN-samplezh222222222222': '4',
+  'AN-sampleen222222222222': '4',
+  'AN-samplemem22222222222': '4',
 }
 export const artRevFor = (id: string): string | undefined => SAMPLE_ART_REV[id]
 

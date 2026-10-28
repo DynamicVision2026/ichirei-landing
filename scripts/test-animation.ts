@@ -243,10 +243,21 @@ const READY: FilmRecord = { status: 'ready', made_at: NOW.toISOString(), picture
   {
     // a sample's picture revision: a stored set of an older revision is ignored (drawn again on the next open); a set of the current revision is kept
     const store = new MemoryOrderStore()
-    for (const [sid, rev] of [[SAMPLE_IDS.ja, '2'], [SAMPLE_IDS.zh, '2'], [SAMPLE_IDS.en, '2'], [SAMPLE_IDS.memorial, '2']] as const) await store.putObject(`films/${sid}/art.json`, JSON.stringify({ schema: 'film-art', id: sid, status: 'done', started_at: NOW.toISOString(), made_at: NOW.toISOString(), slots: ['ai', 'ai', 'ai', 'ai'], rev }), 'application/json')
+    for (const [sid, rev] of [[SAMPLE_IDS.ja, '2'], [SAMPLE_IDS.zh, '3'], [SAMPLE_IDS.en, '3'], [SAMPLE_IDS.memorial, '3']] as const) await store.putObject(`films/${sid}/art.json`, JSON.stringify({ schema: 'film-art', id: sid, status: 'done', started_at: NOW.toISOString(), made_at: NOW.toISOString(), slots: ['ai', 'ai', 'ai', 'ai'], rev }), 'application/json')
     const h = createAnimationHandlers(() => ({ store, env: { ICHIREI_ANIMATION_SAMPLES: 'on' } as never }))
     const view = async (sid: string) => ((await (await h.view(sid)).json()) as any).film.pictures
-    check('(3b) the samples are redrawn after the clothes / setting / no-religious-symbol rules: zh, en and the remembrance sample are on picture revision 3, so their revision-2 pictures are ignored (pictures: null → drawn again on the next open); the Japanese sample stays on 2 and keeps its pictures', (await view(SAMPLE_IDS.ja))?.length === 4 && (await view(SAMPLE_IDS.zh)) === null && (await view(SAMPLE_IDS.en)) === null && (await view(SAMPLE_IDS.memorial)) === null && artRevFor(SAMPLE_IDS.ja) === '2' && ['zh', 'en', 'memorial'].every((k) => artRevFor((SAMPLE_IDS as Record<string, string>)[k]) === '3'))
+    check('(3b) the samples are redrawn after the picture-check fix: zh, en and the remembrance sample are on picture revision 4, so their revision-3 pictures are ignored (pictures: null → drawn again on the next open); the Japanese sample stays on 2 and keeps its pictures', (await view(SAMPLE_IDS.ja))?.length === 4 && (await view(SAMPLE_IDS.zh)) === null && (await view(SAMPLE_IDS.en)) === null && (await view(SAMPLE_IDS.memorial)) === null && artRevFor(SAMPLE_IDS.ja) === '2' && ['zh', 'en', 'memorial'].every((k) => artRevFor((SAMPLE_IDS as Record<string, string>)[k]) === '4'))
+  }
+  {
+    // an UNCHECKED picture is stored but never shown: not served, washi in the view, the film incomplete
+    const r = mkRig()
+    await r.store.put(RID, { ...rec, id: RID, film: READY })
+    await r.store.putObject(`films/${RID}/1.unchecked.webp`, Buffer.from('unchecked-bytes'), 'image/webp')
+    await r.store.putObject(`films/${RID}/art.json`, JSON.stringify({ schema: 'film-art', id: RID, status: 'incomplete', started_at: NOW.toISOString(), made_at: NOW.toISOString(), slots: ['unchecked', 'pending', 'pending', 'pending'], reasons: ['unchecked', 'quota', 'quota', 'quota'], check_fails: [0, 0, 0, 0], calls: 1, retry_after: new Date(NOW.getTime() + 3600_000).toISOString() }), 'application/json')
+    const v = (await (await r.h.view(RID)).json()) as any
+    const p1 = await r.h.picture(RID, '1')
+    const sneaky = await Promise.all([r.h.picture(RID, '1.unchecked'), r.h.picture(RID, '1.unchecked.webp')])
+    check('(3b) an unchecked picture is never shown: the view has washi for its slot and incomplete: true, GET …/picture/1.webp is a 404 (only a picture that passed the check is public), and the stored unchecked file cannot be asked for by name', v.film.incomplete === true && v.film.pictures.every((u: string) => u.startsWith('/film/washi-')) && p1.status === 404 && sneaky.every((x) => x.status === 404))
   }
   {
     const r = mkRig()

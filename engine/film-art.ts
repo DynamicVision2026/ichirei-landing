@@ -6,20 +6,22 @@
 //      answer (429) tries the next model, then waits 8 s, 20 s, 40 s and tries again, inside the render window;
 //   3. one vision call (engine/film-picture-check-prompt.md) looks at what was drawn; a picture that fails is drawn ONE more time; washi is FINAL only
 //      for a picture that fails the safety check twice. A slot that failed only for quota or an outage stays `pending`: the film shows washi there now, is
-//      marked `incomplete`, and the next open (and one background retry ~10 minutes later) draws ONLY the missing slots. A film always plays;
+//      marked `incomplete`, and the next open (and one background retry ~10 minutes later) draws ONLY the missing slots. A picture that was drawn but
+//      could not be CHECKED (the check call failed) is kept stored as `unchecked` (films/<id>/<n>.unchecked.webp, never served): only the check is
+//      retried (5 s, 15 s, 30 s, then on the next open). A film always plays;
 //   4. the pictures are saved as private objects (films/<animation id>/1.webp … 4.webp) in the order bucket and served only through the server.
 //
 // A lock (in this process and, through a create-if-absent object, across instances) makes two opens draw one set. Limits: one full set and four
-// single-picture retries per order (8 billable image calls — quota answers do not count); ICHIREI_FILM_DAILY_MAX sets (default 200) a day — above it
+// single-picture retries per order (8 successful draws — our own errors, quota answers, timeouts and check errors never count); ICHIREI_FILM_DAILY_MAX sets (default 200) a day — above it
 // the pictures wait for the next day (a retry of an incomplete film is not a new set).
 //
 // Env: ICHIREI_FILM_IMAGE_MODEL (one or more, separated by | , or ;, tried in order when a model is not found; default gemini-3.1-flash-image|gemini-2.5-flash-image),
 // ICHIREI_FILM_IMAGE_LOCATION (default global), ICHIREI_FILM_IMAGE_PROJECT (default: the project of the metadata server), ICHIREI_FILM_IMAGE_TIMEOUT_MS
-// (60000 per picture), ICHIREI_FILM_RENDER_MS (120000), ICHIREI_FILM_DAILY_MAX, ICHIREI_FILM_CHECK_MODEL (default claude-haiku-5-5),
+// (90000 per picture), ICHIREI_FILM_RENDER_MS (120000: how long one request is held), ICHIREI_FILM_RENDER_DEADLINE_MS (200000), ICHIREI_FILM_DAILY_MAX, ICHIREI_FILM_CHECK_MODEL (default claude-haiku-5-5), ICHIREI_FILM_CHECK_MAX_TOKENS (4000), ICHIREI_FILM_CHECK_TIMEOUT_MS (60000), ICHIREI_FILM_CHECK_WAITS_MS (5000,15000,30000),
 // ICHIREI_FILM_IMAGE_USD / ICHIREI_FILM_JPY_PER_USD (the cost estimate in the log: 0.039 and 150 — assumptions, not measurements),
 // ICHIREI_FILM_IMAGE_CONCURRENCY (2), ICHIREI_FILM_QUOTA_WAITS_MS (8000,20000,40000), ICHIREI_FILM_RETRY_MS (60000: the least time between two tries of an
 // incomplete film), ICHIREI_FILM_BG_RETRY_MS (600000: the one background retry; 0 = none), ICHIREI_FILM_CALL_CAP (8).
-// Logs (no story text): [ichirei-film] film_render_start | film_render_done | film_picture_fail | film_image_error | film_quota_wait | film_check_error | film_render_deferred | film_render_retry.
+// Logs (no story text): [ichirei-film] film_render_start | film_render_done | film_picture_fail | film_image_error | film_quota_wait | film_check_error | film_check_wait | film_render_deferred | film_render_retry.
 
 import Anthropic from '@anthropic-ai/sdk'
 import { readFileSync } from 'node:fs'
@@ -70,13 +72,13 @@ export interface ArtRecord {
   started_at: string
   made_at?: string
   date?: string
-  /** One per picture: `ai` = drawn and saved as films/<id>/<n>.webp; `washi` = the plain picture, FINAL (it failed the safety check twice); `pending` = not drawn yet. */
-  slots: ('ai' | 'washi' | 'pending')[]
+  /** One per picture: `ai` = drawn and saved as films/<id>/<n>.webp; `washi` = the plain picture, FINAL (it failed the safety check twice); `pending` = not drawn yet; `unchecked` = drawn and kept stored (films/<id>/<n>.unchecked.webp) but the safety check could not run yet — never shown. */
+  slots: ('ai' | 'washi' | 'pending' | 'unchecked')[]
   /** Why a slot is not (yet) a picture (codes only). */
   reasons?: string[]
   /** How often each slot's picture failed the safety check: 2 makes its washi final. */
   check_fails?: number[]
-  /** Billable image calls so far (a quota answer is not one): the order's cap is 8. */
+  /** Successful draws so far (an error, a quota answer or a timeout is not one): the order's cap is 8. */
   calls?: number
   /** The earliest time the next open may draw the pending slots again. */
   retry_after?: string
@@ -88,7 +90,7 @@ export interface ArtRecord {
   model?: string
 }
 
-export const hasPending = (a: Pick<ArtRecord, 'slots'>): boolean => a.slots.includes('pending')
+export const hasPending = (a: Pick<ArtRecord, 'slots'>): boolean => a.slots.includes('pending') || a.slots.includes('unchecked')
 
 /** A record saved before pending slots existed: a washi that was only an image error or an unchecked picture was never final — it is pending. */
 function normalizeArt(a: ArtRecord): ArtRecord {
@@ -101,10 +103,11 @@ function normalizeArt(a: ArtRecord): ArtRecord {
 
 export const artPath = (id: string) => `films/${id}/art.json`
 export const picturePath = (id: string, n: number) => `films/${id}/${n}.webp`
+export const uncheckedPath = (id: string, n: number) => `films/${id}/${n}.unchecked.webp`
 export const rendersPath = (day: string) => `films/renders-${day}.jsonl`
 export const washiUrl = (slot: number) => `/film/washi-${(slot % 2) + 1}.webp`
 
-const LEASE_MS = 150_000
+const LEASE_MS = 240_000
 const num = (v: string | undefined, d: number) => (Number(v) > 0 ? Number(v) : d)
 export const renderBudgetMs = (env: NodeJS.ProcessEnv = process.env) => num(env.ICHIREI_FILM_RENDER_MS, 120_000)
 export const dailyMax = (env: NodeJS.ProcessEnv = process.env): number => {
@@ -268,38 +271,87 @@ export function parseVerdicts(raw: string, n: number): Verdict[] | null {
   }
 }
 
+/** What went wrong with ONE check call (no story text: the status, the stop reason and the first 200 characters of the reply). */
+export interface CheckCause {
+  kind: 'http' | 'timeout' | 'parse' | 'refusal' | 'max_tokens' | 'network'
+  status?: number
+  stop_reason?: string
+  reply?: string
+  /** One picture's own call (the fallback when the call over all of them failed). */
+  single?: number
+}
+
 export interface CheckResult {
-  verdicts: Verdict[]
+  /** One per picture; null = the check could not be done for that picture (it stays unchecked and is never shown). */
+  verdicts: (Verdict | null)[]
+  causes: CheckCause[]
   input_tokens: number
   output_tokens: number
 }
 
-/** One vision call over `jpegs` (with their descriptions). Throws when it cannot get a readable answer in two tries. */
-export async function checkPictures(client: Messages, jpegs: Buffer[], descriptions: string[], memorial: boolean, env: NodeJS.ProcessEnv = process.env, outer?: AbortSignal, language: Language = 'en'): Promise<CheckResult> {
+class CheckFailure extends Error {
+  readonly cause2: CheckCause
+  constructor(c: CheckCause) {
+    super(c.kind)
+    this.cause2 = c
+  }
+}
+
+function causeOf(err: unknown, signal: AbortSignal): CheckCause {
+  if (err instanceof CheckFailure) return err.cause2
+  const e = err as { status?: unknown; message?: unknown; name?: unknown } | null
+  const reply = typeof e?.message === 'string' ? e.message.slice(0, 200) : undefined
+  if (timedOut(signal)) return { kind: 'timeout' }
+  if (typeof e?.status === 'number') return { kind: 'http', status: e.status, reply }
+  return { kind: 'network', reply: reply ?? (typeof e?.name === 'string' ? e.name : undefined) }
+}
+
+/** ONE call over `jpegs`; throws CheckFailure with the cause. The answer is a few dozen tokens, but the model may think first: room and low effort for it. */
+async function checkCall(client: Messages, jpegs: Buffer[], descriptions: string[], memorial: boolean, env: NodeJS.ProcessEnv, outer: AbortSignal | undefined, language: Language, usage: { input_tokens: number; output_tokens: number }): Promise<Verdict[]> {
   const model = env.ICHIREI_FILM_CHECK_MODEL?.trim() || DEFAULT_REVIEW_MODEL
-  const timeout = num(env.ICHIREI_FILM_CHECK_TIMEOUT_MS, 40_000)
   const content: Anthropic.ContentBlockParam[] = [{ type: 'text', text: buildCheckPrompt(descriptions, memorial, language) }]
   jpegs.forEach((j, i) => {
     content.push({ type: 'text', text: `Picture ${i + 1}:` })
     content.push({ type: 'image', source: { type: 'base64', media_type: 'image/jpeg', data: j.toString('base64') } })
   })
-  let last: unknown = null
-  const usage = { input_tokens: 0, output_tokens: 0 }
-  for (let attempt = 1; attempt <= 2; attempt++) {
-    const signal = callSignal(outer, timeout)
-    try {
-      const message = await client.messages.stream({ model, max_tokens: 600, messages: [{ role: 'user', content }] }, { signal }).finalMessage()
-      usage.input_tokens += message.usage?.input_tokens ?? 0
-      usage.output_tokens += message.usage?.output_tokens ?? 0
-      const text = message.content.filter((b): b is Anthropic.TextBlock => b.type === 'text').map((b) => b.text).join('')
-      const verdicts = parseVerdicts(text, jpegs.length)
-      if (verdicts) return { verdicts, ...usage }
-      last = new Error('parse')
-    } catch (err) {
-      last = err
-    }
+  const signal = callSignal(outer, num(env.ICHIREI_FILM_CHECK_TIMEOUT_MS, 60_000))
+  let message: Anthropic.Message
+  try {
+    message = await client.messages.stream({ model, max_tokens: num(env.ICHIREI_FILM_CHECK_MAX_TOKENS, 4000), output_config: { effort: 'low' }, messages: [{ role: 'user', content }] }, { signal }).finalMessage()
+  } catch (err) {
+    throw new CheckFailure(causeOf(err, signal))
   }
-  throw new ImageError('check', last instanceof Error ? last.message.slice(0, 80) : 'check')
+  usage.input_tokens += message.usage?.input_tokens ?? 0
+  usage.output_tokens += message.usage?.output_tokens ?? 0
+  const text = message.content.filter((b): b is Anthropic.TextBlock => b.type === 'text').map((b) => b.text).join('')
+  const verdicts = parseVerdicts(text, jpegs.length)
+  if (verdicts) return verdicts
+  const stop = message.stop_reason ?? undefined
+  throw new CheckFailure({ kind: stop === 'max_tokens' ? 'max_tokens' : stop === 'refusal' ? 'refusal' : 'parse', stop_reason: stop, reply: text.slice(0, 200) })
+}
+
+/**
+ * Check pictures. One call over all of them; if that fails (whatever the cause), each picture gets its own call. A picture whose check still fails is
+ * `null` in the result with the causes — the caller keeps it stored as unchecked and tries again later. Never throws.
+ */
+export async function checkPictures(client: Messages, jpegs: Buffer[], descriptions: string[], memorial: boolean, env: NodeJS.ProcessEnv = process.env, outer?: AbortSignal, language: Language = 'en'): Promise<CheckResult> {
+  const usage = { input_tokens: 0, output_tokens: 0 }
+  const causes: CheckCause[] = []
+  try {
+    return { verdicts: await checkCall(client, jpegs, descriptions, memorial, env, outer, language, usage), causes, ...usage }
+  } catch (err) {
+    causes.push(err instanceof CheckFailure ? err.cause2 : { kind: 'network' })
+  }
+  if (jpegs.length === 1) return { verdicts: [null], causes, ...usage }
+  const verdicts: (Verdict | null)[] = Array(jpegs.length).fill(null)
+  await mapLimit(jpegs.map((_, i) => i), 2, async (i) => {
+    try {
+      verdicts[i] = (await checkCall(client, [jpegs[i]], [descriptions[i]], memorial, env, outer, language, usage))[0]
+    } catch (err) {
+      causes.push({ ...(err instanceof CheckFailure ? err.cause2 : { kind: 'network' as const }), single: i + 1 })
+    }
+  })
+  return { verdicts, causes, ...usage }
 }
 
 // ---- drawing the set --------------------------------------------------------------------------------------------------------------------------------
@@ -386,7 +438,8 @@ async function renderLocked(deps: ArtDeps, input: RenderInput): Promise<ArtRecor
   const n = input.film.pictures.length
   const descriptions = input.film.pictures
   const started = Date.now()
-  const deadline = started + renderBudgetMs(env)
+  // how long this render may keep starting waits and retries: longer than the 120 s a request is held (the page asks again and joins this same render)
+  const deadline = started + num(env.ICHIREI_FILM_RENDER_DEADLINE_MS, 200_000)
 
   // the lock: a create-if-absent object. Someone else's fresh lease is waited for; a stale one (a crashed instance) is taken over; an INCOMPLETE film
   // is drawn again (only its pending slots) once its retry time has come; a deferral of an earlier day is taken over.
@@ -431,19 +484,20 @@ async function renderLocked(deps: ArtDeps, input: RenderInput): Promise<ArtRecor
   let calls = retry ? (cur!.calls ?? 0) : 0
   const cap = num(env.ICHIREI_FILM_CALL_CAP, 8)
   const todo = [...Array(n).keys()].filter((i) => slots[i] === 'pending')
-  logLine(log, retry ? 'film_render_retry' : 'film_render_start', { pictures: n, pending: todo.length })
+  const toCheck = [...Array(n).keys()].filter((i) => slots[i] === 'unchecked')
+  logLine(log, retry ? 'film_render_retry' : 'film_render_start', { pictures: n, pending: todo.length, unchecked: toCheck.length })
 
   const image = deps.image ?? vertexImageClient(env)
   const client = deps.client ?? new Anthropic({ maxRetries: 0 })
-  const timeout = num(env.ICHIREI_FILM_IMAGE_TIMEOUT_MS, 60_000)
+  const timeout = num(env.ICHIREI_FILM_IMAGE_TIMEOUT_MS, 90_000)
   const concurrency = num(env.ICHIREI_FILM_IMAGE_CONCURRENCY, 2)
   const waits = waitsOf(env)
-  const fresh = new Map<number, Buffer>()
+  const checkWaits = (env.ICHIREI_FILM_CHECK_WAITS_MS === undefined || env.ICHIREI_FILM_CHECK_WAITS_MS === '' ? '5000,15000,30000' : env.ICHIREI_FILM_CHECK_WAITS_MS).split(',').map(Number).filter((x) => Number.isFinite(x) && x >= 0)
   let modelUsed = ''
   let drawn = 0
   const usage = { input_tokens: 0, output_tokens: 0 }
 
-  /** One picture, with the quota waits: a 429 (after the fallback model was tried too) waits 8 s, 20 s, 40 s — while the render window has room. */
+  /** One picture, with the quota waits: a 429 (after the fallback model was tried too) waits 8 s, 20 s, 40 s — while the render window has room. Only a picture that was drawn counts toward the order's cap. */
   const draw = async (slot: number, attempt: number): Promise<{ webp: Buffer } | { error: string }> => {
     let w = 0
     for (;;) {
@@ -459,7 +513,6 @@ async function renderLocked(deps: ArtDeps, input: RenderInput): Promise<ArtRecor
       } catch (err) {
         const code = err instanceof ImageError ? err.code : timedOut(signal) ? 'timeout' : 'image'
         if (code === 'quota') {
-          // not counted against the order's limit: nothing was drawn
           const wait = waits[w++]
           if (wait === undefined || Date.now() + wait + 20_000 > deadline) {
             logLine(log, 'film_image_error', { slot: slot + 1, code, attempt, gave_up: true })
@@ -469,56 +522,85 @@ async function renderLocked(deps: ArtDeps, input: RenderInput): Promise<ArtRecor
           await sleep(wait)
           continue
         }
-        calls++
+        // our own errors (an error answer, a timeout, a network failure) are not counted either: nothing was drawn
         logLine(log, 'film_image_error', { slot: slot + 1, code, attempt })
         return { error: code }
       }
     }
   }
 
-  /** Draw `list`, two at a time, then check what was drawn with ONE vision call. A failed check is counted; the second one makes the washi final. */
-  const round = async (list: number[], attempt: number) => {
-    const results = await mapLimit(list, concurrency, async (slot) => ({ slot, r: await draw(slot, attempt) }))
-    const good: { slot: number; webp: Buffer }[] = []
-    for (const { slot, r } of results) {
-      if ('webp' in r) good.push({ slot, webp: r.webp })
-      else reasons[slot] = r.error === 'limit' ? 'limit' : r.error
-    }
-    if (good.length === 0) return
-    try {
-      const jpegs = await Promise.all(good.map((g) => toCheckJpeg(g.webp)))
-      const res = await checkPictures(client, jpegs, good.map((g) => descriptions[g.slot]), input.memorial, env, deps.signal, input.language)
+  /**
+   * The safety check of pictures that are stored as unchecked. One call over all of them (or one each, if that fails); a check that could not run is tried
+   * again after 5 s, 15 s, 30 s while the window has room; what is still unchecked stays stored for the next open. A failed check is counted; the second
+   * one makes that slot's washi final. A verdict "ok" makes the picture public to the page (films/<id>/<n>.webp).
+   */
+  const checkStored = async (items: { slot: number; webp: Buffer }[], attempt: number) => {
+    let left = items
+    for (let t = 0; left.length > 0; t++) {
+      const jpegs = await Promise.all(left.map((g) => toCheckJpeg(g.webp)))
+      const res = await checkPictures(client, jpegs, left.map((g) => descriptions[g.slot]), input.memorial, env, deps.signal, input.language)
       usage.input_tokens += res.input_tokens
       usage.output_tokens += res.output_tokens
-      good.forEach((g, i) => {
+      const still: typeof left = []
+      for (const [i, g] of left.entries()) {
         const v = res.verdicts[i]
-        if (v.ok) {
-          fresh.set(g.slot, g.webp)
+        if (!v) {
+          still.push(g)
+        } else if (v.ok) {
+          await store.putObject(picturePath(id, g.slot + 1), g.webp, 'image/webp')
           slots[g.slot] = 'ai'
           reasons[g.slot] = ''
         } else {
           checkFails[g.slot]++
           reasons[g.slot] = v.reason
           logLine(log, 'film_picture_fail', { slot: g.slot + 1, reason: v.reason, attempt, fails: checkFails[g.slot] })
-          if (checkFails[g.slot] >= 2) slots[g.slot] = 'washi' // failed the safety check twice: final
+          slots[g.slot] = checkFails[g.slot] >= 2 ? 'washi' : 'pending' // failed the safety check twice: final; once: drawn again
         }
-      })
-    } catch (err) {
-      // a picture that could not be checked is never shown; the slot stays pending (an outage is not final)
-      logLine(log, 'film_check_error', { reason: err instanceof ImageError ? err.code : 'check', attempt })
-      for (const g of good) reasons[g.slot] = 'check_error'
+      }
+      if (still.length > 0) {
+        // the real cause, so a log tells why (no story text: the status, the stop reason and the first 200 characters of the reply)
+        logLine(log, 'film_check_error', { reason: 'check', slots: still.map((g) => g.slot + 1), try: t + 1, causes: res.causes.slice(0, 4) })
+        for (const g of still) reasons[g.slot] = 'unchecked'
+      }
+      left = still
+      const wait = checkWaits[t]
+      if (left.length === 0 || wait === undefined || Date.now() + wait + 20_000 > deadline) break
+      logLine(log, 'film_check_wait', { slots: left.map((g) => g.slot + 1), wait_ms: wait })
+      await sleep(wait)
     }
+    for (const g of left) slots[g.slot] = 'unchecked'
   }
 
-  await round(todo, 1)
-  // each picture that failed the check, or hit a transient error other than quota, is drawn once more in this same render
-  const again = todo.filter((i) => slots[i] === 'pending' && reasons[i] !== 'quota' && reasons[i] !== 'check_error' && reasons[i] !== 'limit' && reasons[i] !== 'permission' && reasons[i] !== 'model_not_found')
-  if (again.length > 0 && Date.now() < deadline - 15_000) await round(again, 2)
-  // the order's limit reached: what is still pending can no longer be drawn — final washi
-  for (let i = 0; i < n; i++) if (slots[i] === 'pending' && reasons[i] === 'limit') slots[i] = 'washi'
+  /** Draw `list`, two at a time. Each picture drawn is STORED (unchecked) before anything else, so a check that fails can never throw a drawing away. */
+  const round = async (list: number[], attempt: number) => {
+    const results = await mapLimit(list, concurrency, async (slot) => ({ slot, r: await draw(slot, attempt) }))
+    const good: { slot: number; webp: Buffer }[] = []
+    for (const { slot, r } of results) {
+      if ('webp' in r) good.push({ slot, webp: r.webp })
+      else reasons[slot] = r.error
+    }
+    if (good.length === 0) return
+    await Promise.all(good.map((g) => store.putObject(uncheckedPath(id, g.slot + 1), g.webp, 'image/webp')))
+    for (const g of good) slots[g.slot] = 'unchecked'
+    await checkStored(good, attempt)
+  }
 
-  await Promise.all([...fresh].map(([i, w]) => store.putObject(picturePath(id, i + 1), w, 'image/webp')))
-  const incomplete = slots.includes('pending')
+  // pictures drawn earlier whose check could not run: only the check is done again (nothing is drawn)
+  if (toCheck.length > 0) {
+    const loaded: { slot: number; webp: Buffer }[] = []
+    for (const i of toCheck) {
+      const webp = await store.getObject(uncheckedPath(id, i + 1)).catch(() => null)
+      if (webp) loaded.push({ slot: i, webp })
+      else slots[i] = 'pending' // the stored picture is gone: draw it again
+    }
+    if (loaded.length > 0) await checkStored(loaded, 0)
+  }
+  await round(todo.concat(toCheck.filter((i) => slots[i] === 'pending' && !todo.includes(i))), 1)
+  // each picture that failed the check, or hit a transient error other than quota, is drawn once more in this same render
+  const again = [...Array(n).keys()].filter((i) => slots[i] === 'pending' && ['', 'face', 'text', 'illness', 'celebration', 'unsafe', 'clothing', 'setting', 'religious', 'off_story', 'http', 'timeout', 'network', 'no_image', 'blocked', 'image'].includes(reasons[i]) && (todo.includes(i) || toCheck.includes(i)))
+  if (again.length > 0 && Date.now() < deadline - 15_000) await round(again, 2)
+
+  const incomplete = slots.includes('pending') || slots.includes('unchecked')
   const ms = Date.now() - started
   const art: ArtRecord = {
     schema: 'film-art', id, status: incomplete ? 'incomplete' : 'done', started_at: new Date(started).toISOString(), made_at: now().toISOString(), slots,
