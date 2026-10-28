@@ -12,7 +12,7 @@
 //   4. the pictures are saved as private objects (films/<animation id>/1.webp … 4.webp) in the order bucket and served only through the server.
 //
 // A lock (in this process and, through a create-if-absent object, across instances) makes two opens draw one set. Limits: one full set and four
-// single-picture retries per order (8 successful draws — our own errors, quota answers, timeouts and check errors never count); ICHIREI_FILM_DAILY_MAX sets (default 200) a day — above it
+// single-picture retries per order (12 successful draws — our own errors, quota answers, timeouts and check errors never count); ICHIREI_FILM_DAILY_MAX sets (default 200) a day — above it
 // the pictures wait for the next day (a retry of an incomplete film is not a new set).
 //
 // Env: ICHIREI_FILM_IMAGE_MODEL (one or more, separated by | , or ;, tried in order when a model is not found; default gemini-3.1-flash-image|gemini-2.5-flash-image),
@@ -20,8 +20,8 @@
 // (90000 per picture), ICHIREI_FILM_RENDER_MS (120000: how long one request is held), ICHIREI_FILM_RENDER_DEADLINE_MS (200000), ICHIREI_FILM_DAILY_MAX, ICHIREI_FILM_CHECK_MODEL (default claude-haiku-5-5), ICHIREI_FILM_CHECK_MAX_TOKENS (4000), ICHIREI_FILM_CHECK_TIMEOUT_MS (60000), ICHIREI_FILM_CHECK_WAITS_MS (5000,15000,30000),
 // ICHIREI_FILM_IMAGE_USD / ICHIREI_FILM_JPY_PER_USD (the cost estimate in the log: 0.039 and 150 — assumptions, not measurements),
 // ICHIREI_FILM_IMAGE_CONCURRENCY (2), ICHIREI_FILM_QUOTA_WAITS_MS (8000,20000,40000), ICHIREI_FILM_RETRY_MS (60000: the least time between two tries of an
-// incomplete film), ICHIREI_FILM_BG_RETRY_MS (600000: the one background retry; 0 = none), ICHIREI_FILM_CALL_CAP (8).
-// Logs (no story text): [ichirei-film] film_render_start | film_render_done | film_picture_fail | film_image_error | film_quota_wait | film_check_error | film_check_wait | film_render_deferred | film_render_retry.
+// incomplete film), ICHIREI_FILM_BG_RETRY_MS (600000: the one background retry; 0 = none), ICHIREI_FILM_CALL_CAP (12).
+// Logs (no story text): [ichirei-film] film_render_start | film_render_done | film_picture_fail | film_image_error | film_quota_wait | film_check_error | film_check_wait | film_picture_rewrite | film_render_deferred | film_render_retry.
 
 import Anthropic from '@anthropic-ai/sdk'
 import { readFileSync } from 'node:fs'
@@ -30,14 +30,14 @@ import { fileURLToPath } from 'node:url'
 import sharp from 'sharp'
 import { DEFAULT_REVIEW_MODEL } from './engine.ts'
 import type { Language } from './contract.ts'
-import type { FilmRecord } from './film.ts'
+import { checkPictures as refereeDescriptions, type FilmRecord } from './film.ts'
 import { callSignal, timedOut } from './limits.ts'
 import type { OrderStore } from './order-store.ts'
 
 // ---- the style (fixed, the same for every order) ----------------------------------------------------------------------------------------------------
 
 export const IMAGE_STYLE =
-  'Japanese sumi-e ink-wash painting on warm off-white washi paper. Soft graded black ink only, with at most one muted earth-brown accent wash. Loose, confident brush strokes, visible paper grain, generous empty space. People only as simple silhouettes, as hands, or seen from behind; no faces or facial features. No text, letters, signatures, seals or frames. Quiet, tender, everyday life. Consistent hand, as if one painter made the whole series. Portrait 4:5.'
+  'Japanese sumi-e ink-wash painting on warm off-white washi paper. Soft graded black ink only, with at most one muted earth-brown accent wash. Loose, confident brush strokes, visible paper grain, generous empty space. People only as simple silhouettes, as hands, or seen from behind; no faces or facial features. No text, letters, signatures, seals or frames. Quiet, tender, everyday life. People wear contemporary everyday clothes; modern objects (a plain modern umbrella, modern doors, phones and trains) unless the description says otherwise. Consistent hand, as if one painter made the whole series. Portrait 4:5.'
 export const IMAGE_STYLE_MEMORIAL = 'Paler grey-beige paper, very soft ink, still and calm.'
 /** Added to a picture drawn a second time, for the reason it failed the first time. */
 const RETRY_HINT: Record<string, string> = {
@@ -76,8 +76,12 @@ export interface ArtRecord {
   slots: ('ai' | 'washi' | 'pending' | 'unchecked')[]
   /** Why a slot is not (yet) a picture (codes only). */
   reasons?: string[]
-  /** How often each slot's picture failed the safety check: 2 makes its washi final. */
+  /** How often each slot's picture failed the safety check: the second failure makes the description be rewritten once; a failure after that makes the washi final. */
   check_fails?: number[]
+  /** Per slot: 1 once its description was rewritten (the same moment from a different view) — the rewrite happens once. */
+  rewrites?: number[]
+  /** Per slot: the rewritten description (null = the film's own). */
+  rewritten?: (string | null)[]
   /** Successful draws so far (an error, a quota answer or a timeout is not one): the order's cap is 8. */
   calls?: number
   /** The earliest time the next open may draw the pending slots again. */
@@ -354,6 +358,70 @@ export async function checkPictures(client: Messages, jpegs: Buffer[], descripti
   return { verdicts, causes, ...usage }
 }
 
+// ---- the one rewrite before a washi becomes final ---------------------------------------------------------------------------------------------------
+
+function readRewritePrompt(): string {
+  const here = dirname(fileURLToPath(import.meta.url))
+  for (const p of [process.env.ICHIREI_FILM_REWRITE_PROMPT_PATH, join(here, 'film-picture-rewrite-prompt.md'), join(process.cwd(), 'engine', 'film-picture-rewrite-prompt.md')]) {
+    if (!p) continue
+    try {
+      return readFileSync(p, 'utf8')
+    } catch {
+      // next
+    }
+  }
+  throw new Error('film-picture-rewrite-prompt.md not found')
+}
+
+export function buildRewritePrompt(description: string, reason: string, memorial: boolean, language: Language, feedback = ''): string {
+  const values: Record<string, string> = {
+    REASON: reason,
+    LANGUAGE: language,
+    MEMORIAL: memorial ? 'This is a REMEMBRANCE film (the person it is for has died): no celebration of any kind.' : '',
+    DESCRIPTION: description,
+    FEEDBACK: feedback,
+  }
+  return readRewritePrompt().replace(/\{\{ (REASON|LANGUAGE|MEMORIAL|DESCRIPTION|FEEDBACK) \}\}/g, (m) => values[m.slice(3, -3).trim()])
+}
+
+/**
+ * The same moment from a different view, once (and one retry if the answer breaks a rule). The result must pass the same description rules as a film's own
+ * pictures and must differ from the original. Throws ImageError('rewrite') when it cannot be had — an outage, never a verdict on the picture.
+ */
+export async function rewritePicture(client: Messages, description: string, reason: string, memorial: boolean, language: Language, env: NodeJS.ProcessEnv = process.env, outer?: AbortSignal): Promise<{ text: string; input_tokens: number; output_tokens: number }> {
+  const model = env.ICHIREI_FILM_CHECK_MODEL?.trim() || DEFAULT_REVIEW_MODEL
+  const usage = { input_tokens: 0, output_tokens: 0 }
+  let feedback = ''
+  let last = 'call'
+  for (let attempt = 1; attempt <= 2; attempt++) {
+    const signal = callSignal(outer, num(env.ICHIREI_FILM_CHECK_TIMEOUT_MS, 60_000))
+    try {
+      const message = await client.messages.stream({ model, max_tokens: 2000, output_config: { effort: 'low' }, messages: [{ role: 'user', content: buildRewritePrompt(description, reason, memorial, language, feedback) }] }, { signal }).finalMessage()
+      usage.input_tokens += message.usage?.input_tokens ?? 0
+      usage.output_tokens += message.usage?.output_tokens ?? 0
+      const raw = message.content.filter((b): b is Anthropic.TextBlock => b.type === 'text').map((b) => b.text).join('')
+      const a = raw.indexOf('{')
+      const b = raw.lastIndexOf('}')
+      const text = a >= 0 && b > a ? ((JSON.parse(raw.slice(a, b + 1)) as { picture?: unknown }).picture ?? '') : ''
+      if (typeof text !== 'string' || !text.trim()) {
+        last = 'parse'
+        feedback = '\nYOUR PREVIOUS REPLY COULD NOT BE READ: reply with exactly one JSON object {"picture": "…"}.\n'
+        continue
+      }
+      const t = text.trim()
+      const problems = refereeDescriptions([t], { glyph: '', forms: [], names: [], memorial, occasion: memorial ? 'memorial' : null, language }).filter((p) => p.code !== 'pic_same')
+      if (t.toLowerCase() === description.trim().toLowerCase()) problems.push({ code: 'pic_same', detail: 'It must read differently from the original: a different view of the same moment.' })
+      if (problems.length === 0) return { text: t, ...usage }
+      last = 'rules'
+      feedback = `\nYOUR PREVIOUS ANSWER BROKE THESE RULES — write a new one that fixes every one of them:\n${problems.map((p) => `- ${p.detail}`).join('\n')}\n`
+    } catch {
+      last = timedOut(signal) ? 'timeout' : 'call'
+      feedback = ''
+    }
+  }
+  throw new ImageError('rewrite', last)
+}
+
 // ---- drawing the set --------------------------------------------------------------------------------------------------------------------------------
 
 export interface ArtDeps {
@@ -481,8 +549,14 @@ async function renderLocked(deps: ArtDeps, input: RenderInput): Promise<ArtRecor
   const slots: ArtRecord['slots'] = retry ? [...cur!.slots] : Array(n).fill('pending')
   const reasons: string[] = retry ? [...(cur!.reasons ?? Array(n).fill(''))] : Array(n).fill('')
   const checkFails: number[] = retry ? [...(cur!.check_fails ?? Array(n).fill(0))] : Array(n).fill(0)
+  const rewrites: number[] = retry ? [...(cur!.rewrites ?? Array(n).fill(0))] : Array(n).fill(0)
+  const rewritten: (string | null)[] = retry ? [...(cur!.rewritten ?? Array(n).fill(null))] : Array(n).fill(null)
+  /** The description a slot is drawn and checked from: its rewrite when there is one. */
+  const desc = (i: number) => rewritten[i] ?? descriptions[i]
+  /** Slots whose description was just rewritten and have not been drawn since. */
+  const afterRewrite = new Set<number>()
   let calls = retry ? (cur!.calls ?? 0) : 0
-  const cap = num(env.ICHIREI_FILM_CALL_CAP, 8)
+  const cap = num(env.ICHIREI_FILM_CALL_CAP, 12)
   const todo = [...Array(n).keys()].filter((i) => slots[i] === 'pending')
   const toCheck = [...Array(n).keys()].filter((i) => slots[i] === 'unchecked')
   logLine(log, retry ? 'film_render_retry' : 'film_render_start', { pictures: n, pending: todo.length, unchecked: toCheck.length })
@@ -505,8 +579,9 @@ async function renderLocked(deps: ArtDeps, input: RenderInput): Promise<ArtRecor
       const signal = callSignal(deps.signal, timeout)
       try {
         const hint = attempt > 1 && reasons[slot] ? (RETRY_HINT[reasons[slot]] ?? '') : ''
-        const r = await image.generate(buildImagePrompt(descriptions[slot], input.memorial, hint), signal)
+        const r = await image.generate(buildImagePrompt(desc(slot), input.memorial, hint), signal)
         calls++
+        afterRewrite.delete(slot)
         drawn++
         modelUsed = r.model
         return { webp: await toFilmWebp(r.bytes) }
@@ -529,6 +604,24 @@ async function renderLocked(deps: ArtDeps, input: RenderInput): Promise<ArtRecor
     }
   }
 
+  /** Before a washi becomes final: the description is rewritten ONCE (the same moment from a different view). false = the rewrite could not be had (an outage: the slot stays pending). */
+  const rewriteSlot = async (slot: number, reason: string): Promise<boolean> => {
+    try {
+      const r = await rewritePicture(client, desc(slot), reason, input.memorial, input.language ?? 'en', env, deps.signal)
+      usage.input_tokens += r.input_tokens
+      usage.output_tokens += r.output_tokens
+      rewritten[slot] = r.text
+      rewrites[slot] = 1
+      checkFails[slot] = 1 // the drawing from the new view gets its own check: failing that one is final
+      afterRewrite.add(slot)
+      logLine(log, 'film_picture_rewrite', { slot: slot + 1, reason, ok: true })
+      return true
+    } catch (err) {
+      logLine(log, 'film_picture_rewrite', { slot: slot + 1, reason, ok: false, cause: err instanceof ImageError ? err.message : 'call' })
+      return false
+    }
+  }
+
   /**
    * The safety check of pictures that are stored as unchecked. One call over all of them (or one each, if that fails); a check that could not run is tried
    * again after 5 s, 15 s, 30 s while the window has room; what is still unchecked stays stored for the next open. A failed check is counted; the second
@@ -538,7 +631,7 @@ async function renderLocked(deps: ArtDeps, input: RenderInput): Promise<ArtRecor
     let left = items
     for (let t = 0; left.length > 0; t++) {
       const jpegs = await Promise.all(left.map((g) => toCheckJpeg(g.webp)))
-      const res = await checkPictures(client, jpegs, left.map((g) => descriptions[g.slot]), input.memorial, env, deps.signal, input.language)
+      const res = await checkPictures(client, jpegs, left.map((g) => desc(g.slot)), input.memorial, env, deps.signal, input.language)
       usage.input_tokens += res.input_tokens
       usage.output_tokens += res.output_tokens
       const still: typeof left = []
@@ -554,7 +647,12 @@ async function renderLocked(deps: ArtDeps, input: RenderInput): Promise<ArtRecor
           checkFails[g.slot]++
           reasons[g.slot] = v.reason
           logLine(log, 'film_picture_fail', { slot: g.slot + 1, reason: v.reason, attempt, fails: checkFails[g.slot] })
-          slots[g.slot] = checkFails[g.slot] >= 2 ? 'washi' : 'pending' // failed the safety check twice: final; once: drawn again
+          if (checkFails[g.slot] < 2) slots[g.slot] = 'pending' // failed once: drawn again as it is
+          else if (rewrites[g.slot] < 1) {
+            // failed twice: the description is rewritten once and drawn again (if the rewrite cannot be had now, the slot waits for the next try)
+            await rewriteSlot(g.slot, v.reason)
+            slots[g.slot] = 'pending'
+          } else slots[g.slot] = 'washi' // failed after the rewrite too: final
         }
       }
       if (still.length > 0) {
@@ -573,6 +671,10 @@ async function renderLocked(deps: ArtDeps, input: RenderInput): Promise<ArtRecor
 
   /** Draw `list`, two at a time. Each picture drawn is STORED (unchecked) before anything else, so a check that fails can never throw a drawing away. */
   const round = async (list: number[], attempt: number) => {
+    // a slot that already failed twice and was waiting for its rewrite (the rewrite could not be had earlier)
+    for (const slot of [...list]) {
+      if (slots[slot] === 'pending' && checkFails[slot] >= 2 && rewrites[slot] < 1 && !(await rewriteSlot(slot, reasons[slot] || 'off_story'))) list = list.filter((x) => x !== slot)
+    }
     const results = await mapLimit(list, concurrency, async (slot) => ({ slot, r: await draw(slot, attempt) }))
     const good: { slot: number; webp: Buffer }[] = []
     for (const { slot, r } of results) {
@@ -599,12 +701,15 @@ async function renderLocked(deps: ArtDeps, input: RenderInput): Promise<ArtRecor
   // each picture that failed the check, or hit a transient error other than quota, is drawn once more in this same render
   const again = [...Array(n).keys()].filter((i) => slots[i] === 'pending' && ['', 'face', 'text', 'illness', 'celebration', 'unsafe', 'clothing', 'setting', 'religious', 'off_story', 'http', 'timeout', 'network', 'no_image', 'blocked', 'image'].includes(reasons[i]) && (todo.includes(i) || toCheck.includes(i)))
   if (again.length > 0 && Date.now() < deadline - 15_000) await round(again, 2)
+  // a description rewritten in the last round is drawn from its new view right away (and checked: failing that is final)
+  const third = [...afterRewrite].filter((i) => slots[i] === 'pending')
+  if (third.length > 0 && Date.now() < deadline - 15_000) await round(third, 3)
 
   const incomplete = slots.includes('pending') || slots.includes('unchecked')
   const ms = Date.now() - started
   const art: ArtRecord = {
     schema: 'film-art', id, status: incomplete ? 'incomplete' : 'done', started_at: new Date(started).toISOString(), made_at: now().toISOString(), slots,
-    reasons: reasons.map((r, i) => (slots[i] === 'ai' ? 'ok' : r || 'ok')), check_fails: checkFails, calls, rev: input.rev, ms: (cur?.ms ?? 0) + ms, model: modelUsed || cur?.model,
+    reasons: reasons.map((r, i) => (slots[i] === 'ai' ? 'ok' : r || 'ok')), check_fails: checkFails, rewrites, rewritten, calls, rev: input.rev, ms: (cur?.ms ?? 0) + ms, model: modelUsed || cur?.model,
     ...(incomplete ? { retry_after: new Date(now().getTime() + num(env.ICHIREI_FILM_RETRY_MS, 60_000)).toISOString() } : {}),
     ...(cur?.bg_scheduled ? { bg_scheduled: true } : {}),
   }

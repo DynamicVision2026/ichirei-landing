@@ -8,7 +8,7 @@ import http from 'node:http'
 import { readFileSync } from 'node:fs'
 import sharp from 'sharp'
 import { SAMPLE_IDS, SAMPLE_RECORDS, animationView } from '../engine/animation.ts'
-import { IMAGE_STYLE, IMAGE_STYLE_MEMORIAL, ImageError, artPath, buildCheckPrompt, buildImagePrompt, checkPictures, dailyMax, ensureArt, parseVerdicts, picturePath, readArt, rendersPath, toFilmWebp, uncheckedPath, vertexImageClient, type ArtDeps, type ImageClient, type Verdict } from '../engine/film-art.ts'
+import { IMAGE_STYLE, IMAGE_STYLE_MEMORIAL, ImageError, artPath, buildCheckPrompt, buildImagePrompt, buildRewritePrompt, checkPictures, dailyMax, ensureArt, parseVerdicts, picturePath, readArt, rendersPath, toFilmWebp, uncheckedPath, vertexImageClient, type ArtDeps, type ImageClient, type Verdict } from '../engine/film-art.ts'
 import { GcsOrderStore, MemoryOrderStore, assertObjectPath } from '../engine/order-store.ts'
 
 let failures = 0
@@ -120,12 +120,21 @@ const sig = () => AbortSignal.timeout(5000)
 
 // ---- 3. the picture check ---------------------------------------------------------------------------------------------------------------------------------
 type Call = { content: any[]; model: string }
-function fakeVision(plan: (call: number, n: number) => Verdict[] | string | Error | { text: string; stop_reason: string } | 'HANG') {
+const REWRITE_OK = 'hands holding the handle of a plain modern umbrella beside a quiet doorway, soft evening light on the wet ground'
+function fakeVision(plan: (call: number, n: number) => Verdict[] | string | Error | { text: string; stop_reason: string } | 'HANG', rewritePlan: (call: number) => string | Error = () => JSON.stringify({ picture: REWRITE_OK })) {
   const calls: (Call & { params: any })[] = []
+  const rewrites: { prompt: string; params: any }[] = []
   const client = {
     messages: {
       stream: (params: any, opts?: { signal?: AbortSignal }) => ({
         finalMessage: async () => {
+          if (typeof params.messages[0].content === 'string') {
+            // the description rewrite (a text-only call)
+            rewrites.push({ prompt: params.messages[0].content, params })
+            const o = rewritePlan(rewrites.length)
+            if (o instanceof Error) throw o
+            return { content: [{ type: 'text', text: o }], usage: { input_tokens: 100, output_tokens: 30 }, stop_reason: 'end_turn' }
+          }
           const n = params.messages[0].content.filter((b: any) => b.type === 'image').length
           calls.push({ content: params.messages[0].content, model: params.model, params })
           const out = plan(calls.length, n)
@@ -138,7 +147,7 @@ function fakeVision(plan: (call: number, n: number) => Verdict[] | string | Erro
       }),
     },
   }
-  return { client: client as never, calls }
+  return { client: client as never, calls, rewrites }
 }
 const OK: Verdict = { ok: true, reason: 'ok' }
 function FAIL(reason: string): Verdict {
@@ -172,7 +181,7 @@ function FAIL(reason: string): Verdict {
 
 // ---- 4. drawing a set -----------------------------------------------------------------------------------------------------------------------------------------
 interface Rig { deps: ArtDeps; store: MemoryOrderStore; prompts: string[]; logs: string[]; imageCalls: () => number; maxParallel: () => number; vis: ReturnType<typeof fakeVision> }
-function rig(opts: { image?: (prompt: string, n: number) => Promise<void> | void; vision?: Parameters<typeof fakeVision>[0]; env?: Record<string, string>; store?: MemoryOrderStore } = {}): Rig {
+function rig(opts: { image?: (prompt: string, n: number) => Promise<void> | void; vision?: Parameters<typeof fakeVision>[0]; rewrite?: Parameters<typeof fakeVision>[1]; env?: Record<string, string>; store?: MemoryOrderStore } = {}): Rig {
   const store = opts.store ?? mem()
   const prompts: string[] = []
   let n = 0
@@ -193,7 +202,7 @@ function rig(opts: { image?: (prompt: string, n: number) => Promise<void> | void
       return { bytes: PNG, model: 'fake-image-model' }
     },
   }
-  const vis = fakeVision(opts.vision ?? ((_c, k) => Array(k).fill(OK)))
+  const vis = fakeVision(opts.vision ?? ((_c, k) => Array(k).fill(OK)), opts.rewrite)
   const logs: string[] = []
   return { deps: { store, image, client: vis.client, env: { ICHIREI_FILM_DAILY_MAX: '1000', ...(opts.env ?? {}) } as never, log: (l) => logs.push(l), now: () => NOW, pollMs: 15 }, store, prompts, logs, imageCalls: () => n, maxParallel: () => max, vis }
 }
@@ -223,7 +232,7 @@ const eventsOf = (logs: string[]) => logs.map((l) => JSON.parse(l.replace('[ichi
 {
   const r = rig({ vision: (_c, k) => (k === 4 ? [OK, FAIL('text'), OK, FAIL('illness')] : Array(k).fill(FAIL('text'))) })
   const art = await ensureArt(r.deps, input())
-  check('(4) a picture that fails twice gets the plain washi picture; the film is still done and the other pictures are kept; nothing failed is saved', art.status === 'done' && art.slots.join() === 'ai,washi,ai,washi' && r.imageCalls() === 6 && !r.store.objects.has(picturePath(ID, 2)) && !r.store.objects.has(picturePath(ID, 4)) && r.store.objects.has(picturePath(ID, 1)) && art.reasons?.[1] === 'text' && art.reasons?.[3] === 'text' && eventsOf(r.logs).filter((e) => e.event === 'film_picture_fail').length === 4)
+  check('(4) a picture that fails again after its description was REWRITTEN gets the plain washi picture for good; the film is done and the other pictures are kept; nothing failed is saved. (round 1: 4 draws, round 2: 2, round 3 after the rewrite: 2 — eight draws, two rewrites)', art.status === 'done' && art.slots.join() === 'ai,washi,ai,washi' && r.imageCalls() === 8 && r.vis.rewrites.length === 2 && !r.store.objects.has(picturePath(ID, 2)) && !r.store.objects.has(picturePath(ID, 4)) && r.store.objects.has(picturePath(ID, 1)) && art.rewrites?.join() === '0,1,0,1' && eventsOf(r.logs).filter((e) => e.event === 'film_picture_fail').length === 6)
 }
 {
   let fail = new Set([2])
@@ -245,14 +254,14 @@ const eventsOf = (logs: string[]) => logs.map((l) => JSON.parse(l.replace('[ichi
   check('(4) image timeouts are not final either (pending, calls 0)', tart.slots.join() === 'pending,pending,pending,pending' && tart.calls === 0)
   const ci = mkId('capreachedcapreached')
   const cstore = mem()
-  await cstore.putObject(artPath(ci), JSON.stringify({ schema: 'film-art', id: ci, status: 'incomplete', started_at: NOW.toISOString(), made_at: NOW.toISOString(), slots: ['ai', 'ai', 'pending', 'pending'], reasons: ['ok', 'ok', 'quota', 'quota'], check_fails: [0, 0, 0, 0], calls: 8, retry_after: NOW.toISOString() }), 'application/json')
+  await cstore.putObject(artPath(ci), JSON.stringify({ schema: 'film-art', id: ci, status: 'incomplete', started_at: NOW.toISOString(), made_at: NOW.toISOString(), slots: ['ai', 'ai', 'pending', 'pending'], reasons: ['ok', 'ok', 'quota', 'quota'], check_fails: [0, 0, 0, 0], calls: 12, retry_after: NOW.toISOString() }), 'application/json')
   const cr = rig({ store: cstore, env: { ICHIREI_FILM_RETRY_MS: '0', ICHIREI_FILM_BG_RETRY_MS: '0' } })
   cr.deps.now = () => new Date(NOW.getTime() + 1000)
   const cart = await ensureArt(cr.deps, input(ci))
-  check('(4) the order\'s cap (8 SUCCESSFUL draws) stops drawing but does not turn a pending slot into washi: no image call, the slots stay pending, the film is incomplete', cr.imageCalls() === 0 && cart.status === 'incomplete' && cart.slots.join() === 'ai,ai,pending,pending')
+  check('(4) the order\'s cap (12 SUCCESSFUL draws: four first, four retries, four redraws after a rewrite) stops drawing but does not turn a pending slot into washi: no image call, the slots stay pending, the film is incomplete', cr.imageCalls() === 0 && cart.status === 'incomplete' && cart.slots.join() === 'ai,ai,pending,pending')
   const f = rig({ vision: (_c, k) => Array(k).fill(FAIL('face')) })
   const fart = await ensureArt(f.deps, input(mkId('twofailuresfinalwash')))
-  check('(4) ONLY two safety-check failures of the same slot make washi final: every picture fails twice → four final washi (done), 8 successful draws', fart.status === 'done' && fart.slots.join() === 'washi,washi,washi,washi' && fart.calls === 8 && f.imageCalls() === 8)
+  check('(4) washi is final only when the SAME slot fails the safety check three times — twice as drawn from the film\'s own description, once more from the rewritten one: every picture fails every time → four final washi (done), 12 draws, four rewrites', fart.status === 'done' && fart.slots.join() === 'washi,washi,washi,washi' && fart.calls === 12 && f.imageCalls() === 12 && f.vis.rewrites.length === 4)
 }
 {
   const id = mkId('checkdowncheckdown22')
@@ -345,7 +354,7 @@ const eventsOf = (logs: string[]) => logs.map((l) => JSON.parse(l.replace('[ichi
   const r = rig({ store, env: { ICHIREI_FILM_RETRY_MS: '0', ICHIREI_FILM_BG_RETRY_MS: '0' }, vision: (_c, k) => Array(k).fill(FAIL('face')) })
   r.deps.now = () => new Date(NOW.getTime() + 1000)
   const art = await ensureArt(r.deps, input(id))
-  check('(4b) a picture that failed the safety check once in an earlier open and fails again is washi FOR GOOD (the second failure makes it final); the film is done', art.status === 'done' && art.slots.join() === 'ai,washi,ai,ai' && art.check_fails?.[1] === 2 && r.imageCalls() === 1 && !store.objects.has(picturePath(id, 2)))
+  check('(4b) a picture that failed the safety check once in an earlier open and fails again is REWRITTEN once and drawn from the new view in the same render; failing that too makes the washi final — the film is done', art.status === 'done' && art.slots.join() === 'ai,washi,ai,ai' && art.rewrites?.[1] === 1 && r.imageCalls() === 2 && r.vis.rewrites.length === 1 && !store.objects.has(picturePath(id, 2)))
   const r2 = rig({ store: mem(), vision: (call, k) => (call === 1 ? [OK, FAIL('face'), OK, OK] : Array(k).fill(OK)) })
   const a2 = await ensureArt(r2.deps, input(mkId('failthenpassfailthen')))
   check('(4b) one failed check is not final: the picture is drawn again in the same render and passes', a2.slots.join() === 'ai,ai,ai,ai' && a2.check_fails?.[1] === 1)
@@ -416,6 +425,33 @@ const eventsOf = (logs: string[]) => logs.map((l) => JSON.parse(l.replace('[ichi
 {
   const src = readFileSync(new URL('../engine/film-art.ts', import.meta.url), 'utf8')
   check('(4) an image call may take 90 s (the default of ICHIREI_FILM_IMAGE_TIMEOUT_MS; slots 1 and 2 timed out at 60 s in the live log), the picture check 60 s, and the render may keep going for 200 s while a request is held for 120 s', /ICHIREI_FILM_IMAGE_TIMEOUT_MS, 90_000/.test(src) && /ICHIREI_FILM_CHECK_TIMEOUT_MS, 60_000/.test(src) && /ICHIREI_FILM_RENDER_DEADLINE_MS, 200_000/.test(src) && /ICHIREI_FILM_RENDER_MS, 120_000/.test(src))
+}
+
+// ---- 4c. the rewrite before a washi becomes final -------------------------------------------------------------------------------------------------------
+{
+  check('(4c) the fixed style text carries the contemporary-clothes and modern-objects sentence', IMAGE_STYLE.includes('People wear contemporary everyday clothes; modern objects (a plain modern umbrella, modern doors, phones and trains) unless the description says otherwise.') && buildImagePrompt('x', false).includes('modern objects (a plain modern umbrella'))
+  // slot 2 fails twice from its own description, then PASSES from the rewritten one
+  const id = mkId('rewritepassesrewrite2')
+  const r = rig({ vision: (call, k) => (call === 1 ? [OK, FAIL('religious'), OK, OK] : call === 2 ? [FAIL('religious')] : Array(k).fill(OK)) })
+  const art = await ensureArt(r.deps, input(id))
+  const ev = eventsOf(r.logs)
+  check('(4c) a picture that failed twice is not washi yet: its description is rewritten ONCE (the same moment from a different view; the prompt carries the description, the reason and the language) and the picture is drawn again from the new text — it passes, so it is a real picture', art.slots.join() === 'ai,ai,ai,ai' && r.vis.rewrites.length === 1 && r.vis.rewrites[0].prompt.includes(FILM.pictures[1]) && r.vis.rewrites[0].prompt.includes('failed the safety check (religious)') && r.vis.rewrites[0].prompt.includes('The film\'s language is en') && /DIFFERENT view/.test(r.vis.rewrites[0].prompt) && /hands on an umbrella handle/.test(r.vis.rewrites[0].prompt) && r.imageCalls() === 6 && r.prompts.at(-1)!.includes(REWRITE_OK) && !r.prompts.at(-1)!.includes(FILM.pictures[1]))
+  check('(4c) the rewrite is kept with the film (art.json: rewrites 1, the new text), logged as film_picture_rewrite (slot, reason, ok) — no story text — and happens only once per slot', art.rewrites?.join() === '0,1,0,0' && art.rewritten?.[1] === REWRITE_OK && ev.some((e) => e.event === 'film_picture_rewrite' && e.slot === 2 && e.reason === 'religious' && e.ok === true) && ev.filter((e) => e.event === 'film_picture_rewrite').length === 1 && !r.logs.join('\n').includes('umbrella'))
+  // a rewrite that breaks a rule is asked again once; two bad answers = no rewrite (an outage, not a verdict): the slot waits, it is NOT washi
+  const id2 = mkId('rewritebadrewritebad2')
+  const bad = rig({ vision: (call, k) => (call === 1 ? [OK, FAIL('text'), OK, OK] : call === 2 ? [FAIL('text')] : Array(k).fill(OK)), rewrite: (c) => JSON.stringify({ picture: c === 1 ? 'a smiling mother with a happy face holding an umbrella beside a quiet doorway in soft evening light today' : 'x' }) })
+  const bart = await ensureArt(bad.deps, input(id2))
+  check('(4c) a rewrite that breaks the rules (a smiling face; too short) is refused by the same referee and asked for once more; if no usable rewrite comes, the slot WAITS (pending, check_fails 2, no rewrite recorded) — our own failure never makes washi final', bad.vis.rewrites.length === 2 && /BROKE THESE RULES/.test(bad.vis.rewrites[1].prompt) && bart.slots.join() === 'ai,pending,ai,ai' && bart.rewrites?.[1] === 0 && bart.check_fails?.[1] === 2 && bart.status === 'incomplete')
+  const ok = rig({ store: bad.store, env: { ICHIREI_FILM_RETRY_MS: '0', ICHIREI_FILM_BG_RETRY_MS: '0' } })
+  ok.deps.now = () => new Date(NOW.getTime() + 2 * 60_000)
+  const later = await ensureArt(ok.deps, input(id2))
+  check('(4c) the next open rewrites it first (the rewrite works now), then draws and checks it: a real picture', later.slots.join() === 'ai,ai,ai,ai' && ok.vis.rewrites.length === 1 && ok.imageCalls() === 1 && later.rewrites?.[1] === 1)
+  const id3 = mkId('rewritenotagainrewri')
+  const once = rig({ vision: (_c, k) => Array(k).fill(FAIL('face')) })
+  const oart = await ensureArt(once.deps, input(id3))
+  check('(4c) one rewrite per slot, never two: when the rewritten picture fails too, the washi is final and no second rewrite is asked for', oart.slots.join() === 'washi,washi,washi,washi' && once.vis.rewrites.length === 4 && oart.rewrites?.join() === '1,1,1,1')
+  const bm = buildRewritePrompt('a mother\'s hand on a bento box', 'text', true, 'zh-Hant')
+  check('(4c) the rewrite prompt is a prompt file: the description, the reason, the language and — for a remembrance film — "no celebration"; it asks for the same moment, a different view, no new fact, English, 15–40 words, JSON {"picture"}', bm.includes('a mother\'s hand on a bento box') && bm.includes('(text)') && bm.includes('The film\'s language is zh-Hant') && bm.includes('REMEMBRANCE film') && /Add no new object, place, person or event/.test(bm) && /15–40 words/.test(bm) && /"picture"/.test(bm) && !/\{\{ [A-Z]+ \}\}/.test(bm))
 }
 
 // ---- 5. the lock ------------------------------------------------------------------------------------------------------------------------------------------------

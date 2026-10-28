@@ -243,10 +243,10 @@ const READY: FilmRecord = { status: 'ready', made_at: NOW.toISOString(), picture
   {
     // a sample's picture revision: a stored set of an older revision is ignored (drawn again on the next open); a set of the current revision is kept
     const store = new MemoryOrderStore()
-    for (const [sid, rev] of [[SAMPLE_IDS.ja, '2'], [SAMPLE_IDS.zh, '3'], [SAMPLE_IDS.en, '3'], [SAMPLE_IDS.memorial, '3']] as const) await store.putObject(`films/${sid}/art.json`, JSON.stringify({ schema: 'film-art', id: sid, status: 'done', started_at: NOW.toISOString(), made_at: NOW.toISOString(), slots: ['ai', 'ai', 'ai', 'ai'], rev }), 'application/json')
+    for (const [sid, rev] of [[SAMPLE_IDS.ja, '2'], [SAMPLE_IDS.zh, '4'], [SAMPLE_IDS.en, '4'], [SAMPLE_IDS.memorial, '4']] as const) await store.putObject(`films/${sid}/art.json`, JSON.stringify({ schema: 'film-art', id: sid, status: 'done', started_at: NOW.toISOString(), made_at: NOW.toISOString(), slots: ['ai', 'ai', 'ai', 'ai'], rev }), 'application/json')
     const h = createAnimationHandlers(() => ({ store, env: { ICHIREI_ANIMATION_SAMPLES: 'on' } as never }))
     const view = async (sid: string) => ((await (await h.view(sid)).json()) as any).film.pictures
-    check('(3b) the samples are redrawn after the picture-check fix: zh, en and the remembrance sample are on picture revision 4, so their revision-3 pictures are ignored (pictures: null → drawn again on the next open); the Japanese sample stays on 2 and keeps its pictures', (await view(SAMPLE_IDS.ja))?.length === 4 && (await view(SAMPLE_IDS.zh)) === null && (await view(SAMPLE_IDS.en)) === null && (await view(SAMPLE_IDS.memorial)) === null && artRevFor(SAMPLE_IDS.ja) === '2' && ['zh', 'en', 'memorial'].every((k) => artRevFor((SAMPLE_IDS as Record<string, string>)[k]) === '4'))
+    check('(3b) the zh sample moves to picture revision 5: its revision-4 pictures are ignored (pictures: null → drawn again on the next open); the Japanese (2), English and remembrance samples (4) keep theirs', (await view(SAMPLE_IDS.zh)) === null && (await view(SAMPLE_IDS.ja))?.length === 4 && (await view(SAMPLE_IDS.en))?.length === 4 && (await view(SAMPLE_IDS.memorial))?.length === 4 && artRevFor(SAMPLE_IDS.ja) === '2' && artRevFor(SAMPLE_IDS.zh) === '5' && artRevFor(SAMPLE_IDS.en) === '4' && artRevFor(SAMPLE_IDS.memorial) === '4')
   }
   {
     // an UNCHECKED picture is stored but never shown: not served, washi in the view, the film incomplete
