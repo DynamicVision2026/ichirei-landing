@@ -1,0 +1,124 @@
+{
+ "name": "m1-friend-pays-dinner",
+ "story": "大学の頃から、飲み会のたびにあいつは「ここは俺が」と言って、私がトイレに立った隙に先に払ってしまう。割り勘にしようと言うと「次はお前な」と笑うのに、その次が来たためしがない。それでも、私が仕事を辞めて落ち込んでいた夜、黙って焼き鳥を二人前頼んで、いつもの席に座らせてくれた。",
+ "context": {
+  "language": "ja",
+  "relationship": "friend",
+  "direction": "across",
+  "occasion": "seasonal_thanks",
+  "occasion_detail": null
+ },
+ "model_reply": {
+  "language": "ja",
+  "relationship": "friend",
+  "direction": "across",
+  "occasion": "seasonal_thanks",
+  "occasion_detail": null,
+  "inscription_script": null,
+  "status": "sufficient",
+  "follow_up_question": null,
+  "particulars": [
+   "先に払う",
+   "「次はお前な」",
+   "仕事を辞めた夜の焼き鳥"
+  ],
+  "fingerprint": {
+   "relationship_note": "友人 → 大学の友人",
+   "scarce_asset": "先に払ってしまう癖",
+   "unsaid_truth": "",
+   "dominant_truth_type": "Role",
+   "dignity_direction": "",
+   "emotional_register": [
+    "playful",
+    "grateful"
+   ]
+  },
+  "candidates": [
+   {
+    "slot": "main",
+    "kanji": "支",
+    "reading": "ささえ",
+    "inscription_form": null,
+    "truth_type": "Role",
+    "one_line_gaze": "落ち込んだ夜、何も言わずにいつもの席へ座らせてくれた人。",
+    "story_anchor": "黙って焼き鳥を二人前頼んで、いつもの席に座らせてくれた",
+    "unique_truth": "言葉より先に、席と一皿で人を支える。",
+    "eliminated": false,
+    "eliminated_reason": null,
+    "suitability_flag": null,
+    "palette_status": "ok",
+    "flags": []
+   },
+   {
+    "slot": "second",
+    "kanji": "笑",
+    "reading": "わらい",
+    "inscription_form": null,
+    "truth_type": "Private Symbol",
+    "one_line_gaze": "「次はお前な」と笑って、割り勘をいつも先送りにする人。",
+    "story_anchor": "「次はお前な」と笑う",
+    "unique_truth": "借りを貸しにしない笑い方。",
+    "eliminated": false,
+    "eliminated_reason": null,
+    "suitability_flag": null,
+    "palette_status": "ok",
+    "flags": []
+   },
+   {
+    "slot": "freestyle",
+    "kanji": "奢",
+    "reading": "おご",
+    "inscription_form": null,
+    "truth_type": "Play",
+    "one_line_gaze": "「ここは俺が」で、私の財布はいつも出番なし。",
+    "story_anchor": "ここは俺が",
+    "unique_truth": "",
+    "eliminated": false,
+    "eliminated_reason": null,
+    "suitability_flag": null,
+    "palette_status": "ok",
+    "flags": [
+     "playful_freestyle"
+    ]
+   }
+  ],
+  "primary_kanji": "支",
+  "runner_up_kanji": "笑",
+  "freestyle_kanji": "奢",
+  "fallback_follow_up_question": "大学の友人と過ごした、いちばん忘れられない夜をひとつ教えてください。"
+ },
+ "review_reply": {
+  "verdicts": [
+   {
+    "slot": "main",
+    "kanji": "支",
+    "pass": true,
+    "rule": null,
+    "reason": "Anchored, dignified.",
+    "concern": ""
+   },
+   {
+    "slot": "second",
+    "kanji": "笑",
+    "pass": true,
+    "rule": null,
+    "reason": "Anchored, fits the relationship.",
+    "concern": ""
+   },
+   {
+    "slot": "freestyle",
+    "kanji": "奢",
+    "pass": true,
+    "rule": null,
+    "reason": "Shared habit around paying, teased WITH the receiver; no shaming; warm.",
+    "concern": ""
+   }
+  ]
+ },
+ "expect": {
+  "status": "sufficient",
+  "primary": "支",
+  "second": "笑",
+  "freestyle": "奢"
+ }
+}

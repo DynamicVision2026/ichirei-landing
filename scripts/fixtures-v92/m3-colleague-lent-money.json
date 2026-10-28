@@ -1,0 +1,124 @@
+{
+ "name": "m3-colleague-lent-money",
+ "story": "転職したばかりで給料日までの数日が乗り切れなかったとき、同じ部署の先輩は何も聞かずに封筒を机の端に置いていった。「返すのはいつでもいい」とだけ言って、翌週にはそのことを忘れたような顔で、私にコーヒーを淹れてくれた。返した日も、先輩は「何の話だっけ」と笑っていた。",
+ "context": {
+  "language": "ja",
+  "relationship": "work",
+  "direction": "up",
+  "occasion": "seasonal_thanks",
+  "occasion_detail": null
+ },
+ "model_reply": {
+  "language": "ja",
+  "relationship": "work",
+  "direction": "up",
+  "occasion": "seasonal_thanks",
+  "occasion_detail": null,
+  "inscription_script": null,
+  "status": "sufficient",
+  "follow_up_question": null,
+  "particulars": [
+   "封筒",
+   "「返すのはいつでもいい」",
+   "コーヒー"
+  ],
+  "fingerprint": {
+   "relationship_note": "後輩 → 先輩",
+   "scarce_asset": "封筒と一言",
+   "unsaid_truth": "",
+   "dominant_truth_type": "Turning Point",
+   "dignity_direction": "",
+   "emotional_register": [
+    "grateful",
+    "tender"
+   ]
+  },
+  "candidates": [
+   {
+    "slot": "main",
+    "kanji": "信",
+    "reading": "しん",
+    "inscription_form": null,
+    "truth_type": "Turning Point",
+    "one_line_gaze": "何も聞かずに封筒を置いていった、あの日の先輩。",
+    "story_anchor": "何も聞かずに封筒を机の端に置いていった",
+    "unique_truth": "理由を問わずに、人を信じて差し出す。",
+    "eliminated": false,
+    "eliminated_reason": null,
+    "suitability_flag": null,
+    "palette_status": "ok",
+    "flags": []
+   },
+   {
+    "slot": "second",
+    "kanji": "笑",
+    "reading": "わらい",
+    "inscription_form": null,
+    "truth_type": "Private Symbol",
+    "one_line_gaze": "返した日も「何の話だっけ」と笑っていた人。",
+    "story_anchor": "「何の話だっけ」と笑っていた",
+    "unique_truth": "貸しを、貸しのまま残さない笑い。",
+    "eliminated": false,
+    "eliminated_reason": null,
+    "suitability_flag": null,
+    "palette_status": "ok",
+    "flags": []
+   },
+   {
+    "slot": "freestyle",
+    "kanji": "貸",
+    "reading": "かし",
+    "inscription_form": null,
+    "truth_type": "Play",
+    "one_line_gaze": "「返すのはいつでもいい」。貸した本人が、いちばん先に忘れていた。",
+    "story_anchor": "返すのはいつでもいい",
+    "unique_truth": "",
+    "eliminated": false,
+    "eliminated_reason": null,
+    "suitability_flag": null,
+    "palette_status": "ok",
+    "flags": [
+     "playful_freestyle"
+    ]
+   }
+  ],
+  "primary_kanji": "信",
+  "runner_up_kanji": "笑",
+  "freestyle_kanji": "貸",
+  "fallback_follow_up_question": "先輩と過ごした、いちばん助けられた日をひとつ教えてください。"
+ },
+ "review_reply": {
+  "verdicts": [
+   {
+    "slot": "main",
+    "kanji": "信",
+    "pass": true,
+    "rule": null,
+    "reason": "Anchored, dignified.",
+    "concern": ""
+   },
+   {
+    "slot": "second",
+    "kanji": "笑",
+    "pass": true,
+    "rule": null,
+    "reason": "Anchored, fits the relationship.",
+    "concern": ""
+   },
+   {
+    "slot": "freestyle",
+    "kanji": "貸",
+    "pass": true,
+    "rule": null,
+    "reason": "Lending told as kindness, gentle for an up direction; the reply never shames the sender's money trouble.",
+    "concern": ""
+   }
+  ]
+ },
+ "expect": {
+  "status": "sufficient",
+  "primary": "信",
+  "second": "笑",
+  "freestyle": "貸"
+ }
+}

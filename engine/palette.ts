@@ -10,8 +10,8 @@
 //   2. status=context_required + anchor_required=yes → the kanji may be the primary
 //      only if the candidate carries a usable story anchor (see anchorPresent).
 //   3. The FREESTYLE (遊び字) slot: its story anchor must be a verbatim fragment of the story,
-//      it must not be on the freestyle blocklist (body, appearance, weight, intelligence, money
-//      or status, sexual meaning, illness, disability, cruelty), and it must not repeat a main
+//      it must not be on the freestyle blocklist (body, appearance, weight, intelligence, status — poverty, stinginess, low standing; never money
+//      itself —, sexual meaning, illness, disability, cruelty), and it must not repeat a main
 //      kanji. It needs no palette row and no classical line. It is never the primary.
 //   4. REQUIRE_CLASSICAL_ECHO (off by default): a main candidate without a REVIEWED palette
 //      row that carries a classical line is not eligible.
@@ -59,7 +59,7 @@ export const CLASSICAL_ECHO_REQUIRED_REASON = 'palette: classical_echo_required'
 export const noRowReason = (family: Family) => `palette: no_row_in_${family}`
 
 /** Why the freestyle slot refuses a character (categories of engine/freestyle-blocklist.csv). */
-export const FREESTYLE_CATEGORIES = ['body', 'appearance', 'weight', 'intelligence', 'money_status', 'sexual', 'illness', 'disability', 'cruelty'] as const
+export const FREESTYLE_CATEGORIES = ['body', 'appearance', 'weight', 'intelligence', 'status', 'sexual', 'illness', 'disability', 'cruelty'] as const
 
 /**
  * The parsed palette. A row is found by its `kanji` OR its `inscription_form`, so one

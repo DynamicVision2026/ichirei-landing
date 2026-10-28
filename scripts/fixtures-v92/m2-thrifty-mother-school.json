@@ -1,0 +1,124 @@
+{
+ "name": "m2-thrifty-mother-school",
+ "story": "母は自分の服を何年も同じものでやりくりしながら、私と弟の学費を毎月こつこつ貯めていた。通帳を見せてもらったことは一度もない。私の大学進学が決まった日、母は台所で黙って通帳を一冊差し出して、「あとは自分で頑張りなさい」とだけ言って、いつもの味噌汁をよそってくれた。",
+ "context": {
+  "language": "ja",
+  "relationship": "parent_mother",
+  "direction": "up",
+  "occasion": "parent_day",
+  "occasion_detail": null
+ },
+ "model_reply": {
+  "language": "ja",
+  "relationship": "parent_mother",
+  "direction": "up",
+  "occasion": "parent_day",
+  "occasion_detail": null,
+  "inscription_script": null,
+  "status": "sufficient",
+  "follow_up_question": null,
+  "particulars": [
+   "同じ服で何年も",
+   "学費を毎月貯める",
+   "通帳を黙って渡す"
+  ],
+  "fingerprint": {
+   "relationship_note": "母 → 子",
+   "scarce_asset": "通帳と沈黙",
+   "unsaid_truth": "",
+   "dominant_truth_type": "Hidden Cost",
+   "dignity_direction": "",
+   "emotional_register": [
+    "grateful",
+    "tender"
+   ]
+  },
+  "candidates": [
+   {
+    "slot": "main",
+    "kanji": "育",
+    "reading": "そだて",
+    "inscription_form": null,
+    "truth_type": "Turning Point",
+    "one_line_gaze": "進学が決まった日、黙って通帳を差し出した母。",
+    "story_anchor": "黙って通帳を一冊差し出して",
+    "unique_truth": "自分を後回しにして子の道を育てた人。",
+    "eliminated": false,
+    "eliminated_reason": null,
+    "suitability_flag": null,
+    "palette_status": "ok",
+    "flags": []
+   },
+   {
+    "slot": "second",
+    "kanji": "備",
+    "reading": "そなえ",
+    "inscription_form": null,
+    "truth_type": "Hidden Cost",
+    "one_line_gaze": "自分の服は同じまま、学費を毎月こつこつ積んでいた母。",
+    "story_anchor": "自分の服を何年も同じものでやりくりしながら",
+    "unique_truth": "見えない場所で、先の日に備え続けた時間。",
+    "eliminated": false,
+    "eliminated_reason": null,
+    "suitability_flag": null,
+    "palette_status": "ok",
+    "flags": []
+   },
+   {
+    "slot": "freestyle",
+    "kanji": "貯",
+    "reading": "ため",
+    "inscription_form": null,
+    "truth_type": "Play",
+    "one_line_gaze": "毎月こつこつ。母の通帳は、いちばんの無口な応援だった。",
+    "story_anchor": "毎月こつこつ貯めていた",
+    "unique_truth": "",
+    "eliminated": false,
+    "eliminated_reason": null,
+    "suitability_flag": null,
+    "palette_status": "ok",
+    "flags": [
+     "playful_freestyle"
+    ]
+   }
+  ],
+  "primary_kanji": "育",
+  "runner_up_kanji": "備",
+  "freestyle_kanji": "貯",
+  "fallback_follow_up_question": "お母さんとのいちばん忘れられない台所の場面をひとつ教えてください。"
+ },
+ "review_reply": {
+  "verdicts": [
+   {
+    "slot": "main",
+    "kanji": "育",
+    "pass": true,
+    "rule": null,
+    "reason": "Anchored, dignified.",
+    "concern": ""
+   },
+   {
+    "slot": "second",
+    "kanji": "備",
+    "pass": true,
+    "rule": null,
+    "reason": "Anchored, fits the relationship.",
+    "concern": ""
+   },
+   {
+    "slot": "freestyle",
+    "kanji": "貯",
+    "pass": true,
+    "rule": null,
+    "reason": "Thrift told warmly, a gentle affectionate line for an up direction; no shaming of poverty.",
+    "concern": ""
+   }
+  ]
+ },
+ "expect": {
+  "status": "sufficient",
+  "primary": "育",
+  "second": "備",
+  "freestyle": "貯"
+ }
+}

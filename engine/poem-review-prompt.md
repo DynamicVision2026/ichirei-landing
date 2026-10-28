@@ -29,7 +29,7 @@ FAIL only if one of these clearly holds, and name it in `rule`:
 6. `illness` — The story shows the receiver is ill, in hospital, recovering from a stroke, living with dementia or frail, and the poem has an illness, decline or ending association.
 7. `relationship` — Between THESE two people (relationship and direction together) the poem leaves the receiver, reading it in front of family, judged, owed, pitied, embarrassed or romantically misread.
 8. `goodwill` — The story is hostile or mocking toward the receiver; no poem should be made.
-9. `insult` — It teases or mocks the receiver's body, appearance, money, intelligence, illness or anything cruel.
+9. `insult` — It teases or mocks the receiver's body, appearance, intelligence, illness or anything cruel, or shames them for debt or poverty. Money as a topic (paying, saving, lending) is not an insult.
 10. `attribution` — It quotes or closely imitates a famous poem, or is presented as written by a named poet.
 
 Everything else is at most a concern. A poem with only concerns is a PASS.
