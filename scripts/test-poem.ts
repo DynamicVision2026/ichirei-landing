@@ -21,6 +21,7 @@ import { DEFAULT_POEM_TYPE, MAX_POEMS, POEM_TYPES, type PoemType } from '../src/
 import { COPY } from '../src/demo/i18n.ts'
 // @ts-expect-error untyped test helper
 import { startServer } from './server-fixtures.mjs'
+process.env.ICHIREI_FILM = 'off' // (the film-script call is switched off in this suite: orders here never reach the model)
 
 let failures = 0
 function check(name: string, cond: boolean, detail?: string) {
@@ -300,14 +301,14 @@ const postOrder = (h: (r: Request) => Promise<Response>, b: unknown) => h(new Re
   const rec = store.records.get(j.order_ref) as any
   check('(6) the certificate object carries poems: [{type, lines, reading}] (response and stored record); the record has no price for it', j.certificate.poems.length === 1 && j.certificate.poems[0].type === 'tanka' && j.certificate.poems[0].lines.length === 5 && rec.production.certificate.poems.length === 1 && rec.production.poems.length === 1 && !('price_jpy' in rec.production.poems[0]))
   const anim = store.records.get(j.animation_url.split('/').pop()) as any
-  check('(6) the story animation uses THAT poem: its record holds the chosen poem (type, lines) — the film plays what the buyer chose', anim.poem?.type === 'tanka' && anim.poem.lines.join() === C20.poems.tanka.lines.join())
+  check('(6) the story film does not carry the poem (it retells the story and ends with the character): the animation record has no poem field, while the order keeps the chosen one', !('poem' in anim) && rec.production.poems[0].type === 'tanka')
   const ev = (store.lines.get('analytics/2026-10-28.jsonl') ?? []).map((l) => JSON.parse(l))
   check('(6) analytics: the order is recorded with the poem type, and a poem_added event — type only', ev.some((e) => e.event === 'ordered' && e.poem_types?.join() === 'tanka') && ev.filter((e) => e.event === 'poem_added').map((e) => e.poem_type).join() === 'tanka')
   const none = await quiet(() => postOrder(orderHandler(), orderBody()))
   const jn = (await none.json()) as any
   const noAttrs = shopSeen.at(-1).variables.input.lines[0].attributes.map((a: any) => a.key)
   const noAnim = store.records.get(jn.animation_url.split('/').pop()) as any
-  check('(6) an order with no poem (the buyer\'s poem failed twice) goes through: one line item, no poem attributes, certificate.poems = [], and the film has no poem part', none.status === 200 && shopSeen.at(-1).variables.input.lines.length === 1 && !noAttrs.some((k: string) => k.startsWith('ichirei_poem')) && jn.certificate.poems.length === 0 && noAnim.poem === null)
+  check('(6) an order with no poem (the buyer\'s poem failed twice) goes through: one line item, no poem attributes, certificate.poems = [], and its film is the same as any other', none.status === 200 && shopSeen.at(-1).variables.input.lines.length === 1 && !noAttrs.some((k: string) => k.startsWith('ichirei_poem')) && jn.certificate.poems.length === 0 && !('poem' in noAnim))
   const en = await quiet(() => postOrder(orderHandler(), orderBody({ language: 'en', inscription_style: 'modern', engine_result: { ...orderBody().engine_result, language: 'en' }, poems: [{ poem_id: poemIdEn }] })))
   check('(6) …and an English poem is refused for a Japanese gift (the poem belongs to a language), so the page asks for the poem again', en.status === 400 && ((await en.json()) as any).code === 'poem_mismatch')
 }

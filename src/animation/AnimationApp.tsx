@@ -1,21 +1,21 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { COPY, pageLang, type PageCopy } from './copy.ts'
-import { FRAME_H, FRAME_W, momentSize, poemSizes, whoSize } from './layout.ts'
-import { makeTimeline, type Span, type Timeline } from './timeline.ts'
-import type { AnimationView, StrokeData } from './types.ts'
+import { clamp, frameAt, makeFilmTimeline, phrases, type FilmTimeline } from './film.ts'
+import type { AnimationView } from './types.ts'
 import './animation.css'
 
-// The story animation page /a/<id>: one fixed 30-second film per order, drawn in HTML / SVG / CSS from the data the order already holds
-// (engine/animation.ts) and the stroke order of the character (engine/stroke-data.ts). No model call, no per-customer styling. The timing
-// is src/animation/timeline.ts; this file only plays it with the Web Animations API (smooth on phones, no JS per frame) and holds the last
-// frame. prefers-reduced-motion gets the finished frame as a still.
+// The story film page /a/<id>: a 30-second film that RETELLS the customer's own story in four short scenes and ends with the chosen character as
+// the answer. Fixed template, the same for every order; the script (four lines, four picture IDs) was written once when the order was made and is
+// saved with it — nothing is generated when the film is played. The timing and every frame's maths are src/animation/film.ts; this file draws them.
+// prefers-reduced-motion gets a still page (the four scenes, then the character). While the script is still being written the page waits quietly.
 
 const FONT_CSS =
-  'https://fonts.googleapis.com/css2?family=Zen+Old+Mincho:wght@400;700&family=Noto+Serif+TC:wght@400;600&family=Cormorant+Garamond:ital,wght@0,400;0,500;1,400&display=swap'
+  'https://fonts.googleapis.com/css2?family=Zen+Old+Mincho:wght@400;700;900&family=Noto+Serif+JP:wght@300;400;600&family=Noto+Serif+TC:wght@400;600;900&family=Cormorant+Garamond:ital,wght@0,400;0,500;1,400&family=Inter:wght@300;400&display=swap'
 
 const idFromPath = () => window.location.pathname.match(/^\/a\/([A-Za-z0-9-]{3,64})\/?$/)?.[1] ?? null
+const sceneUrl = (id: string) => `/film/scenes/${encodeURIComponent(id)}.webp`
 
-type Load = { state: 'loading' } | { state: 'error'; kind: 'notFound' | 'unavailable' } | { state: 'ready'; view: AnimationView; strokes: StrokeData | null }
+type Load = { state: 'loading' } | { state: 'error'; kind: 'notFound' | 'unavailable' } | { state: 'ready'; view: AnimationView }
 
 export default function AnimationApp() {
   const id = useMemo(idFromPath, [])
@@ -39,32 +39,32 @@ export default function AnimationApp() {
     return () => meta.remove()
   }, [lang])
 
+  // fetch the view; while the script is still being written ask again every few seconds
   useEffect(() => {
     if (!id) {
       setLoad({ state: 'error', kind: 'notFound' })
       return
     }
     const ac = new AbortController()
-    ;(async () => {
+    let timer: ReturnType<typeof setTimeout> | undefined
+    const go = async () => {
       try {
         const res = await fetch(`/api/animation/${id}`, { signal: ac.signal })
         if (res.status === 404) return setLoad({ state: 'error', kind: 'notFound' })
         if (!res.ok) return setLoad({ state: 'error', kind: 'unavailable' })
         const view = (await res.json()) as AnimationView
         setLang(pageLang(view.language))
-        let strokes: StrokeData | null = null
-        try {
-          const s = await fetch(`/api/strokes?c=${encodeURIComponent(view.glyph)}&script=${view.script}`, { signal: ac.signal })
-          if (s.ok) strokes = (await s.json()) as StrokeData
-        } catch {
-          if (ac.signal.aborted) return
-        }
-        setLoad({ state: 'ready', view, strokes })
+        setLoad({ state: 'ready', view })
+        if (!view.film) timer = setTimeout(go, 3000)
       } catch {
         if (!ac.signal.aborted) setLoad({ state: 'error', kind: 'unavailable' })
       }
-    })()
-    return () => ac.abort()
+    }
+    void go()
+    return () => {
+      ac.abort()
+      if (timer) clearTimeout(timer)
+    }
   }, [id])
 
   return (
@@ -75,34 +75,46 @@ export default function AnimationApp() {
           {load.kind === 'notFound' ? copy.notFound : copy.unavailable}
         </p>
       )}
-      {load.state === 'ready' && <Film view={load.view} strokes={load.strokes} copy={copy} />}
+      {load.state === 'ready' && !load.view.film && (
+        <p className="an-note an-preparing" role="status" data-testid="animation-preparing">
+          {copy.preparing}
+          <span className="an-dots" aria-hidden="true" />
+        </p>
+      )}
+      {load.state === 'ready' && load.view.film && <Film key={load.view.id} view={load.view} film={load.view.film} copy={copy} />}
     </main>
   )
 }
 
-function Film({ view, strokes, copy }: { view: AnimationView; strokes: StrokeData | null; copy: PageCopy }) {
-  const wrap = useRef<HTMLDivElement>(null)
-  const stage = useRef<HTMLDivElement>(null)
-  const strokeEls = useRef<(SVGPathElement | null)[]>([])
-  const [u, setU] = useState(3.6) // px per frame unit (the frame is 100 units wide)
-  const [lengths, setLengths] = useState<number[] | null | undefined>(strokes && strokes.strokes.length > 0 ? undefined : null)
-  const [playKey, setPlayKey] = useState(0)
-  const [reducedMotion, setReducedMotion] = useState(() => window.matchMedia?.('(prefers-reduced-motion: reduce)').matches ?? false)
-  const [forcePlay, setForcePlay] = useState(false)
-  const [ended, setEnded] = useState(false)
-  const [toast, setToast] = useState('')
-  // a browser without the Web Animations API (very old phones) gets the finished frame as a still, like reduced motion
-  const canAnimate = typeof Element !== 'undefined' && typeof Element.prototype.animate === 'function'
-  const still = (reducedMotion && !forcePlay) || !canAnimate
+/** The character's reading under it: the kana reading (ja), the pinyin (zh), the romanization and meaning (en: a reader of English cannot read kana). */
+function readingLine(view: AnimationView): string {
+  if (view.language === 'en') return [view.romanization.split(' / ')[0], view.meaning_en].filter(Boolean).join(' · ')
+  return view.reading
+}
 
-  // the frame fits the screen: as large as a 9:16 box can be in the space above the buttons
+function Film({ view, film, copy }: { view: AnimationView; film: NonNullable<AnimationView['film']>; copy: PageCopy }) {
+  const wrap = useRef<HTMLDivElement>(null)
+  const frame = useRef<HTMLDivElement>(null)
+  const [u, setU] = useState(3.6) // px per unit: the frame is 100 units wide
+  const [ready, setReady] = useState(false)
+  const [playing, setPlaying] = useState(false)
+  const [clock, setClock] = useState(0) // seconds, for the still / progress label only
+  const [toast, setToast] = useState('')
+  const reducedAtStart = useMemo(() => window.matchMedia?.('(prefers-reduced-motion: reduce)').matches ?? false, [])
+  const [forcePlay, setForcePlay] = useState(false)
+  const still = reducedAtStart && !forcePlay
+
+  const tl: FilmTimeline = useMemo(() => makeFilmTimeline(film.lines.length, view.memorial), [film.lines.length, view.memorial])
+  const t = useRef(0)
+  const raf = useRef(0)
+  const last = useRef(0)
+
+  // the frame is as large as a 9:16 box can be in the space above the buttons
   useLayoutEffect(() => {
     const fit = () => {
       const el = wrap.current
       if (!el) return
-      const w = el.clientWidth
-      const h = el.clientHeight
-      setU(Math.max(1.5, Math.min(w / FRAME_W, h / FRAME_H)))
+      setU(Math.max(1.5, Math.min(el.clientWidth / 100, el.clientHeight / 177.78)))
     }
     fit()
     const ro = new ResizeObserver(fit)
@@ -112,97 +124,121 @@ function Film({ view, strokes, copy }: { view: AnimationView; strokes: StrokeDat
       ro.disconnect()
       window.removeEventListener('orientationchange', fit)
     }
-  }, [])
+  }, [still])
 
+  // pictures and fonts first (a few seconds at most), so the film does not stutter at its start
   useEffect(() => {
-    const mq = window.matchMedia?.('(prefers-reduced-motion: reduce)')
-    if (!mq) return
-    const on = () => setReducedMotion(mq.matches)
-    mq.addEventListener?.('change', on)
-    return () => mq.removeEventListener?.('change', on)
-  }, [])
-
-  // stroke lengths decide how long each stroke takes: measure them once the paths are in the page
-  useLayoutEffect(() => {
-    if (lengths !== undefined || !strokes) return
-    setLengths(strokeEls.current.slice(0, strokes.strokes.length).map((p) => (p ? p.getTotalLength() : 1)))
-  }, [lengths, strokes])
-
-  const poem = view.poem
-  const timeline: Timeline | null = useMemo(() => {
-    if (lengths === undefined) return null
-    return makeTimeline({ memorial: view.memorial, poemLines: poem ? poem.lines.length : 0, poemNotes: !!poem && poem.notes.length > 0, strokeLengths: lengths })
-  }, [lengths, view.memorial, poem])
-
-  const sizes = useMemo(() => (poem ? poemSizes(poem.lines, poem.lineAids, poem.notes) : null), [poem])
-  const momentFs = useMemo(() => momentSize(view.moment), [view.moment])
-  const whoFs = useMemo(() => whoSize(view.who), [view.who])
-
-  // play the film
-  useEffect(() => {
-    const root = stage.current
-    if (!root || !timeline || still) return
-    let cancelled = false
-    const anims: Animation[] = []
-    setEnded(false)
-    const q = (sel: string) => Array.from(root.querySelectorAll<HTMLElement | SVGElement>(sel))
-    const one = (sel: string) => root.querySelector<HTMLElement | SVGElement>(sel)
-    const run = (el: Element | null | undefined, keyframes: Keyframe[], span: Span, opts: KeyframeAnimationOptions = {}) => {
-      if (!el) return
-      anims.push(el.animate(keyframes, { delay: span.start * 1000, duration: Math.max((span.end - span.start) * 1000, 1), fill: 'both', easing: 'ease-out', ...opts }))
-    }
-    const rise = [{ opacity: 0, transform: 'translateY(1.2em)' }, { opacity: 1, transform: 'translateY(0)' }]
-    const fade = [{ opacity: 0 }, { opacity: 1 }]
-
-    const go = () => {
-      if (cancelled) return
-      run(one('[data-fx="moment"]'), rise, timeline.moment.in)
-      run(one('[data-fx="moment"]'), [{ opacity: 1 }, { opacity: 0 }], timeline.moment.out, { fill: 'forwards', easing: 'ease-in' })
-      if (strokes && strokes.strokes.length > 0) {
-        q('[data-fx="stroke"]').forEach((el, i) => {
-          const span = timeline.glyph.strokes[i]
-          if (!span) return
-          run(el, [{ strokeDashoffset: 1, opacity: 0 }, { strokeDashoffset: 0.97, opacity: 1, offset: 0.03 }, { strokeDashoffset: 0, opacity: 1 }], span, { easing: 'cubic-bezier(.45,.05,.35,1)' })
-        })
-      } else {
-        run(one('[data-fx="glyph-ink"]'), [{ opacity: 0, filter: 'blur(14px)' }, { opacity: 1, filter: 'blur(0px)' }], timeline.glyph.write, { easing: 'ease-in-out' })
-      }
-      if (timeline.glyphMove) {
-        run(one('[data-fx="glyph-wrap"]'), [{ transform: 'translateY(0) scale(1)' }, { transform: 'translateY(-62.9%) scale(0.42)' }], timeline.glyphMove, { easing: 'cubic-bezier(.5,0,.2,1)' })
-      }
-      if (timeline.reading) run(one('[data-fx="reading"]'), rise, timeline.reading)
-      q('[data-fx="pline"]').forEach((el, i) => run(el, rise, timeline.poemLines[i] ?? timeline.poemLines[timeline.poemLines.length - 1], { easing: 'ease-out' }))
-      if (timeline.poemNotes) run(one('[data-fx="notes"]'), fade, timeline.poemNotes)
-      run(one('[data-fx="who"]'), rise, timeline.who)
-      if (timeline.memorial) run(one('[data-fx="seal"]'), [{ opacity: 0 }, { opacity: 0.55 }], timeline.seal, { easing: 'ease-in-out' })
-      else
-        run(
-          one('[data-fx="seal"]'),
-          [
-            { opacity: 0, transform: 'scale(1.9) rotate(-7deg)' },
-            { opacity: 1, transform: 'scale(0.94) rotate(0deg)', offset: 0.6 },
-            { opacity: 1, transform: 'scale(1) rotate(0deg)' },
-          ],
-          timeline.seal,
-          { easing: 'cubic-bezier(.2,.8,.3,1)' },
-        )
-      // the end: the frame holds (fill: both keeps the last keyframe)
-      const last = anims.reduce<Animation | null>((a, b) => (!a || (b.effect?.getComputedTiming().endTime ?? 0) > (a.effect?.getComputedTiming().endTime ?? 0) ? b : a), null)
-      void last?.finished.then(() => !cancelled && setEnded(true)).catch(() => {})
-    }
-
-    // wait for the fonts (a short moment at most), so the lines do not jump while they appear
-    const ready = document.fonts?.ready ?? Promise.resolve()
-    void Promise.race([ready, new Promise((r) => setTimeout(r, 1500))]).then(go)
-
-    const onVisibility = () => anims.forEach((a) => (document.hidden ? a.pause() : a.play()))
-    document.addEventListener('visibilitychange', onVisibility)
+    let alive = true
+    const imgs = film.scenes.map((s) => new Promise<void>((res) => { const im = new Image(); im.onload = im.onerror = () => res(); im.src = sceneUrl(s) }))
+    const fonts = document.fonts?.ready ?? Promise.resolve()
+    void Promise.race([Promise.all([...imgs, fonts]), new Promise((r) => setTimeout(r, 4000))]).then(() => alive && setReady(true))
     return () => {
-      cancelled = true
-      document.removeEventListener('visibilitychange', onVisibility)
-      anims.forEach((a) => a.cancel())
+      alive = false
     }
-  }, [timeline, strokes, still, playKey])
+  }, [film.scenes])
+
+  /** Apply the frame at time `sec` (direct style writes, like the hand-made reference: smooth and cheap on a phone). */
+  const render = useCallback(
+    (sec: number) => {
+      const root = frame.current
+      if (!root) return
+      const f = frameAt(sec, tl, film.lines)
+      root.querySelectorAll<HTMLElement>('[data-scene]').forEach((el, i) => {
+        const s = f.scenes[i]
+        if (!s) return
+        el.style.opacity = String(s.opacity)
+        const img = el.querySelector<HTMLElement>('.an-art img')
+        if (img) img.style.transform = reducedAtStart && !forcePlay ? 'none' : `scale(${1.02 + 0.08 * s.progress}) translateY(${-6 * s.progress}px)`
+        el.querySelectorAll<HTMLElement>('[data-phrase]').forEach((p, j) => {
+          const k = s.phrases[j] ?? 0
+          p.style.opacity = String(k)
+          p.style.transform = `translateY(${6 * (1 - k)}px)`
+        })
+      })
+      const fin = root.querySelector<HTMLElement>('[data-final]')
+      if (fin) fin.style.opacity = String(f.final.opacity)
+      const kanji = root.querySelector<HTMLElement>('[data-kanji]')
+      if (kanji) {
+        const pos = `0 ${100 - f.final.reveal * 100}%`
+        kanji.style.setProperty('-webkit-mask-position', pos)
+        kanji.style.setProperty('mask-position', pos)
+        kanji.style.filter = `blur(${(1 - f.final.reveal) * 2.5}px)`
+      }
+      const set = (sel: string, v: number) => {
+        const el = root.querySelector<HTMLElement>(sel)
+        if (el) el.style.opacity = String(v)
+      }
+      set('[data-reading]', f.final.reading)
+      set('[data-who]', f.final.who)
+      set('[data-seal]', f.final.seal)
+      const bar = root.querySelector<HTMLElement>('[data-progress]')
+      if (bar) bar.style.width = `${f.progress * 100}%`
+    },
+    [tl, film.lines, reducedAtStart, forcePlay],
+  )
+
+  const tick = useCallback(
+    (now: number) => {
+      t.current = Math.min(tl.total, t.current + (now - last.current) / 1000)
+      last.current = now
+      render(t.current)
+      if (t.current >= tl.total) {
+        setPlaying(false)
+        setClock(tl.total)
+        return
+      }
+      raf.current = requestAnimationFrame(tick)
+    },
+    [render, tl.total],
+  )
+  const play = useCallback(() => {
+    if (t.current >= tl.total) t.current = 0
+    last.current = performance.now()
+    setPlaying(true)
+    cancelAnimationFrame(raf.current)
+    raf.current = requestAnimationFrame(tick)
+  }, [tick, tl.total])
+  const pause = useCallback(() => {
+    cancelAnimationFrame(raf.current)
+    setPlaying(false)
+    setClock(t.current)
+  }, [])
+  const replay = useCallback(() => {
+    t.current = 0
+    render(0)
+    play()
+  }, [play, render])
+
+  // start by itself (nothing to tap); a still page shows the last frame
+  useEffect(() => {
+    if (!ready) return
+    if (still) {
+      render(tl.total)
+      return
+    }
+    render(0)
+    play()
+    return () => cancelAnimationFrame(raf.current)
+  }, [ready, still, tl.total]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  // the film stops while the tab is hidden
+  useEffect(() => {
+    const onVis = () => (document.hidden ? cancelAnimationFrame(raf.current) : playing && (last.current = performance.now(), (raf.current = requestAnimationFrame(tick))))
+    document.addEventListener('visibilitychange', onVis)
+    return () => document.removeEventListener('visibilitychange', onVis)
+  }, [playing, tick])
+
+  // a seam for the tests: seek to a moment, play, pause (nothing else uses it)
+  useEffect(() => {
+    ;(window as unknown as { __ichireiFilm?: unknown }).__ichireiFilm = {
+      seek: (s: number) => { cancelAnimationFrame(raf.current); setPlaying(false); t.current = clamp(s, 0, tl.total); render(t.current) },
+      play,
+      pause,
+      get time() { return t.current },
+      total: tl.total,
+    }
+    return () => { delete (window as unknown as { __ichireiFilm?: unknown }).__ichireiFilm }
+  }, [play, pause, render, tl.total])
 
   const share = useCallback(async () => {
     const url = window.location.href
@@ -218,119 +254,90 @@ function Film({ view, strokes, copy }: { view: AnimationView; strokes: StrokeDat
     }
   }, [copy])
 
-  const q = copy.quote
-  const poemMain = poem ? sizes!.fs : 0
+  const [q0, q1] = copy.quote
+  void q0
+  void q1
+  const ended = !playing && t.current >= tl.total - 0.001
+  void clock
+  const body = (
+    <>
+      {film.lines.map((line, i) => (
+        <div className="an-scene" data-scene={i} data-scene-id={film.scenes[i]} key={i}>
+          <div className="an-art">
+            <img src={sceneUrl(film.scenes[i] ?? '')} alt="" decoding="async" draggable={false} />
+          </div>
+          <p className="an-line" data-testid="film-line">
+            {phrases(line).map((p, j) => (
+              <span key={j} data-phrase={j}>
+                {renderPhrase(p)}
+              </span>
+            ))}
+          </p>
+        </div>
+      ))}
+      <div className="an-final" data-final>
+        <div className="an-kanji notranslate" translate="no" data-kanji data-testid="film-kanji">
+          {view.glyph}
+        </div>
+        <div className="an-reading notranslate" translate="no" data-reading data-testid="film-reading">
+          {readingLine(view)}
+        </div>
+        <div className="an-who" data-who data-testid="film-who">
+          {phrases(view.who).map((p, i) => (
+            <span key={i}>{p}</span>
+          ))}
+        </div>
+        <div className="an-seal" data-seal data-testid="film-seal" aria-hidden="true">
+          <b>{copy.sealText.join('')}</b>
+          <small>ICHIREI</small>
+        </div>
+      </div>
+      <div className="an-progress" data-progress />
+    </>
+  )
+
   return (
     <>
-      <div className="an-wrap" ref={wrap}>
-        <div
-          ref={stage}
-          className={`an-stage${view.memorial ? ' an-memorial' : ''}${still ? ' an-still' : ''}${poem ? ' an-haspoem' : ' an-nopoem'}${view.poem?.type === 'en' ? ' an-poem-en' : ''}`}
-          style={{ ['--u' as string]: `${u}px`, width: `${u * FRAME_W}px`, height: `${u * FRAME_H}px` }}
-          role="img"
-          aria-label={copy.alt}
-          data-testid="animation-stage"
-          data-duration={timeline?.total ?? ''}
-          data-ended={ended ? 'yes' : 'no'}
-          data-memorial={view.memorial ? 'yes' : 'no'}
-        >
-          <div className="an-paper" aria-hidden="true" />
-          <p className="an-moment an-fx" data-fx="moment" data-testid="animation-moment" style={{ fontSize: `calc(var(--u) * ${momentFs})` }}>
-            {q[0]}
-            {view.moment}
-            {q[1]}
-          </p>
-
-          <div className="an-glyph-wrap an-fx-wrap" data-fx="glyph-wrap">
-            <svg
-              className="an-glyph"
-              viewBox={strokes ? `0 0 ${strokes.box} ${strokes.box}` : '0 0 100 100'}
-              aria-hidden="true"
-              data-testid="animation-glyph"
-              data-source={strokes?.source ?? 'ink'}
-              data-strokes={strokes?.strokes.length ?? 0}
-            >
-              {strokes?.source === 'kanjivg' && (
-                <g fill="none" stroke="currentColor" strokeWidth={5.8} strokeLinecap="round" strokeLinejoin="round">
-                  {strokes.strokes.map((s, i) => (
-                    <path key={i} d={s.d} ref={(el) => void (strokeEls.current[i] = el)} className="an-stroke an-fx" data-fx="stroke" pathLength={1} strokeDasharray="1 1" />
-                  ))}
-                </g>
-              )}
-              {strokes?.source === 'hanzi' && (
-                <g transform={strokes.flip}>
-                  <defs>
-                    {strokes.strokes.map((s, i) => (
-                      <clipPath key={i} id={`an-clip-${i}`}>
-                        <path d={s.d} />
-                      </clipPath>
-                    ))}
-                  </defs>
-                  {strokes.strokes.map((s, i) => (
-                    <g key={i} clipPath={`url(#an-clip-${i})`}>
-                      <path
-                        d={s.median}
-                        ref={(el) => void (strokeEls.current[i] = el)}
-                        className="an-stroke an-fx"
-                        data-fx="stroke"
-                        pathLength={1}
-                        strokeDasharray="1 1"
-                        fill="none"
-                        stroke="currentColor"
-                        strokeWidth={170}
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                      />
-                    </g>
-                  ))}
-                </g>
-              )}
-              {!strokes && (
-                <text x="50" y="50" textAnchor="middle" dominantBaseline="central" fontSize="86" fill="currentColor" className="an-ink an-fx" data-fx="glyph-ink">
-                  {view.glyph}
-                </text>
-              )}
-            </svg>
-          </div>
-
-          {!poem && (
-            <div className="an-reading an-fx" data-fx="reading" data-testid="animation-reading">
-              <span className="an-reading-main">{view.reading}</span>
-              {view.language === 'en' && view.meaning_en ? <span className="an-reading-sub">{view.meaning_en}</span> : null}
-            </div>
-          )}
-
-          {poem && sizes && (
-            <div className="an-poem" data-testid="animation-poem" data-type={poem.type} style={{ fontSize: `calc(var(--u) * ${poemMain})` }}>
-              {poem.lines.map((line, i) => (
-                <div key={i} className="an-pline an-fx" data-fx="pline">
-                  <span className="an-pline-main">{line}</span>
-                  {poem.lineAids[i] ? <span className="an-pline-aid" style={{ fontSize: `calc(var(--u) * ${sizes.aid})` }}>{poem.lineAids[i]}</span> : null}
-                </div>
-              ))}
-              {poem.notes.length > 0 && (
-                <div className="an-notes an-fx" data-fx="notes" style={{ fontSize: `calc(var(--u) * ${sizes.note})` }}>
-                  {poem.notes.map((n, i) => (
-                    <p key={i}>{n}</p>
-                  ))}
-                </div>
-              )}
-            </div>
-          )}
-
-          <p className="an-who an-fx" data-fx="who" data-testid="animation-who" style={{ fontSize: `calc(var(--u) * ${whoFs})` }}>
-            {view.who}
-          </p>
-          <div className="an-seal an-fx" data-fx="seal" data-testid="animation-seal" aria-hidden="true">
-            {copy.sealText.map((c) => (
-              <span key={c}>{c}</span>
+      <div className={`an-wrap${still ? ' an-wrap-still' : ''}`} ref={wrap}>
+        {still ? (
+          <div className={`an-still-page${view.memorial ? ' an-memorial' : ''}`} style={{ ['--u' as string]: '3.6px' }} data-testid="film-still">
+            {film.lines.map((line, i) => (
+              <section className="an-still-scene" key={i}>
+                <div className="an-art"><img src={sceneUrl(film.scenes[i] ?? '')} alt="" decoding="async" /></div>
+                <p className="an-line an-line-still">{phrases(line).map((p, j) => <span key={j} style={{ opacity: 1 }}>{renderPhrase(p)}</span>)}</p>
+              </section>
             ))}
+            <section className="an-still-final">
+              <div className="an-kanji an-kanji-still notranslate" translate="no" data-testid="film-kanji">{view.glyph}</div>
+              <div className="an-reading an-reading-still notranslate" translate="no">{readingLine(view)}</div>
+              <div className="an-who an-who-still">{phrases(view.who).map((p, i) => <span key={i}>{p}</span>)}</div>
+              <div className="an-seal an-seal-still"><b>{copy.sealText.join('')}</b><small>ICHIREI</small></div>
+            </section>
           </div>
-        </div>
+        ) : (
+          <div
+            ref={frame}
+            className={`an-film${view.memorial ? ' an-memorial' : ''}`}
+            style={{ ['--u' as string]: `${u}px`, width: `${u * 100}px`, height: `${u * 177.78}px` }}
+            role="img"
+            aria-label={copy.alt}
+            translate="no"
+            data-testid="film"
+            data-duration={tl.total}
+            data-scenes={film.scenes.join(',')}
+            data-status={film.status}
+            data-memorial={view.memorial ? 'yes' : 'no'}
+            data-ready={ready ? 'yes' : 'no'}
+            data-ended={ended ? 'yes' : 'no'}
+            onClick={() => (playing ? pause() : play())}
+          >
+            {body}
+          </div>
+        )}
       </div>
 
       <div className="an-controls">
-        {reducedMotion && !forcePlay && canAnimate && (
+        {still && (
           <p className="an-note an-small" data-testid="animation-reduced">
             {copy.reducedNote}{' '}
             <button type="button" className="an-btn" onClick={() => setForcePlay(true)}>
@@ -339,7 +346,12 @@ function Film({ view, strokes, copy }: { view: AnimationView; strokes: StrokeDat
           </p>
         )}
         <div className="an-buttons">
-          <button type="button" className={`an-btn${ended ? ' an-btn-hot' : ''}`} onClick={() => (forcePlay || !reducedMotion ? setPlayKey((k) => k + 1) : setForcePlay(true))} data-testid="animation-replay">
+          {!still && (
+            <button type="button" className="an-btn" onClick={() => (playing ? pause() : play())} data-testid="animation-play">
+              {playing ? copy.pause : copy.play}
+            </button>
+          )}
+          <button type="button" className={`an-btn${ended ? ' an-btn-hot' : ''}`} onClick={() => (still ? setForcePlay(true) : replay())} data-testid="animation-replay">
             {copy.replay}
           </button>
           <button type="button" className="an-btn" onClick={share} data-testid="animation-share">
@@ -355,4 +367,10 @@ function Film({ view, strokes, copy }: { view: AnimationView; strokes: StrokeDat
       </div>
     </>
   )
+}
+
+/** A phrase with its quotation (「…」 or “…”) set in gold, as in the reference film. */
+function renderPhrase(p: string) {
+  const parts = p.split(/(「[^」]*」|『[^』]*』|“[^”]*”)/g).filter((x) => x !== '')
+  return parts.map((x, i) => (/^(「|『|“)/.test(x) ? <span className="an-q" key={i}>{x}</span> : x))
 }

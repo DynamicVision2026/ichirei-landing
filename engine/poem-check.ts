@@ -124,7 +124,7 @@ export function checkContainsCharacter(d: PoemDraft, forms: string[]): string | 
 }
 
 /** English words the occasion forbids (the AI's own rules are in the prompt and the review; this is the cheap backstop). */
-const EN_FORBIDDEN: Record<string, RegExp> = {
+export const EN_FORBIDDEN: Record<string, RegExp> = {
   memorial: /\b(death|dead|dies?|died|dying|funeral|grave|tomb|heaven|afterlife|passed away|gone forever|loss|lost (her|him|them)|late (mother|father|mum|mom|dad))\b/i,
   birthday_milestone: /\b(old age|elderly|ageing|aging|declin\w*|wither\w*|fading|twilight|winter of (life|age)|too old|growing old)\b/i,
   wedding: /\b(goodbye|farewell|separat\w*|divorc\w*|break ?up|parting|leaving|never again)\b/i,

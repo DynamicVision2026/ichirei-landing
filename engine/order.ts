@@ -309,6 +309,8 @@ export interface OrderRecord {
     certificate: Certificate
     /** The poem add-ons (empty when none): the poem as printed, and the price shown. */
     poems: { poem_id: string; type: PoemType; lines: string[]; pattern: string | null; reading: string }[]
+    /** The story film's script (engine/film.ts), written when the order is made; absent while it is being written. */
+    film?: import('./film.ts').FilmRecord
   }
   /** Kept here, never sent to Shopify. `story` is what the sender wrote first; `follow_ups` are their answers to the engine's questions. */
   story: string

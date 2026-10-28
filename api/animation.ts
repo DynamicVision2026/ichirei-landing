@@ -1,6 +1,5 @@
-// GET /api/animation/<id> — what the page /a/<id> plays (the private story animation of one order).
+// GET /api/animation/<id> — what the page /a/<id> plays (the private story film of one order); `film: null` while its script is being written.
 // GET /api/animation/<id>/qr.svg — a QR code of the page's address, for the printed card (the workshop fetches it by id).
-// GET /api/strokes?c=<one character>&script=ja|zh — the stroke-order data of one character (public, open data, cacheable).
 //
 // The id is a private, unguessable link (100 bits): possession of the link is the only access control, as for any shared link. The answers
 // are never cached by shared caches and never indexed. Web-standard handlers like api/order.ts; mounted by server/app.ts.
@@ -8,7 +7,8 @@
 import QRCode from 'qrcode'
 import { ANIMATION_ID_PATTERN, animationUrl, animationView, isAnimationRecord, sampleRecord } from '../engine/animation.ts'
 import { createOrderStore, type OrderStore } from '../engine/order-store.ts'
-import { isOneIdeograph, strokesFor, type StrokeScript } from '../engine/stroke-data.ts'
+import { FILM_RETRY_AFTER_MS, ensureFilm, filmInFlight } from '../engine/film-store.ts'
+import type { FilmInput, FilmRecord } from '../engine/film.ts'
 
 const headers = (extra: Record<string, string> = {}) => ({ 'x-robots-tag': 'noindex, nofollow', ...extra })
 const json = (status: number, body: unknown, extra: Record<string, string> = {}) =>
@@ -17,6 +17,9 @@ const json = (status: number, body: unknown, extra: Record<string, string> = {})
 export interface AnimationDeps {
   store: OrderStore | null
   env?: NodeJS.ProcessEnv
+  now?: () => Date
+  /** Tests: stands in for the film-script call. */
+  film?: (input: FilmInput) => Promise<FilmRecord>
 }
 
 async function load(id: string, d: AnimationDeps) {
@@ -39,7 +42,13 @@ export function createAnimationHandlers(deps: () => AnimationDeps) {
       const r = await load(id, deps())
       if (r.status === 503) return json(503, { error: 'unavailable' }, { 'cache-control': 'no-store' })
       if (r.status === 404) return json(404, { error: 'not_found' }, { 'cache-control': 'no-store' })
-      return json(200, animationView(r.rec), { 'cache-control': 'private, no-store' })
+      let rec = r.rec
+      // No film yet: if one is on its way (or the first try never finished, long ago) look again here — once, briefly — before answering "not yet".
+      const d = deps()
+      if (!rec.film && rec.order_ref !== 'SAMPLE' && d.store && (filmInFlight(rec.id) || (d.now?.() ?? new Date()).getTime() - Date.parse(rec.created_at) > FILM_RETRY_AFTER_MS)) {
+        rec = await ensureFilm(d.store, rec, { make: d.film })
+      }
+      return json(200, animationView(rec), { 'cache-control': 'private, no-store' })
     },
     async qr(id: string): Promise<Response> {
       const d = deps()
@@ -50,16 +59,6 @@ export function createAnimationHandlers(deps: () => AnimationDeps) {
       return new Response(svg, { status: 200, headers: headers({ 'content-type': 'image/svg+xml; charset=utf-8', 'cache-control': 'private, no-store' }) })
     },
   }
-}
-
-/** Stroke data: public open data, so it is cached hard (the answer for a character never changes). */
-export function strokesGet(url: URL): Response {
-  const c = url.searchParams.get('c')
-  const script: StrokeScript = url.searchParams.get('script') === 'zh' ? 'zh' : 'ja'
-  if (!isOneIdeograph(c)) return json(400, { error: 'bad_character' }, { 'cache-control': 'no-store' })
-  const data = strokesFor(c, script)
-  if (!data) return json(404, { error: 'no_strokes' }, { 'cache-control': 'public, max-age=86400' })
-  return json(200, data, { 'cache-control': 'public, max-age=31536000, immutable' })
 }
 
 export const handlers = createAnimationHandlers(() => ({ store: createOrderStore() }))

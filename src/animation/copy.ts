@@ -21,6 +21,10 @@ export interface PageCopy {
   sealText: string[]
   quote: [string, string]
   alt: string
+  /** The quiet screen while the film's script is still being written. */
+  preparing: string
+  play: string
+  pause: string
 }
 
 export const COPY: Record<PageLang, PageCopy> = {
@@ -37,7 +41,10 @@ export const COPY: Record<PageLang, PageCopy> = {
     playAnyway: 'アニメーションを再生する',
     sealText: ['一', '字', '礼'],
     quote: ['「', '」'],
-    alt: 'この一字が書かれていく様子と、あなたの物語',
+    alt: 'あなたの物語の映像。最後に一字が現れます',
+    preparing: '映像を準備しています',
+    play: '再生',
+    pause: '一時停止',
   },
   'zh-Hant': {
     title: '一字禮 — 你的故事',
@@ -52,7 +59,10 @@ export const COPY: Record<PageLang, PageCopy> = {
     playAnyway: '播放動畫',
     sealText: ['一', '字', '禮'],
     quote: ['「', '」'],
-    alt: '這個字一筆一畫寫成的樣子，以及你的故事',
+    alt: '你的故事的影片，最後出現那一個字',
+    preparing: '正在準備影片',
+    play: '播放',
+    pause: '暫停',
   },
   en: {
     title: 'ICHIREI — your story',
@@ -67,6 +77,9 @@ export const COPY: Record<PageLang, PageCopy> = {
     playAnyway: 'Play the animation',
     sealText: ['一', '字', '礼'],
     quote: ['“', '”'],
-    alt: 'The character being written, stroke by stroke, with your story',
+    alt: 'A film of your story; the character appears at the end',
+    preparing: 'Preparing your film',
+    play: 'Play',
+    pause: 'Pause',
   },
 }

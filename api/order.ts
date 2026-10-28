@@ -12,6 +12,8 @@
 // Web-standard handler (like api/select.ts): mounted directly by server/app.ts and usable on Vercel.
 
 import { animationUrl, buildAnimationRecord, newAnimationId } from '../engine/animation.ts'
+import { filmInputFromRecord, filmWaitMs, raceTimeout, trackFilm } from '../engine/film-store.ts'
+import { makeFilm, type FilmInput, type FilmRecord } from '../engine/film.ts'
 import { cleanSession, cleanSource, recordEvent } from '../engine/analytics.ts'
 import { POEM_ID_PATTERN, buildRecord, lineAttributes, newOrderRef, parseOrderRequest, type OrderRecord, type StoredPoem, type ValidOrder } from '../engine/order.ts'
 import { createOrderStore, type OrderStore } from '../engine/order-store.ts'
@@ -35,6 +37,10 @@ export interface OrderDeps {
   palette?: Palette
   /** The site's public address for the animation link (ICHIREI_PUBLIC_URL); tests inject their own. */
   env?: NodeJS.ProcessEnv
+  /** Tests: stands in for the film-script call (production: engine/film.ts). */
+  film?: (input: FilmInput) => Promise<FilmRecord>
+  /** Tests: how long the answer may wait for the film (production: ICHIREI_FILM_WAIT_MS, 8 s). */
+  filmWaitMs?: number
 }
 
 /**
@@ -95,21 +101,45 @@ export function createOrderHandler(deps: () => OrderDeps) {
     const orderRef = newOrderRef(now)
     const record: OrderRecord = buildRecord(order, orderRef, now, poems)
 
-    // The story animation of this order: a small record under a private id, built from what the engine already produced (no model call).
-    // It never blocks the order: without it there is simply no link.
+    // Writes of the order record go one after the other, so a film that finishes late can never be overwritten by an older write.
+    let chain: Promise<unknown> = Promise.resolve()
+    const putOrder = () => {
+      const p = chain.catch(() => {}).then(() => d.store!.put(orderRef, record))
+      chain = p
+      return p
+    }
+
+    // The story film of this order: a small record under a private id (the page reads it), and ONE small model call that writes the film's script
+    // from the story — started now, in parallel with the cart (nothing waits for it for long, and it can never block or fail the order: engine/film.ts
+    // falls back to a generic script). Without a record there is simply no link.
     let animationLink: string | null = null
+    let filmP: Promise<FilmRecord> | null = null
     try {
       const animationId = newAnimationId()
-      await d.store.put(animationId, buildAnimationRecord(record, animationId, now))
+      const anim = buildAnimationRecord(record, animationId, now)
+      await d.store.put(animationId, anim)
       record.animation_id = animationId
       animationLink = animationUrl(animationId, d.env)
+      filmP = trackFilm(
+        animationId,
+        (d.film ?? makeFilm)(filmInputFromRecord(record)).then(async (film) => {
+          try {
+            anim.film = film
+            record.production.film = film
+            await Promise.all([d.store!.put(animationId, anim), putOrder()])
+          } catch (err) {
+            console.error('[ichirei-order] film save failed', orderRef, err instanceof Error ? err.message : err)
+          }
+          return film
+        }),
+      )
     } catch (err) {
       console.error('[ichirei-order] animation record failed', orderRef, err instanceof Error ? err.message : err)
     }
 
     // 2. Keep the story and the result before anything is sold.
     try {
-      await d.store.put(orderRef, record)
+      await putOrder()
     } catch (err) {
       console.error('[ichirei-order] store failed', orderRef, err instanceof Error ? err.message : err)
       return json(503, { error: 'Could not save the order. Nothing was charged; please try again.', code: 'store_failed' })
@@ -121,8 +151,10 @@ export function createOrderHandler(deps: () => OrderDeps) {
       record.status = 'cart_created'
       record.updated_at = (d.now?.() ?? new Date()).toISOString()
       record.shopify = { cart_id: cart.cartId, checkout_url: cart.checkoutUrl, variant_id: cart.variantId }
+      // the film is written while the cart is made; give it a few seconds more at most, then let the buyer go on (it keeps being written)
+      if (filmP) await raceTimeout(filmP, d.filmWaitMs ?? filmWaitMs(d.env))
       try {
-        await d.store.put(orderRef, record)
+        await putOrder()
       } catch (err) {
         // The first write already holds the story and result; the status update is a convenience.
         console.error('[ichirei-order] status update failed', orderRef, err instanceof Error ? err.message : err)
@@ -150,7 +182,7 @@ export function createOrderHandler(deps: () => OrderDeps) {
       record.status = 'cart_failed'
       record.error = message
       record.updated_at = (d.now?.() ?? new Date()).toISOString()
-      await d.store.put(orderRef, record).catch(() => {})
+      await putOrder().catch(() => {})
       return json(502, {
         error: err instanceof ShopifyError ? 'Could not open the checkout. Nothing was charged; please try again.' : 'Could not open the checkout. Please try again.',
         code: 'cart_failed',

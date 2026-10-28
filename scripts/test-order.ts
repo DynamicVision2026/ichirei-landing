@@ -16,6 +16,7 @@ import { FileOrderStore, GcsOrderStore, MemoryOrderStore, createOrderStore } fro
 import { ShopifyError, createCart, loadShopifyConfig } from '../engine/shopify.ts'
 import { loadPalette } from '../engine/palette.ts'
 import { createOrderHandler, type OrderDeps } from '../api/order.ts'
+process.env.ICHIREI_FILM = 'off' // (the film-script call is switched off in this suite: orders here never reach the model)
 
 let failures = 0
 function check(name: string, cond: boolean, detail?: string) {
@@ -248,9 +249,9 @@ check('Shopify refuses the cart → 502 cart_failed with the order_ref; the reco
 check('the customer-facing error does not leak Shopify\'s message or the token', !JSON.stringify(cartFailJ).includes('merchandise') && !JSON.stringify(cartFailJ).includes('shpat_'))
 shopMode = 'ok'
 let writes = 0
-// (the first write is the story animation's record, the second the order's first write, the third its status update)
-const flaky: any = { kind: 'memory', put: async (ref: string, rr: object) => { writes++; if (writes === 3) throw new Error('second write of the order fails'); await memory.put(ref, rr) }, get: async (ref: string) => memory.get(ref) }
-const survive = await call(base(), createOrderHandler(mkDeps({ store: flaky })))
+// (the order's first write is its first write under the order ref, the second its status update; the film never finishes here, so it writes nothing)
+const flaky: any = { kind: 'memory', put: async (ref: string, rr: object) => { if (!ref.startsWith('AN-')) writes++; if (writes === 2) throw new Error('second write of the order fails'); await memory.put(ref, rr) }, get: async (ref: string) => memory.get(ref) }
+const survive = await call(base(), createOrderHandler(mkDeps({ store: flaky, film: () => new Promise(() => {}), filmWaitMs: 0 })))
 check('the status update after the cart fails → the customer still gets the checkout (the first write already holds the story)', survive.status === 200 && ((await survive.json()) as any).checkout_url.startsWith('https://'))
 const logged: string[] = []
 const realLog = console.log, realErr = console.error

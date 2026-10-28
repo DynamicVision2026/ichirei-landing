@@ -13,7 +13,7 @@ import { POST as selectPost } from '../api/select.ts'
 import { POST as orderPost } from '../api/order.ts'
 import { POST as poemPost } from '../api/poem.ts'
 import { POST as trackPost } from '../api/track.ts'
-import { handlers as animationHandlers, strokesGet } from '../api/animation.ts'
+import { handlers as animationHandlers } from '../api/animation.ts'
 import { POST as analyticsPost } from '../api/analytics.ts'
 import { GET as ratesGet } from '../api/rates.ts'
 import { loadTrackConfig } from '../engine/track.ts'
@@ -139,12 +139,11 @@ export function createApp(config: ServerConfig): Hono {
   app.post('/api/explain', requireApiKey, limited(explainLimit), adaptVercelHandler(explainHandler))
   // The included poem: one model call per poem (45 s ceiling), 20 per hour per IP; all four formats are always available.
   app.post('/api/poem', requireApiKey, limited(poemLimit), (c) => poemPost(c.req.raw))
-  // The story animation (/a/<id>): the private view of one order, a QR code of its address, and the open stroke-order data. Generous
+  // The story animation (/a/<id>): the private view of one order and a QR code of its address. Generous
   // per-IP limit (ICHIREI_ANIMATION_LIMIT): a page load makes a handful of calls; this only stops scraping.
   const animationLimit = envRunLimiter('ICHIREI_ANIMATION_LIMIT', { max: 120, minutes: 10 })
   app.get('/api/animation/:id', limited(animationLimit), (c) => animationHandlers.view(c.req.param('id')))
   app.get('/api/animation/:id/qr.svg', limited(animationLimit), (c) => animationHandlers.qr(c.req.param('id')))
-  app.get('/api/strokes', limited(animationLimit), (c) => strokesGet(new URL(c.req.url)))
   app.post('/api/log', adaptVercelHandler(logHandler))
   // Purchase hand-off: stores the story + result under order_ref, creates the Shopify cart.
   app.post('/api/order', (c) => orderPost(c.req.raw))

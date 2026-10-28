@@ -15,6 +15,7 @@ import { chooseReading } from '../engine/romaji.ts'
 import { MemoryOrderStore } from '../engine/order-store.ts'
 import { createOrderHandler } from '../api/order.ts'
 import { CERTIFICATE_LINE_EN } from '../src/order/certificate.ts'
+process.env.ICHIREI_FILM = 'off' // (the film-script call is switched off in this suite: orders here never reach the model)
 
 let failures = 0
 function check(name: string, cond: boolean, detail?: string) {
