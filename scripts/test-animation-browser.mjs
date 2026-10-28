@@ -8,13 +8,16 @@
 // Needs playwright (npm i --no-save playwright) and builds dist/ with ICHIREI_BASE=/ like the other browser tests.
 
 import { execSync } from 'node:child_process'
+import http from 'node:http'
 import { mkdtempSync, mkdirSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { createRequire } from 'node:module'
 import { startServer } from './server-fixtures.mjs'
 
-const { chromium } = createRequire(import.meta.url)('playwright')
+const require = createRequire(import.meta.url)
+const { chromium } = require('playwright')
+const sharp = require('sharp')
 const SHOTS = process.env.E2E_SHOTS_DIR
 if (SHOTS) mkdirSync(SHOTS, { recursive: true })
 let failures = 0
@@ -26,20 +29,58 @@ const check = (name, cond, detail) => {
 execSync('npm run build', { stdio: 'ignore', env: { ...process.env, ICHIREI_BASE: '/' } })
 
 const mk = (id, over, film) => ({ schema: 'animation', order_ref: 'IC-20261028-ABCDEFGH', created_at: '2026-10-28T00:00:00Z', romanization: '', meaning_en: null, moment: 'm', memorial: false, ...over, id, film })
-const ready = (scenes, lines) => ({ status: 'ready', made_at: '2026-10-28T00:00:00Z', scenes, lines })
+const DESC = ['a mother hand placing one flower on a bento box in soft morning window light', 'a young woman seen from behind at a kitchen doorway in pale light', 'two hands passing a lunch box across a desk in afternoon light', 'a woman seen from behind holding a telephone beside a window at dusk']
+const ready = (lines) => ({ status: 'ready', made_at: '2026-10-28T00:00:00Z', pictures: DESC, lines })
 const recs = {
-  ja: mk('AN-jajajajajajajajajaja', { language: 'ja', glyph: '備', reading: 'そなえ・び', who: 'いつも、頼まれる前に備えている人。' }, ready(['S-02', 'S-12', 'S-21', 'S-15'], ['春には、お弁当に\n庭の花を一輪のせてくれた母。', '「もういらない」と断った日も、\n母は静かに台所へ戻った。', '教師になり、生徒に\n自分のお弁当を分けた日、母を思った。', '帰る日の弁当を頼むと、「ちょうど今詰めてたところ」。'])),
-  zh: mk('AN-zhzhzhzhzhzhzhzhzhzh', { language: 'zh-Hant', glyph: '待', reading: 'dài', who: '總是點著燈、在門口等我回家的人。' }, ready(['S-35', 'S-16', 'S-13', 'S-31'], ['每次晚歸，玄關總有一盞燈亮著。', '下雨的夜裡，媽媽撐著傘在門口等。', '我去外地讀書，她在月台上揮著手。', '電話裡她只說：「家裡燈還亮著。」'])),
-  en: mk('AN-enenenenenenenenenen', { language: 'en', glyph: '待', reading: 'まつ', romanization: 'matsu', meaning_en: 'wait', who: 'The one who waited, every single time, without ever being asked.' }, ready(['S-13', 'S-16', 'S-35', 'S-04'], ['Every time I left, she stood\nat the station and waved.', 'When it rained, she was there\nwith an umbrella, before I asked.', 'I came home late, and the shoes\nwere already set by the door.', 'She only said, “The tea is ready.”'])),
-  mem: mk('AN-memmemmemmemmemmemme', { language: 'ja', glyph: '綴', reading: 'つづる', who: '私の名前で、何十通も手紙を書き続けてくれた人。', memorial: true }, ready(['S-14', 'S-22', 'S-38', 'S-40'], ['母は、私の名前で\n何通も手紙を書いてくれた。', '遠くの先生への礼状も、\n祖母への便りも、母の字だった。', '机の上には、あの日の便箋が\n今も重ねてある。', '母の字を読むと、\n私の名前が少し誇らしい。'])),
-  fb: mk('AN-fbfbfbfbfbfbfbfbfbfb', { language: 'ja', glyph: '龍', reading: 'りゅう', who: '背中で語る人。' }, { status: 'fallback', made_at: '2026-10-28T00:00:00Z', scenes: ['S-39', 'S-40'], lines: ['黙って背中で教えてくれた', '背中で語る人。'], reason: 'timeout' }),
-  long: mk('AN-longlonglonglonglong', { language: 'ja', glyph: '憶', reading: 'おく', who: '言葉より先に、いつも手を差し出してくれた人。人の痛みを自分のことのように感じ取る人。' }, ready(['S-01', 'S-03', 'S-05', 'S-07'], ['三十年前の夏、駅のホームで\n何も言わずに水筒を握らせてくれた。', 'あの日の水筒の重さを、\n私は今もはっきり覚えている。', '「ありがとう」と言えないまま、\n季節だけが何度も過ぎていった。', '今年の夏こそ、あの駅のホームで\n黙って水筒を差し出したい。'])),
+  ja: mk('AN-jajajajajajajajajaja', { language: 'ja', glyph: '備', reading: 'そなえ・び', who: 'いつも、頼まれる前に備えている人。' }, ready(['春には、お弁当に\n庭の花を一輪のせてくれた母。', '「もういらない」と断った日も、\n母は静かに台所へ戻った。', '教師になり、生徒に\n自分のお弁当を分けた日、母を思った。', '帰る日の弁当を頼むと、「ちょうど今詰めてたところ」。'])),
+  zh: mk('AN-zhzhzhzhzhzhzhzhzhzh', { language: 'zh-Hant', glyph: '待', reading: 'dài', who: '總是點著燈、在門口等我回家的人。' }, ready(['每次晚歸，玄關總有一盞燈亮著。', '下雨的夜裡，媽媽撐著傘在門口等。', '我去外地讀書，她在月台上揮著手。', '電話裡她只說：「家裡燈還亮著。」'])),
+  en: mk('AN-enenenenenenenenenen', { language: 'en', glyph: '待', reading: 'まつ', romanization: 'matsu', meaning_en: 'wait', who: 'The one who waited, every single time, without ever being asked.' }, ready(['Every time I left, she stood\nat the station and waved.', 'When it rained, she was there\nwith an umbrella, before I asked.', 'I came home late, and the shoes\nwere already set by the door.', 'She only said, “The tea is ready.”'])),
+  mem: mk('AN-memmemmemmemmemmemme', { language: 'ja', glyph: '綴', reading: 'つづる', who: '私の名前で、何十通も手紙を書き続けてくれた人。', memorial: true }, ready(['母は、私の名前で\n何通も手紙を書いてくれた。', '遠くの先生への礼状も、\n祖母への便りも、母の字だった。', '机の上には、あの日の便箋が\n今も重ねてある。', '母の字を読むと、\n私の名前が少し誇らしい。'])),
+  fb: mk('AN-fbfbfbfbfbfbfbfbfbfb', { language: 'ja', glyph: '龍', reading: 'りゅう', who: '背中で語る人。' }, { status: 'fallback', made_at: '2026-10-28T00:00:00Z', pictures: [], lines: ['黙って背中で教えてくれた', '背中で語る人。'], reason: 'timeout' }),
+  long: mk('AN-longlonglonglonglong', { language: 'ja', glyph: '憶', reading: 'おく', who: '言葉より先に、いつも手を差し出してくれた人。人の痛みを自分のことのように感じ取る人。' }, ready(['三十年前の夏、駅のホームで\n何も言わずに水筒を握らせてくれた。', 'あの日の水筒の重さを、\n私は今もはっきり覚えている。', '「ありがとう」と言えないまま、\n季節だけが何度も過ぎていった。', '今年の夏こそ、あの駅のホームで\n黙って水筒を差し出したい。'])),
 }
 // a film still being written: the record is young and has no film (the server asks nobody for it)
 const pend = mk('AN-pendpendpendpendpend', { language: 'ja', glyph: '備', reading: 'そなえ・び', who: 'いつも、頼まれる前に備えている人。', created_at: new Date().toISOString() }, null)
+// a film whose script is saved but whose pictures are not drawn yet: its first open draws them (fake image model + fake picture check below)
+const first = mk('AN-firstfirstfirstfirst', { language: 'ja', glyph: '備', reading: 'そなえ・び', who: 'いつも、頼まれる前に備えている人。' }, ready(recs.ja.film.lines))
 const dir = mkdtempSync(join(tmpdir(), 'ichirei-anim-browser-'))
-for (const r of [...Object.values(recs), pend]) writeFileSync(join(dir, `${r.id}.json`), JSON.stringify(r))
-const server = await startServer({ upstreamUrl: 'http://127.0.0.1:9', env: { ORDER_STORE_DIR: dir, ICHIREI_RATES: 'off', ICHIREI_ANIMATION_LIMIT: 'off' } })
+for (const r of [...Object.values(recs), pend, first]) writeFileSync(join(dir, `${r.id}.json`), JSON.stringify(r))
+// the pictures of the finished films are seeded as the server itself would have saved them (films/<id>/1..4.webp and art.json)
+const shade = (id, i) => ({ r: 190 + ((id.length * 7 + i * 17) % 40), g: 175 + ((i * 29) % 40), b: 150 + ((i * 41) % 50) })
+for (const r of Object.values(recs)) {
+  if (r.film.status !== 'ready') continue
+  mkdirSync(join(dir, 'films', r.id), { recursive: true })
+  for (let i = 1; i <= 4; i++) writeFileSync(join(dir, 'films', r.id, `${i}.webp`), await sharp({ create: { width: 1080, height: 1350, channels: 3, background: shade(r.id, i) } }).webp().toBuffer())
+  writeFileSync(join(dir, 'films', r.id, 'art.json'), JSON.stringify({ schema: 'film-art', id: r.id, status: 'done', started_at: '2026-10-28T00:00:00Z', made_at: '2026-10-28T00:00:00Z', slots: ['ai', 'ai', 'ai', 'ai'], reasons: ['ok', 'ok', 'ok', 'ok'] }))
+}
+const expectedPictures = (rec) => (rec.film.status === 'fallback' ? ['/film/washi-1.webp', '/film/washi-2.webp'] : [1, 2, 3, 4].map((i) => `/api/film/${rec.id}/picture/${i}.webp`))
+// fakes for the first-open flow: Google's image model (a plain image after a short wait) and the picture check (every picture passes)
+const PNG = await sharp({ create: { width: 320, height: 400, channels: 3, background: '#cdbf9f' } }).png().toBuffer()
+let imageCalls = 0
+const vertex = http.createServer(async (req, res) => {
+  for await (const _c of req) void _c
+  imageCalls++
+  await new Promise((r) => setTimeout(r, 700))
+  res.writeHead(200, { 'content-type': 'application/json' })
+  res.end(JSON.stringify({ candidates: [{ content: { parts: [{ inlineData: { mimeType: 'image/png', data: PNG.toString('base64') } }] } }] }))
+})
+const claude = http.createServer(async (req, res) => {
+  let raw = ''
+  for await (const c of req) raw += c
+  const n = JSON.parse(raw).messages[0].content.filter((b) => b.type === 'image').length
+  const sse = (event, data) => res.write(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`)
+  res.writeHead(200, { 'content-type': 'text/event-stream' })
+  sse('message_start', { type: 'message_start', message: { id: 'm', type: 'message', role: 'assistant', model: 'x', content: [], stop_reason: null, stop_sequence: null, usage: { input_tokens: 1, output_tokens: 0 } } })
+  sse('content_block_start', { type: 'content_block_start', index: 0, content_block: { type: 'text', text: '' } })
+  sse('content_block_delta', { type: 'content_block_delta', index: 0, delta: { type: 'text_delta', text: JSON.stringify({ pictures: Array.from({ length: n }, () => ({ ok: true, reason: 'ok' })) }) } })
+  sse('content_block_stop', { type: 'content_block_stop', index: 0 })
+  sse('message_delta', { type: 'message_delta', delta: { stop_reason: 'end_turn', stop_sequence: null }, usage: { output_tokens: 1 } })
+  sse('message_stop', { type: 'message_stop' })
+  res.end()
+})
+await new Promise((r) => vertex.listen(0, '127.0.0.1', r))
+await new Promise((r) => claude.listen(0, '127.0.0.1', r))
+const server = await startServer({ upstreamUrl: `http://127.0.0.1:${claude.address().port}`, env: { ORDER_STORE_DIR: dir, ICHIREI_RATES: 'off', ICHIREI_ANIMATION_LIMIT: 'off', ICHIREI_FILM_IMAGE_BASE: `http://127.0.0.1:${vertex.address().port}`, ICHIREI_FILM_IMAGE_TOKEN: 'tok-browser', ICHIREI_FILM_IMAGE_PROJECT: 'proj-browser', ICHIREI_FILM_DAILY_MAX: '50' } })
 const browser = await chromium.launch({ ...(process.env.CHROMIUM_PATH ? { executablePath: process.env.CHROMIUM_PATH } : {}), args: ['--no-sandbox'] })
 
 const DEVICES = {
@@ -108,7 +149,7 @@ try {
       const per = rec.memorial ? 5.5 : 5
       const total = Number(await page.getAttribute('[data-testid=film]', 'data-duration'))
       const expected = n * per + (rec.memorial ? 15.5 : 10)
-      check(`${label}: the film is ${expected} s (${n} scenes${rec.memorial ? ', remembrance: slower' : ''})`, total === expected && (await page.getAttribute('[data-testid=film]', 'data-scenes')) === rec.film.scenes.join(','), total)
+      check(`${label}: the film is ${expected} s (${n} scenes${rec.memorial ? ', remembrance: slower' : ''})`, total === expected && (await page.getAttribute('[data-testid=film]', 'data-pictures')).split(',').every((u, i) => u.startsWith(expectedPictures(rec)[i])), total)
       const seeIt = []
       for (let i = 0; i < n; i++) {
         await seek(page, per * i + 3)
@@ -118,7 +159,7 @@ try {
         const text = (await page.textContent(`[data-scene="${i}"] .an-line`)).replace(/\s+/g, '')
         const picture = await page.evaluate((k) => document.querySelector(`[data-scene="${k}"] .an-art img`).getAttribute('src'), i)
         const kanji = await op(page, '[data-final]')
-        seeIt.push(here > 0.99 && others.every((o) => o < 0.01) && text === rec.film.lines[i].replace(/\s+/g, '') && picture.endsWith(`/film/scenes/${rec.film.scenes[i]}.webp`) && kanji < 0.01 ? '' : `scene ${i + 1}: here=${here} others=${others} text=${text} pic=${picture} final=${kanji}`)
+        seeIt.push(here > 0.99 && others.every((o) => o < 0.01) && text === rec.film.lines[i].replace(/\s+/g, '') && picture.startsWith(expectedPictures(rec)[i]) && kanji < 0.01 ? '' : `scene ${i + 1}: here=${here} others=${others} text=${text} pic=${picture} final=${kanji}`)
       }
       check(`${label}: scene by scene, only the scene's own picture and its own line are on screen (the picture is the chosen one), the character is not there yet`, seeIt.every((x) => x === ''), seeIt.filter(Boolean).join(' | '))
       await seek(page, per + 0.2)
@@ -158,8 +199,29 @@ try {
     const msg = await page.textContent('[data-testid=animation-preparing]')
     check('a film that is not written yet: a quiet 「映像を準備しています」 screen — no film, no error', msg.includes('映像を準備しています') && !(await page.isVisible('[data-testid=film]').catch(() => false)) && !(await page.isVisible('[data-testid=animation-error]').catch(() => false)))
     writeFileSync(join(dir, `${pend.id}.json`), JSON.stringify({ ...pend, film: recs.ja.film }))
-    await page.waitForSelector('[data-testid=film][data-ready=yes]', { timeout: 9000 })
-    check('…and when the film is saved the page shows it by itself within a few seconds (no reload)', (await page.getAttribute('[data-testid=film]', 'data-status')) === 'ready' && !(await page.isVisible('[data-testid=animation-preparing]').catch(() => false)))
+    await page.waitForSelector('[data-testid=film][data-ready=yes]', { timeout: 20000 })
+    check('…and when the script is saved the page goes on by itself (no reload): it asks for the pictures (the first open), keeps the quiet screen while they are drawn, then plays the film with four pictures from our private route', (await page.getAttribute('[data-testid=film]', 'data-status')) === 'ready' && !(await page.isVisible('[data-testid=animation-preparing]').catch(() => false)) && (await page.getAttribute('[data-testid=film]', 'data-pictures')).split(',').every((u, i) => u.startsWith(`/api/film/${pend.id}/picture/${i + 1}.webp`)) && imageCalls === 4, String(imageCalls))
+    await context.close()
+  }
+
+  // ---- the first open of a film whose script is saved: pictures are drawn now (fake image model), the film plays, a later open is instant ----
+  {
+    const context = await browser.newContext({ locale: 'ja-JP', ...DEVICES['Pixel-class (412×915, Android UA)'] })
+    const before = imageCalls
+    const page = await context.newPage()
+    const errors = []
+    page.on('pageerror', (e) => errors.push(String(e)))
+    const t0 = Date.now()
+    await page.goto(`${server.url}/a/${first.id}`, { waitUntil: 'domcontentloaded' })
+    await page.waitForSelector('[data-testid=animation-preparing]', { timeout: 8000 })
+    const quiet = (await page.textContent('[data-testid=animation-preparing]')).includes('映像を準備しています') && !(await page.isVisible('[data-testid=film]').catch(() => false))
+    await page.waitForSelector('[data-testid=film][data-ready=yes]', { timeout: 30000 })
+    const drawn = imageCalls - before
+    const imgs = await page.evaluate(() => [...document.querySelectorAll('.an-art img')].map((i) => ({ ok: i.complete && i.naturalWidth > 100, src: i.getAttribute('src') })))
+    check('the first open: 「映像を準備しています」 while the pictures are drawn (about a second here), then the film with four real pictures (four image-model calls, loaded from /api/film/<id>/picture/<n>.webp)', quiet && drawn === 4 && imgs.length === 4 && imgs.every((i, k) => i.ok && i.src.startsWith(`/api/film/${first.id}/picture/${k + 1}.webp`)) && errors.length === 0, JSON.stringify({ quiet, drawn, imgs, ms: Date.now() - t0 }))
+    await page.reload({ waitUntil: 'domcontentloaded' })
+    await page.waitForSelector('[data-testid=film][data-ready=yes]', { timeout: 8000 })
+    check('a later open plays at once: no preparing screen and no new image call', imageCalls === before + 4 && !(await page.isVisible('[data-testid=animation-preparing]').catch(() => false)))
     await context.close()
   }
 
@@ -236,6 +298,8 @@ try {
 } finally {
   await browser.close()
   await server.stop()
+  vertex.close()
+  claude.close()
   rmSync(dir, { recursive: true, force: true })
 }
 

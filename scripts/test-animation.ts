@@ -4,13 +4,15 @@
 //
 //   node --experimental-strip-types scripts/test-animation.ts
 
+import http from 'node:http'
 import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
+import sharp from 'sharp'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { ANIMATION_ID_PATTERN, SAMPLE_IDS, SAMPLE_RECORDS, animationSamplesOn, animationUrl, animationView, buildAnimationRecord, isAnimationRecord, newAnimationId, publicUrl, type AnimationRecord } from '../engine/animation.ts'
 import { createAnimationHandlers } from '../api/animation.ts'
 import { createOrderHandler } from '../api/order.ts'
-import { checkFilmScript, fallbackFilm, loadSceneManifest, type FilmInput, type FilmRecord } from '../engine/film.ts'
+import { checkFilmScript, fallbackFilm, type FilmInput, type FilmRecord } from '../engine/film.ts'
 import { FILM_RETRY_AFTER_MS, filmInputFromRecord, filmWaitMs } from '../engine/film-store.ts'
 import { MemoryOrderStore } from '../engine/order-store.ts'
 import { buildRecord, parseOrderRequest } from '../engine/order.ts'
@@ -30,7 +32,7 @@ function check(name: string, cond: boolean, detail?: string) {
 const read = (p: string) => readFileSync(new URL(`../${p}`, import.meta.url), 'utf8')
 const clone = <T,>(x: T): T => JSON.parse(JSON.stringify(x))
 const palette = loadPalette()
-const manifest = loadSceneManifest()
+
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms))
 
 // ---- 1. the id, the record, the view ------------------------------------------------------------------------------------------------------------------
@@ -54,13 +56,13 @@ if (!parsed.ok) throw new Error('fixture order does not parse: ' + parsed.error)
 const orderRec = buildRecord(parsed.order, 'IC-20261028-ABCDEFGH', NOW, [])
 const ID = 'AN-abcdefghjkmnpqrstuvw'
 const rec = buildAnimationRecord(orderRec, ID, NOW)
-const READY: FilmRecord = { status: 'ready', made_at: NOW.toISOString(), scenes: ['S-02', 'S-12', 'S-21', 'S-15'], lines: ['春には、お弁当に\n庭の花を一輪のせてくれた母。', '「もういらない」と断った日も、\n母は静かに台所へ戻った。', '教師になり、生徒に\n自分のお弁当を分けた日、母を思った。', '帰る日の弁当を頼むと、「ちょうど今詰めてたところ」。'] }
+const READY: FilmRecord = { status: 'ready', made_at: NOW.toISOString(), pictures: [...SAMPLE_RECORDS[SAMPLE_IDS.ja].film!.pictures], lines: ['春には、お弁当に\n庭の花を一輪のせてくれた母。', '「もういらない」と断った日も、\n母は静かに台所へ戻った。', '教師になり、生徒に\n自分のお弁当を分けた日、母を思った。', '帰る日の弁当を頼むと、「ちょうど今詰めてたところ」。'] }
 {
   check('(1) the record is built from what the engine already produced — the carved form, "your moment", "who they are", the reading, the remembrance flag — and has no film yet', rec.glyph === '備' && rec.moment === '何も言わずに台所に戻りました' && rec.who.startsWith('毎朝、お弁当') && rec.reading.length > 0 && rec.memorial === false && rec.film === null && rec.language === 'ja' && isAnimationRecord(rec) && !('poem' in rec) && !('script' in rec))
   const text = JSON.stringify(rec)
   check('(1) …and nothing else of the order: no names, no story, no delivery date, no package, no engine result', !['山田', '毎朝お弁当を作ってくれた', '2026-12-01', 'standard', 'candidates', 'sender_name', 'engine_result'].some((x) => text.includes(x)))
   const v = animationView({ ...rec, film: READY })
-  check('(1) the view the page gets drops the order_ref and the dates; the film comes as {status, lines, scenes}; no film = null', !('order_ref' in v) && !('created_at' in v) && v.film?.status === 'ready' && v.film.lines.length === 4 && v.film.scenes.join() === 'S-02,S-12,S-21,S-15' && animationView(rec).film === null)
+  check('(1) the view the page gets drops the order_ref and the dates; the film comes as {status, lines, pictures}; pictures are null until they are drawn; no film = null; an older film that has scene IDs and no descriptions counts as no film', !('order_ref' in v) && !('created_at' in v) && v.film?.status === 'ready' && v.film.lines.length === 4 && v.film.pictures === null && animationView(rec).film === null && animationView({ ...rec, film: { status: 'ready', lines: READY.lines, scenes: ['S-01'] } as never }).film === null)
   const memOrder = parseOrderRequest(orderBody('ja', { engine_result: { ...clone(orderBody('ja').engine_result), occasion: 'memorial' } }), NOW, palette)
   check('(1) the remembrance flag follows the order\'s certificate (memorial occasion → true)', memOrder.ok && buildAnimationRecord(buildRecord(memOrder.order, 'IC-20261028-MEMMEMME', NOW, []), ID, NOW).memorial === true, memOrder.ok ? '' : memOrder.error)
   const fi = filmInputFromRecord(orderRec)
@@ -144,24 +146,115 @@ const READY: FilmRecord = { status: 'ready', made_at: NOW.toISOString(), scenes:
   check('(3) an animation whose order record is gone: 200 with film null, no crash', lonely.status === 200 && ((await lonely.json()) as any).film === null)
 }
 
+// ---- 3b. the first open: drawing the pictures, serving them -------------------------------------------------------------------------------------------------
+{
+  const PNG = await sharp({ create: { width: 300, height: 380, channels: 3, background: '#d8d0bc' } }).png().toBuffer()
+  const mkRig = (over: { image?: () => Promise<unknown>; env?: Record<string, string>; film?: (i: FilmInput) => Promise<FilmRecord> } = {}) => {
+    const store = new MemoryOrderStore()
+    let imageCalls = 0
+    let filmCalls = 0
+    const image = { async generate() { imageCalls++; await sleep(10); await over.image?.(); return { bytes: PNG, model: 'fake' } } }
+    const vision = { messages: { stream: (params: any) => ({ finalMessage: async () => ({ content: [{ type: 'text', text: JSON.stringify({ pictures: params.messages[0].content.filter((b: any) => b.type === 'image').map(() => ({ ok: true, reason: 'ok' })) }) }], usage: { input_tokens: 10, output_tokens: 5 } }) }) } }
+    const logs: string[] = []
+    const film = async (i: FilmInput) => { filmCalls++; return (over.film ?? (async () => READY))(i) }
+    const h = createAnimationHandlers(() => ({ store, env: { ICHIREI_FILM_DAILY_MAX: '100', ...(over.env ?? {}) } as never, now: () => new Date(NOW.getTime() + 120_000), film, image: image as never, vision: vision as never, log: (l) => logs.push(l), pollMs: 10 }))
+    return { store, h, logs, imageCalls: () => imageCalls, filmCalls: () => filmCalls }
+  }
+  const RID = 'AN-renderrenderrender22'
+  const post = async (r: ReturnType<typeof mkRig>, id = RID) => ((await (await r.h.render(id)).json()) as any)
+  {
+    const r = mkRig()
+    await r.store.put(RID, { ...rec, id: RID, film: READY })
+    const before = (await (await r.h.view(RID)).json()) as any
+    const a = await post(r)
+    const pic = await r.h.picture(RID, '2')
+    const bytes = Buffer.from(await pic.arrayBuffer())
+    const meta = await sharp(bytes).metadata()
+    const second = await post(r)
+    const after = (await (await r.h.view(RID)).json()) as any
+    check('(3b) the first open: the view says "script ready, pictures not drawn" (pictures: null); POST /api/film/<id>/render draws the four pictures and answers {state: ready, view} with four private picture addresses', before.film.pictures === null && a.state === 'ready' && a.view.film.pictures.length === 4 && a.view.film.pictures.every((u: string, i: number) => u.startsWith(`/api/film/${RID}/picture/${i + 1}.webp?v=`)) && r.imageCalls() === 4)
+    check('(3b) GET /api/film/<id>/picture/<n>.webp serves the saved WebP (1080×1350) through the server — private cache, never indexed; every later open gets the pictures from the view with no new image call', pic.status === 200 && pic.headers.get('content-type') === 'image/webp' && /^private,/.test(pic.headers.get('cache-control') ?? '') && pic.headers.get('x-robots-tag') === 'noindex, nofollow' && meta.width === 1080 && meta.height === 1350 && second.state === 'ready' && r.imageCalls() === 4 && after.film.pictures.length === 4 && after.film.pictures[0].includes('/picture/1.webp'))
+    const bad = await Promise.all([r.h.picture(RID, '5'), r.h.picture(RID, '0'), r.h.picture(RID, 'x'), r.h.picture('AN-aaaaaaaaaaaaaaaaaaaa', '1'), r.h.picture('../orders', '1'), r.h.picture('IC-20261028-ABCDEFGH', '1')])
+    check('(3b) a picture is served only for a valid id and number 1–4 that exists: 5, 0, a word, an unknown id, a path trick, an order_ref → 404', bad.every((x) => x.status === 404))
+    const none = await createAnimationHandlers(() => ({ store: null })).picture(RID, '1')
+    check('(3b) no store → 503 (never a 404 that looks like a wrong link)', none.status === 503)
+  }
+  {
+    const r = mkRig()
+    await r.store.put(RID, { ...rec, id: RID, film: READY })
+    const [x, y, z] = await Promise.all([post(r), post(r), post(r)])
+    check('(3b) three first opens at once make ONE set of pictures (four image calls in all), and all three get it', r.imageCalls() === 4 && [x, y, z].every((o) => o.state === 'ready' && o.view.film.pictures.length === 4))
+  }
+  {
+    const r = mkRig()
+    await r.store.put('IC-20261028-ABCDEFGH', orderRec)
+    await r.store.put(RID, { ...rec, id: RID, film: null })
+    const a = await post(r)
+    const savedAnim = (await r.store.get(RID)) as AnimationRecord
+    const savedOrder = (await r.store.get('IC-20261028-ABCDEFGH')) as any
+    check('(3b) the script was lost (no film on the record): the same render request writes the script first (from the saved order), saves it on both records, then draws the pictures', a.state === 'ready' && r.filmCalls() === 1 && r.imageCalls() === 4 && savedAnim.film?.status === 'ready' && savedOrder.production.film?.pictures.length === 4)
+    const r2 = mkRig()
+    await r2.store.put('IC-20261028-ABCDEFGH', orderRec)
+    await r2.store.put(RID, { ...rec, id: RID, film: { status: 'ready', made_at: NOW.toISOString(), lines: READY.lines, scenes: ['S-02', 'S-12', 'S-21', 'S-15'] } as never })
+    const b = await post(r2)
+    check('(3b) a film written before pictures came from descriptions (it has scene IDs, no descriptions) is written again on the first open', b.state === 'ready' && r2.filmCalls() === 1 && r2.imageCalls() === 4)
+    const r3 = mkRig()
+    await r3.store.put(RID, { ...rec, id: RID, film: null })
+    const c = await post(r3)
+    check('(3b) the script cannot be written (the order record is gone): the answer is "pending" with film: null — no crash, no image call', c.state === 'pending' && c.view.film === null && r3.imageCalls() === 0)
+  }
+  {
+    const r = mkRig()
+    await r.store.put(RID, { ...rec, id: RID, film: { status: 'fallback', made_at: NOW.toISOString(), lines: ['a', 'b'], pictures: [], reason: 'timeout' } })
+    const a = await post(r)
+    check('(3b) a fallback script has nothing to draw: ready at once with two washi pictures (/film/washi-1.webp, washi-2.webp), no image call', a.state === 'ready' && a.view.film.pictures.join() === '/film/washi-1.webp,/film/washi-2.webp' && r.imageCalls() === 0)
+  }
+  {
+    const r = mkRig({ image: () => sleep(400), env: { ICHIREI_FILM_RENDER_MS: '150' } })
+    await r.store.put(RID, { ...rec, id: RID, film: READY })
+    const t0 = Date.now()
+    const a = await post(r)
+    const quick = Date.now() - t0
+    await sleep(900)
+    const b = await post(r)
+    check('(3b) a render that takes longer than the request may stay open (here 150 ms of a 400 ms set) answers "pending" with no pictures yet; asking again joins it and returns the finished set (no second set)', a.state === 'pending' && a.view.film.pictures === null && quick < 380 && b.state === 'ready' && b.view.film.pictures.length === 4 && r.imageCalls() === 4, `${quick} ms`)
+  }
+  {
+    const r = mkRig({ env: { ICHIREI_FILM_DAILY_MAX: '0.5' } })
+    const r0 = mkRig({ env: { ICHIREI_FILM_DAILY_MAX: '1' } })
+    await r0.store.put(RID, { ...rec, id: RID, film: READY })
+    await r0.store.put('AN-secondsecondsecond22', { ...rec, id: 'AN-secondsecondsecond22', film: READY })
+    const a = await post(r0)
+    const b = await post(r0, 'AN-secondsecondsecond22')
+    void r
+    check('(3b) above the daily limit the answer is {state: deferred} and the view says so (the page shows 「映像は明日お届けします」); nothing is drawn', a.state === 'ready' && b.state === 'deferred' && b.view.film.deferred === true && b.view.film.pictures === null && r0.imageCalls() === 4)
+  }
+  {
+    const r = mkRig()
+    const [missing, bad] = await Promise.all([r.h.render('AN-aaaaaaaaaaaaaaaaaaaa'), r.h.render('IC-20261028-ABCDEFGH')])
+    const down = await createAnimationHandlers(() => ({ store: null })).render(RID)
+    check('(3b) render: an unknown id or an order_ref → 404; no store → 503', missing.status === 404 && bad.status === 404 && down.status === 503)
+  }
+}
+
 // ---- 4. the sample films (for the owner's phone tests) ---------------------------------------------------------------------------------------------------
 {
   const store = new MemoryOrderStore()
   const off = createAnimationHandlers(() => ({ store, env: {} as never }))
   const on = createAnimationHandlers(() => ({ store, env: { ICHIREI_ANIMATION_SAMPLES: 'on' } as never }))
-  check('(4) the four sample ids are valid ids and each has a valid record with a finished film: Japanese, Chinese, English, remembrance', Object.values(SAMPLE_IDS).length === 4 && Object.values(SAMPLE_IDS).every((i) => ANIMATION_ID_PATTERN.test(i) && isAnimationRecord(SAMPLE_RECORDS[i]) && SAMPLE_RECORDS[i].film?.status === 'ready' && SAMPLE_RECORDS[i].film!.lines.length === 4 && SAMPLE_RECORDS[i].film!.scenes.length === 4) && SAMPLE_RECORDS[SAMPLE_IDS.memorial].memorial === true && SAMPLE_RECORDS[SAMPLE_IDS.zh].language === 'zh-Hant' && SAMPLE_RECORDS[SAMPLE_IDS.en].language === 'en')
+  check('(4) the four sample ids are valid ids and each has a valid record with a finished script: four lines and four picture descriptions — Japanese, Chinese, English, remembrance', Object.values(SAMPLE_IDS).length === 4 && Object.values(SAMPLE_IDS).every((i) => ANIMATION_ID_PATTERN.test(i) && isAnimationRecord(SAMPLE_RECORDS[i]) && SAMPLE_RECORDS[i].film?.status === 'ready' && SAMPLE_RECORDS[i].film!.lines.length === 4 && SAMPLE_RECORDS[i].film!.pictures.length === 4) && SAMPLE_RECORDS[SAMPLE_IDS.memorial].memorial === true && SAMPLE_RECORDS[SAMPLE_IDS.zh].language === 'zh-Hant' && SAMPLE_RECORDS[SAMPLE_IDS.en].language === 'en')
   const probs: string[] = []
   for (const r of Object.values(SAMPLE_RECORDS)) {
     const f = r.film!
     // the samples' own stories are not stored; the lines stand in for them, so every check except "quotations are in the story" is real
     const input: FilmInput = { story: f.lines.join('\n'), language: r.language, relationship: null, direction: null, occasion: r.memorial ? 'memorial' : null, occasion_detail: null, memorial: r.memorial, glyph: r.glyph, forms: [r.glyph], who: r.who, moment: r.moment, names: [] }
-    for (const p of checkFilmScript({ lines: f.lines, scenes: f.scenes }, input, manifest, palette)) probs.push(`${r.id}: ${p.code} ${p.detail}`)
+    for (const p of checkFilmScript({ lines: f.lines, pictures: f.pictures }, input, palette)) probs.push(`${r.id}: ${p.code} ${p.detail}`)
   }
   check('(4) every sample script passes the same referee a real one has to pass (lengths, no digits, no character in the lines, no illness words, no blocked characters, scene rules)', probs.length === 0, probs.join(' | '))
-  check('(4) …and a remembrance sample uses a remembrance picture, no sample uses a celebration picture it should not', SAMPLE_RECORDS[SAMPLE_IDS.memorial].film!.scenes.includes('S-38') && !SAMPLE_RECORDS[SAMPLE_IDS.ja].film!.scenes.some((s) => manifest.find((m) => m.id === s)?.memorial_only))
+  check('(4) …and the Japanese sample\'s pictures are written from story 0020 (a bento with one spring flower, a lunch box passed across a desk) — only what the story says', /bento box/.test(SAMPLE_RECORDS[SAMPLE_IDS.ja].film!.pictures[0]) && /lunch box/.test(SAMPLE_RECORDS[SAMPLE_IDS.ja].film!.pictures[2]) && SAMPLE_RECORDS[SAMPLE_IDS.memorial].film!.pictures.every((d) => !/cake|candle|party|festival/i.test(d)))
   check('(4) off by default (and for anything but "on"): a sample id is a plain 404; on: it plays without any order behind it', !animationSamplesOn({} as never) && !animationSamplesOn({ ICHIREI_ANIMATION_SAMPLES: 'off' } as never) && animationSamplesOn({ ICHIREI_ANIMATION_SAMPLES: 'on' } as never) && (await off.view(SAMPLE_IDS.ja)).status === 404 && (await on.view(SAMPLE_IDS.ja)).status === 200)
   const v = (await (await on.view(SAMPLE_IDS.ja)).json()) as any
-  check('(4) the sample view has the shape of a real one (glyph, who, film with four lines and four scenes) and holds no order data; a sample is never "prepared" or retried', v.glyph === '備' && v.film.lines.length === 4 && !('order_ref' in v) && (await on.qr(SAMPLE_IDS.ja)).status === 200 && (await on.view('AN-sample' + 'x'.repeat(11))).status === 404)
+  check('(4) the sample view has the shape of a real one (glyph, who, film with four lines; pictures null until the first open draws them) and holds no order data', v.glyph === '備' && v.film.lines.length === 4 && v.film.pictures === null && !('order_ref' in v) && (await on.qr(SAMPLE_IDS.ja)).status === 200 && (await on.view('AN-sample' + 'x'.repeat(11))).status === 404)
 }
 
 // ---- 5. the order wiring --------------------------------------------------------------------------------------------------------------------------------
@@ -185,7 +278,7 @@ const READY: FilmRecord = { status: 'ready', made_at: NOW.toISOString(), scenes:
   check('(5) an order makes its film with no manual step: the response and the Shopify line item carry the private address (ichirei_animation_url), https://ichirei.soul-id.jp/a/AN-…', res.status === 200 && j.animation_url === link && /^https:\/\/ichirei\.soul-id\.jp\/a\/AN-[a-z2-9]{20}$/.test(link))
   const stored = (await store.get(id)) as AnimationRecord
   const order = (await store.get(j.order_ref)) as any
-  check('(5) …the film is saved on the animation record (what the page plays) AND with the order (production.film, beside the certificate data); the order points to the animation', isAnimationRecord(stored) && stored.film?.status === 'ready' && stored.film.lines.length === 4 && order.production.film?.status === 'ready' && order.production.film.scenes.join() === 'S-02,S-12,S-21,S-15' && order.animation_id === id && stored.order_ref === j.order_ref)
+  check('(5) …the film script is saved on the animation record (what the page plays) AND with the order (production.film, beside the certificate data); the order points to the animation; the pictures are NOT drawn at order time (unpaid orders cost nothing for pictures)', isAnimationRecord(stored) && stored.film?.status === 'ready' && stored.film.lines.length === 4 && order.production.film?.status === 'ready' && order.production.film.pictures.join() === READY.pictures.join() && order.animation_id === id && stored.order_ref === j.order_ref && (await store.getObject(`films/${id}/art.json`)) === null && (await store.getObject(`films/${id}/1.webp`)) === null)
   check('(5) …the film step got the saved story, the language, the carved character and the "who they are" line of this order', inputs.length === 1 && inputs[0].story.includes('ちょうど今詰めてたところ') && inputs[0].glyph === '備' && inputs[0].language === 'ja' && inputs[0].who.startsWith('毎朝'))
   check('(5) …and the cart sees only the link: no story, no film lines in any attribute', !JSON.stringify(carts[0]).includes('台所に戻りました') && !JSON.stringify(carts[0]).includes('庭の花を一輪') && attrs.at(-1)?.key === 'ichirei_animation_url')
   const pub = await post(handler({ env: { ICHIREI_PUBLIC_URL: 'https://example.test' } as never }), orderBody('ja'))
@@ -216,7 +309,7 @@ const READY: FilmRecord = { status: 'ready', made_at: NOW.toISOString(), scenes:
   const fb = await post(handler({ film: async (i) => fallbackFilm(i, 'timeout', NOW) }), orderBody('ja'))
   const fbJ = (await fb.json()) as any
   const fbRec = (await store.get(fbJ.animation_url.split('/').pop())) as AnimationRecord
-  check('(5) the fallback film (two lines, S-39 and S-40) is saved and served like any other; the order is the same', fb.status === 200 && fbRec.film?.status === 'fallback' && fbRec.film.scenes.join() === 'S-39,S-40' && fbRec.film.lines.length === 2 && fbRec.film.lines[0] === '何も言わずに台所に戻りました' && fbRec.film.lines[1].startsWith('毎朝') && fbRec.film.reason === 'timeout')
+  check('(5) the fallback film (two lines, nothing to draw) is saved and served like any other; the order is the same', fb.status === 200 && fbRec.film?.status === 'fallback' && fbRec.film.pictures.length === 0 && fbRec.film.lines.length === 2 && fbRec.film.lines[0] === '何も言わずに台所に戻りました' && fbRec.film.lines[1].startsWith('毎朝') && fbRec.film.reason === 'timeout')
 
   // the animation record may fail without stopping the order
   const failing: any = { kind: 'memory', put: async (ref: string, r: object) => { if (ref.startsWith('AN-')) throw new Error('animation store down'); await store.put(ref, r) }, get: async (ref: string) => store.get(ref), appendJsonl: async () => {} }
@@ -239,8 +332,9 @@ const READY: FilmRecord = { status: 'ready', made_at: NOW.toISOString(), scenes:
 
 // ---- 6. where the model is (and is not) called ------------------------------------------------------------------------------------------------------------
 {
-  const modelFree = ['api/animation.ts', 'engine/animation.ts', 'src/animation/AnimationApp.tsx', 'src/animation/film.ts', 'src/animation/copy.ts', 'src/animation/CreditsApp.tsx']
-  check('(6) playing a film makes no model call: nothing the page or the view uses imports the Anthropic SDK, a model route or the film-script module (api/animation.ts reaches the script writer only through engine/film-store.ts, for a film that was never written)', !modelFree.some((f) => /anthropic|\/api\/(select|explain|poem)|messages\.(stream|create)|from '\.\.\/engine\/film\.ts'.*makeFilm/i.test(read(f))))
+  const modelFree = ['engine/animation.ts', 'src/animation/AnimationApp.tsx', 'src/animation/film.ts', 'src/animation/copy.ts', 'src/animation/CreditsApp.tsx']
+  const api = read('api/animation.ts')
+  check('(6) playing a film makes no model call: the page, its timeline and the view code import no model SDK and call no model route (the page only asks /api/animation and /api/film/<id>/render); api/animation.ts holds the SDK as a TYPE only — the image model and the picture check run only inside the render route, once per film', !modelFree.some((f) => /anthropic|\/api\/(select|explain|poem)|messages\.(stream|create)|\bmakeFilm\b/i.test(read(f))) && /import type Anthropic/.test(api) && !/import Anthropic/.test(api) && /\/api\/film\/\$\{id\}\/render/.test(read('src/animation/AnimationApp.tsx')))
   const page = read('src/animation/AnimationApp.tsx')
   check('(6) the page never plays a film that is not ready: no film → "preparing" screen that asks again every few seconds', page.includes('animation-preparing') && /setTimeout|setInterval/.test(page) && page.includes('data-testid="animation-preparing"'))
 }
@@ -259,9 +353,9 @@ const READY: FilmRecord = { status: 'ready', made_at: NOW.toISOString(), scenes:
     const qr = await fetch(`${server.url}/api/animation/${ID}/qr.svg`)
     const strokes = await fetch(`${server.url}/api/strokes?c=${encodeURIComponent('備')}&script=ja`)
     check('(7) …the QR code is served; the stroke-data route of the first version is gone (the film no longer draws strokes)', qr.status === 200 && (await qr.text()).includes('<svg') && strokes.status !== 200)
-    const manifestRes = await fetch(`${server.url}/film/scenes/manifest.json`)
-    const pic = await fetch(`${server.url}/film/scenes/S-12.webp`)
-    check('(7) the scene library is served as static files: manifest.json and S-12.webp (a swap of a picture is a file copy, no code)', manifestRes.status === 200 && ((await manifestRes.json()) as any[]).length === 40 && pic.status === 200 && (pic.headers.get('content-type') ?? '').includes('image/webp') && (await pic.arrayBuffer()).byteLength > 1000)
+    const washi = await fetch(`${server.url}/film/washi-1.webp`)
+    const gone = await fetch(`${server.url}/film/scenes/S-12.webp`)
+    check('(7) the two washi fallback pictures are static files (/film/washi-1.webp, washi-2.webp); the 40-picture library is gone', washi.status === 200 && (washi.headers.get('content-type') ?? '').includes('image/webp') && (await washi.arrayBuffer()).byteLength > 1000 && !(gone.headers.get('content-type') ?? '').includes('image/webp'))
     const codes: number[] = []
     for (let i = 0; i < 10; i++) codes.push((await fetch(`${server.url}/api/animation/AN-aaaaaaaaaaaaaaaaaaaa`)).status)
     check('(7) scraping is slowed: the per-IP limit (here 8 per 10 minutes, default 120) answers 429 with Retry-After', codes.includes(429) && codes.indexOf(429) > 0, codes.join())
@@ -281,10 +375,70 @@ const READY: FilmRecord = { status: 'ready', made_at: NOW.toISOString(), scenes:
     const a = await fetch(`${sampled.url}/api/animation/${SAMPLE_IDS.ja}`)
     const b = await fetch(`${plain.url}/api/animation/${SAMPLE_IDS.ja}`)
     const page = await fetch(`${sampled.url}/a/${SAMPLE_IDS.memorial}`)
-    check('(7b) the real server: with ICHIREI_ANIMATION_SAMPLES=on the sample film answers 200 and its page is served; without it the same id is a 404', a.status === 200 && ((await a.json()) as any).film.scenes.length === 4 && page.status === 200 && b.status === 404)
+    check('(7b) the real server: with ICHIREI_ANIMATION_SAMPLES=on the sample film answers 200 and its page is served; without it the same id is a 404', a.status === 200 && ((await a.json()) as any).film.lines.length === 4 && page.status === 200 && b.status === 404)
   } finally {
     await sampled.stop()
     await plain.stop()
+    rmSync(dir, { recursive: true, force: true })
+  }
+}
+
+// ---- 7c. the real server: the first open draws the pictures (fake image model + fake picture check), then every open plays at once -------------------------------
+{
+  const PNG = await sharp({ create: { width: 320, height: 400, channels: 3, background: '#d8d0bc' } }).png().toBuffer()
+  const vertexSeen: { url: string; auth: string }[] = []
+  const vertex = http.createServer(async (req, res) => {
+    for await (const _c of req) void _c
+    vertexSeen.push({ url: req.url ?? '', auth: String(req.headers.authorization ?? '') })
+    await sleep(20)
+    res.writeHead(200, { 'content-type': 'application/json' })
+    res.end(JSON.stringify({ candidates: [{ content: { parts: [{ inlineData: { mimeType: 'image/png', data: PNG.toString('base64') } }] } }] }))
+  })
+  const visionSeen: number[] = []
+  const claude = http.createServer(async (req, res) => {
+    let raw = ''
+    for await (const c of req) raw += c
+    const body = JSON.parse(raw)
+    const n = body.messages[0].content.filter((b: any) => b.type === 'image').length
+    visionSeen.push(n)
+    const sse = (event: string, data: unknown) => res.write(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`)
+    res.writeHead(200, { 'content-type': 'text/event-stream' })
+    sse('message_start', { type: 'message_start', message: { id: 'm', type: 'message', role: 'assistant', model: 'x', content: [], stop_reason: null, stop_sequence: null, usage: { input_tokens: 1, output_tokens: 0 } } })
+    sse('content_block_start', { type: 'content_block_start', index: 0, content_block: { type: 'text', text: '' } })
+    sse('content_block_delta', { type: 'content_block_delta', index: 0, delta: { type: 'text_delta', text: JSON.stringify({ pictures: Array.from({ length: n }, () => ({ ok: true, reason: 'ok' })) }) } })
+    sse('content_block_stop', { type: 'content_block_stop', index: 0 })
+    sse('message_delta', { type: 'message_delta', delta: { stop_reason: 'end_turn', stop_sequence: null }, usage: { output_tokens: 1 } })
+    sse('message_stop', { type: 'message_stop' })
+    res.end()
+  })
+  await new Promise<void>((r) => vertex.listen(0, '127.0.0.1', r))
+  await new Promise<void>((r) => claude.listen(0, '127.0.0.1', r))
+  const dir = mkdtempSync(join(tmpdir(), 'ichirei-art-'))
+  const server = await startServer({
+    upstreamUrl: `http://127.0.0.1:${(claude.address() as { port: number }).port}`,
+    env: { ORDER_STORE_DIR: dir, ICHIREI_ANIMATION_SAMPLES: 'on', ICHIREI_ANIMATION_LIMIT: 'off', ICHIREI_FILM_IMAGE_BASE: `http://127.0.0.1:${(vertex.address() as { port: number }).port}`, ICHIREI_FILM_IMAGE_TOKEN: 'tok-server', ICHIREI_FILM_IMAGE_PROJECT: 'proj-server', ICHIREI_FILM_DAILY_MAX: '50' },
+  })
+  try {
+    const sid = SAMPLE_IDS.ja
+    const v0 = (await (await fetch(`${server.url}/api/animation/${sid}`)).json()) as any
+    const t0 = Date.now()
+    const r1 = await fetch(`${server.url}/api/film/${sid}/render`, { method: 'POST' })
+    const j1 = (await r1.json()) as any
+    const took = Date.now() - t0
+    const pic = await fetch(`${server.url}${j1.view.film.pictures[0]}`)
+    const meta = await sharp(Buffer.from(await pic.arrayBuffer())).metadata()
+    const r2 = await fetch(`${server.url}/api/film/${sid}/render`, { method: 'POST' })
+    const j2 = (await r2.json()) as any
+    const v1 = (await (await fetch(`${server.url}/api/animation/${sid}`)).json()) as any
+    check('(7c) the real server, the first open of a sample: the view has no pictures yet; POST /api/film/<id>/render stays open until the four are drawn (four image-model calls with the token, one picture check over all four), then the view has four pictures served from the private store', v0.film.pictures === null && r1.status === 200 && j1.state === 'ready' && j1.view.film.pictures.length === 4 && vertexSeen.length === 4 && vertexSeen.every((v) => v.auth === 'Bearer tok-server' && v.url.includes('/projects/proj-server/')) && visionSeen.join() === '4' && pic.status === 200 && meta.width === 1080 && meta.height === 1350, `${took} ms ${JSON.stringify([vertexSeen.length, visionSeen])}`)
+    check('(7c) …every later open plays at once: the second render and the plain view make no new image or check call and give the same four pictures', j2.state === 'ready' && vertexSeen.length === 4 && visionSeen.length === 1 && v1.film.pictures.join() === j1.view.film.pictures.join())
+    const bad = await fetch(`${server.url}/api/film/AN-aaaaaaaaaaaaaaaaaaaa/render`, { method: 'POST' })
+    const get = await fetch(`${server.url}/api/film/${sid}/render`)
+    check('(7c) an unknown id → 404; the render route is POST only', bad.status === 404 && get.status !== 200)
+  } finally {
+    await server.stop()
+    vertex.close()
+    claude.close()
     rmSync(dir, { recursive: true, force: true })
   }
 }
@@ -302,7 +456,7 @@ const READY: FilmRecord = { status: 'ready', made_at: NOW.toISOString(), scenes:
   check('(8) prefers-reduced-motion gets a still page of the four scenes and the character (with a button to play it anyway); the film pauses while the tab is hidden; the character keeps translate="no"', app.includes('prefers-reduced-motion: reduce') && app.includes('film-still') && app.includes('animation-reduced') && app.includes('visibilitychange') && /translate="no"/.test(app))
   const pkg = JSON.parse(read('package.json'))
   check('(8) the stroke-data packages are gone from the dependencies (KanjiVG, Make Me a Hanzi); qrcode stays', !pkg.dependencies['@madcat/kanjivg'] && !pkg.dependencies['hanzi-writer-data'] && !!pkg.dependencies.qrcode && !existsSync(new URL('../engine/stroke-data.ts', import.meta.url)))
-  check('(8) the image no longer prunes KanjiVG, and the scene pictures ship with the build (public/ → dist/)', !read('Dockerfile').includes('kanjivg') && existsSync(new URL('../public/film/scenes/S-40.webp', import.meta.url)))
+  check('(8) the image no longer prunes KanjiVG; the washi fallback ships with the build (public/ → dist/); sharp (WebP for the pictures) is a runtime dependency', !read('Dockerfile').includes('kanjivg') && existsSync(new URL('../public/film/washi-2.webp', import.meta.url)) && !!pkg.dependencies.sharp && !pkg.devDependencies?.sharp)
 }
 
 console.log(failures === 0 ? '\nAll animation checks passed.' : `\n${failures} animation check(s) FAILED`)

@@ -1,6 +1,6 @@
 ICHIREI — Film Script Prompt (v1)
 
-This prompt writes the SCRIPT of a 30-second film that retells the sender's own story in four short scenes. The film ends with the chosen character as the answer. Nothing here picks a character; it tells the story that leads to it. Reply with one JSON object only.
+This prompt writes the SCRIPT of a 30-second film that retells the sender's own story in four short scenes: four lines of text and, for each, a description of the picture a painter will paint for it. The film ends with the chosen character as the answer. Nothing here picks a character; it tells the story that leads to it. Reply with one JSON object only.
 
 CONTEXT (supplied by the harness — take it as given)
 language: {{ LANGUAGE }}
@@ -22,7 +22,7 @@ THE STORY (the sender's own words; the receiver is the person they describe)
 ```
 
 WHAT TO WRITE
-Four lines, one for each scene, in the order the story happened. Each line tells what happened at one moment — a scene a painter could draw.
+Four lines, one for each scene, in the order the story happened. Each line tells what happened at one moment — a scene a painter could draw. For each line, also one PICTURE DESCRIPTION (rule 7).
 
 RULES
 1. RETELL, NEVER INVENT. Use only events, words and feelings that are in the story. Add no fact, no detail, no cause, no ending the story does not have. If the story says a visit is next month, it stays in the future ("来月" / "next month" — never "today" or "already"). If you are unsure whether something happened, leave it out.
@@ -37,11 +37,14 @@ RULES
    - Wedding: no parting, leaving, breaking, returning words. New baby: no illness, pain or death. School or career: no failure or falling away.
    - GOODWILL: if the story is hostile or mocking toward the receiver, write no film: return {"declined": true}.
    - Never mention a machine, a computer program or "AI".
-7. FOUR SCENES, FOUR DIFFERENT PICTURES. Choose one scene ID for each line from the LIBRARY below — the picture that best fits what that line tells (read its tags and description). All four IDs must be different. Use only IDs from the list. The list already leaves out the pictures that are not allowed for this order.
+7. FOUR PICTURES, FOUR DIFFERENT MOMENTS. For each line write one picture description, in ENGLISH whatever the language of the lines, 15–40 words. It describes ONE moment from the story, the moment of its line, for an ink-wash painter: the people (only as silhouettes, as hands, or seen from behind), the key object or action, the place, the season and the light. Example: "a mother's hand placing one spring flower on an open bento box, soft morning window light". Rules for the pictures:
+   - ONLY WHAT THE STORY SAYS. No new object, place or person. If the story names no setting, use a simple, neutral East Asian home or street; otherwise follow the story's own culture and place.
+   - NO FACES. People appear only as silhouettes, as hands, or seen from behind. Never write smile, eyes, expression or any feature of a face.
+   - NO TEXT of any kind in the picture: no letters, signs, writing, screens with words, logos or brands. (A letter or a card may appear as a folded paper, never as writing.)
+   - No names, no real place names, no schools or companies; no digits; no Japanese or Chinese characters.
+   - NO illness, hospital, injury, blood, funeral or decline image, even if the story mentions it — paint the moment around it. For a remembrance film, no celebration image either (no party, cake, candles, festival, wedding).
+   - Four different moments, in the story's order. Do not name or hint at the chosen character.
 {{ FEEDBACK }}
 
-THE LIBRARY (id — description — tags)
-{{ LIBRARY }}
-
 OUTPUT. Reply with exactly one JSON object and nothing else (no code fence, no commentary):
-{ "lines": ["…", "…", "…", "…"], "scenes": ["S-00", "S-00", "S-00", "S-00"] }
+{ "lines": ["…", "…", "…", "…"], "pictures": ["…", "…", "…", "…"] }

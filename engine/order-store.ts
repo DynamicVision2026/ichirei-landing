@@ -18,9 +18,21 @@ export interface OrderStore {
   get(orderRef: string): Promise<object | null>
   /** Append one JSON line to an object like `analytics/2026-10-25.jsonl` (the learning loop; no story text, no names). */
   appendJsonl(path: string, record: object): Promise<void>
+  /**
+   * The film's pictures and its small state file (films/<animation id>/1.webp … 4.webp, art.json, and the daily render count). Private objects in the
+   * same bucket: nothing here makes an object public, and nothing lists the bucket. `ifAbsent` makes the write a lock: it returns false when the object
+   * already exists (Cloud Storage: ifGenerationMatch=0).
+   */
+  putObject(path: string, body: Buffer | string, contentType: string, opts?: { ifAbsent?: boolean }): Promise<boolean>
+  getObject(path: string): Promise<Buffer | null>
 }
 
-const SAFE_PATH = /^analytics\/\d{4}-\d{2}-\d{2}\.jsonl$/
+const SAFE_OBJECT = /^films\/(AN-[a-z2-9]{20}\/(art\.json|[1-4]\.webp)|renders-\d{4}-\d{2}-\d{2}\.jsonl)$/
+export function assertObjectPath(path: string): void {
+  if (!SAFE_OBJECT.test(path)) throw new Error(`Unsafe object path: ${path.slice(0, 40)}`)
+}
+
+const SAFE_PATH = /^(analytics\/\d{4}-\d{2}-\d{2}|films\/renders-\d{4}-\d{2}-\d{2})\.jsonl$/
 function assertJsonlPath(path: string): void {
   if (!SAFE_PATH.test(path)) throw new Error(`Unsafe analytics path: ${path.slice(0, 40)}`)
 }
@@ -46,6 +58,18 @@ export class MemoryOrderStore implements OrderStore {
     assertJsonlPath(path)
     this.lines.set(path, [...(this.lines.get(path) ?? []), JSON.stringify(record)])
   }
+  readonly objects = new Map<string, { body: Buffer; contentType: string }>()
+  async putObject(path: string, body: Buffer | string, contentType: string, opts: { ifAbsent?: boolean } = {}) {
+    assertObjectPath(path)
+    if (opts.ifAbsent && this.objects.has(path)) return false
+    this.objects.set(path, { body: Buffer.from(body), contentType })
+    return true
+  }
+  async getObject(path: string) {
+    assertObjectPath(path)
+    if (path.startsWith('films/renders-')) return this.lines.has(path) ? Buffer.from(this.lines.get(path)!.join('\n') + '\n') : null
+    return this.objects.get(path)?.body ?? null
+  }
 }
 
 export class FileOrderStore implements OrderStore {
@@ -67,6 +91,33 @@ export class FileOrderStore implements OrderStore {
     const file = join(this.dir, path)
     await mkdir(dirname(file), { recursive: true })
     await appendFile(file, JSON.stringify(record) + '\n', 'utf8') // O_APPEND: whole small lines never interleave
+  }
+  async putObject(path: string, body: Buffer | string, _contentType: string, opts: { ifAbsent?: boolean } = {}) {
+    assertObjectPath(path)
+    const file = join(this.dir, path)
+    await mkdir(dirname(file), { recursive: true })
+    if (opts.ifAbsent) {
+      try {
+        await writeFile(file, body, { flag: 'wx' }) // fails when it exists: a lock
+        return true
+      } catch (e) {
+        if ((e as NodeJS.ErrnoException).code === 'EEXIST') return false
+        throw e
+      }
+    }
+    const tmp = `${file}.${process.pid}.tmp`
+    await writeFile(tmp, body)
+    await rename(tmp, file)
+    return true
+  }
+  async getObject(path: string) {
+    assertObjectPath(path)
+    try {
+      return await readFile(join(this.dir, path))
+    } catch (e) {
+      if ((e as NodeJS.ErrnoException).code === 'ENOENT') return null
+      throw e
+    }
   }
   async get(ref: string) {
     assertRef(ref)
@@ -155,6 +206,30 @@ export class GcsOrderStore implements OrderStore {
       await new Promise((r) => setTimeout(r, 20 + Math.random() * 80 * (attempt + 1)))
     }
     throw new Error('GCS append: gave up after repeated generation conflicts')
+  }
+
+  async putObject(path: string, body: Buffer | string, contentType: string, opts: { ifAbsent?: boolean } = {}) {
+    assertObjectPath(path)
+    // a plain media upload: no predefinedAcl and no ACL entries, so the object keeps the bucket's (private) access
+    const res = await this.doFetch(`${this.api}/upload/storage/v1/b/${encodeURIComponent(this.bucket)}/o?uploadType=media&name=${encodeURIComponent(path)}${opts.ifAbsent ? '&ifGenerationMatch=0' : ''}`, {
+      method: 'POST',
+      headers: { authorization: `Bearer ${await this.token()}`, 'content-type': contentType },
+      body: typeof body === 'string' ? body : new Uint8Array(body),
+      signal: AbortSignal.timeout(30_000),
+    })
+    if (res.status === 412 && opts.ifAbsent) return false
+    if (!res.ok) throw new Error(`GCS put failed: HTTP ${res.status}`)
+    return true
+  }
+  async getObject(path: string) {
+    assertObjectPath(path)
+    const res = await this.doFetch(`${this.api}/storage/v1/b/${encodeURIComponent(this.bucket)}/o/${encodeURIComponent(path)}?alt=media`, {
+      headers: { authorization: `Bearer ${await this.token()}` },
+      signal: AbortSignal.timeout(30_000),
+    })
+    if (res.status === 404) return null
+    if (!res.ok) throw new Error(`GCS get failed: HTTP ${res.status}`)
+    return Buffer.from(await res.arrayBuffer())
   }
 
   async get(ref: string) {

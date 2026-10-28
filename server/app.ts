@@ -106,6 +106,7 @@ export function createApp(config: ServerConfig): Hono {
       callTimeoutMs: ENGINE_CONFIG.CALL_TIMEOUT_MS,
       reviewTimeoutMs: ENGINE_CONFIG.REVIEW_TIMEOUT_MS,
       lexiconMode: lexiconModeFromEnv(),
+      filmPictures: { model: process.env.ICHIREI_FILM_IMAGE_MODEL || 'gemini-3.1-flash-image|gemini-2.5-flash-image', location: process.env.ICHIREI_FILM_IMAGE_LOCATION || 'global', dailyMax: process.env.ICHIREI_FILM_DAILY_MAX || '200' },
       simpleMaxStrokes: simpleMaxStrokes(),
       configured: config,
       applied: serverRef.current
@@ -144,6 +145,11 @@ export function createApp(config: ServerConfig): Hono {
   const animationLimit = envRunLimiter('ICHIREI_ANIMATION_LIMIT', { max: 120, minutes: 10 })
   app.get('/api/animation/:id', limited(animationLimit), (c) => animationHandlers.view(c.req.param('id')))
   app.get('/api/animation/:id/qr.svg', limited(animationLimit), (c) => animationHandlers.qr(c.req.param('id')))
+  // The film's pictures: drawn on the first open (the request stays open until they are done — it holds one image-model run, so a tight per-IP limit),
+  // then served from the private bucket through the server.
+  const filmRenderLimit = envRunLimiter('ICHIREI_FILM_RENDER_LIMIT', { max: 30, minutes: 10 })
+  app.post('/api/film/:id/render', requireApiKey, limited(filmRenderLimit), (c) => animationHandlers.render(c.req.param('id')))
+  app.get('/api/film/:id/picture/:file', limited(animationLimit), (c) => animationHandlers.picture(c.req.param('id'), c.req.param('file').replace(/\.webp$/, '')))
   app.post('/api/log', adaptVercelHandler(logHandler))
   // Purchase hand-off: stores the story + result under order_ref, creates the Shopify cart.
   app.post('/api/order', (c) => orderPost(c.req.raw))

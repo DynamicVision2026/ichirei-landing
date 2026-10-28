@@ -23,6 +23,8 @@ export interface PageCopy {
   alt: string
   /** The quiet screen while the film's script is still being written. */
   preparing: string
+  /** The daily picture limit was reached: the pictures come the next day. */
+  deferred: string
   play: string
   pause: string
 }
@@ -43,6 +45,7 @@ export const COPY: Record<PageLang, PageCopy> = {
     quote: ['「', '」'],
     alt: 'あなたの物語の映像。最後に一字が現れます',
     preparing: '映像を準備しています',
+    deferred: '映像は明日お届けします',
     play: '再生',
     pause: '一時停止',
   },
@@ -61,6 +64,7 @@ export const COPY: Record<PageLang, PageCopy> = {
     quote: ['「', '」'],
     alt: '你的故事的影片，最後出現那一個字',
     preparing: '正在準備影片',
+    deferred: '影片將於明天送達',
     play: '播放',
     pause: '暫停',
   },
@@ -79,6 +83,7 @@ export const COPY: Record<PageLang, PageCopy> = {
     quote: ['“', '”'],
     alt: 'A film of your story; the character appears at the end',
     preparing: 'Preparing your film',
+    deferred: 'Your film will arrive tomorrow',
     play: 'Play',
     pause: 'Pause',
   },

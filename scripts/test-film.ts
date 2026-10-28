@@ -1,4 +1,4 @@
-// The story film's SCRIPT side: the scene library, the referee (every check of the ticket's section 5), the model call with its retry and its
+// The story film's SCRIPT side: the referee (every check on the four lines and the four picture descriptions), the model call with its retry and its
 // fallback, and the logs. A fake model stands in for Haiku (this suite never calls the real one): it proves the plumbing and the checks, NOT
 // what the real model writes — the run script scripts/run-film-db.mjs does that when a key is available.
 //
@@ -7,7 +7,8 @@
 import http from 'node:http'
 import { existsSync, readFileSync } from 'node:fs'
 import { join } from 'node:path'
-import { FALLBACK_SCENES, allowedScenes, buildFilmPrompt, checkFilmScript, fallbackFilm, lineLimits, lineSize, loadFilmPrompt, loadSceneManifest, makeFilm, renderLibrary, type FilmInput } from '../engine/film.ts'
+import { SAMPLE_IDS, SAMPLE_RECORDS } from '../engine/animation.ts'
+import { PICTURE_WORDS, buildFilmPrompt, checkFilmScript, checkPictures, fallbackFilm, lineLimits, lineSize, loadFilmPrompt, makeFilm, pictureWords, type FilmInput } from '../engine/film.ts'
 import { loadPalette } from '../engine/palette.ts'
 
 delete process.env.ICHIREI_FILM
@@ -18,25 +19,6 @@ function check(name: string, cond: boolean, detail?: string) {
 }
 const read = (p: string) => readFileSync(new URL(`../${p}`, import.meta.url), 'utf8')
 const palette = loadPalette()
-const manifest = loadSceneManifest()
-
-// ---- 1. the scene library -------------------------------------------------------------------------------------------------------------------------
-{
-  const ids = manifest.map((s) => s.id)
-  check('(1) the manifest lists the 40 scenes S-01 … S-40, once each, each with tags and a description', ids.length === 40 && new Set(ids).size === 40 && ids.every((id, i) => id === `S-${String(i + 1).padStart(2, '0')}`) && manifest.every((s) => s.tags.length >= 1 && s.desc.length > 5))
-  check('(1) remembrance-only: S-37 and S-38; celebration: S-25, S-30, S-33, S-36 — exactly as the ticket says', manifest.filter((s) => s.memorial_only).map((s) => s.id).join() === 'S-37,S-38' && manifest.filter((s) => s.celebration).map((s) => s.id).join() === 'S-25,S-30,S-33,S-36')
-  const missing = ids.filter((id) => !existsSync(join(import.meta.dirname, '..', 'public', 'film', 'scenes', `${id}.webp`)))
-  check('(1) every scene has a picture file (public/film/scenes/<ID>.webp — the placeholders until the owner\'s ink-wash pictures replace them by name)', missing.length === 0, missing.join())
-  const sharp = (await import('sharp')).default
-  const sizes = await Promise.all(ids.map(async (id) => { const m = await sharp(join(import.meta.dirname, '..', 'public', 'film', 'scenes', `${id}.webp`)).metadata(); return `${m.width}x${m.height}` }))
-  check('(1) …all 1080 × 1350', sizes.every((s) => s === '1080x1350'), [...new Set(sizes)].join())
-  const normal = allowedScenes(manifest, false).map((s) => s.id)
-  const memorial = allowedScenes(manifest, true).map((s) => s.id)
-  check('(1) a normal order may use every scene except the remembrance-only ones (38); a remembrance order every scene except the celebrations (36, incl. S-37 and S-38)', normal.length === 38 && !normal.includes('S-37') && !normal.includes('S-38') && memorial.length === 36 && ['S-25', 'S-30', 'S-33', 'S-36'].every((c) => !memorial.includes(c)) && memorial.includes('S-37'))
-  const lib = renderLibrary(allowedScenes(manifest, false))
-  check('(1) the library in the prompt is generated from the manifest (id — description — tags), one line per allowed scene', lib.split('\n').length === 38 && lib.startsWith('S-01 — Hands cooking in a morning kitchen — parent, food, home, care') && !lib.includes('S-37'))
-  check('(1) the script that makes the manifest and the placeholders never overwrites a picture that is in place', read('scripts/make-film-scenes.mjs').includes('if (existsSync(file)) continue'))
-}
 
 // ---- the 0020 story (the lunchbox story, daughter → mother, 備) ------------------------------------------------------------------------------------------
 const fixture = JSON.parse(read('scripts/fixtures-v8/s0020-mother-thanks.json'))
@@ -47,27 +29,33 @@ const input = (over: Partial<FilmInput> = {}): FilmInput => ({
 })
 const GOOD = {
   lines: ['春には、お弁当に\n庭の花を一輪のせてくれた母。', '「もういらない」と断った日も、\n母は静かに台所へ戻った。', '教師になり、生徒に\n自分のお弁当を分けた日、母を思った。', '帰る日の弁当を頼むと、「ちょうど今詰めてたところ」。'],
-  scenes: ['S-02', 'S-12', 'S-21', 'S-15'],
+  pictures: [...SAMPLE_RECORDS[SAMPLE_IDS.ja].film!.pictures],
 }
-const codes = (raw: unknown, i = input()) => checkFilmScript(raw, i, manifest, palette).map((p) => p.code)
+const codes = (raw: unknown, i = input()) => checkFilmScript(raw, i, palette).map((p) => p.code)
 const withLine = (n: number, line: string) => ({ ...GOOD, lines: GOOD.lines.map((l, i) => (i === n ? line : l)) })
 
 // ---- 2. the referee ---------------------------------------------------------------------------------------------------------------------------------
 {
-  check('(2) the golden script for story 0020 passes every check: four lines in story order, both quotations exact, the character 備 nowhere, scenes S-02 / S-12 / S-21 / S-15', codes(GOOD).length === 0, JSON.stringify(checkFilmScript(GOOD, input(), manifest, palette)))
+  check('(2) the golden script for story 0020 passes every check: four lines in story order, both quotations exact, the character 備 nowhere, four picture descriptions of 15–40 words', codes(GOOD).length === 0, JSON.stringify(checkFilmScript(GOOD, input(), palette)))
   check('(2) the story really contains the quotations the golden script copies (so "exact" means exact)', STORY.includes('もういらない') && STORY.includes('帰るときお弁当作って') && STORY.includes('ちょうど今詰めてたところ'))
-  check('(2) exactly 4 lines and 4 scene IDs: 3 lines, 5 lines, 3 scenes, a missing field, a non-string are all refused', ['', 'x'].length === 2 && codes({ lines: GOOD.lines.slice(0, 3), scenes: GOOD.scenes }).includes('shape') && codes({ lines: [...GOOD.lines, 'x'], scenes: GOOD.scenes }).includes('shape') && codes({ lines: GOOD.lines, scenes: GOOD.scenes.slice(0, 3) }).includes('shape') && codes({ lines: GOOD.lines }).includes('shape') && codes({ lines: [1, 2, 3, 4], scenes: GOOD.scenes }).includes('shape') && codes(null).includes('shape'))
-  check('(2) scene IDs must exist and be different: an unknown ID, a duplicate', codes({ ...GOOD, scenes: ['S-02', 'S-12', 'S-21', 'S-99'] }).includes('scene_ids') && codes({ ...GOOD, scenes: ['S-02', 'S-02', 'S-21', 'S-15'] }).includes('scene_ids'))
-  check('(2) …and allowed for the order: a remembrance-only picture (S-37) for a normal order; a celebration picture (S-36) for a remembrance order; the reverse is fine', codes({ ...GOOD, scenes: ['S-37', 'S-12', 'S-21', 'S-15'] }).includes('scene_ids') && codes({ ...GOOD, scenes: ['S-36', 'S-12', 'S-21', 'S-15'] }, input({ memorial: true })).includes('scene_ids') && codes({ ...GOOD, scenes: ['S-37', 'S-38', 'S-39', 'S-40'] }, input({ memorial: true })).length === 0 && codes({ ...GOOD, scenes: ['S-25', 'S-30', 'S-33', 'S-36'] }).length === 0)
+  check('(2) exactly 4 lines and 4 picture descriptions: 3 lines, 5 lines, 3 pictures, a missing field, a non-string are all refused', codes({ lines: GOOD.lines.slice(0, 3), pictures: GOOD.pictures }).includes('shape') && codes({ lines: [...GOOD.lines, 'x'], pictures: GOOD.pictures }).includes('shape') && codes({ lines: GOOD.lines, pictures: GOOD.pictures.slice(0, 3) }).includes('shape') && codes({ lines: GOOD.lines }).includes('shape') && codes({ lines: [1, 2, 3, 4], pictures: GOOD.pictures }).includes('shape') && codes(null).includes('shape') && codes({ lines: GOOD.lines, scenes: ['S-01', 'S-02', 'S-03', 'S-04'] }).includes('shape'))
+  const withPic = (n: number, d: string) => ({ ...GOOD, pictures: GOOD.pictures.map((x, i) => (i === n ? d : x)) })
+  check('(2) picture length: 15–40 words — 14 and 41 words are refused, 15 and 40 pass', PICTURE_WORDS.min === 15 && PICTURE_WORDS.max === 40 && pictureWords('one two three four five six seven eight nine ten eleven twelve thirteen fourteen') === 14 && codes(withPic(0, 'a hand on a bento box a kitchen counter in soft morning window light with one spring flower')).includes('pic_length') === false && codes(withPic(0, 'a hand on a bento box a kitchen counter soft morning light')).includes('pic_length') && codes(withPic(0, Array(41).fill('flower').join(' '))).includes('pic_length') && !codes(withPic(0, Array(15).fill('hands').join(' '))).includes('pic_length') && !codes(withPic(0, Array(40).fill('hands').join(' '))).includes('pic_length'))
+  check('(2) pictures: no digits, no Japanese or Chinese characters, never the chosen character, never a personal name', codes(withPic(0, GOOD.pictures[0] + ' with 3 flowers')).includes('pic_digits') && codes(withPic(0, GOOD.pictures[0] + ' beside the character 備')).includes('pic_character') && codes(withPic(0, GOOD.pictures[0] + ' 母')).includes('pic_character') && codes(withPic(0, GOOD.pictures[0] + ' with Hanako Yamada'), input({ names: ['Hanako Yamada'] })).includes('pic_blocked'))
+  check('(2) pictures: no face, no text — smile, eyes, expression, text, words, signs, logos, brand, screens with words are refused; silhouettes, hands and backs are fine', ['a smiling mother', 'her eyes closed', 'a gentle expression', 'a sign above the door', 'a poster with text', 'a brand logo on the box', 'a screen showing words'].every((w) => codes(withPic(1, `a mother and daughter at a quiet kitchen doorway in soft morning light, ${w}, seen from behind`)).includes('pic_blocked')) && codes(withPic(1, 'a young woman seen from behind at a kitchen doorway, her mother a silhouette at the stove, hands on a bowl, pale morning light')).length === 0)
+  check('(2) pictures: no illness, hospital, injury, blood or funeral image in any order (even if the story mentions it)', ['a hospital corridor', 'a sickbed by the window', 'a bandage on her hand', 'a coffin in a hall', 'a wheelchair in the garden', 'blood on the floor'].every((w) => codes(withPic(2, `two hands resting on a wooden table in afternoon light by a window, ${w}, a quiet room and a cup of tea`)).includes('pic_blocked')))
+  check('(2) pictures: a remembrance film has no celebration image (party, cake, candles, wedding, festival, balloons); a normal film may', ['a birthday cake', 'candles on a table', 'a wedding bouquet', 'festival lanterns', 'balloons'].every((w) => codes(withPic(3, `a quiet room with two hands resting on a wooden table in soft afternoon light, ${w} beside a window and a cup`), input({ memorial: true, occasion: 'memorial' })).includes('pic_blocked')) && codes(withPic(3, 'a quiet room with two hands resting on a wooden table in soft afternoon light, a birthday cake beside a window and a cup'), input()).length === 0)
+  check('(2) pictures: the four must be four different moments; the occasion\'s forbidden English words apply (a wedding film: no "goodbye")', codes({ ...GOOD, pictures: [GOOD.pictures[0], GOOD.pictures[0], GOOD.pictures[2], GOOD.pictures[3]] }).includes('pic_same') && codes(withPic(0, GOOD.pictures[0] + ' goodbye'), input({ occasion: 'wedding' })).includes('pic_blocked'))
+  check('(2) checkPictures stands alone too (the same function the referee calls) and the sample scripts pass it', checkPictures(GOOD.pictures, input()).length === 0 && Object.values(SAMPLE_RECORDS).every((r) => checkPictures(r.film!.pictures, { glyph: r.glyph, forms: [r.glyph], names: [], memorial: r.memorial, occasion: r.memorial ? 'memorial' : null }).length === 0))
   const lim = lineLimits('ja')
   check('(2) line length: ja 12–28 characters, zh 10–24 characters, en 4–14 words (a line break and spaces do not count)', lim.min === 12 && lim.max === 28 && lineLimits('zh-Hant').min === 10 && lineLimits('zh-Hant').max === 24 && lineLimits('en').min === 4 && lineLimits('en').max === 14 && lineSize('春には、お弁当に\n庭の花を一輪のせてくれた母。', 'ja') === 22 && lineSize('one two  three\nfour', 'en') === 4)
   check('(2) …a ja line of 11 or 29 characters is refused, 12 and 28 pass', codes(withLine(0, '春にはお弁当に庭の花を一輪')).length === 0 && !codes(withLine(0, '短い一行です')).every((c) => c !== 'line_length') && codes(withLine(0, 'あ'.repeat(28))).includes('character') === false && codes(withLine(0, 'あ'.repeat(29))).includes('line_length') && codes(withLine(0, 'あ'.repeat(11))).includes('line_length') && !codes(withLine(0, 'あ'.repeat(12))).includes('line_length') && !codes(withLine(0, 'あ'.repeat(28))).includes('line_length'))
   check('(2) …a line with two line breaks is refused (one at most)', codes(withLine(0, '春には、\nお弁当に\n庭の花を一輪のせた母。')).includes('line_length'))
   const zh = input({ language: 'zh-Hant', occasion: 'parent_day', glyph: '守', forms: ['守'], story: '每次晚歸，媽媽都替我留一盞燈。她說：「家裡的燈還亮著。」' })
-  const zhGood = { lines: ['每次晚歸，玄關總有一盞燈亮著。', '下雨的夜裡，媽媽撐著傘在門口等。', '我出門念書，她在月台上揮著手。', '她只說：「家裡的燈還亮著。」'], scenes: ['S-35', 'S-16', 'S-13', 'S-31'] }
+  const zhGood = { lines: ['每次晚歸，玄關總有一盞燈亮著。', '下雨的夜裡，媽媽撐著傘在門口等。', '我出門念書，她在月台上揮著手。', '她只說：「家裡的燈還亮著。」'], pictures: [...SAMPLE_RECORDS[SAMPLE_IDS.zh].film!.pictures] }
   const en = input({ language: 'en', occasion: 'parent_day', glyph: '待', forms: ['待'], story: 'My mother waited at the station every time. She only said, "The tea is ready."' })
-  const enGood = { lines: ['Every time I left, she stood\nat the station and waved.', 'When it rained, she was there\nwith an umbrella, before I asked.', 'I came home late, and the shoes\nwere already set by the door.', 'She only said, "The tea is ready."'], scenes: ['S-13', 'S-16', 'S-35', 'S-04'] }
-  check('(2) the Chinese and the English golden scripts pass too (zh with its exact quotation, en with straight quotation marks)', codes(zhGood, zh).length === 0 && codes(enGood, en).length === 0, JSON.stringify([checkFilmScript(zhGood, zh, manifest, palette), checkFilmScript(enGood, en, manifest, palette)]))
+  const enGood = { lines: ['Every time I left, she stood\nat the station and waved.', 'When it rained, she was there\nwith an umbrella, before I asked.', 'I came home late, and the shoes\nwere already set by the door.', 'She only said, "The tea is ready."'], pictures: [...SAMPLE_RECORDS[SAMPLE_IDS.en].film!.pictures] }
+  check('(2) the Chinese and the English golden scripts pass too (zh with its exact quotation, en with straight quotation marks)', codes(zhGood, zh).length === 0 && codes(enGood, en).length === 0, JSON.stringify([checkFilmScript(zhGood, zh, palette), checkFilmScript(enGood, en, palette)]))
   check('(2) en length counts words: 3 words and 15 words are refused', codes({ ...enGood, lines: ['too few words', ...enGood.lines.slice(1)] }, en).includes('line_length') && codes({ ...enGood, lines: ['one two three four five six seven eight nine ten eleven twelve thirteen fourteen fifteen', ...enGood.lines.slice(1)] }, en).includes('line_length'))
   check('(2) quotations must be word for word in the story: a changed word, an added comma, an invented quotation in 「」, “ ” or "" are refused; no quotation at all is fine', codes(withLine(1, '「もう要らない」と断った日も、\n母は静かに台所へ戻った。')).includes('quote') && codes(withLine(3, '「帰るとき、お弁当作って」と頼むと、母は笑った。')).includes('quote') && codes(withLine(2, '教師になり、生徒に\n「お腹すいたでしょ」と言った日。')).includes('quote') && codes({ ...enGood, lines: [...enGood.lines.slice(0, 3), 'She only said, "The tea is hot."'] }, en).includes('quote') && codes({ ...enGood, lines: [...enGood.lines.slice(0, 3), 'She only said, “The tea is ready.”'] }, en).length === 0 && codes(withLine(1, '中学に上がった頃、断った日も、\n母は静かに台所へ戻った。')).length === 0)
   check('(2) the chosen character is not in lines 1–4 — in any form (the carved form, the engine form, the old form)', codes(withLine(0, '春には、備えてお弁当に庭の花の母。')).includes('character') && codes(withLine(0, '春には、燈のお弁当に庭の花の母。'), input({ glyph: '灯', forms: ['灯', '燈'] })).includes('character') && codes(zhGood, { ...zh, glyph: '燈', forms: ['燈', '灯'] }).includes('character'))
@@ -119,14 +107,14 @@ const run = async (reps: unknown[], i = input(), m: 'ok' | 'hang' | 'error' = 'o
 const noStory = () => !logs.some((l) => STORY.split(/[。、\n]/).filter((p) => p.length >= 6).some((p) => l.includes(p)) || l.includes('もういらない'))
 {
   const f = await run([GOOD])
-  check('(3) a good script: one call to claude-haiku-5-5, saved as {status: ready, lines, scenes}; logged as film_generated with the scene IDs and the time — no story text', f.status === 'ready' && f.lines.join('|') === GOOD.lines.join('|') && f.scenes.join() === 'S-02,S-12,S-21,S-15' && seen.length === 1 && seen[0].model === 'claude-haiku-5-5' && logs.some((l) => l.includes('"event":"film_generated"') && l.includes('S-02,S-12') === false && l.includes('"S-02"') && l.includes('"ms"')) && noStory(), JSON.stringify([f, logs]))
-  check('(3) the prompt carries the story, the language and context, the character and its who-they-are line, the line limits, the rules, and the library of this order only', seen[0].prompt.includes(STORY) && seen[0].prompt.includes('language: ja') && seen[0].prompt.includes('parent_mother') && seen[0].prompt.includes('ja: each line') === false && seen[0].prompt.includes('Japanese: each line 12–28 characters') && seen[0].prompt.includes('いつも、頼まれる前に備えている人。') && seen[0].prompt.includes('S-02 — Bento with one flower on top') && !seen[0].prompt.includes('S-37') && seen[0].prompt.includes('RETELL, NEVER INVENT') && !/\{\{ [A-Z_]+ \}\}/.test(seen[0].prompt))
+  check('(3) a good script: one call to claude-haiku-5-5, saved as {status: ready, lines, pictures}; logged as film_generated with the picture count and the time — no story text', f.status === 'ready' && f.lines.join('|') === GOOD.lines.join('|') && f.pictures.join('|') === GOOD.pictures.join('|') && seen.length === 1 && seen[0].model === 'claude-haiku-5-5' && logs.some((l) => l.includes('"event":"film_generated"') && l.includes('"pictures":4') && l.includes('"ms"')) && noStory() && !logs.some((l) => l.includes('bento')), JSON.stringify([f, logs]))
+  check('(3) the prompt carries the story, the language and context, the character and its who-they-are line, the line limits and the picture rules; nothing about a library any more', seen[0].prompt.includes(STORY) && seen[0].prompt.includes('language: ja') && seen[0].prompt.includes('parent_mother') && seen[0].prompt.includes('Japanese: each line 12–28 characters') && seen[0].prompt.includes('いつも、頼まれる前に備えている人。') && seen[0].prompt.includes('RETELL, NEVER INVENT') && seen[0].prompt.includes('PICTURE DESCRIPTION') && seen[0].prompt.includes('NO FACES') && !/LIBRARY|scene ID|S-0\d/.test(seen[0].prompt) && !/\{\{ [A-Z_]+ \}\}/.test(seen[0].prompt))
   await run([GOOD], input({ memorial: true, occasion: 'memorial' }))
-  check('(3) a remembrance film: the library has S-37 and S-38 and no celebration picture; the prompt says the receiver has died and asks for the remembering voice', seen[0].prompt.includes('S-37 — Altar with a flower and incense') && !seen[0].prompt.includes('S-36') && !seen[0].prompt.includes('S-25') && seen[0].prompt.includes('remembering voice'))
+  check('(3) a remembrance film: the prompt says the receiver has died, asks for the remembering voice and for no celebration image', seen[0].prompt.includes('remembering voice') && seen[0].prompt.includes('no celebration image either') && seen[0].prompt.includes('remembrance: yes'))
   const r = await run([withLine(1, '「もう要らない」と断った日も、\n母は静かに台所へ戻った。'), GOOD])
   check('(3) a script that fails a check is retried once with the failed check fed back — the second (good) one is used; film_retry is logged with a reason code only', r.status === 'ready' && seen.length === 2 && seen[1].prompt.includes('YOUR PREVIOUS SCRIPT FAILED') && seen[1].prompt.includes('word for word') && logs.some((l) => l.includes('"event":"film_retry"') && l.includes('"reason":"quote"')) && noStory(), JSON.stringify(logs))
   const f2 = await run([withLine(1, '「もう要らない」と断った日も、\n母は静かに台所へ戻った。')])
-  check('(3) two failed tries → the fallback script (the "your moment" line, the "who they are" line, scenes S-39 and S-40), film_fallback logged with the reason and no story text', f2.status === 'fallback' && f2.lines.join('|') === '「ちょうど今詰めてたところ」|いつも、頼まれる前に備えている人。' && f2.scenes.join() === 'S-39,S-40' && f2.reason === 'quote' && logs.some((l) => l.includes('"event":"film_fallback"') && l.includes('"reason":"quote"')) && seen.length === 2 && noStory(), JSON.stringify(f2))
+  check('(3) two failed tries → the fallback script (the "your moment" line, the "who they are" line, no pictures to draw), film_fallback logged with the reason and no story text', f2.status === 'fallback' && f2.lines.join('|') === '「ちょうど今詰めてたところ」|いつも、頼まれる前に備えている人。' && f2.pictures.length === 0 && f2.reason === 'quote' && logs.some((l) => l.includes('"event":"film_fallback"') && l.includes('"reason":"quote"')) && seen.length === 2 && noStory(), JSON.stringify(f2))
   const f3 = await run(['I cannot write that.'])
   check('(3) an unreadable reply (twice) → fallback, reason parse', f3.status === 'fallback' && f3.reason === 'parse' && seen.length === 2)
   const f4 = await run([{ declined: true }])
@@ -149,16 +137,16 @@ const noStory = () => !logs.some((l) => STORY.split(/[。、\n]/).filter((p) => 
   process.env.ANTHROPIC_BASE_URL = savedBase
   check('(3) with no model key at all: the fallback, quickly, nothing thrown', f8.status === 'fallback' && seen.length === 0)
   const fb = fallbackFilm({ moment: '  moment  ', who: 'who' }, 'x', new Date('2026-10-28T00:00:00Z'))
-  check('(3) the fallback script is data only: two lines, S-39 and S-40, status fallback, no story', fb.status === 'fallback' && fb.lines.join() === 'moment,who' && FALLBACK_SCENES.join() === 'S-39,S-40' && fb.scenes.join() === 'S-39,S-40')
+  check('(3) the fallback script is data only: two lines, no picture descriptions, status fallback, no story', fb.status === 'fallback' && fb.lines.join() === 'moment,who' && fb.pictures.length === 0)
 }
 
 // ---- 4. the prompt file ------------------------------------------------------------------------------------------------------------------------------
 {
   const p = loadFilmPrompt()
-  check('(4) engine/film-prompt.md carries the ticket\'s rules: retell never invent, the sender\'s voice and exact quotations, the line lengths, the character not named, privacy (no names, places, numbers), every engine safety rule (illness and decline, rebirth for 還暦, dignity, goodwill), four different scene IDs from the library, the JSON shape', ['RETELL, NEVER INVENT', 'EXACTLY', 'LINE LENGTH', 'DO NOT NAME THE CHARACTER', 'PRIVACY', 'No illness, hospital', 'REBIRTH', 'Dignity', 'GOODWILL', 'FOUR DIFFERENT PICTURES', '"scenes"'].every((n) => p.includes(n)))
+  check('(4) engine/film-prompt.md carries the ticket\'s rules: retell never invent, the sender\'s voice and exact quotations, the line lengths, the character not named, privacy (no names, places, numbers), every engine safety rule (illness and decline, rebirth for 還暦, dignity, goodwill), four picture descriptions (only what the story says, no faces, no text, no illness), the JSON shape', ['RETELL, NEVER INVENT', 'EXACTLY', 'LINE LENGTH', 'DO NOT NAME THE CHARACTER', 'PRIVACY', 'No illness, hospital', 'REBIRTH', 'Dignity', 'GOODWILL', 'FOUR PICTURES, FOUR DIFFERENT MOMENTS', 'ONLY WHAT THE STORY SAYS', 'NO FACES', 'NO TEXT', '"pictures"'].every((n) => p.includes(n)))
   check('(4) a future plan stays in the future (the 0020 story: "来月帰ります") — the prompt says it', p.includes('stays in the future'))
   check('(4) the prompt never says "AI" to the model about the customer-facing text (the word AI is forbidden in the lines)', p.includes('"AI"') && !/AI-generated|generated by AI/i.test(p))
-  const long = buildFilmPrompt(input({ story: 'x {{ FEEDBACK }} y' }), manifest)
+  const long = buildFilmPrompt(input({ story: 'x {{ FEEDBACK }} y' }))
   check('(4) a slot-like text inside the story is not substituted (one pass over the template\'s own slots)', long.includes('x {{ FEEDBACK }} y'))
 }
 
@@ -178,7 +166,7 @@ const noStory = () => !logs.some((l) => STORY.split(/[。、\n]/).filter((p) => 
       const s = sick[col('test_story_ja')]
       const sentence = s.split(/[。]/).find((x) => /入院|病気|病院|がん|癌|認知症|介護/.test(x)) ?? ''
       const line = sentence.slice(0, 24)
-      check('(5) a line copied from a story that mentions illness is refused by the referee (illness never reaches the film) — taken from the database, no model involved', codes({ lines: [line, GOOD.lines[1], GOOD.lines[2], GOOD.lines[3]], scenes: GOOD.scenes }, input({ story: s, forms: ['零'], glyph: '零', names: [] })).includes('illness'), line)
+      check('(5) a line copied from a story that mentions illness is refused by the referee (illness never reaches the film) — taken from the database, no model involved', codes({ lines: [line, GOOD.lines[1], GOOD.lines[2], GOOD.lines[3]], pictures: GOOD.pictures }, input({ story: s, forms: ['零'], glyph: '零', names: [] })).includes('illness'), line)
     }
   } else {
     console.log('SKIP  (5) the story database is not in this checkout')

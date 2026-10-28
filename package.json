@@ -19,7 +19,8 @@
     "pinyin-pro": "^3.29.5",
     "qrcode": "^1.5.4",
     "react": "^19.2.7",
-    "react-dom": "^19.2.7"
+    "react-dom": "^19.2.7",
+    "sharp": "^0.35.5"
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4.3.2",
@@ -32,7 +33,6 @@
     "autoprefixer": "^10.5.2",
     "oxlint": "^1.71.0",
     "postcss": "^8.5.16",
-    "sharp": "^0.35.5",
     "tailwindcss": "^4.3.2",
     "typescript": "~6.0.2",
     "vite": "^8.1.1"

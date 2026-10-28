@@ -5,15 +5,14 @@ import type { AnimationView } from './types.ts'
 import './animation.css'
 
 // The story film page /a/<id>: a 30-second film that RETELLS the customer's own story in four short scenes and ends with the chosen character as
-// the answer. Fixed template, the same for every order; the script (four lines, four picture IDs) was written once when the order was made and is
-// saved with it — nothing is generated when the film is played. The timing and every frame's maths are src/animation/film.ts; this file draws them.
-// prefers-reduced-motion gets a still page (the four scenes, then the character). While the script is still being written the page waits quietly.
+// the answer. Fixed template, the same for every order; the script (four lines, four picture descriptions) was written once when the order was made and
+// the four pictures were drawn once, on the first open (POST /api/film/<id>/render) — both are saved, nothing is generated when the film is played. The timing and every frame's maths are src/animation/film.ts; this file draws them.
+// prefers-reduced-motion gets a still page (the four scenes, then the character). While the script or the pictures are still being made the page waits quietly.
 
 const FONT_CSS =
   'https://fonts.googleapis.com/css2?family=Zen+Old+Mincho:wght@400;700;900&family=Noto+Serif+JP:wght@300;400;600&family=Noto+Serif+TC:wght@400;600;900&family=Cormorant+Garamond:ital,wght@0,400;0,500;1,400&family=Inter:wght@300;400&display=swap'
 
 const idFromPath = () => window.location.pathname.match(/^\/a\/([A-Za-z0-9-]{3,64})\/?$/)?.[1] ?? null
-const sceneUrl = (id: string) => `/film/scenes/${encodeURIComponent(id)}.webp`
 
 type Load = { state: 'loading' } | { state: 'error'; kind: 'notFound' | 'unavailable' } | { state: 'ready'; view: AnimationView }
 
@@ -67,6 +66,34 @@ export default function AnimationApp() {
     }
   }, [id])
 
+  // the script is there but the pictures are not drawn yet: this is the first open — ask for them. The request stays open until they are done
+  // (the server holds it so Cloud Run keeps the CPU); "pending" means ask again. Two opens draw one set (the server's lock).
+  const needsPictures = load.state === 'ready' && !!load.view.film && load.view.film.pictures === null && !load.view.film.deferred
+  useEffect(() => {
+    if (!needsPictures || !id) return
+    const ac = new AbortController()
+    let timer: ReturnType<typeof setTimeout> | undefined
+    const go = async () => {
+      try {
+        const res = await fetch(`/api/film/${id}/render`, { method: 'POST', signal: ac.signal })
+        if (!res.ok) {
+          timer = setTimeout(go, 5000)
+          return
+        }
+        const j = (await res.json()) as { state: string; view: AnimationView }
+        setLoad({ state: 'ready', view: j.view })
+        if (j.state === 'pending') timer = setTimeout(go, 3000)
+      } catch {
+        if (!ac.signal.aborted) timer = setTimeout(go, 5000)
+      }
+    }
+    void go()
+    return () => {
+      ac.abort()
+      if (timer) clearTimeout(timer)
+    }
+  }, [needsPictures, id])
+
   return (
     <main className={`an-page${load.state === 'ready' && load.view.memorial ? ' an-memorial' : ''}`} data-testid="animation-page" lang={lang}>
       {load.state === 'loading' && <p className="an-note">{copy.loading}</p>}
@@ -75,13 +102,18 @@ export default function AnimationApp() {
           {load.kind === 'notFound' ? copy.notFound : copy.unavailable}
         </p>
       )}
-      {load.state === 'ready' && !load.view.film && (
+      {load.state === 'ready' && !load.view.film?.pictures && !load.view.film?.deferred && (
         <p className="an-note an-preparing" role="status" data-testid="animation-preparing">
           {copy.preparing}
           <span className="an-dots" aria-hidden="true" />
         </p>
       )}
-      {load.state === 'ready' && load.view.film && <Film key={load.view.id} view={load.view} film={load.view.film} copy={copy} />}
+      {load.state === 'ready' && load.view.film?.deferred && !load.view.film.pictures && (
+        <p className="an-note" role="status" data-testid="animation-deferred">
+          {copy.deferred}
+        </p>
+      )}
+      {load.state === 'ready' && load.view.film?.pictures && <Film key={load.view.id} view={load.view} film={{ ...load.view.film, pictures: load.view.film.pictures }} copy={copy} />}
     </main>
   )
 }
@@ -92,7 +124,9 @@ function readingLine(view: AnimationView): string {
   return view.reading
 }
 
-function Film({ view, film, copy }: { view: AnimationView; film: NonNullable<AnimationView['film']>; copy: PageCopy }) {
+type ReadyFilm = Omit<NonNullable<AnimationView['film']>, 'pictures'> & { pictures: string[] }
+
+function Film({ view, film, copy }: { view: AnimationView; film: ReadyFilm; copy: PageCopy }) {
   const wrap = useRef<HTMLDivElement>(null)
   const frame = useRef<HTMLDivElement>(null)
   const [u, setU] = useState(3.6) // px per unit: the frame is 100 units wide
@@ -129,13 +163,13 @@ function Film({ view, film, copy }: { view: AnimationView; film: NonNullable<Ani
   // pictures and fonts first (a few seconds at most), so the film does not stutter at its start
   useEffect(() => {
     let alive = true
-    const imgs = film.scenes.map((s) => new Promise<void>((res) => { const im = new Image(); im.onload = im.onerror = () => res(); im.src = sceneUrl(s) }))
+    const imgs = film.pictures.map((s) => new Promise<void>((res) => { const im = new Image(); im.onload = im.onerror = () => res(); im.src = s }))
     const fonts = document.fonts?.ready ?? Promise.resolve()
     void Promise.race([Promise.all([...imgs, fonts]), new Promise((r) => setTimeout(r, 4000))]).then(() => alive && setReady(true))
     return () => {
       alive = false
     }
-  }, [film.scenes])
+  }, [film.pictures])
 
   /** Apply the frame at time `sec` (direct style writes, like the hand-made reference: smooth and cheap on a phone). */
   const render = useCallback(
@@ -262,9 +296,9 @@ function Film({ view, film, copy }: { view: AnimationView; film: NonNullable<Ani
   const body = (
     <>
       {film.lines.map((line, i) => (
-        <div className="an-scene" data-scene={i} data-scene-id={film.scenes[i]} key={i}>
+        <div className="an-scene" data-scene={i} data-picture={film.pictures[i]} key={i}>
           <div className="an-art">
-            <img src={sceneUrl(film.scenes[i] ?? '')} alt="" decoding="async" draggable={false} />
+            <img src={film.pictures[i]} alt="" decoding="async" draggable={false} />
           </div>
           <p className="an-line" data-testid="film-line">
             {phrases(line).map((p, j) => (
@@ -303,7 +337,7 @@ function Film({ view, film, copy }: { view: AnimationView; film: NonNullable<Ani
           <div className={`an-still-page${view.memorial ? ' an-memorial' : ''}`} style={{ ['--u' as string]: '3.6px' }} data-testid="film-still">
             {film.lines.map((line, i) => (
               <section className="an-still-scene" key={i}>
-                <div className="an-art"><img src={sceneUrl(film.scenes[i] ?? '')} alt="" decoding="async" /></div>
+                <div className="an-art"><img src={film.pictures[i]} alt="" decoding="async" /></div>
                 <p className="an-line an-line-still">{phrases(line).map((p, j) => <span key={j} style={{ opacity: 1 }}>{renderPhrase(p)}</span>)}</p>
               </section>
             ))}
@@ -324,7 +358,7 @@ function Film({ view, film, copy }: { view: AnimationView; film: NonNullable<Ani
             translate="no"
             data-testid="film"
             data-duration={tl.total}
-            data-scenes={film.scenes.join(',')}
+            data-pictures={film.pictures.join(',')}
             data-status={film.status}
             data-memorial={view.memorial ? 'yes' : 'no'}
             data-ready={ready ? 'yes' : 'no'}

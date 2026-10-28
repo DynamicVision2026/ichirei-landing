@@ -5,7 +5,7 @@
 // makeFilm never throws.
 //
 // Env: ICHIREI_FILM_MODEL (default claude-haiku-5-5), ICHIREI_FILM_TIMEOUT_MS (30000 per call), ICHIREI_FILM=off (always the fallback).
-// Logs (no story text — codes, counts and scene IDs only): [ichirei-film] film_generated | film_retry | film_fallback.
+// Logs (no story text — codes and counts only): [ichirei-film] film_generated | film_retry | film_fallback.
 
 import Anthropic from '@anthropic-ai/sdk'
 import { readFileSync } from 'node:fs'
@@ -18,21 +18,15 @@ import { loadPalette, type Palette } from './palette.ts'
 import { EN_FORBIDDEN, checkPalette, type PoemDraft } from './poem-check.ts'
 
 export const FILM_TIMEOUT_MS = 30_000
-export const FALLBACK_SCENES = ['S-39', 'S-40'] as const
 
-export interface SceneInfo {
-  id: string
-  tags: string[]
-  desc: string
-  memorial_only: boolean
-  celebration: boolean
-}
-
-/** What is saved with the order and played by /a/<id>. `fallback` = the generic script (the moment, the who-they-are line, two quiet scenes). */
+/**
+ * What is saved with the order and played by /a/<id>. `ready` = four lines and four picture descriptions (English, one moment of the story each).
+ * `fallback` = the generic script (the moment, the who-they-are line) over plain washi pictures: no descriptions, nothing to draw.
+ */
 export interface FilmRecord {
   status: 'ready' | 'fallback'
   lines: string[]
-  scenes: string[]
+  pictures: string[]
   made_at: string
   /** fallback only: why (a code, never story text). */
   reason?: string
@@ -57,32 +51,6 @@ export interface FilmInput {
   /** Names of the sender and the receiver, as typed on the order form (never allowed in a line). */
   names: string[]
 }
-
-// ---- the scene library --------------------------------------------------------------------------------------------------------------------------
-
-let manifestCache: SceneInfo[] | null = null
-
-/** The manifest next to the pictures: dist/film/scenes/manifest.json in the container, public/film/scenes/manifest.json in the repo. */
-export function loadSceneManifest(): SceneInfo[] {
-  if (manifestCache) return manifestCache
-  const here = dirname(fileURLToPath(import.meta.url))
-  const candidates = [process.env.ICHIREI_FILM_MANIFEST, join(process.cwd(), 'dist', 'film', 'scenes', 'manifest.json'), join(here, '..', 'dist', 'film', 'scenes', 'manifest.json'), join(process.cwd(), 'public', 'film', 'scenes', 'manifest.json'), join(here, '..', 'public', 'film', 'scenes', 'manifest.json')].filter((x): x is string => Boolean(x))
-  for (const p of candidates) {
-    try {
-      const j = JSON.parse(readFileSync(p, 'utf8')) as SceneInfo[]
-      if (Array.isArray(j) && j.length >= 4 && j.every((s) => typeof s.id === 'string' && Array.isArray(s.tags))) return (manifestCache = j)
-    } catch {
-      // try the next place
-    }
-  }
-  throw new Error('the film scene manifest (film/scenes/manifest.json) was not found')
-}
-
-/** The scenes an order may use: a remembrance film never gets a celebration picture, any other film never a remembrance-only one. */
-export const allowedScenes = (manifest: SceneInfo[], memorial: boolean): SceneInfo[] => manifest.filter((s) => (memorial ? !s.celebration : !s.memorial_only))
-
-/** The library as the prompt shows it — generated from the manifest, never typed by hand. */
-export const renderLibrary = (scenes: SceneInfo[]): string => scenes.map((s) => `${s.id} — ${s.desc} — ${s.tags.join(', ')}`).join('\n')
 
 // ---- the referee --------------------------------------------------------------------------------------------------------------------------------
 
@@ -110,24 +78,54 @@ const ILLNESS: Record<'ja' | 'zh' | 'en', RegExp> = {
 
 const QUOTES: RegExp[] = [/「([^」]*)」/g, /『([^』]*)』/g, /“([^”]*)”/g, /"([^"]*)"/g]
 
+// ---- the picture descriptions -------------------------------------------------------------------------------------------------------------------
+
+export const PICTURE_WORDS = { min: 15, max: 40 }
+
+/** Words that ask the painter for a face, for writing, or for what a picture must never show. */
+const PICTURE_FACE_TEXT = /\b(faces?|facial|smil\w+|eyes?|eyebrows?|expressions?|lips|mouth|text|words?|captions?|subtitles?|signboards?|signs?|logos?|brands?|labels?|letters? of|handwriting|calligraphy|writing on|poster|banner|screens? (with|showing|displaying))\b/i
+const PICTURE_UNSAFE = /\b(blood|bloody|injur\w+|wounds?|bandages?|funeral|coffin|casket|cremation|corpse|naked|nude|weapons?|knife|gun|violen\w+|fight\w*|hospital|hospice|clinic|sickbed|wheelchair|stretcher|ill|illness|sick|cancer|dementia|dying|death|dead|grave|tombstone|passed away|passing away|nursing home|old age|elderly|aging|ageing|decline|frail|surgery|stroke|chemo\w*|terminal)\b/i
+const PICTURE_CELEBRATION = /\b(celebrat\w+|festiv\w+|party|birthday|wedding|bride|groom|cake|candles?|confetti|toast\w*|cheers|balloons?|fireworks|festival|lanterns?|congratulat\w+)\b/i
+const CJK = /[\u3040-\u30ff\u3400-\u9fff\uf900-\ufaff]/u
+
+export const pictureWords = (d: string): number => d.split(/\s+/).filter((w) => /[\p{L}\p{N}]/u.test(w)).length
+
+/** The checks the ticket asks of each description (15–40 words, no digits, no level 1 words, not the chosen character) and the rules the prompt gives (no face, no text, no illness, no celebration in a remembrance film). */
+export function checkPictures(pictures: string[], input: Pick<FilmInput, 'glyph' | 'forms' | 'names' | 'memorial' | 'occasion'>): FilmProblem[] {
+  const out: FilmProblem[] = []
+  const add = (i: number, code: string, detail: string) => out.push({ code, detail: `Picture ${i + 1}: ${detail}` })
+  const forms = [...new Set(input.forms.concat(input.glyph).filter(Boolean))]
+  pictures.forEach((d, i) => {
+    const n = pictureWords(d)
+    if (n < PICTURE_WORDS.min || n > PICTURE_WORDS.max) add(i, 'pic_length', `has ${n} words; it must have ${PICTURE_WORDS.min}–${PICTURE_WORDS.max}.`)
+    if (/[0-9０-９]/.test(d)) add(i, 'pic_digits', 'no digits; write numbers as words or leave them out.')
+    if (CJK.test(d) || forms.some((f) => d.includes(f))) add(i, 'pic_character', 'write it in plain English only — no Japanese or Chinese characters (the chosen character must not appear).')
+    const names = input.names.map((x) => x.trim()).filter((x) => [...x].length >= 2 && d.includes(x))
+    if (names.length > 0) add(i, 'pic_blocked', 'a personal name is in it; use relation words.')
+    const bad = d.match(PICTURE_FACE_TEXT) ?? d.match(PICTURE_UNSAFE)
+    if (bad) add(i, 'pic_blocked', `the word “${bad[0]}” must not appear (no faces, no text, no illness, hospital, injury or funeral).`)
+    if (input.memorial && PICTURE_CELEBRATION.test(d)) add(i, 'pic_blocked', 'no celebration image in a remembrance film.')
+    if (input.occasion && EN_FORBIDDEN[input.occasion]?.test(d)) add(i, 'pic_blocked', `a word that does not suit this occasion (${input.occasion}) is in it.`)
+  })
+  if (new Set(pictures.map((d) => d.toLowerCase())).size !== pictures.length) out.push({ code: 'pic_same', detail: 'The four pictures must be four different moments.' })
+  return out
+}
+
 /** Short codes of the failed checks (for the logs) with a sentence for the retry (for the model). Empty when the script is sound. */
 export interface FilmProblem {
   code: string
   detail: string
 }
 
-export function checkFilmScript(raw: unknown, input: FilmInput, manifest: SceneInfo[], palette: Palette): FilmProblem[] {
+export function checkFilmScript(raw: unknown, input: FilmInput, palette: Palette): FilmProblem[] {
   const out: FilmProblem[] = []
-  const r = raw as { lines?: unknown; scenes?: unknown } | null
-  if (!r || !Array.isArray(r.lines) || !Array.isArray(r.scenes) || r.lines.length !== 4 || r.scenes.length !== 4 || r.lines.some((l) => typeof l !== 'string') || r.scenes.some((s) => typeof s !== 'string')) {
-    return [{ code: 'shape', detail: 'Reply with exactly four lines and exactly four scene IDs: {"lines":[4 strings],"scenes":[4 IDs]}.' }]
+  const r = raw as { lines?: unknown; pictures?: unknown } | null
+  if (!r || !Array.isArray(r.lines) || !Array.isArray(r.pictures) || r.lines.length !== 4 || r.pictures.length !== 4 || r.lines.some((l) => typeof l !== 'string') || r.pictures.some((s) => typeof s !== 'string')) {
+    return [{ code: 'shape', detail: 'Reply with exactly four lines and exactly four picture descriptions: {"lines":[4 strings],"pictures":[4 strings]}.' }]
   }
   const lines = (r.lines as string[]).map((l) => l.trim())
-  const scenes = r.scenes as string[]
-  const allowed = new Map(allowedScenes(manifest, input.memorial).map((s) => [s.id, s]))
-  const bad = scenes.filter((s) => !allowed.has(s))
-  if (bad.length > 0) out.push({ code: 'scene_ids', detail: `Scene ID(s) ${bad.join(', ')} are not in the library list for this order. Use only IDs from the list.` })
-  if (new Set(scenes).size !== 4) out.push({ code: 'scene_ids', detail: 'The four scene IDs must all be different.' })
+  const pictures = (r.pictures as string[]).map((p) => p.trim())
+  out.push(...checkPictures(pictures, input))
   const lim = lineLimits(input.language)
   lines.forEach((l, i) => {
     const n = lineSize(l, input.language)
@@ -176,7 +174,7 @@ function readSibling(file: string, override?: string): string {
   throw new Error(`${file} not found`)
 }
 
-export const FILM_SLOTS = ['LANGUAGE', 'RELATIONSHIP', 'DIRECTION', 'OCCASION', 'OCCASION_DETAIL', 'MEMORIAL', 'KANJI', 'WHO', 'STORY', 'LINE_LIMITS', 'FEEDBACK', 'LIBRARY'] as const
+export const FILM_SLOTS = ['LANGUAGE', 'RELATIONSHIP', 'DIRECTION', 'OCCASION', 'OCCASION_DETAIL', 'MEMORIAL', 'KANJI', 'WHO', 'STORY', 'LINE_LIMITS', 'FEEDBACK'] as const
 
 export function loadFilmPrompt(): string {
   const text = readSibling('film-prompt.md', process.env.ICHIREI_FILM_PROMPT_PATH)
@@ -189,7 +187,7 @@ export function loadFilmPrompt(): string {
 const fill = (template: string, values: Record<string, string>): string =>
   template.replace(new RegExp(Object.keys(values).map((k) => `\\{\\{ ${k} \\}\\}`).join('|'), 'g'), (m) => values[m.slice(3, -3).trim()] ?? m)
 
-export function buildFilmPrompt(input: FilmInput, manifest: SceneInfo[], feedback = ''): string {
+export function buildFilmPrompt(input: FilmInput, feedback = ''): string {
   return fill(loadFilmPrompt(), {
     LANGUAGE: input.language,
     RELATIONSHIP: input.relationship ?? 'unspecified',
@@ -202,7 +200,6 @@ export function buildFilmPrompt(input: FilmInput, manifest: SceneInfo[], feedbac
     STORY: input.story,
     LINE_LIMITS: lineLimitText(input.language),
     FEEDBACK: feedback,
-    LIBRARY: renderLibrary(allowedScenes(manifest, input.memorial)),
   })
 }
 
@@ -225,16 +222,15 @@ export interface FilmOptions {
   client?: Pick<Anthropic, 'messages'>
   log?: (line: string) => void
   palette?: Palette
-  manifest?: SceneInfo[]
   now?: () => Date
   /** Tests: a fixed list of problems-to-ignore is never offered; use client to fake the model. */
 }
 
 const logLine = (log: (l: string) => void, event: string, data: Record<string, unknown>) => log(`[ichirei-film] ${JSON.stringify({ event, ...data })}`)
 
-/** The generic script: the "your moment" line, then the "who they are" line, over two quiet pictures (the character follows in the film). */
+/** The generic script: the "your moment" line, then the "who they are" line, over plain washi pictures (nothing to draw; the character follows in the film). */
 export function fallbackFilm(input: Pick<FilmInput, 'moment' | 'who'>, reason: string, now: Date = new Date()): FilmRecord {
-  return { status: 'fallback', lines: [input.moment.trim(), input.who.trim()].filter(Boolean).slice(0, 2), scenes: [...FALLBACK_SCENES], made_at: now.toISOString(), reason }
+  return { status: 'fallback', lines: [input.moment.trim(), input.who.trim()].filter(Boolean).slice(0, 2), pictures: [], made_at: now.toISOString(), reason }
 }
 
 /**
@@ -250,10 +246,8 @@ export async function makeFilm(input: FilmInput, opts: FilmOptions = {}): Promis
     return fallbackFilm(input, reason, now)
   }
   if (process.env.ICHIREI_FILM?.trim().toLowerCase() === 'off') return fallback('disabled')
-  let manifest: SceneInfo[]
   let palette: Palette
   try {
-    manifest = opts.manifest ?? loadSceneManifest()
     palette = opts.palette ?? loadPalette()
   } catch {
     return fallback('library')
@@ -272,7 +266,7 @@ export async function makeFilm(input: FilmInput, opts: FilmOptions = {}): Promis
   for (let attempt = 1; attempt <= 2; attempt++) {
     const signal = callSignal(opts.signal, timeoutMs)
     try {
-      const stream = client.messages.stream({ model, max_tokens: 1500, output_config: { effort: 'low' }, messages: [{ role: 'user', content: buildFilmPrompt(input, manifest, feedback) }] }, { signal })
+      const stream = client.messages.stream({ model, max_tokens: 2500, output_config: { effort: 'low' }, messages: [{ role: 'user', content: buildFilmPrompt(input, feedback) }] }, { signal })
       const message = await stream.finalMessage()
       if (message.stop_reason === 'refusal') throw new Error('refusal')
       const text = message.content.filter((b): b is Anthropic.TextBlock => b.type === 'text').map((b) => b.text).join('')
@@ -283,12 +277,12 @@ export async function makeFilm(input: FilmInput, opts: FilmOptions = {}): Promis
       } else if (raw.declined === true) {
         return fallback('declined')
       } else {
-        const problems = checkFilmScript(raw, input, manifest, palette)
+        const problems = checkFilmScript(raw, input, palette)
         if (problems.length === 0) {
           const lines = (raw.lines as string[]).map((l) => l.trim())
-          const scenes = raw.scenes as string[]
-          logLine(log, 'film_generated', { attempts: attempt, scenes, ms: Date.now() - t0 })
-          return { status: 'ready', lines, scenes, made_at: now.toISOString() }
+          const pictures = (raw.pictures as string[]).map((p) => p.trim())
+          logLine(log, 'film_generated', { attempts: attempt, pictures: pictures.length, ms: Date.now() - t0 })
+          return { status: 'ready', lines, pictures, made_at: now.toISOString() }
         }
         lastReason = [...new Set(problems.map((p) => p.code))].join('+')
         feedback = `\nYOUR PREVIOUS SCRIPT FAILED THESE CHECKS — write a new one that fixes every one of them:\n${problems.map((p) => `- ${p.detail}`).join('\n')}\n`

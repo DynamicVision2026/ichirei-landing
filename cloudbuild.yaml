@@ -27,6 +27,11 @@ substitutions:
   # (secret SHOPIFY_ADMIN_CLIENT_SECRET), so a missing secret can never break a deploy.
   _SHOPIFY_ADMIN_CLIENT_ID: '394a8e955f7e28104f3e2089630bb3a5'
   _ORDER_BUCKET: ''                 # e.g. ichirei-orders
+  # The story film's pictures (engine/film-art.ts): Google's image model on Vertex AI, through the Cloud Run service account (no key). One-time setup in DEPLOY.md
+  # (enable the Vertex AI API, grant roles/aiplatform.user). Models are tried in order when one is not found; separate them with | (a comma would split this list).
+  _FILM_IMAGE_MODEL: 'gemini-3.1-flash-image|gemini-2.5-flash-image'  # ICHIREI_FILM_IMAGE_MODEL
+  _FILM_IMAGE_LOCATION: 'global'    # ICHIREI_FILM_IMAGE_LOCATION — a Vertex AI location where the model is served (global, or a region such as us-central1)
+  _FILM_DAILY_MAX: '200'            # ICHIREI_FILM_DAILY_MAX — sets of four pictures per day (above it, the pictures wait for the next day); off = no limit
   _ANIMATION_SAMPLES: 'on'          # ICHIREI_ANIMATION_SAMPLES — off | on. TEMPORARY: four reserved sample films (/a/AN-sampleja222222222222 …) for testing the story animation on real phones; set to 'off' when done
   # Engine settings (v9 speed). Passed to the service on EVERY deploy (--update-env-vars below), so a value set earlier by hand
   # (ICHIREI_EFFORT=high …) can never silently outlive a deploy. Change them here, or per trigger, not on the console.
@@ -82,7 +87,7 @@ steps:
       # Mount the Secret Manager secrets as env vars of the same name.
       - --set-secrets=ANTHROPIC_API_KEY=ANTHROPIC_API_KEY:latest,SHOPIFY_STOREFRONT_TOKEN=SHOPIFY_STOREFRONT_TOKEN:latest
       # Non-secret settings: the purchase settings and the engine speed settings. --update-env-vars leaves any other variable alone.
-      - --update-env-vars=ICHIREI_EFFORT=${_EFFORT},ICHIREI_MAX_TOKENS=${_MAX_TOKENS},ICHIREI_MAX_TOKENS_RETRY=${_MAX_TOKENS_RETRY},ICHIREI_REVIEW_MODEL=${_REVIEW_MODEL},ICHIREI_REVIEW_EFFORT=${_REVIEW_EFFORT},ICHIREI_CALL_TIMEOUT_MS=${_CALL_TIMEOUT_MS},ICHIREI_REVIEW_TIMEOUT_MS=${_REVIEW_TIMEOUT_MS},ICHIREI_LEXICON_MODE=${_LEXICON_MODE},ICHIREI_SIMPLE_MAX_STROKES=${_SIMPLE_MAX_STROKES},ICHIREI_ANIMATION_SAMPLES=${_ANIMATION_SAMPLES},SHOPIFY_VARIANT_SIMPLE=${_SHOPIFY_VARIANT_SIMPLE},SHOPIFY_VARIANT_STANDARD=${_SHOPIFY_VARIANT_STANDARD},SHOPIFY_STOREFRONT_TOKEN_PUBLIC=${_SHOPIFY_STOREFRONT_TOKEN},SHOPIFY_ADMIN_CLIENT_ID=${_SHOPIFY_ADMIN_CLIENT_ID},ORDER_BUCKET=${_ORDER_BUCKET}
+      - --update-env-vars=ICHIREI_EFFORT=${_EFFORT},ICHIREI_MAX_TOKENS=${_MAX_TOKENS},ICHIREI_MAX_TOKENS_RETRY=${_MAX_TOKENS_RETRY},ICHIREI_REVIEW_MODEL=${_REVIEW_MODEL},ICHIREI_REVIEW_EFFORT=${_REVIEW_EFFORT},ICHIREI_CALL_TIMEOUT_MS=${_CALL_TIMEOUT_MS},ICHIREI_REVIEW_TIMEOUT_MS=${_REVIEW_TIMEOUT_MS},ICHIREI_LEXICON_MODE=${_LEXICON_MODE},ICHIREI_SIMPLE_MAX_STROKES=${_SIMPLE_MAX_STROKES},ICHIREI_ANIMATION_SAMPLES=${_ANIMATION_SAMPLES},ICHIREI_FILM_IMAGE_MODEL=${_FILM_IMAGE_MODEL},ICHIREI_FILM_IMAGE_LOCATION=${_FILM_IMAGE_LOCATION},ICHIREI_FILM_DAILY_MAX=${_FILM_DAILY_MAX},SHOPIFY_VARIANT_SIMPLE=${_SHOPIFY_VARIANT_SIMPLE},SHOPIFY_VARIANT_STANDARD=${_SHOPIFY_VARIANT_STANDARD},SHOPIFY_STOREFRONT_TOKEN_PUBLIC=${_SHOPIFY_STOREFRONT_TOKEN},SHOPIFY_ADMIN_CLIENT_ID=${_SHOPIFY_ADMIN_CLIENT_ID},ORDER_BUCKET=${_ORDER_BUCKET}
 
 images:
   - ${_REGION}-docker.pkg.dev/$PROJECT_ID/${_REPO}/${_SERVICE}:$BUILD_ID
