@@ -114,12 +114,14 @@ export function isAnimationRecord(x: unknown): x is AnimationRecord {
 
 /**
  * The revision of a sample's pictures. An art record saved under another revision is ignored, so changing a number here makes that sample draw its
- * pictures AGAIN on its next open (no access to the bucket needed). 2: ja / zh / memorial redrawn after the quota fixes (the English one came out 4/4).
+ * pictures AGAIN on its next open (no access to the bucket needed). 2: ja / zh / memorial redrawn after the quota fixes; 3: zh / en / memorial redrawn
+ * after the clothes-and-setting and no-religious-symbol rules (ja stays on 2).
  */
 export const SAMPLE_ART_REV: Record<string, string> = {
   'AN-sampleja222222222222': '2',
-  'AN-samplezh222222222222': '2',
-  'AN-samplemem22222222222': '2',
+  'AN-samplezh222222222222': '3',
+  'AN-sampleen222222222222': '3',
+  'AN-samplemem22222222222': '3',
 }
 export const artRevFor = (id: string): string | undefined => SAMPLE_ART_REV[id]
 
@@ -140,7 +142,7 @@ export const SAMPLE_RECORDS: Record<string, AnimationRecord> = {
   [SAMPLE_IDS.ja]: { ...sampleBase, id: SAMPLE_IDS.ja, language: 'ja', glyph: '備', reading: 'そなえ・び', romanization: 'sonae / bi', meaning_en: 'prepare', moment: '「ちょうど今詰めてたところ」', who: 'いつも、頼まれる前に備えている人。', memorial: false,
     film: { status: 'ready', made_at: madeAt, pictures: ['a mother\'s hand placing one spring flower on an open bento box on a wooden kitchen counter, soft morning window light', 'a young woman seen from behind at a kitchen doorway, her mother a small silhouette at the stove beyond, pale morning light', 'two hands passing a wrapped lunch box across a classroom desk, a teacher seen from behind among empty desks, afternoon light through a window', 'a woman seen from behind holding a telephone receiver beside a window at dusk, warm lamp light and a quiet room'], lines: ['春には、お弁当に\n庭の花を一輪のせてくれた母。', '「もういらない」と断った日も、\n母は静かに台所へ戻った。', '教師になり、生徒に\n自分のお弁当を分けた日、母を思った。', '帰る日の弁当を頼むと、「ちょうど今詰めてたところ」。'] } },
   [SAMPLE_IDS.zh]: { ...sampleBase, id: SAMPLE_IDS.zh, language: 'zh-Hant', glyph: '待', reading: 'dài', romanization: 'dài', meaning_en: 'wait', moment: '你總是在門口等我', who: '總是點著燈、在門口等我回家的人。', memorial: false,
-    film: { status: 'ready', made_at: madeAt, pictures: ['a lit paper lantern glowing beside a front door at night, a pair of shoes on the entrance step, a quiet autumn street', 'a mother seen from behind holding an umbrella at a doorway in evening rain, soft reflections on the wet ground', 'a mother\'s silhouette waving on a train platform as a train pulls away, early morning mist', 'a hand holding an old telephone receiver beside a warm lamp in a small room at night'], lines: ['每次晚歸，玄關總有一盞燈亮著。', '下雨的夜裡，媽媽撐著傘在門口等。', '我去外地讀書，她在月台上揮著手。', '電話裡她只說：「家裡燈還亮著。」'] } },
+    film: { status: 'ready', made_at: madeAt, pictures: ['a lit lamp glowing beside a front door at night, a pair of shoes on the entrance step, a quiet apartment street in autumn', 'a mother seen from behind holding an umbrella at a doorway in evening rain, soft reflections on the wet ground', 'a mother\'s silhouette waving on a train platform as a train pulls away, early morning mist', 'a hand holding an old telephone receiver beside a warm lamp in a small room at night'], lines: ['每次晚歸，玄關總有一盞燈亮著。', '下雨的夜裡，媽媽撐著傘在門口等。', '我去外地讀書，她在月台上揮著手。', '電話裡她只說：「家裡燈還亮著。」'] } },
   [SAMPLE_IDS.en]: { ...sampleBase, id: SAMPLE_IDS.en, language: 'en', glyph: '待', reading: 'まつ', romanization: 'matsu', meaning_en: 'wait', moment: 'She was always waiting at the station', who: 'The one who waited, every single time, without ever being asked.', memorial: false,
     film: { status: 'ready', made_at: madeAt, pictures: ['a silhouette of a mother standing on a small railway station platform waving, morning light, a simple wooden bench', 'a woman seen from behind holding an umbrella at a station exit in steady rain, wet paving stones', 'a pair of shoes set neatly by a doorway at night, warm light from inside a home', 'two cups of tea on a low wooden table in a quiet room, steam rising, soft evening light'], lines: ['Every time I left, she stood\nat the station and waved.', 'When it rained, she was there\nwith an umbrella, before I asked.', 'I came home late, and the shoes\nwere already set by the door.', 'She only said, \u201cThe tea is ready.\u201d'] } },
   [SAMPLE_IDS.memorial]: { ...sampleBase, id: SAMPLE_IDS.memorial, language: 'ja', glyph: '綴', reading: 'つづる', romanization: 'tsuzuru', meaning_en: 'stitch', moment: '私の名前で、何十通も手紙を書き続けてくれた', who: '私の名前で、何十通も手紙を書き続けてくれた人。', memorial: true,

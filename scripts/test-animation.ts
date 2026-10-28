@@ -241,13 +241,12 @@ const READY: FilmRecord = { status: 'ready', made_at: NOW.toISOString(), picture
     check('(3b) quota that does not give way: the answer is {ready} with the film INCOMPLETE — four washi pictures and incomplete: true (the page plays it and asks again later); an open inside the retry gap draws nothing more; the plain view says incomplete too', a.state === 'ready' && a.view.film.incomplete === true && a.view.film.pictures.every((u: string) => u.startsWith('/film/washi-')) && b.view.film.incomplete === true && r.imageCalls() === calls && v.film.incomplete === true && v.film.pictures.length === 4)
   }
   {
-    // a sample\'s picture revision: an old art record of ja (no revision) is ignored — its pictures are drawn again; en (no revision) keeps its pictures
+    // a sample's picture revision: a stored set of an older revision is ignored (drawn again on the next open); a set of the current revision is kept
     const store = new MemoryOrderStore()
-    for (const sid of [SAMPLE_IDS.ja, SAMPLE_IDS.en]) await store.putObject(`films/${sid}/art.json`, JSON.stringify({ schema: 'film-art', id: sid, status: 'done', started_at: NOW.toISOString(), made_at: NOW.toISOString(), slots: ['ai', 'ai', 'ai', 'ai'] }), 'application/json')
+    for (const [sid, rev] of [[SAMPLE_IDS.ja, '2'], [SAMPLE_IDS.zh, '2'], [SAMPLE_IDS.en, '2'], [SAMPLE_IDS.memorial, '2']] as const) await store.putObject(`films/${sid}/art.json`, JSON.stringify({ schema: 'film-art', id: sid, status: 'done', started_at: NOW.toISOString(), made_at: NOW.toISOString(), slots: ['ai', 'ai', 'ai', 'ai'], rev }), 'application/json')
     const h = createAnimationHandlers(() => ({ store, env: { ICHIREI_ANIMATION_SAMPLES: 'on' } as never }))
-    const ja = (await (await h.view(SAMPLE_IDS.ja)).json()) as any
-    const en = (await (await h.view(SAMPLE_IDS.en)).json()) as any
-    check('(3b) the samples are redrawn after this fix: ja, zh and the remembrance sample carry picture revision 2, so their older stored pictures are ignored (pictures: null → drawn again on the next open); the English sample (4/4) keeps its pictures', ja.film.pictures === null && en.film.pictures.length === 4 && artRevFor(SAMPLE_IDS.ja) === '2' && artRevFor(SAMPLE_IDS.zh) === '2' && artRevFor(SAMPLE_IDS.memorial) === '2' && artRevFor(SAMPLE_IDS.en) === undefined)
+    const view = async (sid: string) => ((await (await h.view(sid)).json()) as any).film.pictures
+    check('(3b) the samples are redrawn after the clothes / setting / no-religious-symbol rules: zh, en and the remembrance sample are on picture revision 3, so their revision-2 pictures are ignored (pictures: null → drawn again on the next open); the Japanese sample stays on 2 and keeps its pictures', (await view(SAMPLE_IDS.ja))?.length === 4 && (await view(SAMPLE_IDS.zh)) === null && (await view(SAMPLE_IDS.en)) === null && (await view(SAMPLE_IDS.memorial)) === null && artRevFor(SAMPLE_IDS.ja) === '2' && ['zh', 'en', 'memorial'].every((k) => artRevFor((SAMPLE_IDS as Record<string, string>)[k]) === '3'))
   }
   {
     const r = mkRig()

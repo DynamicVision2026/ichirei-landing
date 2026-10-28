@@ -88,7 +88,7 @@ export function createAnimationHandlers(deps: () => AnimationDeps) {
       if (!filmUsable(rec.film)) return json(200, { state: 'pending', view: animationView(rec, null) }, noStore)
       if (rec.film.status === 'fallback' || !d.store) return json(200, { state: 'ready', view: animationView(rec, null) }, noStore)
       const budget = renderBudgetMs(d.env)
-      const art = await raceTimeout(ensureArt({ store: d.store, image: d.image, client: d.vision, env: d.env, log: d.log, now: d.now, pollMs: d.pollMs }, { id: rec.id, film: rec.film, memorial: rec.memorial, rev: artRevFor(rec.id) }), budget)
+      const art = await raceTimeout(ensureArt({ store: d.store, image: d.image, client: d.vision, env: d.env, log: d.log, now: d.now, pollMs: d.pollMs }, { id: rec.id, film: rec.film, memorial: rec.memorial, language: rec.language, rev: artRevFor(rec.id) }), budget)
       if (!art) return json(200, { state: 'pending', view: animationView(rec, await safeArt(d.store, rec.id)) }, noStore) // still being drawn: ask again
       if (art.status === 'rendering') return json(200, { state: 'pending', view: animationView(rec, art) }, noStore)
       return json(200, { state: art.status === 'deferred' ? 'deferred' : 'ready', view: animationView(rec, art) }, noStore)

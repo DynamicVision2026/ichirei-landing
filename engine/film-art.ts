@@ -27,6 +27,7 @@ import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import sharp from 'sharp'
 import { DEFAULT_REVIEW_MODEL } from './engine.ts'
+import type { Language } from './contract.ts'
 import type { FilmRecord } from './film.ts'
 import { callSignal, timedOut } from './limits.ts'
 import type { OrderStore } from './order-store.ts'
@@ -43,6 +44,9 @@ const RETRY_HINT: Record<string, string> = {
   illness: 'Show only a calm everyday moment: no medical or sickroom scene, no injury.',
   celebration: 'No celebration of any kind: quiet and still.',
   unsafe: 'Gentle, safe, everyday imagery only.',
+  clothing: 'People wear contemporary everyday clothes; no kimono or traditional dress.',
+  setting: 'A modern, ordinary home and street; no traditional Japanese interior, lanterns or shrine architecture.',
+  religious: 'No religious symbol of any kind: no cross (not even one made by a window frame), altar, shrine or temple.',
   off_story: 'Follow the description exactly; keep it a simple ink-wash painting.',
 }
 
@@ -220,7 +224,7 @@ export interface Verdict {
   ok: boolean
   reason: string
 }
-const REASONS = new Set(['ok', 'face', 'text', 'illness', 'celebration', 'unsafe', 'off_story'])
+const REASONS = new Set(['ok', 'face', 'text', 'illness', 'celebration', 'unsafe', 'clothing', 'setting', 'religious', 'off_story'])
 type Messages = Pick<Anthropic, 'messages'>
 
 function readPrompt(): string {
@@ -236,12 +240,13 @@ function readPrompt(): string {
   throw new Error('film-picture-check-prompt.md not found')
 }
 
-export function buildCheckPrompt(descriptions: string[], memorial: boolean): string {
+export function buildCheckPrompt(descriptions: string[], memorial: boolean, language: Language = 'en'): string {
   const values: Record<string, string> = {
+    LANGUAGE: language,
     MEMORIAL: memorial ? 'This is a REMEMBRANCE film (the person it is for has died): check "celebration".' : 'This is not a remembrance film: ignore "celebration".',
     DESCRIPTIONS: descriptions.map((d, i) => `Picture ${i + 1}: ${d}`).join('\n'),
   }
-  return readPrompt().replace(/\{\{ (MEMORIAL|DESCRIPTIONS) \}\}/g, (m) => values[m.slice(3, -3).trim()])
+  return readPrompt().replace(/\{\{ (MEMORIAL|DESCRIPTIONS|LANGUAGE) \}\}/g, (m) => values[m.slice(3, -3).trim()])
 }
 
 export function parseVerdicts(raw: string, n: number): Verdict[] | null {
@@ -270,10 +275,10 @@ export interface CheckResult {
 }
 
 /** One vision call over `jpegs` (with their descriptions). Throws when it cannot get a readable answer in two tries. */
-export async function checkPictures(client: Messages, jpegs: Buffer[], descriptions: string[], memorial: boolean, env: NodeJS.ProcessEnv = process.env, outer?: AbortSignal): Promise<CheckResult> {
+export async function checkPictures(client: Messages, jpegs: Buffer[], descriptions: string[], memorial: boolean, env: NodeJS.ProcessEnv = process.env, outer?: AbortSignal, language: Language = 'en'): Promise<CheckResult> {
   const model = env.ICHIREI_FILM_CHECK_MODEL?.trim() || DEFAULT_REVIEW_MODEL
   const timeout = num(env.ICHIREI_FILM_CHECK_TIMEOUT_MS, 40_000)
-  const content: Anthropic.ContentBlockParam[] = [{ type: 'text', text: buildCheckPrompt(descriptions, memorial) }]
+  const content: Anthropic.ContentBlockParam[] = [{ type: 'text', text: buildCheckPrompt(descriptions, memorial, language) }]
   jpegs.forEach((j, i) => {
     content.push({ type: 'text', text: `Picture ${i + 1}:` })
     content.push({ type: 'image', source: { type: 'base64', media_type: 'image/jpeg', data: j.toString('base64') } })
@@ -327,6 +332,8 @@ export interface RenderInput {
   id: string
   film: FilmRecord
   memorial: boolean
+  /** The buyer's language: the picture check judges the setting against it. */
+  language?: Language
   /** A sample's picture revision (engine/animation.ts): an art record of another revision is ignored. */
   rev?: string
 }
@@ -480,7 +487,7 @@ async function renderLocked(deps: ArtDeps, input: RenderInput): Promise<ArtRecor
     if (good.length === 0) return
     try {
       const jpegs = await Promise.all(good.map((g) => toCheckJpeg(g.webp)))
-      const res = await checkPictures(client, jpegs, good.map((g) => descriptions[g.slot]), input.memorial, env, deps.signal)
+      const res = await checkPictures(client, jpegs, good.map((g) => descriptions[g.slot]), input.memorial, env, deps.signal, input.language)
       usage.input_tokens += res.input_tokens
       usage.output_tokens += res.output_tokens
       good.forEach((g, i) => {

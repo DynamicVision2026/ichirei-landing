@@ -38,7 +38,9 @@ RULES
    - GOODWILL: if the story is hostile or mocking toward the receiver, write no film: return {"declined": true}.
    - Never mention a machine, a computer program or "AI".
 7. FOUR PICTURES, FOUR DIFFERENT MOMENTS. For each line write one picture description, in ENGLISH whatever the language of the lines, 15–40 words. It describes ONE moment from the story, the moment of its line, for an ink-wash painter: the people (only as silhouettes, as hands, or seen from behind), the key object or action, the place, the season and the light. Example: "a mother's hand placing one spring flower on an open bento box, soft morning window light". Rules for the pictures:
-   - ONLY WHAT THE STORY SAYS. No new object, place or person. If the story names no setting, use a simple, neutral East Asian home or street; otherwise follow the story's own culture and place.
+   - ONLY WHAT THE STORY SAYS. No new object, place or person.
+   - CLOTHES AND SETTING. People wear contemporary everyday clothes — never a kimono, yukata, hanbok, qipao or any other traditional dress unless the story mentions it. The setting is the buyer's own modern world, by the language above: ja → a modern Japanese home and town; zh-Hant / zh-Hans → a modern Taiwanese, Hong Kong or Chinese home and street (never Japanese houses, paper lanterns, tatami, shoji or torii); en → a neutral modern home. If the story names a place or a culture, follow the story.
+   - NO RELIGIOUS SYMBOLS: no cross (also not one made by a window frame or a shadow), no Buddhist altar, shrine, temple, torii, prayer beads or any other religious sign — unless the story itself mentions it. This matters most in a remembrance film: show a quiet table, a window, hands, a chair, never an altar.
    - NO FACES. People appear only as silhouettes, as hands, or seen from behind. Never write smile, eyes, expression or any feature of a face.
    - NO TEXT of any kind in the picture: no letters, signs, writing, screens with words, logos or brands. (A letter or a card may appear as a folded paper, never as writing.)
    - No names, no real place names, no schools or companies; no digits; no Japanese or Chinese characters.

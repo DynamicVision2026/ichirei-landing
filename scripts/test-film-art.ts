@@ -30,6 +30,8 @@ const mem = () => new MemoryOrderStore()
   const m = buildImagePrompt('x', true, 'Absolutely no faces.')
   check('(1) a remembrance film adds the paler grey-beige line; a second try adds the hint for why the first failed', m.includes('Paler grey-beige paper, very soft ink, still and calm.') && m.endsWith('Absolutely no faces.'))
   const c = buildCheckPrompt(['one', 'two'], true)
+  const cz = buildCheckPrompt(['one'], false, 'zh-Hant')
+  check('(1) the picture check also judges clothes, setting and religious symbols: reasons "clothing", "setting", "religious" (a cross made by a window frame counts), against the buyer\'s language — and an unknown reason is still a failure', ['"clothing"', '"setting"', '"religious"'].every((r) => c.includes(r)) && /window whose frame forms a cross counts/.test(c) && cz.includes('the film\'s language is zh-Hant') && /Chinese home and street \(no Japanese houses, paper lanterns, tatami or torii\)/.test(cz) && buildCheckPrompt(['x'], false, 'ja').includes('the film\'s language is ja') && parseVerdicts('{"pictures":[{"ok":false,"reason":"religious"},{"ok":false,"reason":"clothing"},{"ok":false,"reason":"setting"}]}', 3)!.map((v) => v.reason).join() === 'religious,clothing,setting')
   check('(1) the picture check allows handwriting that cannot be read (a letter, a notebook, soft strokes — the remembrance story is about letters) and fails only readable words', /CANNOT be read as words/.test(c) && /Only words you can actually read fail/.test(c))
   check('(1) the picture-check prompt (a prompt file, not code) lists the descriptions, names every reason, and says when "celebration" applies', c.includes('Picture 1: one') && c.includes('Picture 2: two') && ['face', 'text', 'illness', 'celebration', 'unsafe', 'off_story'].every((r) => c.includes(`"${r}"`)) && c.includes('REMEMBRANCE film') && buildCheckPrompt(['a'], false).includes('ignore "celebration"') && !/\{\{ [A-Z]+ \}\}/.test(c))
 }
@@ -350,6 +352,12 @@ const eventsOf = (logs: string[]) => logs.map((l) => JSON.parse(l.replace('[ichi
   const slotsAi = arts.flatMap((a) => a.slots).filter((x) => x === 'ai').length
   console.log(`      simulated: 3 films at once against a model that allows 2 image calls at a time — ${Date.now() - t0} ms, ${slotsAi}/12 pictures drawn, ${ev.filter((e) => e.event === 'film_quota_wait').length} quota waits, ${ev.filter((e) => e.event === 'film_image_error').length} gave up, ${arts.filter((a) => a.status === 'incomplete').length} incomplete`)
   check('(4b) three films opened together against a model that rejects a third simultaneous call: the waits absorb it — no film is left incomplete here, and anything that did run out of waits is pending (retried later), never final washi', arts.every((a) => a.status === 'done' || (a.status === 'incomplete' && !a.slots.includes('washi'))) && slotsAi + arts.flatMap((a) => a.slots).filter((x) => x === 'pending').length === 12)
+}
+
+{
+  const r = rig({ vision: (call, k) => (call === 1 ? [OK, FAIL('religious'), OK, FAIL('clothing')] : Array(k).fill(OK)) })
+  const art = await ensureArt(r.deps, { ...input(mkId('languagesettingcheck')), language: 'zh-Hant' })
+  check('(4) the buyer\'s language reaches the picture check (a Chinese film is judged against a Chinese home); a picture that fails for a cross or for a kimono is drawn again with a hint that names the rule', r.vis.calls[0].content[0].text.includes('the film\'s language is zh-Hant') && art.slots.join() === 'ai,ai,ai,ai' && r.prompts.some((p) => p.includes('No religious symbol of any kind: no cross (not even one made by a window frame)')) && r.prompts.some((p) => p.includes('no kimono or traditional dress')))
 }
 
 // ---- 5. the lock ------------------------------------------------------------------------------------------------------------------------------------------------

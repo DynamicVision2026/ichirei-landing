@@ -86,12 +86,19 @@ export const PICTURE_WORDS = { min: 15, max: 40 }
 const PICTURE_FACE_TEXT = /\b(faces?|facial|smil\w+|eyes?|eyebrows?|expressions?|lips|mouth|text|words?|captions?|subtitles?|signboards?|signs?|logos?|brands?|labels?|letters? of|handwriting|calligraphy|writing on|poster|banner|screens? (with|showing|displaying))\b/i
 const PICTURE_UNSAFE = /\b(blood|bloody|injur\w+|wounds?|bandages?|funeral|coffin|casket|cremation|corpse|naked|nude|weapons?|knife|gun|violen\w+|fight\w*|hospital|hospice|clinic|sickbed|wheelchair|stretcher|ill|illness|sick|cancer|dementia|dying|death|dead|grave|tombstone|passed away|passing away|nursing home|old age|elderly|aging|ageing|decline|frail|surgery|stroke|chemo\w*|terminal)\b/i
 const PICTURE_CELEBRATION = /\b(celebrat\w+|festiv\w+|party|birthday|wedding|bride|groom|cake|candles?|confetti|toast\w*|cheers|balloons?|fireworks|festival|lanterns?|congratulat\w+)\b/i
+// traditional dress, a setting from another country's world, and religious symbols: not allowed in a picture unless the STORY itself mentions them
+const PICTURE_TRADITIONAL = /\b(kimono\w*|yukata|hanbok|qipao|cheongsam|haori|hakama|obi|geta|zori|samurai|geisha|traditional (dress|clothes|clothing|costume|attire|garments?)|ceremonial (dress|robes?))\b/i
+const PICTURE_JAPANESE_INTERIOR = /\b(tatami|shoji|fusuma|tokonoma|engawa|zabuton|irori|futon|paper lanterns?|chochin|torii|noren|kotatsu|japanese (house|home|room|garden|style))\b/i
+const PICTURE_RELIGIOUS = /\b(crosses|cross|crucifix\w*|church\w*|cathedral|chapel|altars?|shrines?|temples?|torii|pagoda|buddha\w*|buddhist|butsudan|kamidana|incense|rosary|prayer beads|prayer|praying|mosque|monk|priest|nun|stained glass|religio\w+)\b/i
+const STORY_TRADITIONAL = /着物|浴衣|和服|旗袍|長衫|袍|はかま|袴|晴れ着|振袖|kimono|yukata|hanbok|qipao|cheongsam|traditional|伝統/i
+const STORY_JAPANESE = /日本|畳|襖|障子|縁側|こたつ|炬燵|提灯|鳥居|japan/i
+const STORY_RELIGIOUS = /十字架|仏壇|仏|神社|鳥居|お寺|寺|教会|神棚|祭壇|礼拝|祈|お経|数珠|線香|墓|神様|佛|廟|教堂|十字|拜拜|祭祀|燒香|church|temple|shrine|altar|cross|buddh|pray|mosque|incense|religio/i
 const CJK = /[\u3040-\u30ff\u3400-\u9fff\uf900-\ufaff]/u
 
 export const pictureWords = (d: string): number => d.split(/\s+/).filter((w) => /[\p{L}\p{N}]/u.test(w)).length
 
 /** The checks the ticket asks of each description (15–40 words, no digits, no level 1 words, not the chosen character) and the rules the prompt gives (no face, no text, no illness, no celebration in a remembrance film). */
-export function checkPictures(pictures: string[], input: Pick<FilmInput, 'glyph' | 'forms' | 'names' | 'memorial' | 'occasion'>): FilmProblem[] {
+export function checkPictures(pictures: string[], input: Pick<FilmInput, 'glyph' | 'forms' | 'names' | 'memorial' | 'occasion'> & Partial<Pick<FilmInput, 'language' | 'story'>>): FilmProblem[] {
   const out: FilmProblem[] = []
   const add = (i: number, code: string, detail: string) => out.push({ code, detail: `Picture ${i + 1}: ${detail}` })
   const forms = [...new Set(input.forms.concat(input.glyph).filter(Boolean))]
@@ -104,6 +111,10 @@ export function checkPictures(pictures: string[], input: Pick<FilmInput, 'glyph'
     if (names.length > 0) add(i, 'pic_blocked', 'a personal name is in it; use relation words.')
     const bad = d.match(PICTURE_FACE_TEXT) ?? d.match(PICTURE_UNSAFE)
     if (bad) add(i, 'pic_blocked', `the word “${bad[0]}” must not appear (no faces, no text, no illness, hospital, injury or funeral).`)
+    const story = input.story ?? ''
+    if (PICTURE_TRADITIONAL.test(d) && !STORY_TRADITIONAL.test(story)) add(i, 'pic_blocked', 'people wear contemporary everyday clothes — no kimono, yukata or other traditional dress (the story does not mention it).')
+    if (input.language && input.language !== 'ja' && PICTURE_JAPANESE_INTERIOR.test(d) && !STORY_JAPANESE.test(story)) add(i, 'pic_blocked', 'the setting must be this buyer\'s modern world: no Japanese interior, lantern, tatami or torii (the story does not name Japan).')
+    if (PICTURE_RELIGIOUS.test(d) && !STORY_RELIGIOUS.test(story)) add(i, 'pic_blocked', 'no religious symbol (cross, altar, shrine, temple, incense …) — the story does not mention one.')
     if (input.memorial && PICTURE_CELEBRATION.test(d)) add(i, 'pic_blocked', 'no celebration image in a remembrance film.')
     if (input.occasion && EN_FORBIDDEN[input.occasion]?.test(d)) add(i, 'pic_blocked', `a word that does not suit this occasion (${input.occasion}) is in it.`)
   })
