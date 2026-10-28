@@ -75,8 +75,9 @@ export interface AnimationView {
    * null = the film script is still being written (the page shows a quiet waiting screen and asks again).
    * `pictures` null = the script is there but the four pictures are not drawn yet: the page asks POST /api/film/<id>/render, which stays open until they are.
    * `deferred` = the daily picture limit was reached; they come the next day.
+   * `incomplete` = some pictures could not be drawn yet (quota or an outage): washi is shown in their place and the page asks the server to draw only those.
    */
-  film: { status: 'ready' | 'fallback'; lines: string[]; pictures: string[] | null; deferred?: boolean } | null
+  film: { status: 'ready' | 'fallback'; lines: string[]; pictures: string[] | null; deferred?: boolean; incomplete?: boolean } | null
 }
 
 /** A film the pictures can be drawn for: a fallback script (nothing to draw) or one with its four descriptions (older films with scene IDs are written again). */
@@ -92,8 +93,10 @@ export function animationView(r: AnimationRecord, art: ArtRecord | null = null):
   let film: AnimationView['film'] = null
   if (filmUsable(f)) {
     if (f.status === 'fallback') film = { status: 'fallback', lines: f.lines, pictures: f.lines.map((_, i) => washiPictureUrl(i)) }
-    else if (art?.status === 'done') film = { status: 'ready', lines: f.lines, pictures: f.lines.map((_, i) => (art.slots[i] === 'ai' ? pictureUrl(r.id, i + 1, art.made_at) : washiPictureUrl(i))) }
-    else film = { status: 'ready', lines: f.lines, pictures: null, ...(art?.status === 'deferred' ? { deferred: true } : {}) }
+    else if (art && art.status !== 'deferred' && art.slots.length === f.lines.length) {
+      // done, incomplete, or being drawn again (a lease still shows what was there): a picture where there is one, washi elsewhere
+      film = { status: 'ready', lines: f.lines, pictures: f.lines.map((_, i) => (art.slots[i] === 'ai' ? pictureUrl(r.id, i + 1, art.made_at) : washiPictureUrl(i))), ...(art.slots.includes('pending') ? { incomplete: true } : {}) }
+    } else film = { status: 'ready', lines: f.lines, pictures: null, ...(art?.status === 'deferred' ? { deferred: true } : {}) }
   }
   return { id: r.id, language: r.language, glyph: r.glyph, reading: r.reading, romanization: r.romanization, meaning_en: r.meaning_en, who: r.who, memorial: r.memorial, film }
 }
@@ -108,6 +111,17 @@ export function isAnimationRecord(x: unknown): x is AnimationRecord {
 // phone before a real order exists. Off by default; switch it off in cloudbuild.yaml (`_ANIMATION_SAMPLES`) when the testing is done. The sample
 // stories are invented for this purpose and belong to no customer; their scripts were written by hand to follow the film-script rules (they were not
 // produced by the model).
+
+/**
+ * The revision of a sample's pictures. An art record saved under another revision is ignored, so changing a number here makes that sample draw its
+ * pictures AGAIN on its next open (no access to the bucket needed). 2: ja / zh / memorial redrawn after the quota fixes (the English one came out 4/4).
+ */
+export const SAMPLE_ART_REV: Record<string, string> = {
+  'AN-sampleja222222222222': '2',
+  'AN-samplezh222222222222': '2',
+  'AN-samplemem22222222222': '2',
+}
+export const artRevFor = (id: string): string | undefined => SAMPLE_ART_REV[id]
 
 export const SAMPLE_IDS = {
   ja: 'AN-sampleja222222222222',

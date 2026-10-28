@@ -30,13 +30,14 @@ const mem = () => new MemoryOrderStore()
   const m = buildImagePrompt('x', true, 'Absolutely no faces.')
   check('(1) a remembrance film adds the paler grey-beige line; a second try adds the hint for why the first failed', m.includes('Paler grey-beige paper, very soft ink, still and calm.') && m.endsWith('Absolutely no faces.'))
   const c = buildCheckPrompt(['one', 'two'], true)
+  check('(1) the picture check allows handwriting that cannot be read (a letter, a notebook, soft strokes — the remembrance story is about letters) and fails only readable words', /CANNOT be read as words/.test(c) && /Only words you can actually read fail/.test(c))
   check('(1) the picture-check prompt (a prompt file, not code) lists the descriptions, names every reason, and says when "celebration" applies', c.includes('Picture 1: one') && c.includes('Picture 2: two') && ['face', 'text', 'illness', 'celebration', 'unsafe', 'off_story'].every((r) => c.includes(`"${r}"`)) && c.includes('REMEMBRANCE film') && buildCheckPrompt(['a'], false).includes('ignore "celebration"') && !/\{\{ [A-Z]+ \}\}/.test(c))
 }
 
 // ---- 2. the Vertex AI client (a fake server) ---------------------------------------------------------------------------------------------------------------
 type Seen = { url: string; auth: string; body: any }
 const seen: Seen[] = []
-let vertexMode: 'ok' | 'first404' | '403' | '429' | 'blocked' | 'noimage' | 'hang' | '500' = 'ok'
+let vertexMode: 'ok' | 'first404' | 'first429' | '403' | '429' | 'blocked' | 'noimage' | 'hang' | '500' = 'ok'
 const vertex = http.createServer(async (req, res) => {
   let raw = ''
   for await (const ch of req) raw += ch
@@ -47,6 +48,7 @@ const vertex = http.createServer(async (req, res) => {
   if (vertexMode === '429') return send(429, { error: { message: 'quota' } })
   if (vertexMode === '500') return send(500, { error: { message: 'boom' } })
   if (vertexMode === 'first404' && (req.url ?? '').includes('gemini-3.1-flash-image')) return send(404, { error: { message: 'not found' } })
+  if (vertexMode === 'first429' && (req.url ?? '').includes('gemini-3.1-flash-image')) return send(429, { error: { message: 'quota' } })
   if (vertexMode === 'blocked') return send(200, { candidates: [{ finishReason: 'IMAGE_SAFETY' }], promptFeedback: { blockReason: 'SAFETY' } })
   if (vertexMode === 'noimage') return send(200, { candidates: [{ content: { parts: [{ text: 'sorry' }] } }] })
   send(200, { candidates: [{ content: { parts: [{ text: 'here' }, { inlineData: { mimeType: 'image/png', data: PNG.toString('base64') } }] } }] })
@@ -69,6 +71,12 @@ const sig = () => AbortSignal.timeout(5000)
   const r2 = await fb.generate('x', sig())
   const r3 = await fb.generate('y', sig())
   check('(2) a model that is not found (404) hands over to the next one in the list; the one that worked is tried first from then on', r2.model === 'gemini-2.5-flash-image' && seen.length === 3 && seen[0].url.includes('gemini-3.1') && seen[1].url.includes('gemini-2.5') && r3.model === 'gemini-2.5-flash-image' && seen[2].url.includes('gemini-2.5'))
+  vertexMode = 'first429'
+  seen.length = 0
+  const q = vertexImageClient(venv())
+  const rq = await q.generate('x', sig())
+  const rq2 = await q.generate('y', sig())
+  check('(2) a quota answer (429) from the first model tries the FALLBACK model at once (gemini-2.5-flash-image) — and the first model stays the first choice next time (a quota is not "not found")', rq.model === 'gemini-2.5-flash-image' && seen[0].url.includes('gemini-3.1') && seen[1].url.includes('gemini-2.5') && seen[2].url.includes('gemini-3.1') && rq2.model === 'gemini-2.5-flash-image')
   vertexMode = '403'
   const e403 = await vertexImageClient(venv()).generate('x', sig()).catch((e) => e)
   vertexMode = '429'
@@ -182,7 +190,7 @@ const eventsOf = (logs: string[]) => logs.map((l) => JSON.parse(l.replace('[ichi
   const objs = [1, 2, 3, 4].map((i) => r.store.objects.get(picturePath(ID, i)))
   const meta = await Promise.all(objs.map((o) => sharp(o!.body).metadata()))
   const ev = eventsOf(r.logs)
-  check('(4) a set: four pictures drawn IN PARALLEL (one image call each, from the film\'s own descriptions), one picture check, four WebP 1080×1350 objects films/<id>/1..4.webp and art.json {done, all ai}', art.status === 'done' && art.slots.join() === 'ai,ai,ai,ai' && r.imageCalls() === 4 && r.maxParallel() === 4 && r.vis.calls.length === 1 && meta.every((m) => m.format === 'webp' && m.width === 1080 && m.height === 1350) && objs.every((o) => o!.contentType === 'image/webp') && saved?.status === 'done' && r.prompts.every((p, i) => p.includes(FILM.pictures[i]) || FILM.pictures.some((d) => p.includes(d))))
+  check('(4) a set: four pictures drawn TWO AT A TIME (one image call each, from the film\'s own descriptions), one picture check, four WebP 1080×1350 objects films/<id>/1..4.webp and art.json {done, all ai}', art.status === 'done' && art.slots.join() === 'ai,ai,ai,ai' && r.imageCalls() === 4 && r.maxParallel() === 2 && r.vis.calls.length === 1 && meta.every((m) => m.format === 'webp' && m.width === 1080 && m.height === 1350) && objs.every((o) => o!.contentType === 'image/webp') && saved?.status === 'done' && r.prompts.every((p, i) => p.includes(FILM.pictures[i]) || FILM.pictures.some((d) => p.includes(d))))
   check('(4) logs: film_render_start, film_render_done with the time, the picture count and an estimated cost in yen — and no story text or description', ev[0].event === 'film_render_start' && ev.at(-1).event === 'film_render_done' && ev.at(-1).pictures === 4 && ev.at(-1).est_cost_jpy > 0 && typeof ev.at(-1).ms === 'number' && !r.logs.join('\n').includes('bento') && !r.logs.join('\n').includes('flower'), r.logs.join('\n'))
   const again = rig({ store: r.store })
   const second = await ensureArt(again.deps, input())
@@ -207,15 +215,19 @@ const eventsOf = (logs: string[]) => logs.map((l) => JSON.parse(l.replace('[ichi
   const art = await ensureArt(r.deps, input())
   check('(4) an image error (slot 2 once) → that picture is drawn once more and the film gets all four; film_image_error is logged with the slot and the code', art.slots.join() === 'ai,ai,ai,ai' && r.imageCalls() === 5 && eventsOf(r.logs).some((e) => e.event === 'film_image_error' && e.slot === 2 && e.code === 'http'), JSON.stringify([art, r.imageCalls(), r.logs]))
   fail = new Set()
-  const down = rig({ image: () => { throw new ImageError('permission') } })
+  const down = rig({ image: () => { throw new ImageError('http') } })
   const dart = await ensureArt(down.deps, input(mkId('downdowndowndowndo22')))
-  const again = await ensureArt(rig({ store: down.store }).deps, input(mkId('downdowndowndowndo22')))
-  check('(4) the image model is down (all four fail, twice): all four are washi, the film still plays, at most 4 + 4 calls were made (one set plus single retries) — and a later open does not start again', dart.status === 'done' && dart.slots.join() === 'washi,washi,washi,washi' && down.imageCalls() === 8 && down.vis.calls.length === 0 && eventsOf(down.logs).filter((e) => e.event === 'film_image_error').length === 8 && again.status === 'done')
+  const soon = await ensureArt(down.deps, input(mkId('downdowndowndowndo22')))
+  check('(4) the image model is down (every call fails, twice): the film STILL PLAYS with washi, but it is INCOMPLETE — every slot is pending, not final; at most 4 + 4 calls were made; an open straight after makes no new call (retry_after)', dart.status === 'incomplete' && dart.slots.join() === 'pending,pending,pending,pending' && down.imageCalls() === 8 && down.vis.calls.length === 0 && eventsOf(down.logs).filter((e) => e.event === 'film_image_error').length === 8 && !!dart.retry_after && soon.status === 'incomplete' && down.imageCalls() === 8)
+  const later = rig({ store: down.store })
+  later.deps.now = () => new Date(NOW.getTime() + 5 * 60_000)
+  const lart = await ensureArt(later.deps, input(mkId('downdowndowndowndo22')))
+  check('(4) the order\'s limit holds: after 8 billable calls nothing more is drawn for that film — the pending slots become final washi (done), no image call', later.imageCalls() === 0 && lart.status === 'done' && lart.slots.join() === 'washi,washi,washi,washi')
 }
 {
   const r = rig({ vision: () => new Error('overloaded') })
   const art = await ensureArt(r.deps, input(mkId('checkdowncheckdown22')))
-  check('(4) the picture check cannot run: NO unchecked picture is shown — all washi, nothing saved but the state, film_check_error logged; the film plays', art.slots.join() === 'washi,washi,washi,washi' && r.store.objects.size === 1 && eventsOf(r.logs).some((e) => e.event === 'film_check_error') && r.imageCalls() === 4)
+  check('(4) the picture check cannot run: NO unchecked picture is shown — washi for now, the slots stay pending (an outage is not final), nothing saved but the state, film_check_error logged; the film plays', art.status === 'incomplete' && art.slots.join() === 'pending,pending,pending,pending' && r.store.objects.size === 1 && eventsOf(r.logs).some((e) => e.event === 'film_check_error') && r.imageCalls() === 4)
 }
 {
   const r = rig()
@@ -224,6 +236,120 @@ const eventsOf = (logs: string[]) => logs.map((l) => JSON.parse(l.replace('[ichi
   const f = rig()
   const art = await ensureArt(f.deps, { id: mkId('fallbackfallbackfa22'), film: { status: 'fallback', lines: ['a', 'b'], pictures: [], made_at: NOW.toISOString() }, memorial: false })
   check('(4) a fallback script (two lines) has nothing to draw: no image call, no check, no object — two washi slots', art.slots.join() === 'washi,washi' && f.imageCalls() === 0 && f.vis.calls.length === 0 && f.store.objects.size === 0)
+}
+
+// ---- 4b. quota (429): two at a time, the fallback model, waits, pending slots, retries --------------------------------------------------------------------------
+{
+  const QUOTA = { ICHIREI_FILM_QUOTA_WAITS_MS: '15,30,45', ICHIREI_FILM_RETRY_MS: '60000', ICHIREI_FILM_BG_RETRY_MS: '0' }
+  // a quota that gives way after N rejections: the first N image calls answer 429
+  let rejects = 0
+  const r = rig({ env: QUOTA, image: () => { if (rejects > 0) { rejects--; throw new ImageError('quota') } } })
+  rejects = 5
+  const art = await ensureArt(r.deps, input(mkId('quotaquotaquotaquota')))
+  const ev = eventsOf(r.logs)
+  check('(4b) a quota answer waits and tries again (here 15 / 30 / 45 ms instead of 8 / 20 / 40 s) and the picture still comes: all four drawn, never more than two at a time, film_quota_wait logged per wait', art.status === 'done' && art.slots.join() === 'ai,ai,ai,ai' && r.maxParallel() <= 2 && ev.filter((e) => e.event === 'film_quota_wait').length >= 5 && ev.filter((e) => e.event === 'film_quota_wait').every((e) => [15, 30, 45].includes(e.wait_ms)))
+  check('(4b) quota answers do NOT count toward the order\'s limit: five 429s, four pictures, and the saved count of billable calls is 4 (not 9)', art.calls === 4 && r.imageCalls() === 9)
+}
+{
+  const QUOTA = { ICHIREI_FILM_QUOTA_WAITS_MS: '10,10,10', ICHIREI_FILM_RETRY_MS: '60000', ICHIREI_FILM_BG_RETRY_MS: '0' }
+  let healthy = false
+  const id = mkId('quotagivesupquotagi')
+  const r = rig({ env: QUOTA, image: () => { if (!healthy) throw new ImageError('quota') } })
+  const art = await ensureArt(r.deps, input(id))
+  const ev = eventsOf(r.logs)
+  check('(4b) quota that does not give way (after the three waits): the film is INCOMPLETE — washi shown now, every slot pending (not final), retry_after set; 4 slots × (1 + 3 waits) = 16 tries, none billable, no picture check', art.status === 'incomplete' && art.slots.join() === 'pending,pending,pending,pending' && art.calls === 0 && r.imageCalls() === 16 && r.vis.calls.length === 0 && !!art.retry_after && ev.filter((e) => e.event === 'film_quota_wait').length === 12 && ev.some((e) => e.event === 'film_image_error' && e.gave_up === true))
+  const view = animationView({ ...SAMPLE_RECORDS[SAMPLE_IDS.ja], id }, art)
+  check('(4b) the view of an incomplete film: four pictures (washi), incomplete: true — the page plays it and asks for the missing ones', view.film?.incomplete === true && !!view.film.pictures?.every((u) => u.startsWith('/film/washi-')))
+  const early = rig({ store: r.store, env: QUOTA })
+  const again = await ensureArt(early.deps, input(id))
+  check('(4b) an open BEFORE retry_after draws nothing (no hammering of a quota): same incomplete state, no image call', again.status === 'incomplete' && early.imageCalls() === 0)
+  healthy = true
+  const later = rig({ store: r.store, env: QUOTA })
+  later.deps.now = () => new Date(NOW.getTime() + 2 * 60_000)
+  const done = await ensureArt(later.deps, input(id))
+  check('(4b) the next open after retry_after draws the missing slots (quota healthy again): four pictures, status done, saved; films/<id>/1..4.webp exist', done.status === 'done' && done.slots.join() === 'ai,ai,ai,ai' && later.imageCalls() === 4 && [1, 2, 3, 4].every((i) => r.store.objects.has(picturePath(id, i))))
+}
+{
+  // only the missing slots are drawn: slot 1 and 3 are already pictures
+  const QUOTA = { ICHIREI_FILM_QUOTA_WAITS_MS: '10', ICHIREI_FILM_RETRY_MS: '0', ICHIREI_FILM_BG_RETRY_MS: '0' }
+  const id = mkId('onlymissingonlymiss')
+  const store = mem()
+  await store.putObject(picturePath(id, 1), Buffer.from('p1'), 'image/webp')
+  await store.putObject(picturePath(id, 3), Buffer.from('p3'), 'image/webp')
+  await store.putObject(artPath(id), JSON.stringify({ schema: 'film-art', id, status: 'incomplete', started_at: NOW.toISOString(), made_at: NOW.toISOString(), slots: ['ai', 'pending', 'ai', 'pending'], reasons: ['ok', 'quota', 'ok', 'quota'], check_fails: [0, 0, 0, 0], calls: 2, retry_after: NOW.toISOString() }), 'application/json')
+  const r = rig({ store, env: QUOTA })
+  r.deps.now = () => new Date(NOW.getTime() + 1000)
+  const art = await ensureArt(r.deps, input(id))
+  check('(4b) a retry draws ONLY the missing slots (2 and 4): two image calls with their own descriptions, the check sees two pictures, slots 1 and 3 are untouched', art.status === 'done' && art.slots.join() === 'ai,ai,ai,ai' && r.imageCalls() === 2 && r.prompts.some((p) => p.includes(FILM.pictures[1])) && r.prompts.some((p) => p.includes(FILM.pictures[3])) && !r.prompts.some((p) => p.includes(FILM.pictures[0])) && r.vis.calls[0].content.filter((b: any) => b.type === 'image').length === 2 && store.objects.get(picturePath(id, 1))!.body.toString() === 'p1' && art.calls === 4)
+}
+{
+  // washi is FINAL only after the safety check failed twice (across opens too)
+  const id = mkId('finalonlytwicefinal')
+  const store = mem()
+  await store.putObject(artPath(id), JSON.stringify({ schema: 'film-art', id, status: 'incomplete', started_at: NOW.toISOString(), made_at: NOW.toISOString(), slots: ['ai', 'pending', 'ai', 'ai'], reasons: ['ok', 'face', 'ok', 'ok'], check_fails: [0, 1, 0, 0], calls: 5, retry_after: NOW.toISOString() }), 'application/json')
+  const r = rig({ store, env: { ICHIREI_FILM_RETRY_MS: '0', ICHIREI_FILM_BG_RETRY_MS: '0' }, vision: (_c, k) => Array(k).fill(FAIL('face')) })
+  r.deps.now = () => new Date(NOW.getTime() + 1000)
+  const art = await ensureArt(r.deps, input(id))
+  check('(4b) a picture that failed the safety check once in an earlier open and fails again is washi FOR GOOD (the second failure makes it final); the film is done', art.status === 'done' && art.slots.join() === 'ai,washi,ai,ai' && art.check_fails?.[1] === 2 && r.imageCalls() === 1 && !store.objects.has(picturePath(id, 2)))
+  const r2 = rig({ store: mem(), vision: (call, k) => (call === 1 ? [OK, FAIL('face'), OK, OK] : Array(k).fill(OK)) })
+  const a2 = await ensureArt(r2.deps, input(mkId('failthenpassfailthen')))
+  check('(4b) one failed check is not final: the picture is drawn again in the same render and passes', a2.slots.join() === 'ai,ai,ai,ai' && a2.check_fails?.[1] === 1)
+}
+{
+  // the background retry: about ten minutes later (here 60 ms), draws only what is missing
+  let healthy = false
+  const id = mkId('backgroundretrybackg')
+  const r = rig({ env: { ICHIREI_FILM_QUOTA_WAITS_MS: '5', ICHIREI_FILM_RETRY_MS: '0', ICHIREI_FILM_BG_RETRY_MS: '60' }, image: () => { if (!healthy) throw new ImageError('quota') } })
+  const first = await ensureArt(r.deps, input(id))
+  healthy = true
+  let saved = await readArt(r.store, id)
+  for (let k = 0; k < 100 && saved?.status !== 'done'; k++) {
+    await sleep(30)
+    saved = await readArt(r.store, id)
+  }
+  const ev = eventsOf(r.logs)
+  check('(4b) one background retry is scheduled for an incomplete film and draws the missing slots by itself (no open needed); it is scheduled once and never again', first.status === 'incomplete' && first.bg_scheduled === true && saved?.status === 'done' && saved.slots.join() === 'ai,ai,ai,ai' && ev.filter((e) => e.event === 'film_render_retry').length === 1, JSON.stringify([first.status, first.bg_scheduled, saved?.status, saved?.slots, ev.map((e) => e.event)]))
+}
+{
+  // a record saved by the first version (a quota failure was written down as washi, "done"): it is pending again
+  const id = mkId('legacylegacylegacylega')
+  const store = mem()
+  await store.putObject(artPath(id), JSON.stringify({ schema: 'film-art', id, status: 'done', started_at: NOW.toISOString(), made_at: NOW.toISOString(), slots: ['ai', 'washi', 'ai', 'washi'], reasons: ['ok', 'image_error', 'ok', 'face'] }), 'application/json')
+  await store.putObject(picturePath(id, 1), Buffer.from('a'), 'image/webp')
+  await store.putObject(picturePath(id, 3), Buffer.from('c'), 'image/webp')
+  const read = await readArt(store, id)
+  check('(4b) a record from the first version: a washi that was only an image error is pending again (a failed check stays final), the status becomes incomplete', read?.status === 'incomplete' && read.slots.join() === 'ai,pending,ai,washi')
+  const r = rig({ store, env: { ICHIREI_FILM_RETRY_MS: '0', ICHIREI_FILM_BG_RETRY_MS: '0' } })
+  r.deps.now = () => new Date(NOW.getTime() + 1000)
+  const art = await ensureArt(r.deps, input(id))
+  check('(4b) …and the next open draws just that slot', art.slots.join() === 'ai,ai,ai,washi' && r.imageCalls() === 1)
+}
+{
+  // a sample\'s revision: an art record of an older revision is ignored and the pictures are drawn again
+  const id = mkId('samplerevsamplerevsam')
+  const store = mem()
+  await store.putObject(artPath(id), JSON.stringify({ schema: 'film-art', id, status: 'done', started_at: NOW.toISOString(), made_at: NOW.toISOString(), slots: ['ai', 'ai', 'ai', 'ai'] }), 'application/json')
+  const stale = await readArt(store, id, '2')
+  const plain = await readArt(store, id)
+  const r = rig({ store })
+  const art = await ensureArt(r.deps, { ...input(id), rev: '2' })
+  const saved = await readArt(store, id, '2')
+  check('(4b) a sample\'s picture revision: an older record is ignored (read as none) and the pictures are drawn again, saved under the new revision; a record without a revision still reads for a normal film', stale === null && plain?.status === 'done' && art.status === 'done' && r.imageCalls() === 4 && saved?.rev === '2')
+}
+{
+  // three films opened within a minute, a model that allows two image calls at a time and rejects the rest with 429 (the situation in the live log)
+  let active = 0
+  const gate = async () => { if (active >= 2) throw new ImageError('quota'); active++; try { await sleep(40) } finally { active-- } }
+  const store = mem()
+  const logs: string[] = []
+  const mk3 = (name: string) => { const r = rig({ store, env: { ICHIREI_FILM_QUOTA_WAITS_MS: '30,60,90', ICHIREI_FILM_BG_RETRY_MS: '0', ICHIREI_FILM_RETRY_MS: '0' }, image: gate }); r.deps.log = (l) => logs.push(l); return { id: mkId(name), r } }
+  const films = [mk3('threefilmsonesimul'), mk3('threefilmstwosimul'), mk3('threefilmsthreesimul')]
+  const t0 = Date.now()
+  const arts = await Promise.all(films.map((f) => ensureArt(f.r.deps, input(f.id))))
+  const ev = eventsOf(logs)
+  const slotsAi = arts.flatMap((a) => a.slots).filter((x) => x === 'ai').length
+  console.log(`      simulated: 3 films at once against a model that allows 2 image calls at a time — ${Date.now() - t0} ms, ${slotsAi}/12 pictures drawn, ${ev.filter((e) => e.event === 'film_quota_wait').length} quota waits, ${ev.filter((e) => e.event === 'film_image_error').length} gave up, ${arts.filter((a) => a.status === 'incomplete').length} incomplete`)
+  check('(4b) three films opened together against a model that rejects a third simultaneous call: the waits absorb it — no film is left incomplete here, and anything that did run out of waits is pending (retried later), never final washi', arts.every((a) => a.status === 'done' || (a.status === 'incomplete' && !a.slots.includes('washi'))) && slotsAi + arts.flatMap((a) => a.slots).filter((x) => x === 'pending').length === 12)
 }
 
 // ---- 5. the lock ------------------------------------------------------------------------------------------------------------------------------------------------

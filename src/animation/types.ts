@@ -11,5 +11,5 @@ export interface AnimationView {
   who: string
   memorial: boolean
   /** null = the script is still being written; pictures null = drawn on the first open (the page asks POST /api/film/<id>/render); deferred = the daily limit. */
-  film: { status: 'ready' | 'fallback'; lines: string[]; pictures: string[] | null; deferred?: boolean } | null
+  film: { status: 'ready' | 'fallback'; lines: string[]; pictures: string[] | null; deferred?: boolean; incomplete?: boolean } | null
 }

@@ -10,7 +10,7 @@
 
 import QRCode from 'qrcode'
 import type Anthropic from '@anthropic-ai/sdk'
-import { ANIMATION_ID_PATTERN, animationUrl, animationView, filmUsable, isAnimationRecord, sampleRecord, type AnimationRecord } from '../engine/animation.ts'
+import { ANIMATION_ID_PATTERN, animationUrl, animationView, artRevFor, filmUsable, isAnimationRecord, sampleRecord, type AnimationRecord } from '../engine/animation.ts'
 import { ensureArt, picturePath, readArt, renderBudgetMs, type ArtRecord, type ImageClient } from '../engine/film-art.ts'
 import { createOrderStore, type OrderStore } from '../engine/order-store.ts'
 import { FILM_RETRY_AFTER_MS, ensureFilm, filmInFlight, raceTimeout } from '../engine/film-store.ts'
@@ -51,7 +51,7 @@ async function load(id: string, d: AnimationDeps) {
 const safeArt = async (store: OrderStore | null, id: string): Promise<ArtRecord | null> => {
   if (!store) return null
   try {
-    return await readArt(store, id)
+    return await readArt(store, id, artRevFor(id))
   } catch {
     return null
   }
@@ -88,8 +88,9 @@ export function createAnimationHandlers(deps: () => AnimationDeps) {
       if (!filmUsable(rec.film)) return json(200, { state: 'pending', view: animationView(rec, null) }, noStore)
       if (rec.film.status === 'fallback' || !d.store) return json(200, { state: 'ready', view: animationView(rec, null) }, noStore)
       const budget = renderBudgetMs(d.env)
-      const art = await raceTimeout(ensureArt({ store: d.store, image: d.image, client: d.vision, env: d.env, log: d.log, now: d.now, pollMs: d.pollMs }, { id: rec.id, film: rec.film, memorial: rec.memorial }), budget)
-      if (!art || art.status === 'rendering') return json(200, { state: 'pending', view: animationView(rec, null) }, noStore)
+      const art = await raceTimeout(ensureArt({ store: d.store, image: d.image, client: d.vision, env: d.env, log: d.log, now: d.now, pollMs: d.pollMs }, { id: rec.id, film: rec.film, memorial: rec.memorial, rev: artRevFor(rec.id) }), budget)
+      if (!art) return json(200, { state: 'pending', view: animationView(rec, await safeArt(d.store, rec.id)) }, noStore) // still being drawn: ask again
+      if (art.status === 'rendering') return json(200, { state: 'pending', view: animationView(rec, art) }, noStore)
       return json(200, { state: art.status === 'deferred' ? 'deferred' : 'ready', view: animationView(rec, art) }, noStore)
     },
 

@@ -9,7 +9,7 @@ import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'no
 import sharp from 'sharp'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { ANIMATION_ID_PATTERN, SAMPLE_IDS, SAMPLE_RECORDS, animationSamplesOn, animationUrl, animationView, buildAnimationRecord, isAnimationRecord, newAnimationId, publicUrl, type AnimationRecord } from '../engine/animation.ts'
+import { ANIMATION_ID_PATTERN, SAMPLE_IDS, artRevFor, SAMPLE_RECORDS, animationSamplesOn, animationUrl, animationView, buildAnimationRecord, isAnimationRecord, newAnimationId, publicUrl, type AnimationRecord } from '../engine/animation.ts'
 import { createAnimationHandlers } from '../api/animation.ts'
 import { createOrderHandler } from '../api/order.ts'
 import { checkFilmScript, fallbackFilm, type FilmInput, type FilmRecord } from '../engine/film.ts'
@@ -228,6 +228,26 @@ const READY: FilmRecord = { status: 'ready', made_at: NOW.toISOString(), picture
     const b = await post(r0, 'AN-secondsecondsecond22')
     void r
     check('(3b) above the daily limit the answer is {state: deferred} and the view says so (the page shows 「映像は明日お届けします」); nothing is drawn', a.state === 'ready' && b.state === 'deferred' && b.view.film.deferred === true && b.view.film.pictures === null && r0.imageCalls() === 4)
+  }
+  {
+    // quota that never gives way: the film is incomplete — it plays with washi, the view says so, the next open inside the retry gap draws nothing
+    const { ImageError } = await import('../engine/film-art.ts')
+    const r = mkRig({ image: () => { throw new ImageError('quota') }, env: { ICHIREI_FILM_QUOTA_WAITS_MS: '5', ICHIREI_FILM_RETRY_MS: '60000', ICHIREI_FILM_BG_RETRY_MS: '0' } })
+    await r.store.put(RID, { ...rec, id: RID, film: READY })
+    const a = await post(r)
+    const calls = r.imageCalls()
+    const b = await post(r)
+    const v = (await (await r.h.view(RID)).json()) as any
+    check('(3b) quota that does not give way: the answer is {ready} with the film INCOMPLETE — four washi pictures and incomplete: true (the page plays it and asks again later); an open inside the retry gap draws nothing more; the plain view says incomplete too', a.state === 'ready' && a.view.film.incomplete === true && a.view.film.pictures.every((u: string) => u.startsWith('/film/washi-')) && b.view.film.incomplete === true && r.imageCalls() === calls && v.film.incomplete === true && v.film.pictures.length === 4)
+  }
+  {
+    // a sample\'s picture revision: an old art record of ja (no revision) is ignored — its pictures are drawn again; en (no revision) keeps its pictures
+    const store = new MemoryOrderStore()
+    for (const sid of [SAMPLE_IDS.ja, SAMPLE_IDS.en]) await store.putObject(`films/${sid}/art.json`, JSON.stringify({ schema: 'film-art', id: sid, status: 'done', started_at: NOW.toISOString(), made_at: NOW.toISOString(), slots: ['ai', 'ai', 'ai', 'ai'] }), 'application/json')
+    const h = createAnimationHandlers(() => ({ store, env: { ICHIREI_ANIMATION_SAMPLES: 'on' } as never }))
+    const ja = (await (await h.view(SAMPLE_IDS.ja)).json()) as any
+    const en = (await (await h.view(SAMPLE_IDS.en)).json()) as any
+    check('(3b) the samples are redrawn after this fix: ja, zh and the remembrance sample carry picture revision 2, so their older stored pictures are ignored (pictures: null → drawn again on the next open); the English sample (4/4) keeps its pictures', ja.film.pictures === null && en.film.pictures.length === 4 && artRevFor(SAMPLE_IDS.ja) === '2' && artRevFor(SAMPLE_IDS.zh) === '2' && artRevFor(SAMPLE_IDS.memorial) === '2' && artRevFor(SAMPLE_IDS.en) === undefined)
   }
   {
     const r = mkRig()
@@ -450,6 +470,7 @@ const READY: FilmRecord = { status: 'ready', made_at: NOW.toISOString(), picture
   check('(8) the word "AI" is never shown to the customer: not in the page copy, the credits page or the player', !/\bAI\b|人工知能|人工智慧|artificial intelligence/i.test(words) && !/\bAI\b|人工知能|人工智慧|artificial intelligence/i.test(read('src/animation/CreditsApp.tsx')) && !/>[^<]*\bAI\b[^<]*</.test(read('src/animation/AnimationApp.tsx')))
   check('(8) the preparing screen is quiet and in all three languages', (['ja', 'zh-Hant', 'en'] as const).every((l) => COPY[l].preparing.length > 3) && COPY.ja.preparing.includes('映像を準備しています'))
   const credits = read('src/animation/CreditsApp.tsx')
+  check('(8) /credits has one line, "Illustrations drawn with Google\u2019s image model" (nothing about it in the film itself: the player and its copy never mention it)', /Illustrations drawn with Google&rsquo;s image model/.test(credits) && !/image model|Google/.test(read('src/animation/AnimationApp.tsx').replace(/fonts\.googleapis\.com/g, '')) && (['ja', 'zh-Hant', 'en'] as const).every((l) => !/Google|image model|画像モデル/.test(Object.values(COPY[l]).flat().join(' '))))
   check('(8) the credits page no longer lists KanjiVG or Make Me a Hanzi (nothing is drawn stroke by stroke any more) and still carries the typefaces (SIL OFL)', !/KanjiVG|Make Me a Hanzi|Arphic|Ulrich Apel/.test(credits) && ['Zen Old Mincho', 'Noto Serif TC', 'Cormorant', 'SIL Open Font License'].every((n) => credits.includes(n)))
   const app = read('src/animation/AnimationApp.tsx')
   check('(8) the film links to the credits page, and /a/<id> and /credits are routed', app.includes('/credits') && /startsWith\('\/a\/'\)/.test(read('src/Routes.tsx')) && read('src/Routes.tsx').includes("'/credits'"))

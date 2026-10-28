@@ -66,9 +66,11 @@ export default function AnimationApp() {
     }
   }, [id])
 
-  // the script is there but the pictures are not drawn yet: this is the first open — ask for them. The request stays open until they are done
-  // (the server holds it so Cloud Run keeps the CPU); "pending" means ask again. Two opens draw one set (the server's lock).
-  const needsPictures = load.state === 'ready' && !!load.view.film && load.view.film.pictures === null && !load.view.film.deferred
+  // the script is there but the pictures are not drawn yet (the first open), or some could not be drawn earlier (quota or an outage): ask the server.
+  // The request stays open until it is done (the server holds it so Cloud Run keeps the CPU); "pending" means ask again. An incomplete film PLAYS
+  // meanwhile (washi where a picture is missing) and the missing pictures replace the washi when they arrive. Two opens draw one set (the server's lock).
+  const film0 = load.state === 'ready' ? load.view.film : null
+  const needsPictures = !!film0 && ((film0.pictures === null && !film0.deferred) || film0.incomplete === true)
   useEffect(() => {
     if (!needsPictures || !id) return
     const ac = new AbortController()
@@ -81,7 +83,8 @@ export default function AnimationApp() {
           return
         }
         const j = (await res.json()) as { state: string; view: AnimationView }
-        setLoad({ state: 'ready', view: j.view })
+        // never take pictures away from a film that is already playing
+        setLoad((cur) => (cur.state === 'ready' && cur.view.film?.pictures && !j.view.film?.pictures ? cur : { state: 'ready', view: j.view }))
         if (j.state === 'pending') timer = setTimeout(go, 3000)
       } catch {
         if (!ac.signal.aborted) timer = setTimeout(go, 5000)

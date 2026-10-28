@@ -43,8 +43,10 @@ const recs = {
 const pend = mk('AN-pendpendpendpendpend', { language: 'ja', glyph: '備', reading: 'そなえ・び', who: 'いつも、頼まれる前に備えている人。', created_at: new Date().toISOString() }, null)
 // a film whose script is saved but whose pictures are not drawn yet: its first open draws them (fake image model + fake picture check below)
 const first = mk('AN-firstfirstfirstfirst', { language: 'ja', glyph: '備', reading: 'そなえ・び', who: 'いつも、頼まれる前に備えている人。' }, ready(recs.ja.film.lines))
+// a film whose slot 2 could not be drawn earlier (quota): it plays with washi there and the page asks for the missing picture
+const inc = mk('AN-incompleteincomplete', { language: 'ja', glyph: '備', reading: 'そなえ・び', who: 'いつも、頼まれる前に備えている人。' }, ready(recs.ja.film.lines))
 const dir = mkdtempSync(join(tmpdir(), 'ichirei-anim-browser-'))
-for (const r of [...Object.values(recs), pend, first]) writeFileSync(join(dir, `${r.id}.json`), JSON.stringify(r))
+for (const r of [...Object.values(recs), pend, first, inc]) writeFileSync(join(dir, `${r.id}.json`), JSON.stringify(r))
 // the pictures of the finished films are seeded as the server itself would have saved them (films/<id>/1..4.webp and art.json)
 const shade = (id, i) => ({ r: 190 + ((id.length * 7 + i * 17) % 40), g: 175 + ((i * 29) % 40), b: 150 + ((i * 41) % 50) })
 for (const r of Object.values(recs)) {
@@ -53,14 +55,18 @@ for (const r of Object.values(recs)) {
   for (let i = 1; i <= 4; i++) writeFileSync(join(dir, 'films', r.id, `${i}.webp`), await sharp({ create: { width: 1080, height: 1350, channels: 3, background: shade(r.id, i) } }).webp().toBuffer())
   writeFileSync(join(dir, 'films', r.id, 'art.json'), JSON.stringify({ schema: 'film-art', id: r.id, status: 'done', started_at: '2026-10-28T00:00:00Z', made_at: '2026-10-28T00:00:00Z', slots: ['ai', 'ai', 'ai', 'ai'], reasons: ['ok', 'ok', 'ok', 'ok'] }))
 }
+mkdirSync(join(dir, 'films', inc.id), { recursive: true })
+for (const i of [1, 3, 4]) writeFileSync(join(dir, 'films', inc.id, `${i}.webp`), await sharp({ create: { width: 1080, height: 1350, channels: 3, background: shade(inc.id, i) } }).webp().toBuffer())
+writeFileSync(join(dir, 'films', inc.id, 'art.json'), JSON.stringify({ schema: 'film-art', id: inc.id, status: 'incomplete', started_at: '2026-10-28T00:00:00Z', made_at: '2026-10-28T00:00:00Z', slots: ['ai', 'pending', 'ai', 'ai'], reasons: ['ok', 'quota', 'ok', 'ok'], check_fails: [0, 0, 0, 0], calls: 3, retry_after: '2026-10-28T00:01:00Z' }))
 const expectedPictures = (rec) => (rec.film.status === 'fallback' ? ['/film/washi-1.webp', '/film/washi-2.webp'] : [1, 2, 3, 4].map((i) => `/api/film/${rec.id}/picture/${i}.webp`))
 // fakes for the first-open flow: Google's image model (a plain image after a short wait) and the picture check (every picture passes)
 const PNG = await sharp({ create: { width: 320, height: 400, channels: 3, background: '#cdbf9f' } }).png().toBuffer()
 let imageCalls = 0
+let imageDelayMs = 700
 const vertex = http.createServer(async (req, res) => {
   for await (const _c of req) void _c
   imageCalls++
-  await new Promise((r) => setTimeout(r, 700))
+  await new Promise((r) => setTimeout(r, imageDelayMs))
   res.writeHead(200, { 'content-type': 'application/json' })
   res.end(JSON.stringify({ candidates: [{ content: { parts: [{ inlineData: { mimeType: 'image/png', data: PNG.toString('base64') } }] } }] }))
 })
@@ -204,6 +210,22 @@ try {
     await context.close()
   }
 
+  // ---- an incomplete film (a picture could not be drawn earlier): it plays at once with washi in that slot; the missing picture arrives by itself ----
+  {
+    const context = await browser.newContext({ locale: 'ja-JP', ...DEVICES['iPhone-class (390×844, iOS UA)'] })
+    const before = imageCalls
+    imageDelayMs = 4000
+    const { page, errors } = await open(context, inc)
+    const first = await page.evaluate(() => [...document.querySelectorAll('.an-art img')].map((i) => i.getAttribute('src')))
+    const playing = (await page.evaluate(() => window.__ichireiFilm.time)) >= 0 && !(await page.isVisible('[data-testid=animation-preparing]').catch(() => false))
+    check('an incomplete film plays at once (no preparing screen): pictures 1, 3, 4 are real, picture 2 is the washi picture for now', playing && first[0].startsWith(`/api/film/${inc.id}/picture/1.webp`) && first[1].startsWith('/film/washi-') && first[2].startsWith(`/api/film/${inc.id}/picture/3.webp`), JSON.stringify(first))
+    imageDelayMs = 700
+    await page.waitForFunction((id) => document.querySelectorAll('.an-art img')[1]?.getAttribute('src')?.startsWith(`/api/film/${id}/picture/2.webp`), inc.id, { timeout: 25000 })
+    const loaded = await page.evaluate(() => new Promise((res) => { const im = document.querySelectorAll('.an-art img')[1]; if (im.complete && im.naturalWidth > 100) res(true); else im.addEventListener('load', () => res(im.naturalWidth > 100)) }))
+    check('…the page asked the server to draw only the missing picture (one image-model call); when it arrives it replaces the washi without a reload, and nothing breaks', imageCalls === before + 1 && loaded === true && errors.length === 0, `${imageCalls - before} calls`)
+    await context.close()
+  }
+
   // ---- the first open of a film whose script is saved: pictures are drawn now (fake image model), the film plays, a later open is instant ----
   {
     const context = await browser.newContext({ locale: 'ja-JP', ...DEVICES['Pixel-class (412×915, Android UA)'] })
@@ -257,7 +279,7 @@ try {
     await page.click('[data-testid=animation-credits-link]')
     await page.waitForSelector('[data-testid=credits-page]')
     const credits = await page.textContent('[data-testid=credits-page]')
-    check('the credits link opens the credits page: the typefaces (SIL OFL), no KanjiVG / Make Me a Hanzi any more, the film is silent, no "AI"', ['Zen Old Mincho', 'SIL Open Font License'].every((x) => credits.includes(x)) && !/KanjiVG|Make Me a Hanzi/.test(credits) && !/\bAI\b/.test(credits))
+    check('the credits link opens the credits page: the typefaces (SIL OFL), the one illustration line (Google\u2019s image model), no KanjiVG / Make Me a Hanzi any more, the film is silent, no "AI"', ['Zen Old Mincho', 'SIL Open Font License', 'Illustrations drawn with Google\u2019s image model'].every((x) => credits.includes(x)) && !/KanjiVG|Make Me a Hanzi/.test(credits) && !/\bAI\b/.test(credits))
     await context.close()
   }
 

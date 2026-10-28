@@ -66,6 +66,8 @@ export default function CreditsApp() {
           </p>
         </section>
       ))}
+      <h2>Illustrations</h2>
+      <p data-testid="credit-illustrations">Illustrations drawn with Google&rsquo;s image model. イラストは Google の画像モデルで描いています。</p>
       <h2>Music</h2>
       <p>The film is silent. 音楽は使用していません。</p>
       <p>
