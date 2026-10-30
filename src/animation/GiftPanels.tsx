@@ -52,7 +52,13 @@ interface PanelCopy {
   alreadyReceived: string
   addressError: string
   addressPrivacy: string
+  saveScroll: string
+  savePng: string
+  savePdf: string
 }
+
+/** The story scroll exists only when all four pictures are real (never with a washi slot). */
+const scrollAvailable = (v: AnimationView): boolean => !!v.film && v.film.status === 'ready' && !v.film.incomplete && !!v.film.pictures && v.film.pictures.length === 4 && v.film.pictures.every((u) => !u.startsWith('/film/washi-'))
 
 const COPY: Record<PageLang, PanelCopy> = {
   ja: {
@@ -65,6 +71,7 @@ const COPY: Record<PageLang, PanelCopy> = {
     receive: '受け取る', receiveLead: 'お届け先を入力してください。', receiveJapanOnly: '日本国内のみお届けできます。',
     formName: 'お名前', formCountry: '国', formPostal: '郵便番号', formRegion: '都道府県', formLine1: '住所', formLine2: '建物名・部屋番号', formPhone: '電話番号',
     send: '送信する', sending: '送信しています…', thanks: 'ありがとうございます。お届け先を受け取りました。', alreadyReceived: 'お届け先はすでに受け取っています。', addressError: '入力内容を確認してください。', addressPrivacy: '入力された住所は、お届けのためだけに使います。',
+    saveScroll: '物語絵巻を保存', savePng: '画像（PNG）', savePdf: 'PDF',
   },
   'zh-Hant': {
     giveTitle: '送出', giveLead: '這是為對方準備的頁面。把連結傳給對方，會先從影片開始。',
@@ -76,6 +83,7 @@ const COPY: Record<PageLang, PanelCopy> = {
     receive: '收下', receiveLead: '請填寫收件資料。', receiveJapanOnly: '僅限寄送至日本國內。',
     formName: '姓名', formCountry: '國家', formPostal: '郵遞區號', formRegion: '都道府縣／省', formLine1: '地址', formLine2: '建築物名稱・房號', formPhone: '電話',
     send: '送出', sending: '送出中…', thanks: '謝謝。已收到你的收件資料。', alreadyReceived: '已經收到收件資料了。', addressError: '請確認填寫的內容。', addressPrivacy: '填寫的地址只用於寄送。',
+    saveScroll: '儲存故事長卷', savePng: '圖片（PNG）', savePdf: 'PDF',
   },
   en: {
     giveTitle: 'Give it', giveLead: 'This page is for the person you are giving it to. Send them the link and it starts with the film.',
@@ -87,6 +95,7 @@ const COPY: Record<PageLang, PanelCopy> = {
     receive: 'Receive your gift', receiveLead: 'Please tell us where to send it.', receiveJapanOnly: 'This size can be sent within Japan only.',
     formName: 'Name', formCountry: 'Country', formPostal: 'Postal code', formRegion: 'Prefecture / state', formLine1: 'Address', formLine2: 'Building, room', formPhone: 'Phone',
     send: 'Send', sending: 'Sending…', thanks: 'Thank you. We have your address.', alreadyReceived: 'Your address has already been received.', addressError: 'Please check what you entered.', addressPrivacy: 'Your address is used only for the delivery.',
+    saveScroll: 'Save the story scroll', savePng: 'Image (PNG)', savePdf: 'PDF',
   },
 }
 
@@ -139,6 +148,16 @@ export function SenderPanel({ view, lang }: { view: AnimationView; lang: PageLan
         <p className="an-qr" data-testid="give-qr-img">
           <img src={`/api/gift/${token}/qr.svg`} alt="QR" width={200} height={200} />
           <span>{c.qrNote}</span>
+        </p>
+      )}
+      {scrollAvailable(view) && (
+        <p className="an-buttons" data-testid="sender-scroll">
+          <a className="an-btn" href={`/api/animation/${view.id}/scroll.png`} download>
+            {c.saveScroll} · {c.savePng}
+          </a>
+          <a className="an-btn" href={`/api/animation/${view.id}/scroll.pdf`} download>
+            {c.savePdf}
+          </a>
         </p>
       )}
       <h3>{c.statusTitle}</h3>
@@ -219,6 +238,16 @@ export function GiftPanel({ view, lang }: { view: GiftView; lang: PageLang }) {
             ))}
           </p>
         </>
+      )}
+      {scrollAvailable(view) && (
+        <p className="an-buttons" data-testid="gift-scroll">
+          <a className="an-btn" href={`/api/gift/${view.token}/scroll.png`} download>
+            {c.saveScroll} · {c.savePng}
+          </a>
+          <a className="an-btn" href={`/api/gift/${view.token}/scroll.pdf`} download>
+            {c.savePdf}
+          </a>
+        </p>
       )}
       {view.egift && phase === 'idle' && (
         <p>

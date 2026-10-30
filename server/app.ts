@@ -15,6 +15,7 @@ import { POST as poemPost } from '../api/poem.ts'
 import { POST as trackPost } from '../api/track.ts'
 import { handlers as animationHandlers } from '../api/animation.ts'
 import { handlers as giftHandlers } from '../api/gift.ts'
+import { handlers as opsHandlers } from '../api/ops.ts'
 import { POST as analyticsPost } from '../api/analytics.ts'
 import { GET as ratesGet } from '../api/rates.ts'
 import { GET as sizesGet } from '../api/sizes.ts'
@@ -157,8 +158,22 @@ export function createApp(config: ServerConfig): Hono {
   app.get('/api/gift/:token/qr.svg', limited(animationLimit), (c) => giftHandlers.qr(c.req.param('token')))
   app.post('/api/gift/:token/render', requireApiKey, limited(filmRenderLimit), (c) => giftHandlers.render(c.req.param('token')))
   app.get('/api/gift/:token/picture/:file', limited(animationLimit), (c) => giftHandlers.picture(c.req.param('token'), c.req.param('file').replace(/\.webp$/, '')))
+  // The story scroll: an image is drawn per request (a few seconds of CPU), so a tight per-IP limit.
+  const scrollLimit = envRunLimiter('ICHIREI_SCROLL_LIMIT', { max: 20, minutes: 10 })
+  for (const ext of ['png', 'pdf']) {
+    app.get(`/api/gift/:token/scroll.${ext}`, limited(scrollLimit), (c) => giftHandlers.scroll(c.req.param('token'), ext))
+    app.get(`/api/animation/:id/scroll.${ext}`, limited(scrollLimit), (c) => giftHandlers.scrollForSender(c.req.param('id'), ext))
+  }
   const addressLimit = envRunLimiter('ICHIREI_GIFT_ADDRESS_LIMIT', { max: 20, minutes: 60 })
   app.post('/api/gift/:token/address', limited(addressLimit), async (c) => giftHandlers.address(c.req.param('token'), await c.req.json().catch(() => null)))
+  // The owner's page (Basic Auth, ICHIREI_OPS_PASSWORD; refused outright without it). Never indexed, never cached.
+  const opsLimit = envRunLimiter('ICHIREI_OPS_LIMIT', { max: 120, minutes: 10 })
+  app.get('/ops', limited(opsLimit), (c) => opsHandlers.page(c.req.raw))
+  app.get('/ops/card/:file', limited(opsLimit), (c) => opsHandlers.card(c.req.raw, c.req.param('file').replace(/\.pdf$/, '')))
+  app.get('/ops/cards/today.pdf', limited(opsLimit), (c) => opsHandlers.cardsToday(c.req.raw))
+  app.get('/ops/wooden-today.csv', limited(opsLimit), (c) => opsHandlers.woodenCsv(c.req.raw))
+  app.post('/ops/mark', limited(opsLimit), (c) => opsHandlers.mark(c.req.raw))
+  app.post('/ops/egift/run', limited(opsLimit), (c) => opsHandlers.egiftRun(c.req.raw))
   app.post('/api/log', adaptVercelHandler(logHandler))
   // Purchase hand-off: stores the story + result under order_ref, creates the Shopify cart.
   app.post('/api/order', (c) => orderPost(c.req.raw))

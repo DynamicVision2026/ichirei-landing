@@ -844,6 +844,29 @@ const mockPage = async (browser, { onExplain, result, order, track } = {}) => {
   await gp.close()
 }
 
+// ---------- Run 8e: Part E — the story scroll's 保存 buttons appear only when all four pictures are real ----------
+{
+  const base = { id: 'AN-testtesttesttesttest', language: 'ja', glyph: '備', reading: 'そなえる', romanization: 'sonaeru', meaning_en: 'to be ready', who: 'いつも、頼まれる前に備えている人。', memorial: false }
+  const lines = ['「ちょうど今詰めてたところ」', 'いつも、頼まれる前に備えている人。', '三', '四']
+  const real = ['/film-art/a.webp', '/film-art/b.webp', '/film-art/c.webp', '/film-art/d.webp']
+  const cases = [
+    ['four real pictures', { status: 'ready', lines, pictures: real }, true],
+    ['one washi slot', { status: 'ready', lines, pictures: [...real.slice(0, 3), '/film/washi-4.webp'] }, false],
+    ['an incomplete film', { status: 'ready', lines, pictures: real, incomplete: true }, false],
+  ]
+  for (const [name, film, shown] of cases) {
+    const p = await browser.newPage({ locale: 'ja-JP', viewport: { width: 390, height: 800 } })
+    await p.route('**/api/animation/AN-testtesttesttesttest', (r) => r.fulfill({ json: { ...base, film, gift: { url: 'https://ichirei.soul-id.jp/g/RG-testtesttesttesttest', size_code: 'ICHIREI-CARD', ship_to: 'me' } } }))
+    await p.route('**/api/gift/RG-testtesttesttesttest/qr.svg', (r) => r.fulfill({ status: 200, contentType: 'image/svg+xml', body: '<svg xmlns="http://www.w3.org/2000/svg" width="10" height="10"/>' }))
+    await p.route('**/film-art/**', (r) => r.fulfill({ status: 200, contentType: 'image/svg+xml', body: '<svg xmlns="http://www.w3.org/2000/svg" width="10" height="10"/>' }))
+    await p.goto('http://localhost:5173/a/AN-testtesttesttesttest', { waitUntil: 'networkidle' })
+    await p.locator('[data-testid=sender-panel]').waitFor()
+    const n = await p.locator('[data-testid=sender-scroll] a').count()
+    check(`scroll buttons (${name}): ${shown ? 'PNG and PDF links to this film' : 'none'}`, shown ? n === 2 && (await p.locator('[data-testid=sender-scroll] a').first().getAttribute('href')) === '/api/animation/AN-testtesttesttesttest/scroll.png' : n === 0)
+    await p.close()
+  }
+}
+
 // ---------- Run 8d: the included poem (歌の添え書き) on the order form: one format, shown in full, free ----------
 {
   const poemCalls = []

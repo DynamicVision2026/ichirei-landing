@@ -31,6 +31,7 @@ RUN npm ci --omit=dev && npm cache clean --force
 # files, read at request time. Editing them = a normal commit; Cloud Build
 # rebuilds and redeploys. No code changes.
 COPY engine ./engine
+COPY assets ./assets
 # Small plain-TS modules shared with the browser (packages, certificate text, glyph choice).
 COPY src/order ./src/order
 COPY api ./api

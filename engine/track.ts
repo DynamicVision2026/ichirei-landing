@@ -193,7 +193,12 @@ const METADATA = 'http://metadata.google.internal/computeMetadata/v1'
  * deploy, it only makes /track answer "unavailable" until it is created and granted.
  */
 export async function readAdminSecret(env: NodeJS.ProcessEnv = process.env, fetchImpl: typeof fetch = fetch): Promise<string> {
-  const direct = env.SHOPIFY_ADMIN_CLIENT_SECRET?.trim()
+  return readSecret(ADMIN_SECRET_NAME, env, fetchImpl)
+}
+
+/** Same rule for any secret: the environment variable of the same name wins, otherwise Secret Manager (latest version). */
+export async function readSecret(name: string, env: NodeJS.ProcessEnv = process.env, fetchImpl: typeof fetch = fetch): Promise<string> {
+  const direct = env[name]?.trim()
   if (direct) return direct
   const meta = async (path: string) => {
     const r = await fetchImpl(`${METADATA}/${path}`, { headers: { 'Metadata-Flavor': 'Google' }, signal: AbortSignal.timeout(5_000) })
@@ -203,13 +208,13 @@ export async function readAdminSecret(env: NodeJS.ProcessEnv = process.env, fetc
   const project = env.GOOGLE_CLOUD_PROJECT?.trim() || (await (await meta('project/project-id')).text()).trim()
   const { access_token } = (await (await meta('instance/service-accounts/default/token')).json()) as { access_token: string }
   const base = (env.SECRET_MANAGER_API_BASE || 'https://secretmanager.googleapis.com').replace(/\/$/, '')
-  const res = await fetchImpl(`${base}/v1/projects/${encodeURIComponent(project)}/secrets/${ADMIN_SECRET_NAME}/versions/latest:access`, {
+  const res = await fetchImpl(`${base}/v1/projects/${encodeURIComponent(project)}/secrets/${encodeURIComponent(name)}/versions/latest:access`, {
     headers: { authorization: `Bearer ${access_token}` },
     signal: AbortSignal.timeout(10_000),
   })
-  if (!res.ok) throw new TrackUnavailable(`Secret Manager HTTP ${res.status} for ${ADMIN_SECRET_NAME}`)
+  if (!res.ok) throw new TrackUnavailable(`Secret Manager HTTP ${res.status} for ${name}`)
   const data = ((await res.json()) as { payload?: { data?: string } }).payload?.data
-  if (!data) throw new TrackUnavailable(`${ADMIN_SECRET_NAME} has no value`)
+  if (!data) throw new TrackUnavailable(`${name} has no value`)
   return Buffer.from(data, 'base64').toString('utf8').trim()
 }
 

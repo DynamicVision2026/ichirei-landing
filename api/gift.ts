@@ -14,6 +14,8 @@ import { readArt, picturePath, type ArtRecord } from '../engine/film-art.ts'
 import { createOrderStore, type OrderStore } from '../engine/order-store.ts'
 import { createAnimationHandlers, type AnimationDeps } from './animation.ts'
 import { filmUsable } from '../engine/animation.ts'
+import { loadArtwork, scrollReady } from '../engine/render/artwork.ts'
+import { makeScroll, scrollPdf } from '../engine/render/scroll.ts'
 
 const headers = (extra: Record<string, string> = {}) => ({ 'x-robots-tag': 'noindex, nofollow', ...extra })
 const json = (status: number, body: unknown, extra: Record<string, string> = {}) =>
@@ -44,6 +46,21 @@ const safeArt = async (store: OrderStore | null, id: string): Promise<ArtRecord 
     return await readArt(store, id)
   } catch {
     return null
+  }
+}
+
+async function scrollResponse(gift: GiftRecord, anim: AnimationRecord, ext: string, d: GiftDeps): Promise<Response> {
+  if (ext !== 'png' && ext !== 'pdf') return json(404, { error: 'not_found' }, { 'cache-control': 'no-store' })
+  const art = await safeArt(d.store, anim.id)
+  if (!scrollReady(anim, art)) return json(404, { error: 'not_ready' }, { 'cache-control': 'no-store' })
+  try {
+    const work = await loadArtwork(d.store!, gift, anim, art, d.env)
+    const scroll = await makeScroll(work, d.env)
+    const body = ext === 'png' ? scroll.png : await scrollPdf(scroll)
+    return new Response(new Uint8Array(body), { status: 200, headers: headers({ 'content-type': ext === 'png' ? 'image/png' : 'application/pdf', 'content-disposition': `attachment; filename="ichirei-scroll.${ext}"`, 'cache-control': 'private, no-store' }) })
+  } catch (err) {
+    console.error('[ichirei-scroll] failed', err instanceof Error ? err.message : err)
+    return json(500, { error: 'scroll_failed' }, { 'cache-control': 'no-store' })
   }
 }
 
@@ -96,6 +113,28 @@ export function createGiftHandlers(deps: () => GiftDeps) {
       if (r.status !== 200) return json(r.status, { error: r.status === 404 ? 'not_found' : 'unavailable' }, { 'cache-control': 'no-store' })
       const svg = await QRCode.toString(giftUrl(r.gift.token, d.env), { type: 'svg', errorCorrectionLevel: 'M', margin: 2 })
       return new Response(svg, { status: 200, headers: headers({ 'content-type': 'image/svg+xml; charset=utf-8', 'cache-control': 'private, no-store' }) })
+    },
+
+    /** The story scroll (PNG or PDF) of the receiver's gift. Only when all four pictures are real: never with a washi slot. */
+    async scroll(token: string, ext: string): Promise<Response> {
+      const d = deps()
+      const r = await loadGift(token, d)
+      if (r.status !== 200) return json(r.status, { error: r.status === 404 ? 'not_found' : 'unavailable' }, { 'cache-control': 'no-store' })
+      return scrollResponse(r.gift, r.anim, ext, d)
+    },
+
+    /** The same scroll from the SENDER's page (by the sender's own id). */
+    async scrollForSender(animationId: string, ext: string): Promise<Response> {
+      const d = deps()
+      if (!ANIMATION_ID_PATTERN.test(animationId) || !d.store) return json(404, { error: 'not_found' }, { 'cache-control': 'no-store' })
+      try {
+        const a = await d.store.get(animationId)
+        if (!isAnimationRecord(a) || !a.gift_token) return json(404, { error: 'not_found' }, { 'cache-control': 'no-store' })
+        const r = await loadGift(a.gift_token, d)
+        return r.status === 200 ? scrollResponse(r.gift, r.anim, ext, d) : json(404, { error: 'not_found' }, { 'cache-control': 'no-store' })
+      } catch {
+        return json(503, { error: 'unavailable' }, { 'cache-control': 'no-store' })
+      }
     },
 
     /** The e-gift receiver types their address — once. The address is stored on the gift record and returned by NO call. */
