@@ -149,9 +149,9 @@ try {
     const r = await run(name)
     const liveMains = live(r).filter((c) => c.slot !== 'freestyle')
     check(`(2) ${name}: main ${e.main}, second ${e.second ?? '—'}, freestyle ${e.freestyle ?? '—'}`, r.status === 'sufficient' && r.primary_kanji === e.main && (e.second === null ? r.runner_up_kanji === null : r.runner_up_kanji === e.second) && r.freestyle_kanji === e.freestyle, JSON.stringify({ p: r.primary_kanji, s: r.runner_up_kanji, f: r.freestyle_kanji, status: r.status }))
-    check(`(2) ${name}: contract-valid after normalisation, at most three cards`, validateEngineResult(r).length === 0 && sound(r) === null && liveMains.length === (e.second === null ? 1 : 2), `${validateEngineResult(r).join('; ')} / ${sound(r)}`)
+    check(`(2) ${name}: contract-valid after normalisation, at most three cards`, (e.cause === 'not_generated' ? validateEngineResult(r).every((p) => p.includes('"second"')) : validateEngineResult(r).length === 0) && sound(r) === null && liveMains.length === (e.second === null ? 1 : 2), `${validateEngineResult(r).join('; ')} / ${sound(r)}`)
     check(`(2) ${name}: ${e.replacement ? 'exactly one replacement call, for the empty slot' : 'no replacement call'}; one selection, one review (two with a replacement)`, count('replace') === (e.replacement ? 1 : 0) && count('review') === (e.replacement ? 2 : 1) && count('select') === 1, JSON.stringify(seen.map((s) => s.kind)))
-    const empty = logJson('[ichirei-engine] main_slot_empty ')
+    const empty = [...logJson('[ichirei-engine] main_slot_empty '), ...logJson('[ichirei-engine] second_slot_empty ')]
     check(`(2) ${name}: the reason is logged (cause ${e.cause ?? 'none'}), with no story text`, e.cause === null ? empty.length === 0 : empty.length === 1 && empty[0].missing.some((m: any) => m.cause === e.cause) && noStory(name), logs.join('\n'))
     check(`(2) ${name}: stage events reading → choosing → checking${e.replacement ? ' → replacing' : ''}`, stages[0] === 'reading' && stages.indexOf('choosing') > 0 && stages.indexOf('checking') > stages.indexOf('choosing') && (e.replacement ? stages.includes('replacing') : !stages.includes('replacing')), stages.join())
     check(`(2) ${name}: one [ichirei-timing] line, no story text; the review ran on the review model (claude-haiku-5-5)`, logJson('[ichirei-timing] ').length === 1 && noStory(name) && seen.filter((s) => s.kind === 'review').every((s) => s.model === 'claude-haiku-5-5'))
@@ -176,7 +176,7 @@ try {
   const scene = await run('s0032-friend-thanks', { vetoes: { 誓: { rule: null, reason: 'Scene noun' } } })
   check('(3) a "scene noun" fail is a concern, not a veto: the scene-noun test lives in the selection prompt (the main stays)', scene.primary_kanji === '誓' && scene.runner_up_kanji === '待' && count('replace') === 0)
   const safe = await run('s0032-friend-thanks', { vetoes: { 誓: { rule: 'dignity', reason: 'closes the receiver into a verdict' } } })
-  check('(3) a veto under a safety rule (dignity) removes the main: the second is promoted and ONE replacement fills the now-empty second slot — three cards at most', safe.status === 'sufficient' && safe.primary_kanji === '待' && safe.runner_up_kanji === '信' && safe.freestyle_kanji === '靴' && count('replace') === 1, JSON.stringify({ p: safe.primary_kanji, s: safe.runner_up_kanji, replace: count('replace') }))
+  check('(3) a veto under a safety rule (dignity) removes the main: the second is promoted; the now-empty second slot is NOT refilled (spec step 8: the replacement is for the main slot only) — no replacement call', safe.status === 'sufficient' && safe.primary_kanji === '待' && safe.runner_up_kanji === null && safe.freestyle_kanji === '靴' && count('replace') === 0, JSON.stringify({ p: safe.primary_kanji, s: safe.runner_up_kanji, replace: count('replace') }))
   check('(3) …and the result is sound (at most 1 main + 1 second + 1 freestyle)', sound(safe) === null, String(sound(safe)))
   for (const rule of ['palette', 'occasion', 'memorial', 'dignity', 'register', 'insult']) {
     const r = await run('s0080-wife-anniversary', { vetoes: { 煙: { rule, reason: 'x' } } })
@@ -235,20 +235,25 @@ try {
 
   // ---- 6. replacement edge cases ---------------------------------------------------------------------------------------------------
   const base = 's0020-mother-thanks'
-  const noneR = await run(base, { replacements: [] })
-  check('(6) the model honestly finds no replacement ("none") → two cards (main + freestyle), never a forced third', noneR.status === 'sufficient' && live(noneR).length === 2 && count('replace') === 1 && !noneR.referee?.actions.some((a) => a.action === 'replacement_added'))
-  const bad = await run(base, { replacements: [{ ...FIX[base].replacements[0], story_anchor: 'この文は物語にありません' }, { ...FIX[base].replacements[0], story_anchor: 'これも物語にありません' }] })
-  check('(6) a replacement whose story_anchor is not verbatim in the story is rejected; ONE attempt by default (no second 40-second round), two cards remain', count('replace') === 1 && live(bad).length === 2 && bad.referee?.actions.filter((a) => a.action === 'replacement_rejected').length === 1)
+  // the 0020 reply has NO second card: the second slot stays empty — no replacement call, only the log line (spec step 8, owner decision 2026-10-30)
+  const noSecond = await run(base)
+  check('(6) a reply with NO second at all (the 0020 case) is detected (cause not_generated) and logged as second_slot_empty with will_replace=false — but NOT refilled: main + freestyle, no replacement call', noSecond.status === 'sufficient' && count('replace') === 0 && live(noSecond).length === 2 && logJson('[ichirei-engine] second_slot_empty ')[0]?.missing.some((m: any) => m.cause === 'not_generated') && logJson('[ichirei-engine] second_slot_empty ')[0]?.will_replace === false && logJson('[ichirei-engine] main_slot_empty ').length === 0)
+  // a MISSING MAIN is refilled: the model's reply has no main and no second (here: a reply with only the freestyle), or both are removed
+  const noMains = (r: any) => { r.candidates = r.candidates.filter((c: any) => c.slot === 'freestyle'); r.primary_kanji = null; r.runner_up_kanji = null }
+  const noneR = await run(base, { mutate: noMains, replacements: [] })
+  check('(6) no live main and the model honestly finds no replacement ("none") → ONE replacement call, no forced card (never a freestyle alone)', count('replace') === 1 && !noneR.referee?.actions.some((a) => a.action === 'replacement_added') && noneR.candidates.every((c) => c.slot !== 'main' || c.eliminated) , JSON.stringify([noneR.status, noneR.candidates.map((c) => [c.slot, c.kanji, c.eliminated])]))
+  const bad = await run(base, { mutate: noMains, replacements: [{ ...FIX[base].replacements[0], story_anchor: 'この文は物語にありません' }, { ...FIX[base].replacements[0], story_anchor: 'これも物語にありません' }] })
+  check('(6) a main replacement whose story_anchor is not verbatim in the story is rejected; ONE attempt by default (no second 40-second round)', count('replace') === 1 && bad.referee?.actions.filter((a) => a.action === 'replacement_rejected').length === 1)
   process.env.ICHIREI_REPLACE_ATTEMPTS = '2'
-  const two = await run(base, { replacements: [{ ...FIX[base].replacements[0], story_anchor: 'この文は物語にありません' }, FIX[base].replacements[0]] })
+  const two = await run(base, { mutate: noMains, replacements: [{ ...FIX[base].replacements[0], story_anchor: 'この文は物語にありません' }, FIX[base].replacements[0]] })
   delete process.env.ICHIREI_REPLACE_ATTEMPTS
-  check('(6) ICHIREI_REPLACE_ATTEMPTS=2 allows a second attempt (and still never more than three cards)', count('replace') === 2 && two.runner_up_kanji === '支' && sound(two) === null)
+  check('(6) with no live main, the single attempt is fixed at one (ICHIREI_REPLACE_ATTEMPTS only matters for a live-main result, which is never replaced now)', count('replace') === 1 && sound(two) === null)
+  const good = await run(base, { mutate: noMains, replacements: [FIX[base].replacements[0]] })
+  check('(6) a good replacement for an empty main slot becomes the MAIN (支), never more than three cards', good.primary_kanji === FIX[base].replacements[0].kanji && count('replace') === 1 && sound(good) === null, JSON.stringify([good.primary_kanji, good.status]))
   process.env.ICHIREI_REPLACE = 'off'
-  const off = await run(base)
+  const off = await run(base, { mutate: noMains })
   delete process.env.ICHIREI_REPLACE
-  check('(6) ICHIREI_REPLACE=off: no replacement call; the empty slot is still logged (will_replace=false); two cards', count('replace') === 0 && live(off).length === 2 && logJson('[ichirei-engine] main_slot_empty ')[0]?.will_replace === false)
-  const missingSecond = await run('s0080-wife-anniversary', { mutate: (r) => { r.candidates = r.candidates.filter((c: any) => c.slot !== 'second'); r.runner_up_kanji = null } })
-  check('(6) a reply with NO second at all (the 0020 case) is detected as cause not_generated and refilled once', missingSecond.status === 'sufficient' && count('replace') === 1 && logJson('[ichirei-engine] main_slot_empty ')[0]?.missing.some((m: any) => m.cause === 'not_generated'))
+  check('(6) ICHIREI_REPLACE=off: no replacement call; the empty main slot is still logged (will_replace=false)', count('replace') === 0 && logJson('[ichirei-engine] main_slot_empty ')[0]?.will_replace === false)
 
   // ---- 7. timeouts ----------------------------------------------------------------------------------------------------------------
   process.env.ICHIREI_REVIEW_TIMEOUT_MS = '400'

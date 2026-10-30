@@ -146,12 +146,13 @@ export async function completeMains(
   const log = opts.log ?? ((l: string) => console.log(l))
   if (result.status !== 'sufficient') return result
   const { live, gone } = missingMains(result)
-  // Only an EMPTY slot is filled: with two live main candidates nothing is asked of the model. With none live (the referee and the
+  // Spec step 8 (owner decision 2026-10-30): a replacement fills a missing MAIN only. A removed second or freestyle card stays empty — one true
+  // card shown quickly beats a weaker card shown slowly. With a live main nothing is asked of the model. With none live (the referee and the
   // review removed every main candidate) ONE replacement is tried before the sender is told there is nothing.
-  // (a result whose primary is gone although two mains are still live — both unreadable, both without an anchor — is also filled)
-  if (live.length >= 2 && result.primary_kanji !== null) return result
-  log(`[ichirei-engine] main_slot_empty ${JSON.stringify({ live: live.map((c) => ({ slot: c.slot, kanji: c.kanji })), missing: gone, will_replace: replaceEnabled() })}`)
-  if (!replaceEnabled()) return result
+  // (a result whose primary is gone although a main is still live — unreadable, without an anchor — is also filled: that slot is the main's)
+  const mainMissing = live.length === 0 || result.primary_kanji === null
+  if (live.length < 2) log(`[ichirei-engine] ${mainMissing ? 'main_slot_empty' : 'second_slot_empty'} ${JSON.stringify({ live: live.map((c) => ({ slot: c.slot, kanji: c.kanji })), missing: gone, will_replace: mainMissing && replaceEnabled() })}`)
+  if (!mainMissing || !replaceEnabled()) return result
 
   // one attempt by default: a failed attempt costs a model call and a review (≈ 40 s) and the sender still gets a valid result
   const attemptsMax = live.length === 0 ? 1 : Math.max(0, Number(process.env.ICHIREI_REPLACE_ATTEMPTS ?? 1) || 0)

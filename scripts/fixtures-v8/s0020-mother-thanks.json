@@ -90,9 +90,9 @@
   ],
   "expect": {
     "main": "備",
-    "second": "支",
+    "second": null,
     "freestyle": "詰",
     "cause": "not_generated",
-    "replacement": true
+    "replacement": false
   }
 }
