@@ -14,6 +14,7 @@ import { POST as orderPost } from '../api/order.ts'
 import { POST as poemPost } from '../api/poem.ts'
 import { POST as trackPost } from '../api/track.ts'
 import { handlers as animationHandlers } from '../api/animation.ts'
+import { handlers as giftHandlers } from '../api/gift.ts'
 import { POST as analyticsPost } from '../api/analytics.ts'
 import { GET as ratesGet } from '../api/rates.ts'
 import { GET as sizesGet } from '../api/sizes.ts'
@@ -151,6 +152,13 @@ export function createApp(config: ServerConfig): Hono {
   const filmRenderLimit = envRunLimiter('ICHIREI_FILM_RENDER_LIMIT', { max: 30, minutes: 10 })
   app.post('/api/film/:id/render', requireApiKey, limited(filmRenderLimit), (c) => animationHandlers.render(c.req.param('id')))
   app.get('/api/film/:id/picture/:file', limited(animationLimit), (c) => animationHandlers.picture(c.req.param('id'), c.req.param('file').replace(/\.webp$/, '')))
+  // The receiver's gift page (/g/<token>): its own view, pictures, render and QR; and the e-gift address (typed once, never returned by any call).
+  app.get('/api/gift/:token', limited(animationLimit), (c) => giftHandlers.view(c.req.param('token')))
+  app.get('/api/gift/:token/qr.svg', limited(animationLimit), (c) => giftHandlers.qr(c.req.param('token')))
+  app.post('/api/gift/:token/render', requireApiKey, limited(filmRenderLimit), (c) => giftHandlers.render(c.req.param('token')))
+  app.get('/api/gift/:token/picture/:file', limited(animationLimit), (c) => giftHandlers.picture(c.req.param('token'), c.req.param('file').replace(/\.webp$/, '')))
+  const addressLimit = envRunLimiter('ICHIREI_GIFT_ADDRESS_LIMIT', { max: 20, minutes: 60 })
+  app.post('/api/gift/:token/address', limited(addressLimit), async (c) => giftHandlers.address(c.req.param('token'), await c.req.json().catch(() => null)))
   app.post('/api/log', adaptVercelHandler(logHandler))
   // Purchase hand-off: stores the story + result under order_ref, creates the Shopify cart.
   app.post('/api/order', (c) => orderPost(c.req.raw))
@@ -177,6 +185,10 @@ export function createApp(config: ServerConfig): Hono {
 
   // The private animation pages are never indexed.
   app.use('/a/*', async (c, next) => {
+    await next()
+    c.header('X-Robots-Tag', 'noindex, nofollow')
+  })
+  app.use('/g/*', async (c, next) => {
     await next()
     c.header('X-Robots-Tag', 'noindex, nofollow')
   })

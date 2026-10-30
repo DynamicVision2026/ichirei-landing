@@ -1,0 +1,188 @@
+// The receiver's gift page (Part D of the 2026-10-30 ticket): a second private link per order, separate from the sender's page.
+//
+//   sender's page   /a/<AN-…>   (private, exists since the film): order details, a preview of everything, the 「贈る」 button.
+//   receiver's page /g/<RG-…>   (new): the film plays first, then the character, the poem, the certificate line, 「○○より」, the sender's
+//                               message and the scroll download. It NEVER shows a price, an order number, the other candidate characters or the
+//                               sender's story; and nothing in it names the sender's page (its pictures come through the receiver's own link).
+//
+// The receiver's link is a token of 100 bits (RG-…), stored as its own small record in the order store (like the film record). For an e-gift the
+// receiver types their address here: it is kept on our side only (this record), goes onto the owner's daily list, and is never shown to the sender or
+// to anyone else; it is deleted 90 days after the order ships.
+
+import { randomBytes } from 'node:crypto'
+import { animationView, publicUrl, type AnimationRecord, type AnimationView } from './animation.ts'
+import { certificateText } from '../src/order/certificate.ts'
+import { EGIFT_JAPAN_ONLY, PACKAGE_SKU, type PackageId } from '../src/order/packages.ts'
+import type { OrderRecord } from './order.ts'
+import type { ArtRecord } from './film-art.ts'
+import type { Language } from './contract.ts'
+
+export const GIFT_TOKEN_PATTERN = /^RG-[a-z2-9]{20}$/
+
+export const newGiftToken = (random: (n: number) => Uint8Array = randomBytes): string => {
+  const alphabet = 'abcdefghjkmnpqrstuvwxyz23456789' // no look-alikes (no i, l, o, 0, 1)
+  const bytes = random(20)
+  let out = ''
+  for (const b of bytes) out += alphabet[b % alphabet.length]
+  return `RG-${out}`
+}
+export const giftUrl = (token: string, env: NodeJS.ProcessEnv = process.env): string => `${publicUrl(env)}/g/${token}`
+
+export interface GiftAddress {
+  name: string
+  /** ISO 3166 alpha-2. */
+  country: string
+  postal: string
+  region: string
+  line1: string
+  line2: string
+  phone: string
+}
+
+export interface GiftEgift {
+  /** waiting: the receiver has not typed an address yet · received: they have. */
+  state: 'waiting' | 'received'
+  /** For the one reminder e-mail after 7 days; never shown to the receiver. */
+  sender_email: string | null
+  reminded_at: string | null
+  received_at: string | null
+  address: GiftAddress | null
+}
+
+export interface GiftRecord {
+  schema: 'gift'
+  token: string
+  /** The sender's film page. Never sent to the receiver's page. */
+  animation_id: string
+  /** Kept for the owner; never sent to a page. */
+  order_ref: string
+  created_at: string
+  language: Language
+  glyph: string
+  reading: string
+  romanization: string
+  meaning_en: string | null
+  who: string
+  memorial: boolean
+  /** The one line that comes with the character (the certificate line), in the sender's language. */
+  certificate_line: string
+  poem: { type: string; lines: string[]; reading: string } | null
+  /** 「○○より」 / 「＿＿さんへ」: the sender's and the receiver's names as the sender typed them. */
+  from: string
+  to: string
+  /** The short message for the card (60 characters at most); empty when none. */
+  message: string
+  size_code: string
+  package: PackageId
+  ship_to: 'none' | 'me' | 'direct' | 'egift'
+  egift: GiftEgift | null
+  /** Set from the owner page when the order has shipped: the address is deleted 90 days later. */
+  shipped_at?: string | null
+}
+
+export function buildGiftRecord(record: OrderRecord, animationId: string, token: string, senderEmail: string | null, now: Date = new Date()): GiftRecord {
+  const p = record.production
+  const poem = p.certificate.poems[0] ?? p.poems[0] ?? null
+  const ship = p.ship_to ?? 'me'
+  return {
+    schema: 'gift',
+    token,
+    animation_id: animationId,
+    order_ref: record.order_ref,
+    created_at: now.toISOString(),
+    language: p.language,
+    glyph: p.glyph_to_carve,
+    reading: p.certificate.reading,
+    romanization: p.certificate.romanization,
+    meaning_en: p.certificate.meaning_en,
+    who: p.gaze_line,
+    memorial: p.certificate.memorial === true,
+    certificate_line: certificateText(p.language),
+    poem: poem ? { type: String((poem as { type?: unknown }).type ?? ''), lines: [...((poem as { lines?: string[] }).lines ?? [])], reading: String((poem as { reading?: unknown }).reading ?? '') } : null,
+    from: p.sender_name,
+    to: p.receiver_name,
+    message: p.gift_message ?? '',
+    size_code: p.size_code ?? PACKAGE_SKU[p.package],
+    package: p.package,
+    ship_to: ship,
+    egift: ship === 'egift' ? { state: 'waiting', sender_email: senderEmail, reminded_at: null, received_at: null, address: null } : null,
+    shipped_at: null,
+  }
+}
+
+export function isGiftRecord(x: unknown): x is GiftRecord {
+  const r = x as Partial<GiftRecord> | null
+  return !!r && r.schema === 'gift' && typeof r.token === 'string' && GIFT_TOKEN_PATTERN.test(r.token) && typeof r.animation_id === 'string' && typeof r.glyph === 'string'
+}
+
+/** What the receiver's page gets: the film, the character, the poem, the lines and the message — and nothing about the order or the story. */
+export interface GiftView extends AnimationView {
+  token: string
+  certificate_line: string
+  poem: { type: string; lines: string[]; reading: string } | null
+  from: string
+  to: string
+  message: string
+  /** null: an ordinary gift (nothing to enter). Otherwise the receiver is asked for an address: worldwide, or Japan only for the wooden sizes. */
+  egift: { state: 'waiting' | 'received'; japan_only: boolean } | null
+}
+
+export function giftView(g: GiftRecord, anim: AnimationRecord, art: ArtRecord | null): GiftView {
+  const v = animationView(anim, art)
+  const from = `/api/film/${anim.id}/picture/`
+  const to = `/api/gift/${g.token}/picture/`
+  return {
+    ...v,
+    id: g.token, // the receiver's page never carries the sender's id
+    film: v.film ? { ...v.film, pictures: v.film.pictures ? v.film.pictures.map((u) => (u.startsWith(from) ? to + u.slice(from.length) : u)) : null } : null,
+    token: g.token,
+    certificate_line: g.certificate_line,
+    poem: g.poem,
+    from: g.from,
+    to: g.to,
+    message: g.message,
+    egift: g.egift ? { state: g.egift.state, japan_only: EGIFT_JAPAN_ONLY[g.package] } : null,
+  }
+}
+
+// ---- the e-gift address -----------------------------------------------------------------------------------------------------------------------
+
+const clean = (v: unknown, max: number): string => (typeof v === 'string' ? v.replace(/\p{Cc}+/gu, ' ').replace(/\s+/g, ' ').trim().slice(0, max) : '')
+
+export type AddressCheck = { ok: true; address: GiftAddress } | { ok: false; field: string; error: string }
+
+/** Validate what the receiver typed. Japan format by default; the wooden sizes are Japan only at launch, the card ships worldwide. */
+export function checkAddress(body: unknown, pkg: PackageId): AddressCheck {
+  const b = (body ?? {}) as Record<string, unknown>
+  const name = clean(b.name, 60)
+  if (!name) return { ok: false, field: 'name', error: 'Name is required' }
+  const country = (clean(b.country, 2) || 'JP').toUpperCase()
+  if (!/^[A-Z]{2}$/.test(country)) return { ok: false, field: 'country', error: 'Country must be a 2-letter code' }
+  if (EGIFT_JAPAN_ONLY[pkg] && country !== 'JP') return { ok: false, field: 'country', error: 'This size can be sent as an e-gift within Japan only' }
+  const postal = clean(b.postal, 20)
+  if (country === 'JP' ? !/^\d{3}-?\d{4}$/.test(postal.replace(/[〒\s]/g, '')) : postal === '') return { ok: false, field: 'postal', error: 'Postal code is required' }
+  const line1 = clean(b.line1, 120)
+  if (!line1) return { ok: false, field: 'line1', error: 'Address is required' }
+  const phone = clean(b.phone, 20)
+  if (!/^[0-9+\-() ]{7,20}$/.test(phone)) return { ok: false, field: 'phone', error: 'Phone number is required' }
+  const region = clean(b.region, 60)
+  if (country === 'JP' && !region) return { ok: false, field: 'region', error: 'Prefecture is required' }
+  return { ok: true, address: { name, country, postal: country === 'JP' ? postal.replace(/[〒\s]/g, '').replace(/^(\d{3})-?(\d{4})$/, '$1-$2') : postal, region, line1, line2: clean(b.line2, 120), phone } }
+}
+
+// ---- reminders and clean-up --------------------------------------------------------------------------------------------------------------------
+
+export const REMIND_AFTER_DAYS = 7
+export const FLAG_AFTER_DAYS = 30
+export const ADDRESS_KEEP_DAYS = 90
+const DAY = 86_400_000
+
+/** E-gifts whose receiver has not typed an address 7 days after the order, and who have not been reminded yet (the sender is e-mailed ONCE). */
+export const reminderDue = (g: GiftRecord, now: Date): boolean => !!g.egift && g.egift.state === 'waiting' && !g.egift.reminded_at && !!g.egift.sender_email && now.getTime() - Date.parse(g.created_at) >= REMIND_AFTER_DAYS * DAY
+/** After 30 days with no address the order is flagged on the owner page; the owner decides, there is no automatic refund. */
+export const flaggedNoAddress = (g: GiftRecord, now: Date): boolean => !!g.egift && g.egift.state === 'waiting' && now.getTime() - Date.parse(g.created_at) >= FLAG_AFTER_DAYS * DAY
+/** The receiver's address is deleted 90 days after the order ships. */
+export const addressExpired = (g: GiftRecord, now: Date): boolean => !!g.egift?.address && !!g.shipped_at && now.getTime() - Date.parse(g.shipped_at) >= ADDRESS_KEEP_DAYS * DAY
+export function purgeAddress(g: GiftRecord): GiftRecord {
+  return g.egift ? { ...g, egift: { ...g.egift, address: null } } : g
+}

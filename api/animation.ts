@@ -11,6 +11,7 @@
 import QRCode from 'qrcode'
 import type Anthropic from '@anthropic-ai/sdk'
 import { ANIMATION_ID_PATTERN, animationUrl, animationView, artRevFor, filmUsable, isAnimationRecord, sampleRecord, type AnimationRecord } from '../engine/animation.ts'
+import { giftUrl, isGiftRecord } from '../engine/gift.ts'
 import { ensureArt, picturePath, readArt, renderBudgetMs, type ArtRecord, type ImageClient } from '../engine/film-art.ts'
 import { createOrderStore, type OrderStore } from '../engine/order-store.ts'
 import { FILM_RETRY_AFTER_MS, ensureFilm, filmInFlight, raceTimeout } from '../engine/film-store.ts'
@@ -74,7 +75,17 @@ export function createAnimationHandlers(deps: () => AnimationDeps) {
       // No script yet: if one is on its way (or the first try never finished, long ago) look again here — once, briefly — before answering "not yet".
       const rec = await withScript(r.rec, d, false)
       const art = filmUsable(rec.film) && rec.film.status === 'ready' ? await safeArt(d.store, rec.id) : null
-      return json(200, animationView(rec, art), { 'cache-control': 'private, no-store' })
+      const view = animationView(rec, art)
+      // the sender's page only: what to share with the receiver and where the order stands (no price, no names)
+      if (rec.gift_token && d.store) {
+        try {
+          const g = await d.store.get(rec.gift_token)
+          if (isGiftRecord(g)) view.gift = { url: giftUrl(g.token, d.env), size_code: g.size_code, ship_to: g.ship_to, egift_state: g.egift?.state ?? null }
+        } catch {
+          // the page works without it
+        }
+      }
+      return json(200, view, { 'cache-control': 'private, no-store' })
     },
 
     /** The first open of a film: write its script if it is missing, then draw its four pictures. The answer carries the view (with the pictures when done). */

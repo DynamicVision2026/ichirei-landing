@@ -41,6 +41,8 @@ export interface AnimationRecord {
   memorial: boolean
   /** The film script (engine/film.ts): four lines and four picture descriptions, or the fallback; null while it is being written. */
   film: FilmRecord | null
+  /** The receiver's page of this order (engine/gift.ts): the sender's page offers it for sharing. Never sent to the receiver. */
+  gift_token?: string | null
 }
 
 export function buildAnimationRecord(record: OrderRecord, id: string, now: Date = new Date()): AnimationRecord {
@@ -78,6 +80,8 @@ export interface AnimationView {
    * `incomplete` = some pictures could not be drawn yet (quota or an outage): washi is shown in their place and the page asks the server to draw only those.
    */
   film: { status: 'ready' | 'fallback'; lines: string[]; pictures: string[] | null; deferred?: boolean; incomplete?: boolean } | null
+  /** The sender's page only (api/animation.ts adds it): what to share and where the order stands. */
+  gift?: { url: string; size_code: string; ship_to: string; egift_state: 'waiting' | 'received' | null } | null
 }
 
 /** A film the pictures can be drawn for: a fallback script (nothing to draw) or one with its four descriptions (older films with scene IDs are written again). */

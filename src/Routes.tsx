@@ -19,7 +19,7 @@ export default function Routes() {
       </Suspense>
     )
   }
-  if (path.startsWith('/a/')) {
+  if (path.startsWith('/a/') || path.startsWith('/g/')) {
     return (
       <Suspense fallback={null}>
         <AnimationApp />

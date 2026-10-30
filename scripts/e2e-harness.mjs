@@ -798,6 +798,52 @@ const mockPage = async (browser, { onExplain, result, order, track } = {}) => {
   await g.close()
 }
 
+// ---------- Run 8c-5: Part D — the sender's page (「贈る」) and the receiver's gift page (/g/<token>), the e-gift address form ----------
+{
+  const baseView = { id: 'AN-testtesttesttesttest', language: 'ja', glyph: '備', reading: 'そなえる', romanization: 'sonaeru', meaning_en: 'to be ready', who: 'いつも、頼まれる前に備えている人。', memorial: false, film: { status: 'fallback', lines: ['「ちょうど今詰めてたところ」', 'いつも、頼まれる前に備えている人。'], pictures: ['/film/washi-1.webp', '/film/washi-2.webp'] } }
+  const GIFT = 'https://ichirei.soul-id.jp/g/RG-testtesttesttesttest'
+  // the sender's page
+  const sp = await browser.newPage({ locale: 'ja-JP', viewport: { width: 390, height: 800 } })
+  const errors = []
+  sp.on('pageerror', (e) => errors.push(String(e)))
+  await sp.route('**/api/animation/AN-testtesttesttesttest', (r) => r.fulfill({ json: { ...baseView, gift: { url: GIFT, size_code: 'ICHIREI-CARD', ship_to: 'egift', egift_state: 'waiting' } } }))
+  await sp.route('**/api/gift/RG-testtesttesttesttest/qr.svg', (r) => r.fulfill({ status: 200, contentType: 'image/svg+xml', body: '<svg xmlns="http://www.w3.org/2000/svg" width="10" height="10"/>' }))
+  await sp.goto('http://localhost:5173/a/AN-testtesttesttesttest', { waitUntil: 'networkidle' })
+  const panel = sp.locator('[data-testid=sender-panel]')
+  await panel.waitFor()
+  check('sender page: below the film, 「贈る」 with LINE, copy-the-link, QR and e-mail; the receiver\'s link as selectable text', (await panel.locator('h2').innerText()) === '贈る' && (await panel.locator('[data-testid=give-link]').inputValue()) === GIFT && (await panel.locator('[data-testid=give-line]').getAttribute('href')).startsWith('https://line.me/R/share?text=') && decodeURIComponent(await panel.locator('[data-testid=give-line]').getAttribute('href')).includes(GIFT) && (await panel.locator('[data-testid=give-mail]').getAttribute('href')).startsWith('mailto:?subject='))
+  await panel.locator('[data-testid=give-qr]').click()
+  check('sender page: the QR code of the receiver\'s page shows on screen', (await panel.locator('[data-testid=give-qr-img] img').getAttribute('src')) === '/api/gift/RG-testtesttesttesttest/qr.svg')
+  check('sender page: order details — size カード, delivery e-gift, waiting for the receiver\'s address — and no price', (await panel.locator('[data-testid=status-size]').innerText()) === 'カード' && (await panel.locator('[data-testid=status-ship]').innerText()).startsWith('eギフト') && (await panel.locator('[data-testid=status-egift]').innerText()).includes('待っています') && !/¥/.test(await panel.innerText()))
+  check('no page errors (run 8c-5, sender page)', errors.length === 0, errors.join('; '))
+  await sp.close()
+  // the receiver's page
+  const gp = await browser.newPage({ locale: 'ja-JP', viewport: { width: 390, height: 800 } })
+  const gerrors = []
+  gp.on('pageerror', (e) => gerrors.push(String(e)))
+  const posted = []
+  await gp.route('**/api/gift/RG-testtesttesttesttest', (r) => r.fulfill({ json: { ...baseView, id: 'RG-testtesttesttesttest', token: 'RG-testtesttesttesttest', certificate_line: 'この字は、あなたの目に映る、その人です。', poem: { type: 'tanka', lines: ['朝ごとに', '蓋の花添え'], reading: 'あさごとに' }, from: '山田 太郎', to: '山田 一郎', message: 'いつも、ありがとう。', egift: { state: 'waiting', japan_only: true } } }))
+  await gp.route('**/api/gift/RG-testtesttesttesttest/address', async (r) => { posted.push(JSON.parse(r.request().postData() ?? '{}')); await r.fulfill({ json: { ok: true } }) })
+  await gp.goto('http://localhost:5173/g/RG-testtesttesttesttest', { waitUntil: 'networkidle' })
+  const gift = gp.locator('[data-testid=gift-panel]')
+  await gift.waitFor()
+  const gtext = await gift.innerText()
+  check('receiver page: the film first, then 「○○より」, the receiver\'s name, the sender\'s message, the character, the certificate line and the poem', (await gp.locator('[data-testid=gift-page]').count()) === 1 && (await gift.locator('[data-testid=gift-from]').innerText()).includes('山田 太郎 より') && (await gift.locator('[data-testid=gift-to]').innerText()) === '山田 一郎 さんへ' && (await gift.locator('[data-testid=gift-message]').innerText()) === 'いつも、ありがとう。' && (await gift.locator('[data-testid=gift-glyph]').innerText()) === '備' && (await gift.locator('[data-testid=gift-line]').innerText()).startsWith('この字は') && (await gift.locator('[data-testid=gift-poem]').innerText()).includes('朝ごとに'))
+  check('receiver page: no price, no order number, no other candidates, no sender page link', !/¥|IC-2026|AN-test/.test(gtext + (await gp.locator('body').innerText())) && (await gp.locator('a[href*="/a/"]').count()) === 0 && !(await gp.locator('main').innerHTML()).includes('AN-test'))
+  await gift.locator('[data-testid=gift-receive]').click()
+  check('e-gift: 「受け取る」 opens a short form (name, postal code, prefecture, address, phone); the Japan-only size says so and asks for no country', (await gift.locator('[data-testid=gift-form] input').count()) === 6 && (await gift.locator('[data-testid=gift-japan-only]').count()) === 1 && (await gift.locator('input[name=country]').count()) === 0)
+  await gift.locator('input[name=name]').fill('山田 一郎')
+  await gift.locator('input[name=postal]').fill('1500001')
+  await gift.locator('input[name=region]').fill('東京都')
+  await gift.locator('input[name=line1]').fill('渋谷区神宮前1-2-3')
+  await gift.locator('input[name=phone]').fill('03-1234-5678')
+  await gift.locator('[data-testid=gift-send]').click()
+  await gift.locator('[data-testid=gift-thanks]').waitFor()
+  check('e-gift: the address is posted to the receiver\'s own endpoint and the page thanks them; nothing of it stays on the page', posted.length === 1 && posted[0].postal === '1500001' && posted[0].line1 === '渋谷区神宮前1-2-3' && (await gift.locator('[data-testid=gift-form]').count()) === 0 && !(await gp.content()).includes('渋谷区'))
+  check('no page errors (run 8c-5, receiver page)', gerrors.length === 0, gerrors.join('; '))
+  await gp.close()
+}
+
 // ---------- Run 8d: the included poem (歌の添え書き) on the order form: one format, shown in full, free ----------
 {
   const poemCalls = []

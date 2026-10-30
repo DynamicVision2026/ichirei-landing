@@ -229,14 +229,14 @@ check('every order gets its own order_ref', j1.order_ref !== j2.order_ref)
 
 shopSeen.length = 0
 const bad = await call(base({ delivery_date: '2020-01-01' }))
-check('invalid input → 400 naming the field, no record, no cart', bad.status === 400 && ((await bad.json()) as any).field === 'delivery_date' && shopSeen.length === 0 && memory.records.size === 4)
+check('invalid input → 400 naming the field, no record, no cart', bad.status === 400 && ((await bad.json()) as any).field === 'delivery_date' && shopSeen.length === 0 && memory.records.size === 6)
 check('malformed JSON → 400; oversized body → 413; GET → 405', (await call('{nope')).status === 400 && (await call('x'.repeat(300_001))).status === 413 && (await handler(new Request('http://x/api/order'))).status === 405)
 
 const noStore = await call(base(), createOrderHandler(mkDeps({ store: null })))
 check('no order store configured → 503 store_not_configured, and NO Shopify cart is created', noStore.status === 503 && ((await noStore.json()) as any).code === 'store_not_configured' && shopSeen.length === 0)
 const noShop = await call(base(), createOrderHandler(mkDeps({ shopify: null, shopifyMissing: ['SHOPIFY_STOREFRONT_TOKEN'] })))
 const noShopJ = (await noShop.json()) as any
-check('Shopify not configured → 503 naming the missing variable; nothing stored', noShop.status === 503 && noShopJ.code === 'shopify_not_configured' && noShopJ.missing.join() === 'SHOPIFY_STOREFRONT_TOKEN' && memory.records.size === 4)
+check('Shopify not configured → 503 naming the missing variable; nothing stored', noShop.status === 503 && noShopJ.code === 'shopify_not_configured' && noShopJ.missing.join() === 'SHOPIFY_STOREFRONT_TOKEN' && memory.records.size === 6)
 const brokenStore: any = { kind: 'memory', put: async () => { throw new Error('disk on fire') }, get: async () => null }
 shopSeen.length = 0
 const storeFail = await call(base(), createOrderHandler(mkDeps({ store: brokenStore })))
@@ -250,7 +250,7 @@ check('the customer-facing error does not leak Shopify\'s message or the token',
 shopMode = 'ok'
 let writes = 0
 // (the order's first write is its first write under the order ref, the second its status update; the film never finishes here, so it writes nothing)
-const flaky: any = { kind: 'memory', put: async (ref: string, rr: object) => { if (!ref.startsWith('AN-')) writes++; if (writes === 2) throw new Error('second write of the order fails'); await memory.put(ref, rr) }, get: async (ref: string) => memory.get(ref) }
+const flaky: any = { kind: 'memory', put: async (ref: string, rr: object) => { if (!ref.startsWith('AN-') && !ref.startsWith('RG-')) writes++; if (writes === 2) throw new Error('second write of the order fails'); await memory.put(ref, rr) }, get: async (ref: string) => memory.get(ref) }
 const survive = await call(base(), createOrderHandler(mkDeps({ store: flaky, film: () => new Promise(() => {}), filmWaitMs: 0 })))
 check('the status update after the cart fails → the customer still gets the checkout (the first write already holds the story)', survive.status === 200 && ((await survive.json()) as any).checkout_url.startsWith('https://'))
 const logged: string[] = []

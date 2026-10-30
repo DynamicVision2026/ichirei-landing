@@ -161,16 +161,16 @@ const ob = { story: STORY, engine_result: clone(GOLDEN), selected_kanji: '証', 
 const orderRes = await handler(new Request('http://x/api/order', { method: 'POST', body: JSON.stringify(ob) }))
 await orderRes.json()
 await new Promise((r) => setTimeout(r, 50))
-const ordered = [...ostore.lines.values()].flat().map((l) => JSON.parse(l))
+const ordered = [...ostore.lines.entries()].filter(([k]) => k.startsWith('analytics/')).flatMap(([, v]) => v).map((l) => JSON.parse(l))
 check('/api/order success writes "ordered" with the session id ONLY — no order_ref, names, story or package', orderRes.status === 200 && ordered.length === 1 && ordered[0].event === 'ordered' && ordered[0].session === S1 && !JSON.stringify(ordered[0]).includes('IC-') && !JSON.stringify(ordered[0]).includes('山田') && Object.keys(ordered[0]).sort().join() === 'event,session,source,ts')
 const orderRes2 = await handler(new Request('http://x/api/order', { method: 'POST', body: JSON.stringify({ ...ob, session: undefined, delivery_date: '2026-12-02' }) }))
 await orderRes2.json()
 await new Promise((r) => setTimeout(r, 50))
-check('/api/order without a session id records nothing', [...ostore.lines.values()].flat().length === 1)
+check('/api/order without a session id records nothing', [...ostore.lines.entries()].filter(([k]) => k.startsWith('analytics/')).flatMap(([, v]) => v).length === 1)
 const failedHandler = createOrderHandler(() => ({ store: ostore, shopify, shopifyMissing: [], now: () => new Date('2026-10-25T03:00:00Z'), fetchImpl: (async () => new Response('{}', { status: 500 })) as unknown as typeof fetch }))
 await (await failedHandler(new Request('http://x/api/order', { method: 'POST', body: JSON.stringify({ ...ob, delivery_date: '2026-12-03' }) }))).text()
 await new Promise((r) => setTimeout(r, 50))
-check('a failed checkout (no cart) is NOT counted as "ordered"', [...ostore.lines.values()].flat().length === 1)
+check('a failed checkout (no cart) is NOT counted as "ordered"', [...ostore.lines.entries()].filter(([k]) => k.startsWith('analytics/')).flatMap(([, v]) => v).length === 1)
 
 // ---- the report ------------------------------------------------------------------------------------------
 const T = '2026-10-26T01:00:00Z'

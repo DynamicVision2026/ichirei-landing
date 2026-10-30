@@ -1,7 +1,8 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { COPY, pageLang, type PageCopy } from './copy.ts'
 import { clamp, frameAt, makeFilmTimeline, phrases, type FilmTimeline } from './film.ts'
-import type { AnimationView } from './types.ts'
+import type { AnimationView, GiftView } from './types.ts'
+import { GiftPanel, SenderPanel } from './GiftPanels.tsx'
 import './animation.css'
 
 // The story film page /a/<id>: a 30-second film that RETELLS the customer's own story in four short scenes and ends with the chosen character as
@@ -12,12 +13,23 @@ import './animation.css'
 const FONT_CSS =
   'https://fonts.googleapis.com/css2?family=Zen+Old+Mincho:wght@400;700;900&family=Noto+Serif+JP:wght@300;400;600&family=Noto+Serif+TC:wght@400;600;900&family=Cormorant+Garamond:ital,wght@0,400;0,500;1,400&family=Inter:wght@300;400&display=swap'
 
-const idFromPath = () => window.location.pathname.match(/^\/a\/([A-Za-z0-9-]{3,64})\/?$/)?.[1] ?? null
+/** /a/<id> is the sender's private page; /g/<token> is the receiver's gift page (Part D). */
+const routeFromPath = (): { kind: 'sender' | 'gift'; id: string } | null => {
+  const a = window.location.pathname.match(/^\/a\/([A-Za-z0-9-]{3,64})\/?$/)?.[1]
+  if (a) return { kind: 'sender', id: a }
+  const g = window.location.pathname.match(/^\/g\/([A-Za-z0-9-]{3,64})\/?$/)?.[1]
+  return g ? { kind: 'gift', id: g } : null
+}
 
 type Load = { state: 'loading' } | { state: 'error'; kind: 'notFound' | 'unavailable' } | { state: 'ready'; view: AnimationView }
 
 export default function AnimationApp() {
-  const id = useMemo(idFromPath, [])
+  const route = useMemo(routeFromPath, [])
+  const id = route?.id ?? null
+  const gift = route?.kind === 'gift'
+  // the two pages read the same film through different doors: the receiver's never shows the sender's id
+  const viewUrl = gift ? `/api/gift/${id}` : `/api/animation/${id}`
+  const renderUrl = gift ? `/api/gift/${id}/render` : `/api/film/${id}/render`
   const [load, setLoad] = useState<Load>({ state: 'loading' })
   const [lang, setLang] = useState(() => pageLang('ja'))
   const copy = COPY[lang]
@@ -48,7 +60,7 @@ export default function AnimationApp() {
     let timer: ReturnType<typeof setTimeout> | undefined
     const go = async () => {
       try {
-        const res = await fetch(`/api/animation/${id}`, { signal: ac.signal })
+        const res = await fetch(viewUrl, { signal: ac.signal })
         if (res.status === 404) return setLoad({ state: 'error', kind: 'notFound' })
         if (!res.ok) return setLoad({ state: 'error', kind: 'unavailable' })
         const view = (await res.json()) as AnimationView
@@ -64,7 +76,7 @@ export default function AnimationApp() {
       ac.abort()
       if (timer) clearTimeout(timer)
     }
-  }, [id])
+  }, [id, viewUrl])
 
   // the script is there but the pictures are not drawn yet (the first open), or some could not be drawn earlier (quota or an outage): ask the server.
   // The request stays open until it is done (the server holds it so Cloud Run keeps the CPU); "pending" means ask again. An incomplete film PLAYS
@@ -77,7 +89,7 @@ export default function AnimationApp() {
     let timer: ReturnType<typeof setTimeout> | undefined
     const go = async () => {
       try {
-        const res = await fetch(`/api/film/${id}/render`, { method: 'POST', signal: ac.signal })
+        const res = await fetch(renderUrl, { method: 'POST', signal: ac.signal })
         if (!res.ok) {
           timer = setTimeout(go, 5000)
           return
@@ -95,10 +107,12 @@ export default function AnimationApp() {
       ac.abort()
       if (timer) clearTimeout(timer)
     }
-  }, [needsPictures, id])
+  }, [needsPictures, id, renderUrl])
 
+  // below the film: the receiver's page shows the gift; the sender's own page shows where the order stands and the 「贈る」 buttons
+  const panel = load.state === 'ready' && load.view.film?.pictures ? (gift ? <GiftPanel view={load.view as GiftView} lang={lang} /> : <SenderPanel view={load.view} lang={lang} />) : null
   return (
-    <main className={`an-page${load.state === 'ready' && load.view.memorial ? ' an-memorial' : ''}`} data-testid="animation-page" lang={lang}>
+    <main className={`an-page${load.state === 'ready' && load.view.memorial ? ' an-memorial' : ''}${panel ? ' an-with-panel' : ''}`} data-testid={gift ? 'gift-page' : 'animation-page'} lang={lang}>
       {load.state === 'loading' && <p className="an-note">{copy.loading}</p>}
       {load.state === 'error' && (
         <p className="an-note" role="alert" data-testid="animation-error">
@@ -116,7 +130,12 @@ export default function AnimationApp() {
           {copy.deferred}
         </p>
       )}
-      {load.state === 'ready' && load.view.film?.pictures && <Film key={load.view.id} view={load.view} film={{ ...load.view.film, pictures: load.view.film.pictures }} copy={copy} />}
+      {load.state === 'ready' && load.view.film?.pictures && (
+        <section className={panel ? 'an-stage' : undefined}>
+          <Film key={load.view.id} view={load.view} film={{ ...load.view.film, pictures: load.view.film.pictures }} copy={copy} />
+        </section>
+      )}
+      {panel}
     </main>
   )
 }
@@ -278,7 +297,8 @@ function Film({ view, film, copy }: { view: AnimationView; film: ReadyFilm; copy
   }, [play, pause, render, tl.total])
 
   const share = useCallback(async () => {
-    const url = window.location.href
+    // the sender's page shares the RECEIVER's link (never its own); the receiver's page and the samples share their own address
+    const url = view.gift?.url ?? window.location.href
     try {
       if (navigator.share) await navigator.share({ title: copy.title, url })
       else {
@@ -289,7 +309,7 @@ function Film({ view, film, copy }: { view: AnimationView; film: ReadyFilm; copy
     } catch {
       // the share sheet was dismissed
     }
-  }, [copy])
+  }, [copy, view.gift?.url])
 
   const [q0, q1] = copy.quote
   void q0

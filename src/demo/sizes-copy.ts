@@ -17,6 +17,9 @@ export interface SizeCopy {
   shipTo: { label: string } & Record<ShipTo, { label: string; note: string }>
   /** Remembrance: nothing is "given" — the same three ways, without gift wording. */
   shipToMemorial: { label: string } & Record<ShipTo, { label: string; note: string }>
+  /** E-gift: the sender's e-mail, for the one reminder if the receiver has not entered an address after 7 days. */
+  emailLabel: string
+  emailNote: string
   messageLabel: string
   messagePlaceholder: string
   messageCounter: (n: number, max: number) => string
@@ -58,6 +61,8 @@ const ja: SizeCopy = {
     direct: { label: 'ご家族などに直接届ける', note: 'チェックアウトの配送先に、お届け先の住所を入れてください。お名前とひと言をカードに印刷し、価格明細は入れず、無地の包装でお届けします。' },
     egift: { label: 'リンクで届ける（住所は受け取る方が入力）', note: '受け取る方にリンクを送ります。住所は受け取る方が自分で入力します。お名前とひと言はカードに印刷されます。' },
   },
+  emailLabel: 'あなたのメールアドレス',
+  emailNote: '相手が7日たっても住所を入力しない場合に、一度だけお知らせします。それ以外には使いません。',
   messageLabel: 'カードのひと言（任意・60字まで）',
   messagePlaceholder: '例：いつも、ありがとう。',
   messageCounter: (n, max) => `${n} / ${max}字`,
@@ -96,6 +101,8 @@ const en: SizeCopy = {
     direct: { label: 'Send directly to the family', note: 'Enter their address as the shipping address at checkout. The names and a short message are printed on the card, with no price slip and plain wrapping.' },
     egift: { label: 'Send by link (they enter the address)', note: 'We give you a link to pass on. They enter their own address. The names and the short message are printed on the card.' },
   },
+  emailLabel: 'Your e-mail address',
+  emailNote: 'Used only to tell you once, after 7 days, if they have not entered an address yet.',
   messageLabel: 'A short message for the card (optional, up to 60 characters)',
   messagePlaceholder: 'e.g. Thank you, always.',
   messageCounter: (n, max) => `${n} / ${max}`,
@@ -134,6 +141,8 @@ const zhHant: SizeCopy = {
     direct: { label: '直接寄給家人', note: '請在結帳時填入收件人的地址。名字與一句話會印在卡片上，不附價格明細，並以素色包裝寄出。' },
     egift: { label: '以連結寄送（地址由對方填寫）', note: '我們會給你一個連結傳給對方，由對方自己填寫地址。名字與一句話會印在卡片上。' },
   },
+  emailLabel: '你的電子郵件',
+  emailNote: '若對方 7 天後仍未填寫地址，我們只會通知你一次。不作其他用途。',
   messageLabel: '卡片上的一句話（選填，最多 60 字）',
   messagePlaceholder: '例：一直以來，謝謝你。',
   messageCounter: (n, max) => `${n} / ${max} 字`,
@@ -172,6 +181,8 @@ const zhHans: SizeCopy = {
     direct: { label: '直接寄给家人', note: '请在结账时填入收件人的地址。名字与一句话会印在卡片上，不附价格明细，并以素色包装寄出。' },
     egift: { label: '以链接寄送（地址由对方填写）', note: '我们会给你一个链接传给对方，由对方自己填写地址。名字与一句话会印在卡片上。' },
   },
+  emailLabel: '你的电子邮件',
+  emailNote: '若对方 7 天后仍未填写地址，我们只会通知你一次。不作其他用途。',
   messageLabel: '卡片上的一句话（选填，最多 60 字）',
   messagePlaceholder: '例：一直以来，谢谢你。',
   messageCounter: (n, max) => `${n} / ${max} 字`,

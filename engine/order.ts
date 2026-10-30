@@ -95,6 +95,8 @@ export interface ValidOrder {
   package: PackageId
   /** Where it ships (Part C): 'none' for the digital size; otherwise me (the sender hands it over), direct (the receiver's address at checkout) or egift (the receiver types the address). */
   ship_to: ShipTo | 'none'
+  /** E-gift only: where to send the one reminder after 7 days. Kept on our side, never sent to Shopify or to a page. */
+  sender_email: string | null
   /** The short message printed on the card when shipping directly or as an e-gift (empty otherwise). */
   gift_message: string
 }
@@ -183,6 +185,7 @@ export function parseOrderRequest(body: unknown, now: Date = new Date(), palette
   // a gift that goes to the receiver (direct or e-gift): printed on the card, at most 60 characters.
   let ship_to: ShipTo | 'none' = 'none'
   let gift_message = ''
+  let sender_email: string | null = null
   if (SHIPS[pkg as PackageId]) {
     const raw = body.ship_to === undefined || body.ship_to === null || body.ship_to === '' ? 'me' : body.ship_to
     if (typeof raw !== 'string' || !(SHIP_TO as readonly string[]).includes(raw)) return fail('ship_to', `Invalid "ship_to": expected one of ${SHIP_TO.join(' | ')}`)
@@ -192,6 +195,11 @@ export function parseOrderRequest(body: unknown, now: Date = new Date(), palette
       const flat = body.gift_message.replace(/\p{Cc}+/gu, ' ').replace(/\s+/g, ' ').trim()
       if (countChars(flat) > GIFT_MESSAGE_MAX) return fail('gift_message', `"gift_message" is longer than ${GIFT_MESSAGE_MAX} characters`)
       gift_message = flat
+    }
+    if (ship_to === 'egift') {
+      const e = typeof body.sender_email === 'string' ? body.sender_email.trim() : ''
+      if (!/^[^\s@]{1,64}@[^\s@]{1,190}\.[^\s@]{2,}$/.test(e) || e.length > 254) return fail('sender_email', 'An e-gift needs your e-mail address (for the one reminder if the address is not entered)')
+      sender_email = e
     }
   } else if (body.ship_to !== undefined && body.ship_to !== null && body.ship_to !== '' && body.ship_to !== 'none') {
     return fail('ship_to', 'The digital size is not shipped: "ship_to" does not apply')
@@ -224,6 +232,7 @@ export function parseOrderRequest(body: unknown, now: Date = new Date(), palette
       package: pkg as PackageId,
       ship_to,
       gift_message,
+      sender_email,
     },
   }
 }
@@ -256,7 +265,7 @@ export interface Attribute {
  * form (ja: modern, zh: simplified); `inscription_form` is the glyph to CARVE (after the sender's
  * choice of kyūjitai/modern or traditional/simplified).
  */
-export function lineAttributes(order: ValidOrder, orderRef: string, animationLink?: string | null): Attribute[] {
+export function lineAttributes(order: ValidOrder, orderRef: string, animationLink?: string | null, giftLink?: string | null): Attribute[] {
   return [
     { key: 'kanji', value: order.candidate.kanji },
     { key: 'inscription_form', value: order.glyph },
@@ -277,6 +286,8 @@ export function lineAttributes(order: ValidOrder, orderRef: string, animationLin
     // The poem included with the gift (when there is one): type, the lines (one per row) and the reading aids.
     ...(order.certificate.poems[0] ? poemAttributes(order.certificate.poems[0]) : []),
     // The private address of the story animation (/a/<id>): for the confirmation e-mail and the QR code on the printed card.
+    // The receiver's page (/g/<token>): the QR code on the printed card points here; and the sender's own private page.
+    ...(giftLink ? [{ key: 'ichirei_gift_url', value: giftLink }] : []),
     ...(animationLink ? [{ key: 'ichirei_animation_url', value: animationLink }] : []),
   ]
 }
@@ -320,6 +331,8 @@ export interface OrderRecord {
   updated_at: string
   /** The private story animation of this order (AN-…): the page is /a/<id>. */
   animation_id?: string | null
+  /** The receiver's gift page (RG-…): /g/<token>. */
+  gift_token?: string | null
   /** What production needs at a glance (also derivable from the rest of the record). */
   production: {
     language: Language

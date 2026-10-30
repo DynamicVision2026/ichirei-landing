@@ -68,6 +68,7 @@ export default function OrderForm({ result, story, followUps = [], promptQuestio
   const sc = SIZE_COPY[language]
   const [shipTo, setShipTo] = useState<ShipTo>('me')
   const [giftMessage, setGiftMessage] = useState('')
+  const [senderEmail, setSenderEmail] = useState('')
   const [poemIds, setPoemIds] = useState<string[]>([]) // the included poem of this order (zero or one); the server reads it back by id
   const [poemStep, setPoemStep] = useState<PoemStep>('loading') // the buyer sees the whole poem before paying: the order waits while it is being written
   const [phase, setPhase] = useState<'edit' | 'submitting' | 'redirecting'>('edit')
@@ -88,7 +89,8 @@ export default function OrderForm({ result, story, followUps = [], promptQuestio
   if (pkg === 'simple' && !simpleOk) setTimeout(() => setPkg(''), 0)
   const onSale = pkg !== '' && (sizes ?? []).includes(pkg)
   const messageOk = [...giftMessage].length <= GIFT_MESSAGE_MAX
-  const valid = senderOk && receiverOk && dateOk && pkg !== '' && onSale && messageOk && !(pkg === 'simple' && !simpleOk) && poemStep !== 'loading'
+  const emailOk = shipTo !== 'egift' || pkg === '' || !SHIPS[pkg] || /^[^\s@]{1,64}@[^\s@]{1,190}\.[^\s@]{2,}$/.test(senderEmail.trim())
+  const valid = senderOk && receiverOk && dateOk && pkg !== '' && onSale && messageOk && emailOk && !(pkg === 'simple' && !simpleOk) && poemStep !== 'loading'
 
   const submit = async () => {
     if (!valid || phase !== 'edit') return
@@ -110,7 +112,7 @@ export default function OrderForm({ result, story, followUps = [], promptQuestio
           delivery_date: date,
           inscription_style: style,
           package: pkg,
-          ...(SHIPS[pkg as PackageId] ? { ship_to: shipTo, ...(shipTo !== 'me' && giftMessage.trim() ? { gift_message: giftMessage.trim() } : {}) } : {}),
+          ...(SHIPS[pkg as PackageId] ? { ship_to: shipTo, ...(shipTo !== 'me' && giftMessage.trim() ? { gift_message: giftMessage.trim() } : {}), ...(shipTo === 'egift' ? { sender_email: senderEmail.trim() } : {}) } : {}),
           ...(poemIds.length ? { poems: poemIds.map((poem_id) => ({ poem_id })) } : {}),
           session: sessionId,
           source: 'customer',
@@ -283,6 +285,13 @@ export default function OrderForm({ result, story, followUps = [], promptQuestio
               ))}
             </div>
             {shipTo === 'egift' && EGIFT_JAPAN_ONLY[pkg] && WOODEN[pkg] && <p className="sent" data-egift-japan>{sc.egiftJapanOnly}</p>}
+            {shipTo === 'egift' && (
+              <div>
+                <label className="clab" htmlFor="sender_email">{sc.emailLabel}</label>
+                <input id="sender_email" name="sender_email" type="email" autoComplete="email" maxLength={254} value={senderEmail} onChange={(e) => setSenderEmail(e.target.value)} />
+                <span className="sent block">{sc.emailNote}</span>
+              </div>
+            )}
             {shipTo !== 'me' && (
               <div>
                 <label className="clab" htmlFor="gift_message">{sc.messageLabel}</label>

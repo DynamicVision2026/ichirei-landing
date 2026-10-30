@@ -27,12 +27,12 @@ export interface OrderStore {
   getObject(path: string): Promise<Buffer | null>
 }
 
-const SAFE_OBJECT = /^films\/(AN-[a-z2-9]{20}\/(art\.json|[1-4](\.unchecked)?\.webp)|renders-\d{4}-\d{2}-\d{2}\.jsonl)$/
+const SAFE_OBJECT = /^(films\/(AN-[a-z2-9]{20}\/(art\.json|[1-4](\.unchecked)?\.webp)|renders-\d{4}-\d{2}-\d{2}\.jsonl)|ops\/(orders-\d{4}-\d{2}-\d{2}|egift)\.jsonl)$/
 export function assertObjectPath(path: string): void {
   if (!SAFE_OBJECT.test(path)) throw new Error(`Unsafe object path: ${path.slice(0, 40)}`)
 }
 
-const SAFE_PATH = /^(analytics\/\d{4}-\d{2}-\d{2}|films\/renders-\d{4}-\d{2}-\d{2})\.jsonl$/
+const SAFE_PATH = /^(analytics\/\d{4}-\d{2}-\d{2}|films\/renders-\d{4}-\d{2}-\d{2}|ops\/orders-\d{4}-\d{2}-\d{2}|ops\/egift)\.jsonl$/
 function assertJsonlPath(path: string): void {
   if (!SAFE_PATH.test(path)) throw new Error(`Unsafe analytics path: ${path.slice(0, 40)}`)
 }
@@ -67,7 +67,7 @@ export class MemoryOrderStore implements OrderStore {
   }
   async getObject(path: string) {
     assertObjectPath(path)
-    if (path.startsWith('films/renders-')) return this.lines.has(path) ? Buffer.from(this.lines.get(path)!.join('\n') + '\n') : null
+    if (path.endsWith('.jsonl')) return this.lines.has(path) ? Buffer.from(this.lines.get(path)!.join('\n') + '\n') : null
     return this.objects.get(path)?.body ?? null
   }
 }

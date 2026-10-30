@@ -12,6 +12,8 @@
 // Web-standard handler (like api/select.ts): mounted directly by server/app.ts and usable on Vercel.
 
 import { animationUrl, buildAnimationRecord, newAnimationId } from '../engine/animation.ts'
+import { buildGiftRecord, giftUrl, newGiftToken } from '../engine/gift.ts'
+import { recordOrderIndex } from '../engine/egift-ops.ts'
 import { filmInputFromRecord, filmWaitMs, raceTimeout, trackFilm } from '../engine/film-store.ts'
 import { makeFilm, type FilmInput, type FilmRecord } from '../engine/film.ts'
 import { cleanSession, cleanSource, recordEvent } from '../engine/analytics.ts'
@@ -115,12 +117,19 @@ export function createOrderHandler(deps: () => OrderDeps) {
     // from the story — started now, in parallel with the cart (nothing waits for it for long, and it can never block or fail the order: engine/film.ts
     // falls back to a generic script). Without a record there is simply no link.
     let animationLink: string | null = null
+    let giftLink: string | null = null
     let filmP: Promise<FilmRecord> | null = null
     try {
       const animationId = newAnimationId()
       const anim = buildAnimationRecord(record, animationId, now)
+      // the receiver's own link (Part D): a second small record, so the receiver's page never carries the sender's id
+      const token = newGiftToken()
+      anim.gift_token = token
       await d.store.put(animationId, anim)
+      await d.store.put(token, buildGiftRecord(record, animationId, token, order.sender_email, now))
       record.animation_id = animationId
+      record.gift_token = token
+      giftLink = giftUrl(token, d.env)
       animationLink = animationUrl(animationId, d.env)
       filmP = trackFilm(
         animationId,
@@ -146,10 +155,12 @@ export function createOrderHandler(deps: () => OrderDeps) {
       console.error('[ichirei-order] store failed', orderRef, err instanceof Error ? err.message : err)
       return json(503, { error: 'Could not save the order. Nothing was charged; please try again.', code: 'store_failed' })
     }
+    // The owner's list (/ops) and the e-gift reminders read this small index: codes only, no story, no names, no address.
+    await recordOrderIndex(d.store, record, now)
 
     // 3. The Shopify cart.
     try {
-      const cart = await createCart(d.shopify, order.package, lineAttributes(order, orderRef, animationLink), orderRef, d.fetchImpl)
+      const cart = await createCart(d.shopify, order.package, lineAttributes(order, orderRef, animationLink, giftLink), orderRef, d.fetchImpl)
       record.status = 'cart_created'
       record.updated_at = (d.now?.() ?? new Date()).toISOString()
       record.shopify = { cart_id: cart.cartId, checkout_url: cart.checkoutUrl, variant_id: cart.variantId }
@@ -177,6 +188,7 @@ export function createOrderHandler(deps: () => OrderDeps) {
         certificate_text: record.production.certificate_text,
         certificate: record.production.certificate,
         animation_url: animationLink,
+        gift_url: giftLink,
       })
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err)

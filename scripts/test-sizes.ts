@@ -24,6 +24,7 @@ const GOLDEN = JSON.parse(readFileSync(join(process.cwd(), 'scripts', 'golden-fi
 const clone = <T,>(x: T): T => JSON.parse(JSON.stringify(x))
 const NOW = new Date('2026-10-23T03:00:00Z')
 const base = (over: Record<string, unknown> = {}) => ({
+  sender_email: 'taro@example.com',
   story: '父は口下手で厳しくて、駅まで送ってくれて、盆に帰るたびに車で駅まで迎えに来て、帰りも必ず送ってくれる。', engine_result: clone(GOLDEN), selected_kanji: '証', language: 'ja',
   sender_name: '山田 太郎', receiver_name: '山田 一郎', delivery_date: '2026-12-01', inscription_style: 'kyujitai', package: 'standard', ...over,
 })
