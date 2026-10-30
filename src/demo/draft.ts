@@ -15,10 +15,12 @@ export interface Draft {
   direction: GiftContext['direction']
   occasion: GiftContext['occasion']
   occasionDetail: string
+  /** Part B: where the receiver will read it ('' = same as the sender). */
+  reader: string
   questionId: string | null
 }
 
-export const draftOf = (story: string, ctx: Pick<GiftContext, 'relationship' | 'direction' | 'occasion' | 'occasionDetail'>, questionId: string | null, now: number = Date.now()): Draft => ({
+export const draftOf = (story: string, ctx: Pick<GiftContext, 'relationship' | 'direction' | 'occasion' | 'occasionDetail' | 'reader'>, questionId: string | null, now: number = Date.now()): Draft => ({
   v: 1,
   savedAt: now,
   story,
@@ -26,6 +28,7 @@ export const draftOf = (story: string, ctx: Pick<GiftContext, 'relationship' | '
   direction: ctx.direction,
   occasion: ctx.occasion,
   occasionDetail: ctx.occasionDetail,
+  reader: ctx.reader ?? '',
   questionId,
 })
 
@@ -64,6 +67,7 @@ export function loadDraft(now: number = Date.now(), storage: Pick<Storage, 'getI
       direction: (d.direction ?? '') as Draft['direction'],
       occasion: (d.occasion ?? '') as Draft['occasion'],
       occasionDetail: typeof d.occasionDetail === 'string' ? d.occasionDetail : '',
+      reader: typeof d.reader === 'string' ? d.reader : '',
       questionId: typeof d.questionId === 'string' ? d.questionId : null,
     }
   } catch {

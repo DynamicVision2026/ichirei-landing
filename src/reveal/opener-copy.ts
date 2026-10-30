@@ -15,6 +15,9 @@ export interface OpenerCopy {
   draftNew: string
   /** Where the browser cannot recognise speech: the button is hidden and this one line is shown. */
   voiceNone: string
+  /** Part B: where will the receiver read it? Collapsed by default; not shown for remembrance. */
+  readerLabel: string
+  readerOptions: { '': string; ja: string; zh: string; en: string; other: string }
 }
 
 export const STORY_MIN = 10
@@ -28,6 +31,8 @@ export const OPENER: Record<RevealLang, OpenerCopy> = {
     draftContinue: '続ける',
     draftNew: '新しく書く',
     voiceNone: 'キーボードのマイクでも話して入力できます。',
+    readerLabel: '受け取る方が読むのは？',
+    readerOptions: { '': 'わたしと同じ', ja: '日本', zh: '台湾・香港・マカオ', en: '英語圏', other: 'その他' },
   },
   'zh-Hant': {
     switchQuestion: '換一個問題',
@@ -37,6 +42,8 @@ export const OPENER: Record<RevealLang, OpenerCopy> = {
     draftContinue: '繼續',
     draftNew: '重新寫',
     voiceNone: '也可以使用鍵盤上的麥克風來說話輸入。',
+    readerLabel: '對方閱讀的語言？',
+    readerOptions: { '': '和我相同', ja: '日本', zh: '台灣・香港・澳門', en: '英語圈', other: '其他' },
   },
   en: {
     switchQuestion: 'Try another question',
@@ -46,5 +53,7 @@ export const OPENER: Record<RevealLang, OpenerCopy> = {
     draftContinue: 'Continue',
     draftNew: 'Start new',
     voiceNone: "You can also use your keyboard's microphone.",
+    readerLabel: 'Where will they read it?',
+    readerOptions: { '': 'Same as me', ja: 'Japan', zh: 'Taiwan / Hong Kong / Macau', en: 'English-speaking', other: 'Other' },
   },
 }

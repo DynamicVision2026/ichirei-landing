@@ -6,6 +6,7 @@ import {
   DIRECTION_CODES,
   OCCASION_CODES,
   OCCASION_DETAIL_MAX,
+  READER_CHOICES,
   RELATIONSHIP_CODES,
   STORY_MAX,
   appendSpoken,
@@ -224,6 +225,19 @@ export default function Composer({ story, onStoryChange, onSubmit, copy, lang, c
       <Chips name="relationship" label={copy.relationshipLabel} codes={RELATIONSHIP_CODES} labels={copy.relationships} value={context.relationship} onPick={(c) => setCtx({ relationship: c })} />
       <Chips name="direction" label={memorial ? copy.memorial.directionLabel : copy.directionLabel} codes={DIRECTION_CODES} labels={memorial ? copy.memorial.directions : copy.directions} value={context.direction} onPick={(c) => setCtx({ direction: c })} />
       <Chips name="occasion" label={copy.occasionLabel} codes={OCCASION_CODES} labels={copy.occasions} value={context.occasion} onPick={(c) => setCtx({ occasion: c })} />
+
+      {!memorial && (
+        <details className="readerField" data-testid="reader-field" open={context.reader ? true : undefined}>
+          <summary>{o.readerLabel}</summary>
+          <div className="cchips" role="group" aria-label={o.readerLabel}>
+            {READER_CHOICES.map((r) => (
+              <button key={r || 'same'} type="button" className="cchip" data-chip={`reader:${r || 'same'}`} aria-pressed={(context.reader ?? '') === r} onClick={() => setCtx({ reader: r })}>
+                {o.readerOptions[r === '' ? '' : r]}
+              </button>
+            ))}
+          </div>
+        </details>
+      )}
 
       <label className="clab" htmlFor="occasion-detail">
         {copy.occasionDetailLabel}

@@ -43,6 +43,7 @@ import {
   type Family,
   type Language,
   type PaletteRow,
+  type Reader,
   type RefereeAction,
   type RefereeReport,
   type ReviewVerdict,
@@ -362,7 +363,15 @@ function rowFor(palette: Palette, family: Family, c: Candidate): PaletteRow | un
  * orders a Japanese kanji, but the gift may be shown to friends in Taiwan, Hong Kong, Macau or Singapore,
  * so a main candidate must be safe in every kanji culture.
  */
-export const refereeFamilies = (language: Language): Family[] => (language === 'en' ? ['ja', 'zh'] : [familyOf(language)])
+export const refereeFamilies = (language: Language, reader: Reader | null | undefined = null): Family[] => {
+  const base: Family[] = language === 'en' ? ['ja', 'zh'] : [familyOf(language)]
+  // Part B: the receiver may read the gift in another culture. Japan → ja; Taiwan / Hong Kong / Macau → zh; English-speaking → both (as for an
+  // English buyer, the gift may be shown anywhere); other / not said → nothing added. A character must then pass every family that judges the gift.
+  const extra: Family[] = reader === 'ja' ? ['ja'] : reader === 'zh' ? ['zh'] : reader === 'en' ? ['ja', 'zh'] : []
+  return [...new Set([...base, ...extra])]
+}
+/** True when the reader choice adds a family the buyer's language would not have had. */
+export const readerAddsFamily = (language: Language, reader: Reader | null | undefined): boolean => refereeFamilies(language, reader).length > refereeFamilies(language).length
 
 interface Found {
   family: Family
@@ -473,14 +482,15 @@ export function applyPalette(result: EngineResult, palette: Palette, story: stri
   if (result.status !== 'sufficient' || !Array.isArray(result.candidates) || result.candidates.length === 0) return result
   const requireEcho = opts.requireClassicalEcho ?? requireClassicalEchoFromEnv()
   const log = opts.log ?? ((l: string) => console.log(l))
-  const families = refereeFamilies(result.language)
+  const families = refereeFamilies(result.language, result.reader)
   const cross = families.length > 1
+  const crossLabel = result.language !== 'en' && readerAddsFamily(result.language, result.reader) ? 'reader' : 'en'
   const language = familyOf(result.language) // the family whose classical lines are shown
   const actions: RefereeAction[] = []
 
   // The en cross-check log: the kanji and which family blocked it — never any story text.
   const crossLog = (c: Candidate, blockedBy: Family[], reason: string) => {
-    if (cross) log(`[ichirei-referee] en cross-check ${JSON.stringify({ kanji: c.kanji, slot: c.slot, blocked_by: blockedBy, reason })}`)
+    if (cross) log(`[ichirei-referee] ${crossLabel} cross-check ${JSON.stringify({ kanji: c.kanji, slot: c.slot, blocked_by: blockedBy, reason })}`)
   }
 
   // 1. Per-candidate: overwrite palette_status/flags from the row(s); enforce hard_block / blocked_occasion
@@ -710,7 +720,7 @@ export function applyReviewVerdicts(
   if (live && (!review.ran || !review.verdicts.some((v) => v.slot === 'freestyle' && v.kanji === live.kanji))) {
     failFlag(live, review.skipped_reason ?? 'no review verdict for the freestyle')
   }
-  const families = refereeFamilies(result.language)
+  const families = refereeFamilies(result.language, result.reader)
   const anchorMissing = (c: Candidate): boolean =>
     rowsFor(palette, families, c).some((f) => f.row?.status === 'context_required' && f.row.anchor_required) && !anchorPresent(c, story)
   // A candidate removed by the review or by an earlier referee rule (the model's own eliminations are not the referee's to act on).

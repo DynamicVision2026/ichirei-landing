@@ -66,7 +66,11 @@ export interface GiftContext {
   occasion: OccasionCode | ''
   occasionDetail: string
   inscriptionScript: InscriptionScript
+  /** Where the receiver will READ the gift when that differs from the sender (Part B): '' = the same. Never asked for remembrance. */
+  reader?: ReaderChoice
 }
+export type ReaderChoice = '' | 'ja' | 'zh' | 'en' | 'other'
+export const READER_CHOICES: readonly ReaderChoice[] = ['', 'ja', 'zh', 'en', 'other']
 
 export const DEFAULT_GIFT_CONTEXT: GiftContext = {
   language: 'ja',
@@ -851,6 +855,8 @@ export function contextToPayload(ctx: GiftContext): Record<string, string> {
   const detail = ctx.occasionDetail.replace(/\s+/g, ' ').trim()
   if (detail) out.occasion_detail = detail
   if (isChineseUi(ctx.language)) out.inscription_script = ctx.inscriptionScript
+  // Remembrance never asks where the receiver will read it (nothing is given).
+  if (ctx.reader && ctx.occasion !== 'memorial') out.reader = ctx.reader
   return out
 }
 

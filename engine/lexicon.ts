@@ -7,7 +7,7 @@
 // eligible characters fits the story is the model's judgement (engine/lexicon-prompt.md) — nothing here reads the story or weighs meaning.
 
 import { readFileSync } from 'node:fs'
-import { familyOf, type PaletteRow, type Candidate, type ClassicalEcho, type Direction, type EngineContext, type Family, type Language, type Occasion, type Relationship } from './contract.ts'
+import { familyOf, type PaletteRow, type Candidate, type ClassicalEcho, type Direction, type EngineContext, type Family, type Language, type Occasion, type Reader, type Relationship } from './contract.ts'
 import { isJoyo } from './joyo.ts'
 import { isAiReviewer, parseCsv, refereeFamilies, resolveSiblingPath, type Palette } from './palette.ts'
 
@@ -141,6 +141,7 @@ export interface GiftFacts {
   direction: Direction | null
   occasion: Occasion | null
   language: Language
+  reader?: Reader | null
 }
 
 /**
@@ -151,7 +152,7 @@ export interface GiftFacts {
  *   綠 — not for a partner when the Chinese palette judges the gift (zh, and en).
  * The relationship tags of lexicon.csv are guidance for the AI, not a filter: only 35 entries fit parent → child.
  */
-const inFamilies = (g: GiftFacts, f: Family) => refereeFamilies(g.language).includes(f)
+const inFamilies = (g: GiftFacts, f: Family) => refereeFamilies(g.language, g.reader).includes(f)
 const isPartner = (g: GiftFacts) => g.relationship !== null && PARTNER_RELATIONSHIPS.includes(g.relationship)
 export const LEXICON_RESTRICTIONS: Record<string, (g: GiftFacts) => string | null> = {
   藏: (g) => (isPartner(g) ? null : 'partner only'),
@@ -201,9 +202,9 @@ export interface EligibleSet {
   dropped: Record<string, number>
 }
 
-export function eligibleFor(lexicon: Lexicon, palette: Palette, context: Pick<EngineContext, 'language' | 'relationship' | 'direction' | 'occasion'>): EligibleSet {
-  const gift: GiftFacts = { relationship: context.relationship, direction: context.direction, occasion: context.occasion, language: context.language }
-  const families = refereeFamilies(context.language)
+export function eligibleFor(lexicon: Lexicon, palette: Palette, context: Pick<EngineContext, 'language' | 'relationship' | 'direction' | 'occasion' | 'reader'>): EligibleSet {
+  const gift: GiftFacts = { relationship: context.relationship, direction: context.direction, occasion: context.occasion, language: context.language, reader: context.reader }
+  const families = refereeFamilies(context.language, context.reader)
   const primary: Family = familyOf(context.language)
   const wantTags = context.relationship ? TAGS_OF_RELATIONSHIP[context.relationship] : null
   const byKey = new Map<string, EligibleChar>()

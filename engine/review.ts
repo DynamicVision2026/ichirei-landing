@@ -17,7 +17,7 @@ import { readFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { familyOf, type ReviewVerdict, type Candidate, type EngineContext, type EngineResult, type ReviewReport, type Slot } from './contract.ts'
-import type { Palette } from './palette.ts'
+import { refereeFamilies, type Palette } from './palette.ts'
 import { callSignal, reviewTimeoutMs } from './limits.ts'
 
 export const REVIEW_SLOTS = {
@@ -65,6 +65,7 @@ export interface ReviewItem {
   palette: PaletteFacts | null
   /** en only: the Mandarin palette's row for the same character (en is judged against ja AND zh). */
   palette_zh?: PaletteFacts | null
+  palette_ja?: PaletteFacts | null
 }
 interface PaletteFacts {
   status: string
@@ -78,6 +79,7 @@ interface PaletteFacts {
 /** The live candidates to review, in output order (main, second, freestyle). */
 export function reviewItems(result: EngineResult, palette: Palette): ReviewItem[] {
   const family = familyOf(result.language)
+  const families = refereeFamilies(result.language, result.reader)
   const order: Slot[] = ['main', 'second', 'freestyle']
   return result.candidates
     .filter((c: Candidate) => !c.eliminated)
@@ -96,7 +98,9 @@ export function reviewItems(result: EngineResult, palette: Palette): ReviewItem[
         one_line_gaze: c.one_line_gaze,
         story_anchor: c.story_anchor,
         palette: facts(row),
-        ...(result.language === 'en' ? { palette_zh: facts(find('zh')) } : {}),
+        // an English buyer, or a receiver who will read it in the other family's culture (Part B): that family's row too
+        ...(families.includes('zh') && family !== 'zh' ? { palette_zh: facts(find('zh')) } : {}),
+        ...(families.includes('ja') && family !== 'ja' ? { palette_ja: facts(find('ja')) } : {}),
       }
     })
 }

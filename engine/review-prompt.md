@@ -69,5 +69,5 @@ One verdict per candidate given, in the order given, no more and no fewer.
 STORY
 {{ STORY }}
 
-CANDIDATES (JSON; `palette` is what the curated palette holds, or null if the character has no row. For language en there is also `palette_zh`: the Mandarin palette's row for the same character, because an English-speaking buyer's gift may be shown to friends in Taiwan, Hong Kong, Macau or Singapore — apply the palette rule to BOTH rows)
+CANDIDATES (JSON; `palette` is what the curated palette holds, or null if the character has no row. For language en there is also `palette_zh`: the Mandarin palette's row for the same character, because an English-speaking buyer's gift may be shown to friends in Taiwan, Hong Kong, Macau or Singapore — apply the palette rule to BOTH rows). The same holds when the sender said the receiver will read the gift in the other culture: a Japanese sender with a Chinese-reading receiver also gets `palette_zh`, a Chinese sender with a Japanese-reading receiver gets `palette_ja` — apply the palette rule to every row given)
 {{ CANDIDATES }}

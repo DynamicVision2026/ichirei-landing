@@ -61,6 +61,13 @@ export const RELATIONSHIPS = [
 ] as const
 export type Relationship = (typeof RELATIONSHIPS)[number]
 
+/**
+ * Where the receiver will READ the gift (Part B, 2026-10-30): null = where the buyer reads (the default). ja = Japan, zh = Taiwan / Hong Kong / Macau,
+ * en = English-speaking (the gift may be shown anywhere: both palettes judge it, as for an English buyer), other = unknown (nothing added).
+ */
+export const READERS = ['ja', 'zh', 'en', 'other'] as const
+export type Reader = (typeof READERS)[number]
+
 export const DIRECTIONS = ['up', 'down', 'across'] as const
 export type Direction = (typeof DIRECTIONS)[number]
 
@@ -88,6 +95,8 @@ export interface EngineContext {
   occasion_detail: string | null
   /** Chinese only: traditional (default) or simplified. Always null for ja and en — not applicable there. */
   inscription_script: InscriptionScript | null
+  /** Where the receiver will read the gift, when that differs from the buyer's language (Part B). Absent / null: the same as the buyer. */
+  reader?: Reader | null
 }
 
 /** Longest occasion_detail accepted — it is a short label, not a second story. */
@@ -139,6 +148,7 @@ export function parseContext(input: {
   occasion?: unknown
   occasion_detail?: unknown
   inscription_script?: unknown
+  reader?: unknown
 }): Parsed {
   const pick = <T extends string>(
     name: string,
@@ -163,6 +173,8 @@ export function parseContext(input: {
 
   const script = pick('inscription_script', input.inscription_script, INSCRIPTION_SCRIPTS)
   if ('error' in script) return { ok: false, error: script.error }
+  const reader = pick('reader', input.reader, READERS)
+  if ('error' in reader) return { ok: false, error: reader.error }
 
   // occasion_detail is free text: trim, flatten whitespace to single spaces (it sits on one
   // line of the prompt's CONTEXT block), blank = not supplied, over the cap = rejected.
@@ -188,6 +200,8 @@ export function parseContext(input: {
       occasion_detail: occasionDetail,
       // Chinese: the supplied script, else traditional. ja and en: not applicable, so a supplied value is ignored.
       inscription_script: isChinese(resolvedLanguage) ? (script.value ?? DEFAULT_INSCRIPTION_SCRIPT) : null,
+      // Remembrance never asks where the receiver will read it (nothing is given): the choice is dropped there.
+      reader: occasion.value === 'memorial' ? null : reader.value,
     },
   }
 }
@@ -437,6 +451,8 @@ export interface EngineResult {
   occasion: Occasion | null
   /** v5: echo of the optional free-text occasion detail, null when not supplied. */
   occasion_detail: string | null
+  /** Part B: where the receiver will read the gift when that differs from the buyer's language (echo of the context); absent = the same. */
+  reader?: Reader | null
   /** v5: echo of the inscription script (Chinese: traditional | simplified; ja: null). */
   inscription_script: InscriptionScript | null
   status: 'sufficient' | 'insufficient'

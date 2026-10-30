@@ -713,6 +713,34 @@ const mockPage = async (browser, { onExplain, result, order, track } = {}) => {
   }
 }
 
+// ---------- Run 8c-3: Part B — "where will they read it?" ----------
+{
+  const { page, errors, calls } = await mockPage(browser)
+  await page.goto('http://localhost:5173/', { waitUntil: 'networkidle' })
+  const field = page.locator('#write [data-testid=reader-field]')
+  check('reader: the field 「受け取る方が読むのは？」 is there, collapsed by default', (await field.count()) === 1 && (await field.getAttribute('open')) === null && (await field.locator('summary').innerText()) === '受け取る方が読むのは？')
+  await field.locator('summary').click()
+  const labels = await field.locator('[data-chip^="reader:"]').allInnerTexts()
+  check('reader: the options are 日本 / 台湾・香港・マカオ / 英語圏 / その他 (default: わたしと同じ)', labels.join('|') === 'わたしと同じ|日本|台湾・香港・マカオ|英語圏|その他' && (await field.locator('[data-chip="reader:same"]').getAttribute('aria-pressed')) === 'true')
+  await pickContext(page)
+  await field.locator('[data-chip="reader:zh"]').click()
+  await page.locator('#write [data-testid=story-input]').fill('父は、駅の改札でいつも黙って手を振った。')
+  await page.click(`#write >> text=${GO.ja}`)
+  await page.waitForSelector(`button:has-text("${FINALIZE.ja}")`, { timeout: 15000 })
+  check('reader: the choice travels to /api/select as reader "zh"', calls.select[0].reader === 'zh')
+  await page.close()
+  const m = await mockPage(browser)
+  await m.page.goto('http://localhost:5173/', { waitUntil: 'networkidle' })
+  await pickContext(m.page, { occasion: 'memorial' })
+  check('reader: for remembrance the field is not shown at all', (await m.page.locator('#write [data-testid=reader-field]').count()) === 0)
+  await m.page.locator('#write [data-testid=story-input]').fill('父は、駅の改札でいつも黙って手を振った。')
+  await m.page.click(`#write >> text=${GO.ja}`)
+  await m.page.waitForSelector(`button:has-text("${FINALIZE.ja}")`, { timeout: 15000 })
+  check('reader: …and a remembrance request never carries one', !('reader' in m.calls.select[0]))
+  check('no page errors (run 8c-3, reader)', errors.length === 0 && m.errors.length === 0)
+  await m.page.close()
+}
+
 // ---------- Run 8d: the included poem (歌の添え書き) on the order form: one format, shown in full, free ----------
 {
   const poemCalls = []

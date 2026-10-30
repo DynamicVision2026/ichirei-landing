@@ -449,6 +449,7 @@ function stampResult(extracted: EngineResult, context: EngineContext): EngineRes
     occasion: context.occasion,
     occasion_detail: context.occasion_detail,
     inscription_script: context.inscription_script,
+    ...(context.reader ? { reader: context.reader } : {}),
   }
   // Remembrance: a suggestion only, and only when the sender did not already choose memorial. Normalised here (the model
   // decides; this is plumbing): true or absent, never a stray value.
