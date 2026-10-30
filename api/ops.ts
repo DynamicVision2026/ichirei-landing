@@ -20,7 +20,8 @@ import { readArt } from '../engine/film-art.ts'
 import { isGiftRecord, type GiftRecord } from '../engine/gift.ts'
 import { createOrderStore, type OrderStore } from '../engine/order-store.ts'
 import type { OrderRecord } from '../engine/order.ts'
-import { readSecret } from '../engine/track.ts'
+import { readShippingAddresses, SHIPPING_SOURCE, type ShippingResult } from '../engine/shipping.ts'
+import { AdminTokenCache, loadTrackConfig, readAdminSecret, readSecret, type TrackDeps } from '../engine/track.ts'
 import { loadArtwork } from '../engine/render/artwork.ts'
 import { cardsPdf } from '../engine/render/card.ts'
 import { PACKAGE_SKU, SHIPS, WOODEN, type PackageId } from '../src/order/packages.ts'
@@ -36,6 +37,8 @@ export interface OpsDeps {
   mailer?: Mailer
   /** Tests only: the Secret Manager reader. */
   readSecret?: (name: string, env: NodeJS.ProcessEnv) => Promise<string>
+  /** The Shopify address lookup (read-only Tracking app); tests replace it. Default: the same app and secret /track uses. */
+  shipping?: (refs: string[]) => Promise<ShippingResult>
 }
 
 const sha = (s: string) => createHash('sha256').update(s).digest()
@@ -148,6 +151,17 @@ async function artworkFor(store: OrderStore, row: Row, env: NodeJS.ProcessEnv) {
   return loadArtwork(store, row.gift, anim, art, env)
 }
 
+const adminTokens = new AdminTokenCache()
+
+/** The default address lookup: the read-only ICHIREI Tracking app, the way /track asks for its orders. */
+function shopifyShipping(env: NodeJS.ProcessEnv): (refs: string[]) => Promise<ShippingResult> {
+  return (refs) => {
+    const { config } = loadTrackConfig(env)
+    const td: TrackDeps | null = config ? { config, secret: () => readAdminSecret(env) } : null
+    return readShippingAddresses(refs, td, adminTokens)
+  }
+}
+
 export function createOpsHandlers(deps: () => OpsDeps) {
   const guard = async (req: Request): Promise<{ d: OpsDeps; env: NodeJS.ProcessEnv; now: Date; store: OrderStore } | Response> => {
     const d = deps()
@@ -225,16 +239,24 @@ export function createOpsHandlers(deps: () => OpsDeps) {
       const today = analyticsDay(now)
       const head = ['order_ref', 'size', 'character_to_carve', 'remembrance', 'ship_to', 'recipient_name', 'country', 'postal', 'region', 'address', 'phone', 'address_source', 'gift_packaging', 'no_price_slip']
       const out = [head.join(',')]
-      for (const r of await loadRows(store, [today])) {
+      const rows = (await loadRows(store, [today])).filter((r) => {
         const size = sizeOf(r.entry.size_code)
-        if (!size || !WOODEN[size]) continue
+        return size && WOODEN[size]
+      })
+      // "send to me" / "send directly": the address is the one typed at the Shopify checkout; ask the read-only Tracking app for exactly these orders.
+      const atShopify = rows.filter((r) => r.entry.ship_to !== 'egift' && !r.gift?.egift?.address).map((r) => r.entry.order_ref)
+      const shop = atShopify.length ? await (g.d.shipping ?? shopifyShipping(g.env))(atShopify) : { found: new Map(), failure: null }
+      for (const r of rows) {
         const p = r.record?.production
         const a = r.gift?.egift?.address
+        const sa = shop.found.get(r.entry.order_ref)
         const direct = r.entry.ship_to === 'direct'
+        const source = a ? 'e-gift form' : r.entry.ship_to === 'egift' ? 'e-gift: not entered yet' : sa ? SHIPPING_SOURCE.read : shop.failure ? SHIPPING_SOURCE[shop.failure] : SHIPPING_SOURCE.notFound
         out.push([
           r.entry.order_ref, SIZE_LABEL[r.entry.size_code] ?? r.entry.size_code, p?.glyph_to_carve ?? r.gift?.glyph ?? '', r.entry.memorial ? 'yes' : 'no', r.entry.ship_to,
-          a?.name ?? '', a?.country ?? '', a?.postal ?? '', a?.region ?? '', a ? [a.line1, a.line2].filter(Boolean).join(' ') : '', a?.phone ?? '',
-          a ? 'e-gift form' : r.entry.ship_to === 'egift' ? 'e-gift: not entered yet' : 'Shopify checkout address', direct ? 'yes' : 'no', direct ? 'yes' : 'no',
+          a?.name ?? sa?.name ?? '', a?.country ?? sa?.country ?? '', a?.postal ?? sa?.postal ?? '', a?.region ?? sa?.region ?? '',
+          a ? [a.line1, a.line2].filter(Boolean).join(' ') : sa?.address ?? '', a?.phone ?? sa?.phone ?? '',
+          source, direct ? 'yes' : 'no', direct ? 'yes' : 'no',
         ].map(csvCell).join(','))
       }
       return text(200, '﻿' + out.join('\r\n') + '\r\n', 'text/csv; charset=utf-8', { 'content-disposition': `attachment; filename="ichirei-wooden-${today}.csv"` })

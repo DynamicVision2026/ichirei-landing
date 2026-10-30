@@ -654,6 +654,7 @@ const mockPage = async (browser, { onExplain, result, order, track } = {}) => {
   await qEl.waitFor()
   const first = await qEl.getAttribute('data-question-id')
   check('opener: after the chips, ONE specific question stands above the box in large type (a question of the "up" set), and the box placeholder becomes an answer hint', first in QJA && (await qEl.innerText()) === QJA[first] && (await box.getAttribute('placeholder')) === 'ひとつの場面や、ひと言だけでも大丈夫です。' && (await qEl.evaluate((el) => parseFloat(getComputedStyle(el).fontSize))) >= 19)
+  check('opener: one quiet line under the question says answering it is optional (「この問いに答えなくても、思い浮かぶ場面を自由に書いて大丈夫です。」), after the question and before the box', (await page.locator('#write [data-testid=question-optional]').innerText()) === 'この問いに答えなくても、思い浮かぶ場面を自由に書いて大丈夫です。' && (await page.evaluate(() => { const q = document.querySelector('#write [data-testid=story-question]'); const n = document.querySelector('#write [data-testid=question-optional]'); return q?.nextElementSibling === n })))
   const seenIds = [first]
   for (let i = 0; i < 4; i++) { await page.click('#write [data-testid=question-switch]'); seenIds.push(await qEl.getAttribute('data-question-id')) }
   check('opener: 「別の問いにする」 cycles the four angles of the same set and returns to the first', new Set(seenIds.slice(0, 4)).size === 4 && seenIds[4] === first && seenIds.every((id) => id in QJA))

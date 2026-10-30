@@ -6,6 +6,8 @@ import type { RevealLang } from './copy.ts'
 export interface OpenerCopy {
   /** Quiet link under the question: another angle for the same set. */
   switchQuestion: string
+  /** One quiet line under the question: answering it is optional. */
+  optionalNote: string
   /** The textarea placeholder: a short answer hint, not "write your story". */
   answerHint: string
   /** Shown while the story is shorter than the minimum. */
@@ -25,6 +27,7 @@ export const STORY_MIN = 10
 export const OPENER: Record<RevealLang, OpenerCopy> = {
   ja: {
     switchQuestion: '別の問いにする',
+    optionalNote: 'この問いに答えなくても、思い浮かぶ場面を自由に書いて大丈夫です。',
     answerHint: 'ひとつの場面や、ひと言だけでも大丈夫です。',
     tooShort: '10字以上で送れます。',
     draftBanner: '書きかけの物語があります',
@@ -36,6 +39,7 @@ export const OPENER: Record<RevealLang, OpenerCopy> = {
   },
   'zh-Hant': {
     switchQuestion: '換一個問題',
+    optionalNote: '不一定要回答這個問題，想到哪個畫面都可以寫。',
     answerHint: '只寫一個場景，或一句話也沒關係。',
     tooShort: '寫滿 10 個字即可送出。',
     draftBanner: '有一篇還沒寫完的故事',
@@ -47,6 +51,7 @@ export const OPENER: Record<RevealLang, OpenerCopy> = {
   },
   en: {
     switchQuestion: 'Try another question',
+    optionalNote: "You don't have to answer this. Any moment that comes to mind is fine.",
     answerHint: 'One moment, or even one sentence, is enough.',
     tooShort: 'At least 10 characters to send.',
     draftBanner: 'You have a story in progress',

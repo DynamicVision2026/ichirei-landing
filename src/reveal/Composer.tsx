@@ -257,6 +257,9 @@ export default function Composer({ story, onStoryChange, onSubmit, copy, lang, c
           <label className="qPrompt" htmlFor="moment" data-testid="story-question" data-question-id={question.id}>
             {question.text}
           </label>
+          <p className="qNote" data-testid="question-optional">
+            {o.optionalNote}
+          </p>
           <button type="button" className="qSwitch" data-testid="question-switch" onClick={switchQuestion}>
             {o.switchQuestion}
           </button>

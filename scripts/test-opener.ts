@@ -100,7 +100,7 @@ check('(2) an unknown id, a wrong type or no question at all is simply ignored: 
 check('(2) the question does not count toward the 2,000-character limit (a 2,000-character story with a question is accepted)', (await post({ story: FIX.story + 'あ'.repeat(2000 - [...FIX.story].length), prompt_question: { id: 'up-habit' } })).status === 200)
 for (const lang of ['ja', 'en', 'zh-Hant'] as const) {
   const p = loadPrompt(lang)
-  check(`(2) prompt.${lang}.md: the question slot, and "the story answers this question — the question is context only: choose the character from what the story says, not from the question"`, p.includes('{{ SENDER QUESTION }}') && p.includes('The story answers this question. The question is context only: choose the character from what the story says, not from the question.') && p.includes('never quote it as a story_anchor'))
+  check(`(2) prompt.${lang}.md: the question slot, and "the sender saw this question; the story may answer it or be about something else; choose the character only from what the story says"`, p.includes('{{ SENDER QUESTION }}') && p.includes('The sender saw this question. The story may answer it or may be about something else. Choose the character only from what the story says.') && !p.includes('The story answers this question') && p.includes('never quote it as a story_anchor'))
 }
 check('(2) parsePromptQuestion / questionText: known ids only, the server\'s wording', parsePromptQuestion({ id: 'memorial-habit' }, 'zh-Hans')?.text === qf.sets.memorial[0]['zh-Hant'] && parsePromptQuestion({ id: 'x' }, 'ja') === null && parsePromptQuestion(null, 'ja') === null && questionText('work-said', 'en') === qf.sets.work[2].en && findQuestion(5) === null)
 upstream.close()

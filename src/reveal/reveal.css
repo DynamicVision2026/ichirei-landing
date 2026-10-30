@@ -262,6 +262,7 @@
 .rv .composer .btn.voice{align-self:flex-start;padding:.55rem 1.1rem;font-size:.9rem}
 /* the story opener (Part A): one specific question in large type above the box, a quiet link for another angle, the draft banner */
 .rv .composer .qPrompt{display:block;font-family:var(--display);font-weight:600;font-size:clamp(1.25rem,3.2vw,1.6rem);line-height:1.45;color:var(--ink);margin-top:.3rem}
+.rv .composer .qNote{margin:-.3rem 0 .1rem;font:400 .88rem/1.6 var(--body);color:var(--mute)}
 .rv .composer .qSwitch{align-self:flex-start;background:none;border:0;padding:.1rem 0;margin:-.4rem 0 .2rem;font:500 .88rem var(--body);color:var(--mute);text-decoration:underline;text-underline-offset:3px;cursor:pointer}
 .rv .composer .qSwitch:hover,.rv .composer .qSwitch:focus-visible{color:var(--ink)}
 .rv .composer .readerField summary{cursor:pointer;font-size:.9rem;color:var(--mute);padding:.15rem 0}
