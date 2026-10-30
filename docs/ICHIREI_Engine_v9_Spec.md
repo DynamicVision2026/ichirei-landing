@@ -96,7 +96,7 @@ From one true story, find **one character** that shows how the sender honestly s
 
 **Step 8. If something is missing**
 - Main removed: the second becomes the main.
-- One replacement may be chosen from the eligible list, for the empty slot only.
+- One replacement may be chosen from the eligible list, **for the main slot only**. A removed second or freestyle card is not replaced: one true card shown quickly beats a weaker card shown slowly (owner decision, 2026-10-30).
 - Still nothing: ask one follow-up question.
 - Still nothing: fall back to the wider palette (marked `lexicon_miss`, no classical line).
 - **Never zero cards without a question. Never an error page from a timeout.**
@@ -122,7 +122,7 @@ Every order includes **one poem at no extra charge**. The buyer picks the format
 After payment, a 30-second film retells the buyer's own story, then shows the character as the answer. One AI call writes 4 short lines and 4 picture descriptions from the story only; Google's image model draws 4 ink-wash pictures (no faces, no text, contemporary clothes, the buyer's own setting, no religious symbols unless the story has them); a vision check removes unsafe pictures. Never blocks an order; a failed slot falls back to plain washi. See `ICHIREI_Story_Film_v2_Pictures_Ticket.md`.
 
 **Step 12. Learn (logs, no story text, no kanji)**
-Analytics hold codes only, never the character or the story (owner rule). Record:
+Analytics hold codes only, never the character or the story (owner rule). Operational Cloud Run logs may show the character (needed for debugging) but never story text. Record:
 - which card the buyer chose and whether they ordered;
 - the ideal characters not in the lexicon;
 - lexicon misses;
