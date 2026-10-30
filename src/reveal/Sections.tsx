@@ -280,7 +280,7 @@ export function Reviews({ t }: { t: T }) {
 }
 
 const GIFT_ALT = {
-  simple: 'Walnut tag with a gold-leaf character, red-and-white mizuhiki cord, certificate card and gift box',
+  simple: 'Wooden tag with the character in gold colour, red-and-white mizuhiki cord, certificate card and gift box',
   standard: 'Carved wooden block, rubbing ink, tampo, washi paper, certificate card and pouch',
 } as const
 
@@ -413,6 +413,7 @@ export function Footer({ t }: { t: T }) {
     <footer>
       <div className="wrap">
         <span>ICHIREI 一字礼 · Beyond Culture 獨歩文化株式会社</span>
+        <span data-testid="footer-slogan">{t.slogan}</span>
         <span>{withTrackLink(t.foot)}</span>
       </div>
     </footer>

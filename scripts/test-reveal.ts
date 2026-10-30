@@ -22,7 +22,9 @@ const grab = (from: string, to: string) => script.slice(script.indexOf(from), sc
 const { JA, ZH, EXAMPLES: REF_EX } = new Function(grab('var JA=', 'var RATE') + '; return {JA,ZH,EXAMPLES}')() as { JA: Record<string, string>; ZH: Record<string, string>; EXAMPLES: Record<string, unknown> }
 const { ANG } = new Function(grab('var ANG=', 'var ag=0') + '; return {ANG}')() as { ANG: Record<string, unknown> }
 const DROPPED = new Set(['s2']) // "Checked by native speakers": no such claim yet (build ticket, honesty rules)
-const keysUsed = [...ref.matchAll(/data-i="(\w+)"/g)].map((m) => m[1]).filter((k) => !DROPPED.has(k))
+// The reference's hand-made / walnut / gold-leaf claims were replaced on 2026-10-30 (ticket Part F: the claims must be true): scripts/test-claims.ts checks the new words.
+const CLAIMS_REPLACED = new Set(['sub', 's1', 'st3', 'st3p', 'sp1'])
+const keysUsed = [...ref.matchAll(/data-i="(\w+)"/g)].map((m) => m[1]).filter((k) => !DROPPED.has(k) && !CLAIMS_REPLACED.has(k))
 
 check('the page uses the reference\'s copy keys: every key used by the reference page exists in all three languages', keysUsed.every((k) => k in TEXT.en && k in TEXT.ja && k in TEXT['zh-Hant']), keysUsed.filter((k) => !(k in TEXT.en)))
 check('日本語 copy is the reference\'s, word for word', keysUsed.every((k) => TEXT.ja[k as keyof typeof TEXT.ja] === (JA[k] ?? TEXT.en[k as keyof typeof TEXT.en])), keysUsed.filter((k) => TEXT.ja[k as keyof typeof TEXT.ja] !== (JA[k] ?? TEXT.en[k as keyof typeof TEXT.en])))
@@ -47,7 +49,7 @@ const banned: [string, RegExp][] = [
   ['review counts / ratings / testimonials', /\d+(?:\.\d+)?\s*(?:\/\s*5|stars?|★)|[★⭐]|\d[\d,]*\s*(?:reviews|customers|happy|満足|件のレビュー|則評價|位客戶)|testimonial/i],
 ]
 for (const [what, re] of banned) check(`honesty: no ${what} in any language`, REVEAL_LANGS.every((l) => !re.test(allText(l))), REVEAL_LANGS.map((l) => allText(l).match(re)?.[0]).filter(Boolean))
-check('honesty: the trust strip has three items — "Checked by native speakers" is not one of them', !('s2' in TEXT.en) && TEXT.en.s1 === 'Carved by hand in Japan' && TEXT.en.s3 === 'Ships worldwide' && TEXT.en.s4 === 'You choose the final character')
+check('honesty: the trust strip has three items — "Checked by native speakers" is not one of them', !('s2' in TEXT.en) && TEXT.en.s1 === 'Designed in Tokyo. Made in Japan. Delivered worldwide.' && TEXT.en.s3 === 'Ships worldwide' && TEXT.en.s4 === 'You choose the final character')
 check('honesty: the reviews section is the honest empty state', TEXT.en.rvB === 'Real reviews will appear here' && TEXT.en.rvH === 'Be one of our first givers')
 check('prices in the copy: none (they come from src/order/packages.ts: ¥9,800 / ¥18,850)', PACKAGE_PRICE_JPY.simple === 9800 && PACKAGE_PRICE_JPY.standard === 18850 && REVEAL_LANGS.every((l) => !/¥\s?\d/.test(allText(l).replace(/¥6,000/g, ''))))
 
