@@ -77,7 +77,7 @@ From one true story, find **one character** that shows how the sender honestly s
 - If the ideal character was not on the list, log `ideal_not_in_lexicon` (no story text).
 
 **Step 5. Choose the playful card (AI, open choice, "freestyle")**
-- The freestyle card is a core part of the product: it is the most honest card. It is always offered when the story gives an honest playful choice.
+- The freestyle card is a core part of the product: it is the most honest card. It must be **light**: a smile, a shared joke, a habit they laugh about together. If the story has no light moment, show no freestyle card. Never build it on a painful or shame-linked detail (e.g. 黒 for a father's oil-stained hands the child was once ashamed of). The safety review fails a heavy freestyle under `register`, a shame-linked one under `dignity` (owner decision, 2026-10-30).
 - It is anchored in a real shared moment from the story.
 - **Money is allowed and never blocked** (owner decision, 2026-10-28). Many real relationships run through money: the one who always pays, the one who saved, the one who lent, the one who counts every yen. Money characters (e.g. 金 銭 財 富 貯 稼 奢 宝) are never on any blocklist, and the safety review never removes a card just because its topic is money.
 - Teasing, never insulting: no body, looks, weight, intelligence, illness, disability, sexual meaning or cruelty. Words that label a person as poor, stingy or low-standing (ja 貧 乏 賤 卑 吝; zh 穷 窮 贫 貧 贱 賤 抠 摳 吝) stay blocked: they are insults, not money. Their warm forms are open (倹 貯 払 奢). The same dignity test as every card applies: the receiver, reading it in front of family, smiles and does not feel shamed. "The one who always treats everyone" passes; shaming someone's debt or poverty does not.
@@ -91,7 +91,7 @@ From one true story, find **one character** that shows how the sender honestly s
 - At most 3 cards (1 main, 1 second, 1 playful), all different characters.
 
 **Step 7. Safety review (fast AI check, ALL three cards)**
-- It may remove a card **only** for safety: levels 1, 3 or 4, dignity, wrong register, insult, goodwill.
+- It may remove a card **only** for safety: levels 1, 3 or 4, dignity, wrong register, insult, goodwill, or **truth** (a "who they are" line or reason adds a fact the story does not say; added 2026-10-30).
 - Taste concerns are logged, never used to remove a card.
 
 **Step 8. If something is missing**
