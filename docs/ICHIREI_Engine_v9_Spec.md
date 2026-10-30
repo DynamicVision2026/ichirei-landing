@@ -39,7 +39,7 @@ From one true story, find **one character** that shows how the sender honestly s
 ## D. The process, from story to cards
 
 **Step 0. Input (page and code)**
-- Story: max 600 characters.
+- Story: max 2,000 characters (raised from 600 on 2026-10-30 so spoken stories are never cut off). The page still says 50–300 characters is enough.
 - Choices: language, relationship, direction (up / across / down), occasion.
 - If the story clearly says the person has died, the page asks the sender whether to switch to remembrance (偲ぶ). It never switches silently.
 

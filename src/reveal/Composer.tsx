@@ -5,6 +5,7 @@ import {
   OCCASION_DETAIL_MAX,
   RELATIONSHIP_CODES,
   STORY_MAX,
+  appendSpoken,
   clipStory,
   contextComplete,
   storyLength,
@@ -98,6 +99,7 @@ export default function Composer({ story, onStoryChange, onSubmit, copy, lang, c
 
   const [listening, setListening] = useState(false)
   const [interim, setInterim] = useState('')
+  const [voiceLimit, setVoiceLimit] = useState(false)
   const recognitionRef = useRef<SpeechRecognitionLike | null>(null)
   const speechSupported = getSpeechRecognition() !== null
   const storyRef = useRef(story)
@@ -111,6 +113,7 @@ export default function Composer({ story, onStoryChange, onSubmit, copy, lang, c
     }
     const Ctor = getSpeechRecognition()
     if (!Ctor) return
+    setVoiceLimit(false)
     const rec = new Ctor()
     rec.lang = copy.speechLang
     rec.continuous = true
@@ -121,7 +124,14 @@ export default function Composer({ story, onStoryChange, onSubmit, copy, lang, c
         const r = e.results[i]
         if (r.isFinal) {
           const text = r[0].transcript.trim()
-          if (text) onStoryChange(clipStory(storyRef.current ? `${storyRef.current}${text}` : text))
+          if (text) {
+            // never past the limit without a word: the first STORY_MAX characters are kept, the page says so and stops listening
+            const next = appendSpoken(storyRef.current, text)
+            storyRef.current = next.text
+            onStoryChange(next.text)
+            if (next.clipped) setVoiceLimit(true)
+            if (next.full) rec.stop()
+          }
         } else {
           interimText += r[0].transcript
         }
@@ -194,6 +204,11 @@ export default function Composer({ story, onStoryChange, onSubmit, copy, lang, c
         </button>
       )}
       {interim && <span className="sent">{interim}…</span>}
+      {voiceLimit && (
+        <span className="sent" role="status" data-testid="voice-limit-note">
+          {copy.voiceLimit}
+        </span>
+      )}
 
       <button type="submit" className="btn primary" disabled={!ready}>
         {t.cGo}

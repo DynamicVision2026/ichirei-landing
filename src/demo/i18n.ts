@@ -37,14 +37,26 @@ export type OccasionCode = (typeof OCCASION_CODES)[number]
 export const OCCASION_DETAIL_MAX = 60
 
 /** Longest story the API accepts (engine/contract.ts STORY_MAX) — characters as Unicode code points. No minimum. */
-export const STORY_MAX = 600
+export const STORY_MAX = 2000
 /** Each follow-up answer is its own field with its own limit (engine/contract.ts FOLLOW_UP_MAX). */
 export const FOLLOW_UP_MAX = 600
-/** The live "n / 600" counter appears from this length. */
-export const STORY_COUNTER_FROM = 450
+/** The live "n / 2000" counter appears from this length (75% of the limit) where it is not always shown. */
+export const STORY_COUNTER_FROM = 1500
+/** A follow-up answer keeps its own 600-character limit; its counter still starts at 75% of it. */
+export const FOLLOW_UP_COUNTER_FROM = 450
 export const storyLength = (text: string): number => [...text].length
 /** Cut to STORY_MAX characters (code points) — a paste can never push the story over the limit. */
 export const clipStory = (text: string, max = STORY_MAX): string => (storyLength(text) <= max ? text : [...text].slice(0, max).join(''))
+
+/**
+ * Add a spoken phrase (voice input) to the story. Never mid-sentence without a word: when the story would pass the limit the first `max` characters
+ * are kept and `clipped` says so (the page then stops listening and shows a short note); `full` = the story has reached the limit exactly.
+ */
+export function appendSpoken(current: string, spoken: string, max = STORY_MAX): { text: string; clipped: boolean; full: boolean } {
+  const joined = current ? `${current}${spoken}` : spoken
+  const n = storyLength(joined)
+  return n > max ? { text: clipStory(joined, max), clipped: true, full: true } : { text: joined, clipped: false, full: n === max }
+}
 
 /** The gift's context as the sender fills it in. '' = not chosen yet. */
 export interface GiftContext {
@@ -103,6 +115,8 @@ export interface Copy {
   openingAsk: string
   voiceStart: string
   voiceListening: string
+  /** Shown when speech went past the story limit: the first STORY_MAX characters were kept. */
+  voiceLimit: string
   voiceUnsupported: string
   storyPlaceholder: string
   /** Soft hint under the story box (no minimum is enforced). */
@@ -268,11 +282,12 @@ const ja: Copy = {
   openingAsk: 'その人のことを、全部書かなくていい。その人らしい、小さなことを、ひとつだけ。',
   voiceStart: '声で話す',
   voiceListening: '聞いています… タップで停止',
+  voiceLimit: '2000字までです。それ以降の音声は入っていません。',
   voiceUnsupported: 'このブラウザは音声入力に対応していません — 下に書いてください',
   storyPlaceholder: 'たとえば——いつも同じ場所に座って、同じ湯のみでお茶を飲んでいた……',
   storyHint: '50〜300字くらいで十分です',
   storyCounter: (n, max) => `${n} / ${max}字`,
-  storyTooLong: '物語は600字までです。少し短くして、もう一度お試しください。',
+  storyTooLong: '物語は2000字までです。少し短くして、もう一度お試しください。',
   anglesHeading: '思い出の入り口',
   angles: [
     'いつものクセ・口ぐせ',
@@ -414,11 +429,12 @@ const zhHans: Copy = {
   openingAsk: '不必写下那个人的全部。只写一件最像那个人的小事就好。',
   voiceStart: '用语音说',
   voiceListening: '正在聆听… 点按停止',
+  voiceLimit: '最多 2000 字，之后说的内容没有写入。',
   voiceUnsupported: '此浏览器不支持语音输入——请在下方书写',
   storyPlaceholder: '例如——总是坐在同一个位置，用同一只杯子喝茶……',
   storyHint: '50〜300字就足够',
   storyCounter: (n, max) => `${n} / ${max}字`,
-  storyTooLong: '故事最多 600 字，请稍微缩短后再试。',
+  storyTooLong: '故事最多 2000 字，请稍微缩短后再试。',
   anglesHeading: '回忆的入口',
   angles: [
     '常有的习惯、口头禅',
@@ -563,11 +579,12 @@ const zhHant: Copy = {
   openingAsk: '不必寫下那個人的全部。只寫一件最像那個人的小事就好。',
   voiceStart: '用語音說',
   voiceListening: '正在聆聽… 點按停止',
+  voiceLimit: '最多 2000 字，之後說的內容沒有寫入。',
   voiceUnsupported: '此瀏覽器不支援語音輸入——請在下方書寫',
   storyPlaceholder: '例如——總是坐在同一個位置，用同一只杯子喝茶……',
   storyHint: '50〜300字就足夠',
   storyCounter: (n, max) => `${n} / ${max}字`,
-  storyTooLong: '故事最多 600 字，請稍微縮短後再試。',
+  storyTooLong: '故事最多 2000 字，請稍微縮短後再試。',
   anglesHeading: '回憶的入口',
   angles: [
     '常有的習慣、口頭禪',
@@ -715,11 +732,12 @@ const en: Copy = {
   openingAsk: "You don't have to write everything about them. Just one small thing that is so like them.",
   voiceStart: 'Speak instead',
   voiceListening: 'Listening… tap to stop',
+  voiceLimit: 'Stories can be up to 2,000 characters; what you said after that was not added.',
   voiceUnsupported: 'This browser does not support voice input — please write below',
   storyPlaceholder: 'For example — they always sat in the same spot and drank tea from the same cup…',
   storyHint: '50–300 characters is plenty',
   storyCounter: (n, max) => `${n} / ${max} characters`,
-  storyTooLong: 'Stories can be up to 600 characters. Please shorten it a little and try again.',
+  storyTooLong: 'Stories can be up to 2,000 characters. Please shorten it a little and try again.',
   anglesHeading: 'Ways in',
   angles: [
     'A habit or a phrase they always use',

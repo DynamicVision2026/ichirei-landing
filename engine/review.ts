@@ -10,7 +10,7 @@
 // ships only after a PASS.
 //
 // Env: ICHIREI_REVIEW=off disables the call; ICHIREI_REVIEW_MODEL, ICHIREI_REVIEW_EFFORT (default
-// low), ICHIREI_REVIEW_MAX_TOKENS (default 2500; the reasoning counts against it), ICHIREI_REVIEW_TIMEOUT_MS (default 60000), ICHIREI_REVIEW_PROMPT_PATH.
+// low), ICHIREI_REVIEW_MAX_TOKENS (default 4000; the reasoning counts against it), ICHIREI_REVIEW_TIMEOUT_MS (default 60000), ICHIREI_REVIEW_PROMPT_PATH.
 
 import Anthropic from '@anthropic-ai/sdk'
 import { readFileSync } from 'node:fs'
@@ -178,7 +178,7 @@ export async function runReview(result: EngineResult, palette: Palette, story: s
     const effort = (process.env.ICHIREI_REVIEW_EFFORT ?? 'low') as 'low' | 'medium' | 'high'
     const signal = callSignal(opts.signal, reviewTimeoutMs())
     const stream = client.messages.stream(
-      { model: opts.model, max_tokens: Number(process.env.ICHIREI_REVIEW_MAX_TOKENS ?? 2500), output_config: { effort }, messages: [{ role: 'user', content: prompt }] },
+      { model: opts.model, max_tokens: Number(process.env.ICHIREI_REVIEW_MAX_TOKENS ?? 4000), output_config: { effort }, messages: [{ role: 'user', content: prompt }] },
       { signal },
     )
     const message = await stream.finalMessage()

@@ -8,7 +8,7 @@ import Composer from '../reveal/Composer'
 import { toRevealLang } from '../reveal/lang'
 import { sessionId } from './analytics'
 import { exportEvents, log, setCondition as logSetCondition, setStory as logSetStory } from './logging'
-import { COPY, DEFAULT_GIFT_CONTEXT, FOLLOW_UP_MAX, STORY_COUNTER_FROM, clipStory, contextToPayload, storyLength, type Copy, type GiftContext } from './i18n'
+import { COPY, DEFAULT_GIFT_CONTEXT, FOLLOW_UP_COUNTER_FROM, FOLLOW_UP_MAX, clipStory, contextToPayload, storyLength, type Copy, type GiftContext } from './i18n'
 import { getLanguage, setLanguage } from '../lang-store'
 import { useLanguage } from '../useLanguage'
 
@@ -444,7 +444,7 @@ export default function DemoApp({ mode = 'harness', aside }: { mode?: Mode; asid
             placeholder={copy.followUpPlaceholder}
             className="font-serif-jp w-full resize-none rounded-sm border border-line bg-page p-4 text-base leading-loose text-fg outline-none transition-colors placeholder:text-mute focus:border-accent"
           />
-          {(customer || storyLength(followUpAnswer) >= STORY_COUNTER_FROM) && (
+          {(customer || storyLength(followUpAnswer) >= FOLLOW_UP_COUNTER_FROM) && (
             <p data-testid="story-counter" className="font-label mt-2 text-right text-[12px] text-mute">
               {copy.storyCounter(storyLength(followUpAnswer), FOLLOW_UP_MAX)}
             </p>

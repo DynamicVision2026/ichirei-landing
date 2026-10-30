@@ -324,7 +324,7 @@ async function review(
       TYPE: input.type,
       POEM: draft.lines.join('\n'),
     })
-    const raw = parseJson(await callText('review', process.env.ICHIREI_REVIEW_MODEL ?? DEFAULT_REVIEW_MODEL, prompt, Number(process.env.ICHIREI_REVIEW_MAX_TOKENS ?? 2500), 'low'))
+    const raw = parseJson(await callText('review', process.env.ICHIREI_REVIEW_MODEL ?? DEFAULT_REVIEW_MODEL, prompt, Number(process.env.ICHIREI_REVIEW_MAX_TOKENS ?? 4000), 'low'))
     if (!raw || typeof raw.pass !== 'boolean' || raw.pass) return null
     const rule = typeof raw.rule === 'string' ? raw.rule.toLowerCase() : ''
     if (!(REVIEW_VETO_RULES as readonly string[]).includes(rule) && rule !== 'attribution') return null // not a safety rule: a concern, not a veto

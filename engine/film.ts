@@ -277,7 +277,7 @@ export async function makeFilm(input: FilmInput, opts: FilmOptions = {}): Promis
   for (let attempt = 1; attempt <= 2; attempt++) {
     const signal = callSignal(opts.signal, timeoutMs)
     try {
-      const stream = client.messages.stream({ model, max_tokens: 2500, output_config: { effort: 'low' }, messages: [{ role: 'user', content: buildFilmPrompt(input, feedback) }] }, { signal })
+      const stream = client.messages.stream({ model, max_tokens: Number(process.env.ICHIREI_FILM_MAX_TOKENS ?? 4000), output_config: { effort: 'low' }, messages: [{ role: 'user', content: buildFilmPrompt(input, feedback) }] }, { signal })
       const message = await stream.finalMessage()
       if (message.stop_reason === 'refusal') throw new Error('refusal')
       const text = message.content.filter((b): b is Anthropic.TextBlock => b.type === 'text').map((b) => b.text).join('')

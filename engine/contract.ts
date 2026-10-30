@@ -94,7 +94,7 @@ export interface EngineContext {
 export const OCCASION_DETAIL_MAX = 60
 
 /** Longest story accepted (characters, counted as Unicode code points). No minimum: STEP 0 judges sufficiency by content. */
-export const STORY_MAX = 600
+export const STORY_MAX = 2000
 /** Each follow-up answer has its own limit (it is a separate field, not part of `story`), and at most MAX_FOLLOW_UPS are accepted. */
 export const FOLLOW_UP_MAX = 600
 export const MAX_FOLLOW_UPS = 2

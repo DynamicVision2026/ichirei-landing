@@ -62,7 +62,7 @@ npm run dev                                              # landing on /, harness
 npx tsc -b && npx tsc -p tsconfig.engine.json            # typecheck frontend + engine/api
 node --experimental-strip-types scripts/test-plumbing.ts # prompts, slots, palette header, contract validator — no key needed
 node --experimental-strip-types scripts/test-palette.ts  # referee rules (hard_block, anchor, promotion, zh scripts) — no key needed
-node --experimental-strip-types scripts/test-v6.ts         # v6: 2 main + freestyle, referee/review end to end, classical lines, 600-char limit + follow-ups; fixtures in scripts/fixtures-v6/
+node --experimental-strip-types scripts/test-v6.ts         # v6: 2 main + freestyle, referee/review end to end, classical lines, 2,000-char limit + follow-ups; fixtures in scripts/fixtures-v6/
 node --experimental-strip-types scripts/test-v7.ts         # v7: en cross-check (fixtures in scripts/fixtures-v7/), palette-attached en fields, certificate object
 node --experimental-strip-types scripts/test-analytics.ts  # learning loop: events, JSONL store, report
 node --experimental-strip-types scripts/test-track.ts      # /track: status rules, arrival dates, fake Shopify Admin, privacy + rate limits, 4-language copy

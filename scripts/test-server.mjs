@@ -131,14 +131,14 @@ try {
   const exEn = await post(base, '/api/explain', { story: 'My mum left the porch light on every night until I got home.', candidate: { kanji: '灯', inscription_form: '燈', reading: 'on: tō · kun: hi, akari', meaning: 'lamp; a light kept lit', one_line_gaze: 'You left the porch light on every night.', story_anchor: 'left the porch light on' }, language: 'en', relationship: 'parent_mother', direction: 'up', occasion: 'parent_day', inscription_script: 'simplified' })
   const exEnPrompt = upstream.state.requests.filter((r) => r.kind === 'explain').at(-1)?.body.messages?.[0]?.content ?? ''
   check('explain: en → explain-prompt.en.md, romaji reading + English meaning + older form + context injected, no slot left', exEn.status === 200 && exEnPrompt.includes('English / en') && exEnPrompt.includes('reading: on: tō · kun: hi, akari') && exEnPrompt.includes('meaning: lamp; a light kept lit') && exEnPrompt.includes('older form 燈; the piece itself is carved in the modern form') && exEnPrompt.includes('relationship: parent_mother') && !/\{\{ [A-Z_]+ \}\}/.test(exEnPrompt))
-  const exLong = await post(base, '/api/explain', { story: 'あ'.repeat(601), candidate: cand })
+  const exLong = await post(base, '/api/explain', { story: 'あ'.repeat(2001), candidate: cand })
   const exLongJ = await exLong.json()
   const exFu = await post(base, '/api/explain', { story: '父は無口だった。', follow_ups: ['毎朝、駅まで送ってくれた。'], candidate: cand })
   const exFuPrompt = upstream.state.requests.filter((r) => r.kind === 'explain').at(-1)?.body.messages?.[0]?.content ?? ''
   const exFuBad = await post(base, '/api/explain', { story: '父', follow_ups: ['あ'.repeat(601)], candidate: cand })
-  check('explain: a story over 600 characters → 400 story_too_long; follow-up answers ride along (merged for the prompt) and are limited to 600 each', exLong.status === 400 && exLongJ.code === 'story_too_long' && exLongJ.max === 600 && exFu.status === 200 && exFuPrompt.includes('父は無口だった。\n\n毎朝、駅まで送ってくれた。') && exFuBad.status === 400 && (await exFuBad.json()).code === 'follow_up_too_long')
-  const longSel = await post(base, '/api/select', { story: 'あ'.repeat(700), language: 'ja' })
-  check('select (server): the 700-character story is rejected with 400 story_too_long (max 600) before the model is asked', longSel.status === 400 && (await longSel.json()).max === 600)
+  check('explain: a story over 2000 characters → 400 story_too_long; follow-up answers ride along (merged for the prompt) and are limited to 600 each', exLong.status === 400 && exLongJ.code === 'story_too_long' && exLongJ.max === 2000 && exFu.status === 200 && exFuPrompt.includes('父は無口だった。\n\n毎朝、駅まで送ってくれた。') && exFuBad.status === 400 && (await exFuBad.json()).code === 'follow_up_too_long')
+  const longSel = await post(base, '/api/select', { story: 'あ'.repeat(2100), language: 'ja' })
+  check('select (server): the 2100-character story is rejected with 400 story_too_long (max 2000) before the model is asked', longSel.status === 400 && (await longSel.json()).max === 2000)
   const exBadCtx = await post(base, '/api/explain', { story: STORY, candidate: cand, occasion: 'kanreki' })
   check('explain: an invalid context code → 400', exBadCtx.status === 400 && /occasion/.test((await exBadCtx.json()).error))
   const exMissing = await post(base, '/api/explain', { story: STORY })

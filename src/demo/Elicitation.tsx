@@ -8,6 +8,7 @@ import {
   RELATIONSHIP_CODES,
   STORY_COUNTER_FROM,
   STORY_MAX,
+  appendSpoken,
   clipStory,
   storyLength,
   UI_LANGUAGES,
@@ -89,6 +90,7 @@ export default function Elicitation({
   const [angleText, setAngleText] = useState('')
   const [listening, setListening] = useState(false)
   const [interim, setInterim] = useState('')
+  const [voiceLimit, setVoiceLimit] = useState(false)
   const recognitionRef = useRef<SpeechRecognitionLike | null>(null)
   const speechSupported = getSpeechRecognition() !== null
 
@@ -105,6 +107,7 @@ export default function Elicitation({
     }
     const Ctor = getSpeechRecognition()
     if (!Ctor) return
+    setVoiceLimit(false)
     const rec = new Ctor()
     rec.lang = copy.speechLang
     rec.continuous = true
@@ -116,8 +119,12 @@ export default function Elicitation({
         if (r.isFinal) {
           const t = r[0].transcript.trim()
           if (t) {
-            const base = storyRef.current
-            onStoryChange(base ? `${base}${base.endsWith('。') ? '' : ''}${t}` : t)
+            // never past the limit without a word: the first STORY_MAX characters are kept, the page says so and stops listening
+            const next = appendSpoken(storyRef.current, t)
+            storyRef.current = next.text
+            onStoryChange(next.text)
+            if (next.clipped) setVoiceLimit(true)
+            if (next.full) rec.stop()
           }
         } else {
           interimText += r[0].transcript
@@ -312,6 +319,11 @@ export default function Elicitation({
       />
       <div className="mt-2 flex items-baseline justify-between gap-4">
         <p data-testid="story-hint" className="font-label text-[11px] text-ivory/40">{copy.storyHint}</p>
+        {voiceLimit && (
+          <p role="status" data-testid="voice-limit-note" className="font-label text-[11px] text-gold">
+            {copy.voiceLimit}
+          </p>
+        )}
         {storyLength(story) >= STORY_COUNTER_FROM && (
           <p data-testid="story-counter" className={`font-label text-[11px] ${storyLength(story) >= STORY_MAX ? 'text-gold' : 'text-ivory/60'}`}>
             {copy.storyCounter(storyLength(story), STORY_MAX)}
