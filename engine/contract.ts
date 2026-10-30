@@ -416,7 +416,7 @@ export const DECLINE_MESSAGE: Record<Language, string> = {
   en: 'We could not find in this story the regard for the person that a character is meant to carry. A character shows how you truly see someone. If you have another story to tell, we would be glad to read it.',
 }
 
-export const REVIEW_VETO_RULES = ['palette', 'occasion', 'memorial', 'dignity', 'register', 'insult', 'illness', 'relationship', 'goodwill'] as const
+export const REVIEW_VETO_RULES = ['palette', 'occasion', 'memorial', 'dignity', 'register', 'insult', 'illness', 'relationship', 'goodwill', 'truth'] as const
 export type ReviewVetoRule = (typeof REVIEW_VETO_RULES)[number]
 export interface ReviewVerdict {
   slot: Slot

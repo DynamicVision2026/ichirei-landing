@@ -11,7 +11,7 @@ import http from 'node:http'
 import { readFileSync, readdirSync } from 'node:fs'
 import { join } from 'node:path'
 import { runEngine } from '../engine/engine.ts'
-import { FOLLOW_UP_MAX, MAX_FOLLOW_UPS, STORY_MAX, countChars, mergeStory, parseFollowUps, validateEngineResult, type EngineResult } from '../engine/contract.ts'
+import { FOLLOW_UP_MAX, MAX_FOLLOW_UPS, REVIEW_VETO_RULES, STORY_MAX, countChars, mergeStory, parseFollowUps, validateEngineResult, type EngineResult } from '../engine/contract.ts'
 import { applyPalette, applyReviewVerdicts, classicalEchoOf, loadPalette, parseFreestyleBlocklist, parsePalette, FREESTYLE_CATEGORIES } from '../engine/palette.ts'
 import { REVIEW_SLOTS, fillReviewPrompt, loadReviewPrompt, parseVerdicts, reviewItems } from '../engine/review.ts'
 import { parseOrderRequest } from '../engine/order.ts'
@@ -182,6 +182,15 @@ try {
   check('review: a missing verdict for the freestyle drops it (no PASS, no freestyle); missing main verdicts leave the mains standing', rv7.freestyle_kanji === null && rv7.primary_kanji === '証' && rv7.runner_up_kanji === '守')
   check('review prompt: every slot is in the file, loads, and fills in one pass (slot-like text in the story is not re-substituted)', Object.values(REVIEW_SLOTS).every((s) => loadReviewPrompt().includes(s)) && (() => { const f = fillReviewPrompt(loadReviewPrompt(), 'x {{ CANDIDATES }} y', { language: 'ja', relationship: 'friend', direction: 'across', occasion: null, occasion_detail: null, inscription_script: null }, []); return f.includes('x {{ CANDIDATES }} y') && f.includes('occasion: unspecified') })())
   check('review prompt: the rules — palette, occasion taboos, dignity, invention, generic; the freestyle rules; vetoes only under a safety rule', ['SAFETY RULES', 'THE CONCERNS', '`palette`', '`occasion`', '`dignity`', '`register`', '`insult`', 'Invention', 'Generic', 'birthday_milestone', 'retirement_farewell'].every((k) => loadReviewPrompt().includes(k)))
+  check('review prompt (2026-10-30): `truth` is a safety rule for the gaze lines of the main, second AND freestyle cards (an added fact such as "forgave" fails); the freestyle must be light (`register`) and never built on a painful or shame-linked detail (`dignity`, 黒 for ashamed-of hands)', ['9. `truth`', '7. `truth`', '8. `dignity`', '"forgave"', 'It is not light', 'oil-stained hands', '| "truth", "reason"'].every((k) => loadReviewPrompt().includes(k)) && (REVIEW_VETO_RULES as readonly string[]).includes('truth'))
+  for (const fam of ['ja', 'zh', 'en']) {
+    const p = readFileSync(join(process.cwd(), 'engine', `prompt.${fam}.md`), 'utf8')
+    check(`prompt.${fam}.md (2026-10-30): every "who they are" line states only what the story says (no "forgave" when the story says he never came again); the freestyle is LIGHT, absent when there is no light moment, never a painful or shame-linked detail (黒 for ashamed-of oil-stained hands)`, p.includes('every line that says who the receiver is') && p.includes('"forgave"') && p.includes('The freestyle is LIGHT') && p.includes('show NO freestyle card') && p.includes('NEVER use the freestyle slot for a painful or shame-linked detail') && p.includes('oil-stained hands') && p.includes('7. Light only.'))
+  }
+  const truthVeto = await run('a', (_reply, review) => {
+    review.verdicts[0] = { slot: 'main', kanji: review.verdicts[0].kanji, pass: false, rule: 'truth', reason: 'States that he forgave; the story only says he never came again.', concern: '' }
+  })
+  check('a `truth` veto on a main card is APPLIED (the card is removed with the rule named), not ignored as "no safety rule named"', bySlot(truthVeto, 'main')?.eliminated === true && /review: truth:/.test(bySlot(truthVeto, 'main')?.eliminated_reason ?? '') && !truthVeto.referee?.actions.some((x) => x.action === 'review_veto_ignored'))
   check('review input: the reviewer sees the palette facts for each candidate (status, taboo flags) and null for a character with no row', (() => { const items = reviewItems(a, loadPalette()); return items.find((i) => i.kanji === '証')?.palette?.status === 'context_required' && items.find((i) => i.kanji === '封')?.palette === null && items.map((i) => i.slot).join() === 'main,second,freestyle' })())
   check('review parser: fenced / prose-wrapped JSON accepted; verdicts for unasked candidates ignored; a non-boolean pass is not a verdict', (() => {
     const items = reviewItems(a, loadPalette())
