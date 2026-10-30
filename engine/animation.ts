@@ -119,10 +119,10 @@ export function isAnimationRecord(x: unknown): x is AnimationRecord {
 /**
  * The revision of a sample's pictures. An art record saved under another revision is ignored, so changing a number here makes that sample draw its
  * pictures AGAIN on its next open (no access to the bucket needed). 2: ja / zh / memorial redrawn after the quota fixes; 3: zh / en / memorial redrawn
- * after the clothes-and-setting and no-religious-symbol rules; 4: zh / en / memorial redrawn again after the picture-check fix (ja stays on 2); 5: zh redrawn after the contemporary-objects style line and the rewrite-before-washi step.
+ * after the clothes-and-setting and no-religious-symbol rules; 4: zh / en / memorial redrawn again after the picture-check fix (ja stays on 2); 5: zh redrawn after the contemporary-objects style line and the rewrite-before-washi step; ja 3 (2026-10-30): the Japanese sample redrawn so it picks up the modern-clothes rule.
  */
 export const SAMPLE_ART_REV: Record<string, string> = {
-  'AN-sampleja222222222222': '2',
+  'AN-sampleja222222222222': '3',
   'AN-samplezh222222222222': '5',
   'AN-sampleen222222222222': '4',
   'AN-samplemem22222222222': '4',
