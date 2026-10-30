@@ -349,6 +349,10 @@ gcloud projects add-iam-policy-binding ichirei --member="serviceAccount:$(gcloud
 
 `scripts/test-film.ts` (the script referee incl. the picture descriptions, the call with a fake model: good, retry, fallback, timeout, off, no key, logs), `scripts/test-film-art.ts` (the style, the Vertex client against a fake server — URL, token, 4:5, model hand-over, error codes, metadata server —, the picture check, a set with per-slot retry and washi, the lock across instances, the limits, the private bucket), `scripts/test-animation.ts` (records, timeline, API incl. the first open, order wiring, samples, the real server with a fake image model), `scripts/test-animation-browser.mjs` (Chromium on iPhone-class, Pixel-class and 320 × 568 screens, incl. the first-open flow). **No test calls Google or Claude; the image model's look and the picture check's judgement have not been seen.** The phones are emulated in Chromium — real iPhone Safari and Android Chrome are for the owner's check of the sample links. `ANTHROPIC_API_KEY=… node --experimental-strip-types scripts/run-film-db.mjs` runs the *script* call over ~11 stories for a human to read (picture descriptions included).
 
+## The engine spec in this repo
+
+`docs/ICHIREI_Engine_v9_Spec.md` is the owner's spec (v9.3, 2026-10-30) — the single source of truth: if code and the document disagree, the document wins and the difference is reported. The code check of 2026-10-30 found four differences (the free poem, no main-character count in analytics, the wider freestyle teasing list, the palette-row rule); all four were settled by updating the spec, so code and spec agree. The older alignment report of the v9.1 build is `review/V9_1_alignment_report.md`.
+
 ## Spec v9.2 step 5 — the freestyle card and money (2026-10-28)
 
 **Money is never blocked in the freestyle card.** Audit of every list and prompt (found / changed):
