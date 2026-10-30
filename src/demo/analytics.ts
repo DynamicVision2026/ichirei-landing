@@ -33,3 +33,18 @@ export function track(event: 'chosen' | 'explain_opened', source: Source, choice
     // analytics must never get in the way
   }
 }
+
+/** The story step of the page (engine/analytics.ts FLOW_EVENTS): codes only — the language, the question set and a known question id. Never text. */
+export type FlowEvent = 'story_opened' | 'question_shown' | 'question_switched' | 'voice_used' | 'draft_restored' | 'story_submitted' | 'followup_shown' | 'reveal_shown'
+export function trackFlow(event: FlowEvent, fields: { language?: string; set?: string | null; qid?: string | null } = {}): void {
+  try {
+    void fetch('/api/analytics', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ session: sessionId, source: 'customer', event, language: fields.language, set: fields.set ?? undefined, qid: fields.qid ?? undefined }),
+      keepalive: true,
+    }).catch(() => {})
+  } catch {
+    // analytics must never get in the way
+  }
+}

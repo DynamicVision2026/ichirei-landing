@@ -4,6 +4,7 @@ import type { Candidate, EngineResult } from './types'
 import type { Copy, InscriptionStyle, OrderField, PackageId, UiLanguage } from './i18n'
 import { log } from './logging'
 import { sessionId } from './analytics'
+import { clearDraft } from './draft'
 import { PACKAGES, PACKAGE_PRICE_JPY, formatYen } from '../order/packages.ts'
 import { isMemorial } from '../order/memorial.ts'
 import { certificateText } from '../order/certificate.ts'
@@ -26,6 +27,8 @@ type Props = {
   result: EngineResult
   story: string
   followUps?: string[]
+  /** The story-opener question the sender was shown (a known id): kept with the order for the report of questions → characters. */
+  promptQuestionId?: string | null
   candidate: Candidate
   copy: Copy
   onBack: () => void
@@ -45,7 +48,7 @@ const daysUntil = (iso: string) => {
 
 const FIELD_KEYS: readonly OrderField[] = ['sender_name', 'receiver_name', 'delivery_date', 'inscription_style', 'package']
 
-export default function OrderForm({ result, story, followUps = [], candidate, copy, onBack }: Props) {
+export default function OrderForm({ result, story, followUps = [], promptQuestionId = null, candidate, copy, onBack }: Props) {
   const reduceMotion = useReducedMotion()
   // The gift's language is the language the engine ran in (the certificate follows it).
   const language: UiLanguage = result.language ?? 'ja'
@@ -90,6 +93,7 @@ export default function OrderForm({ result, story, followUps = [], candidate, co
         body: JSON.stringify({
           story,
           ...(followUps.length ? { follow_ups: followUps } : {}),
+          ...(promptQuestionId ? { prompt_question_id: promptQuestionId } : {}),
           engine_result: result,
           selected_kanji: candidate.kanji,
           language,
@@ -124,6 +128,7 @@ export default function OrderForm({ result, story, followUps = [], candidate, co
         return
       }
       log('order_submitted', { order_ref: data.order_ref, package: pkg, language })
+      clearDraft() // the story is ordered: a saved draft of it is no longer wanted
       setPhase('redirecting')
       window.location.assign(data.checkout_url)
     } catch {

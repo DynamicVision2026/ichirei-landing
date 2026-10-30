@@ -15,6 +15,7 @@
 import { runEngine } from '../engine/engine.ts'
 import { ModelTimeoutError, callTimeoutMs } from '../engine/limits.ts'
 import { cleanSession, cleanSource, recordEvent, shownEvent } from '../engine/analytics.ts'
+import { parsePromptQuestion } from '../engine/story-questions.ts'
 import { FOLLOW_UP_MAX, STORY_MAX, countChars, mergeStory, parseContext, parseFollowUps, type Condition } from '../engine/contract.ts'
 
 // Full Hobby-plan ceiling (also mirrored in vercel.json).
@@ -37,7 +38,8 @@ export async function POST(req: Request): Promise<Response> {
     return jsonResponse(400, { error: 'Body is not valid JSON' })
   }
 
-  const { story, follow_ups, session, source, condition, language, relationship, direction, occasion, occasion_detail, inscription_script } = (body ?? {}) as {
+  const { story, follow_ups, session, source, condition, language, relationship, direction, occasion, occasion_detail, inscription_script, prompt_question } = (body ?? {}) as {
+    prompt_question?: unknown
     story?: unknown
     follow_ups?: unknown
     session?: unknown
@@ -71,6 +73,9 @@ export async function POST(req: Request): Promise<Response> {
   // length-capped).
   const parsed = parseContext({ language, relationship, direction, occasion, occasion_detail, inscription_script })
   if (!parsed.ok) return jsonResponse(400, { error: parsed.error })
+  // The story-opener question: `prompt_question` is { id, text }. Only a KNOWN id counts and the wording is the server's own (text from the
+  // request is never put in a prompt); it does not count toward the story limit and an unknown one is simply ignored.
+  const promptQuestion = parsePromptQuestion(prompt_question, parsed.context.language)
 
   if (!process.env.ANTHROPIC_API_KEY) {
     return jsonResponse(500, {
@@ -89,6 +94,7 @@ export async function POST(req: Request): Promise<Response> {
       try {
         const result = await runEngine(mergeStory(story, fu.followUps), cond, {
           context: parsed.context,
+          promptQuestion: promptQuestion?.text ?? null,
           followUpsUsed: fu.followUps.length,
           onStage: (stage) => send({ type: 'stage', stage }),
           onDelta: (text) => {

@@ -4,6 +4,7 @@
 //
 // Plumbing only — nothing here selects or judges a character.
 
+import { findQuestion } from './story-questions.ts'
 import { randomBytes } from 'node:crypto'
 import { LANGUAGES, STORY_MAX as ENGINE_STORY_MAX, countChars, parseFollowUps, type Candidate, type EngineResult, type Language } from './contract.ts'
 import { PACKAGES, PACKAGE_PRICE_JPY, type PackageId, type PoemType } from '../src/order/packages.ts'
@@ -79,6 +80,8 @@ export interface ValidOrder {
   story: string
   /** The sender's answers to the engine's follow-up questions (each at most 600 characters), kept apart from the story. */
   follow_ups: string[]
+  /** The story-opener question the sender was shown (a known id; codes only) — for the report of which questions lead to which characters. */
+  prompt_question_id?: string | null
   engine_result: EngineResult
   language: Language
   candidate: Candidate
@@ -186,6 +189,7 @@ export function parseOrderRequest(body: unknown, now: Date = new Date(), palette
     order: {
       story,
       follow_ups: fu.followUps,
+      prompt_question_id: findQuestion(body.prompt_question_id)?.question.id ?? null,
       engine_result: result as unknown as EngineResult,
       language: lang,
       candidate,
@@ -315,6 +319,8 @@ export interface OrderRecord {
   /** Kept here, never sent to Shopify. `story` is what the sender wrote first; `follow_ups` are their answers to the engine's questions. */
   story: string
   follow_ups: string[]
+  /** The story-opener question the sender was shown (a known id; codes only) — for the report of which questions lead to which characters. */
+  prompt_question_id?: string | null
   engine_result: EngineResult
   shopify: { cart_id: string; checkout_url: string; variant_id: string } | null
   error: string | null
@@ -351,6 +357,7 @@ export function buildRecord(order: ValidOrder, orderRef: string, now: Date = new
     },
     story: order.story,
     follow_ups: order.follow_ups,
+    prompt_question_id: order.prompt_question_id ?? null,
     engine_result: order.engine_result,
     shopify: null,
     error: null,

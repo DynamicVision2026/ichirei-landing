@@ -260,6 +260,14 @@
 .rv .cchip:hover{border-color:var(--ink)}
 .rv .cchip[aria-pressed="true"]{background:var(--ink);color:var(--paper);border-color:var(--ink)}
 .rv .composer .btn.voice{align-self:flex-start;padding:.55rem 1.1rem;font-size:.9rem}
+/* the story opener (Part A): one specific question in large type above the box, a quiet link for another angle, the draft banner */
+.rv .composer .qPrompt{display:block;font-family:var(--display);font-weight:600;font-size:clamp(1.25rem,3.2vw,1.6rem);line-height:1.45;color:var(--ink);margin-top:.3rem}
+.rv .composer .qSwitch{align-self:flex-start;background:none;border:0;padding:.1rem 0;margin:-.4rem 0 .2rem;font:500 .88rem var(--body);color:var(--mute);text-decoration:underline;text-underline-offset:3px;cursor:pointer}
+.rv .composer .qSwitch:hover,.rv .composer .qSwitch:focus-visible{color:var(--ink)}
+.rv .draftBanner{display:flex;flex-wrap:wrap;align-items:center;gap:.6rem 1rem;margin:0 0 1rem;padding:.8rem 1rem;border:1px solid var(--line);border-radius:12px;background:var(--card);font-size:.95rem}
+.rv .draftBanner span{flex:1 1 12rem}
+.rv .draftBanner .btn{padding:.45rem 1rem;font-size:.9rem}
+
 .rv .composer .btn.voice .dot{width:.55rem;height:.55rem;border-radius:50%;background:var(--gold)}
 .rv .composer .btn.voice.on .dot{background:var(--seal);animation:fill 1s ease-in-out infinite alternate}
 .rv .composer .btn:disabled,.rv .orderForm .btn:disabled{opacity:.45;cursor:not-allowed;transform:none}

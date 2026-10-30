@@ -8,6 +8,7 @@
 
 import { LANGUAGES, OCCASIONS, RELATIONSHIPS, type EngineResult, type Language, type Occasion, type Relationship } from './contract.ts'
 import { createOrderStore, type OrderStore } from './order-store.ts'
+import { QUESTION_SETS, findQuestion, type QuestionSet } from './story-questions.ts'
 import type { PoemType } from '../src/order/packages.ts'
 
 export const SESSION_PATTERN = /^[A-Za-z0-9_-]{16,64}$/
@@ -17,10 +18,14 @@ export type Source = (typeof SOURCES)[number]
 export const CHOICES = ['main', 'second', 'freestyle'] as const
 export type Choice = (typeof CHOICES)[number]
 /** Events the BROWSER may report; `shown` and `ordered` are written by the server itself. */
-export const CLIENT_EVENTS = ['chosen', 'explain_opened'] as const
+/** The story step of the page (Part A, 2026-10-30): codes only — the language, the question set and the question id (a known id, never text). */
+export const FLOW_EVENTS = ['story_opened', 'question_shown', 'question_switched', 'voice_used', 'draft_restored', 'story_submitted', 'followup_shown', 'reveal_shown'] as const
+export type FlowEvent = (typeof FLOW_EVENTS)[number]
+export const CLIENT_EVENTS = ['chosen', 'explain_opened', ...FLOW_EVENTS] as const
 
 export type AnalyticsEvent =
   | { ts: string; session: string; source: Source; event: 'shown'; language: Language; relationship: Relationship | null; occasion: Occasion | null; status: 'sufficient' | 'insufficient'; main_slot: 'main' | 'second' | null; has_freestyle: boolean }
+  | { ts: string; session: string; source: Source; event: FlowEvent; language: Language | null; set: QuestionSet | null; qid: string | null }
   | { ts: string; session: string; source: Source; event: 'chosen'; choice: Choice }
   | { ts: string; session: string; source: Source; event: 'explain_opened'; choice: Choice | null }
   | { ts: string; session: string; source: Source; event: 'ordered'; poem_types?: PoemType[] }
@@ -42,6 +47,12 @@ export function parseClientEvent(body: unknown, now: Date): AnalyticsEvent | nul
   const source = cleanSource(b.source)
   const choice = (CHOICES as readonly string[]).includes(b.choice as string) ? (b.choice as Choice) : null
   const ts = now.toISOString()
+  if ((FLOW_EVENTS as readonly string[]).includes(b.event as string)) {
+    const language = (LANGUAGES as readonly string[]).includes(b.language as string) ? (b.language as Language) : null
+    const qid = findQuestion(b.qid)?.question.id ?? null
+    const set = (QUESTION_SETS as readonly string[]).includes(b.set as string) ? (b.set as QuestionSet) : null
+    return { ts, session, source, event: b.event as FlowEvent, language, set, qid }
+  }
   if (b.event === 'chosen') return choice ? { ts, session, source, event: 'chosen', choice } : null
   return { ts, session, source, event: 'explain_opened', choice }
 }

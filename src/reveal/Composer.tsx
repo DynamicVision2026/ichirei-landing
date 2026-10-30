@@ -1,4 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
+import { trackFlow } from '../demo/analytics'
+import { nextQuestionId, questionSetOf, questionsOf, randomFirst, setOfQuestionId } from '../demo/questions'
+import { OPENER, STORY_MIN } from './opener-copy'
 import {
   DIRECTION_CODES,
   OCCASION_CODES,
@@ -87,13 +90,25 @@ type Props = {
   lang: RevealLang
   context: GiftContext
   onContextChange: (next: GiftContext) => void
+  /** The story-opener question shown above the box (a known id from engine/story-questions.json), chosen here and held by the page. */
+  questionId: string | null
+  onQuestionChange: (id: string | null) => void
 }
 
-export default function Composer({ story, onStoryChange, onSubmit, copy, lang, context, onContextChange }: Props) {
+// story_opened is reported once per page load (the Composer remounts after a retry).
+let openedReported = false
+
+export default function Composer({ story, onStoryChange, onSubmit, copy, lang, context, onContextChange, questionId, onQuestionChange }: Props) {
   const t = TEXT[lang]
+  const o = OPENER[lang]
   const setCtx = (patch: Partial<GiftContext>) => onContextChange({ ...context, ...patch })
-  const ready = contextComplete(context) && story.trim() !== ''
   const n = storyLength(story)
+  // A short sentence is enough, but not an empty or junk try: every submit costs real AI money (Part A3).
+  const longEnough = storyLength(story.trim()) >= STORY_MIN
+  const ready = contextComplete(context) && longEnough
+  const set = questionSetOf(context)
+  const questions = set ? questionsOf(set, lang) : []
+  const question = questions.find((q) => q.id === questionId) ?? null
   // Remembrance: the wording stops speaking of gifts (the person has died; the character is kept, not given).
   const memorial = context.occasion === 'memorial'
 
@@ -106,6 +121,49 @@ export default function Composer({ story, onStoryChange, onSubmit, copy, lang, c
   storyRef.current = story
   useEffect(() => () => recognitionRef.current?.stop(), [])
 
+  // The question: once a relationship and an occasion are picked, show ONE specific question (a random angle first, so the question never
+  // steers every story to the same few characters). A saved draft brings its own question back; changing the set picks a new one.
+  useEffect(() => {
+    if (!set) {
+      if (questionId !== null) onQuestionChange(null)
+      return
+    }
+    if (setOfQuestionId(questionId) === set) return
+    const id = randomFirst(set)
+    onQuestionChange(id)
+    trackFlow('question_shown', { language: context.language, set, qid: id })
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [set])
+  const switchQuestion = () => {
+    if (!set) return
+    const id = nextQuestionId(set, questionId)
+    onQuestionChange(id)
+    trackFlow('question_switched', { language: context.language, set, qid: id })
+    trackFlow('question_shown', { language: context.language, set, qid: id })
+  }
+
+  // story_opened: the story section comes into view (once per page load).
+  const formRef = useRef<HTMLFormElement | null>(null)
+  useEffect(() => {
+    if (openedReported) return
+    const el = formRef.current
+    const fire = () => {
+      if (openedReported) return
+      openedReported = true
+      trackFlow('story_opened', { language: context.language })
+    }
+    if (!el || typeof IntersectionObserver === 'undefined') return fire()
+    const io = new IntersectionObserver((entries) => {
+      if (entries.some((e) => e.isIntersecting)) {
+        fire()
+        io.disconnect()
+      }
+    }, { threshold: 0.25 })
+    io.observe(el)
+    return () => io.disconnect()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
   const toggleVoice = () => {
     if (listening) {
       recognitionRef.current?.stop()
@@ -114,6 +172,7 @@ export default function Composer({ story, onStoryChange, onSubmit, copy, lang, c
     const Ctor = getSpeechRecognition()
     if (!Ctor) return
     setVoiceLimit(false)
+    trackFlow('voice_used', { language: context.language, set, qid: questionId })
     const rec = new Ctor()
     rec.lang = copy.speechLang
     rec.continuous = true
@@ -154,6 +213,7 @@ export default function Composer({ story, onStoryChange, onSubmit, copy, lang, c
 
   return (
     <form
+      ref={formRef}
       className="composer"
       autoComplete="off"
       onSubmit={(e) => {
@@ -178,9 +238,20 @@ export default function Composer({ story, onStoryChange, onSubmit, copy, lang, c
         placeholder={copy.occasionDetailPlaceholder}
       />
 
-      <label className="clab" htmlFor="moment">
-        {t.cMom}
-      </label>
+      {question ? (
+        <>
+          <label className="qPrompt" htmlFor="moment" data-testid="story-question" data-question-id={question.id}>
+            {question.text}
+          </label>
+          <button type="button" className="qSwitch" data-testid="question-switch" onClick={switchQuestion}>
+            {o.switchQuestion}
+          </button>
+        </>
+      ) : (
+        <label className="clab" htmlFor="moment">
+          {t.cMom}
+        </label>
+      )}
       <textarea
         id="moment"
         data-testid="story-input"
@@ -188,15 +259,21 @@ export default function Composer({ story, onStoryChange, onSubmit, copy, lang, c
         value={story}
         maxLength={STORY_MAX}
         onChange={(e) => onStoryChange(clipStory(e.target.value))}
-        placeholder={copy.storyPlaceholder}
+        placeholder={question ? o.answerHint : copy.storyPlaceholder}
       />
       <div className="cmeta">
         <span data-testid="story-hint">{copy.storyHint}</span>
+        {n > 0 && !longEnough && <span data-testid="story-too-short">{o.tooShort}</span>}
         <span className="cnt" data-testid="story-counter" aria-live="off">
           {copy.storyCounter(n, STORY_MAX)}
         </span>
       </div>
 
+      {!speechSupported && (
+        <span className="sent" data-testid="voice-none">
+          {o.voiceNone}
+        </span>
+      )}
       {speechSupported && (
         <button type="button" className={`btn ghost voice${listening ? ' on' : ''}`} onClick={toggleVoice} aria-pressed={listening}>
           <span className="dot" aria-hidden="true" />

@@ -1,0 +1,161 @@
+{
+  "_note": "Story-opener questions (Part A). Always about the PERSON as the sender sees them — never what to tell them, never their reaction. Four angles per set: habit, moment, said, changed. Keyed by set: up / across / down / work (by direction and relationship) and memorial (remembering voice, no mention of death or loss). Native reviewers check these before launch. The question is context for the engine only: the character comes from what the story says.",
+  "angles": [
+    "habit",
+    "moment",
+    "said",
+    "changed"
+  ],
+  "sets": {
+    "up": [
+      {
+        "id": "up-habit",
+        "angle": "habit",
+        "ja": "その人が、頼まれる前にいつもしていることは？",
+        "zh-Hant": "那個人總是在你開口之前，就先做了什麼？",
+        "en": "What do they always do without being asked?"
+      },
+      {
+        "id": "up-moment",
+        "angle": "moment",
+        "ja": "今もはっきり覚えている、その人との場面をひとつ教えてください。",
+        "zh-Hant": "請說一個你至今仍清楚記得、與那個人有關的場景。",
+        "en": "Tell us one moment with them that you still remember clearly."
+      },
+      {
+        "id": "up-said",
+        "angle": "said",
+        "ja": "その人がよく口にする言葉、または忘れられないひと言は？",
+        "zh-Hant": "那個人常說的一句話，或是你忘不了的一句話是什麼？",
+        "en": "What do they often say, or what is one thing they said that has stayed with you?"
+      },
+      {
+        "id": "up-changed",
+        "angle": "changed",
+        "ja": "その人のおかげで、あなたが変わったことは？",
+        "zh-Hant": "因為那個人，你有了什麼改變？",
+        "en": "How have you changed because of them?"
+      }
+    ],
+    "across": [
+      {
+        "id": "across-habit",
+        "angle": "habit",
+        "ja": "ふたりだけが笑える、いつもの場面は？",
+        "zh-Hant": "只有你們兩個才懂的那個瞬間是什麼？",
+        "en": "What's a moment only the two of you laugh about?"
+      },
+      {
+        "id": "across-moment",
+        "angle": "moment",
+        "ja": "ふたりで過ごした中で、いちばん忘れられない場面は？",
+        "zh-Hant": "你們一起度過的時光裡，最難忘的一幕是什麼？",
+        "en": "What is the moment the two of you shared that you remember best?"
+      },
+      {
+        "id": "across-said",
+        "angle": "said",
+        "ja": "その人が言った、ずっと心に残っているひと言は？",
+        "zh-Hant": "他說過的哪一句話，一直留在你心裡？",
+        "en": "What did they once say that has stayed with you?"
+      },
+      {
+        "id": "across-changed",
+        "angle": "changed",
+        "ja": "その人と出会って、あなたの何が変わりましたか？",
+        "zh-Hant": "認識他之後，你有什麼不一樣了？",
+        "en": "How are you different since you met them?"
+      }
+    ],
+    "down": [
+      {
+        "id": "down-habit",
+        "angle": "habit",
+        "ja": "その子が、いつの間にか自分でやっていることは？",
+        "zh-Hant": "那個孩子不知不覺就會自己去做的事是什麼？",
+        "en": "What do they do on their own, without anyone noticing?"
+      },
+      {
+        "id": "down-moment",
+        "angle": "moment",
+        "ja": "その子に、はっとさせられたのはどんな時？",
+        "zh-Hant": "他什麼時候讓你刮目相看？",
+        "en": "When did they surprise you?"
+      },
+      {
+        "id": "down-said",
+        "angle": "said",
+        "ja": "その子が言った、忘れられないひと言は？",
+        "zh-Hant": "他說過的哪一句話，你忘不了？",
+        "en": "What is one thing they said that you can't forget?"
+      },
+      {
+        "id": "down-changed",
+        "angle": "changed",
+        "ja": "その子のおかげで、あなた自身が変わったことは？",
+        "zh-Hant": "因為這個孩子，你自己有了什麼改變？",
+        "en": "How have you changed because of them?"
+      }
+    ],
+    "work": [
+      {
+        "id": "work-habit",
+        "angle": "habit",
+        "ja": "その人が、仕事でいつも欠かさずにしていることは？",
+        "zh-Hant": "他在工作上，總是不會漏掉的一件事是什麼？",
+        "en": "What do they never skip in their work?"
+      },
+      {
+        "id": "work-moment",
+        "angle": "moment",
+        "ja": "その人の仕事ぶりで、ずっと覚えている場面は？",
+        "zh-Hant": "他工作時的哪一幕，你一直記得？",
+        "en": "What's one thing about how they work that you'll always remember?"
+      },
+      {
+        "id": "work-said",
+        "angle": "said",
+        "ja": "その人にかけられて、今も覚えている言葉は？",
+        "zh-Hant": "他對你說過、你至今記得的一句話是什麼？",
+        "en": "What did they say to you that you still remember?"
+      },
+      {
+        "id": "work-changed",
+        "angle": "changed",
+        "ja": "その人と働いて、仕事への向き合い方はどう変わりましたか？",
+        "zh-Hant": "和他共事之後，你面對工作的方式有什麼改變？",
+        "en": "How has working with them changed the way you work?"
+      }
+    ],
+    "memorial": [
+      {
+        "id": "memorial-habit",
+        "angle": "habit",
+        "ja": "その人が、いつもしてくれていたことは？",
+        "zh-Hant": "那個人以前總是為你做些什麼？",
+        "en": "What did they always do for you?"
+      },
+      {
+        "id": "memorial-moment",
+        "angle": "moment",
+        "ja": "その人との場面で、今も思い出すものをひとつ教えてください。",
+        "zh-Hant": "請說一個你至今仍會想起、與那個人在一起的場景。",
+        "en": "Tell us one moment with them that you still remember."
+      },
+      {
+        "id": "memorial-said",
+        "angle": "said",
+        "ja": "その人がよく口にしていた言葉は？",
+        "zh-Hant": "那個人以前常說的話是什麼？",
+        "en": "What did they often say?"
+      },
+      {
+        "id": "memorial-changed",
+        "angle": "changed",
+        "ja": "その人のおかげで、今のあなたにあるものは？",
+        "zh-Hant": "因為那個人，現在的你擁有了什麼？",
+        "en": "What do you carry today because of them?"
+      }
+    ]
+  }
+}

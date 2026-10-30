@@ -58,6 +58,8 @@ const REVIEW_MODEL = process.env.ICHIREI_REVIEW_MODEL ?? DEFAULT_REVIEW_MODEL
 // Slots every prompt file must contain. The story slot is the original Phase 0
 // placeholder; the four context slots are new in v5.
 export const STORY_SLOT = '{{ Paste the story here }}'
+/** Optional (a template without it simply has no question): the story-opener question the sender was shown, as one line before the story. */
+export const QUESTION_SLOT = '{{ SENDER QUESTION }}'
 export const CONTEXT_SLOTS = {
   language: '{{ LANGUAGE }}',
   relationship: '{{ RELATIONSHIP }}',
@@ -129,8 +131,8 @@ export function loadPrompt(language: Language): string {
  * the story or the free-text occasion_detail that happens to look like a slot is
  * never re-scanned or substituted.
  */
-export function fillPrompt(template: string, story: string, context: EngineContext): string {
-  const values = new Map<string, string>([[STORY_SLOT, story]])
+export function fillPrompt(template: string, story: string, context: EngineContext, promptQuestion: string | null = null): string {
+  const values = new Map<string, string>([[STORY_SLOT, story], [QUESTION_SLOT, promptQuestion ? `QUESTION SHOWN TO THE SENDER (context only): ${promptQuestion.replace(/\s+/g, ' ').trim()}\n\n` : '']])
   for (const key of Object.keys(CONTEXT_SLOTS) as (keyof typeof CONTEXT_SLOTS)[]) {
     values.set(CONTEXT_SLOTS[key], context[key] ?? UNSPECIFIED)
   }
@@ -208,6 +210,8 @@ export interface RunEngineOptions {
   /** language / relationship / direction / occasion / occasion_detail / inscription_script. Omitted fields: language 'ja',
    *  the rest unspecified. Validated against the code lists in contract.ts. */
   context?: Partial<EngineContext>
+  /** The story-opener question the sender was shown (the server's own wording for a known id; engine/story-questions.ts). Context only, one line before the story. */
+  promptQuestion?: string | null
   /** Token usage of each model call (stage 'select' = the main call, 'review' = the separate review call) — for cost accounting by the test runner. */
   onUsage?: (stage: 'select' | 'review' | 'replace', usage: { model: string; input_tokens: number; output_tokens: number }) => void
   /**
@@ -265,7 +269,7 @@ async function runEngineInner(
   if (!parsed.ok) throw new Error(parsed.error)
   const context = parsed.context
 
-  const prompt = fillPrompt(loadPrompt(context.language), trimmed, context)
+  const prompt = fillPrompt(loadPrompt(context.language), trimmed, context, opts.promptQuestion ?? null)
   // Load the palette BEFORE spending a reasoning pass: no palette, no blocklist, no run.
   const palette = loadPalette()
   const client = new Anthropic(opts.apiKey ? { apiKey: opts.apiKey } : {})

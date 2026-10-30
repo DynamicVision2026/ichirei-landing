@@ -640,6 +640,79 @@ const mockPage = async (browser, { onExplain, result, order, track } = {}) => {
   await p2.close()
 }
 
+// ---------- Run 8c-2: Part A — the story opener: the question, the angle switch, the 10-character minimum, drafts, no-speech line, events ----------
+{
+  const QJA = { 'up-habit': 'その人が、頼まれる前にいつもしていることは？', 'up-moment': '今もはっきり覚えている、その人との場面をひとつ教えてください。', 'up-said': 'その人がよく口にする言葉、または忘れられないひと言は？', 'up-changed': 'その人のおかげで、あなたが変わったことは？' }
+  const { page, errors, calls } = await mockPage(browser)
+  await page.addInitScript(() => { window.SpeechRecognition = undefined; window.webkitSpeechRecognition = undefined })
+  await page.goto('http://localhost:5173/', { waitUntil: 'networkidle' })
+  const qEl = page.locator('#write [data-testid=story-question]')
+  const box = page.locator('#write [data-testid=story-input]')
+  check('opener: before a relationship and an occasion are picked there is no question (the plain label stays)', (await qEl.count()) === 0)
+  check('opener: a browser without speech recognition hides the voice button and shows one line instead (「キーボードのマイクでも…」)', (await page.locator('#write button.voice').count()) === 0 && (await page.locator('#write [data-testid=voice-none]').innerText()).includes('キーボードのマイク'))
+  await pickContext(page) // parent_father · up · birthday_milestone
+  await qEl.waitFor()
+  const first = await qEl.getAttribute('data-question-id')
+  check('opener: after the chips, ONE specific question stands above the box in large type (a question of the "up" set), and the box placeholder becomes an answer hint', first in QJA && (await qEl.innerText()) === QJA[first] && (await box.getAttribute('placeholder')) === 'ひとつの場面や、ひと言だけでも大丈夫です。' && (await qEl.evaluate((el) => parseFloat(getComputedStyle(el).fontSize))) >= 19)
+  const seenIds = [first]
+  for (let i = 0; i < 4; i++) { await page.click('#write [data-testid=question-switch]'); seenIds.push(await qEl.getAttribute('data-question-id')) }
+  check('opener: 「別の問いにする」 cycles the four angles of the same set and returns to the first', new Set(seenIds.slice(0, 4)).size === 4 && seenIds[4] === first && seenIds.every((id) => id in QJA))
+  // a memorial gift gets the remembering-voice set
+  await page.click('[data-chip="occasion:memorial"]')
+  await page.waitForFunction(() => document.querySelector('#write [data-testid=story-question]')?.getAttribute('data-question-id')?.startsWith('memorial-'))
+  check('opener: the occasion "memorial" switches to the memorial set (no mention of death or loss)', !/死|亡|逝|失|悲/.test(await qEl.innerText()))
+  await page.click('[data-chip="occasion:birthday_milestone"]')
+  await page.waitForFunction(() => document.querySelector('#write [data-testid=story-question]')?.getAttribute('data-question-id')?.startsWith('up-'))
+  const shownId = await qEl.getAttribute('data-question-id')
+  // the 10-character minimum
+  const goBtn = page.locator(`#write button:has-text("${GO.ja}")`)
+  await box.fill('あ'.repeat(9))
+  check('opener: 9 characters — the submit button is disabled and a quiet note says 10 are needed', await goBtn.isDisabled() && (await page.locator('#write [data-testid=story-too-short]').innerText()) === '10字以上で送れます。')
+  await box.fill('あ'.repeat(10))
+  check('opener: 10 characters — the button is enabled and the note is gone', (await goBtn.isEnabled()) && (await page.locator('#write [data-testid=story-too-short]').count()) === 0)
+  // drafts
+  await box.fill('父は、駅の改札でいつも黙って手を振った。')
+  await page.waitForTimeout(700)
+  const stored = await page.evaluate(() => window.localStorage.getItem('ichirei.draft.v1'))
+  check('opener: the draft is saved in this browser as the visitor types (story, chips, question — and only those)', !!stored && JSON.parse(stored).story.startsWith('父は、駅の改札') && JSON.parse(stored).questionId === shownId && JSON.parse(stored).relationship === 'parent_father')
+  await page.reload({ waitUntil: 'networkidle' })
+  const banner = page.locator('#write [data-testid=draft-banner]')
+  await banner.waitFor()
+  check('opener: coming back shows the quiet banner 「書きかけの物語があります — 続ける / 新しく書く」 and nothing is applied silently', (await banner.innerText()).includes('書きかけの物語があります') && (await page.locator('#write [data-testid=story-input]').inputValue()) === '')
+  await page.click('#write [data-testid=draft-continue]')
+  check('opener: 続ける restores the story, the chips and the same question', (await page.locator('#write [data-testid=story-input]').inputValue()).startsWith('父は、駅の改札') && (await page.locator('[data-chip="relationship:parent_father"]').getAttribute('aria-pressed')) === 'true' && (await page.locator('#write [data-testid=story-question]').getAttribute('data-question-id')) === shownId && (await banner.count()) === 0)
+  await page.reload({ waitUntil: 'networkidle' })
+  await banner.waitFor()
+  await page.click('#write [data-testid=draft-new]')
+  check('opener: 新しく書く deletes the saved draft at once', (await banner.count()) === 0 && (await page.evaluate(() => window.localStorage.getItem('ichirei.draft.v1'))) === null)
+  await page.evaluate(() => window.localStorage.setItem('ichirei.draft.v1', JSON.stringify({ v: 1, savedAt: Date.now() - 31 * 24 * 3600 * 1000, story: '古い物語', relationship: 'friend', direction: 'across', occasion: 'wedding', occasionDetail: '', questionId: 'across-habit' })))
+  await page.reload({ waitUntil: 'networkidle' })
+  check('opener: a draft older than 30 days is not offered and is deleted', (await page.locator('#write [data-testid=draft-banner]').count()) === 0 && (await page.evaluate(() => window.localStorage.getItem('ichirei.draft.v1'))) === null)
+  // submit: the question travels with the story, as { id, text }
+  await pickContext(page)
+  await page.locator('#write [data-testid=story-question]').waitFor()
+  const sendId = await page.locator('#write [data-testid=story-question]').getAttribute('data-question-id')
+  await page.locator('#write [data-testid=story-input]').fill('父は、駅の改札でいつも黙って手を振った。')
+  await page.click(`#write >> text=${GO.ja}`)
+  await page.waitForSelector(`button:has-text("${FINALIZE.ja}")`, { timeout: 15000 })
+  check('opener: /api/select receives prompt_question { id, text } and the story is just the story (the question is not inside it)', calls.select[0].prompt_question?.id === sendId && calls.select[0].prompt_question?.text === QJA[sendId] && calls.select[0].story === '父は、駅の改札でいつも黙って手を振った。')
+  const evs = calls.analytics.map((e) => e.event)
+  check('opener: events — story_opened (once per page load), question_shown (id) at the start and after each switch, question_switched, story_submitted, reveal_shown; codes only', evs.filter((e) => e === 'story_opened').length === 4 && evs.includes('question_shown') && evs.filter((e) => e === 'question_switched').length === 4 && evs.includes('story_submitted') && evs.includes('reveal_shown') && calls.analytics.filter((e) => e.event === 'question_shown').every((e) => !('story' in e) && (e.qid in QJA || String(e.qid).startsWith('memorial-'))) && !JSON.stringify(calls.analytics).includes('父は'))
+  check('no page errors (run 8c-2, the opener)', errors.length === 0, errors.join('; '))
+  await page.close()
+  // English and Traditional Chinese: the same question set in the page language
+  for (const [lang, q0] of [['en', 'What do they always do without being asked?'], ['zh-Hant', '那個人總是在你開口之前，就先做了什麼？']]) {
+    const e = await mockPage(browser)
+    await e.page.goto(`http://localhost:5173/?lang=${lang}`, { waitUntil: 'networkidle' })
+    await pickContext(e.page)
+    await e.page.locator('#write [data-testid=story-question]').waitFor()
+    let found = false
+    for (let i = 0; i < 4 && !found; i++) { found = (await e.page.locator('#write [data-testid=story-question]').innerText()) === q0; if (!found) await e.page.click('#write [data-testid=question-switch]') }
+    check(`opener (${lang}): the "up" set is shown in the page language (the habit question found within four angles)`, found)
+    await e.page.close()
+  }
+}
+
 // ---------- Run 8d: the included poem (歌の添え書き) on the order form: one format, shown in full, free ----------
 {
   const poemCalls = []
@@ -1067,7 +1140,7 @@ const SECTION_ORDER = ['.hero', '.strip', '.philo', '#shape', '#angles', '#write
   await page.screenshot({ path: `${SHOTS}/e2e-reveal-en.png`, fullPage: true })
   await page.click(`button:has-text("${FINALIZE.en}")`)
   await page.waitForTimeout(300)
-  check('learning loop: choosing a card reports ONE event "chosen" with the kind of card (灯 is the main) — and no story, kanji or name', calls.analytics.filter((e) => e.event === 'chosen').length === 1 && calls.analytics.find((e) => e.event === 'chosen').choice === 'main' && calls.analytics.find((e) => e.event === 'chosen').session === calls.select[0].session && Object.keys(calls.analytics[0]).sort().join() === 'choice,event,session,source' && !JSON.stringify(calls.analytics).includes('灯'))
+  check('learning loop: choosing a card reports ONE event "chosen" with the kind of card (灯 is the main) — and no story, kanji or name', calls.analytics.filter((e) => e.event === 'chosen').length === 1 && calls.analytics.find((e) => e.event === 'chosen').choice === 'main' && calls.analytics.find((e) => e.event === 'chosen').session === calls.select[0].session && Object.keys(calls.analytics.find((e) => e.event === 'chosen')).sort().join() === 'choice,event,session,source' && !JSON.stringify(calls.analytics).includes('灯'))
 
   // -- the order form
   const form = page.locator('[data-testid=order-form]')

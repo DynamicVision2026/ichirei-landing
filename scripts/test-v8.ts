@@ -251,7 +251,7 @@ try {
   const good = await run(base, { mutate: noMains, replacements: [FIX[base].replacements[0]] })
   check('(6) a good replacement for an empty main slot becomes the MAIN (支), never more than three cards', good.primary_kanji === FIX[base].replacements[0].kanji && count('replace') === 1 && sound(good) === null, JSON.stringify([good.primary_kanji, good.status]))
   process.env.ICHIREI_REPLACE = 'off'
-  const off = await run(base, { mutate: noMains })
+  await run(base, { mutate: noMains })
   delete process.env.ICHIREI_REPLACE
   check('(6) ICHIREI_REPLACE=off: no replacement call; the empty main slot is still logged (will_replace=false)', count('replace') === 0 && logJson('[ichirei-engine] main_slot_empty ')[0]?.will_replace === false)
 

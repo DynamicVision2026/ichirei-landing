@@ -6,7 +6,10 @@ import Reveal from './Reveal'
 import OrderForm from './OrderForm'
 import Composer from '../reveal/Composer'
 import { toRevealLang } from '../reveal/lang'
-import { sessionId } from './analytics'
+import { sessionId, trackFlow } from './analytics'
+import { clearDraft, draftOf, loadDraft, saveDraft, type Draft } from './draft'
+import { questionSetOf, questionTextOf } from './questions'
+import { OPENER } from '../reveal/opener-copy'
 import { exportEvents, log, setCondition as logSetCondition, setStory as logSetStory } from './logging'
 import { COPY, DEFAULT_GIFT_CONTEXT, FOLLOW_UP_COUNTER_FROM, FOLLOW_UP_MAX, clipStory, contextToPayload, storyLength, type Copy, type GiftContext } from './i18n'
 import { getLanguage, setLanguage } from '../lang-store'
@@ -191,6 +194,10 @@ export default function DemoApp({ mode = 'harness', aside }: { mode?: Mode; asid
   const customer = mode === 'customer'
   const [phase, setPhase] = useState<Phase>('elicit')
   const [story, setStory] = useState('')
+  // The story-opener question shown above the box (customer page): a known id from engine/story-questions.json, picked by the Composer.
+  const [questionId, setQuestionId] = useState<string | null>(null)
+  // A draft saved by an earlier visit (customer page): offered once, never applied silently.
+  const [draftOffer, setDraftOffer] = useState<Draft | null>(() => (mode === 'customer' ? loadDraft() : null))
   // The language is shared with the landing page: starts from the sender's stored choice and writes it back.
   const [context, setContextState] = useState<GiftContext>(() => ({ ...DEFAULT_GIFT_CONTEXT, language: getLanguage() }))
   const setContext = (next: GiftContext) => {
@@ -229,6 +236,17 @@ export default function DemoApp({ mode = 'harness', aside }: { mode?: Mode; asid
     if (customer) document.getElementById('write')?.scrollIntoView({ block: 'start', behavior: reduceMotion ? 'auto' : 'smooth' })
   }, [phase, customer, reduceMotion])
 
+  // Never lose a draft (customer page): the story, the chips and the question are saved in this browser as the visitor types — but not
+  // while an earlier draft is still waiting for 続ける / 新しく書く, and never into a page without browser storage (saveDraft swallows that).
+  useEffect(() => {
+    if (!customer || draftOffer) return
+    const id = window.setTimeout(() => {
+      if (story.trim() === '') clearDraft()
+      else saveDraft(draftOf(story, context, questionId))
+    }, 400)
+    return () => window.clearTimeout(id)
+  }, [customer, draftOffer, story, context.relationship, context.direction, context.occasion, context.occasionDetail, questionId]) // eslint-disable-line react-hooks/exhaustive-deps
+
   const changeCondition = (c: Condition) => {
     if (c === condition) return
     log('condition_changed', { from: condition, to: c })
@@ -255,7 +273,7 @@ export default function DemoApp({ mode = 'harness', aside }: { mode?: Mode; asid
       const res = await fetch('/api/select', {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ story: fullStory, ...(answers.length ? { follow_ups: answers } : {}), session: sessionId, source: customer ? 'customer' : 'harness', condition, ...contextToPayload(ctx) }),
+        body: JSON.stringify({ story: fullStory, ...(answers.length ? { follow_ups: answers } : {}), ...(customer && questionId ? { prompt_question: { id: questionId, text: questionTextOf(questionId, toRevealLang(ctx.language)) ?? '' } } : {}), session: sessionId, source: customer ? 'customer' : 'harness', condition, ...contextToPayload(ctx) }),
         signal: controller.signal,
       })
       if (!res.ok) {
@@ -296,6 +314,7 @@ export default function DemoApp({ mode = 'harness', aside }: { mode?: Mode; asid
           setFollowUpQuestion(engineResult.follow_up_question)
           setFollowUpAnswer('')
           log('follow_up_shown', { question: engineResult.follow_up_question })
+          if (customer) trackFlow('followup_shown', { language: ctx.language, set: questionSetOf(ctx), qid: questionId })
           setPhase('followup')
         } else {
           setPhase('thin')
@@ -305,6 +324,7 @@ export default function DemoApp({ mode = 'harness', aside }: { mode?: Mode; asid
         log('memorial_suggested', {})
         setPhase('suggest')
       } else {
+        if (customer) trackFlow('reveal_shown', { language: ctx.language, set: questionSetOf(ctx), qid: questionId })
         setPhase('reveal')
       }
     } catch (e) {
@@ -354,6 +374,7 @@ export default function DemoApp({ mode = 'harness', aside }: { mode?: Mode; asid
   const declineMemorial = () => {
     log('memorial_declined', {})
     memorialDeclined.current = true
+    if (customer) trackFlow('reveal_shown', { language: context.language, set: questionSetOf(context), qid: questionId })
     setPhase('reveal')
   }
 
@@ -375,6 +396,37 @@ export default function DemoApp({ mode = 'harness', aside }: { mode?: Mode; asid
         </p>
       )}
 
+      {phase === 'elicit' && customer && draftOffer && (
+        <div className="draftBanner" role="status" data-testid="draft-banner">
+          <span>{OPENER[revealLang].draftBanner}</span>
+          <button
+            type="button"
+            className="btn ghost"
+            data-testid="draft-continue"
+            onClick={() => {
+              setStory(draftOffer.story)
+              setContextState((c) => ({ ...c, relationship: draftOffer.relationship, direction: draftOffer.direction, occasion: draftOffer.occasion, occasionDetail: draftOffer.occasionDetail }))
+              setQuestionId(draftOffer.questionId)
+              trackFlow('draft_restored', { language: context.language })
+              setDraftOffer(null)
+            }}
+          >
+            {OPENER[revealLang].draftContinue}
+          </button>
+          <button
+            type="button"
+            className="btn ghost"
+            data-testid="draft-new"
+            onClick={() => {
+              clearDraft() // 「新しく書く」 deletes the saved draft at once
+              setDraftOffer(null)
+            }}
+          >
+            {OPENER[revealLang].draftNew}
+          </button>
+        </div>
+      )}
+
       {phase === 'elicit' && (
         <>
           {customer ? (
@@ -383,12 +435,15 @@ export default function DemoApp({ mode = 'harness', aside }: { mode?: Mode; asid
               onStoryChange={setStory}
               onSubmit={() => {
                 setFollowUps([])
+                trackFlow('story_submitted', { language: context.language, set: questionSetOf(context), qid: questionId })
                 void runEngine(story)
               }}
               copy={copy}
               lang={revealLang}
               context={context}
               onContextChange={setContext}
+              questionId={questionId}
+              onQuestionChange={setQuestionId}
             />
           ) : (
             <Elicitation
@@ -542,7 +597,7 @@ export default function DemoApp({ mode = 'harness', aside }: { mode?: Mode; asid
       )}
 
       {customer && phase === 'order' && result && chosen && (
-        <OrderForm result={result} story={story} followUps={followUps} candidate={chosen} copy={copy} onBack={() => setPhase('reveal')} />
+        <OrderForm result={result} story={story} followUps={followUps} promptQuestionId={customer ? questionId : null} candidate={chosen} copy={copy} onBack={() => setPhase('reveal')} />
       )}
 
       {!customer && result && (phase === 'reveal' || phase === 'thin') && (
