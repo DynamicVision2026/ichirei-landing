@@ -298,6 +298,19 @@
 .rv .opt:focus-within{outline:2px solid var(--gold);outline-offset:3px}
 .rv .optGlyph{font-size:2.4rem}
 .rv .pkgRow{display:grid;grid-template-columns:repeat(2,minmax(0,1fr))}
+@media (max-width:640px){.rv .pkgRow{grid-template-columns:1fr}}
+/* the four sizes (Part C): the includes and shipping lines sit under the name and price; the badges are ink, never cinnabar (cinnabar is the main character's) */
+.rv .opt.pkg .pkgName{display:flex;flex-wrap:wrap;align-items:center;gap:.4rem}
+.rv .opt.pkg .pkgIncludes,.rv .opt.pkg .pkgShip,.rv .opt.pkg [data-approx],.rv .opt.pkg [data-stroke-note]{flex:none;max-width:100%}
+.rv .opt.pkg .pkgShip{color:var(--ink);font-size:.85rem}
+.rv .badge,.rv .opt .badge{background:var(--ink);color:var(--paper)}
+.rv .badge.quiet{background:transparent;color:var(--mute);border:1px solid var(--line)}
+.rv .giftArt{aspect-ratio:1600/1000;display:grid;place-items:center;background:var(--tint);border-bottom:1px solid var(--line)}
+.rv .giftArt .k{font-family:var(--kanji);font-weight:900;font-size:clamp(4rem,10vw,7rem);color:var(--ink);opacity:.18;line-height:1}
+.rv .shipRow{display:grid;grid-template-columns:1fr;gap:.6rem}
+.rv .shipRow .opt{flex-wrap:wrap}
+.rv .shipRow .opt .sent{flex:1 1 100%;padding-left:2rem}
+
 .rv .pkg{flex-direction:column;align-items:flex-start;gap:.3rem;padding:1.1rem 1.2rem;position:relative}
 .rv .pkg input{position:absolute;opacity:0;pointer-events:none}
 .rv .pkgName{font-family:var(--display);font-weight:600;font-size:1.05rem}

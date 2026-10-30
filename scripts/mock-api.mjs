@@ -60,6 +60,12 @@ const server = createServer(async (req, res) => {
     }))
   }
 
+  // the sizes on sale (Part C): all four unless MOCK_SIZES lists others (comma separated, display order)
+  if (url.pathname === '/api/sizes' && req.method === 'GET') {
+    res.writeHead(200, { 'content-type': 'application/json' })
+    res.end(JSON.stringify({ sizes: (process.env.MOCK_SIZES ?? 'simple,standard,card,digital').split(',').filter(Boolean) }))
+    return
+  }
   if (url.pathname === '/api/rates' && req.method === 'GET') {
     res.writeHead(200, { 'content-type': 'application/json' })
     return res.end(JSON.stringify({ date: '2026-10-25', base: 'JPY', rates: { USD: 0.0066, EUR: 0.0061, GBP: 0.0052, AUD: 0.010, TWD: 0.21, HKD: 0.052, SGD: 0.0088, KRW: 9.2 } }))

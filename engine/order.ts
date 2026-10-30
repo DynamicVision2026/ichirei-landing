@@ -7,7 +7,7 @@
 import { findQuestion } from './story-questions.ts'
 import { randomBytes } from 'node:crypto'
 import { LANGUAGES, STORY_MAX as ENGINE_STORY_MAX, countChars, parseFollowUps, type Candidate, type EngineResult, type Language } from './contract.ts'
-import { PACKAGES, PACKAGE_PRICE_JPY, type PackageId, type PoemType } from '../src/order/packages.ts'
+import { GIFT_MESSAGE_MAX, PACKAGES, PACKAGE_PRICE_JPY, PACKAGE_SKU, SHIPS, SHIP_TO, type PackageId, type PoemType, type ShipTo } from '../src/order/packages.ts'
 import { CERTIFICATE_LINE_EN, certificateText } from '../src/order/certificate.ts'
 import { isMemorial } from '../src/order/memorial.ts'
 import { loadPalette, plainMeaning, type Palette } from './palette.ts'
@@ -93,6 +93,10 @@ export interface ValidOrder {
   delivery_date: string
   inscription_style: InscriptionStyle
   package: PackageId
+  /** Where it ships (Part C): 'none' for the digital size; otherwise me (the sender hands it over), direct (the receiver's address at checkout) or egift (the receiver types the address). */
+  ship_to: ShipTo | 'none'
+  /** The short message printed on the card when shipping directly or as an e-gift (empty otherwise). */
+  gift_message: string
 }
 
 export type ParsedOrder = { ok: true; order: ValidOrder } | { ok: false; error: string; field: string }
@@ -175,6 +179,24 @@ export function parseOrderRequest(body: unknown, now: Date = new Date(), palette
     return fail('package', `Invalid "package": expected one of ${PACKAGES.join(' | ')}`)
   }
 
+  // Part C: where the gift goes. The digital size ships nowhere; the others default to the sender (they hand it over). A message only travels with
+  // a gift that goes to the receiver (direct or e-gift): printed on the card, at most 60 characters.
+  let ship_to: ShipTo | 'none' = 'none'
+  let gift_message = ''
+  if (SHIPS[pkg as PackageId]) {
+    const raw = body.ship_to === undefined || body.ship_to === null || body.ship_to === '' ? 'me' : body.ship_to
+    if (typeof raw !== 'string' || !(SHIP_TO as readonly string[]).includes(raw)) return fail('ship_to', `Invalid "ship_to": expected one of ${SHIP_TO.join(' | ')}`)
+    ship_to = raw as ShipTo
+    if (ship_to !== 'me' && body.gift_message !== undefined && body.gift_message !== null) {
+      if (typeof body.gift_message !== 'string') return fail('gift_message', '"gift_message" must be text')
+      const flat = body.gift_message.replace(/\p{Cc}+/gu, ' ').replace(/\s+/g, ' ').trim()
+      if (countChars(flat) > GIFT_MESSAGE_MAX) return fail('gift_message', `"gift_message" is longer than ${GIFT_MESSAGE_MAX} characters`)
+      gift_message = flat
+    }
+  } else if (body.ship_to !== undefined && body.ship_to !== null && body.ship_to !== '' && body.ship_to !== 'none') {
+    return fail('ship_to', 'The digital size is not shipped: "ship_to" does not apply')
+  }
+
   const inscription_style = style as InscriptionStyle
   const glyph = glyphFor(candidate, inscription_style)
   // The carving check (spec v9.1 step 9): the Simple set takes only characters up to ICHIREI_SIMPLE_MAX_STROKES strokes (default 20). The count
@@ -200,6 +222,8 @@ export function parseOrderRequest(body: unknown, now: Date = new Date(), palette
       delivery_date: date,
       inscription_style,
       package: pkg as PackageId,
+      ship_to,
+      gift_message,
     },
   }
 }
@@ -243,6 +267,11 @@ export function lineAttributes(order: ValidOrder, orderRef: string, animationLin
     { key: 'delivery_date', value: order.delivery_date },
     { key: 'language', value: order.language },
     { key: 'order_ref', value: orderRef },
+    // Part C: the size code (the SKU) and where it goes. Direct: gift packaging and NO price slip, the receiver's address is the one at checkout.
+    { key: 'ichirei_size', value: PACKAGE_SKU[order.package] },
+    ...(order.ship_to !== 'none' ? [{ key: 'ship_to', value: order.ship_to }] : []),
+    ...(order.ship_to === 'direct' ? [{ key: 'gift_packaging', value: 'yes' }, { key: 'no_price_slip', value: 'yes' }] : []),
+    ...(order.gift_message ? [{ key: 'gift_message', value: order.gift_message }] : []),
     // Remembrance: tells the workshop to carve in black or gold — no red seal, no red-and-white cord.
     ...(order.certificate.memorial ? [{ key: 'ichirei_memorial', value: 'yes' }] : []),
     // The poem included with the gift (when there is one): type, the lines (one per row) and the reading aids.
@@ -308,6 +337,13 @@ export interface OrderRecord {
     receiver_name: string
     delivery_date: string
     package: PackageId
+    /** The size code (ICHIREI-DIGITAL | -CARD | -SIMPLE | -STANDARD). */
+    size_code?: string
+    /** Where it ships: none (digital) | me | direct | egift, the card message, and the packing flags of a direct gift. */
+    ship_to?: ShipTo | 'none'
+    gift_message?: string
+    gift_packaging?: boolean
+    no_price_slip?: boolean
     price_jpy: number
     certificate_text: string
     certificate: Certificate
@@ -349,6 +385,11 @@ export function buildRecord(order: ValidOrder, orderRef: string, now: Date = new
       receiver_name: order.receiver_name,
       delivery_date: order.delivery_date,
       package: order.package,
+      size_code: PACKAGE_SKU[order.package],
+      ship_to: order.ship_to,
+      gift_message: order.gift_message,
+      gift_packaging: order.ship_to === 'direct',
+      no_price_slip: order.ship_to === 'direct',
       price_jpy: PACKAGE_PRICE_JPY[order.package],
       certificate_text: certificateText(order.language),
       /** The bilingual certificate data (character, reading, romanization, English meaning, both lines). */

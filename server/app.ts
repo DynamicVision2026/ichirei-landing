@@ -16,6 +16,7 @@ import { POST as trackPost } from '../api/track.ts'
 import { handlers as animationHandlers } from '../api/animation.ts'
 import { POST as analyticsPost } from '../api/analytics.ts'
 import { GET as ratesGet } from '../api/rates.ts'
+import { GET as sizesGet } from '../api/sizes.ts'
 import { loadTrackConfig } from '../engine/track.ts'
 import { createOrderStore } from '../engine/order-store.ts'
 import { loadShopifyConfig } from '../engine/shopify.ts'
@@ -160,6 +161,8 @@ export function createApp(config: ServerConfig): Hono {
 
   // Approximate JPY rates for the "≈ US$65" lines (display only; null → the page hides them).
   app.get('/api/rates', () => ratesGet())
+  // Which sizes of the gift can be ordered now (those with a Shopify variant); the page hides the rest.
+  app.get('/api/sizes', () => sizesGet())
 
   const methodNotAllowed = (c: Context) =>
     c.json({ error: 'Method not allowed' }, 405, { Allow: 'POST' })

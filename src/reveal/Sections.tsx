@@ -1,3 +1,6 @@
+import { PACKAGE_DISPLAY_ORDER, RECOMMENDED_PACKAGE } from '../order/packages.ts'
+import { SIZE_COPY } from '../demo/sizes-copy.ts'
+import { useSizes } from '../demo/useSizes.ts'
 import { useEffect, useId, useRef, useState, type KeyboardEvent, type ReactNode } from 'react'
 import { ANGLES, TEXT, type RevealLang } from './copy.ts'
 import { rich } from './rich.tsx'
@@ -298,10 +301,18 @@ export function Gifts({
   rates: Rates | null
   onCurrency: (c: Currency) => void
 }) {
-  const cards = [
-    { id: 'simple', title: 'Simple', img: 'simple-hero', items: [t.sp1, t.sp2, t.sp3, t.sp4], cta: t.buy1, badge: null },
-    { id: 'standard', title: 'Standard', img: 'standard-hero', items: [t.dp1, t.dp2, t.dp3, t.dp4], cta: t.buy2, badge: t.pop },
-  ] as const
+  // The four sizes of the one gift (Part C), in the order ③ 木札 (recommended), ④ 版木, ② カード, ① デジタル (last, "send it now"); a size whose Shopify
+  // variant is missing is not listed (useSizes).
+  const sizes = useSizes()
+  const sc = SIZE_COPY[lang]
+  const cards = PACKAGE_DISPLAY_ORDER.filter((id) => (sizes ?? []).includes(id)).map((id) => ({
+    id,
+    title: sc.names[id],
+    img: id === 'simple' ? 'simple-hero' : id === 'standard' ? 'standard-hero' : null,
+    items: id === 'simple' ? [t.sp1, t.sp2, t.sp3, t.sp4] : id === 'standard' ? [t.dp1, t.dp2, t.dp3, t.dp4] : [sc.includes[id], sc.ship[id]],
+    cta: id === 'simple' ? t.buy1 : id === 'standard' ? t.buy2 : t.ctaHero,
+    badge: id === RECOMMENDED_PACKAGE ? sc.recommended : id === 'digital' ? sc.sendNow : null,
+  }))
   return (
     <section className="tintBand" id="gifts">
       <div className="wrap center">
@@ -315,12 +326,18 @@ export function Gifts({
         {cards.map((c) => {
           const approx = approxLine(PACKAGE_PRICE_JPY[c.id], currency, rates, lang)
           return (
-            <article className="gift" key={c.id}>
-              <Picture name={c.img} width={1600} height={1000} alt={GIFT_ALT[c.id]} sizes="(max-width: 860px) 100vw, 540px" />
+            <article className="gift" key={c.id} data-size={c.id}>
+              {c.img ? (
+                <Picture name={c.img} width={1600} height={1000} alt={GIFT_ALT[c.id as 'simple' | 'standard']} sizes="(max-width: 860px) 100vw, 540px" />
+              ) : (
+                <div className="giftArt notranslate" aria-hidden="true">
+                  <span className="k">字</span>
+                </div>
+              )}
               <div className="body">
                 <div className="row">
                   <h3>
-                    {c.title} {c.badge && <span className="badge">{c.badge}</span>}
+                    {c.title} {c.badge && <span className="badge" data-badge={c.id === 'digital' ? 'now' : 'recommended'}>{c.badge}</span>}
                   </h3>
                   <span className="price" data-price={c.id}>
                     {formatYen(PACKAGE_PRICE_JPY[c.id])}

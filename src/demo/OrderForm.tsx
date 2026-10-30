@@ -5,7 +5,9 @@ import type { Copy, InscriptionStyle, OrderField, PackageId, UiLanguage } from '
 import { log } from './logging'
 import { sessionId } from './analytics'
 import { clearDraft } from './draft'
-import { PACKAGES, PACKAGE_PRICE_JPY, formatYen } from '../order/packages.ts'
+import { EGIFT_JAPAN_ONLY, GIFT_MESSAGE_MAX, PACKAGE_DISPLAY_ORDER, PACKAGE_PRICE_JPY, RECOMMENDED_PACKAGE, SHIPS, SHIP_TO, WOODEN, formatYen, type ShipTo } from '../order/packages.ts'
+import { SIZE_COPY } from './sizes-copy.ts'
+import { useSizes } from './useSizes.ts'
 import { isMemorial } from '../order/memorial.ts'
 import { certificateText } from '../order/certificate.ts'
 import { DEFAULT_STYLE, STYLES_BY_LANGUAGE, glyphFor, hasFormChoice } from '../order/inscription.ts'
@@ -62,6 +64,10 @@ export default function OrderForm({ result, story, followUps = [], promptQuestio
   const [date, setDate] = useState('')
   const [style, setStyle] = useState<InscriptionStyle>(DEFAULT_STYLE[language])
   const [pkg, setPkg] = useState<PackageId | ''>('')
+  const sizes = useSizes() // the sizes on sale right now (Part C): a size without a Shopify variant is not shown
+  const sc = SIZE_COPY[language]
+  const [shipTo, setShipTo] = useState<ShipTo>('me')
+  const [giftMessage, setGiftMessage] = useState('')
   const [poemIds, setPoemIds] = useState<string[]>([]) // the included poem of this order (zero or one); the server reads it back by id
   const [poemStep, setPoemStep] = useState<PoemStep>('loading') // the buyer sees the whole poem before paying: the order waits while it is being written
   const [phase, setPhase] = useState<'edit' | 'submitting' | 'redirecting'>('edit')
@@ -80,7 +86,9 @@ export default function OrderForm({ result, story, followUps = [], promptQuestio
   const dateOk = /^\d{4}-\d{2}-\d{2}$/.test(date) && date >= today
   // (switching the carved form can make Simple unavailable after it was picked: the Standard set is then the only choice)
   if (pkg === 'simple' && !simpleOk) setTimeout(() => setPkg(''), 0)
-  const valid = senderOk && receiverOk && dateOk && pkg !== '' && !(pkg === 'simple' && !simpleOk) && poemStep !== 'loading'
+  const onSale = pkg !== '' && (sizes ?? []).includes(pkg)
+  const messageOk = [...giftMessage].length <= GIFT_MESSAGE_MAX
+  const valid = senderOk && receiverOk && dateOk && pkg !== '' && onSale && messageOk && !(pkg === 'simple' && !simpleOk) && poemStep !== 'loading'
 
   const submit = async () => {
     if (!valid || phase !== 'edit') return
@@ -102,6 +110,7 @@ export default function OrderForm({ result, story, followUps = [], promptQuestio
           delivery_date: date,
           inscription_style: style,
           package: pkg,
+          ...(SHIPS[pkg as PackageId] ? { ship_to: shipTo, ...(shipTo !== 'me' && giftMessage.trim() ? { gift_message: giftMessage.trim() } : {}) } : {}),
           ...(poemIds.length ? { poems: poemIds.map((poem_id) => ({ poem_id })) } : {}),
           session: sessionId,
           source: 'customer',
@@ -230,25 +239,59 @@ export default function OrderForm({ result, story, followUps = [], promptQuestio
         <fieldset className="cgroup">
           <legend className="clab">{o.packageLabel}</legend>
           <div className="optRow pkgRow">
-            {PACKAGES.map((id) => {
+            {PACKAGE_DISPLAY_ORDER.filter((id) => (sizes ?? []).includes(id)).map((id) => {
               const approx = approxLine(PACKAGE_PRICE_JPY[id], currency, rates, pageLang)
               return (
-                <label key={id} className={`opt pkg${pkg === id ? ' on' : ''}${id === 'simple' && !simpleOk ? ' off' : ''}`} data-simple-unavailable={id === 'simple' && !simpleOk ? 'yes' : undefined}>
+                <label key={id} className={`opt pkg${pkg === id ? ' on' : ''}${id === 'simple' && !simpleOk ? ' off' : ''}`} data-simple-unavailable={id === 'simple' && !simpleOk ? 'yes' : undefined} data-size={id}>
                   <input type="radio" name="package" value={id} checked={pkg === id} disabled={id === 'simple' && !simpleOk} onChange={() => setPkg(id)} />
-                  <span className="pkgName">{o.packages[id]}</span>
+                  <span className="pkgName">
+                    {o.packages[id]}
+                    {id === RECOMMENDED_PACKAGE && <span className="badge" data-badge="recommended">{sc.recommended}</span>}
+                    {id === 'digital' && !memorial && <span className="badge quiet" data-badge="now">{sc.sendNow}</span>}
+                  </span>
                   <span className="pkgPrice" data-price={id}>
                     {formatYen(PACKAGE_PRICE_JPY[id])}
                   </span>
                   {approx && <span className="sent" data-approx>{approx}</span>}
+                  <span className="sent pkgIncludes" data-includes={id}>{memorial ? sc.includesMemorial[id] : sc.includes[id]}</span>
+                  <span className="sent pkgShip" data-ship-line={id}>{sc.ship[id]}</span>
                   {id === 'simple' && !simpleOk && <span className="sent" data-stroke-note>{o.simpleUnavailable(maxStrokes)}</span>}
                 </label>
               )
             })}
           </div>
-          <p data-shipping className="sent">
-            {o.shippingNote}
-          </p>
+          {memorial && <p className="sent" data-memorial-sizes>{sc.memorialNote}</p>}
+          {pkg === 'digital' && <p className="sent" data-digital-note>{memorial ? sc.digitalNoteMemorial : sc.digitalNote}</p>}
+          {(pkg === '' || WOODEN[pkg]) && (
+            <p data-shipping className="sent">
+              {o.shippingNote}
+            </p>
+          )}
         </fieldset>
+
+        {/* Where it goes (sizes that ship): to me, directly to them, or as an e-gift */}
+        {pkg !== '' && SHIPS[pkg] && (
+          <fieldset className="cgroup" data-testid="ship-to">
+            <legend className="clab">{(memorial ? sc.shipToMemorial : sc.shipTo).label}</legend>
+            <div className="optRow shipRow">
+              {SHIP_TO.map((st) => (
+                <label key={st} className={`opt${shipTo === st ? ' on' : ''}`} data-ship-to={st}>
+                  <input type="radio" name="ship_to" value={st} checked={shipTo === st} onChange={() => setShipTo(st)} />
+                  <span className="pkgName">{(memorial ? sc.shipToMemorial : sc.shipTo)[st].label}</span>
+                  <span className="sent">{(memorial ? sc.shipToMemorial : sc.shipTo)[st].note}</span>
+                </label>
+              ))}
+            </div>
+            {shipTo === 'egift' && EGIFT_JAPAN_ONLY[pkg] && WOODEN[pkg] && <p className="sent" data-egift-japan>{sc.egiftJapanOnly}</p>}
+            {shipTo !== 'me' && (
+              <div>
+                <label className="clab" htmlFor="gift_message">{sc.messageLabel}</label>
+                <input id="gift_message" name="gift_message" type="text" maxLength={GIFT_MESSAGE_MAX} value={giftMessage} onChange={(e) => setGiftMessage([...e.target.value].slice(0, GIFT_MESSAGE_MAX).join(''))} placeholder={sc.messagePlaceholder} />
+                <span className="sent block" data-testid="gift-message-counter">{sc.messageCounter([...giftMessage].length, GIFT_MESSAGE_MAX)}</span>
+              </div>
+            )}
+          </fieldset>
+        )}
 
         {error && (
           <p role="alert" data-testid="order-error" className="orderError">

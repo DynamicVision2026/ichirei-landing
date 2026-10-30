@@ -74,6 +74,12 @@ for (const width of [375, 1280]) {
     await page.waitForSelector('[data-testid=order-form]')
     await page.waitForTimeout(900)
     await page.locator('#write').screenshot({ path: `${OUT}/order-${tag}.png` })
+    // Part C: the four sizes are in the shot above; pick the card size, then the ship-to choice with the message box
+    await page.click('label[data-size=card]')
+    await page.click('[data-ship-to=direct]')
+    await page.fill('#gift_message', lang === 'ja' ? 'いつも、ありがとう。' : lang === 'en' ? 'Thank you, always.' : '一直以來，謝謝你。')
+    await page.locator('[data-testid=ship-to]').scrollIntoViewIfNeeded()
+    await page.locator('#write').screenshot({ path: `${OUT}/shipto-${tag}.png` })
     console.log('done', tag)
     await ctx.close()
   }

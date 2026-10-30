@@ -94,6 +94,8 @@ export function createOrderHandler(deps: () => OrderDeps) {
     }
 
     const order = parsed.order
+    // A size whose Shopify variant is not configured (① and ② until the owner creates them) cannot be ordered.
+    if (!d.shopify.variants[order.package]) return json(400, { error: `The size "${order.package}" is not on sale yet.`, code: 'size_unavailable', field: 'package' })
     const resolved = await resolvePoems((body as { poems?: unknown } | null)?.poems, d.store, order)
     if (!resolved.ok) return json(400, { error: resolved.error, code: resolved.code, field: 'poems' })
     const poems = resolved.poems

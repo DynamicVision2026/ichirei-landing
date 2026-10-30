@@ -7,13 +7,15 @@
 //                              (needs unauthenticated_write_checkouts)
 //   SHOPIFY_VARIANT_SIMPLE     variant of the ¥9,800 package   (gid://shopify/ProductVariant/… or the number)
 //   SHOPIFY_VARIANT_STANDARD   variant of the ¥18,850 package
+//   SHOPIFY_VARIANT_CARD       OPTIONAL: variant of the ¥4,980 card size (hidden while missing)
+//   SHOPIFY_VARIANT_DIGITAL    OPTIONAL: variant of the ¥2,980 digital size (hidden while missing)
 //   (the poem is free and included: it travels as attributes on the main line — there are no poem products or variants)
 //   SHOPIFY_STORE_DOMAIN       default soul-id-2.myshopify.com
 //   SHOPIFY_API_VERSION        default 2025-01
 //   SHOPIFY_API_BASE           tests only: replaces https://<domain>
 // What the customer is charged is decided by the variant's price in Shopify, never by the browser.
 
-import type { PackageId } from '../src/order/packages.ts'
+import { PACKAGES, type PackageId } from '../src/order/packages.ts'
 import type { Attribute } from './order.ts'
 
 export const DEFAULT_STORE_DOMAIN = 'soul-id-2.myshopify.com'
@@ -24,7 +26,8 @@ export interface ShopifyConfig {
   apiVersion: string
   token: string
   apiBase: string
-  variants: Record<PackageId, string>
+  /** The variant of each size that is on sale: simple and standard always; digital and card only once the owner has created them in Shopify. */
+  variants: Partial<Record<PackageId, string>>
 }
 
 export class ShopifyError extends Error {
@@ -53,7 +56,13 @@ export function loadShopifyConfig(env: NodeJS.ProcessEnv = process.env): { confi
       apiVersion: (env.SHOPIFY_API_VERSION || DEFAULT_API_VERSION).trim(),
       token,
       apiBase: (env.SHOPIFY_API_BASE || `https://${storeDomain}`).replace(/\/$/, ''),
-      variants: { simple: toGid(env.SHOPIFY_VARIANT_SIMPLE!.trim()), standard: toGid(env.SHOPIFY_VARIANT_STANDARD!.trim()) },
+      variants: {
+        simple: toGid(env.SHOPIFY_VARIANT_SIMPLE!.trim()),
+        standard: toGid(env.SHOPIFY_VARIANT_STANDARD!.trim()),
+        // ① and ② are created by the owner in Shopify later: while their id is missing, that size is hidden on the page and refused by the server.
+        ...(env.SHOPIFY_VARIANT_DIGITAL?.trim() ? { digital: toGid(env.SHOPIFY_VARIANT_DIGITAL.trim()) } : {}),
+        ...(env.SHOPIFY_VARIANT_CARD?.trim() ? { card: toGid(env.SHOPIFY_VARIANT_CARD.trim()) } : {}),
+      },
     },
   }
 }
@@ -79,6 +88,7 @@ export async function createCart(
   fetchImpl: typeof fetch = fetch,
 ): Promise<CartResult> {
   const variantId = config.variants[pkg]
+  if (!variantId) throw new ShopifyError(`The size "${pkg}" has no Shopify variant configured`, { code: 'size_unavailable' })
   const res = await fetchImpl(`${config.apiBase}/api/${config.apiVersion}/graphql.json`, {
     method: 'POST',
     headers: { 'content-type': 'application/json', 'x-shopify-storefront-access-token': config.token },
@@ -119,3 +129,6 @@ export async function createCart(
   if (url.protocol !== 'https:' && !config.apiBase.startsWith('http://')) throw new ShopifyError('Shopify returned a non-https checkout URL')
   return { cartId: cart.id, checkoutUrl: cart.checkoutUrl, variantId }
 }
+
+/** The sizes that can be ordered right now: those with a variant. Without a config (not ready) none. */
+export const availableSizes = (config: ShopifyConfig | null): PackageId[] => (config ? (PACKAGES.filter((p) => Boolean(config.variants[p])) as PackageId[]) : [])
