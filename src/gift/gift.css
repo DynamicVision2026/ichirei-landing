@@ -170,3 +170,11 @@
 .gf-env-line, .gf-locked-note, .gf-lead, .gf-who, .gf-cert-line, .gf-poem-reading, .gf-note { text-wrap: balance; }
 .gf-env-line { max-width: 19em; }
 .gf-memorial .gf-seal i { background: radial-gradient(circle at 35% 30%, #cdc3a4, var(--seal) 60%, #7c704f); }
+
+/* the keepsakes: the film as a video, the scroll, the card */
+.gf-save { display: flex; flex-direction: column; align-items: center; gap: 12px; width: 100%; }
+.gf-save-list { display: flex; flex-direction: column; align-items: center; gap: 10px; width: 100%; }
+.gf-save-note { margin: 0; max-width: 24em; font-size: 12.5px; line-height: 1.9; color: var(--muted); text-wrap: balance; }
+.gf-video { width: min(100%, 240px); aspect-ratio: 9 / 16; background: #000; border-radius: 3px; }
+.an-panel .gf-save { margin-top: 1.4rem; }
+.an-panel .gf-btn { color: inherit; }

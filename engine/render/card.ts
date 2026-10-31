@@ -156,3 +156,56 @@ export async function cardsPdf(cards: Artwork[], env: NodeJS.ProcessEnv = proces
   doc.end()
   return done
 }
+
+
+// ---- the e-gift's card for the receiver's own printer ------------------------------------------------------------------------------------------
+// A4 landscape, two pages: page 1 the outside, page 2 the inside, each the card's own A5-landscape sheet at its true size (210 × 148 mm), centred, with crop
+// marks at its four corners, a dashed fold mark down the middle (past the edge, so it can be seen on the print) and the instruction in the margin. Cut on the
+// marks, glue the two sheets back to back (or print double-sided), fold on the dashed line: an A6 card, the same card as the wooden sizes'. No bleed is needed
+// (the paper margin of a home printer would cut it off), no price, no order data, no sample mark.
+
+const A4_W = 297 * MM
+const A4_H = 210 * MM
+const HOME_HELP = {
+  ja: ['切り取り線（四隅の印）で切り、2枚を裏どうしに貼り合わせて、点線で二つに折ると、A6のカードになります。', '両面印刷できるときは、1ページ目と2ページ目をそのまま両面に印刷してください。'],
+  'zh-Hant': ['沿四角的裁切記號剪下，將兩張背對背貼合，再沿虛線對折，就是 A6 大小的卡片。', '若印表機可雙面列印，可直接將第 1 頁與第 2 頁印在同一張紙的兩面。'],
+  en: ['Cut along the corner marks, glue the two sheets back to back and fold on the dashed line: an A6 card.', 'If your printer can print on both sides, print page 1 and page 2 on the two sides of one sheet.'],
+} as const
+
+function homeMarks(doc: Doc, a: Artwork) {
+  const x0 = (A4_W - TRIM_W) / 2
+  const y0 = (A4_H - TRIM_H) / 2
+  const m = 5 * MM
+  doc.lineWidth(0.4).strokeColor('#000000')
+  for (const [cx, cy, dx, dy] of [[x0, y0, -1, -1], [x0 + TRIM_W, y0, 1, -1], [x0, y0 + TRIM_H, -1, 1], [x0 + TRIM_W, y0 + TRIM_H, 1, 1]] as const) {
+    doc.moveTo(cx + dx * 2 * MM, cy).lineTo(cx + dx * (2 * MM + m), cy).stroke()
+    doc.moveTo(cx, cy + dy * 2 * MM).lineTo(cx, cy + dy * (2 * MM + m)).stroke()
+  }
+  doc.lineWidth(0.5).strokeColor('#6B5F4E').dash(2.5, { space: 2.5 })
+  doc.moveTo(A4_W / 2, y0 - 9 * MM).lineTo(A4_W / 2, y0 - 2 * MM).stroke().moveTo(A4_W / 2, y0 + TRIM_H + 2 * MM).lineTo(A4_W / 2, y0 + TRIM_H + 9 * MM).stroke()
+  doc.moveTo(A4_W / 2, y0).lineTo(A4_W / 2, y0 + TRIM_H).stroke().undash()
+  const help = HOME_HELP[a.language === 'ja' ? 'ja' : a.language === 'en' ? 'en' : 'zh-Hant']
+  doc.font(names.body).fontSize(7.2).fillColor('#6B5F4E')
+  doc.text(help[0], 14 * MM, A4_H - 15 * MM, { width: A4_W - 28 * MM, align: 'center', lineBreak: false })
+  doc.text(help[1], 14 * MM, A4_H - 10.5 * MM, { width: A4_W - 28 * MM, align: 'center', lineBreak: false })
+}
+
+/** The card an e-gift receiver prints at home: A4 landscape, outside then inside, exact card size, with crop and fold marks. */
+export async function homePrintPdf(a: Artwork, env: NodeJS.ProcessEnv = process.env): Promise<Buffer> {
+  const doc = new PDFDocument({ size: [A4_W, A4_H], layout: 'landscape', margin: 0, autoFirstPage: false, info: { Title: 'ICHIREI card (print at home)', Producer: 'ICHIREI' } })
+  const chunks: Buffer[] = []
+  doc.on('data', (c: Buffer) => chunks.push(c))
+  const done = new Promise<Buffer>((resolve) => doc.on('end', () => resolve(Buffer.concat(chunks))))
+  registerFonts(doc, a, env, new Set())
+  for (const draw of [drawOutside, drawInside]) {
+    doc.addPage({ size: [A4_W, A4_H], margin: 0 })
+    doc.save()
+    doc.translate((A4_W - PAGE_W) / 2, (A4_H - PAGE_H) / 2)
+    doc.rect(BLEED, BLEED, TRIM_W, TRIM_H).clip() // the sheet is drawn at its true size and only its trimmed card is kept
+    draw(doc, a)
+    doc.restore()
+    homeMarks(doc, a)
+  }
+  doc.end()
+  return done
+}

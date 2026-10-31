@@ -385,6 +385,7 @@ export function Faq({ t }: { t: T }) {
     [t.fq6, t.fa6],
     [t.fq7, t.fa7],
     [t.fq8, t.fa8],
+    [t.fq9, t.fa9],
   ] as const
   return (
     <section className="tintBand">

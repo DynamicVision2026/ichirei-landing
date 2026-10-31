@@ -175,6 +175,14 @@ export function createApp(config: ServerConfig): Hono {
   }
   const replyLimit = envRunLimiter('ICHIREI_GIFT_REPLY_LIMIT', { max: 20, minutes: 60 })
   app.post('/api/gift/:token/reply', limited(replyLimit), async (c) => giftHandlers.reply(c.req.param('token'), await c.req.json().catch(() => null)))
+  // The keepsakes: the film as a video (made once per order, about half a minute of one CPU — a tight per-IP limit) and the card as a PDF.
+  const videoLimit = envRunLimiter('ICHIREI_FILM_VIDEO_LIMIT', { max: 8, minutes: 10 })
+  app.post('/api/gift/:token/film/make', limited(videoLimit), (c) => giftHandlers.filmMake(c.req.param('token'), c.req.query('preview')))
+  app.get('/api/gift/:token/film.mp4', limited(animationLimit), (c) => giftHandlers.filmGet(c.req.param('token'), c.req.raw, c.req.query('preview')))
+  app.get('/api/gift/:token/card.pdf', limited(scrollLimit), (c) => giftHandlers.cardPdf(c.req.param('token'), c.req.query('preview')))
+  app.post('/api/animation/:id/film/make', limited(videoLimit), (c) => giftHandlers.filmMakeForSender(c.req.param('id')))
+  app.get('/api/animation/:id/film.mp4', limited(animationLimit), (c) => giftHandlers.filmGetForSender(c.req.param('id'), c.req.raw))
+  app.get('/api/animation/:id/card.pdf', limited(scrollLimit), (c) => giftHandlers.cardPdfForSender(c.req.param('id')))
   const addressLimit = envRunLimiter('ICHIREI_GIFT_ADDRESS_LIMIT', { max: 20, minutes: 60 })
   app.post('/api/gift/:token/address', limited(addressLimit), async (c) => giftHandlers.address(c.req.param('token'), await c.req.json().catch(() => null)))
   // The owner's page (Basic Auth, ICHIREI_OPS_PASSWORD; refused outright without it). Never indexed, never cached.

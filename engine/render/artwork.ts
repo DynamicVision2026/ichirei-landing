@@ -46,7 +46,8 @@ export async function loadArtwork(store: OrderStore, gift: GiftRecord, anim: Ani
       pictures.push(null)
     }
   }
-  const blank = gift.ship_to === 'me' || gift.ship_to === 'none'
+  // the printed card of a wooden size has blank lines (the sender hands it over and may write them); the e-gift's home-print card carries the names
+  const blank = gift.package !== 'egift' && (gift.ship_to === 'me' || gift.ship_to === 'none')
   return {
     language: gift.language,
     glyph: gift.glyph,

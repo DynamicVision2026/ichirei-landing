@@ -380,6 +380,25 @@ No new environment variable.
   receiver path (about 340 KB for a Chinese reader, 440 KB for English, 970 KB for Japanese, which carries a 590 KB Japanese serif; plus the film's four
   pictures).
 
+## Downloads: the film as an MP4, the story scroll, the card as a PDF (Part 5 of 2026-10-31)
+
+「ギフトを保存する」 on the receiver's page (after the certificate) and on the sender's page; shown only when the film is complete (a final washi slot is allowed).
+
+- **The film as an MP4** — 1080 × 1920, H.264 (High, yuv420p, faststart), 24 fps, **no sound**, 30 s (37.5 s for a remembrance). Composed from the same timeline
+  and frame maths as the film on the page (`src/animation/film.ts`) in `engine/render/film-video.ts` — nothing is written or drawn by a model — and encoded by
+  **ffmpeg, which the container now installs** (`Dockerfile`, runtime stage). Made **once per order**, the first time someone presses 「映像を保存」 after the
+  pictures are final, and kept in the private bucket next to the pictures (`films/<AN-id>/film.mp4` + `film.json`); made again only if the character changed in the
+  24-hour window or the pictures were drawn again. The request stays open while it is made (so Cloud Run keeps the CPU); at most `ICHIREI_FILM_VIDEO_PARALLEL`
+  (default 2) renders run at once per instance, the rest are told to ask again. `ICHIREI_FILM_VIDEO_LIMIT` (default 8 per 10 minutes per address) limits asking.
+  Served inline with `Accept-Ranges` (an iPhone plays video in ranges) and as an attachment with `?download=1`. **`cloudbuild.yaml` now deploys with 1 GiB of memory
+  (was 512 MiB)**: the frames are composed in memory.
+- **The story scroll** (PNG, PDF) — unchanged; only when all four pictures are real.
+- **The card as a PDF** — an e-gift: an A4 landscape PDF to print at home, two pages (outside, inside), each the card's own sheet at true size with crop marks and
+  a dashed fold line, and the instruction in the margin (cut, glue back to back or print double-sided, fold: an A6 card); the names and the message are filled
+  in. The wooden sizes: a keepsake copy of the printed card itself (A5 landscape with bleed, two pages, the lines for the names left blank as on the printed one).
+  Neither carries a sample mark, a price or any order data.
+- **Public for ten years**: the gift page stays online for at least ten years (the FAQ says so); nothing deletes a gift record, its pictures or its video.
+
 ## The engine spec in this repo
 
 `docs/ICHIREI_Engine_v9_Spec.md` is the owner's spec (v9.3, 2026-10-30) — the single source of truth: if code and the document disagree, the document wins and the difference is reported. The code check of 2026-10-30 found four differences (the free poem, no main-character count in analytics, the wider freestyle teasing list, the palette-row rule); all four were settled by updating the spec, so code and spec agree. The older alignment report of the v9.1 build is `review/V9_1_alignment_report.md`.

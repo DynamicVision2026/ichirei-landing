@@ -1148,6 +1148,44 @@ const mockPage = async (browser, { onExplain, result, order, track } = {}) => {
     if (!memorial) await shot(page, `shots/share-sheet-${lang}.png`)
     await ctx.close()
   }
+
+  // Part 5: 「ギフトを保存する」 — the film (made on the server the first time, then saved), the scroll, the card
+  for (const [lang, locale, pkg] of [['ja', 'ja-JP', 'egift'], ['zh-Hant', 'zh-TW', 'simple'], ['en', 'en-US', 'egift']]) {
+    const { page, ctx } = await open(mk({ language: lang, package: pkg, film: { status: 'ready', lines: ['「a」', 'b', 'c', 'd'], pictures: ['/film/washi-1.webp', '/film/washi-2.webp', '/film/washi-1.webp', '/film/washi-2.webp'] } }), { locale })
+    const makes = []
+    await page.route(`**/api/gift/${TOKEN}/film/make**`, (r) => { makes.push(1); return r.fulfill({ status: makes.length === 1 ? 202 : 200, json: { state: makes.length === 1 ? 'pending' : 'ready', seconds: 30, bytes: 1 } }) })
+    await page.route(`**/api/gift/${TOKEN}/film.mp4**`, (r) => r.fulfill({ status: 200, contentType: 'video/mp4', body: 'x' }))
+    await T(page, 'gift-open').click()
+    await T(page, 'gift-to-film').click({ timeout: 4000 })
+    await page.waitForSelector('[data-testid=film][data-ready=yes]', { timeout: 8000 })
+    await page.evaluate(() => window.__ichireiFilm.seek(window.__ichireiFilm.total))
+    await T(page, 'gift-to-poem').click({ timeout: 6000 })
+    await T(page, 'gift-to-cert').click()
+    await T(page, 'gift-to-keep').click()
+    const k = T(page, 'keepsakes')
+    await k.waitFor()
+    const want = { ja: ['ギフトを保存する', '映像を保存（MP4）'], 'zh-Hant': ['儲存禮物', '儲存影片（MP4）'], en: ['Keep the gift', 'Save the film (MP4)'] }[lang]
+    check(`keepsakes (${lang}): the heading, the film button, the card button (${pkg === 'egift' ? 'A4 home-print' : 'keepsake copy'}) and the ten-year line`, (await T(page, 'keepsakes-title').innerText()) === want[0] && (await T(page, 'save-film').innerText()) === want[1] && (await T(page, 'save-card').getAttribute('data-kind')) === (pkg === 'egift' ? 'home' : 'keep') && (await T(page, 'save-card').getAttribute('href')) === `/api/gift/${TOKEN}/card.pdf` && (await T(page, 'save-forever').innerText()).includes({ ja: '10年間', 'zh-Hant': '10 年', en: 'ten years' }[lang]) && ((await T(page, 'save-card-note').count()) === (pkg === 'egift' ? 1 : 0)))
+    const dl = page.waitForEvent('download', { timeout: 15000 }).catch(() => null)
+    await T(page, 'save-film').click()
+    const d = await dl
+    check(`keepsakes (${lang}): the film button asks the server to make the video (and asks again while it says pending), then downloads ichirei-film.mp4 and shows a player`, makes.length === 2 && !!d && d.suggestedFilename() === 'ichirei-film.mp4' && (await T(page, 'save-film-video').count()) === 1, `${makes.length} ${d?.suggestedFilename()}`)
+    await shot(page, `shots/gift-save-${lang}.png`)
+    await ctx.close()
+  }
+  {
+    // not offered while the film is not complete
+    const { page, ctx } = await open(mk({ film: { status: 'ready', lines: ['「a」', 'b', 'c', 'd'], pictures: ['/film/washi-1.webp', '/film/washi-2.webp', '/film/washi-1.webp', '/film/washi-2.webp'], incomplete: true } }))
+    await T(page, 'gift-open').click()
+    await T(page, 'gift-to-film').click({ timeout: 4000 })
+    await page.waitForSelector('[data-testid=film][data-ready=yes]', { timeout: 8000 })
+    await page.evaluate(() => window.__ichireiFilm.seek(window.__ichireiFilm.total))
+    await T(page, 'gift-to-poem').click({ timeout: 6000 })
+    await T(page, 'gift-to-cert').click()
+    await T(page, 'gift-to-keep').click()
+    check('keepsakes: while a picture is still to be drawn (incomplete film) there is no film button, no card button and no scroll', (await T(page, 'keepsakes').count()) === 0)
+    await ctx.close()
+  }
 }
 
 // ---------- Run 8e: Part E — the story scroll's 保存 buttons appear only when all four pictures are real ----------
@@ -1167,8 +1205,8 @@ const mockPage = async (browser, { onExplain, result, order, track } = {}) => {
     await p.route('**/film-art/**', (r) => r.fulfill({ status: 200, contentType: 'image/svg+xml', body: '<svg xmlns="http://www.w3.org/2000/svg" width="10" height="10"/>' }))
     await p.goto('http://localhost:5173/a/AN-testtesttesttesttest', { waitUntil: 'networkidle' })
     await p.locator('[data-testid=sender-panel]').waitFor()
-    const n = await p.locator('[data-testid=sender-scroll] a').count()
-    check(`scroll buttons (${name}): ${shown ? 'PNG and PDF links to this film' : 'none'}`, shown ? n === 2 && (await p.locator('[data-testid=sender-scroll] a').first().getAttribute('href')) === '/api/animation/AN-testtesttesttesttest/scroll.png' : n === 0)
+    const n = await p.locator('[data-testid=save-scroll] a').count()
+    check(`scroll buttons (${name}): ${shown ? 'PNG and PDF links to this film' : 'none'}`, shown ? n === 2 && (await p.locator('[data-testid=save-scroll] a').first().getAttribute('href')) === '/api/animation/AN-testtesttesttesttest/scroll.png' : n === 0)
     await p.close()
   }
 }
@@ -1219,7 +1257,7 @@ const mockPage = async (browser, { onExplain, result, order, track } = {}) => {
   await home.route('**/api/**', (r) => r.fulfill({ status: 204, body: '' }))
   await home.goto('http://localhost:5173/?lang=ja', { waitUntil: 'networkidle' })
   check('legal: the landing footer links to /legal', (await home.locator('[data-testid=footer-legal]').getAttribute('href')) === '/legal' && (await home.locator('[data-testid=footer-legal]').innerText()).includes('特定商取引法'))
-  check('legal: the landing\'s own questions now include the three (change after ordering, cancel, a problem)', (await home.locator('.faq details').count()) === 8 && (await home.locator('.faq').textContent())?.includes('注文後に字を変えられますか？'))
+  check('legal: the landing\'s own questions now include the three (change after ordering, cancel, a problem)', (await home.locator('.faq details').count()) === 9 && (await home.locator('.faq').textContent())?.includes('注文後に字を変えられますか？') && (await home.locator('.faq').textContent())?.includes('ギフトページは少なくとも10年間公開します。映像・絵巻・カードは、いつでもスマートフォンに保存できます。'))
   await home.close()
 }
 

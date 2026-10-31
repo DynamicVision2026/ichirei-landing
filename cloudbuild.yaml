@@ -83,7 +83,7 @@ steps:
       - --port=8080
       - --timeout=${_TIMEOUT}          # the whole point of the move: far above Vercel's 60s
       - --cpu=1
-      - --memory=512Mi
+      - --memory=1Gi                   # the film's MP4 is composed in memory (about 0.3 GB while it runs)
       - --cpu-boost                    # faster cold starts
       - --min-instances=0
       - --max-instances=3              # caps concurrent spend; raise when needed

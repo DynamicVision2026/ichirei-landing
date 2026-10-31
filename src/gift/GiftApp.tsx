@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { COPY as FILM_COPY, pageLang, type PageLang } from '../animation/copy.ts'
 import { Film } from '../animation/AnimationApp.tsx'
 import { EgiftReceive } from '../animation/GiftPanels.tsx'
+import Keepsakes from './Keepsakes.tsx'
 import type { GiftLockedView, GiftView } from '../animation/types.ts'
 import { GIFT_COPY, fullDateText, openDateText, type GiftCopy } from './copy.ts'
 import { linerFor } from './liner.ts'
@@ -27,6 +28,9 @@ const routeToken = (): string | null => window.location.pathname.match(/^\/g\/(R
 const previewKey = (): string | null => new URLSearchParams(window.location.search).get('preview')
 
 const prefersReducedMotion = (): boolean => window.matchMedia?.('(prefers-reduced-motion: reduce)').matches ?? false
+
+/** The film is complete (a washi slot is allowed): its video and its card can be made. */
+const filmComplete = (v: GiftView): boolean => !!v.film && v.film.status === 'ready' && !v.film.incomplete && !!v.film.pictures && !v.film.deferred
 
 /** The story scroll exists only when all four pictures are real (never with a washi slot). */
 const scrollAvailable = (v: GiftView): boolean => !!v.film && v.film.status === 'ready' && !v.film.incomplete && !!v.film.pictures && v.film.pictures.length === 4 && v.film.pictures.every((u) => !u.startsWith('/film/washi-'))
@@ -222,13 +226,7 @@ export default function GiftApp() {
   // 8. what to keep, and the one thank-you
   return stage(
     <section className="gf-keep" data-testid="gift-keep">
-      <h2 className="gf-label">{copy.keepTitle}</h2>
-      {scrollAvailable(view) && (
-        <p className="gf-row" data-testid="gift-scroll">
-          <a className="gf-btn gf-btn-quiet" href={`/api/gift/${view.token}/scroll.png${q}`} download>{copy.saveScroll} · {copy.savePng}</a>
-          <a className="gf-btn gf-btn-quiet" href={`/api/gift/${view.token}/scroll.pdf${q}`} download>{copy.savePdf}</a>
-        </p>
-      )}
+      <Keepsakes lang={lang} base={`/api/gift/${view.token}`} q={q} complete={filmComplete(view)} scroll={scrollAvailable(view)} egift={view.package === 'egift'} />
       {view.egift && <EgiftReceive view={view} lang={lang} />}
       {!preview && <ReplyBox token={view.token} copy={copy} from={view.from} replied={view.replied} />}
       <p className="gf-row">

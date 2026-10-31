@@ -24,6 +24,11 @@ FROM node:22-slim AS runtime
 ENV NODE_ENV=production
 WORKDIR /app
 
+# ffmpeg makes the film's MP4 (the gift's "save the film" keepsake): H.264, 1080 x 1920, no sound — see engine/render/film-video.ts.
+RUN apt-get update \
+  && apt-get install -y --no-install-recommends ffmpeg \
+  && rm -rf /var/lib/apt/lists/*
+
 COPY package.json package-lock.json ./
 RUN npm ci --omit=dev && npm cache clean --force
 

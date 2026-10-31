@@ -18,6 +18,8 @@ import { loadArtwork, scrollReady } from '../engine/render/artwork.ts'
 import { makeScroll, scrollPdf } from '../engine/render/scroll.ts'
 import { makeOgImage } from '../engine/render/og.ts'
 import { injectOg, ogKey, ogMeta } from '../engine/gift-share.ts'
+import { ensureFilmVideo, filmComplete, filmVideoPath, serveBytes } from '../engine/film-video-store.ts'
+import { cardsPdf, homePrintPdf } from '../engine/render/card.ts'
 
 const headers = (extra: Record<string, string> = {}) => ({ 'x-robots-tag': 'noindex, nofollow', ...extra })
 const json = (status: number, body: unknown, extra: Record<string, string> = {}) =>
@@ -26,6 +28,8 @@ const noStore = { 'cache-control': 'private, no-store' }
 
 export interface GiftDeps extends AnimationDeps {
   store: OrderStore | null
+  /** For the tests: stands in for the video renderer. */
+  videoRender?: typeof import('../engine/render/film-video.ts').makeFilmVideo
 }
 
 async function loadGift(token: string, d: GiftDeps): Promise<{ status: 200; gift: GiftRecord; anim: AnimationRecord } | { status: 404 | 503 }> {
@@ -70,6 +74,60 @@ async function scrollResponse(gift: GiftRecord, anim: AnimationRecord, ext: stri
   } catch (err) {
     console.error('[ichirei-scroll] failed', err instanceof Error ? err.message : err)
     return json(500, { error: 'scroll_failed' }, { 'cache-control': 'no-store' })
+  }
+}
+
+type Found = { gift: GiftRecord; anim: AnimationRecord }
+
+/** The film as a video (made once, kept): answers when it is ready, or says it is still being made. */
+async function videoMake(f: Found, d: GiftDeps): Promise<Response> {
+  const art = await safeArt(d.store, f.anim.id)
+  if (!filmComplete(f.anim, art)) return json(409, { state: 'not_ready' }, noStore)
+  try {
+    const r = await ensureFilmVideo({ store: d.store!, env: d.env, now: d.now, render: d.videoRender }, f.gift, f.anim, art)
+    if (r.state === 'ready') return json(200, { state: 'ready', seconds: r.meta.seconds, bytes: r.meta.bytes }, noStore)
+    return json(r.state === 'busy' ? 202 : 409, { state: r.state === 'busy' ? 'pending' : 'not_ready' }, noStore)
+  } catch (err) {
+    console.error('[ichirei-film-video] failed', err instanceof Error ? err.message : err)
+    return json(500, { state: 'failed' }, noStore)
+  }
+}
+
+async function videoGet(f: Found, d: GiftDeps, req: Request): Promise<Response> {
+  let bytes: Buffer | null
+  try {
+    bytes = await d.store!.getObject(filmVideoPath(f.anim.id))
+  } catch {
+    return json(503, { error: 'unavailable' }, { 'cache-control': 'no-store' })
+  }
+  if (!bytes) return json(404, { error: 'not_ready' }, { 'cache-control': 'no-store' })
+  const download = new URL(req.url).searchParams.get('download') === '1'
+  return serveBytes(bytes, 'video/mp4', req.headers.get('range'), { 'cache-control': 'private, max-age=3600', 'x-robots-tag': 'noindex, nofollow', 'content-disposition': `${download ? 'attachment' : 'inline'}; filename="ichirei-film.mp4"` })
+}
+
+/** The card as a PDF: the e-gift's A4 home-print (outside, inside, crop and fold marks), or a keepsake copy of the wooden sizes' printed card. */
+async function cardResponse(f: Found, d: GiftDeps): Promise<Response> {
+  const art = await safeArt(d.store, f.anim.id)
+  if (!filmComplete(f.anim, art)) return json(404, { error: 'not_ready' }, { 'cache-control': 'no-store' })
+  try {
+    const work = await loadArtwork(d.store!, f.gift, f.anim, art, d.env)
+    const pdf = f.gift.package === 'egift' ? await homePrintPdf(work, d.env) : await cardsPdf([work], d.env)
+    return new Response(new Uint8Array(pdf), { status: 200, headers: headers({ 'content-type': 'application/pdf', 'content-disposition': `attachment; filename="${f.gift.package === 'egift' ? 'ichirei-card-print-at-home' : 'ichirei-card'}.pdf"`, 'cache-control': 'private, no-store' }) })
+  } catch (err) {
+    console.error('[ichirei-card] failed', err instanceof Error ? err.message : err)
+    return json(500, { error: 'card_failed' }, { 'cache-control': 'no-store' })
+  }
+}
+
+async function bySender(animationId: string, d: GiftDeps): Promise<Found | Response> {
+  if (!ANIMATION_ID_PATTERN.test(animationId) || !d.store) return json(404, { error: 'not_found' }, { 'cache-control': 'no-store' })
+  try {
+    const a = await d.store.get(animationId)
+    if (!isAnimationRecord(a) || !a.gift_token) return json(404, { error: 'not_found' }, { 'cache-control': 'no-store' })
+    const r = await loadGift(a.gift_token, d)
+    return r.status === 200 ? { gift: r.gift, anim: r.anim } : json(404, { error: 'not_found' }, { 'cache-control': 'no-store' })
+  } catch {
+    return json(503, { error: 'unavailable' }, { 'cache-control': 'no-store' })
   }
 }
 
@@ -170,6 +228,44 @@ export function createGiftHandlers(deps: () => GiftDeps) {
       if (r.status !== 200) return json(r.status, { error: r.status === 404 ? 'not_found' : 'unavailable' }, { 'cache-control': 'no-store' })
       const png = await QRCode.toBuffer(giftUrl(r.gift.token, d.env), { type: 'png', errorCorrectionLevel: 'M', margin: 4, width: 720 })
       return new Response(new Uint8Array(png), { status: 200, headers: headers({ 'content-type': 'image/png', 'content-disposition': 'attachment; filename="ichirei-qr.png"', 'cache-control': 'private, no-store' }) })
+    },
+
+    // ---- the keepsakes: the film as a video, the card as a PDF (the receiver's own link, or the sender's page by their own id) ----
+    async filmMake(token: string, preview?: string | null): Promise<Response> {
+      const d = deps()
+      const r = await loadGift(token, d)
+      if (r.status !== 200) return json(r.status, { error: r.status === 404 ? 'not_found' : 'unavailable' }, { 'cache-control': 'no-store' })
+      if (closed(r.gift, d, preview)) return json(403, { error: 'locked' }, { 'cache-control': 'no-store' })
+      return videoMake(r, d)
+    },
+    async filmGet(token: string, req: Request, preview?: string | null): Promise<Response> {
+      const d = deps()
+      const r = await loadGift(token, d)
+      if (r.status !== 200) return json(r.status, { error: r.status === 404 ? 'not_found' : 'unavailable' }, { 'cache-control': 'no-store' })
+      if (closed(r.gift, d, preview)) return json(403, { error: 'locked' }, { 'cache-control': 'no-store' })
+      return videoGet(r, d, req)
+    },
+    async cardPdf(token: string, preview?: string | null): Promise<Response> {
+      const d = deps()
+      const r = await loadGift(token, d)
+      if (r.status !== 200) return json(r.status, { error: r.status === 404 ? 'not_found' : 'unavailable' }, { 'cache-control': 'no-store' })
+      if (closed(r.gift, d, preview)) return json(403, { error: 'locked' }, { 'cache-control': 'no-store' })
+      return cardResponse(r, d)
+    },
+    async filmMakeForSender(animationId: string): Promise<Response> {
+      const d = deps()
+      const f = await bySender(animationId, d)
+      return f instanceof Response ? f : videoMake(f, d)
+    },
+    async filmGetForSender(animationId: string, req: Request): Promise<Response> {
+      const d = deps()
+      const f = await bySender(animationId, d)
+      return f instanceof Response ? f : videoGet(f, d, req)
+    },
+    async cardPdfForSender(animationId: string): Promise<Response> {
+      const d = deps()
+      const f = await bySender(animationId, d)
+      return f instanceof Response ? f : cardResponse(f, d)
     },
 
     /** The story scroll (PNG or PDF) of the receiver's gift. Only when all four pictures are real: never with a washi slot. */
