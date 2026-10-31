@@ -37,7 +37,7 @@ export default function CardPreview({ copy: c, glyph, reading, who, poem, certif
               return (
                 <figure key={i} className="cardPic" data-slot={i + 1} data-ready={kind === 'ai' ? 'yes' : 'no'} data-kind={kind}>
                   {kind === 'ai' ? (
-                    <img src={preview.pictures[i]!} alt="" loading="lazy" draggable={false} onContextMenu={(e) => e.preventDefault()} />
+                    <img src={preview.pictures[i]!} alt="" loading="eager" decoding="async" draggable={false} onContextMenu={(e) => e.preventDefault()} />
                   ) : kind === 'washi' ? (
                     <span className="cardPicWashi" data-testid="washi-tile" aria-hidden="true" />
                   ) : (

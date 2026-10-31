@@ -15,7 +15,7 @@ import { artPath, picturePath, type ArtRecord } from '../engine/film-art.ts'
 import { buildGiftRecord, newGiftToken, type GiftRecord } from '../engine/gift.ts'
 import { buildRecord, parseOrderRequest } from '../engine/order.ts'
 import { MemoryOrderStore } from '../engine/order-store.ts'
-import { makeFilmTimeline } from '../src/animation/film.ts'
+import { makeFilmTimeline } from '../src/order/film-timeline.ts'
 
 let failures = 0
 function check(name: string, cond: boolean, detail?: string) {

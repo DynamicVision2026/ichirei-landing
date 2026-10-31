@@ -19,7 +19,7 @@ import { buildRecord, parseOrderRequest } from '../engine/order.ts'
 import { loadPalette } from '../engine/palette.ts'
 import { loadShopifyConfig } from '../engine/shopify.ts'
 import { COPY, pageLang } from '../src/animation/copy.ts'
-import { clamp, filmTimelineProblems, frameAt, makeFilmTimeline, phrases } from '../src/animation/film.ts'
+import { clamp, filmTimelineProblems, frameAt, makeFilmTimeline, phrases } from '../src/order/film-timeline.ts'
 // @ts-expect-error untyped .mjs
 import { startServer } from './server-fixtures.mjs'
 
@@ -362,7 +362,7 @@ const READY: FilmRecord = { status: 'ready', made_at: NOW.toISOString(), picture
 
 // ---- 6. where the model is (and is not) called ------------------------------------------------------------------------------------------------------------
 {
-  const modelFree = ['engine/animation.ts', 'src/animation/AnimationApp.tsx', 'src/animation/film.ts', 'src/animation/copy.ts', 'src/animation/CreditsApp.tsx']
+  const modelFree = ['engine/animation.ts', 'src/animation/AnimationApp.tsx', 'src/order/film-timeline.ts', 'src/animation/copy.ts', 'src/animation/CreditsApp.tsx']
   const api = read('api/animation.ts')
   check('(6) playing a film makes no model call: the page, its timeline and the view code import no model SDK and call no model route (the page only asks /api/animation and /api/film/<id>/render); api/animation.ts holds the SDK as a TYPE only — the image model and the picture check run only inside the render route, once per film', !modelFree.some((f) => /anthropic|\/api\/(select|explain|poem)|messages\.(stream|create)|\bmakeFilm\b/i.test(read(f))) && /import type Anthropic/.test(api) && !/import Anthropic/.test(api) && /\/api\/film\/\$\{id\}\/render/.test(read('src/animation/AnimationApp.tsx')))
   const page = read('src/animation/AnimationApp.tsx')

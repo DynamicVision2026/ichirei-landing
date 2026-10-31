@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { COPY, pageLang, type PageCopy } from './copy.ts'
-import { clamp, frameAt, makeFilmTimeline, phrases, type FilmTimeline } from './film.ts'
+import { clamp, frameAt, makeFilmTimeline, phrases, type FilmTimeline } from '../order/film-timeline.ts'
 import type { AnimationView } from './types.ts'
 import { SenderPanel } from './GiftPanels.tsx'
 import '../fonts.css'
@@ -8,7 +8,7 @@ import './animation.css'
 
 // The story film page /a/<id>: a 30-second film that RETELLS the customer's own story in four short scenes and ends with the chosen character as
 // the answer. Fixed template, the same for every order; the script (four lines, four picture descriptions) was written once when the order was made and
-// the four pictures were drawn once, on the first open (POST /api/film/<id>/render) — both are saved, nothing is generated when the film is played. The timing and every frame's maths are src/animation/film.ts; this file draws them.
+// the four pictures were drawn once, on the first open (POST /api/film/<id>/render) — both are saved, nothing is generated when the film is played. The timing and every frame's maths are src/order/film-timeline.ts; this file draws them.
 // prefers-reduced-motion gets a still page (the four scenes, then the character). While the script or the pictures are still being made the page waits quietly.
 
 
