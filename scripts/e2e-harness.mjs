@@ -930,7 +930,7 @@ const mockPage = async (browser, { onExplain, result, order, track } = {}) => {
     return c
   }
   const sets = [FIXTURE, rename(FIXTURE, { 証: '備', 守: '憶', 封: '想' }), rename(FIXTURE, { 証: '恵', 守: '誠', 封: '光' })]
-  const mk = async (lang, { limited = false, order } = {}) => {
+  const mk = async (lang, { limited = false, order, mode = 'normal' } = {}) => {
     const f = await mockPage(browser, { order: order ?? (() => ({ json: { order_ref: 'IC-20261030-PREVIEW1', checkout_url: 'http://localhost:5173/__checkout?cart=pv', glyph: '証', certificate_text: 'x' } })), result: (b) => ({ ...sets[b.retry ?? 0], language: b.language, inscription_script: b.language === 'en' ? null : b.language === 'ja' ? sets[0].inscription_script : 'traditional' }) })
     const pv = { start: [], render: 0, polls: 0 }
     await f.page.route('**/api/preview', async (route) => {
@@ -945,6 +945,8 @@ const mockPage = async (browser, { onExplain, result, order, track } = {}) => {
     })
     await f.page.route(/\/api\/preview\/AN-[a-z0-9]+$/, async (route) => {
       pv.polls++
+      if (mode === 'washi') return route.fulfill({ json: { id: DRAFT, state: 'done', lines: ['朝、母は台所に立っていた。', '「もういらない」と私は言った。', '母は黙って戻っていった。', '今も、庭の花が添えてある。'], pictures: [null, 2, 3, 4].map((k) => (k ? `/api/film/${DRAFT}/picture/${k}.webp` : null)), slots: ['washi', 'ai', 'ai', 'ai'] } })
+      if (mode === 'allfail') return route.fulfill({ json: { id: DRAFT, state: 'failed', lines: ['朝、母は台所に立っていた。', '「もういらない」と私は言った。', '母は黙って戻っていった。', '今も、庭の花が添えてある。'], pictures: [null, null, null, null], slots: ['washi', 'washi', 'washi', 'washi'] } })
       const n = pv.polls === 1 ? 0 : pv.polls === 2 ? 2 : 4
       await route.fulfill({ json: { id: DRAFT, state: n === 4 ? 'done' : 'drawing', lines: ['朝、母は台所に立っていた。', '「もういらない」と私は言った。', '母は黙って戻っていった。', '今も、庭の花が添えてある。'], pictures: [1, 2, 3, 4].map((k) => (k <= n ? `/api/film/${DRAFT}/picture/${k}.webp` : null)) } })
     })
@@ -1040,6 +1042,17 @@ const mockPage = async (browser, { onExplain, result, order, track } = {}) => {
   await lim.page.locator('[data-poem-result=tanka][data-state=ready]').waitFor({ timeout: 6000 })
   check('limit: the order button still works (pictures never block checkout)', await lim.page.locator('[data-testid=order-submit]').isDisabled() === true /* names missing */ && (await lim.page.locator('input[name=package]').count()) >= 1)
   await lim.page.close()
+  // Part 1 fix: one picture failed its check — the three that are there stay, the washi tile takes the place of the fourth, and no "after the order" message
+  const wa = await mk('ja', { mode: 'washi' })
+  await pickMain(wa.page, 'ja')
+  await wa.page.waitForFunction(() => document.querySelectorAll('[data-testid=card-pictures] .cardPic[data-ready=yes]').length === 3, null, { timeout: 8000 })
+  check('washi: three pictures are shown, the fourth place is the plain washi tile, no message — never "after the order" while any picture is there', (await wa.page.locator('[data-testid=washi-tile]').count()) === 1 && (await wa.page.locator('[data-testid=card-pictures] .cardPic[data-kind=washi]').getAttribute('data-slot')) === '1' && (await wa.page.locator('[data-testid=card-status]').innerText()) === '' && (await wa.page.locator('[data-testid=card-preview]').getAttribute('data-state')) === 'done')
+  await wa.page.close()
+  const af = await mk('ja', { mode: 'allfail' })
+  await pickMain(af.page, 'ja')
+  await af.page.waitForFunction(() => document.querySelector('[data-testid=card-preview]')?.getAttribute('data-state') === 'failed', null, { timeout: 8000 })
+  check('washi: only when ALL FOUR failed does the card leave the pictures out and say 「物語の絵は、ご注文後にお届けします」', (await af.page.locator('[data-testid=card-pictures]').count()) === 0 && (await af.page.locator('[data-testid=card-status]').innerText()) === '物語の絵は、ご注文後にお届けします')
+  await af.page.close()
   // the other two languages: the drawing line, the sample mark, the made-to-order note
   for (const [lang, drawing, sample, note] of [['zh-Hant', '正在描繪你的故事', '樣本', '因為是接單製作'], ['en', 'Drawing your story', 'Sample', 'made to order']]) {
     const l = await mk(lang)

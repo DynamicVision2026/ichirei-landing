@@ -77,6 +77,7 @@ export type StartOutcome =
  * per-person daily limit — asked only when a NEW set would be drawn.
  */
 export async function startPreview(deps: PreviewDeps, input: PreviewStart, allowNew: () => boolean = () => true): Promise<StartOutcome> {
+  const pickedAt = (deps.now?.() ?? new Date()).toISOString()
   const hash = storyHash(input.story, input.language, input.memorial)
   if (input.draft_id) {
     const old = await read(deps.store, input.draft_id)
@@ -118,32 +119,42 @@ export async function startPreview(deps: PreviewDeps, input: PreviewStart, allow
     who: '',
     memorial: input.memorial,
     film,
-    draft: { story_hash: hash, memorial: input.memorial, created_at: now.toISOString() },
+    draft: { story_hash: hash, memorial: input.memorial, created_at: now.toISOString(), picked_at: pickedAt },
   }
   await deps.store.put(id, record)
   return { state: 'ok', id, reused: false, script: film.status === 'ready' ? 'ready' : 'fallback' }
 }
 
 export type PreviewState = 'drawing' | 'done' | 'failed' | 'deferred'
+/** One picture of the preview: drawn and checked (`ai`), the plain washi tile (`washi`: it failed its check — the others stay), or not there yet (`pending`). */
+export type PreviewSlot = 'ai' | 'washi' | 'pending'
 export interface PreviewView {
   id: string
+  /**
+   * drawing = still at work; done = finished — every slot is a picture or a washi tile, and at least one is a picture; failed = nothing could be drawn at all
+   * (all four failed, or the script was only the fallback): only then does the page leave the pictures out; deferred = the film limit of the day.
+   */
   state: PreviewState
   /** The four lines, in the order the story happened (empty for a fallback script). */
   lines: string[]
-  /** Per picture: its address once it has passed its check, else null. */
+  /** Per picture: its address once it has passed its check, else null. A picture that is shown is never taken away. */
   pictures: (string | null)[]
+  slots: PreviewSlot[]
 }
 
 /** What the page shows now: the lines and the pictures that are already there. */
 export function viewOf(rec: AnimationRecord, art: ArtRecord | null): PreviewView {
   const film = rec.film
-  if (!film || film.status !== 'ready' || film.lines.length !== 4) return { id: rec.id, state: 'failed', lines: [], pictures: [null, null, null, null] }
-  const pictures = film.lines.map((_, i) => (art && art.slots[i] === 'ai' ? pictureUrl(rec.id, i + 1, art.made_at) : null))
+  if (!film || film.status !== 'ready' || film.lines.length !== 4) return { id: rec.id, state: 'failed', lines: [], pictures: [null, null, null, null], slots: ['washi', 'washi', 'washi', 'washi'] }
+  const slots: PreviewSlot[] = film.lines.map((_, i) => (art && art.slots[i] === 'ai' ? 'ai' : art && art.slots[i] === 'washi' ? 'washi' : 'pending'))
+  const pictures = film.lines.map((_, i) => (slots[i] === 'ai' ? pictureUrl(rec.id, i + 1, art?.made_at) : null))
+  const anyPicture = slots.includes('ai')
+  const settled = !slots.includes('pending')
   let state: PreviewState = 'drawing'
   if (art?.status === 'deferred') state = 'deferred'
-  else if (art?.status === 'done') state = pictures.every(Boolean) ? 'done' : 'failed' // a final washi: the preview stays without that picture
-  else if (art?.status === 'incomplete') state = pictures.some(Boolean) ? 'drawing' : 'failed' // still being tried again; nothing drawn at all = failed for now
-  return { id: rec.id, state, lines: film.lines, pictures }
+  else if (art?.status === 'done' || (settled && art)) state = anyPicture ? 'done' : 'failed'
+  else if (art?.status === 'incomplete') state = anyPicture ? 'drawing' : 'failed' // still being tried again; nothing drawn at all = failed for now
+  return { id: rec.id, state, lines: film.lines, pictures, slots }
 }
 
 export async function previewView(deps: PreviewDeps, id: string): Promise<PreviewView | null> {
@@ -164,8 +175,22 @@ export async function renderPreview(deps: PreviewDeps, id: string): Promise<Prev
     ensureArt({ store: deps.store, image: deps.image, client: deps.vision, env: deps.env, log: deps.log, now: deps.now, pollMs: deps.pollMs, progress: true }, { id, film: rec.film, memorial: rec.memorial, language: rec.language }),
     new Promise<null>((resolve) => setTimeout(() => resolve(null), budget).unref?.()),
   ])
-  ;(deps.log ?? console.log)(`[ichirei-preview] ${JSON.stringify({ event: 'preview_render', ms: Date.now() - t0, finished: art !== null, status: art?.status ?? 'rendering', pictures: art ? art.slots.filter((s) => s === 'ai').length : null })}`)
-  return viewOf(rec, art ?? (await readArt(deps.store, id).catch(() => null)))
+  const final = art ?? (await readArt(deps.store, id).catch(() => null))
+  // The owner's timing, per picture: seconds from the moment the character was picked (the draft's `picked_at`) to the moment each picture passed its check.
+  const pickedMs = Date.parse(rec.draft.picked_at ?? rec.created_at)
+  const startedMs = final ? Date.parse(final.started_at) : NaN
+  const secs = (ms: number | null | undefined) => (typeof ms === 'number' && Number.isFinite(startedMs) ? Math.round(((startedMs - pickedMs) + ms) / 100) / 10 : null)
+  ;(deps.log ?? console.log)(`[ichirei-preview] ${JSON.stringify({
+    event: 'preview_render',
+    render_secs: Math.round((Date.now() - t0) / 100) / 10,
+    secs_from_pick_to_render: Number.isFinite(startedMs) ? Math.round((startedMs - pickedMs) / 100) / 10 : null,
+    picture_secs_from_pick: final?.slots.map((s, i) => (s === 'ai' ? secs(final.ready_ms?.[i]) : null)) ?? null,
+    finished: art !== null,
+    status: final?.status ?? 'rendering',
+    pictures: final ? final.slots.filter((s) => s === 'ai').length : null,
+    washi: final ? final.slots.filter((s) => s === 'washi').length : null,
+  })}`)
+  return viewOf(rec, final)
 }
 
 /**
@@ -183,7 +208,8 @@ export async function adoptDraft(store: OrderStore, draftId: string, record: Ord
   const forms = [p.kanji, p.glyph_to_carve].filter(Boolean)
   if (film.lines.some((l) => forms.some((f) => l.includes(f)))) return null
   if (checkPictures(film.pictures, { glyph: p.glyph_to_carve, forms, names: [p.sender_name, p.receiver_name], memorial: expect.memorial, occasion: record.engine_result.occasion ?? null, language: expect.language, story: expect.story }).length > 0) return null
-  const adopted: AnimationRecord = { ...built, id: old.id, created_at: old.created_at, film, draft: null }
+  // a preview that ended with washi slots: the first open after payment gives each of them one more full attempt (the other pictures stay)
+  const adopted: AnimationRecord = { ...built, id: old.id, created_at: old.created_at, film, draft: null, retry_washi: true }
   return adopted
 }
 

@@ -37,11 +37,11 @@ import type { OrderStore } from './order-store.ts'
 // ---- the style (fixed, the same for every order) ----------------------------------------------------------------------------------------------------
 
 export const IMAGE_STYLE =
-  'Japanese sumi-e ink-wash painting on warm off-white washi paper. Soft graded black ink only, with at most one muted earth-brown accent wash. Loose, confident brush strokes, visible paper grain, generous empty space. People only as simple silhouettes, as hands, or seen from behind; no faces or facial features. No text, letters, signatures, seals or frames. Quiet, tender, everyday life. People wear contemporary everyday clothes; modern objects (a plain modern umbrella, modern doors, phones and trains) unless the description says otherwise. Consistent hand, as if one painter made the whole series. Portrait 4:5.'
+  'Japanese sumi-e ink-wash painting on warm off-white washi paper. Soft graded black ink only, with at most one muted earth-brown accent wash. Loose, confident brush strokes, visible paper grain, generous empty space. People only as hands, or seen from behind, or from far away as small silhouettes; never a face, not even in profile, and no facial features. No text, letters, signatures, seals or frames. Quiet, tender, everyday life. People wear contemporary everyday clothes; modern objects (a plain modern umbrella, modern doors, phones and trains) unless the description says otherwise. Consistent hand, as if one painter made the whole series. Portrait 4:5.'
 export const IMAGE_STYLE_MEMORIAL = 'Paler grey-beige paper, very soft ink, still and calm.'
 /** Added to a picture drawn a second time, for the reason it failed the first time. */
 const RETRY_HINT: Record<string, string> = {
-  face: 'Absolutely no faces: show only figures seen from behind, silhouettes and hands.',
+  face: 'Absolutely no faces, not even in profile: show only hands, or a person seen from behind or far away as a small silhouette.',
   text: 'Absolutely no writing, letters or marks that look like writing anywhere in the picture.',
   illness: 'Show only a calm everyday moment: no medical or sickroom scene, no injury.',
   celebration: 'No celebration of any kind: quiet and still.',
@@ -90,6 +90,10 @@ export interface ArtRecord {
   bg_scheduled?: boolean
   /** Samples only: the set of pictures was redrawn for a new revision (an older art record is ignored). */
   rev?: string
+  /** Per slot: milliseconds from the start of the render that drew it to the moment it passed its check (null = not a picture). For the owner's timing. */
+  ready_ms?: (number | null)[]
+  /** Washi slots of the card preview got their one more full attempt after payment (engine/film-art.ts markWashiForRetry). */
+  paid_retry?: boolean
   ms?: number
   model?: string
 }
@@ -673,9 +677,16 @@ async function renderLocked(deps: ArtDeps, input: RenderInput): Promise<ArtRecor
     for (const g of left) slots[g.slot] = 'unchecked'
   }
 
+  /** The moment each picture passed its check, as milliseconds since this render began (kept in the record; the owner reads it as 'seconds from the pick'). */
+  const readyMs: (number | null)[] = Array(n).fill(null)
+  const hadPicture = slots.map((s) => s === 'ai') // pictures from an earlier render keep their own time
+  const markReady = () => {
+    for (let i = 0; i < n; i++) if (slots[i] === 'ai' && !hadPicture[i] && readyMs[i] === null) readyMs[i] = Date.now() - started
+  }
   /** While drawing: the pictures that are already checked are written into the lease (same start time, still `rendering`), so a page that is waiting can show each one as it arrives (the card preview). */
   const progress = async () => {
-    const snap: ArtRecord = { schema: 'film-art', id, status: 'rendering', started_at: leaseAt, slots: slots.map((s) => (s === 'ai' || s === 'washi' ? s : ('pending' as const))), rev: input.rev }
+    markReady()
+    const snap: ArtRecord = { schema: 'film-art', id, status: 'rendering', started_at: leaseAt, slots: slots.map((s) => (s === 'ai' || s === 'washi' ? s : ('pending' as const))), rev: input.rev, ...(cur?.paid_retry ? { paid_retry: true } : {}) }
     await store.putObject(artPath(id), JSON.stringify(snap), 'application/json').catch(() => {})
   }
 
@@ -734,10 +745,11 @@ async function renderLocked(deps: ArtDeps, input: RenderInput): Promise<ArtRecor
   const incomplete = slots.includes('pending') || slots.includes('unchecked')
   const ms = Date.now() - started
   const art: ArtRecord = {
-    schema: 'film-art', id, status: incomplete ? 'incomplete' : 'done', started_at: new Date(started).toISOString(), made_at: now().toISOString(), slots,
+    schema: 'film-art', id, status: incomplete ? 'incomplete' : 'done', started_at: new Date(started).toISOString(), made_at: now().toISOString(), slots, ready_ms: ((): (number | null)[] => { markReady(); return slots.map((sl, i) => (sl === 'ai' ? (readyMs[i] ?? (cur?.ready_ms?.[i] ?? null)) : null)) })(),
     reasons: reasons.map((r, i) => (slots[i] === 'ai' ? 'ok' : r || 'ok')), check_fails: checkFails, rewrites, rewritten, calls, rev: input.rev, ms: (cur?.ms ?? 0) + ms, model: modelUsed || cur?.model,
     ...(incomplete ? { retry_after: new Date(now().getTime() + num(env.ICHIREI_FILM_RETRY_MS, 60_000)).toISOString() } : {}),
     ...(cur?.bg_scheduled ? { bg_scheduled: true } : {}),
+    ...(cur?.paid_retry ? { paid_retry: true } : {}),
   }
   // one background retry about ten minutes later (best effort: an idle Cloud Run instance may be paused — the next open draws them anyway)
   const bgMs = env.ICHIREI_FILM_BG_RETRY_MS === undefined || env.ICHIREI_FILM_BG_RETRY_MS === '' ? 600_000 : Number(env.ICHIREI_FILM_BG_RETRY_MS)
@@ -754,4 +766,32 @@ async function renderLocked(deps: ArtDeps, input: RenderInput): Promise<ArtRecor
   const usd = drawn * Number(env.ICHIREI_FILM_IMAGE_USD || 0.039) + (usage.input_tokens * 1 + usage.output_tokens * 5) / 1e6
   logLine(log, 'film_render_done', { ms, pictures: slots.filter((x) => x === 'ai').length, drawn, washi: slots.filter((x) => x === 'washi').length, pending: slots.filter((x) => x === 'pending').length, incomplete, est_cost_jpy: Math.round(usd * Number(env.ICHIREI_FILM_JPY_PER_USD || 150) * 10) / 10 })
   return art
+}
+
+/**
+ * After payment, the washi slots of the card preview get ONE more full attempt (a fresh draw, check and, if it fails twice, a fresh description rewrite): they are
+ * made pending again with their counters cleared and a fresh call budget; the pictures that are there stay exactly as they are. Done once per film (`paid_retry`).
+ * Returns true when something was reset (the next open of the film then draws only those slots).
+ */
+export async function markWashiForRetry(store: OrderStore, id: string, now: Date = new Date()): Promise<boolean> {
+  const art = await readArtRaw(store, id)
+  if (!art || art.paid_retry || (art.status !== 'done' && art.status !== 'incomplete') || !art.slots.includes('washi')) return false
+  const n = art.slots.length
+  const wash = art.slots.map((s) => s === 'washi')
+  const next: ArtRecord = {
+    ...art,
+    status: 'incomplete',
+    paid_retry: true,
+    slots: art.slots.map((s, i) => (wash[i] ? ('pending' as const) : s)),
+    reasons: (art.reasons ?? Array(n).fill('')).map((r, i) => (wash[i] ? '' : r)),
+    check_fails: (art.check_fails ?? Array(n).fill(0)).map((c, i) => (wash[i] ? 0 : c)),
+    rewrites: (art.rewrites ?? Array(n).fill(0)).map((c, i) => (wash[i] ? 0 : c)),
+    rewritten: (art.rewritten ?? Array(n).fill(null)).map((r, i) => (wash[i] ? null : r)),
+    ready_ms: (art.ready_ms ?? Array(n).fill(null)).map((r, i) => (wash[i] ? null : r)),
+    calls: 0,
+    retry_after: now.toISOString(),
+    bg_scheduled: false,
+  }
+  await store.putObject(artPath(id), JSON.stringify(next), 'application/json')
+  return true
 }

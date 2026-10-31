@@ -27,7 +27,7 @@ const mem = () => new MemoryOrderStore()
 // ---- 1. the style and the prompts -----------------------------------------------------------------------------------------------------------------------
 {
   const p = buildImagePrompt('a mother\'s hand placing one flower on a bento box', false)
-  check('(1) the image prompt = the fixed sumi-e style + the picture description: ink-wash on washi, no faces, no text, silhouettes / hands / from behind, 4:5', p.startsWith(IMAGE_STYLE) && p.includes('Japanese sumi-e ink-wash painting on warm off-white washi paper') && p.includes('no faces or facial features') && p.includes('No text, letters, signatures, seals or frames') && p.includes('Portrait 4:5') && p.includes("Scene: a mother's hand placing one flower on a bento box") && !p.includes(IMAGE_STYLE_MEMORIAL))
+  check('(1) the image prompt = the fixed sumi-e style + the picture description: ink-wash on washi, no faces, no text, silhouettes / hands / from behind, 4:5', p.startsWith(IMAGE_STYLE) && p.includes('Japanese sumi-e ink-wash painting on warm off-white washi paper') && p.includes('never a face, not even in profile, and no facial features') && p.includes('only as hands, or seen from behind, or from far away') && p.includes('No text, letters, signatures, seals or frames') && p.includes('Portrait 4:5') && p.includes("Scene: a mother's hand placing one flower on a bento box") && !p.includes(IMAGE_STYLE_MEMORIAL))
   const m = buildImagePrompt('x', true, 'Absolutely no faces.')
   check('(1) a remembrance film adds the paler grey-beige line; a second try adds the hint for why the first failed', m.includes('Paler grey-beige paper, very soft ink, still and calm.') && m.endsWith('Absolutely no faces.'))
   const c = buildCheckPrompt(['one', 'two'], true)

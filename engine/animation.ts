@@ -44,7 +44,9 @@ export interface AnimationRecord {
   /** The receiver's page of this order (engine/gift.ts): the sender's page offers it for sharing. Never sent to the receiver. */
   gift_token?: string | null
   /** The card preview before payment (engine/preview.ts): set while the record belongs to a story, not yet to an order; removed when an order adopts it. */
-  draft?: { story_hash: string; memorial: boolean; created_at: string } | null
+  draft?: { story_hash: string; memorial: boolean; created_at: string; picked_at?: string } | null
+  /** Adopted from a card preview that ended with washi slots: the first open after payment gives them one more full attempt (engine/film-art.ts markWashiForRetry). */
+  retry_washi?: boolean
 }
 
 export function buildAnimationRecord(record: OrderRecord, id: string, now: Date = new Date()): AnimationRecord {

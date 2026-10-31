@@ -32,16 +32,21 @@ export default function CardPreview({ copy: c, glyph, reading, who, poem, certif
         <span className="sampleMark" data-testid="sample-mark">{c.sample}</span>
         {!noPictures && (
           <div className="cardPics" data-testid="card-pictures">
-            {[0, 1, 2, 3].map((i) => (
-              <figure key={i} className="cardPic" data-slot={i + 1} data-ready={preview.pictures[i] ? 'yes' : 'no'}>
-                {preview.pictures[i] ? (
-                  <img src={preview.pictures[i]!} alt="" loading="lazy" draggable={false} onContextMenu={(e) => e.preventDefault()} />
-                ) : (
-                  <span className="cardPicWait" aria-label={c.waiting} />
-                )}
-                <figcaption className="notranslate">{preview.lines[i] ?? ''}</figcaption>
-              </figure>
-            ))}
+            {[0, 1, 2, 3].map((i) => {
+              const kind = preview.pictures[i] ? 'ai' : preview.slots[i] === 'washi' ? 'washi' : 'pending'
+              return (
+                <figure key={i} className="cardPic" data-slot={i + 1} data-ready={kind === 'ai' ? 'yes' : 'no'} data-kind={kind}>
+                  {kind === 'ai' ? (
+                    <img src={preview.pictures[i]!} alt="" loading="lazy" draggable={false} onContextMenu={(e) => e.preventDefault()} />
+                  ) : kind === 'washi' ? (
+                    <span className="cardPicWashi" data-testid="washi-tile" aria-hidden="true" />
+                  ) : (
+                    <span className="cardPicWait" aria-label={c.waiting} />
+                  )}
+                  <figcaption className="notranslate">{preview.lines[i] ?? ''}</figcaption>
+                </figure>
+              )
+            })}
           </div>
         )}
         <div className="cardText">

@@ -223,6 +223,82 @@ const rig = () => {
   check('(6) only codes and whole seconds are kept: no character, no story, no free text', e !== null && e.secs === 42 && !('kanji' in e) && !('story' in e) && !('character' in e) && ev({ event: 'card_preview_shown', secs: -3 })?.secs === null)
 }
 
+// ---- 7. Part 1 fix (2026-10-31): a washi slot never hides the pictures that are there ----------------------------------------------------------------------------
+{
+  const { createHash } = await import('node:crypto')
+  const { markWashiForRetry, artPath, readArt } = await import('../engine/film-art.ts')
+  const KITCHEN = 'standing at a quiet kitchen counter'
+  let failKitchen = true // the first picture fails every check while this is on (a face, even after the rewrite)
+  const visionFail = {
+    messages: {
+      stream: (params: { messages: { content: string | { type: string; text?: string }[] }[] }) => ({
+        finalMessage: async () => {
+          const content = params.messages[0].content
+          if (typeof content === 'string') return { content: [{ type: 'text', text: JSON.stringify({ picture: `A woman seen from behind ${KITCHEN} in soft grey light, her hands resting on a closed bento box on the counter` }) }], usage: { input_tokens: 1, output_tokens: 1 }, stop_reason: 'end_turn' }
+          const text = content.filter((b) => b.type === 'text').map((b) => b.text).join(' ')
+          const n = content.filter((b) => b.type === 'image').length
+          const bad = failKitchen && text.includes(KITCHEN)
+          return { content: [{ type: 'text', text: JSON.stringify({ pictures: Array.from({ length: n }, () => (bad ? { ok: false, reason: 'face' } : OKV)) }) }], usage: { input_tokens: 1, output_tokens: 1 }, stop_reason: 'end_turn' }
+        },
+      }),
+    },
+  }
+  const store = new MemoryOrderStore()
+  let drawn = 0
+  const image: ImageClient = { async generate() { drawn++; await new Promise((r) => setTimeout(r, 15)); return { bytes: PNG, model: 'fake-image' } } }
+  const logs: string[] = []
+  const env = { ICHIREI_FILM_DAILY_MAX: '1000', ICHIREI_FILM_RENDER_MS: '30000', ICHIREI_FILM_QUOTA_WAITS_MS: '0', ICHIREI_FILM_CHECK_WAITS_MS: '0', ICHIREI_FILM_BG_RETRY_MS: '0' } as never
+  const H = createPreviewHandlers(() => ({ store, now: () => NOW, film: async () => clone(FILM), image, vision: visionFail as never, env, log: (l) => logs.push(l), pollMs: 10, daily: new SlidingWindowLimiter(5, 86_400_000) }))
+  const started = await (await H.start(new Request('http://x/api/preview', { method: 'POST', body: JSON.stringify({ story: FIX.story, language: 'ja', ...FIX.context, shown: ['証'] }) }))).json() as { id: string }
+  // watch the page's view while the pictures are being drawn: what is shown never goes away
+  const seen: number[] = []
+  let polling = true
+  const watcher = (async () => { while (polling) { const v = await (await H.view(started.id)).json() as { pictures: (string | null)[] }; seen.push(v.pictures.filter(Boolean).length); await new Promise((r) => setTimeout(r, 5)) } })()
+  const view = await (await H.render(started.id)).json() as { state: string; pictures: (string | null)[]; slots: string[] }
+  polling = false
+  await watcher
+  check('(7) the slot that failed its check three times is the plain washi tile, and the other three pictures are shown: state "done" (not "failed"), slots washi / ai / ai / ai', view.state === 'done' && view.slots.join() === 'washi,ai,ai,ai' && view.pictures[0] === null && view.pictures.slice(1).every((u) => typeof u === 'string'))
+  check('(7) the pictures that are shown never go away while the others are still being drawn (the number shown never goes down)', seen.length > 2 && seen.every((n, i) => i === 0 || n >= seen[i - 1]) && seen.at(-1) === 3)
+  const ev = logs.map((l) => (l.startsWith('[ichirei-preview] ') ? JSON.parse(l.slice('[ichirei-preview] '.length)) : null)).find((e) => e?.event === 'preview_render')
+  check('(7) preview_render is logged with the seconds from the pick to each picture (null for the washi tile) — codes and numbers only', !!ev && ev.picture_secs_from_pick.length === 4 && ev.picture_secs_from_pick[0] === null && ev.picture_secs_from_pick.slice(1).every((x: unknown) => typeof x === 'number' && (x as number) >= 0) && ev.pictures === 3 && ev.washi === 1 && typeof ev.secs_from_pick_to_render === 'number')
+  const art0 = await readArt(store, started.id)
+  check('(7) the art record keeps when each picture was ready, and no story text', art0?.ready_ms?.length === 4 && art0.ready_ms[0] === null && art0.ready_ms.slice(1).every((x) => typeof x === 'number'))
+  // the order adopts the draft; the washi slot gets ONE more full attempt at the first open, the others stay exactly as they are
+  const sha = (b: Buffer | null) => (b ? createHash('sha256').update(b).digest('hex') : '')
+  const before = await Promise.all([2, 3, 4].map(async (n) => sha(await store.getObject(`films/${started.id}/${n}.webp`))))
+  const drawnBefore = drawn
+  const deps = (): OrderDeps => ({ store, shopify: loadShopifyConfig({ SHOPIFY_STOREFRONT_TOKEN: 't', SHOPIFY_VARIANT_SIMPLE: '1', SHOPIFY_VARIANT_STANDARD: '2' } as NodeJS.ProcessEnv).config, shopifyMissing: [], now: () => NOW, fetchImpl: (async () => new Response(JSON.stringify({ data: { cartCreate: { cart: { id: 'gid://shopify/Cart/x', checkoutUrl: 'https://soul-id-2.myshopify.com/cart/c/x' }, userErrors: [] } } }), { status: 200 })) as typeof fetch, film: async () => clone(FILM), filmWaitMs: 0 })
+  const res = await createOrderHandler(deps)(new Request('http://x/api/order', { method: 'POST', body: JSON.stringify({ story: FIX.story, engine_result: clone(GOLDEN), selected_kanji: '証', language: 'ja', sender_name: '山田 太郎', receiver_name: '山田 一郎', delivery_date: '2027-01-15', inscription_style: 'modern', package: 'standard', draft_id: started.id }) }))
+  const rec = (await store.get(((await res.json()) as { order_ref: string }).order_ref)) as { animation_id: string }
+  check('(7) the order adopted the draft (same id) and remembers that its washi slot is to be tried once more', res.status === 200 && rec.animation_id === started.id && ((await store.get(started.id)) as { retry_washi?: boolean }).retry_washi === true && drawn === drawnBefore)
+  failKitchen = false // the second attempt passes
+  const A = createAnimationHandlers(() => ({ store, now: () => NOW, image, vision: visionFail as never, env, log: (l) => logs.push(l), pollMs: 10 }))
+  const opened = await (await A.render(started.id)).json() as { state: string; view: { film: { pictures: string[] } } }
+  const art1 = await readArt(store, started.id)
+  check('(7) AFTER PAYMENT the washi slot is drawn once more and passes: all four are pictures now', opened.state === 'ready' && art1?.slots.join() === 'ai,ai,ai,ai' && art1.paid_retry === true && opened.view.film.pictures.every((u) => u.startsWith('/api/film/')))
+  const after = await Promise.all([2, 3, 4].map(async (n) => sha(await store.getObject(`films/${started.id}/${n}.webp`))))
+  check('(7) …only that one slot was drawn (one picture, not four): the other three are byte for byte what they were', drawn - drawnBefore === 1 && after.join() === before.join())
+  check('(7) it is done once per film: a second call changes nothing', (await markWashiForRetry(store, started.id, NOW)) === false)
+  // a slot that fails again after payment stays washi, and is not tried a third time
+  failKitchen = true
+  const store2 = new MemoryOrderStore()
+  const H2 = createPreviewHandlers(() => ({ store: store2, now: () => NOW, film: async () => clone(FILM), image, vision: visionFail as never, env, log: () => {}, pollMs: 10, daily: new SlidingWindowLimiter(5, 86_400_000) }))
+  const s2 = await (await H2.start(new Request('http://x/api/preview', { method: 'POST', body: JSON.stringify({ story: FIX.story + ' 二', language: 'ja', ...FIX.context, shown: ['証'] }) }))).json() as { id: string }
+  await H2.render(s2.id)
+  await markWashiForRetry(store2, s2.id, NOW)
+  const A2 = createAnimationHandlers(() => ({ store: store2, now: () => NOW, image, vision: visionFail as never, env, log: () => {}, pollMs: 10 }))
+  void A2
+  const art2 = JSON.parse((await store2.getObject(artPath(s2.id)))!.toString())
+  check('(7) before the retry the washi slot is "pending" again with its counters cleared, a fresh call budget, and the pictures untouched', art2.slots.join() === 'pending,ai,ai,ai' && art2.check_fails[0] === 0 && art2.rewrites[0] === 0 && art2.calls === 0 && art2.status === 'incomplete')
+  // when ALL four fail, the page leaves the pictures out (state failed); with one picture it never does
+  const { viewOf } = await import('../engine/preview.ts')
+  const recAny = { id: started.id, film: { ...clone(FILM) }, order_ref: 'DRAFT', draft: {}, language: 'ja', memorial: false } as never
+  const none = viewOf(recAny, { schema: 'film-art', id: started.id, status: 'done', started_at: NOW.toISOString(), slots: ['washi', 'washi', 'washi', 'washi'] })
+  const one = viewOf(recAny, { schema: 'film-art', id: started.id, status: 'done', started_at: NOW.toISOString(), slots: ['washi', 'washi', 'washi', 'ai'] })
+  const mid = viewOf(recAny, { schema: 'film-art', id: started.id, status: 'rendering', started_at: NOW.toISOString(), slots: ['ai', 'pending', 'washi', 'pending'] })
+  check('(7) the page says "pictures after the order" only when ALL FOUR slots failed (state failed) — one picture is enough to show the card with its washi tiles; while drawing, a washi tile already shows', none.state === 'failed' && one.state === 'done' && mid.state === 'drawing' && mid.slots.join() === 'ai,pending,washi,pending')
+}
+
 upstream.close()
 if (failures) {
   console.error(`\n${failures} preview check(s) FAILED`)

@@ -7,16 +7,21 @@ import { sessionId, trackPreview } from './analytics.ts'
 // never draws again. Nothing here blocks the order: a limit, an error or a slow picture only means the card shows no picture yet.
 
 export type PreviewPhase = 'script' | 'drawing' | 'done' | 'failed' | 'limited'
+export type PreviewSlot = 'ai' | 'washi' | 'pending'
 export interface PreviewState {
   phase: PreviewPhase
   lines: string[]
   pictures: (string | null)[]
+  /** Per picture: drawn (`ai`), the plain washi tile (`washi`), or not there yet (`pending`). A picture that is shown is never taken away. */
+  slots: PreviewSlot[]
   /** The draft to send with the order (so the order's film is the one the buyer saw). */
   draftId: string | null
 }
 export type DraftRef = MutableRefObject<{ key: string; id: string } | null>
 
 const EMPTY: (string | null)[] = [null, null, null, null]
+const PENDING: PreviewSlot[] = ['pending', 'pending', 'pending', 'pending']
+const WASHI: PreviewSlot[] = ['washi', 'washi', 'washi', 'washi']
 const POLL_MS = 2500
 const GIVE_UP_MS = 240_000
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms))
@@ -24,11 +29,11 @@ const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms))
 /** Requests of one story still on their way (React's strict mode asks twice in development; a second ask joins the first). */
 const starting = new Map<string, Promise<{ state: 'ok'; id: string } | { state: 'limited' } | { state: 'error' }>>()
 
-type View = { state: 'drawing' | 'done' | 'failed' | 'deferred'; lines: string[]; pictures: (string | null)[] }
+type View = { state: 'drawing' | 'done' | 'failed' | 'deferred'; lines: string[]; pictures: (string | null)[]; slots?: PreviewSlot[] }
 
 export function usePreview(args: { result: EngineResult; story: string; followUps: string[]; shown: string[]; draftRef: DraftRef }): PreviewState {
   const { result, story, followUps, shown, draftRef } = args
-  const [state, setState] = useState<PreviewState>({ phase: 'script', lines: [], pictures: EMPTY, draftId: draftRef.current?.id ?? null })
+  const [state, setState] = useState<PreviewState>({ phase: 'script', lines: [], pictures: EMPTY, slots: PENDING, draftId: draftRef.current?.id ?? null })
   const memorial = result.occasion === 'memorial'
   const key = JSON.stringify([result.language, memorial, story.trim(), followUps])
 
@@ -38,7 +43,9 @@ export function usePreview(args: { result: EngineResult; story: string; followUp
     const secs = () => (Date.now() - t0) / 1000
     const finish = (phase: PreviewPhase, id: string | null, view?: View) => {
       if (!alive) return
-      setState({ phase, lines: view?.lines ?? [], pictures: view?.pictures ?? EMPTY, draftId: id })
+      const pictures = view?.pictures ?? EMPTY
+      const slots = view?.slots ?? pictures.map((p): PreviewSlot => (p ? 'ai' : phase === 'drawing' || phase === 'script' ? 'pending' : 'washi'))
+      setState({ phase, lines: view?.lines ?? [], pictures, slots: phase === 'failed' || phase === 'limited' ? (view?.slots ?? WASHI) : slots, draftId: id })
     }
     ;(async () => {
       const known = draftRef.current?.key === key ? draftRef.current.id : null
@@ -104,8 +111,10 @@ export function usePreview(args: { result: EngineResult; story: string; followUp
         await sleep(POLL_MS)
       }
       if (alive && !done) {
-        trackPreview('pictures_before_pay', { language: result.language, state: 'failed', secs: secs() })
-        finish('failed', out.id, last ?? undefined)
+        // out of time: what is there stays on the card (a picture is never taken away); what is not there is shown as the plain washi tile
+        const some = !!last?.pictures.some(Boolean)
+        trackPreview('pictures_before_pay', { language: result.language, state: some ? 'shown' : 'failed', secs: secs() })
+        finish(some ? 'done' : 'failed', out.id, last ? { ...last, slots: last.slots?.map((s) => (s === 'pending' ? 'washi' : s)) ?? last.pictures.map((p): PreviewSlot => (p ? 'ai' : 'washi')) } : undefined)
       }
     })()
     return () => {

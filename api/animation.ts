@@ -12,7 +12,7 @@ import QRCode from 'qrcode'
 import type Anthropic from '@anthropic-ai/sdk'
 import { ANIMATION_ID_PATTERN, animationUrl, animationView, artRevFor, filmUsable, isAnimationRecord, sampleRecord, type AnimationRecord } from '../engine/animation.ts'
 import { giftUrl, isGiftRecord } from '../engine/gift.ts'
-import { ensureArt, picturePath, readArt, renderBudgetMs, type ArtRecord, type ImageClient } from '../engine/film-art.ts'
+import { ensureArt, markWashiForRetry, picturePath, readArt, renderBudgetMs, type ArtRecord, type ImageClient } from '../engine/film-art.ts'
 import { createOrderStore, type OrderStore } from '../engine/order-store.ts'
 import { FILM_RETRY_AFTER_MS, ensureFilm, filmInFlight, raceTimeout } from '../engine/film-store.ts'
 import type { FilmInput, FilmRecord } from '../engine/film.ts'
@@ -96,6 +96,12 @@ export function createAnimationHandlers(deps: () => AnimationDeps) {
       if (r.status === 503) return json(503, { error: 'unavailable' }, { 'cache-control': 'no-store' })
       if (r.status === 404) return json(404, { error: 'not_found' }, { 'cache-control': 'no-store' })
       const rec = await withScript(r.rec, d, true)
+      // adopted from a card preview that ended with washi slots: they get one more full attempt now (once; the pictures that are there stay)
+      if (rec.retry_washi && d.store) {
+        await markWashiForRetry(d.store, rec.id, d.now?.() ?? new Date()).catch(() => false)
+        rec.retry_washi = false
+        await d.store.put(rec.id, rec).catch(() => {})
+      }
       const noStore = { 'cache-control': 'private, no-store' }
       if (!filmUsable(rec.film)) return json(200, { state: 'pending', view: animationView(rec, null) }, noStore)
       if (rec.film.status === 'fallback' || !d.store) return json(200, { state: 'ready', view: animationView(rec, null) }, noStore)
