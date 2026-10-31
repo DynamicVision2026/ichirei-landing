@@ -7,7 +7,7 @@
 import { findQuestion } from './story-questions.ts'
 import { randomBytes } from 'node:crypto'
 import { LANGUAGES, STORY_MAX as ENGINE_STORY_MAX, countChars, parseFollowUps, type Candidate, type EngineResult, type Language } from './contract.ts'
-import { GIFT_MESSAGE_MAX, PACKAGES, PACKAGE_PRICE_JPY, PACKAGE_SKU, SHIPS, SHIP_TO, type PackageId, type PoemType, type ShipTo } from '../src/order/packages.ts'
+import { GIFT_MESSAGE_MAX, OPEN_DATE_MAX_DAYS, PACKAGES, PACKAGE_PRICE_JPY, PACKAGE_SKU, SHIPS, SHIP_TO, type PackageId, type PoemType, type ShipTo } from '../src/order/packages.ts'
 import { CERTIFICATE_LINE_EN, certificateText } from '../src/order/certificate.ts'
 import { isMemorial } from '../src/order/memorial.ts'
 import { loadPalette, plainMeaning, type Palette } from './palette.ts'
@@ -133,12 +133,14 @@ export interface ValidOrder {
   delivery_date: string
   inscription_style: InscriptionStyle
   package: PackageId
-  /** Where it ships (Part C): 'none' for the digital size; otherwise me (the sender hands it over), direct (the receiver's address at checkout) or egift (the receiver types the address). */
+  /** Where it ships: 'none' for the e-gift (sent as a link); otherwise me (the sender hands it over), direct (the receiver's address at checkout) or egift (the receiver types the address). */
   ship_to: ShipTo | 'none'
   /** E-gift only: where to send the one reminder after 7 days. Kept on our side, never sent to Shopify or to a page. */
   sender_email: string | null
-  /** The short message printed on the card when shipping directly or as an e-gift (empty otherwise). */
+  /** The short message shown in the letter (empty when none); printed on the card only when the gift goes to the receiver. */
   gift_message: string
+  /** The day the receiver's envelope can be opened (YYYY-MM-DD, JST), or null = it opens at once. */
+  open_date: string | null
   /** Every character shown for this story, with its slot (see ShownCharacter); always contains the chosen one. */
   shown: ShownCharacter[]
 }
@@ -213,12 +215,25 @@ export function parseOrderRequest(body: unknown, now: Date = new Date(), palette
   const receiver = cleanName(body.receiver_name)
   if (!receiver) return fail('receiver_name', `"receiver_name" must be 1–${NAME_MAX} characters, no control characters`)
 
-  const date = body.delivery_date
-  if (typeof date !== 'string' || !validDate(date)) return fail('delivery_date', '"delivery_date" must be a real date, YYYY-MM-DD')
   const today = todayJst(now)
+  const isEgift = body.package === 'egift'
+  // The desired delivery date belongs to the wooden sizes; the e-gift is delivered at once (or on its opening date), so it needs none.
+  const date = isEgift && (body.delivery_date === undefined || body.delivery_date === null || body.delivery_date === '') ? today : body.delivery_date
+  if (typeof date !== 'string' || !validDate(date)) return fail('delivery_date', '"delivery_date" must be a real date, YYYY-MM-DD')
   if (date < today) return fail('delivery_date', '"delivery_date" is in the past')
   const latest = new Date(new Date(`${today}T00:00:00Z`).getTime() + MAX_DAYS_AHEAD * 86_400_000).toISOString().slice(0, 10)
   if (date > latest) return fail('delivery_date', `"delivery_date" is more than ${MAX_DAYS_AHEAD} days ahead`)
+
+  // The opening date (optional, every size): the day the receiver's envelope can be opened — up to a year ahead. Today or nothing = it opens at once.
+  let open_date: string | null = null
+  if (body.open_date !== undefined && body.open_date !== null && body.open_date !== '') {
+    const od = body.open_date
+    if (typeof od !== 'string' || !validDate(od)) return fail('open_date', '"open_date" must be a real date, YYYY-MM-DD')
+    if (od < today) return fail('open_date', '"open_date" is in the past')
+    const lastDay = new Date(new Date(`${today}T00:00:00Z`).getTime() + OPEN_DATE_MAX_DAYS * 86_400_000).toISOString().slice(0, 10)
+    if (od > lastDay) return fail('open_date', `"open_date" is more than ${OPEN_DATE_MAX_DAYS} days ahead`)
+    open_date = od > today ? od : null
+  }
 
   const style = typeof body.inscription_style === 'string' ? normalizeStyle(lang, body.inscription_style) : body.inscription_style
   if (typeof style !== 'string' || !(STYLES_BY_LANGUAGE[lang] as readonly string[]).includes(style)) {
@@ -230,28 +245,28 @@ export function parseOrderRequest(body: unknown, now: Date = new Date(), palette
     return fail('package', `Invalid "package": expected one of ${PACKAGES.join(' | ')}`)
   }
 
-  // Part C: where the gift goes. The digital size ships nowhere; the others default to the sender (they hand it over). A message only travels with
-  // a gift that goes to the receiver (direct or e-gift): printed on the card, at most 60 characters.
-  let ship_to: ShipTo | 'none' = 'none'
+  // The message (optional, every size): shown in the letter the receiver opens, at most 60 characters. It is printed on the card only when the gift goes to the receiver.
   let gift_message = ''
+  if (body.gift_message !== undefined && body.gift_message !== null) {
+    if (typeof body.gift_message !== 'string') return fail('gift_message', '"gift_message" must be text')
+    const flat = body.gift_message.replace(/\p{Cc}+/gu, ' ').replace(/\s+/g, ' ').trim()
+    if (countChars(flat) > GIFT_MESSAGE_MAX) return fail('gift_message', `"gift_message" is longer than ${GIFT_MESSAGE_MAX} characters`)
+    gift_message = flat
+  }
+  // Where it goes: the e-gift ships nowhere (it is a link); the wooden sizes default to the sender (they hand it over).
+  let ship_to: ShipTo | 'none' = 'none'
   let sender_email: string | null = null
   if (SHIPS[pkg as PackageId]) {
     const raw = body.ship_to === undefined || body.ship_to === null || body.ship_to === '' ? 'me' : body.ship_to
     if (typeof raw !== 'string' || !(SHIP_TO as readonly string[]).includes(raw)) return fail('ship_to', `Invalid "ship_to": expected one of ${SHIP_TO.join(' | ')}`)
     ship_to = raw as ShipTo
-    if (ship_to !== 'me' && body.gift_message !== undefined && body.gift_message !== null) {
-      if (typeof body.gift_message !== 'string') return fail('gift_message', '"gift_message" must be text')
-      const flat = body.gift_message.replace(/\p{Cc}+/gu, ' ').replace(/\s+/g, ' ').trim()
-      if (countChars(flat) > GIFT_MESSAGE_MAX) return fail('gift_message', `"gift_message" is longer than ${GIFT_MESSAGE_MAX} characters`)
-      gift_message = flat
-    }
     if (ship_to === 'egift') {
       const e = typeof body.sender_email === 'string' ? body.sender_email.trim() : ''
       if (!/^[^\s@]{1,64}@[^\s@]{1,190}\.[^\s@]{2,}$/.test(e) || e.length > 254) return fail('sender_email', 'An e-gift needs your e-mail address (for the one reminder if the address is not entered)')
       sender_email = e
     }
   } else if (body.ship_to !== undefined && body.ship_to !== null && body.ship_to !== '' && body.ship_to !== 'none') {
-    return fail('ship_to', 'The digital size is not shipped: "ship_to" does not apply')
+    return fail('ship_to', 'The e-gift is not shipped: "ship_to" does not apply')
   }
 
   const inscription_style = style as InscriptionStyle
@@ -280,6 +295,7 @@ export function parseOrderRequest(body: unknown, now: Date = new Date(), palette
       package: pkg as PackageId,
       ship_to,
       gift_message,
+      open_date,
       sender_email,
       shown: withChosen(parseShown(body.shown_characters), candidate),
     },
@@ -418,11 +434,13 @@ export interface OrderRecord {
     receiver_name: string
     delivery_date: string
     package: PackageId
-    /** The size code (ICHIREI-DIGITAL | -CARD | -SIMPLE | -STANDARD). */
+    /** The size code (ICHIREI-EGIFT | -SIMPLE | -STANDARD; old test orders may carry -DIGITAL or -CARD). */
     size_code?: string
-    /** Where it ships: none (digital) | me | direct | egift, the card message, and the packing flags of a direct gift. */
+    /** Where it ships: none (the e-gift) | me | direct | egift, the message, and the packing flags of a direct gift. */
     ship_to?: ShipTo | 'none'
     gift_message?: string
+    /** The day the receiver's envelope opens (null = at once). */
+    open_date?: string | null
     gift_packaging?: boolean
     no_price_slip?: boolean
     price_jpy: number
@@ -473,6 +491,7 @@ export function buildRecord(order: ValidOrder, orderRef: string, now: Date = new
       size_code: PACKAGE_SKU[order.package],
       ship_to: order.ship_to,
       gift_message: order.gift_message,
+      open_date: order.open_date,
       gift_packaging: order.ship_to === 'direct',
       no_price_slip: order.ship_to === 'direct',
       price_jpy: PACKAGE_PRICE_JPY[order.package],

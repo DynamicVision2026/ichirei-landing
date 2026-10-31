@@ -52,7 +52,7 @@ const parse = (b: unknown) => parseOrderRequest(b, NOW)
 const err = (b: unknown) => { const r = parse(b); return r.ok ? '' : `${r.field}: ${r.error}` }
 
 // ---- packages, certificate, glyph -------------------------------------------------------------
-check('packages: the four sizes — digital ¥2,980, card ¥4,980, simple ¥9,800 and standard ¥18,850 (the Shopify variant prices)', PACKAGES.join() === 'digital,card,simple,standard' && PACKAGE_PRICE_JPY.digital === 2980 && PACKAGE_PRICE_JPY.card === 4980 && PACKAGE_PRICE_JPY.simple === 9800 && PACKAGE_PRICE_JPY.standard === 18850 && formatYen(9800) === '¥9,800' && formatYen(18850) === '¥18,850')
+check('packages: the three sizes — e-gift ¥3,980, simple ¥9,800 and standard ¥18,850 (the Shopify variant prices)', PACKAGES.join() === 'egift,simple,standard' && PACKAGE_PRICE_JPY.egift === 3980 && PACKAGE_PRICE_JPY.simple === 9800 && PACKAGE_PRICE_JPY.standard === 18850 && formatYen(9800) === '¥9,800' && formatYen(18850) === '¥18,850')
 check('certificate ja: 「この字は、あなたの目に映る、その人です。」 — no name in it, no 〇〇 left', certificateText('ja') === 'この字は、あなたの目に映る、その人です。' && !certificateText('ja').includes('〇〇') && !certificateText('ja').includes('様'))
 check('certificate: the same line whatever the sender is called (the sender\'s name no longer appears in it)', (certificateText as (l: string, n: string) => string)('ja', '山田 太郎') === certificateText('ja') && certificateText.length === 1)
 check('certificate zh / en: the character is the person as seen through the sender\'s eyes', certificateText('zh-Hans') === '这个字，是你眼中的那个人。' && certificateText('zh-Hant') === '這個字，是你眼中的那個人。' && certificateText('en') === 'This character is the person as seen through your eyes.' && CERTIFICATE_LINE_EN === certificateText('en'))

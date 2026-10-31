@@ -1,7 +1,7 @@
-// GET /api/sizes — which sizes of the gift can be ordered right now (Part C of the 2026-10-30 ticket).
-//   200 { "sizes": ["simple", "standard", "card", "digital"] }   in the page's display order, only those whose Shopify variant is configured.
-// Public, no input, nothing secret (variant ids are never sent). A size whose variant id is missing (SHOPIFY_VARIANT_DIGITAL / _CARD until
-// the owner creates them in Shopify) is simply absent: the page hides it and /api/order refuses it. Without a Shopify config: { sizes: [] }.
+// GET /api/sizes — which sizes of the gift can be ordered right now.
+//   200 { "sizes": ["egift", "simple", "standard"] }   in the page's display order (left to right), only those whose Shopify variant is configured.
+// Public, no input, nothing secret (variant ids are never sent). A size whose variant id is missing (SHOPIFY_VARIANT_EGIFT until
+// the owner creates the e-gift in Shopify) is simply absent: the page hides it and /api/order refuses it. Without a Shopify config: { sizes: [] }.
 
 import { availableSizes, loadShopifyConfig } from '../engine/shopify.ts'
 import { PACKAGE_DISPLAY_ORDER } from '../src/order/packages.ts'

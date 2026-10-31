@@ -22,7 +22,7 @@ for (const lang of ['ja', 'zh-Hant', 'en']) {
     const ctx = await browser.newContext({ viewport: { width, height } })
     const page = await ctx.newPage()
     await page.route('**/api/gift/RG-shotshotshotshotshot', (r) => r.fulfill({ json: { ...base, id: 'RG-shotshotshotshotshot', token: 'RG-shotshotshotshotshot', certificate_line: d.line, poem: { type: 'tanka', lines: d.poem, reading: '' }, from: d.from, to: d.to, message: d.message, egift: { state: 'waiting', japan_only: false } } }))
-    await page.route('**/api/animation/AN-shotshotshotshotshot', (r) => r.fulfill({ json: { ...base, id: 'AN-shotshotshotshotshot', gift: { url: 'https://ichirei.soul-id.jp/g/RG-shotshotshotshotshot', size_code: 'ICHIREI-CARD', ship_to: 'egift', egift_state: 'waiting' } } }))
+    await page.route('**/api/animation/AN-shotshotshotshotshot', (r) => r.fulfill({ json: { ...base, id: 'AN-shotshotshotshotshot', gift: { url: 'https://ichirei.soul-id.jp/g/RG-shotshotshotshotshot', size_code: 'ICHIREI-SIMPLE', ship_to: 'egift', egift_state: 'waiting' } } }))
     await page.route('**/api/gift/RG-shotshotshotshotshot/qr.svg', (r) => r.fulfill({ status: 200, contentType: 'image/svg+xml', body: '<svg xmlns="http://www.w3.org/2000/svg" width="29" height="29" viewBox="0 0 29 29"><path d="M0 0h7v7H0zM22 0h7v7h-7zM0 22h7v7H0z M9 9h3v3H9z M14 14h4v4h-4z M20 20h3v3h-3z"/></svg>' }))
     await page.goto(`${BASE}/g/RG-shotshotshotshotshot`, { waitUntil: 'networkidle' })
     await page.locator('[data-testid=gift-panel]').waitFor()

@@ -26,7 +26,7 @@ import { createPoemHandler } from './poem.ts'
 import type { Candidate } from '../engine/contract.ts'
 import type { Palette } from '../engine/palette.ts'
 import type { generatePoem } from '../engine/poem.ts'
-import { POEM_TYPES, type PoemType } from '../src/order/packages.ts'
+import { POEM_TYPES, PRINTED_CARD, type PoemType } from '../src/order/packages.ts'
 import type { StoredPoem } from '../engine/order.ts'
 import { AdminTokenCache, loadTrackConfig, readAdminSecret, readSecret, type TrackDeps } from '../engine/track.ts'
 import { loadArtwork } from '../engine/render/artwork.ts'
@@ -116,7 +116,7 @@ const csvCell = (v: unknown) => {
   return /[",\n\r]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s
 }
 
-const SIZE_LABEL: Record<string, string> = { 'ICHIREI-DIGITAL': '① デジタル', 'ICHIREI-CARD': '② カード', 'ICHIREI-SIMPLE': '③ 木札', 'ICHIREI-STANDARD': '④ 版木' }
+const SIZE_LABEL: Record<string, string> = { 'ICHIREI-EGIFT': '一字礼 eギフト', 'ICHIREI-SIMPLE': '木札', 'ICHIREI-STANDARD': '版木', 'ICHIREI-DIGITAL': '（旧）デジタル', 'ICHIREI-CARD': '（旧）カード' }
 const SHIP_LABEL: Record<string, string> = { none: '郵送なし', me: '自分に', direct: '相手に直接', egift: 'eギフト' }
 const sizeOf = (sku: string): PackageId | null => ((Object.entries(PACKAGE_SKU).find(([, v]) => v === sku)?.[0] as PackageId | undefined) ?? null)
 
@@ -217,9 +217,10 @@ async function classify(rows: Row[], d: OpsDeps, env: NodeJS.ProcessEnv, now: Da
   return { verified, rows: rows.map((r) => ({ ...r, win: windowOf(r.record, verified ? (pay.found.get(r.entry.order_ref) ?? null) : 'unverified', now) })) }
 }
 
+/** The sizes whose printed card is made by the owner (木札, 版木). The e-gift's card is a PDF the receiver prints at home; it is never in a print list. */
 const isCardSize = (r: Row) => {
   const s = sizeOf(r.entry.size_code)
-  return !!s && s !== 'digital'
+  return !!s && PRINTED_CARD[s]
 }
 
 /** 製作に進めるもの: the window has closed and the order is not cancelled. */
@@ -258,8 +259,8 @@ export function createOpsHandlers(deps: () => OpsDeps) {
         const size = sizeOf(e.size_code)
         const ops = r.record?.ops
         return `<tr>${common(r)}<td>${esc(addrOf(r))}</td><td>${esc(e.delivery_date)}</td>` +
-          `<td>${size && size !== 'digital' ? `<a href="/ops/card/${esc(e.order_ref)}.pdf">カードPDF</a>` : ''}</td>` +
-          `<td>${ops?.printed_at ? '印刷済み' : size && size !== 'digital' ? `<button name="what" value="printed" data-ref="${esc(e.order_ref)}">印刷した</button>` : ''}</td>` +
+          `<td>${size && PRINTED_CARD[size] ? `<a href="/ops/card/${esc(e.order_ref)}.pdf">カードPDF</a>` : ''}</td>` +
+          `<td>${ops?.printed_at ? '印刷済み' : size && PRINTED_CARD[size] ? `<button name="what" value="printed" data-ref="${esc(e.order_ref)}">印刷した</button>` : ''}</td>` +
           `<td>${ops?.shipped_at ? '発送済み' : size && SHIPS[size] ? `<button name="what" value="shipped" data-ref="${esc(e.order_ref)}">発送した</button>` : ''}</td></tr>`
       }
       const readyTable = (list: Classified[]) =>
@@ -289,12 +290,12 @@ export function createOpsHandlers(deps: () => OpsDeps) {
       }
       const openTable = (list: Classified[]) =>
         `<div class="wide"><table class="openT"><thead><tr><th>注文番号</th><th>サイズ</th><th>偲ぶ</th><th>状態</th><th>操作</th></tr></thead><tbody>${list.map(openLine).join('') || '<tr><td colspan="5">なし</td></tr>'}</tbody></table></div>`
-      const otherLine = (r: Classified) => `<tr class="inwindow">${common(r)}<td>${r.win.phase === 'cancelled' ? 'キャンセル' : '入金を確認できません'}</td></tr>`
+      const otherLine = (r: Classified) => `<tr class="inwindow">${common(r)}<td>${r.win.phase === 'cancelled' ? 'キャンセル' : r.win.phase === 'unpaid' ? '入金を確認できません' : '製作なし（eギフトなど）'}</td></tr>`
       const otherTable = (list: Classified[]) =>
         `<div class="wide"><table><thead><tr><th>注文番号</th><th>サイズ</th><th>偲ぶ</th><th>お届け</th><th>状態</th></tr></thead><tbody>${list.map(otherLine).join('') || '<tr><td colspan="5">なし</td></tr>'}</tbody></table></div>`
-      const readyRows = rows.filter(ready)
+      const readyRows = rows.filter((r) => ready(r) && isCardSize(r))
       const openRows = rows.filter((r) => r.win.phase === 'open')
-      const otherRows = rows.filter((r) => r.win.phase === 'cancelled' || r.win.phase === 'unpaid')
+      const otherRows = rows.filter((r) => r.win.phase === 'cancelled' || r.win.phase === 'unpaid' || (ready(r) && !isCardSize(r)))
       const html = `<!doctype html><html lang="ja"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="robots" content="noindex,nofollow"><title>ICHIREI ops</title>` +
         `<style>body{font:15px/1.6 system-ui,'Hiragino Sans',sans-serif;margin:1.2rem;color:#2a221b;background:#efe6d2}table{border-collapse:collapse;width:100%;background:#fff}th,td{border:1px solid #d7ccb4;padding:.35rem .5rem;text-align:left;white-space:nowrap}.wide{overflow-x:auto}a,button{color:#2a221b}button{cursor:pointer}h1,h2{font-weight:600}.bar a,.bar button{margin-right:.8rem}tr.inwindow td{color:#8a8070;background:#f4efe3}tr.inwindow summary{cursor:pointer;color:#2a221b}.chg{white-space:normal;min-width:30rem;color:#2a221b}.chg p{margin:.4rem 0}.note{background:#fff;border:1px solid #d7ccb4;padding:.5rem .8rem}.log{font-size:.85rem}</style></head><body>` +
         `<h1>ICHIREI 注文</h1>` +
@@ -303,7 +304,7 @@ export function createOpsHandlers(deps: () => OpsDeps) {
         `<p class="bar"><a href="/ops/cards/today.pdf">製作に進めるカードをまとめてPDF</a><a href="/ops/wooden-today.csv">製作に進める木札・版木 CSV</a><button id="egift-run">eギフトの確認を今すぐ実行</button></p>` +
         `<h2>製作に進めるもの（${readyRows.length}）</h2>${readyTable(readyRows)}` +
         `<h2>変更受付中（${openRows.length}）</h2>${openTable(openRows)}` +
-        `<h2>そのほか（キャンセル・入金未確認 ${otherRows.length}）</h2>${otherTable(otherRows)}` +
+        `<h2>そのほか（キャンセル・入金未確認・製作なし ${otherRows.length}）</h2>${otherTable(otherRows)}` +
         `<p>${flagged.length ? `⚠ 住所が30日たっても入力されていないeギフト: ${flagged.length}件（自動の返金はしません。ご判断ください）` : ''}</p>` +
         `<script>document.addEventListener('click',async(e)=>{const b=e.target.closest('button');if(!b)return;if(b.id==='egift-run'){const r=await fetch('/ops/egift/run',{method:'POST'});alert(await r.text());return}` +
         `const act=b.dataset.act;if(act){const box=b.closest('.chg');const f=(n)=>box.querySelector('[name='+n+']');if(act==='cancel'&&!confirm('この注文をキャンセルとして記録します。製作の対象から外れます。よろしいですか？'))return;` +
@@ -320,7 +321,7 @@ export function createOpsHandlers(deps: () => OpsDeps) {
       const { rows } = await classify((await loadRows(store, lastDays(now, 60))).filter((r) => r.entry.order_ref === ref).slice(-1), d, env, now)
       const row = rows.at(-1)
       const size = row ? sizeOf(row.entry.size_code) : null
-      if (!row || !size || size === 'digital') return jsonRes(404, { error: 'not_found' })
+      if (!row || !size || !PRINTED_CARD[size]) return jsonRes(404, { error: 'not_found' })
       // nothing is made before the change window closes, and nothing for a cancelled order
       if (row.win.phase === 'open') return jsonRes(409, { error: 'まだ変更受付中です（支払いから24時間は製作しません）', code: 'window_open', ends_at: row.win.ends_at })
       if (row.win.phase !== 'closed') return jsonRes(409, { error: 'キャンセル済み、または入金を確認できない注文です', code: row.win.phase })

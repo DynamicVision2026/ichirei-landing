@@ -114,7 +114,7 @@ export function SenderPanel({ view, lang }: { view: AnimationView; lang: PageLan
   const [qr, setQr] = useState(false)
   if (!g) return null
   const token = g.url.split('/g/')[1] ?? ''
-  const size = Object.entries({ digital: 'ICHIREI-DIGITAL', card: 'ICHIREI-CARD', simple: 'ICHIREI-SIMPLE', standard: 'ICHIREI-STANDARD' }).find(([, sku]) => sku === g.size_code)?.[0] as PackageId | undefined
+  const size = Object.entries({ egift: 'ICHIREI-EGIFT', simple: 'ICHIREI-SIMPLE', standard: 'ICHIREI-STANDARD' }).find(([, sku]) => sku === g.size_code)?.[0] as PackageId | undefined
   const sc = SIZE_COPY[toUi(lang)]
   const message = `${c.shareText}\n${g.url}`
   const ship = g.ship_to === 'none' ? c.shipNone : g.ship_to === 'direct' ? c.shipDirect : g.ship_to === 'egift' ? c.shipEgift : c.shipMe

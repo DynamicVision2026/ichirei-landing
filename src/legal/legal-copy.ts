@@ -29,7 +29,7 @@ export interface LegalCopy {
   note: string
 }
 
-const y = (id: 'digital' | 'card' | 'simple' | 'standard') => formatYen(PACKAGE_PRICE_JPY[id])
+const y = (id: 'egift' | 'simple' | 'standard') => formatYen(PACKAGE_PRICE_JPY[id])
 
 export const LEGAL: Record<RevealLang, LegalCopy> = {
   ja: {
@@ -43,11 +43,11 @@ export const LEGAL: Record<RevealLang, LegalCopy> = {
       { label: '電話番号', value: PLACEHOLDER },
       { label: 'メールアドレス', value: PLACEHOLDER },
       { label: '販売URL', value: 'https://ichirei.soul-id.jp' },
-      { label: '販売価格', value: `① デジタル ${y('digital')} ／ ② カード ${y('card')} ／ ③ 木札 ${y('simple')} ／ ④ 版木 ${y('standard')}（いずれも税込）` },
-      { label: '商品代金以外の必要料金', value: `日本国内への送料は無料です。海外へのお届け（③ 木札・④ 版木）は EMS ¥6,000。② カードの送料: ${PLACEHOLDER}。デジタルに送料はかかりません。` },
+      { label: '販売価格', value: `一字礼 eギフト ${y('egift')} ／ 木札 ${y('simple')} ／ 版木 ${y('standard')}（いずれも税込）` },
+      { label: '商品代金以外の必要料金', value: '日本国内への送料は無料です。海外へのお届け（木札・版木）は EMS ¥6,000。eギフトは郵送がなく、送料はかかりません。' },
       { label: 'お支払い方法', value: `ご注文手続きの画面（Shopify）に表示される方法。${PLACEHOLDER}` },
       { label: 'お支払い時期', value: PLACEHOLDER },
-      { label: '商品のお届け時期', value: `ご注文時に指定した希望日に合わせて製作・発送します（製作はご注文から24時間の変更受付期間のあとに始まります）。製作・発送にかかる日数: ${PLACEHOLDER}。デジタルは、お支払い後すぐにギフトページをお使いいただけます。` },
+      { label: '商品のお届け時期', value: `eギフト: お支払い後すぐ（開封日を指定した場合はその日）。木札・版木: ご注文時に指定した希望日に合わせて製作・発送します（製作はご注文から24時間の変更受付期間のあとに始まります）。製作・発送にかかる日数: ${PLACEHOLDER}。` },
     ],
     returnsTitle: '返品・交換・キャンセルについて',
     returns: [
@@ -55,7 +55,7 @@ export const LEGAL: Record<RevealLang, LegalCopy> = {
       'ご注文から24時間以内であれば、ご注文時に表示された他の字への変更、名入れ・メッセージの修正、詩の形式の変更（1回）、またはキャンセル（全額返金）を承ります。ご注文確認メールにご返信ください。',
       '24時間を過ぎたお客様都合による変更・返品・返金はお受けできません。',
       '商品の破損、誤った字・誤印刷など当方の不備があった場合は、お届けから14日以内にご連絡ください。作り直し、または返金いたします。',
-      'デジタル商品は、ギフトページのお届け後の返金はいたしかねます（正常に表示されない場合を除きます）。',
+      'eギフトは、ギフトページのお届け後の返金はいたしかねます（正常に表示されない場合を除きます）。',
     ],
     faqTitle: 'よくあるご質問',
     faq: [
@@ -77,11 +77,11 @@ export const LEGAL: Record<RevealLang, LegalCopy> = {
       { label: '電話號碼', value: PLACEHOLDER },
       { label: '電子郵件', value: PLACEHOLDER },
       { label: '販售網址', value: 'https://ichirei.soul-id.jp' },
-      { label: '售價', value: `① 數位版 ${y('digital')} ／ ② 卡片 ${y('card')} ／ ③ 木牌 ${y('simple')} ／ ④ 版木 ${y('standard')}（皆含稅）` },
-      { label: '商品價款以外的費用', value: `寄往日本國內免運費。寄往海外（③ 木牌、④ 版木）為 EMS ¥6,000。② 卡片的運費：${PLACEHOLDER}。數位版無運費。` },
+      { label: '售價', value: `一字禮 e 禮物 ${y('egift')} ／ 木牌 ${y('simple')} ／ 版木 ${y('standard')}（皆含稅）` },
+      { label: '商品價款以外的費用', value: '寄往日本國內免運費。寄往海外（木牌、版木）為 EMS ¥6,000。e 禮物不郵寄，無運費。' },
       { label: '付款方式', value: `訂購流程畫面（Shopify）所顯示的方式。${PLACEHOLDER}` },
       { label: '付款時間', value: PLACEHOLDER },
-      { label: '交付時間', value: `依訂購時指定的希望日製作並寄出（下單後有 24 小時的更換受理期間，之後才開始製作）。製作與寄送所需天數：${PLACEHOLDER}。數位版付款後即可使用禮物頁面。` },
+      { label: '交付時間', value: `e 禮物：付款後立即送達（若指定了開封日，則於當天開啟）。木牌、版木：依訂購時指定的希望日製作並寄出（下單後有 24 小時的更換受理期間，之後才開始製作）。製作與寄送所需天數：${PLACEHOLDER}。` },
     ],
     returnsTitle: '退貨、更換與取消',
     returns: [
@@ -89,7 +89,7 @@ export const LEGAL: Record<RevealLang, LegalCopy> = {
       '下單後 24 小時內，可更換為訂購時顯示過的其他字、修正署名與訊息、變更詩的形式（限 1 次），或取消訂單（全額退款）。請回覆訂單確認信。',
       '超過 24 小時，因顧客個人因素的更換、退貨與退款，恕不受理。',
       '商品破損、字錯或印刷錯誤等屬於我方的疏失，請於收到商品後 14 天內聯絡我們，我們會重新製作或退款。',
-      '數位商品在禮物頁面送達後恕不退款（頁面無法正常顯示時除外）。',
+      'e 禮物在禮物頁面送達後恕不退款（頁面無法正常顯示時除外）。',
     ],
     faqTitle: '常見問題',
     faq: [
@@ -111,11 +111,11 @@ export const LEGAL: Record<RevealLang, LegalCopy> = {
       { label: 'Telephone', value: PLACEHOLDER },
       { label: 'E-mail', value: PLACEHOLDER },
       { label: 'Site', value: 'https://ichirei.soul-id.jp' },
-      { label: 'Prices', value: `① Digital ${y('digital')} · ② Card ${y('card')} · ③ Wooden tag ${y('simple')} · ④ Carved block ${y('standard')} (all tax included)` },
-      { label: 'Other charges', value: `Shipping inside Japan is free. Shipping abroad (③ and ④) is EMS ¥6,000. ② Card shipping: ${PLACEHOLDER}. Digital has no shipping.` },
+      { label: 'Prices', value: `ICHIREI e-gift ${y('egift')} · Wooden tag ${y('simple')} · Carved block ${y('standard')} (all tax included)` },
+      { label: 'Other charges', value: 'Shipping inside Japan is free. Shipping abroad (wooden tag and carved block) is EMS ¥6,000. The e-gift is not posted, so it has no shipping.' },
       { label: 'Payment methods', value: `The methods shown at checkout (Shopify). ${PLACEHOLDER}` },
       { label: 'When you pay', value: PLACEHOLDER },
-      { label: 'Delivery', value: `Made and shipped for the date you choose when you order (making starts after the 24-hour change window). Days to make and ship: ${PLACEHOLDER}. The digital gift page works as soon as you have paid.` },
+      { label: 'Delivery', value: `E-gift: right after you pay (on the day you chose, if you set an opening date). Wooden tag and carved block: made and shipped for the date you choose when you order (making starts after the 24-hour change window). Days to make and ship: ${PLACEHOLDER}.` },
     ],
     returnsTitle: 'Returns, changes and cancellation',
     returns: [
@@ -123,7 +123,7 @@ export const LEGAL: Record<RevealLang, LegalCopy> = {
       'Within 24 hours of your order you can switch to another character you were shown when you ordered, correct the names and message, change the poem format (once), or cancel for a full refund. Please reply to your order confirmation e-mail.',
       'After 24 hours we cannot accept changes, returns or refunds for personal reasons.',
       'If something is our fault — a damaged piece, the wrong character, a misprint — tell us within 14 days of delivery and we will remake it or refund you.',
-      'Digital orders are not refundable once the gift page has been delivered, unless it does not work.',
+      'The e-gift is not refundable once the gift page has been delivered, unless it does not work.',
     ],
     faqTitle: 'Questions',
     faq: [

@@ -37,7 +37,7 @@ const webp = async (c: string) => sharp({ create: { width: 1080, height: 1350, c
 /** One order, fully stored: the order record, the film, the receiver's gift, four pictures. */
 async function addOrder(store: MemoryOrderStore, over: Record<string, unknown>, ref: string, slots: ('ai' | 'washi')[] = ['ai', 'ai', 'ai', 'ai'], memorial = false) {
   const body = orderBody(over) as Record<string, unknown>
-  if (body.package === 'digital') delete body.ship_to
+  if (body.package === 'egift') delete body.ship_to
   if (memorial) (body.engine_result as { occasion: string }).occasion = 'memorial'
   const p = parseOrderRequest(body, NOW)
   if (!p.ok) throw new Error(p.error)
@@ -120,8 +120,8 @@ check('(3) the QR code points to the RECEIVER\'s page, never the sender\'s', wor
 const opsStore = new MemoryOrderStore()
 await addOrder(opsStore, { package: 'standard', ship_to: 'me' }, 'IC-20261023-STANDARD')
 const o2 = await addOrder(opsStore, { package: 'simple', ship_to: 'egift', sender_email: 'taro@example.com' }, 'IC-20261023-SIMPLEEG')
-await addOrder(opsStore, { package: 'card', ship_to: 'direct', gift_message: '=HYPERLINK("x")' }, 'IC-20261023-CARDDIR1')
-await addOrder(opsStore, { package: 'digital' }, 'IC-20261023-DIGITAL1', undefined, true)
+await addOrder(opsStore, { package: 'simple', ship_to: 'direct', gift_message: '=HYPERLINK("x")' }, 'IC-20261023-CARDDIR1')
+await addOrder(opsStore, { package: 'egift' }, 'IC-20261023-DIGITAL1', undefined, true)
 const O = createOpsHandlers(() => ({ store: opsStore, env: ENV, now: () => LATER, mailer: async () => true }))
 const req = (path: string, init: RequestInit & { auth?: string } = {}) => new Request(`https://ichirei.soul-id.jp${path}`, { ...init, headers: { ...(init.auth ? { authorization: `Basic ${Buffer.from(init.auth).toString('base64')}` } : {}), ...(init.headers as Record<string, string> | undefined) } })
 const good = 'owner:correct horse'
@@ -140,7 +140,7 @@ for (const [name, call] of [['card', () => O.card(req('/ops/card/IC-20261023-STA
 }
 check('(4) every other /ops route is also refused without the password (card, cards today, csv, mark, e-gift run)', true)
 const page = await (await O.page(req('/ops', { auth: good }))).text()
-check('(4) the list: today\'s orders with order number, size, remembrance, where it goes, address status — never a story, a name, an e-mail or an address', ['IC-20261023-STANDARD', 'IC-20261023-SIMPLEEG', 'IC-20261023-CARDDIR1', 'IC-20261023-DIGITAL1', '④ 版木', '③ 木札', '② カード', '① デジタル', '入力待ち', '偲ぶ'].every((k) => page.includes(k)) && !page.includes('口下手') && !page.includes('山田') && !page.includes('taro@example.com') && /robots/.test(page))
+check('(4) the list: today\'s orders with order number, size, remembrance, where it goes, address status — never a story, a name, an e-mail or an address', ['IC-20261023-STANDARD', 'IC-20261023-SIMPLEEG', 'IC-20261023-CARDDIR1', 'IC-20261023-DIGITAL1', '版木', '木札', '一字礼 eギフト', '入力待ち', '偲ぶ'].every((k) => page.includes(k)) && !page.includes('口下手') && !page.includes('山田') && !page.includes('taro@example.com') && /robots/.test(page))
 check('(4) a card PDF button for every size that is printed (not the digital one); printed / shipped buttons', page.includes('/ops/card/IC-20261023-STANDARD.pdf') && page.includes('/ops/card/IC-20261023-CARDDIR1.pdf') && !page.includes('/ops/card/IC-20261023-DIGITAL1.pdf') && page.includes('data-ref="IC-20261023-STANDARD"'))
 const cardRes = await O.card(req('/ops/card/IC-20261023-STANDARD.pdf', { auth: good }), 'IC-20261023-STANDARD')
 check('(4) one order\'s card as a print-ready PDF (2 pages); the digital size has none (404)', cardRes.status === 200 && cardRes.headers.get('content-type') === 'application/pdf' && ((await cardRes.arrayBuffer()).byteLength > 20000) && (await O.card(req('/ops/card/IC-20261023-DIGITAL1.pdf', { auth: good }), 'IC-20261023-DIGITAL1')).status === 404 && (await O.card(req('/ops/card/IC-00000000-NOPE0000.pdf', { auth: good }), 'IC-00000000-NOPE0000')).status === 404)
@@ -151,7 +151,7 @@ await opsStore.put(o2.token, { ...o2.gift, egift: { ...o2.gift.egift!, state: 'r
 const csvRes = await O.woodenCsv(req('/ops/wooden-today.csv', { auth: good }))
 const csv = await csvRes.text()
 const lines = csv.replace(/^﻿/, '').trim().split('\r\n')
-check('(4) the CSV for the workshop: today\'s WOODEN orders only (③ and ④ — not the card or the digital one), with the character to carve, remembrance, where it goes, gift packaging and no price slip', csvRes.headers.get('content-type')?.startsWith('text/csv') === true && lines[0].split(',').join() === 'order_ref,size,character_to_carve,remembrance,ship_to,recipient_name,country,postal,region,address,phone,address_source,gift_packaging,no_price_slip,payment' && lines.length === 3 && lines.some((l) => l.startsWith('IC-20261023-STANDARD,④ 版木,')) && lines.some((l) => l.startsWith('IC-20261023-SIMPLEEG,③ 木札,')) && !csv.includes('IC-20261023-CARDDIR1') && !csv.includes('IC-20261023-DIGITAL1'))
+check('(4) the CSV for the workshop: today\'s WOODEN orders only (木札 and 版木 — never the e-gift), with the character to carve, remembrance, where it goes, gift packaging and no price slip', csvRes.headers.get('content-type')?.startsWith('text/csv') === true && lines[0].split(',').join() === 'order_ref,size,character_to_carve,remembrance,ship_to,recipient_name,country,postal,region,address,phone,address_source,gift_packaging,no_price_slip,payment' && lines.length === 4 && lines.some((l) => l.startsWith('IC-20261023-STANDARD,版木,')) && lines.some((l) => l.startsWith('IC-20261023-SIMPLEEG,木札,')) && lines.some((l) => l.startsWith('IC-20261023-CARDDIR1,木札,')) && !csv.includes('IC-20261023-DIGITAL1'))
 const egRow = lines.find((l) => l.startsWith('IC-20261023-SIMPLEEG'))!
 check('(4) an e-gift row carries the receiver\'s name and address as they typed them; an order shipped by Shopify says its address is at the Shopify checkout', egRow.includes('山田 花子') && egRow.includes('150-0001') && egRow.includes('渋谷区神宮前1-2-3 コーポA') && egRow.includes('e-gift form') && lines.find((l) => l.startsWith('IC-20261023-STANDARD'))!.includes('look it up in Shopify'))
 await addOrder(opsStore, { package: 'simple', ship_to: 'direct', gift_message: '=HYPERLINK("http://evil")' }, 'IC-20261023-SIMPLEDI', undefined)
@@ -164,9 +164,9 @@ check('(4) a direct gift is marked gift packaging + no price slip; the CSV never
   const ok = await (await withShop(async () => ({ found: new Map([['IC-20261023-STANDARD', addr]]), failure: null })).woodenCsv(req('/ops/wooden-today.csv', { auth: good }))).text()
   const stdRow = ok.split('\r\n').find((l) => l.startsWith('IC-20261023-STANDARD'))!
   const diRow = ok.split('\r\n').find((l) => l.startsWith('IC-20261023-SIMPLEDI'))!
-  check('(4) "send to me" / "send directly": the CSV carries the Shopify checkout address (name, country, postal, region, address, phone) read through the Tracking app; only those two orders are asked about, never the e-gift', stdRow.includes('山田 花子') && stdRow.includes('150-0001') && stdRow.includes('渋谷区 神宮前1-2-3') && stdRow.includes('090-1111-2222') && stdRow.includes(',Shopify checkout address,') && asked.sort().join() === 'IC-20261023-SIMPLEDI,IC-20261023-STANDARD' && diRow.includes('order not found'))
+  check('(4) "send to me" / "send directly": the CSV carries the Shopify checkout address (name, country, postal, region, address, phone) read through the Tracking app; only those two orders are asked about, never the e-gift', stdRow.includes('山田 花子') && stdRow.includes('150-0001') && stdRow.includes('渋谷区 神宮前1-2-3') && stdRow.includes('090-1111-2222') && stdRow.includes(',Shopify checkout address,') && asked.sort().join() === 'IC-20261023-CARDDIR1,IC-20261023-SIMPLEDI,IC-20261023-STANDARD' && diRow.includes('order not found'))
   const denied = await (await withShop(async () => ({ found: new Map(), failure: 'protected_customer_data' })).woodenCsv(req('/ops/wooden-today.csv', { auth: good }))).text()
-  check('(4) when Shopify refuses the address (protected customer data), the CSV still downloads and says exactly what is needed — nothing is guessed, nothing is written to Shopify', denied.includes('protected customer data access (name, address, phone)') && denied.split('\r\n').filter((l) => l.startsWith('IC-')).length === 3)
+  check('(4) when Shopify refuses the address (protected customer data), the CSV still downloads and says exactly what is needed — nothing is guessed, nothing is written to Shopify', denied.includes('protected customer data access (name, address, phone)') && denied.split('\r\n').filter((l) => l.startsWith('IC-')).length === 4)
   const eg = await (await withShop(async () => ({ found: new Map(), failure: null })).woodenCsv(req('/ops/wooden-today.csv', { auth: good }))).text()
   check('(4) the e-gift row keeps the address from our own form and is not looked up at Shopify', eg.split('\r\n').find((l) => l.startsWith('IC-20261023-SIMPLEEG'))!.includes('e-gift form') && !asked.includes('IC-20261023-SIMPLEEG'))
 }

@@ -97,7 +97,8 @@ export default function OrderForm({ result, story, followUps = [], promptQuestio
   const cert = certificateText(language)
   const senderOk = sender.trim() !== '' && [...sender.trim()].length <= NAME_MAX
   const receiverOk = receiver.trim() !== '' && [...receiver.trim()].length <= NAME_MAX
-  const dateOk = /^\d{4}-\d{2}-\d{2}$/.test(date) && date >= today
+  // the e-gift is delivered at once (or on its opening date), so only the wooden sizes ask for a desired delivery date
+  const dateOk = pkg === 'egift' || (/^\d{4}-\d{2}-\d{2}$/.test(date) && date >= today)
   // (switching the carved form can make Simple unavailable after it was picked: the Standard set is then the only choice)
   if (pkg === 'simple' && !simpleOk) setTimeout(() => setPkg(''), 0)
   const onSale = pkg !== '' && (sizes ?? []).includes(pkg)
@@ -124,7 +125,7 @@ export default function OrderForm({ result, story, followUps = [], promptQuestio
           language,
           sender_name: sender,
           receiver_name: receiver,
-          delivery_date: date,
+          ...(pkg !== 'egift' ? { delivery_date: date } : {}),
           inscription_style: style,
           package: pkg,
           ...(SHIPS[pkg as PackageId] ? { ship_to: shipTo, ...(shipTo !== 'me' && giftMessage.trim() ? { gift_message: giftMessage.trim() } : {}), ...(shipTo === 'egift' ? { sender_email: senderEmail.trim() } : {}) } : {}),
@@ -243,6 +244,7 @@ export default function OrderForm({ result, story, followUps = [], promptQuestio
               placeholder={memorial ? copy.memorial.receiverPlaceholder : o.receiverPlaceholder}
             />
           </div>
+          {pkg !== 'egift' && (
           <div>
             <label className="clab" htmlFor="delivery_date">{o.dateLabel}</label>
             <input
@@ -255,6 +257,7 @@ export default function OrderForm({ result, story, followUps = [], promptQuestio
             />
             {dateOk && <span className="sent block">{o.dateNotice(daysUntil(date))}</span>}
           </div>
+          )}
         </div>
 
         <fieldset className="cgroup">
@@ -268,7 +271,7 @@ export default function OrderForm({ result, story, followUps = [], promptQuestio
                   <span className="pkgName">
                     {o.packages[id]}
                     {id === RECOMMENDED_PACKAGE && <span className="badge" data-badge="recommended">{sc.recommended}</span>}
-                    {id === 'digital' && !memorial && <span className="badge quiet" data-badge="now">{sc.sendNow}</span>}
+                    {id === 'egift' && !memorial && <span className="badge quiet" data-badge="now">{sc.sendNow}</span>}
                   </span>
                   <span className="pkgPrice" data-price={id}>
                     {formatYen(PACKAGE_PRICE_JPY[id])}
@@ -282,7 +285,7 @@ export default function OrderForm({ result, story, followUps = [], promptQuestio
             })}
           </div>
           {memorial && <p className="sent" data-memorial-sizes>{sc.memorialNote}</p>}
-          {pkg === 'digital' && <p className="sent" data-digital-note>{memorial ? sc.digitalNoteMemorial : sc.digitalNote}</p>}
+          {pkg === 'egift' && <p className="sent" data-egift-note>{memorial ? sc.egiftNoteMemorial : sc.egiftNote}</p>}
           {(pkg === '' || WOODEN[pkg]) && (
             <p data-shipping className="sent">
               {o.shippingNote}

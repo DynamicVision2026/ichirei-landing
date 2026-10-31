@@ -203,7 +203,7 @@ paidAt['IC-20261023-CLOSED01'] = paid(-30) // paid 30 hours before T0 → at T0+
   const csv = await (await O.woodenCsv(req('/ops/wooden-today.csv'))).text()
   check('(8) CANCEL: the order is flagged (our record only), logged, and gone from the workshop CSV and the print list — the page says the refund is made in Shopify', r.status === 200 && !!after.ops?.cancelled_at && after.ops?.log?.at(-1)?.action === 'cancel' && !csv.includes('IC-20261023-INWINDOW'))
   const page = await (await O.page(req('/ops'))).text()
-  check('(8) …it moves to "そのほか（キャンセル…）" and shows no actions any more', /そのほか（キャンセル・入金未確認 [1-9]/.test(page) && !/data-ref="IC-20261023-INWINDOW"/.test(page.replace(/<tr class="inwindow"><td>IC-20261023-INWINDOW[\s\S]*?<\/tr>/, '')) )
+  check('(8) …it moves to "そのほか（キャンセル…）" and shows no actions any more', /そのほか（キャンセル・入金未確認・製作なし [1-9]/.test(page) && !/data-ref="IC-20261023-INWINDOW"/.test(page.replace(/<tr class="inwindow"><td>IC-20261023-INWINDOW[\s\S]*?<\/tr>/, '')) )
   const again = await change({ order_ref: 'IC-20261023-INWINDOW', action: 'cancel' })
   check('(8) a cancelled order accepts no further change (409), and the flag is not set twice', again.status === 409 && again.json.code === 'cancelled')
   const cards = await O.card(req('/ops/card/IC-20261023-INWINDOW.pdf'), 'IC-20261023-INWINDOW')

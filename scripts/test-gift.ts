@@ -25,7 +25,7 @@ const GOLDEN = JSON.parse(readFileSync(join(process.cwd(), 'scripts', 'golden-fi
 const clone = <T,>(x: T): T => JSON.parse(JSON.stringify(x))
 const NOW = new Date('2026-10-23T03:00:00Z')
 const STORY = '父は口下手で厳しくて、駅まで送ってくれて、盆に帰るたびに車で駅まで迎えに来て、帰りも必ず送ってくれる。'
-const body = (over: Record<string, unknown> = {}) => ({ story: STORY, engine_result: clone(GOLDEN), selected_kanji: '証', language: 'ja', sender_name: '山田 太郎', receiver_name: '山田 一郎', delivery_date: '2026-12-01', inscription_style: 'kyujitai', package: 'card', ship_to: 'egift', sender_email: 'taro@example.com', gift_message: 'いつも、ありがとう。', ...over })
+const body = (over: Record<string, unknown> = {}) => ({ story: STORY, engine_result: clone(GOLDEN), selected_kanji: '証', language: 'ja', sender_name: '山田 太郎', receiver_name: '山田 一郎', delivery_date: '2026-12-01', inscription_style: 'kyujitai', package: 'simple', ship_to: 'egift', sender_email: 'taro@example.com', gift_message: 'いつも、ありがとう。', ...over })
 
 // ---- a gift built the way /api/order builds it -------------------------------------------------------------------------------------------------
 const store = new MemoryOrderStore()
@@ -63,11 +63,11 @@ check('(1) POST /api/gift/<token>/render answers with the receiver\'s view (the 
 
 // ---- 2. the sender's page: what to share and where the order stands -----------------------------------------------------------------------------
 const sv = (await (await A.view(animId)).json()) as { gift?: { url: string; size_code: string; ship_to: string; egift_state: string | null }; id: string }
-check('(2) the sender\'s page view carries the receiver link, the size code, where it goes and the e-gift state — and no price or names', !!sv.gift && sv.gift.url === giftUrl(token) && sv.gift.size_code === 'ICHIREI-CARD' && sv.gift.ship_to === 'egift' && sv.gift.egift_state === 'waiting' && !JSON.stringify(sv).includes('山田') && !/¥|price/.test(JSON.stringify(sv)))
+check('(2) the sender\'s page view carries the receiver link, the size code, where it goes and the e-gift state — and no price or names', !!sv.gift && sv.gift.url === giftUrl(token) && sv.gift.size_code === 'ICHIREI-SIMPLE' && sv.gift.ship_to === 'egift' && sv.gift.egift_state === 'waiting' && !JSON.stringify(sv).includes('山田') && !/¥|price/.test(JSON.stringify(sv)))
 
 // ---- 3. the e-gift address -------------------------------------------------------------------------------------------------------------------------
 const addr = { name: '山田 一郎', country: 'JP', postal: '1500001', region: '東京都', line1: '渋谷区神宮前1-2-3', line2: 'コーポA 201', phone: '03-1234-5678' }
-check('(3) the receiver sees the e-gift state: waiting, and whether the size is Japan only (card: worldwide)', view.egift?.state === 'waiting' && view.egift.japan_only === false)
+check('(3) the receiver sees the e-gift state: waiting, and whether the size is Japan only (the wooden sizes are)', view.egift?.state === 'waiting' && view.egift.japan_only === true)
 const bad = await H.address(token, { ...addr, phone: 'x' })
 check('(3) a bad address is refused with the field named: 400 on phone; nothing is stored', bad.status === 400 && ((await bad.json()) as { field: string }).field === 'phone' && ((await store.get(token)) as GiftRecord).egift?.state === 'waiting')
 const okRes = await H.address(token, addr)
@@ -78,7 +78,7 @@ const sv2 = JSON.stringify(await (await A.view(animId)).json())
 check('(3) the address is returned by NO call: not in the receiver\'s view, not in the sender\'s page — the sender only sees "received"', !view2.includes('渋谷') && !view2.includes('03-1234') && !sv2.includes('渋谷') && !sv2.includes('03-1234') && JSON.parse(view2).egift.state === 'received' && JSON.parse(sv2).gift.egift_state === 'received')
 check('(3) a second submission is refused (409 already_received) and does not overwrite', (await H.address(token, { ...addr, name: '別の人' })).status === 409 && ((await store.get(token)) as GiftRecord).egift?.address?.name === '山田 一郎')
 check('(3) an ordinary gift (not an e-gift) takes no address: 409 not_egift', await (async () => { const p = parseOrderRequest(body({ ship_to: 'direct', sender_email: undefined }), NOW); if (!p.ok) return false; const t = newGiftToken(); await store.put(t, buildGiftRecord(buildRecord(p.order, 'IC-20261023-ZZZZZZZZ', NOW), animId, t, null, NOW)); return (await H.address(t, addr)).status === 409 })())
-check('(3) e-gift of the wooden sizes is Japan only; the card ships worldwide; Japan format is checked (7-digit postal code, prefecture)', !checkAddress({ ...addr, country: 'US', postal: '10001' }, 'simple').ok && !checkAddress({ ...addr, country: 'US', postal: '10001' }, 'standard').ok && checkAddress({ ...addr, country: 'US', postal: '10001', region: 'NY' }, 'card').ok && !checkAddress({ ...addr, postal: '12' }, 'card').ok && !checkAddress({ ...addr, region: '' }, 'card').ok && !checkAddress({ ...addr, name: '' }, 'card').ok)
+check('(3) entering the receiver\'s address for the wooden sizes is Japan only; the Japan format is checked (7-digit postal code, prefecture, name)', !checkAddress({ ...addr, country: 'US', postal: '10001' }, 'simple').ok && !checkAddress({ ...addr, country: 'US', postal: '10001' }, 'standard').ok && !checkAddress({ ...addr, postal: '12' }, 'simple').ok && !checkAddress({ ...addr, region: '' }, 'simple').ok && !checkAddress({ ...addr, name: '' }, 'standard').ok)
 
 // ---- 4. 7-day reminder, 30-day flag, 90-day clean-up ---------------------------------------------------------------------------------------------
 const waiting = gift
@@ -93,7 +93,7 @@ check('(4) the receiver\'s address is deleted 90 days after the order ships (not
   const mem = new MemoryOrderStore()
   const carts: { variables: { input: { lines: { attributes: { key: string; value: string }[] }[] } } }[] = []
   const fetchImpl = (async (_u: string, init: RequestInit) => { carts.push(JSON.parse(String(init.body))); return new Response(JSON.stringify({ data: { cartCreate: { cart: { id: 'gid://shopify/Cart/x', checkoutUrl: 'https://soul-id-2.myshopify.com/cart/c/x' }, userErrors: [] } } }), { status: 200 }) }) as typeof fetch
-  const deps = (): OrderDeps => ({ store: mem, shopify: loadShopifyConfig({ SHOPIFY_STOREFRONT_TOKEN: 't', SHOPIFY_VARIANT_SIMPLE: '1', SHOPIFY_VARIANT_STANDARD: '2', SHOPIFY_VARIANT_CARD: '3' } as NodeJS.ProcessEnv).config, shopifyMissing: [], now: () => NOW, fetchImpl, film: () => new Promise(() => {}), filmWaitMs: 0 } as OrderDeps)
+  const deps = (): OrderDeps => ({ store: mem, shopify: loadShopifyConfig({ SHOPIFY_STOREFRONT_TOKEN: 't', SHOPIFY_VARIANT_SIMPLE: '1', SHOPIFY_VARIANT_STANDARD: '2', SHOPIFY_VARIANT_EGIFT: '3' } as NodeJS.ProcessEnv).config, shopifyMissing: [], now: () => NOW, fetchImpl, film: () => new Promise(() => {}), filmWaitMs: 0 } as OrderDeps)
   const post = async (b: unknown) => { const r = await createOrderHandler(deps)(new Request('http://x/api/order', { method: 'POST', body: JSON.stringify(b) })); return { status: r.status, json: (await r.json()) as Record<string, unknown> } }
   const noMail = await post(body({ sender_email: '' }))
   check('(5) an e-gift without the sender\'s e-mail address is refused (field sender_email) — it is needed for the one reminder', noMail.status === 400 && noMail.json.field === 'sender_email')
@@ -118,7 +118,7 @@ check('(4) the receiver\'s address is deleted 90 days after the order ships (not
   await mem.put(t, g0)
   await recordOrderIndex(mem, entry, NOW)
   const idx = await readJsonl<Record<string, unknown>>(mem, ordersIndexPath(NOW))
-  check('(6) every order is indexed for the owner\'s list: order_ref, receiver token, size, where it goes, remembrance, delivery date — and nothing private (no names, story, e-mail or address)', idx.length === 1 && idx[0].order_ref === 'IC-20261023-QQQQQQQQ' && idx[0].token === t && idx[0].size_code === 'ICHIREI-CARD' && idx[0].ship_to === 'egift' && idx[0].memorial === false && !JSON.stringify(idx).includes('taro@') && !JSON.stringify(idx).includes('山田') && (await readJsonl(mem, EGIFT_INDEX_PATH)).length === 1)
+  check('(6) every order is indexed for the owner\'s list: order_ref, receiver token, size, where it goes, remembrance, delivery date — and nothing private (no names, story, e-mail or address)', idx.length === 1 && idx[0].order_ref === 'IC-20261023-QQQQQQQQ' && idx[0].token === t && idx[0].size_code === 'ICHIREI-SIMPLE' && idx[0].ship_to === 'egift' && idx[0].memorial === false && !JSON.stringify(idx).includes('taro@') && !JSON.stringify(idx).includes('山田') && (await readJsonl(mem, EGIFT_INDEX_PATH)).length === 1)
   const sent: Mail[] = []
   const mailer: Mailer = async (m) => { sent.push(m); return true }
   check('(6) before 7 days nobody is mailed', (await runEgiftReminders(mem, mailer, at(6))).due === 0 && sent.length === 0)

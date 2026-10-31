@@ -63,7 +63,7 @@ const server = createServer(async (req, res) => {
   // the sizes on sale (Part C): all four unless MOCK_SIZES lists others (comma separated, display order)
   if (url.pathname === '/api/sizes' && req.method === 'GET') {
     res.writeHead(200, { 'content-type': 'application/json' })
-    res.end(JSON.stringify({ sizes: (process.env.MOCK_SIZES ?? 'simple,standard,card,digital').split(',').filter(Boolean) }))
+    res.end(JSON.stringify({ sizes: (process.env.MOCK_SIZES ?? 'egift,simple,standard').split(',').filter(Boolean) }))
     return
   }
   if (url.pathname === '/api/rates' && req.method === 'GET') {

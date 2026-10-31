@@ -7,8 +7,7 @@
 //                              (needs unauthenticated_write_checkouts)
 //   SHOPIFY_VARIANT_SIMPLE     variant of the ¥9,800 package   (gid://shopify/ProductVariant/… or the number)
 //   SHOPIFY_VARIANT_STANDARD   variant of the ¥18,850 package
-//   SHOPIFY_VARIANT_CARD       OPTIONAL: variant of the ¥4,980 card size (hidden while missing)
-//   SHOPIFY_VARIANT_DIGITAL    OPTIONAL: variant of the ¥2,980 digital size (hidden while missing)
+//   SHOPIFY_VARIANT_EGIFT      OPTIONAL: variant of the ¥3,980 一字礼 eギフト (a digital product with no shipping; hidden while missing)
 //   (the poem is free and included: it travels as attributes on the main line — there are no poem products or variants)
 //   SHOPIFY_STORE_DOMAIN       default soul-id-2.myshopify.com
 //   SHOPIFY_API_VERSION        default 2025-01
@@ -26,7 +25,7 @@ export interface ShopifyConfig {
   apiVersion: string
   token: string
   apiBase: string
-  /** The variant of each size that is on sale: simple and standard always; digital and card only once the owner has created them in Shopify. */
+  /** The variant of each size that is on sale: simple and standard always; the e-gift only once the owner has created it in Shopify. */
   variants: Partial<Record<PackageId, string>>
 }
 
@@ -59,9 +58,8 @@ export function loadShopifyConfig(env: NodeJS.ProcessEnv = process.env): { confi
       variants: {
         simple: toGid(env.SHOPIFY_VARIANT_SIMPLE!.trim()),
         standard: toGid(env.SHOPIFY_VARIANT_STANDARD!.trim()),
-        // ① and ② are created by the owner in Shopify later: while their id is missing, that size is hidden on the page and refused by the server.
-        ...(env.SHOPIFY_VARIANT_DIGITAL?.trim() ? { digital: toGid(env.SHOPIFY_VARIANT_DIGITAL.trim()) } : {}),
-        ...(env.SHOPIFY_VARIANT_CARD?.trim() ? { card: toGid(env.SHOPIFY_VARIANT_CARD.trim()) } : {}),
+        // The e-gift is created by the owner in Shopify: while its id is missing, that size is hidden on the page and refused by the server.
+        ...(env.SHOPIFY_VARIANT_EGIFT?.trim() ? { egift: toGid(env.SHOPIFY_VARIANT_EGIFT.trim()) } : {}),
       },
     },
   }

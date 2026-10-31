@@ -311,7 +311,7 @@ export function Gifts({
     img: id === 'simple' ? 'simple-hero' : id === 'standard' ? 'standard-hero' : null,
     items: id === 'simple' ? [t.sp1, t.sp2, t.sp3, t.sp4] : id === 'standard' ? [t.dp1, t.dp2, t.dp3, t.dp4] : [sc.includes[id], sc.ship[id]],
     cta: id === 'simple' ? t.buy1 : id === 'standard' ? t.buy2 : t.ctaHero,
-    badge: id === RECOMMENDED_PACKAGE ? sc.recommended : id === 'digital' ? sc.sendNow : null,
+    badge: id === RECOMMENDED_PACKAGE ? sc.recommended : id === 'egift' ? sc.sendNow : null,
   }))
   return (
     <section className="tintBand" id="gifts">
@@ -337,7 +337,7 @@ export function Gifts({
               <div className="body">
                 <div className="row">
                   <h3>
-                    {c.title} {c.badge && <span className="badge" data-badge={c.id === 'digital' ? 'now' : 'recommended'}>{c.badge}</span>}
+                    {c.title} {c.badge && <span className="badge" data-badge={c.id === 'egift' ? 'now' : 'recommended'}>{c.badge}</span>}
                   </h3>
                   <span className="price" data-price={c.id}>
                     {formatYen(PACKAGE_PRICE_JPY[c.id])}

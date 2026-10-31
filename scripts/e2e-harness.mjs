@@ -742,13 +742,13 @@ const mockPage = async (browser, { onExplain, result, order, track } = {}) => {
   await m.page.close()
 }
 
-// ---------- Run 8c-4: Part C — the four sizes, the badges, where it goes, the message for the card ----------
+// ---------- Run 8c-4: the three sizes (eギフト / 木札 / 版木), the badges, where it goes, the message ----------
 {
   const f = await mockPage(browser, { order: () => ({ json: { order_ref: 'IC-20261023-SIZES222', checkout_url: 'http://localhost:5173/__checkout?cart=sz', glyph: '証', certificate_text: 'x' } }) })
   await f.page.goto('http://localhost:5173/', { waitUntil: 'networkidle' })
   const gifts = await f.page.locator('#gifts article.gift').evaluateAll((els) => els.map((e) => e.getAttribute('data-size')))
-  check('sizes (landing): the gift section lists ③ 木札 (simple), ④ 版木 (standard), ② カード, ① デジタル — in that order', gifts.join() === 'simple,standard,card,digital', gifts.join())
-  check('sizes (landing): ③ is marked おすすめ, ① is marked 「今すぐ贈れる」 and is last; the prices are ¥9,800 / ¥18,850 / ¥4,980 / ¥2,980', (await f.page.locator('#gifts article[data-size=simple] [data-badge=recommended]').textContent()) === 'おすすめ' && (await f.page.locator('#gifts article[data-size=digital] [data-badge=now]').textContent()) === '今すぐ贈れる' && (await f.page.locator('#gifts [data-price=simple]').textContent()) === '¥9,800' && (await f.page.locator('#gifts [data-price=standard]').textContent()) === '¥18,850' && (await f.page.locator('#gifts [data-price=card]').textContent()) === '¥4,980' && (await f.page.locator('#gifts [data-price=digital]').textContent()) === '¥2,980')
+  check('sizes (landing): the gift section lists the three sizes left to right: eギフト, 木札 (simple), 版木 (standard)', gifts.join() === 'egift,simple,standard', gifts.join())
+  check('sizes (landing): 木札 is marked おすすめ, the e-gift is marked 「今すぐ贈れる」; the prices are ¥3,980 / ¥9,800 / ¥18,850', (await f.page.locator('#gifts article[data-size=simple] [data-badge=recommended]').textContent()) === 'おすすめ' && (await f.page.locator('#gifts article[data-size=egift] [data-badge=now]').textContent()) === '今すぐ贈れる' && (await f.page.locator('#gifts [data-price=egift]').textContent()) === '¥3,980' && (await f.page.locator('#gifts [data-price=simple]').textContent()) === '¥9,800' && (await f.page.locator('#gifts [data-price=standard]').textContent()) === '¥18,850' && (await f.page.locator('#gifts [data-price=card], #gifts [data-price=digital]').count()) === 0)
   await f.page.locator('#write [data-testid=story-input]').fill('父は、駅の改札でいつも黙って手を振った。')
   await pickContext(f.page)
   await f.page.click(`#write >> text=${GO.ja}`)
@@ -760,34 +760,52 @@ const mockPage = async (browser, { onExplain, result, order, track } = {}) => {
   await form.waitFor()
   await form.locator('[data-size]').first().waitFor()
   const order = await form.locator('label[data-size]').evaluateAll((els) => els.map((e) => e.getAttribute('data-size')))
-  check('sizes (order form): ③ 木札, ④ 版木, ② カード, ① デジタル in that order, with the recommended and "send it now" badges', order.join() === 'simple,standard,card,digital' && (await form.locator('[data-size=simple] [data-badge=recommended]').count()) === 1 && (await form.locator('[data-size=digital] [data-badge=now]').count()) === 1 && (await form.locator('[data-size=standard] .badge').count()) === 0, order.join())
-  check('sizes (order form): each size says what it includes and how it ships (木札: 日本国内送料無料・海外は EMS ¥6,000; デジタル: 送料なし)', (await form.locator('[data-includes=simple]').innerText()).includes('木札に一字（金色）') && (await form.locator('[data-ship-line=simple]').innerText()).includes('EMS ¥6,000') && (await form.locator('[data-ship-line=digital]').innerText()) === '送料なし' && (await form.locator('[data-ship-line=card]').innerText()).includes('郵送'))
-  check('sizes (order form): no ship-to choice until a size is picked; the digital size has none at all (no address, nothing shipped)', (await form.locator('[data-testid=ship-to]').count()) === 0)
+  check('sizes (order form): eギフト, 木札, 版木 in that order, with the recommended and "send it now" badges', order.join() === 'egift,simple,standard' && (await form.locator('[data-size=simple] [data-badge=recommended]').count()) === 1 && (await form.locator('[data-size=egift] [data-badge=now]').count()) === 1 && (await form.locator('[data-size=standard] .badge').count()) === 0, order.join())
+  check('sizes (order form): each size says what it includes and how it ships (木札: 日本国内送料無料・海外は EMS ¥6,000; eギフト: 送料なし, with the card PDF to print at home)', (await form.locator('[data-includes=simple]').innerText()).includes('木札に一字（金色）') && (await form.locator('[data-ship-line=simple]').innerText()).includes('EMS ¥6,000') && (await form.locator('[data-ship-line=egift]').innerText()).includes('送料なし') && (await form.locator('[data-includes=egift]').innerText()).includes('カードPDF'))
+  check('sizes (order form): no ship-to choice until a size is picked', (await form.locator('[data-testid=ship-to]').count()) === 0)
   await f.page.fill('input[name=sender_name]', '山田 太郎')
   await f.page.fill('input[name=receiver_name]', '山田 一郎')
+  check('sizes (order form): before a size is picked the wooden sizes\' delivery date is asked', (await form.locator('input[name=delivery_date]').count()) === 1)
+  await f.page.click('label[data-size=egift]')
+  check('sizes (order form): the e-gift shows its price, says it is not posted, offers no ship-to choice and asks for no delivery date (it arrives at once)', (await form.locator('[data-price=egift]').innerText()) === '¥3,980' && (await form.locator('[data-egift-note]').count()) === 1 && (await form.locator('[data-testid=ship-to]').count()) === 0 && (await form.locator('input[name=delivery_date]').count()) === 0)
+  await f.page.click('label[data-size=simple]')
   const od = new Date(); od.setDate(od.getDate() + 20)
   await f.page.fill('input[name=delivery_date]', `${od.getFullYear()}-${String(od.getMonth() + 1).padStart(2, '0')}-${String(od.getDate()).padStart(2, '0')}`)
-  await f.page.click('label[data-size=digital]')
-  check('sizes (order form): the digital size shows its price, says it is not shipped and offers no ship-to choice', (await form.locator('[data-price=digital]').innerText()) === '¥2,980' && (await form.locator('[data-digital-note]').count()) === 1 && (await form.locator('[data-testid=ship-to]').count()) === 0)
-  await f.page.click('label[data-size=card]')
   const shipOpts = await form.locator('[data-ship-to]').evaluateAll((els) => els.map((e) => e.getAttribute('data-ship-to')))
-  check('ship-to: the card size asks where it goes — me / directly to them / e-gift — with 「自分に届ける」 first and no message box while "me" is chosen', shipOpts.join() === 'me,direct,egift' && (await form.locator('[data-ship-to=me] .pkgName').innerText()) === '自分に届ける' && (await form.locator('[data-ship-to=direct] .pkgName').innerText()) === '相手に直接届ける' && (await form.locator('[data-ship-to=egift] .pkgName').innerText()).startsWith('eギフトで贈る') && (await form.locator('#gift_message').count()) === 0)
+  check('ship-to: a wooden size asks where it goes — me / directly to them / e-gift — with 「自分に届ける」 first and no message box while "me" is chosen', shipOpts.join() === 'me,direct,egift' && (await form.locator('[data-ship-to=me] .pkgName').innerText()) === '自分に届ける' && (await form.locator('[data-ship-to=direct] .pkgName').innerText()) === '相手に直接届ける' && (await form.locator('[data-ship-to=egift] .pkgName').innerText()).startsWith('eギフトで贈る') && (await form.locator('#gift_message').count()) === 0)
   await f.page.click('[data-ship-to=direct]')
   await f.page.fill('#gift_message', 'あ'.repeat(70))
   check('ship-to: directly to them → a message box (60 characters at most, with its counter), and a note that the receiver\'s address goes in at checkout', (await form.locator('#gift_message').inputValue()).length === 60 && (await form.locator('[data-testid=gift-message-counter]').innerText()) === '60 / 60字' && (await form.locator('[data-ship-to=direct]').innerText()).includes('チェックアウトの配送先'))
   await f.page.fill('#gift_message', 'いつも、ありがとう。')
   await f.page.click('label[data-size=standard]')
   await f.page.click('[data-ship-to=egift]')
-  check('ship-to: e-gift of a wooden size says it is Japan only; the card size does not', (await form.locator('[data-egift-japan]').count()) === 1)
-  await f.page.click('label[data-size=card]')
-  check('ship-to: …and for the card size the Japan-only note is gone', (await form.locator('[data-egift-japan]').count()) === 0)
+  check('ship-to: entering the receiver\'s address for a wooden size says it is Japan only', (await form.locator('[data-egift-japan]').count()) === 1)
   await f.page.click('[data-ship-to=direct]')
   await f.page.click('[data-testid=order-submit]')
   await f.page.waitForSelector('#co', { timeout: 8000 })
   const body = f.calls.order[0]
-  check('order request: package card, ship_to direct and the message; no price anywhere', body.package === 'card' && body.ship_to === 'direct' && body.gift_message === 'いつも、ありがとう。' && !('price' in body) && !('price_jpy' in body))
+  check('order request: package standard, ship_to direct and the message; no price anywhere', body.package === 'standard' && body.ship_to === 'direct' && body.gift_message === 'いつも、ありがとう。' && !('price' in body) && !('price_jpy' in body))
   check('no page errors (run 8c-4, sizes)', f.errors.length === 0, f.errors.join('; '))
   await f.page.close()
+  // the e-gift order: no delivery date, no ship_to in the request
+  const e = await mockPage(browser, { order: () => ({ json: { order_ref: 'IC-20261023-EGIFT222', checkout_url: 'http://localhost:5173/__checkout?cart=eg', glyph: '証', certificate_text: 'x' } }) })
+  await e.page.goto('http://localhost:5173/', { waitUntil: 'networkidle' })
+  await e.page.locator('#write [data-testid=story-input]').fill('父は、駅の改札でいつも黙って手を振った。')
+  await pickContext(e.page)
+  await e.page.click(`#write >> text=${GO.ja}`)
+  await e.page.waitForSelector(`button:has-text("${FINALIZE.ja}")`, { timeout: 15000 })
+  await e.page.locator('article[data-slot=main]').click()
+  await e.page.locator('article[data-slot=main]').locator('text=この一字を選ぶ').click()
+  await e.page.click(`button:has-text("${FINALIZE.ja}")`)
+  await e.page.locator('[data-testid=order-form]').waitFor()
+  await e.page.fill('input[name=sender_name]', '山田 太郎')
+  await e.page.fill('input[name=receiver_name]', '山田 一郎')
+  await e.page.click('label[data-size=egift]')
+  await e.page.click('[data-testid=order-submit]')
+  await e.page.waitForSelector('#co', { timeout: 8000 })
+  const eb = e.calls.order[0]
+  check('order request (e-gift): package egift, no delivery date, no ship_to — and the order went through', eb.package === 'egift' && !('delivery_date' in eb) && !('ship_to' in eb) && e.errors.length === 0, JSON.stringify(eb).slice(0, 200))
+  await e.page.close()
   // sizes whose variant is missing are hidden: the API says which are on sale
   const g = await browser.newPage({ locale: 'ja-JP', viewport: { width: 1100, height: 950 } })
   await g.route('**/api/sizes', (r) => r.fulfill({ json: { sizes: ['simple', 'standard'] } }))
@@ -795,7 +813,7 @@ const mockPage = async (browser, { onExplain, result, order, track } = {}) => {
   await g.route('**/api/log', (r) => r.fulfill({ status: 204, body: '' }))
   await g.goto('http://localhost:5173/', { waitUntil: 'networkidle' })
   await g.locator('#gifts article.gift').first().waitFor()
-  check('sizes: while ① and ② have no Shopify variant (the API lists only ③ and ④) they are not on the page at all', (await g.locator('#gifts article.gift').evaluateAll((els) => els.map((e) => e.getAttribute('data-size')))).join() === 'simple,standard')
+  check('sizes: while the e-gift has no Shopify variant (the API lists only 木札 and 版木) it is not on the page at all', (await g.locator('#gifts article.gift').evaluateAll((els) => els.map((e) => e.getAttribute('data-size')))).join() === 'simple,standard')
   await g.close()
 }
 
@@ -807,7 +825,7 @@ const mockPage = async (browser, { onExplain, result, order, track } = {}) => {
   const sp = await browser.newPage({ locale: 'ja-JP', viewport: { width: 390, height: 800 } })
   const errors = []
   sp.on('pageerror', (e) => errors.push(String(e)))
-  await sp.route('**/api/animation/AN-testtesttesttesttest', (r) => r.fulfill({ json: { ...baseView, gift: { url: GIFT, size_code: 'ICHIREI-CARD', ship_to: 'egift', egift_state: 'waiting' } } }))
+  await sp.route('**/api/animation/AN-testtesttesttesttest', (r) => r.fulfill({ json: { ...baseView, gift: { url: GIFT, size_code: 'ICHIREI-SIMPLE', ship_to: 'egift', egift_state: 'waiting' } } }))
   await sp.route('**/api/gift/RG-testtesttesttesttest/qr.svg', (r) => r.fulfill({ status: 200, contentType: 'image/svg+xml', body: '<svg xmlns="http://www.w3.org/2000/svg" width="10" height="10"/>' }))
   await sp.goto('http://localhost:5173/a/AN-testtesttesttesttest', { waitUntil: 'networkidle' })
   const panel = sp.locator('[data-testid=sender-panel]')
@@ -815,7 +833,7 @@ const mockPage = async (browser, { onExplain, result, order, track } = {}) => {
   check('sender page: below the film, 「贈る」 with LINE, copy-the-link, QR and e-mail; the receiver\'s link as selectable text', (await panel.locator('h2').innerText()) === '贈る' && (await panel.locator('[data-testid=give-link]').inputValue()) === GIFT && (await panel.locator('[data-testid=give-line]').getAttribute('href')).startsWith('https://line.me/R/share?text=') && decodeURIComponent(await panel.locator('[data-testid=give-line]').getAttribute('href')).includes(GIFT) && (await panel.locator('[data-testid=give-mail]').getAttribute('href')).startsWith('mailto:?subject='))
   await panel.locator('[data-testid=give-qr]').click()
   check('sender page: the QR code of the receiver\'s page shows on screen', (await panel.locator('[data-testid=give-qr-img] img').getAttribute('src')) === '/api/gift/RG-testtesttesttesttest/qr.svg')
-  check('sender page: order details — size カード, delivery e-gift, waiting for the receiver\'s address — and no price', (await panel.locator('[data-testid=status-size]').innerText()) === 'カード' && (await panel.locator('[data-testid=status-ship]').innerText()).startsWith('eギフト') && (await panel.locator('[data-testid=status-egift]').innerText()).includes('待っています') && !/¥/.test(await panel.innerText()))
+  check('sender page: order details — size 木札, delivery e-gift, waiting for the receiver\'s address — and no price', (await panel.locator('[data-testid=status-size]').innerText()) === '木札（シンプル）' && (await panel.locator('[data-testid=status-ship]').innerText()).startsWith('eギフト') && (await panel.locator('[data-testid=status-egift]').innerText()).includes('待っています') && !/¥/.test(await panel.innerText()))
   check('no page errors (run 8c-5, sender page)', errors.length === 0, errors.join('; '))
   await sp.close()
   // the receiver's page
@@ -857,7 +875,7 @@ const mockPage = async (browser, { onExplain, result, order, track } = {}) => {
   ]
   for (const [name, film, shown] of cases) {
     const p = await browser.newPage({ locale: 'ja-JP', viewport: { width: 390, height: 800 } })
-    await p.route('**/api/animation/AN-testtesttesttesttest', (r) => r.fulfill({ json: { ...base, film, gift: { url: 'https://ichirei.soul-id.jp/g/RG-testtesttesttesttest', size_code: 'ICHIREI-CARD', ship_to: 'me' } } }))
+    await p.route('**/api/animation/AN-testtesttesttesttest', (r) => r.fulfill({ json: { ...base, film, gift: { url: 'https://ichirei.soul-id.jp/g/RG-testtesttesttesttest', size_code: 'ICHIREI-SIMPLE', ship_to: 'me' } } }))
     await p.route('**/api/gift/RG-testtesttesttesttest/qr.svg', (r) => r.fulfill({ status: 200, contentType: 'image/svg+xml', body: '<svg xmlns="http://www.w3.org/2000/svg" width="10" height="10"/>' }))
     await p.route('**/film-art/**', (r) => r.fulfill({ status: 200, contentType: 'image/svg+xml', body: '<svg xmlns="http://www.w3.org/2000/svg" width="10" height="10"/>' }))
     await p.goto('http://localhost:5173/a/AN-testtesttesttesttest', { waitUntil: 'networkidle' })
@@ -889,9 +907,9 @@ const mockPage = async (browser, { onExplain, result, order, track } = {}) => {
 // ---------- Run 8h: /legal — 特定商取引法に基づく表記 with 【 】 placeholders, the return rules, three questions, in three languages; the footer link ----------
 {
   const T = {
-    ja: { title: '特定商取引法に基づく表記', ret: ['本商品は、お客様の物語から選ばれた一字でつくる受注制作品です。', 'ご注文から24時間以内であれば、ご注文時に表示された他の字への変更、名入れ・メッセージの修正、詩の形式の変更（1回）、またはキャンセル（全額返金）を承ります。ご注文確認メールにご返信ください。', '24時間を過ぎたお客様都合による変更・返品・返金はお受けできません。', '商品の破損、誤った字・誤印刷など当方の不備があった場合は、お届けから14日以内にご連絡ください。作り直し、または返金いたします。', 'デジタル商品は、ギフトページのお届け後の返金はいたしかねます（正常に表示されない場合を除きます）。'], faq: ['注文後に字を変えられますか？', 'キャンセルできますか？', '届いた品物に問題があったら？'], rows: ['販売業者', '運営責任者', '所在地', '電話番号', 'メールアドレス'] },
-    'zh-Hant': { title: '特定商取引法標示', ret: ['接單製作', '24 小時內', '24 小時，因顧客個人因素', '14 天內聯絡', '數位商品'], faq: ['下單後可以換字嗎？', '可以取消訂單嗎？', '收到的商品有問題怎麼辦？'], rows: ['販售業者', '營運負責人', '所在地', '電話號碼', '電子郵件'] },
-    en: { title: 'Legal notice', ret: ['made to order', 'Within 24 hours of your order', 'After 24 hours', 'within 14 days of delivery', 'Digital orders'], faq: ['Can I change the character after I order?', 'Can I cancel?', 'What if what I receive has a problem?'], rows: ['Seller', 'Person in charge', 'Address', 'Telephone', 'E-mail'] },
+    ja: { title: '特定商取引法に基づく表記', ret: ['本商品は、お客様の物語から選ばれた一字でつくる受注制作品です。', 'ご注文から24時間以内であれば、ご注文時に表示された他の字への変更、名入れ・メッセージの修正、詩の形式の変更（1回）、またはキャンセル（全額返金）を承ります。ご注文確認メールにご返信ください。', '24時間を過ぎたお客様都合による変更・返品・返金はお受けできません。', '商品の破損、誤った字・誤印刷など当方の不備があった場合は、お届けから14日以内にご連絡ください。作り直し、または返金いたします。', 'eギフトは、ギフトページのお届け後の返金はいたしかねます（正常に表示されない場合を除きます）。'], faq: ['注文後に字を変えられますか？', 'キャンセルできますか？', '届いた品物に問題があったら？'], rows: ['販売業者', '運営責任者', '所在地', '電話番号', 'メールアドレス'] },
+    'zh-Hant': { title: '特定商取引法標示', ret: ['接單製作', '24 小時內', '24 小時，因顧客個人因素', '14 天內聯絡', 'e 禮物在禮物頁面送達後恕不退款'], faq: ['下單後可以換字嗎？', '可以取消訂單嗎？', '收到的商品有問題怎麼辦？'], rows: ['販售業者', '營運負責人', '所在地', '電話號碼', '電子郵件'] },
+    en: { title: 'Legal notice', ret: ['made to order', 'Within 24 hours of your order', 'After 24 hours', 'within 14 days of delivery', 'The e-gift is not refundable'], faq: ['Can I change the character after I order?', 'Can I cancel?', 'What if what I receive has a problem?'], rows: ['Seller', 'Person in charge', 'Address', 'Telephone', 'E-mail'] },
   }
   for (const lang of ['ja', 'zh-Hant', 'en']) {
     const p = await browser.newPage({ locale: 'ja-JP', viewport: { width: 375, height: 800 } })
@@ -902,9 +920,9 @@ const mockPage = async (browser, { onExplain, result, order, track } = {}) => {
     const t = T[lang]
     const rows = await p.locator('[data-testid=legal-rows]').innerText()
     check(`legal (${lang}): the title, the five seller rows with 【 】 placeholders (nothing invented), and the owner's note`, (await p.locator('h1').innerText()).includes(t.title) && t.rows.every((r) => rows.includes(r)) && (await p.locator('[data-testid=legal-rows] dd[data-placeholder]').count()) >= 5 && !!(await p.locator('[data-testid=legal-note]').count()) && (await p.locator('[data-testid=legal-rows] dd').first().innerText()) === '【 】')
-    check(`legal (${lang}): the prices and the shipping come from the product (¥2,980 / ¥4,980 / ¥9,800 / ¥18,850; EMS ¥6,000)`, ['2,980', '4,980', '9,800', '18,850', '6,000'].every((x) => rows.includes(x)))
+    check(`legal (${lang}): the prices and the shipping come from the product (¥3,980 / ¥9,800 / ¥18,850; EMS ¥6,000)`, ['3,980', '9,800', '18,850', '6,000'].every((x) => rows.includes(x)))
     const ret = await p.locator('[data-testid=legal-returns]').innerText()
-    check(`legal (${lang}): the return section — made to order, 24 hours, our mistakes within 14 days, digital`, lang === 'ja' ? t.ret.every((x) => ret.includes(x)) && (await p.locator('[data-testid=legal-returns] li').count()) === 5 : t.ret.every((x) => ret.includes(x)) && (await p.locator('[data-testid=legal-returns] li').count()) === 5)
+    check(`legal (${lang}): the return section — made to order, 24 hours, our mistakes within 14 days, the e-gift`, lang === 'ja' ? t.ret.every((x) => ret.includes(x)) && (await p.locator('[data-testid=legal-returns] li').count()) === 5 : t.ret.every((x) => ret.includes(x)) && (await p.locator('[data-testid=legal-returns] li').count()) === 5)
     const faq = await p.locator('[data-testid=legal-faq]').innerText()
     check(`legal (${lang}): three questions`, (await p.locator('[data-testid=legal-faq] details').count()) === 3 && t.faq.every((q) => faq.includes(q)))
     check(`no page errors (run 8h, ${lang})`, errors.length === 0, errors.join('; '))
@@ -1324,7 +1342,7 @@ const SECTION_ORDER = ['.hero', '.strip', '.philo', '#shape', '#angles', '#write
   const form = page.locator('[data-testid=order-form]')
   await form.waitFor({ timeout: 5000 })
   check('order form appears after the character is chosen (the reveal stays mounted but hidden)', await form.isVisible() && (await page.locator('#write article').first().isHidden()))
-  check('order form: sender, receiver, delivery date, package (no old-form choice: Japanese buyers carve the modern form)', (await page.locator('input[name=sender_name]').count()) === 1 && (await page.locator('input[name=receiver_name]').count()) === 1 && (await page.locator('input[name=delivery_date]').count()) === 1 && (await page.locator('input[name=inscription_style]').count()) === 0 && (await page.locator('input[name=package]').count()) === 4)
+  check('order form: sender, receiver, delivery date, package (no old-form choice: Japanese buyers carve the modern form)', (await page.locator('input[name=sender_name]').count()) === 1 && (await page.locator('input[name=receiver_name]').count()) === 1 && (await page.locator('input[name=delivery_date]').count()) === 1 && (await page.locator('input[name=inscription_style]').count()) === 0 && (await page.locator('input[name=package]').count()) === 3)
   check('order form: Simple ¥9,800 and Standard ¥18,850, and the shipping line 「国内送料無料・海外送料 ¥6,000」', (await page.locator('#write [data-price=simple]').innerText()) === '¥9,800' && (await page.locator('#write [data-price=standard]').innerText()) === '¥18,850' && (await page.locator('[data-shipping]').innerText()) === '国内送料無料・海外送料 ¥6,000' && !(await form.innerText()).includes('送料別') && (await form.innerText()).includes('シンプル') && (await form.innerText()).includes('スタンダード'))
   check('order form (ja): no form choice — the slip shows the modern form 守 and the note says it is carved in the modern form', (await page.locator('input[name=inscription_style]').count()) === 0 && (await page.locator('[data-order-glyph]').innerText()) === '守' && (await form.innerText()).includes('新字体'))
   check('certificate: 「この字は、あなたの目に映る、その人です。」 from the start', (await page.locator('[data-certificate]').innerText()) === 'この字は、あなたの目に映る、その人です。')
