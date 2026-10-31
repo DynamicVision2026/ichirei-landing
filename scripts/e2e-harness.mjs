@@ -1097,6 +1097,57 @@ const mockPage = async (browser, { onExplain, result, order, track } = {}) => {
     check('e-gift: the address is posted to the receiver\'s own endpoint and the page thanks them; nothing of it stays on the page', seen.address.length === 1 && seen.address[0].postal === '1500001' && seen.address[0].line1 === '渋谷区神宮前1-2-3' && (await gift.locator('[data-testid=gift-form]').count()) === 0 && !(await page.content()).includes('渋谷区'))
     await ctx.close()
   }
+
+  // Part 4: nothing on the receiver's page, the film page, the sender's page or /credits is asked of Google — with Google blocked everything still works
+  {
+    const ctx = await browser.newContext({ locale: 'ja-JP', viewport: { width: 375, height: 844 } })
+    const hosts = new Set()
+    const blocked = []
+    const fontFiles = []
+    ctx.on('request', (r) => hosts.add(new URL(r.url()).hostname))
+    ctx.on('response', (r) => { if (r.url().includes('/fonts/')) fontFiles.push(`${r.status()} ${new URL(r.url()).pathname}`) })
+    await ctx.route(/google|gstatic/, (r) => { blocked.push(r.request().url()); return r.abort() })
+    const page = await ctx.newPage()
+    const errs = []
+    page.on('pageerror', (e) => errs.push(String(e)))
+    const view = mk()
+    await page.route(`**/api/gift/${TOKEN}**`, (r) => { const u = new URL(r.request().url()); return u.pathname.endsWith('/render') ? r.fulfill({ json: { state: 'ready', view } }) : r.fulfill({ json: view }) })
+    await page.route('**/api/animation/AN-testtesttesttesttest', (r) => r.fulfill({ json: { ...view, id: 'AN-testtesttesttesttest', gift: { url: `https://ichirei.soul-id.jp/g/${TOKEN}`, size_code: 'ICHIREI-SIMPLE', ship_to: 'me', egift_state: null, opens_on: null, certificate_no: 12, reply: null } } }))
+    await page.goto(`http://localhost:5173/g/${TOKEN}`, { waitUntil: 'networkidle' })
+    await T(page, 'gift-open').click()
+    await T(page, 'gift-to-film').click({ timeout: 4000 })
+    await page.waitForSelector('[data-testid=film][data-ready=yes]', { timeout: 8000 })
+    await page.evaluate(() => window.__ichireiFilm.seek(window.__ichireiFilm.total))
+    await T(page, 'gift-to-poem').click({ timeout: 6000 })
+    await T(page, 'gift-to-cert').click()
+    await T(page, 'gift-to-keep').click()
+    const fonts = await page.evaluate(async () => { await document.fonts.ready; return { hero: document.fonts.check('900 40px "Zen Old Mincho"', '備'), body: document.fonts.check('400 16px "Noto Serif JP"', 'あ') } })
+    await page.goto('http://localhost:5173/a/AN-testtesttesttesttest', { waitUntil: 'networkidle' })
+    await page.goto('http://localhost:5173/credits', { waitUntil: 'networkidle' })
+    check('no Google: the gift page (every screen), the film/sender page and /credits never asked a Google host for anything (and nothing was lost with Google blocked)', blocked.length === 0 && ![...hosts].some((h) => /google|gstatic/.test(h)) && errs.length === 0, `${blocked.join(',')} ${[...hosts].join(',')} ${errs.join(';')}`)
+    check('no Google: the fonts come from our own /fonts/ (the character font and the Japanese serif were fetched, 200)', fontFiles.some((f) => f.startsWith('200') && f.includes('zen-old-mincho-900.woff2')) && fonts.hero === true, `${fontFiles.join(' | ')} ${JSON.stringify(fonts)}`)
+    await ctx.close()
+  }
+
+  // Part 4: the sender's share buttons — LINE, WhatsApp, WeChat (a QR image and a line), copy, e-mail, and the link as selectable text
+  for (const [lang, locale, memorial, sent] of [['ja', 'ja-JP', false, '贈りものを送りました。'], ['ja', 'ja-JP', true, '一字の便りを送りました。'], ['zh-Hant', 'zh-TW', false, '我送了你一份禮物。'], ['en', 'en-US', false, 'I have sent you a gift.']]) {
+    const ctx = await browser.newContext({ locale, viewport: { width: 375, height: 844 } })
+    const page = await ctx.newPage()
+    const GIFT = `https://ichirei.soul-id.jp/g/${TOKEN}`
+    await page.route('**/api/animation/AN-testtesttesttesttest', (r) => r.fulfill({ json: { ...mk({ language: lang, memorial }), id: 'AN-testtesttesttesttest', gift: { url: GIFT, size_code: 'ICHIREI-SIMPLE', ship_to: 'me', egift_state: null, opens_on: null, certificate_no: 12, reply: null } } }))
+    await page.route(`**/api/gift/${TOKEN}/qr.svg`, (r) => r.fulfill({ status: 200, contentType: 'image/svg+xml', body: '<svg xmlns="http://www.w3.org/2000/svg" width="10" height="10"/>' }))
+    await page.goto('http://localhost:5173/a/AN-testtesttesttesttest', { waitUntil: 'networkidle' })
+    const panel = T(page, 'sender-panel')
+    await panel.waitFor()
+    const line = decodeURIComponent((await T(page, 'give-line').getAttribute('href')) ?? '')
+    const wa = decodeURIComponent((await T(page, 'give-whatsapp').getAttribute('href')) ?? '')
+    check(`share (${lang}${memorial ? ', remembrance' : ''}): LINE and WhatsApp carry the link and 「${sent}」 — nothing of the character, the poem or the story`, line.startsWith('https://line.me/R/share?text=') && line.includes(sent) && line.includes(GIFT) && wa.startsWith('https://wa.me/?text=') && wa.includes(sent) && wa.includes(GIFT) && !/備|朝ごとに/.test(line + wa), line + wa)
+    await T(page, 'give-wechat').click()
+    check(`share (${lang}${memorial ? ', remembrance' : ''}): WeChat shows the QR code as an image the sender can save, and the line about sending the image or the video`, (await T(page, 'give-qr-img').locator('img').getAttribute('src')) === `/api/gift/${TOKEN}/qr.svg` && (await T(page, 'give-qr-save').getAttribute('href')) === `/api/gift/${TOKEN}/qr.png` && (await T(page, 'give-qr-save').getAttribute('download')) === 'ichirei-qr.png' && (await T(page, 'give-wechat-note').innerText()) === ({ ja: 'WeChatでは、QRコードの画像か、物語の映像（動画）を送ってください。', 'zh-Hant': '在微信裡，請傳送 QR code 圖片，或故事影片。', en: 'On WeChat, please send the QR code as an image, or the story video.' })[lang])
+    check(`share (${lang}${memorial ? ', remembrance' : ''}): copy-the-link, e-mail and the link as selectable text are there`, (await T(page, 'give-copy').count()) === 1 && decodeURIComponent((await T(page, 'give-mail').getAttribute('href')) ?? '').includes(GIFT) && (await T(page, 'give-link').inputValue()) === GIFT)
+    if (!memorial) await shot(page, `shots/share-sheet-${lang}.png`)
+    await ctx.close()
+  }
 }
 
 // ---------- Run 8e: Part E — the story scroll's 保存 buttons appear only when all four pictures are real ----------

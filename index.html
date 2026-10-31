@@ -27,8 +27,6 @@
     <meta property="og:image:height" content="1600" />
     <meta name="twitter:card" content="summary_large_image" />
     <meta name="twitter:image" content="https://ichirei.soul-id.jp/img/scenes/parents.jpg" />
-    <link rel="preconnect" href="https://fonts.googleapis.com" />
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <!--
       Fonts and the hero photo, chosen by page and loaded without blocking the first paint (display=swap):
       the customer site (/) needs only the Reveal design's five families; /demo and /track keep the earlier set.
@@ -36,6 +34,17 @@
     <script>
       (function () {
         var base = '%BASE_URL%'
+        // The gift page (/g/), the film page and the sender's page (/a/) and /credits use only our own fonts (public/fonts) and ask Google for nothing:
+        // fonts.googleapis.com and fonts.gstatic.com are unreliable in mainland China.
+        if (/^\/(g|a|credits)(\/|$)/.test(location.pathname)) return
+        var pre = [['https://fonts.googleapis.com', false], ['https://fonts.gstatic.com', true]]
+        pre.forEach(function (p) {
+          var l = document.createElement('link')
+          l.rel = 'preconnect'
+          l.href = p[0]
+          if (p[1]) l.crossOrigin = ''
+          document.head.appendChild(l)
+        })
         var tools = location.pathname.indexOf('/demo') >= 0 || location.pathname.indexOf('/track') >= 0
         var css = 'https://fonts.googleapis.com/css2?family='
         var href = tools

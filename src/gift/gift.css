@@ -12,7 +12,7 @@
   --muted: #a89b83;
   --char: var(--cinnabar);
   --f-hero: 'Zen Old Mincho', 'Hiragino Mincho ProN', 'Yu Mincho', serif;
-  --f-body: 'Noto Serif JP', 'Hiragino Mincho ProN', 'Yu Mincho', serif;
+  --f-body: 'Hiragino Mincho ProN', 'Yu Mincho', 'Songti TC', serif;
   --f-label: 'Inter', system-ui, sans-serif;
   box-sizing: border-box;
   min-height: 100vh;
@@ -29,8 +29,9 @@
   text-align: center;
 }
 .gf-page.gf-memorial { --char: #d9d1bd; --gold: #b9ad90; background: #1a1813; }
-.gf-page[lang='zh-Hant'] { --f-hero: 'Noto Serif TC', 'Songti TC', 'PMingLiU', serif; --f-body: 'Noto Serif TC', 'Songti TC', 'PMingLiU', serif; }
-.gf-page[lang='en'] { --f-body: 'Cormorant Garamond', 'Noto Serif JP', Georgia, serif; }
+.gf-page[lang='zh-Hant'] { --f-hero: 'ICHIREI Hero TC', 'Songti TC', 'PMingLiU', serif; --f-body: 'Songti TC', 'PMingLiU', 'Noto Serif TC', 'Noto Serif CJK TC', serif; }
+.gf-page[lang='ja'] { --f-body: 'ICHIREI Serif JP', 'Hiragino Mincho ProN', 'Yu Mincho', serif; }
+.gf-page[lang='en'] { --f-body: 'Cormorant Garamond', Georgia, 'Hiragino Mincho ProN', 'Yu Mincho', serif; }
 .gf-page > * { animation: gf-in 0.6s ease both; }
 @keyframes gf-in { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
 
@@ -69,7 +70,7 @@
   inset: 0; z-index: 3; background: var(--paper); border-radius: 3px; clip-path: polygon(0 0, 50% 54%, 100% 0, 100% 100%, 0 100%);
   display: flex; flex-direction: column; align-items: center; justify-content: flex-end; gap: 4px; padding-bottom: 7%;
 }
-.gf-env-to { margin: 0; font-family: var(--f-hero); font-size: 22px; letter-spacing: 0.12em; color: var(--sumi); max-width: 90%; overflow-wrap: anywhere; }
+.gf-env-to { margin: 0; font-family: var(--f-body); font-size: 22px; letter-spacing: 0.12em; color: var(--sumi); max-width: 90%; overflow-wrap: anywhere; }
 .gf-env-from { margin: 0; font-size: 13px; letter-spacing: 0.1em; color: #5b4f3d; max-width: 90%; overflow-wrap: anywhere; }
 .gf-env-flap { left: 0; top: 0; width: 100%; height: 54%; transform-origin: 50% 0; transform-style: preserve-3d; z-index: 4; }
 .gf-flap-out, .gf-flap-in { position: absolute; inset: 0; clip-path: polygon(0 0, 100% 0, 50% 100%); backface-visibility: hidden; -webkit-backface-visibility: hidden; }
@@ -84,7 +85,7 @@
 .gf-seal-r { right: 0; border-radius: 0 28px 28px 0; }
 .gf-seal b { position: relative; font-family: var(--f-hero); font-weight: 700; font-size: 13px; line-height: 1.1; color: #4a3510; writing-mode: vertical-rl; letter-spacing: 0.04em; }
 
-.gf-locked { margin: 0; font-family: var(--f-hero); font-size: 20px; letter-spacing: 0.14em; color: var(--gold); }
+.gf-locked { margin: 0; font-family: var(--f-body); font-size: 20px; letter-spacing: 0.14em; color: var(--gold); }
 .gf-locked-note { margin: 0; max-width: 20em; font-size: 14px; line-height: 1.9; opacity: 0.88; }
 
 /* 2. the opening: about 1.5 s — the seal breaks, the flap lifts onto the liner, the letter slides up */
@@ -113,7 +114,7 @@
 
 /* 3. the letter */
 .gf-letter { display: flex; flex-direction: column; align-items: center; gap: 18px; }
-.gf-to { margin: 0; align-self: flex-start; font-family: var(--f-hero); font-size: 22px; letter-spacing: 0.1em; overflow-wrap: anywhere; }
+.gf-to { margin: 0; align-self: flex-start; font-family: var(--f-body); font-size: 22px; letter-spacing: 0.1em; overflow-wrap: anywhere; }
 .gf-message { margin: 0; padding: 0; text-align: left; font-size: 17px; line-height: 2; white-space: pre-wrap; overflow-wrap: anywhere; }
 .gf-lead { margin: 0; text-align: left; font-size: 15px; line-height: 2; color: #4a4030; }
 .gf-from { margin: 0; align-self: flex-end; font-size: 15px; letter-spacing: 0.1em; overflow-wrap: anywhere; }
@@ -123,12 +124,12 @@
 .gf-reveal { display: flex; flex-direction: column; align-items: center; gap: 12px; width: 100%; }
 .gf-char { margin: 0; font-family: var(--f-hero); font-weight: 900; font-size: clamp(150px, 52vw, 230px); line-height: 1.05; color: var(--char); }
 .gf-reading { margin: 0; font-size: 18px; letter-spacing: 0.16em; color: var(--ivory); }
-.gf-gold { margin: 10px 0 0; font-family: var(--f-hero); font-size: 19px; letter-spacing: 0.1em; color: var(--gold); }
+.gf-gold { margin: 10px 0 0; font-family: var(--f-body); font-size: 19px; letter-spacing: 0.1em; color: var(--gold); }
 .gf-who { margin: 0 0 12px; max-width: 20em; font-size: 15px; line-height: 2; opacity: 0.9; }
 
 /* 6. the poem */
 .gf-poem-wrap { display: flex; flex-direction: column; align-items: center; gap: 16px; width: 100%; }
-.gf-poem { display: flex; flex-direction: column; align-items: center; gap: 6px; font-family: var(--f-hero); font-size: 20px; line-height: 1.9; letter-spacing: 0.08em; }
+.gf-poem { display: flex; flex-direction: column; align-items: center; gap: 6px; font-family: var(--f-body); font-size: 20px; line-height: 1.9; letter-spacing: 0.08em; }
 .gf-poem p { margin: 0; }
 .gf-poem-tanka { flex-direction: row; justify-content: center; align-items: center; width: min(100%, 320px); min-height: 300px; padding: 30px 20px; }
 .gf-vert { display: block; writing-mode: vertical-rl; -webkit-writing-mode: vertical-rl; height: 280px; letter-spacing: 0.18em; font-size: 22px; line-height: 2; }
@@ -157,7 +158,7 @@
 .gf-reply textarea:focus-visible { outline: 2px solid var(--gold); outline-offset: 2px; }
 .gf-reply .gf-btn { align-self: center; }
 .gf-count { margin: 0; text-align: right; font-size: 12px; color: var(--muted); }
-.gf-sent { margin: 0; font-family: var(--f-hero); font-size: 18px; letter-spacing: 0.1em; color: var(--gold); }
+.gf-sent { margin: 0; font-family: var(--f-body); font-size: 18px; letter-spacing: 0.1em; color: var(--gold); }
 .gf-error { margin: 0; font-size: 13px; color: #e0a090; }
 .gf-memorial .gf-error { color: var(--ivory); }
 

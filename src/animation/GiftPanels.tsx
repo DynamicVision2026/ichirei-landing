@@ -63,6 +63,13 @@ interface PanelCopy {
   replyTitle: string
   replyNone: string
   numberLabel: string
+  /** The words that go with the link when it is shared (nothing about the character, the poem or the story). */
+  sentLine: string
+  sentLineMemorial: string
+  whatsapp: string
+  wechat: string
+  wechatNote: string
+  saveQr: string
 }
 
 /** The story scroll exists only when all four pictures are real (never with a washi slot). */
@@ -82,6 +89,7 @@ const COPY: Record<PageLang, PanelCopy> = {
     send: '送信する', sending: '送信しています…', thanks: 'ありがとうございます。お届け先を受け取りました。', alreadyReceived: 'お届け先はすでに受け取っています。', addressError: '入力内容を確認してください。', addressPrivacy: '入力された住所は、お届けのためだけに使います。',
     saveScroll: '物語絵巻を保存', savePng: '画像（PNG）', savePdf: 'PDF',
     previewLink: '相手に届くとおりに見る', previewNote: '封を開く前の状態から、相手に届くとおりに確認できます。', opensOnLabel: (d) => `開封日 ${d}`, replyTitle: '相手からのひとこと', replyNone: 'まだ届いていません。', numberLabel: '証の番号',
+    sentLine: '贈りものを送りました。', sentLineMemorial: '一字の便りを送りました。', whatsapp: 'WhatsAppで贈る', wechat: 'WeChatで贈る', wechatNote: 'WeChatでは、QRコードの画像か、物語の映像（動画）を送ってください。', saveQr: 'QRコードを画像で保存',
   },
   'zh-Hant': {
     giveTitle: '送出', giveLead: '這是為對方準備的頁面。把連結傳給對方，會先從影片開始。',
@@ -96,6 +104,7 @@ const COPY: Record<PageLang, PanelCopy> = {
     send: '送出', sending: '送出中…', thanks: '謝謝。已收到你的收件資料。', alreadyReceived: '已經收到收件資料了。', addressError: '請確認填寫的內容。', addressPrivacy: '填寫的地址只用於寄送。',
     saveScroll: '儲存故事長卷', savePng: '圖片（PNG）', savePdf: 'PDF',
     previewLink: '以對方收到的樣子預覽', previewNote: '可以從拆信封之前開始，確認對方收到的樣子。', opensOnLabel: (d) => `開啟日 ${d}`, replyTitle: '對方的回覆', replyNone: '尚未收到。', numberLabel: '證書編號',
+    sentLine: '我送了你一份禮物。', sentLineMemorial: '我寄了一封一個字的信給你。', whatsapp: '用 WhatsApp 傳送', wechat: '用微信傳送', wechatNote: '在微信裡，請傳送 QR code 圖片，或故事影片。', saveQr: '將 QR code 存成圖片',
   },
   en: {
     giveTitle: 'Give it', giveLead: 'This page is for the person you are giving it to. Send them the link and it starts with the film.',
@@ -110,6 +119,7 @@ const COPY: Record<PageLang, PanelCopy> = {
     send: 'Send', sending: 'Sending…', thanks: 'Thank you. We have your address.', alreadyReceived: 'Your address has already been received.', addressError: 'Please check what you entered.', addressPrivacy: 'Your address is used only for the delivery.',
     saveScroll: 'Save the story scroll', savePng: 'Image (PNG)', savePdf: 'PDF',
     previewLink: 'Preview it as they will see it', previewNote: 'You can look at it from the sealed envelope onwards, exactly as they will.', opensOnLabel: (d) => `Opens on ${d}`, replyTitle: 'Their reply', replyNone: 'Nothing yet.', numberLabel: 'Certificate number',
+    sentLine: 'I have sent you a gift.', sentLineMemorial: 'I have sent you a letter of one character.', whatsapp: 'Send on WhatsApp', wechat: 'Send on WeChat', wechatNote: 'On WeChat, please send the QR code as an image, or the story video.', saveQr: 'Save the QR code as an image',
   },
 }
 
@@ -121,11 +131,12 @@ export function SenderPanel({ view, lang }: { view: AnimationView; lang: PageLan
   const g = view.gift
   const [copied, setCopied] = useState(false)
   const [qr, setQr] = useState(false)
+  const [wechat, setWechat] = useState(false)
   if (!g) return null
   const token = g.url.split('/g/')[1] ?? ''
   const size = Object.entries({ egift: 'ICHIREI-EGIFT', simple: 'ICHIREI-SIMPLE', standard: 'ICHIREI-STANDARD' }).find(([, sku]) => sku === g.size_code)?.[0] as PackageId | undefined
   const sc = SIZE_COPY[toUi(lang)]
-  const message = `${c.shareText}\n${g.url}`
+  const message = `${view.memorial ? c.sentLineMemorial : c.sentLine}\n${g.url}`
   const ship = g.ship_to === 'none' ? c.shipNone : g.ship_to === 'direct' ? c.shipDirect : g.ship_to === 'egift' ? c.shipEgift : c.shipMe
   const copy = async () => {
     try {
@@ -144,6 +155,12 @@ export function SenderPanel({ view, lang }: { view: AnimationView; lang: PageLan
         <a className="an-btn an-btn-hot" data-testid="give-line" href={`https://line.me/R/share?text=${encodeURIComponent(message)}`} target="_blank" rel="noopener noreferrer">
           {c.line}
         </a>
+        <a className="an-btn" data-testid="give-whatsapp" href={`https://wa.me/?text=${encodeURIComponent(message)}`} target="_blank" rel="noopener noreferrer">
+          {c.whatsapp}
+        </a>
+        <button type="button" className="an-btn" data-testid="give-wechat" onClick={() => setWechat((v) => !v)} aria-expanded={wechat}>
+          {c.wechat}
+        </button>
         <button type="button" className="an-btn" data-testid="give-copy" onClick={copy}>
           {copied ? c.copied : c.copyLink}
         </button>
@@ -158,10 +175,18 @@ export function SenderPanel({ view, lang }: { view: AnimationView; lang: PageLan
         <span>{c.linkLabel}</span>
         <input readOnly value={g.url} onFocus={(e) => e.currentTarget.select()} data-testid="give-link" />
       </label>
-      {qr && token && (
+      {(qr || wechat) && token && (
         <p className="an-qr" data-testid="give-qr-img">
           <img src={`/api/gift/${token}/qr.svg`} alt="QR" width={200} height={200} />
           <span>{c.qrNote}</span>
+          {wechat && (
+            <>
+              <span data-testid="give-wechat-note">{c.wechatNote}</span>
+              <a className="an-btn" data-testid="give-qr-save" href={`/api/gift/${token}/qr.png`} download="ichirei-qr.png">
+                {c.saveQr}
+              </a>
+            </>
+          )}
         </p>
       )}
       {scrollAvailable(view) && (

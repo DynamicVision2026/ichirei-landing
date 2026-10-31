@@ -6,6 +6,7 @@ import type { GiftLockedView, GiftView } from '../animation/types.ts'
 import { GIFT_COPY, fullDateText, openDateText, type GiftCopy } from './copy.ts'
 import { linerFor } from './liner.ts'
 import '../animation/animation.css'
+import '../fonts.css'
 import './gift.css'
 
 // The receiver's gift page /g/<token> (Part 3 of the 2026-10-31 ticket). One screen at a time:
@@ -15,8 +16,6 @@ import './gift.css'
 // The page never shows a price, an order number, the other candidate characters or the sender's story; the server sends the closed envelope
 // (names and the date) and nothing else until the day. The sender may look at any time with ?preview=<their own page id>.
 
-const FONT_CSS =
-  'https://fonts.googleapis.com/css2?family=Zen+Old+Mincho:wght@400;700;900&family=Noto+Serif+JP:wght@300;400;600&family=Noto+Serif+TC:wght@400;600;900&family=Cormorant+Garamond:ital,wght@0,400;0,500;1,400&family=Inter:wght@300;400&display=swap'
 
 type Step = 'envelope' | 'opening' | 'letter' | 'film' | 'reveal' | 'poem' | 'cert' | 'keep'
 type Load = { state: 'loading' } | { state: 'error'; kind: 'notFound' | 'unavailable' } | { state: 'locked'; view: GiftLockedView } | { state: 'ready'; view: GiftView }
@@ -37,7 +36,8 @@ export default function GiftApp() {
   const preview = useMemo(previewKey, [])
   const q = preview ? `?preview=${encodeURIComponent(preview)}` : ''
   const [load, setLoad] = useState<Load>({ state: 'loading' })
-  const [lang, setLang] = useState<PageLang>('ja')
+  // until the gift says which language it is in, the reader's own browser language (so a Chinese or English reader is not shown Japanese while it loads)
+  const [lang, setLang] = useState<PageLang>(() => { const n = (navigator.language ?? 'ja').toLowerCase(); return n.startsWith('zh') ? 'zh-Hant' : n.startsWith('en') ? 'en' : 'ja' })
   const [step, setStep] = useState<Step>('envelope')
   const reduced = useMemo(prefersReducedMotion, [])
   const copy = GIFT_COPY[lang]
@@ -48,13 +48,6 @@ export default function GiftApp() {
     meta.name = 'robots'
     meta.content = 'noindex, nofollow'
     document.head.appendChild(meta)
-    if (!document.querySelector('link[data-animation-fonts]')) {
-      const l = document.createElement('link')
-      l.rel = 'stylesheet'
-      l.href = FONT_CSS
-      l.setAttribute('data-animation-fonts', '')
-      document.head.appendChild(l)
-    }
     return () => meta.remove()
   }, [lang])
 

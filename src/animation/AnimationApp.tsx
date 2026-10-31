@@ -3,6 +3,7 @@ import { COPY, pageLang, type PageCopy } from './copy.ts'
 import { clamp, frameAt, makeFilmTimeline, phrases, type FilmTimeline } from './film.ts'
 import type { AnimationView } from './types.ts'
 import { SenderPanel } from './GiftPanels.tsx'
+import '../fonts.css'
 import './animation.css'
 
 // The story film page /a/<id>: a 30-second film that RETELLS the customer's own story in four short scenes and ends with the chosen character as
@@ -10,8 +11,6 @@ import './animation.css'
 // the four pictures were drawn once, on the first open (POST /api/film/<id>/render) — both are saved, nothing is generated when the film is played. The timing and every frame's maths are src/animation/film.ts; this file draws them.
 // prefers-reduced-motion gets a still page (the four scenes, then the character). While the script or the pictures are still being made the page waits quietly.
 
-const FONT_CSS =
-  'https://fonts.googleapis.com/css2?family=Zen+Old+Mincho:wght@400;700;900&family=Noto+Serif+JP:wght@300;400;600&family=Noto+Serif+TC:wght@400;600;900&family=Cormorant+Garamond:ital,wght@0,400;0,500;1,400&family=Inter:wght@300;400&display=swap'
 
 /** /a/<id> is the sender's private page (the receiver's gift page /g/<token> is src/gift/GiftApp.tsx). */
 const routeFromPath = (): { id: string } | null => {
@@ -36,13 +35,6 @@ export default function AnimationApp() {
     meta.name = 'robots'
     meta.content = 'noindex, nofollow'
     document.head.appendChild(meta)
-    if (!document.querySelector('link[data-animation-fonts]')) {
-      const l = document.createElement('link')
-      l.rel = 'stylesheet'
-      l.href = FONT_CSS
-      l.setAttribute('data-animation-fonts', '')
-      document.head.appendChild(l)
-    }
     return () => meta.remove()
   }, [lang])
 

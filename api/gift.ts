@@ -16,6 +16,8 @@ import { createAnimationHandlers, type AnimationDeps } from './animation.ts'
 import { filmUsable } from '../engine/animation.ts'
 import { loadArtwork, scrollReady } from '../engine/render/artwork.ts'
 import { makeScroll, scrollPdf } from '../engine/render/scroll.ts'
+import { makeOgImage } from '../engine/render/og.ts'
+import { injectOg, ogKey, ogMeta } from '../engine/gift-share.ts'
 
 const headers = (extra: Record<string, string> = {}) => ({ 'x-robots-tag': 'noindex, nofollow', ...extra })
 const json = (status: number, body: unknown, extra: Record<string, string> = {}) =>
@@ -125,6 +127,49 @@ export function createGiftHandlers(deps: () => GiftDeps) {
       if (r.status !== 200) return json(r.status, { error: r.status === 404 ? 'not_found' : 'unavailable' }, { 'cache-control': 'no-store' })
       const svg = await QRCode.toString(giftUrl(r.gift.token, d.env), { type: 'svg', errorCorrectionLevel: 'M', margin: 2 })
       return new Response(svg, { status: 200, headers: headers({ 'content-type': 'image/svg+xml; charset=utf-8', 'cache-control': 'private, no-store' }) })
+    },
+
+    /** The picture a shared link shows (1200 × 630): the sealed envelope with 「○○へ」 — never the character. Made once per gift, kept in the bucket. */
+    async og(token: string): Promise<Response> {
+      const d = deps()
+      const r = await loadGift(token, d)
+      if (r.status !== 200) return json(r.status, { error: r.status === 404 ? 'not_found' : 'unavailable' }, { 'cache-control': 'no-store' })
+      const g = r.gift
+      const key = ogKey(g)
+      let bytes: Buffer | null = null
+      try {
+        bytes = await d.store!.getObject(key)
+      } catch {
+        bytes = null
+      }
+      if (!bytes) {
+        try {
+          bytes = await makeOgImage({ to: g.to, from: g.from, memorial: g.memorial, language: g.language }, d.env)
+        } catch (err) {
+          console.error('[ichirei-og] failed', err instanceof Error ? err.message : err)
+          return json(500, { error: 'og_failed' }, { 'cache-control': 'no-store' })
+        }
+        await d.store!.putObject(key, bytes, 'image/png').catch(() => false)
+      }
+      return new Response(new Uint8Array(bytes), { status: 200, headers: headers({ 'content-type': 'image/png', 'cache-control': 'public, max-age=3600' }) })
+    },
+
+    /** /g/<token> as HTML for the crawlers of LINE, WhatsApp, WeChat and mail: the page with this gift's own Open Graph tags. null = serve the page as it is. */
+    async page(token: string, html: string): Promise<Response | null> {
+      const d = deps()
+      const r = await loadGift(token, d)
+      if (r.status !== 200) return null
+      const out = injectOg(html, ogMeta(r.gift, d.env, d.now?.() ?? new Date()))
+      return new Response(out, { status: 200, headers: headers({ 'content-type': 'text/html; charset=utf-8', 'cache-control': 'no-cache' }) })
+    },
+
+    /** The same QR code as a PNG picture: WeChat has no share link, so the sender saves this image and sends it. */
+    async qrPng(token: string): Promise<Response> {
+      const d = deps()
+      const r = await loadGift(token, d)
+      if (r.status !== 200) return json(r.status, { error: r.status === 404 ? 'not_found' : 'unavailable' }, { 'cache-control': 'no-store' })
+      const png = await QRCode.toBuffer(giftUrl(r.gift.token, d.env), { type: 'png', errorCorrectionLevel: 'M', margin: 4, width: 720 })
+      return new Response(new Uint8Array(png), { status: 200, headers: headers({ 'content-type': 'image/png', 'content-disposition': 'attachment; filename="ichirei-qr.png"', 'cache-control': 'private, no-store' }) })
     },
 
     /** The story scroll (PNG or PDF) of the receiver's gift. Only when all four pictures are real: never with a washi slot. */

@@ -305,6 +305,36 @@ try {
     }
   }
 
+  // ---- I2. the receiver's link as HTML for link previews (LINE / WhatsApp / WeChat), the envelope picture, our own fonts -------------------------------
+  {
+    const dir = mkdtempSync(join(tmpdir(), 'ichirei-gift-'))
+    const token = 'RG-' + 'abcdefghjkmnpqrstuvw'
+    const gift = { schema: 'gift', token, animation_id: 'AN-' + 'abcdefghjkmnpqrstuvw', order_ref: 'IC-20261107-ABCDEFGH', created_at: '2026-11-07T03:00:00Z', language: 'ja', glyph: '備', reading: 'そなえる', romanization: 'sonaeru', meaning_en: null, who: 'x', memorial: false, certificate_line: 'x', poem: null, from: '山田 太郎', to: '山田 一郎', message: '', size_code: 'ICHIREI-EGIFT', package: 'egift', ship_to: 'none', egift: null, opens_on: '2026-11-10', certificate_no: 1, reply: null }
+    const { writeFileSync } = await import('node:fs')
+    writeFileSync(join(dir, `${token}.json`), JSON.stringify(gift))
+    writeFileSync(join(dir, `${gift.animation_id}.json`), JSON.stringify({ schema: 'animation', id: gift.animation_id, order_ref: gift.order_ref, created_at: gift.created_at, language: 'ja', glyph: '備', reading: 'そなえる', romanization: 'sonaeru', meaning_en: null, who: 'x', moment: 'x', memorial: false, gift_token: token, film: null }))
+    const gs = await startServer({ upstreamUrl: upstream.url, env: { ORDER_STORE_DIR: dir, ICHIREI_RATES: 'off', ICHIREI_PUBLIC_URL: 'https://ichirei.soul-id.jp' } })
+    try {
+      const page = await fetch(`${gs.url}/g/${token}`)
+      const html = await page.text()
+      check('link preview: /g/<token> answers the page with this gift\'s own tags — title 「○○へ　一字の贈りもの」, 「○○さんから · 11月10日に開封」, the envelope picture, noindex', page.status === 200 && html.includes('<div id="root">') && html.includes('property="og:title" content="山田 一郎へ　一字の贈りもの"') && html.includes('山田 太郎さんから · 11月10日に開封') && html.includes(`https://ichirei.soul-id.jp/api/gift/${token}/og.png?v=`) && html.includes('og:image:width" content="1200"') && /noindex/.test(html) && /noindex/.test(page.headers.get('x-robots-tag') ?? ''))
+      check('link preview: that HTML asks Google for nothing (no font link, no preconnect, no noscript)', !/googleapis|gstatic/.test(html), html.match(/.{0,40}(googleapis|gstatic).{0,40}/)?.[0])
+      check('link preview: the character, the poem and the reading are nowhere in it', !html.includes('備') && !html.includes('そなえる'))
+      const og = await fetch(`${gs.url}/api/gift/${token}/og.png`)
+      const png = Buffer.from(await og.arrayBuffer())
+      check('link preview: the envelope picture is a 1200 × 630 PNG', og.status === 200 && og.headers.get('content-type') === 'image/png' && png.readUInt32BE(16) === 1200 && png.readUInt32BE(20) === 630)
+      const qr = await fetch(`${gs.url}/api/gift/${token}/qr.png`)
+      check('WeChat: the QR code is also served as a PNG image to save', qr.status === 200 && qr.headers.get('content-type') === 'image/png')
+      const other = await fetch(`${gs.url}/g/RG-zzzzzzzzzzzzzzzzzzzz`)
+      const generic = await other.text()
+      check('link preview: an unknown token gets the plain page (no gift tags)', other.status === 200 && generic.includes('<div id="root">') && !generic.includes('og.png'))
+      const f = await fetch(`${gs.url}/fonts/zen-old-mincho-900.woff2`)
+      check('our own fonts are served under /fonts/ (woff2, 200)', f.status === 200 && (await f.arrayBuffer()).byteLength > 50_000)
+    } finally {
+      await gs.stop()
+    }
+  }
+
   // ---- J. (opt-in) one stream longer than Vercel's 60s cap --------------
   if (LONG) {
     console.log('\n--long: streaming a 75s response (Vercel Hobby would have killed this at 60s)…')

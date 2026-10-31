@@ -1,0 +1,46 @@
+/* The fonts of the receiver's gift page, the film page and the sender's page — all from our own server (public/fonts, see the README there). No request to
+   Google: fonts.googleapis.com and fonts.gstatic.com are unreliable in mainland China. Each file is cut to the characters the page can show; a missing character
+   falls back to the device's own serif font. Latin and CJK files are loaded only when the page uses them. */
+
+@font-face {
+  font-family: 'Zen Old Mincho';
+  src: url('/fonts/zen-old-mincho-900.woff2') format('woff2');
+  font-weight: 400 900;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: 'ICHIREI Hero TC';
+  src: url('/fonts/ichirei-hero-tc-900.woff2') format('woff2');
+  font-weight: 400 900;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: 'ICHIREI Serif JP';
+  src: url('/fonts/noto-serif-jp-400.woff2') format('woff2');
+  font-weight: 300 600;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: 'Cormorant Garamond';
+  src: url('/fonts/cormorant-garamond.woff2') format('woff2');
+  font-weight: 400 500;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: 'Cormorant Garamond';
+  src: url('/fonts/cormorant-garamond-italic.woff2') format('woff2');
+  font-weight: 400;
+  font-style: italic;
+  font-display: swap;
+}
+@font-face {
+  font-family: 'Inter';
+  src: url('/fonts/inter.woff2') format('woff2');
+  font-weight: 300 400;
+  font-style: normal;
+  font-display: swap;
+}

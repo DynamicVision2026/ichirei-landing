@@ -12,7 +12,7 @@
   --sumi: #2a221b;
   --muted: #a89b83;
   --f-hero: 'Zen Old Mincho', 'Hiragino Mincho ProN', 'Yu Mincho', serif;
-  --f-body: 'Noto Serif JP', 'Hiragino Mincho ProN', 'Yu Mincho', serif;
+  --f-body: 'Hiragino Mincho ProN', 'Yu Mincho', 'Songti TC', serif;
   --f-label: 'Inter', system-ui, sans-serif;
   box-sizing: border-box;
   min-height: 100vh;
@@ -27,8 +27,9 @@
   font-family: var(--f-body);
 }
 .an-page.an-memorial { background: #1a1813; }
-.an-page[lang='zh-Hant'] { --f-hero: 'Noto Serif TC', 'Songti TC', 'PMingLiU', serif; --f-body: 'Noto Serif TC', 'Songti TC', 'PMingLiU', serif; }
-.an-page[lang='en'] { --f-body: 'Cormorant Garamond', 'Noto Serif JP', Georgia, serif; }
+.an-page[lang='zh-Hant'] { --f-hero: 'ICHIREI Hero TC', 'Songti TC', 'PMingLiU', serif; --f-body: 'Songti TC', 'PMingLiU', 'Noto Serif TC', 'Noto Serif CJK TC', serif; }
+.an-page[lang='ja'] { --f-body: 'ICHIREI Serif JP', 'Hiragino Mincho ProN', 'Yu Mincho', serif; }
+.an-page[lang='en'] { --f-body: 'Cormorant Garamond', Georgia, 'Hiragino Mincho ProN', 'Yu Mincho', serif; }
 
 .an-note { margin: auto; max-width: 28em; text-align: center; line-height: 1.8; font-size: 15px; opacity: 0.92; }
 .an-small { margin: 0 0 8px; font-size: 13px; }
@@ -117,13 +118,13 @@
 .an-page.an-with-panel { height: auto; display: block; padding: 0; }
 .an-stage { box-sizing: border-box; height: 100svh; min-height: 100svh; display: flex; flex-direction: column; align-items: center; padding: 10px 16px 6px; }
 .an-panel { box-sizing: border-box; max-width: 36rem; margin: 0 auto; padding: 2.2rem 1.2rem 4rem; line-height: 1.9; text-align: center; }
-.an-panel h2 { font-family: var(--f-hero); font-weight: 700; font-size: 1.5rem; margin: 0 0 .4rem; }
+.an-panel h2 { font-family: var(--f-body); font-weight: 700; font-size: 1.5rem; margin: 0 0 .4rem; }
 .an-panel h3 { font-family: var(--f-label); font-weight: 600; font-size: .78rem; letter-spacing: .14em; text-transform: uppercase; color: var(--gold); margin: 2rem 0 .4rem; }
 .an-panel .an-buttons { display: flex; flex-wrap: wrap; justify-content: center; gap: .6rem; margin: 1rem 0; }
 .an-panel a.an-btn { text-decoration: none; display: inline-block; }
 .an-char { font-family: var(--f-hero); font-weight: 900; font-size: 6rem; line-height: 1.1; color: var(--cinnabar); margin: .2rem 0; }
 .an-memorial .an-char { color: var(--ivory); }
-.an-poem { font-family: var(--f-hero); font-size: 1.15rem; }
+.an-poem { font-family: var(--f-body); font-size: 1.15rem; }
 .an-from { margin: 0 0 1rem; color: var(--gold); }
 .an-message { margin: 1rem auto; padding: .4rem 1rem; border-left: 2px solid var(--gold); text-align: left; max-width: 26rem; }
 .an-field { display: block; text-align: left; margin: .7rem 0; font-size: .85rem; color: var(--muted); }

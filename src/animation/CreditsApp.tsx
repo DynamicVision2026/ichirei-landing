@@ -1,4 +1,5 @@
 import { useEffect } from 'react'
+import '../fonts.css'
 import './animation.css'
 
 // /credits — the attributions the typefaces behind the story film require. Shown in English and Japanese (the licences are English).

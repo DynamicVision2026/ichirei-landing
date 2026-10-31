@@ -363,6 +363,23 @@ gcloud projects add-iam-policy-binding ichirei --member="serviceAccount:$(gcloud
   leaves a gap — numbers are never handed out twice.
 - **Thank-you**: one reply per gift (200 characters), stored on the gift record, shown on the sender's page; no e-mail is sent.
 
+## Sharing a gift, and fonts that come from our own server (Part 4 of 2026-10-31)
+
+No new environment variable.
+
+- **The picture a shared link shows** (`GET /api/gift/<token>/og.png`, 1200 × 630): the sealed envelope with 「○○へ」 and the gold seal on the dark ground —
+  drawn from the two names only, so it can never show the character. Made once per gift (and again only if a name is corrected within the 24 hours) and kept in
+  the private bucket as `og/<token>.<hash>.png`; served with `Cache-Control: public, max-age=3600`.
+- **The link preview** (LINE, WhatsApp, WeChat, e-mail do not run the page's scripts): `GET /g/<token>` answers `dist/index.html` with this gift's own Open Graph
+  tags (`og:title` 「○○へ　一字の贈りもの」, `og:description` 「○○さんから · 11月10日に開封」, the picture above). Names and the opening date only; every value is
+  escaped; the generic landing tags, the Google font loader and the `<noscript>` font link are removed from it.
+- **WeChat** has no share link: the sender page offers the QR code as an image to save (`/api/gift/<token>/qr.png`) and says to send the image or the video.
+- **Fonts**: the gift page, the film/sender page and /credits ask Google for nothing (fonts.googleapis.com / fonts.gstatic.com are unreliable in mainland China).
+  Their fonts are `public/fonts/*.woff2` (see the README there), declared in `src/fonts.css`. `index.html` skips the Google font loader and the landing photo for
+  `/g/`, `/a/` and `/credits`. `scripts/measure-weight.mjs` builds the app, serves it with gzip, blocks every Google host and adds up the bytes of the whole
+  receiver path (about 340 KB for a Chinese reader, 440 KB for English, 970 KB for Japanese, which carries a 590 KB Japanese serif; plus the film's four
+  pictures).
+
 ## The engine spec in this repo
 
 `docs/ICHIREI_Engine_v9_Spec.md` is the owner's spec (v9.3, 2026-10-30) — the single source of truth: if code and the document disagree, the document wins and the difference is reported. The code check of 2026-10-30 found four differences (the free poem, no main-character count in analytics, the wider freestyle teasing list, the palette-row rule); all four were settled by updating the spec, so code and spec agree. The older alignment report of the v9.1 build is `review/V9_1_alignment_report.md`.

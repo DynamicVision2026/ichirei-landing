@@ -15,6 +15,7 @@ import { POST as poemPost } from '../api/poem.ts'
 import { POST as trackPost } from '../api/track.ts'
 import { handlers as animationHandlers } from '../api/animation.ts'
 import { handlers as previewHandlers } from '../api/preview.ts'
+import { readFile } from 'node:fs/promises'
 import { handlers as giftHandlers } from '../api/gift.ts'
 import { handlers as opsHandlers } from '../api/ops.ts'
 import { POST as analyticsPost } from '../api/analytics.ts'
@@ -161,6 +162,8 @@ export function createApp(config: ServerConfig): Hono {
   app.get('/api/film/:id/picture/:file', limited(animationLimit), (c) => animationHandlers.picture(c.req.param('id'), c.req.param('file').replace(/\.webp$/, '')))
   // The receiver's gift page (/g/<token>): its own view, pictures, render and QR; and the e-gift address (typed once, never returned by any call).
   app.get('/api/gift/:token', limited(animationLimit), (c) => giftHandlers.view(c.req.param('token'), c.req.query('preview')))
+  app.get('/api/gift/:token/og.png', limited(animationLimit), (c) => giftHandlers.og(c.req.param('token')))
+  app.get('/api/gift/:token/qr.png', limited(animationLimit), (c) => giftHandlers.qrPng(c.req.param('token')))
   app.get('/api/gift/:token/qr.svg', limited(animationLimit), (c) => giftHandlers.qr(c.req.param('token')))
   app.post('/api/gift/:token/render', requireApiKey, limited(filmRenderLimit), (c) => giftHandlers.render(c.req.param('token'), c.req.query('preview')))
   app.get('/api/gift/:token/picture/:file', limited(animationLimit), (c) => giftHandlers.picture(c.req.param('token'), c.req.param('file').replace(/\.webp$/, ''), c.req.query('preview')))
@@ -215,6 +218,17 @@ export function createApp(config: ServerConfig): Hono {
   app.use('/g/*', async (c, next) => {
     await next()
     c.header('X-Robots-Tag', 'noindex, nofollow')
+  })
+  // The receiver's link, as HTML for the crawlers of LINE, WhatsApp, WeChat and mail (they do not run the page's scripts): this gift's own Open Graph tags
+  // (names and the opening date, and the envelope picture — never the character). Everything else about the page is the built index.html.
+  let indexHtml: string | null = null
+  app.get('/g/:token', limited(animationLimit), async (c, next) => {
+    try {
+      indexHtml ??= await readFile('./dist/index.html', 'utf8')
+    } catch {
+      return next()
+    }
+    return (await giftHandlers.page(c.req.param('token'), indexHtml)) ?? next()
   })
 
   // The built bundle, stylesheet and pages are text: gzip them (Cloud Run does not). Never the API — the NDJSON
