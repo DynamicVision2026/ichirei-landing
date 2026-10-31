@@ -914,7 +914,7 @@ const mockPage = async (browser, { onExplain, result, order, track } = {}) => {
   await home.route('**/api/**', (r) => r.fulfill({ status: 204, body: '' }))
   await home.goto('http://localhost:5173/?lang=ja', { waitUntil: 'networkidle' })
   check('legal: the landing footer links to /legal', (await home.locator('[data-testid=footer-legal]').getAttribute('href')) === '/legal' && (await home.locator('[data-testid=footer-legal]').innerText()).includes('特定商取引法'))
-  check('legal: the landing\'s own questions now include the three (change after ordering, cancel, a problem)', (await home.locator('.faq details').count()) === 8 && (await home.locator('.faq').innerText()).includes('注文後に字を変えられますか？'))
+  check('legal: the landing\'s own questions now include the three (change after ordering, cancel, a problem)', (await home.locator('.faq details').count()) === 8 && (await home.locator('.faq').textContent())?.includes('注文後に字を変えられますか？'))
   await home.close()
 }
 
