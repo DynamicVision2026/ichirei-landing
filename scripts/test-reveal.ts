@@ -24,9 +24,12 @@ const { ANG } = new Function(grab('var ANG=', 'var ag=0') + '; return {ANG}')() 
 const DROPPED = new Set(['s2']) // "Checked by native speakers": no such claim yet (build ticket, honesty rules)
 // The reference's hand-made / walnut / gold-leaf claims were replaced on 2026-10-30 (ticket Part F: the claims must be true): scripts/test-claims.ts checks the new words.
 const CLAIMS_REPLACED = new Set(['sub', 's1', 'st3', 'st3p', 'sp1'])
-const keysUsed = [...ref.matchAll(/data-i="(\w+)"/g)].map((m) => m[1]).filter((k) => !DROPPED.has(k) && !CLAIMS_REPLACED.has(k))
+// The size section's heading was changed on 2026-10-31 (there are three sizes, not two): 「贈り方は、三つ」 / “Three ways to give” / 「三種送出的方式」.
+const OWNER_CHANGED = new Set(['gfH'])
+const keysUsed = [...ref.matchAll(/data-i="(\w+)"/g)].map((m) => m[1]).filter((k) => !DROPPED.has(k) && !CLAIMS_REPLACED.has(k) && !OWNER_CHANGED.has(k))
 
 check('the page uses the reference\'s copy keys: every key used by the reference page exists in all three languages', keysUsed.every((k) => k in TEXT.en && k in TEXT.ja && k in TEXT['zh-Hant']), keysUsed.filter((k) => !(k in TEXT.en)))
+check('the size heading says three: 「贈り方は、三つ」 / “Three ways to give” / 「三種送出的方式」', TEXT.ja.gfH === '贈り方は、三つ' && TEXT.en.gfH === 'Three ways to give' && TEXT['zh-Hant'].gfH === '三種送出的方式')
 check('日本語 copy is the reference\'s, word for word', keysUsed.every((k) => TEXT.ja[k as keyof typeof TEXT.ja] === (JA[k] ?? TEXT.en[k as keyof typeof TEXT.en])), keysUsed.filter((k) => TEXT.ja[k as keyof typeof TEXT.ja] !== (JA[k] ?? TEXT.en[k as keyof typeof TEXT.en])))
 check('繁中 copy is the reference\'s, word for word', keysUsed.every((k) => TEXT['zh-Hant'][k as keyof typeof TEXT.en] === (ZH[k] ?? TEXT.en[k as keyof typeof TEXT.en])), keysUsed.filter((k) => TEXT['zh-Hant'][k as keyof typeof TEXT.en] !== (ZH[k] ?? TEXT.en[k as keyof typeof TEXT.en])))
 // English: the HTML's own text for each data-i element (innerHTML), read with a regexp over the simple markup
@@ -101,7 +104,7 @@ check('rates: a table missing a currency, or with a bad number, is refused (the 
 
 // ---- 5. photos: WebP + JPG, swapping needs no code -------------------------------------------------------------------
 const IMG = new URL('../public/img/', import.meta.url).pathname
-const NAMES = ['parents', 'partner', 'friends', 'children', 'mentor', 'work', 'm1', 'm2', 'm3', 'm4', 'm5', 'm6'].map((n) => `scenes/${n}`).concat(['simple-hero', 'standard-hero'])
+const NAMES = ['parents', 'partner', 'friends', 'children', 'mentor', 'work', 'm1', 'm2', 'm3', 'm4', 'm5', 'm6'].map((n) => `scenes/${n}`).concat(['simple-hero', 'standard-hero', 'egift-hero'])
 check('photos: the 12 scenes and the 2 gift-set photos exist as JPG, with 640w and 1280w WebP beside each', NAMES.every((n) => ['.jpg', '-640.webp', '-1280.webp'].every((e) => existsSync(`${IMG}${n}${e}`))), NAMES.filter((n) => !existsSync(`${IMG}${n}.jpg`)))
 check('photos: every category in the hero has its scene photo', CATEGORIES.every((c) => existsSync(`${IMG}scenes/${c}.jpg`)))
 check('photos: no stray image files (every JPG in public/img is one the page uses)', readdirSync(`${IMG}scenes`).filter((f) => f.endsWith('.jpg')).length === 12)

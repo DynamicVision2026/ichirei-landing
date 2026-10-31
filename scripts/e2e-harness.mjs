@@ -823,6 +823,32 @@ const mockPage = async (browser, { onExplain, result, order, track } = {}) => {
   await g.close()
 }
 
+// ---------- Run 8c-4b: the size section — three ways, three columns from 900 px, the sealed envelope for the e-gift ----------
+{
+  for (const [lang, locale, head, btns] of [['ja', 'ja-JP', '贈り方は、三つ', ['eギフトではじめる', 'シンプルではじめる', 'スタンダードではじめる']], ['zh-Hant', 'zh-TW', '三種送出的方式', ['選擇 e 禮物', '選擇簡約款', '選擇標準款']], ['en', 'en-US', 'Three ways to give', ['Start with the e-gift', 'Start with Simple', 'Start with Standard']]]) {
+    for (const width of [1280, 899, 375]) {
+      const ctx = await browser.newContext({ locale, viewport: { width, height: 900 } })
+      const page = await ctx.newPage()
+      await page.goto(`http://localhost:5173/?lang=${lang}`, { waitUntil: 'networkidle' })
+      await page.locator('#gifts article').first().waitFor()
+      await page.locator('#gifts').scrollIntoViewIfNeeded()
+      await page.waitForFunction(() => [...document.querySelectorAll('#gifts article img')].length === 3 && [...document.querySelectorAll('#gifts article img')].every((i) => i.complete && i.naturalWidth > 0), null, { timeout: 8000 }).catch(() => {})
+      const g = await page.evaluate(() => ({
+        h: document.querySelector('#gifts h2').textContent,
+        boxes: [...document.querySelectorAll('#gifts article')].map((a) => ({ id: a.dataset.size, ...(({ left, top }) => ({ left: Math.round(left), top: Math.round(top) }))(a.getBoundingClientRect()), btn: a.querySelector('.btn').textContent, src: (a.querySelector('img')?.currentSrc ?? ''), ok: !!a.querySelector('img') && a.querySelector('img').complete, ph: !!a.querySelector('.giftArt') })),
+      }))
+      const ids = g.boxes.map((x) => x.id).join()
+      const sameRow = g.boxes.every((x) => x.top === g.boxes[0].top)
+      const lefts = new Set(g.boxes.map((x) => x.left)).size
+      if (width === 1280) check(`size section (${lang}, 1280 px): 「${head}」, three columns in one row in the order eギフト, 木札, 版木, and the three buttons`, g.h === head && ids === 'egift,simple,standard' && sameRow && lefts === 3 && g.boxes.map((x) => x.btn).join() === btns.join(), JSON.stringify(g))
+      if (width === 899) check(`size section (${lang}, 899 px): one column below 900 px`, lefts === 1 && !sameRow)
+      if (width === 375) check(`size section (${lang}, 375 px): one column on a phone, the e-gift first`, lefts === 1 && ids === 'egift,simple,standard' && g.boxes.every((x) => Math.abs(x.left - 16) <= 1))
+      if (width === 1280) check(`size section (${lang}): the e-gift card shows the sealed envelope picture (no grey 「字」 placeholder), the same frame as the other two`, g.boxes.every((x) => !x.ph) && g.boxes[0].src.includes('egift-hero') && g.boxes.every((x) => x.ok), JSON.stringify(g.boxes.map((x) => [x.src, x.ph])))
+      await ctx.close()
+    }
+  }
+}
+
 // ---------- Run 8c-5: Part D — the sender's page (「贈る」) and the receiver's gift page (/g/<token>), the e-gift address form ----------
 {
   const baseView = { id: 'AN-testtesttesttesttest', language: 'ja', glyph: '備', reading: 'そなえる', romanization: 'sonaeru', meaning_en: 'to be ready', who: 'いつも、頼まれる前に備えている人。', memorial: false, film: { status: 'fallback', lines: ['「ちょうど今詰めてたところ」', 'いつも、頼まれる前に備えている人。'], pictures: ['/film/washi-1.webp', '/film/washi-2.webp'] } }

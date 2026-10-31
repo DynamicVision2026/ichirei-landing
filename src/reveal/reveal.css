@@ -106,7 +106,8 @@
 .rv .stars{color:var(--star);letter-spacing:.15em;font-size:1.3rem}
 .rv .reviewsEmpty p{margin:0;color:var(--mute)}
 .rv .reviewsEmpty b{color:var(--ink);font-family:var(--display);font-size:1.15rem;display:block;margin-bottom:.2rem}
-.rv .gifts{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:1.4rem;margin-top:2.6rem}
+.rv .gifts{display:grid;grid-template-columns:1fr;gap:1.4rem;margin-top:2.6rem}
+@media (min-width:900px){.rv .gifts{grid-template-columns:repeat(3,minmax(0,1fr))}}
 .rv .gift{background:var(--card);border:1px solid var(--line);border-radius:18px;overflow:hidden;display:flex;flex-direction:column;min-width:0}
 .rv .gift img{display:block;width:100%;aspect-ratio:4/3;object-fit:cover;max-width:100%}
 .rv .gift .body{padding:1.5rem;display:flex;flex-direction:column;gap:.9rem;flex:1}
@@ -306,8 +307,6 @@
 .rv .opt.pkg .pkgShip{color:var(--ink);font-size:.85rem}
 .rv .badge,.rv .opt .badge{background:var(--ink);color:var(--paper)}
 .rv .badge.quiet{background:transparent;color:var(--mute);border:1px solid var(--line)}
-.rv .giftArt{aspect-ratio:1600/1000;display:grid;place-items:center;background:var(--tint);border-bottom:1px solid var(--line)}
-.rv .giftArt .k{font-family:var(--kanji);font-weight:900;font-size:clamp(4rem,10vw,7rem);color:var(--ink);opacity:.18;line-height:1}
 .rv .shipRow{display:grid;grid-template-columns:1fr;gap:.6rem}
 .rv .shipRow .opt{flex-wrap:wrap}
 .rv .shipRow .opt .sent{flex:1 1 100%;padding-left:2rem}

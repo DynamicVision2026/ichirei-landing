@@ -285,9 +285,10 @@ export function Reviews({ t }: { t: T }) {
 const GIFT_ALT = {
   simple: 'Wooden tag with the character in gold colour, red-and-white mizuhiki cord, certificate card and gift box',
   standard: 'Carved wooden block, rubbing ink, tampo, washi paper, certificate card and pouch',
+  egift: 'A sealed washi envelope with a gold seal, on a dark ground',
 } as const
 
-/** The two packages. Prices are the ones the order form uses (src/order/packages.ts); the approximate line is display only. */
+/** The three sizes. Prices are the ones the order form uses (src/order/packages.ts); the approximate line is display only. */
 export function Gifts({
   t,
   lang,
@@ -308,9 +309,9 @@ export function Gifts({
   const cards = PACKAGE_DISPLAY_ORDER.filter((id) => (sizes ?? []).includes(id)).map((id) => ({
     id,
     title: sc.names[id],
-    img: id === 'simple' ? 'simple-hero' : id === 'standard' ? 'standard-hero' : null,
+    img: id === 'simple' ? 'simple-hero' : id === 'standard' ? 'standard-hero' : 'egift-hero',
     items: id === 'simple' ? [t.sp1, t.sp2, t.sp3, t.sp4] : id === 'standard' ? [t.dp1, t.dp2, t.dp3, t.dp4] : [sc.includes[id], sc.ship[id]],
-    cta: id === 'simple' ? t.buy1 : id === 'standard' ? t.buy2 : t.ctaHero,
+    cta: id === 'simple' ? t.buy1 : id === 'standard' ? t.buy2 : t.buy0,
     badge: id === RECOMMENDED_PACKAGE ? sc.recommended : id === 'egift' ? sc.sendNow : null,
   }))
   return (
@@ -327,13 +328,7 @@ export function Gifts({
           const approx = approxLine(PACKAGE_PRICE_JPY[c.id], currency, rates, lang)
           return (
             <article className="gift" key={c.id} data-size={c.id}>
-              {c.img ? (
-                <Picture name={c.img} width={1600} height={1000} alt={GIFT_ALT[c.id as 'simple' | 'standard']} sizes="(max-width: 860px) 100vw, 540px" />
-              ) : (
-                <div className="giftArt notranslate" aria-hidden="true">
-                  <span className="k">字</span>
-                </div>
-              )}
+              <Picture name={c.img} width={1600} height={1000} alt={GIFT_ALT[c.id]} sizes="(max-width: 860px) 100vw, 380px" />
               <div className="body">
                 <div className="row">
                   <h3>

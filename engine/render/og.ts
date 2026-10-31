@@ -65,3 +65,35 @@ ${brand.svg}
 </svg>`
   return sharp(Buffer.from(svg)).png({ compressionLevel: 9 }).toBuffer()
 }
+
+/**
+ * The landing page's picture for the e-gift: the same sealed washi envelope and gold seal on the dark ground as the link picture, with no name on it,
+ * at the 16:10 frame of the other two size photos (1600 × 1000). Made by scripts/make-egift-image.ts into public/img/egift-hero.jpg.
+ */
+export async function makeEnvelopeArt(env: NodeJS.ProcessEnv = process.env): Promise<Buffer> {
+  const W = 1600
+  const H = 1000
+  const hero = fontObject(fontsFor('ja').character, env)
+  const ew = 880
+  const eh = Math.round(ew * (427 / 640))
+  const x0 = (W - ew) / 2
+  const y0 = (H - eh) / 2
+  const tipX = W / 2
+  const tipY = y0 + eh * 0.54
+  const seal = ['#e6c97e', '#c9a45c', '#8f6f2f']
+  const glyph = textPaths(hero, '礼', 64, tipX, tipY + 22, '#4A3510', 'middle')
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${W}" height="${H}" viewBox="0 0 ${W} ${H}">
+<defs>
+<radialGradient id="seal" cx="35%" cy="30%" r="75%"><stop offset="0" stop-color="${seal[0]}"/><stop offset=".6" stop-color="${seal[1]}"/><stop offset="1" stop-color="${seal[2]}"/></radialGradient>
+<filter id="shadow" x="-20%" y="-20%" width="140%" height="150%"><feDropShadow dx="0" dy="24" stdDeviation="26" flood-color="#000" flood-opacity=".55"/></filter>
+</defs>
+<rect width="${W}" height="${H}" fill="#1A1410"/>
+<g filter="url(#shadow)"><rect x="${x0}" y="${y0}" width="${ew}" height="${eh}" rx="8" fill="#E4D8BC"/></g>
+<polygon points="${x0},${y0 + eh} ${tipX},${y0 + eh * 0.46} ${x0 + ew},${y0 + eh}" fill="#D6C8A6" opacity=".55"/>
+<polygon points="${x0},${y0} ${x0 + ew},${y0} ${tipX},${tipY}" fill="#D6C8A6"/>
+<polyline points="${x0},${y0} ${tipX},${tipY} ${x0 + ew},${y0}" fill="none" stroke="#000" stroke-opacity=".12" stroke-width="2.5"/>
+<circle cx="${tipX}" cy="${tipY}" r="66" fill="url(#seal)"/>
+${glyph.svg}
+</svg>`
+  return sharp(Buffer.from(svg)).jpeg({ quality: 90 }).toBuffer()
+}
