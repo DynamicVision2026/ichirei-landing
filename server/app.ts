@@ -14,6 +14,7 @@ import { POST as orderPost } from '../api/order.ts'
 import { POST as poemPost } from '../api/poem.ts'
 import { POST as trackPost } from '../api/track.ts'
 import { handlers as animationHandlers } from '../api/animation.ts'
+import { handlers as previewHandlers } from '../api/preview.ts'
 import { handlers as giftHandlers } from '../api/gift.ts'
 import { handlers as opsHandlers } from '../api/ops.ts'
 import { POST as analyticsPost } from '../api/analytics.ts'
@@ -152,6 +153,11 @@ export function createApp(config: ServerConfig): Hono {
   // then served from the private bucket through the server.
   const filmRenderLimit = envRunLimiter('ICHIREI_FILM_RENDER_LIMIT', { max: 30, minutes: 10 })
   app.post('/api/film/:id/render', requireApiKey, limited(filmRenderLimit), (c) => animationHandlers.render(c.req.param('id')))
+  // The free card preview (before payment): the draft is made the moment a character is picked; its pictures are drawn once per story.
+  const previewLimit = envRunLimiter('ICHIREI_PREVIEW_LIMIT', { max: 30, minutes: 60 })
+  app.post('/api/preview', requireApiKey, limited(previewLimit), (c) => previewHandlers.start(c.req.raw))
+  app.post('/api/preview/:id/render', requireApiKey, limited(filmRenderLimit), (c) => previewHandlers.render(c.req.param('id')))
+  app.get('/api/preview/:id', limited(animationLimit), (c) => previewHandlers.view(c.req.param('id')))
   app.get('/api/film/:id/picture/:file', limited(animationLimit), (c) => animationHandlers.picture(c.req.param('id'), c.req.param('file').replace(/\.webp$/, '')))
   // The receiver's gift page (/g/<token>): its own view, pictures, render and QR; and the e-gift address (typed once, never returned by any call).
   app.get('/api/gift/:token', limited(animationLimit), (c) => giftHandlers.view(c.req.param('token')))
@@ -173,6 +179,7 @@ export function createApp(config: ServerConfig): Hono {
   app.get('/ops/cards/today.pdf', limited(opsLimit), (c) => opsHandlers.cardsToday(c.req.raw))
   app.get('/ops/wooden-today.csv', limited(opsLimit), (c) => opsHandlers.woodenCsv(c.req.raw))
   app.post('/ops/mark', limited(opsLimit), (c) => opsHandlers.mark(c.req.raw))
+  app.post('/ops/change', limited(opsLimit), (c) => opsHandlers.change(c.req.raw))
   app.post('/ops/egift/run', limited(opsLimit), (c) => opsHandlers.egiftRun(c.req.raw))
   app.post('/api/log', adaptVercelHandler(logHandler))
   // Purchase hand-off: stores the story + result under order_ref, creates the Shopify cart.

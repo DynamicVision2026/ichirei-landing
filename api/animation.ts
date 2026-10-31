@@ -46,7 +46,8 @@ async function load(id: string, d: AnimationDeps) {
   } catch {
     return { status: 503 as const }
   }
-  return isAnimationRecord(rec) ? { status: 200 as const, rec } : { status: 404 as const }
+  // a card-preview draft (engine/preview.ts) has no order behind it: it is not a page anyone can open until an order adopts it
+  return isAnimationRecord(rec) && rec.order_ref !== 'DRAFT' ? { status: 200 as const, rec } : { status: 404 as const }
 }
 
 const safeArt = async (store: OrderStore | null, id: string): Promise<ArtRecord | null> => {

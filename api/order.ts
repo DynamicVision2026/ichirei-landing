@@ -11,7 +11,10 @@
 //
 // Web-standard handler (like api/select.ts): mounted directly by server/app.ts and usable on Vercel.
 
-import { animationUrl, buildAnimationRecord, newAnimationId } from '../engine/animation.ts'
+import { animationUrl, buildAnimationRecord, newAnimationId, type AnimationRecord } from '../engine/animation.ts'
+import { adoptDraft } from '../engine/preview.ts'
+import { mergeStory } from '../engine/contract.ts'
+import { ANIMATION_ID_PATTERN } from '../engine/animation.ts'
 import { buildGiftRecord, giftUrl, newGiftToken } from '../engine/gift.ts'
 import { recordOrderIndex } from '../engine/egift-ops.ts'
 import { filmInputFromRecord, filmWaitMs, raceTimeout, trackFilm } from '../engine/film-store.ts'
@@ -120,8 +123,15 @@ export function createOrderHandler(deps: () => OrderDeps) {
     let giftLink: string | null = null
     let filmP: Promise<FilmRecord> | null = null
     try {
-      const animationId = newAnimationId()
-      const anim = buildAnimationRecord(record, animationId, now)
+      // The card preview the buyer saw (a draft made when they picked the character): if it is for this very story, it BECOMES this order's film — the same
+      // script and the same pictures, nothing written or drawn twice. Otherwise the film is made now, as before.
+      const draftId = typeof (body as { draft_id?: unknown } | null)?.draft_id === 'string' && ANIMATION_ID_PATTERN.test((body as { draft_id: string }).draft_id) ? (body as { draft_id: string }).draft_id : null
+      const built = buildAnimationRecord(record, newAnimationId(), now)
+      const adopted: AnimationRecord | null = draftId
+        ? await adoptDraft(d.store, draftId, record, built, { story: mergeStory(order.story, order.follow_ups), language: order.language, memorial: order.certificate.memorial === true }).catch(() => null)
+        : null
+      const anim = adopted ?? built
+      const animationId = anim.id
       // the receiver's own link (Part D): a second small record, so the receiver's page never carries the sender's id
       const token = newGiftToken()
       anim.gift_token = token
@@ -131,7 +141,11 @@ export function createOrderHandler(deps: () => OrderDeps) {
       record.gift_token = token
       giftLink = giftUrl(token, d.env)
       animationLink = animationUrl(animationId, d.env)
-      filmP = trackFilm(
+      if (adopted) {
+        record.production.film = adopted.film ?? undefined
+        console.log(`[ichirei-preview] ${JSON.stringify({ event: 'draft_adopted', order_ref: orderRef })}`)
+      } else if (draftId) console.log(`[ichirei-preview] ${JSON.stringify({ event: 'draft_not_adopted', order_ref: orderRef })}`)
+      if (!adopted) filmP = trackFilm(
         animationId,
         (d.film ?? makeFilm)(filmInputFromRecord(record)).then(async (film) => {
           try {

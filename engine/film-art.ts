@@ -436,6 +436,8 @@ export interface ArtDeps {
   signal?: AbortSignal
   /** The background retry: draw the pending slots now, whatever `retry_after` says. */
   force?: boolean
+  /** The card preview (before payment): every picture is checked on its own and shown as soon as it passes (see `progress` in renderLocked). */
+  progress?: boolean
 }
 
 const logLine = (log: (l: string) => void, event: string, data: Record<string, unknown>) => log(`[ichirei-film] ${JSON.stringify({ event, ...data })}`)
@@ -512,6 +514,7 @@ async function renderLocked(deps: ArtDeps, input: RenderInput): Promise<ArtRecor
   // the lock: a create-if-absent object. Someone else's fresh lease is waited for; a stale one (a crashed instance) is taken over; an INCOMPLETE film
   // is drawn again (only its pending slots) once its retry time has come; a deferral of an earlier day is taken over.
   let cur: ArtRecord | null = null
+  let leaseAt = ''
   for (;;) {
     const raw = await readArtRaw(store, id)
     const stale = !!raw && (raw.rev ?? undefined) !== (input.rev ?? undefined) // a sample of an older revision: drawn again from scratch
@@ -525,7 +528,8 @@ async function renderLocked(deps: ArtDeps, input: RenderInput): Promise<ArtRecor
     }
     if (cur?.status === 'deferred' && cur.date === dayOf(now())) return cur
     const carried = cur && cur.slots.length === n
-    const lease: ArtRecord = { ...(carried ? cur! : {}), schema: 'film-art', id, status: 'rendering', started_at: now().toISOString(), slots: carried ? cur!.slots : [], rev: input.rev }
+    leaseAt = now().toISOString()
+    const lease: ArtRecord = { ...(carried ? cur! : {}), schema: 'film-art', id, status: 'rendering', started_at: leaseAt, slots: carried ? cur!.slots : [], rev: input.rev }
     const got = await store.putObject(artPath(id), JSON.stringify(lease), 'application/json', raw ? {} : { ifAbsent: true })
     if (got) break
     // lost the race: look again
@@ -669,11 +673,33 @@ async function renderLocked(deps: ArtDeps, input: RenderInput): Promise<ArtRecor
     for (const g of left) slots[g.slot] = 'unchecked'
   }
 
+  /** While drawing: the pictures that are already checked are written into the lease (same start time, still `rendering`), so a page that is waiting can show each one as it arrives (the card preview). */
+  const progress = async () => {
+    const snap: ArtRecord = { schema: 'film-art', id, status: 'rendering', started_at: leaseAt, slots: slots.map((s) => (s === 'ai' || s === 'washi' ? s : ('pending' as const))), rev: input.rev }
+    await store.putObject(artPath(id), JSON.stringify(snap), 'application/json').catch(() => {})
+  }
+
   /** Draw `list`, two at a time. Each picture drawn is STORED (unchecked) before anything else, so a check that fails can never throw a drawing away. */
   const round = async (list: number[], attempt: number) => {
     // a slot that already failed twice and was waiting for its rewrite (the rewrite could not be had earlier)
     for (const slot of [...list]) {
       if (slots[slot] === 'pending' && checkFails[slot] >= 2 && rewrites[slot] < 1 && !(await rewriteSlot(slot, reasons[slot] || 'off_story'))) list = list.filter((x) => x !== slot)
+    }
+    if (deps.progress) {
+      // The card preview (before payment): each picture is stored the moment it is drawn and checked on its own while the next one is drawn,
+      // and every picture that has passed is written into the lease — the page that waits shows each one as soon as it is there.
+      await mapLimit(list, concurrency, async (slot) => {
+        const r = await draw(slot, attempt)
+        if (!('webp' in r)) {
+          reasons[slot] = r.error
+          return
+        }
+        await store.putObject(uncheckedPath(id, slot + 1), r.webp, 'image/webp')
+        slots[slot] = 'unchecked'
+        await checkStored([{ slot, webp: r.webp }], attempt)
+        await progress()
+      })
+      return
     }
     const results = await mapLimit(list, concurrency, async (slot) => ({ slot, r: await draw(slot, attempt) }))
     const good: { slot: number; webp: Buffer }[] = []

@@ -48,3 +48,18 @@ export function trackFlow(event: FlowEvent, fields: { language?: string; set?: s
     // analytics must never get in the way
   }
 }
+
+/** The free card preview (engine/analytics.ts PREVIEW_EVENTS): codes and counts only — never a character, a poem or a story. */
+export type PreviewEvent = 'card_preview_shown' | 'candidates_retry' | 'pictures_before_pay' | 'preview_to_order'
+export function trackPreview(event: PreviewEvent, fields: { language?: string; n?: 1 | 2; state?: 'shown' | 'limited' | 'failed'; secs?: number } = {}): void {
+  try {
+    void fetch('/api/analytics', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ session: sessionId, source: 'customer', event, ...fields }),
+      keepalive: true,
+    }).catch(() => {})
+  } catch {
+    // analytics must never get in the way
+  }
+}

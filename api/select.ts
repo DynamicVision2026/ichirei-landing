@@ -16,7 +16,7 @@ import { runEngine } from '../engine/engine.ts'
 import { ModelTimeoutError, callTimeoutMs } from '../engine/limits.ts'
 import { cleanSession, cleanSource, recordEvent, shownEvent } from '../engine/analytics.ts'
 import { parsePromptQuestion } from '../engine/story-questions.ts'
-import { FOLLOW_UP_MAX, STORY_MAX, countChars, mergeStory, parseContext, parseFollowUps, type Condition } from '../engine/contract.ts'
+import { FOLLOW_UP_MAX, STORY_MAX, parseExclude, countChars, mergeStory, parseContext, parseFollowUps, type Condition } from '../engine/contract.ts'
 
 // Full Hobby-plan ceiling (also mirrored in vercel.json).
 export const maxDuration = 60
@@ -38,7 +38,9 @@ export async function POST(req: Request): Promise<Response> {
     return jsonResponse(400, { error: 'Body is not valid JSON' })
   }
 
-  const { story, follow_ups, session, source, condition, language, relationship, direction, occasion, occasion_detail, inscription_script, prompt_question, reader } = (body ?? {}) as {
+  const { story, follow_ups, session, source, condition, language, relationship, direction, occasion, occasion_detail, inscription_script, prompt_question, reader, exclude, retry } = (body ?? {}) as {
+    exclude?: unknown
+    retry?: unknown
     prompt_question?: unknown
     reader?: unknown
     story?: unknown
@@ -78,6 +80,10 @@ export async function POST(req: Request): Promise<Response> {
   // request is never put in a prompt); it does not count toward the story limit and an unknown one is simply ignored.
   const promptQuestion = parsePromptQuestion(prompt_question, parsed.context.language)
 
+  // 「別の候補を見る」: the characters already shown for this story (never chosen again) and which retry this is (at most 2).
+  const ex = parseExclude(exclude, retry)
+  if (!ex.ok) return jsonResponse(400, { error: ex.error, code: ex.code })
+
   if (!process.env.ANTHROPIC_API_KEY) {
     return jsonResponse(500, {
       error:
@@ -96,6 +102,7 @@ export async function POST(req: Request): Promise<Response> {
         const result = await runEngine(mergeStory(story, fu.followUps), cond, {
           context: parsed.context,
           promptQuestion: promptQuestion?.text ?? null,
+          exclude: ex.exclude,
           followUpsUsed: fu.followUps.length,
           onStage: (stage) => send({ type: 'stage', stage }),
           onDelta: (text) => {

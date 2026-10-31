@@ -195,8 +195,9 @@ Produce, in this order:
 5. The FREESTYLE candidate (slot freestyle) if there is one: its character, its pinyin reading, one light line, its story anchor — or none
 6. Honesty flags — anywhere you were unsure of suitability, anywhere you inferred beyond the text, and (if relevant) whether the honest best answer was limited by thin input.
 Do not write the deep explanation, classical allusion, or gift symbolism. That is Stage B, and it is only earned after a character has proven itself here on one sentence alone.
+ALREADY SHOWN (optional). If the sender has already seen characters for this same story and asked for others, they are listed just above the story as `ALREADY SHOWN FOR THIS STORY`, otherwise this paragraph is empty. Never choose any of those characters, in any slot, in any form. Choose characters that are still true to the story and that carry a different truth about the person, not only a different shape.
 SENDER QUESTION (optional). The sender may have been shown one question above the story box; if so, it appears on the next line as `QUESTION SHOWN TO THE SENDER`, otherwise this paragraph is empty. The sender saw this question. The story may answer it or may be about something else. Choose the character only from what the story says. The question is not part of the story: never quote it as a story_anchor, never treat it as something the sender said, and never let it decide the truth type or the character.
-{{ SENDER QUESTION }}STORY
+{{ ALREADY SHOWN }}{{ SENDER QUESTION }}STORY
 
 ```
 {{ Paste the story here }}

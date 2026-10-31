@@ -21,11 +21,17 @@ export type Choice = (typeof CHOICES)[number]
 /** The story step of the page (Part A, 2026-10-30): codes only — the language, the question set and the question id (a known id, never text). */
 export const FLOW_EVENTS = ['story_opened', 'question_shown', 'question_switched', 'voice_used', 'draft_restored', 'story_submitted', 'followup_shown', 'reveal_shown'] as const
 export type FlowEvent = (typeof FLOW_EVENTS)[number]
-export const CLIENT_EVENTS = ['chosen', 'explain_opened', ...FLOW_EVENTS] as const
+/** The free card preview (2026-10-30): codes only — never a character or a story. `n` = which retry (1 or 2); `state` = how the pictures went; `secs` = seconds from the pick to a complete preview. */
+export const PREVIEW_EVENTS = ['card_preview_shown', 'candidates_retry', 'pictures_before_pay', 'preview_to_order'] as const
+export type PreviewEvent = (typeof PREVIEW_EVENTS)[number]
+export const PICTURE_STATES = ['shown', 'limited', 'failed'] as const
+export type PictureState = (typeof PICTURE_STATES)[number]
+export const CLIENT_EVENTS = ['chosen', 'explain_opened', ...FLOW_EVENTS, ...PREVIEW_EVENTS] as const
 
 export type AnalyticsEvent =
   | { ts: string; session: string; source: Source; event: 'shown'; language: Language; relationship: Relationship | null; occasion: Occasion | null; status: 'sufficient' | 'insufficient'; main_slot: 'main' | 'second' | null; has_freestyle: boolean }
   | { ts: string; session: string; source: Source; event: FlowEvent; language: Language | null; set: QuestionSet | null; qid: string | null }
+  | { ts: string; session: string; source: Source; event: PreviewEvent; language: Language | null; n: 1 | 2 | null; state: PictureState | null; secs: number | null }
   | { ts: string; session: string; source: Source; event: 'chosen'; choice: Choice }
   | { ts: string; session: string; source: Source; event: 'explain_opened'; choice: Choice | null }
   | { ts: string; session: string; source: Source; event: 'ordered'; poem_types?: PoemType[] }
@@ -52,6 +58,13 @@ export function parseClientEvent(body: unknown, now: Date): AnalyticsEvent | nul
     const qid = findQuestion(b.qid)?.question.id ?? null
     const set = (QUESTION_SETS as readonly string[]).includes(b.set as string) ? (b.set as QuestionSet) : null
     return { ts, session, source, event: b.event as FlowEvent, language, set, qid }
+  }
+  if ((PREVIEW_EVENTS as readonly string[]).includes(b.event as string)) {
+    const language = (LANGUAGES as readonly string[]).includes(b.language as string) ? (b.language as Language) : null
+    const n = b.n === 1 || b.n === 2 ? b.n : null
+    const state = (PICTURE_STATES as readonly string[]).includes(b.state as string) ? (b.state as PictureState) : null
+    const secs = typeof b.secs === 'number' && Number.isFinite(b.secs) && b.secs >= 0 && b.secs < 3600 ? Math.round(b.secs) : null
+    return { ts, session, source, event: b.event as PreviewEvent, language, n, state, secs }
   }
   if (b.event === 'chosen') return choice ? { ts, session, source, event: 'chosen', choice } : null
   return { ts, session, source, event: 'explain_opened', choice }

@@ -382,6 +382,9 @@ export function Faq({ t }: { t: T }) {
     [t.fq3, t.fa3],
     [t.fq4, t.fa4],
     [t.fq5, t.fa5],
+    [t.fq6, t.fa6],
+    [t.fq7, t.fa7],
+    [t.fq8, t.fa8],
   ] as const
   return (
     <section className="tintBand">
@@ -432,6 +435,7 @@ export function Footer({ t }: { t: T }) {
         <span>ICHIREI 一字礼 · Beyond Culture 獨歩文化株式会社</span>
         <span data-testid="footer-slogan">{t.slogan}</span>
         <span>{withTrackLink(t.foot)}</span>
+        <a href="/legal" data-testid="footer-legal">{t.legal}</a>
       </div>
     </footer>
   )

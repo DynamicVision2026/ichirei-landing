@@ -15,6 +15,7 @@ relationship and direction describe who the RECEIVER is to the SENDER (direction
 THE CHARACTER THAT WILL BE SHOWN AT THE END (do not write it, do not hint at it)
 character: {{ KANJI }}
 the line printed under it ("who they are"): {{ WHO }}
+If the character line reads `(chosen after the film)`, this film is drawn before the sender has chosen a character: write it from the story alone, and make every line and picture work whichever character is chosen. Never name or hint at any character.
 
 THE STORY (the sender's own words; the receiver is the person they describe)
 ```

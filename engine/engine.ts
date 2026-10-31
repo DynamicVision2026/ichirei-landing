@@ -60,6 +60,8 @@ const REVIEW_MODEL = process.env.ICHIREI_REVIEW_MODEL ?? DEFAULT_REVIEW_MODEL
 export const STORY_SLOT = '{{ Paste the story here }}'
 /** Optional (a template without it simply has no question): the story-opener question the sender was shown, as one line before the story. */
 export const QUESTION_SLOT = '{{ SENDER QUESTION }}'
+/** 「別の候補を見る」: the characters already shown for this story (the prompt files say what to do with them). */
+export const SHOWN_SLOT = '{{ ALREADY SHOWN }}'
 export const CONTEXT_SLOTS = {
   language: '{{ LANGUAGE }}',
   relationship: '{{ RELATIONSHIP }}',
@@ -117,7 +119,7 @@ export function loadPrompt(language: Language): string {
   const path = resolvePromptPath(language)
   const text = readFileSync(path, 'utf8')
   // A prompt that silently dropped a slot would silently drop an input — fail loudly.
-  const required = [STORY_SLOT, ...Object.values(CONTEXT_SLOTS), ...(family === 'zh' ? Object.values(SCRIPT_SLOTS) : [])]
+  const required = [STORY_SLOT, SHOWN_SLOT, ...Object.values(CONTEXT_SLOTS), ...(family === 'zh' ? Object.values(SCRIPT_SLOTS) : [])]
   const missing = required.filter((slot) => !text.includes(slot))
   if (missing.length > 0) {
     throw new Error(`${promptFileName(language)} is missing slot(s) ${missing.join(', ')} (looked at ${path})`)
@@ -131,8 +133,8 @@ export function loadPrompt(language: Language): string {
  * the story or the free-text occasion_detail that happens to look like a slot is
  * never re-scanned or substituted.
  */
-export function fillPrompt(template: string, story: string, context: EngineContext, promptQuestion: string | null = null): string {
-  const values = new Map<string, string>([[STORY_SLOT, story], [QUESTION_SLOT, promptQuestion ? `QUESTION SHOWN TO THE SENDER (context only): ${promptQuestion.replace(/\s+/g, ' ').trim()}\n\n` : '']])
+export function fillPrompt(template: string, story: string, context: EngineContext, promptQuestion: string | null = null, shown: readonly string[] = []): string {
+  const values = new Map<string, string>([[STORY_SLOT, story], [SHOWN_SLOT, shown.length ? `ALREADY SHOWN FOR THIS STORY: ${shown.join(' ')}\n\n` : ''], [QUESTION_SLOT, promptQuestion ? `QUESTION SHOWN TO THE SENDER (context only): ${promptQuestion.replace(/\s+/g, ' ').trim()}\n\n` : '']])
   for (const key of Object.keys(CONTEXT_SLOTS) as (keyof typeof CONTEXT_SLOTS)[]) {
     values.set(CONTEXT_SLOTS[key], context[key] ?? UNSPECIFIED)
   }
@@ -212,6 +214,8 @@ export interface RunEngineOptions {
   context?: Partial<EngineContext>
   /** The story-opener question the sender was shown (the server's own wording for a known id; engine/story-questions.ts). Context only, one line before the story. */
   promptQuestion?: string | null
+  /** 「別の候補を見る」: characters already shown to the sender for THIS story (any form). They are left out of the list, named in the prompt, and removed by the referee from every slot. */
+  exclude?: string[]
   /** Token usage of each model call (stage 'select' = the main call, 'review' = the separate review call) — for cost accounting by the test runner. */
   onUsage?: (stage: 'select' | 'review' | 'replace', usage: { model: string; input_tokens: number; output_tokens: number }) => void
   /**
@@ -269,7 +273,7 @@ async function runEngineInner(
   if (!parsed.ok) throw new Error(parsed.error)
   const context = parsed.context
 
-  const prompt = fillPrompt(loadPrompt(context.language), trimmed, context, opts.promptQuestion ?? null)
+  const prompt = fillPrompt(loadPrompt(context.language), trimmed, context, opts.promptQuestion ?? null, opts.exclude ?? [])
   // Load the palette BEFORE spending a reasoning pass: no palette, no blocklist, no run.
   const palette = loadPalette()
   const client = new Anthropic(opts.apiKey ? { apiKey: opts.apiKey } : {})
@@ -283,6 +287,10 @@ async function runEngineInner(
     try {
       const lexicon = opts.lexicon ?? loadLexicon()
       const set = eligibleFor(lexicon, palette, context)
+      if (opts.exclude?.length) {
+        const out = new Set(opts.exclude)
+        set.chars = set.chars.filter((ch) => !out.has(ch.kanji) && !(ch.inscription_form && out.has(ch.inscription_form)))
+      }
       view = { set, parts: buildLexiconPrompt(lexicon, set, context.relationship, context.language), lexicon }
     } catch (err) {
       console.log(`[ichirei-lexicon] unavailable ${JSON.stringify({ mode, error: (err instanceof Error ? err.message : String(err)).slice(0, 160) })}`)
@@ -542,7 +550,8 @@ async function runPipeline(a: PipelineArgs): Promise<PipelineOut> {
   // context_required kanji as primary; promotes slot 2. When no main candidate survives, the result is held (deferInsufficient) so one
   // replacement can be tried before the sender is told there is nothing. A missing or malformed palette fails the request loudly
   // (above), never silently skips the blocklist. In lexicon mode the same pass also rejects any main or second character outside the list.
-  const refereed = applyPalette(stamped, palette, story, { deferInsufficient: true, inLexicon: onList, canBeMain })
+  const excluded = opts.exclude?.length ? new Set(opts.exclude) : undefined
+  const refereed = applyPalette(stamped, palette, story, { deferInsufficient: true, inLexicon: onList, canBeMain, excluded })
   if (refereed.status !== 'sufficient') {
     const closed = finalizeResult(refereed)
     timing({ review_ms: 0, replace_ms: 0, status: closed.status })
@@ -581,6 +590,7 @@ async function runPipeline(a: PipelineArgs): Promise<PipelineOut> {
     onStage: opts.onStage,
     inLexicon: onList,
     mainOk: canBeMain,
+    excluded,
   })
   // The last gate: at most one main, one second, one freestyle — and never zero cards without a question.
   const final = finalizeResult(completed)

@@ -46,7 +46,7 @@ interface AdminOrderAddr {
   shippingAddress?: AdminAddress | null
 }
 
-const QUERY = `query ShipTo($q: String!, $after: String) {
+const ADDRESS_QUERY = `query ShipTo($q: String!, $after: String) {
   orders(first: 100, after: $after, query: $q, sortKey: CREATED_AT, reverse: true) {
     pageInfo { hasNextPage endCursor }
     nodes {
@@ -58,10 +58,25 @@ const QUERY = `query ShipTo($q: String!, $after: String) {
   }
 }`
 
+/** Payment only — no customer data at all, so it works with read_orders alone (no protected-customer-data approval). */
+const PAYMENT_QUERY = `query Paid($q: String!, $after: String) {
+  orders(first: 100, after: $after, query: $q, sortKey: CREATED_AT, reverse: true) {
+    pageInfo { hasNextPage endCursor }
+    nodes {
+      createdAt
+      cancelledAt
+      displayFinancialStatus
+      customAttributes { key value }
+      lineItems(first: 5) { nodes { customAttributes { key value } } }
+      transactions(first: 10) { kind status processedAt }
+    }
+  }
+}`
+
 const DENIED = /protected customer data|not approved|access denied|ACCESS_DENIED|not have access/i
 const MAX_PAGES = 5
 
-const refOf = (o: AdminOrderAddr): string | null => {
+const refOf = (o: { customAttributes?: Attr[] | null; lineItems?: { nodes?: { customAttributes?: Attr[] | null }[] } | null }): string | null => {
   for (const a of [...(o.customAttributes ?? []), ...(o.lineItems?.nodes ?? []).flatMap((n) => n.customAttributes ?? [])]) if (a?.key === 'order_ref' && a.value) return a.value
   return null
 }
@@ -81,8 +96,20 @@ const dayOfRef = (ref: string): string | null => {
   return m ? `${m[1]}-${m[2]}-${m[3]}` : null
 }
 
-export async function readShippingAddresses(refs: string[], d: TrackDeps | null, tokens: AdminTokenCache): Promise<ShippingResult> {
-  const found = new Map<string, ShippingAddress>()
+interface Page<T> {
+  pageInfo?: { hasNextPage?: boolean; endCursor?: string | null }
+  nodes?: T[]
+}
+
+/** The orders of the Shopify store since the day of the oldest ref, matched to our refs; `pick` turns one Shopify order into what the caller wants (null = skip it). */
+async function scan<N extends { customAttributes?: Attr[] | null; lineItems?: { nodes?: { customAttributes?: Attr[] | null }[] } | null }, T>(
+  refs: string[],
+  d: TrackDeps | null,
+  tokens: AdminTokenCache,
+  query: string,
+  pick: (o: N) => T | null,
+): Promise<{ found: Map<string, T>; failure: ShippingFailure | null }> {
+  const found = new Map<string, T>()
   if (!refs.length) return { found, failure: null }
   if (!d) return { found, failure: 'not_configured' }
   const days = refs.map(dayOfRef).filter((x): x is string => !!x).sort()
@@ -97,7 +124,7 @@ export async function readShippingAddresses(refs: string[], d: TrackDeps | null,
         doFetch(`${d.config.apiBase}/admin/api/${d.config.apiVersion}/graphql.json`, {
           method: 'POST',
           headers: { 'content-type': 'application/json', 'x-shopify-access-token': token },
-          body: JSON.stringify({ query: QUERY, variables: { q: `created_at:>=${since}`, after } }),
+          body: JSON.stringify({ query, variables: { q: `created_at:>=${since}`, after } }),
           signal: AbortSignal.timeout(20_000),
         })
       let res = await call(await tokens.get(d))
@@ -107,7 +134,7 @@ export async function readShippingAddresses(refs: string[], d: TrackDeps | null,
       }
       if (res.status === 403) return { found, failure: 'protected_customer_data' }
       if (!res.ok) throw new TrackUnavailable(`Shopify Admin API HTTP ${res.status}`)
-      const json = (await res.json()) as { data?: { orders?: { pageInfo?: { hasNextPage?: boolean; endCursor?: string | null }; nodes?: AdminOrderAddr[] } }; errors?: { message?: string; extensions?: { code?: string } }[] }
+      const json = (await res.json()) as { data?: { orders?: Page<N> }; errors?: { message?: string; extensions?: { code?: string } }[] }
       if (json.errors?.length) {
         const text = json.errors.map((e) => `${e.extensions?.code ?? ''} ${e.message ?? ''}`).join('; ')
         if (DENIED.test(text)) return { found, failure: 'protected_customer_data' }
@@ -117,9 +144,9 @@ export async function readShippingAddresses(refs: string[], d: TrackDeps | null,
       if (!orders?.nodes) throw new TrackUnavailable('Shopify Admin API returned no orders field')
       for (const o of orders.nodes) {
         const ref = refOf(o)
-        if (!ref || !wanted.has(ref) || o.cancelledAt) continue
-        // A shipping address that came back empty for an order we know is the access refusal in disguise (Shopify blanks protected fields), unless the order truly has none.
-        if (o.shippingAddress) found.set(ref, clean(o.shippingAddress))
+        if (!ref || !wanted.has(ref) || found.has(ref)) continue
+        const got = pick(o)
+        if (got !== null) found.set(ref, got)
       }
       if (found.size >= wanted.size || !orders.pageInfo?.hasNextPage || !orders.pageInfo.endCursor) break
       after = orders.pageInfo.endCursor
@@ -127,9 +154,52 @@ export async function readShippingAddresses(refs: string[], d: TrackDeps | null,
     return { found, failure: null }
   } catch (err) {
     // the reason goes to the log; no address is ever in it
-    console.error('[ichirei-ops] shipping addresses unavailable:', err instanceof Error ? err.message : err)
+    console.error('[ichirei-ops] Shopify orders unavailable:', err instanceof Error ? err.message : err)
     return { found, failure: 'unavailable' }
   }
+}
+
+export async function readShippingAddresses(refs: string[], d: TrackDeps | null, tokens: AdminTokenCache): Promise<ShippingResult> {
+  return scan<AdminOrderAddr, ShippingAddress>(refs, d, tokens, ADDRESS_QUERY, (o) => (o.cancelledAt || !o.shippingAddress ? null : clean(o.shippingAddress)))
+}
+
+// ---- payment: when was it paid, and is the order still alive ---------------------------------------------------------------------------------------------------
+
+/** What Shopify says about one order: paid (and when), cancelled, refunded. No customer data. */
+export interface PaymentInfo {
+  state: 'paid' | 'unpaid' | 'cancelled' | 'refunded'
+  /** When the payment went through (the 24-hour change window starts here). null while unpaid. */
+  paid_at: string | null
+}
+export interface PaymentResult {
+  found: Map<string, PaymentInfo>
+  failure: ShippingFailure | null
+}
+
+interface AdminOrderPay {
+  createdAt?: string | null
+  cancelledAt?: string | null
+  displayFinancialStatus?: string | null
+  customAttributes?: Attr[] | null
+  lineItems?: { nodes?: { customAttributes?: Attr[] | null }[] } | null
+  transactions?: { kind?: string | null; status?: string | null; processedAt?: string | null }[] | null
+}
+
+const PAID_STATES = new Set(['PAID', 'PARTIALLY_PAID', 'AUTHORIZED', 'PARTIALLY_REFUNDED'])
+
+/** The moment of payment: the first successful sale / capture (else authorization) transaction, else the order's own time when it is marked paid. */
+export function paymentOf(o: AdminOrderPay): PaymentInfo {
+  const status = (o.displayFinancialStatus ?? '').toUpperCase()
+  if (o.cancelledAt) return { state: 'cancelled', paid_at: null }
+  if (status === 'REFUNDED' || status === 'VOIDED' || status === 'EXPIRED') return { state: 'refunded', paid_at: null }
+  if (!PAID_STATES.has(status)) return { state: 'unpaid', paid_at: null }
+  const ok = (o.transactions ?? []).filter((t) => (t.status ?? '').toUpperCase() === 'SUCCESS' && t.processedAt)
+  const pick = (kinds: string[]) => ok.filter((t) => kinds.includes((t.kind ?? '').toUpperCase())).map((t) => t.processedAt as string).sort()[0]
+  return { state: 'paid', paid_at: pick(['SALE', 'CAPTURE']) ?? pick(['AUTHORIZATION']) ?? o.createdAt ?? null }
+}
+
+export async function readPayments(refs: string[], d: TrackDeps | null, tokens: AdminTokenCache): Promise<PaymentResult> {
+  return scan<AdminOrderPay, PaymentInfo>(refs, d, tokens, PAYMENT_QUERY, (o) => paymentOf(o))
 }
 
 /** The wording of the CSV's address_source cell. */

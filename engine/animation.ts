@@ -43,6 +43,8 @@ export interface AnimationRecord {
   film: FilmRecord | null
   /** The receiver's page of this order (engine/gift.ts): the sender's page offers it for sharing. Never sent to the receiver. */
   gift_token?: string | null
+  /** The card preview before payment (engine/preview.ts): set while the record belongs to a story, not yet to an order; removed when an order adopts it. */
+  draft?: { story_hash: string; memorial: boolean; created_at: string } | null
 }
 
 export function buildAnimationRecord(record: OrderRecord, id: string, now: Date = new Date()): AnimationRecord {

@@ -129,6 +129,8 @@ export interface ReplaceOptions {
   inLexicon?: (c: Candidate) => boolean
   /** Readability: when the replacement becomes the MAIN (no primary is left), it must pass this (Japanese buyers: a 常用漢字). */
   mainOk?: (c: Candidate) => boolean
+  /** Characters already shown for this story (a retry): a replacement may not be one of them. */
+  excluded?: ReadonlySet<string>
 }
 
 /**
@@ -205,7 +207,7 @@ export async function completeMains(
     }
     // The same referee, then the same review, as any candidate: judged alone (the primary and the other slots are not touched).
     const mini: EngineResult = { ...current, candidates: [cand], primary_kanji: cand.kanji, runner_up_kanji: null, freestyle_kanji: null, referee: undefined, review: undefined }
-    const refereed = applyPalette(mini, palette, story, { inLexicon: opts.inLexicon })
+    const refereed = applyPalette(mini, palette, story, { inLexicon: opts.inLexicon, excluded: opts.excluded })
     const reasonOf = (r: EngineResult) => r.referee?.actions.find((a) => a.kanji === cand!.kanji && /eliminated/.test(a.action))?.detail ?? r.candidates[0]?.eliminated_reason ?? 'refused'
     // (judged alone, the candidate is its own mini-result's primary: a refusal turns that result `insufficient`)
     if (refereed.status !== 'sufficient' || !refereed.candidates[0] || refereed.candidates[0].eliminated) {

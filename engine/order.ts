@@ -76,6 +76,46 @@ export function buildCertificate(candidate: Candidate, glyph: string, language: 
   }
 }
 
+/**
+ * Every character shown to the sender for this story ("別の候補を見る" gives up to three sets), with its slot and its "how it matches" lines (the candidate as the
+ * engine wrote it). Kept on the order: for 24 hours after payment the owner may switch to any of them (/ops).
+ */
+export interface ShownCharacter {
+  /** Which set of candidates it was in (1 = the first, 2 and 3 = after 「別の候補を見る」). */
+  set: 1 | 2 | 3
+  slot: 'main' | 'second' | 'freestyle'
+  candidate: Candidate
+}
+
+export const SHOWN_MAX = 9
+
+/** The chosen character is always part of the shown list (the browser may have sent none). */
+function withChosen(list: ShownCharacter[], chosen: Candidate): ShownCharacter[] {
+  if (list.some((s) => s.candidate.kanji === chosen.kanji)) return list
+  const slot = chosen.slot === 'main' || chosen.slot === 'second' || chosen.slot === 'freestyle' ? chosen.slot : 'main'
+  return [...list, { set: 1 as const, slot, candidate: chosen }].slice(0, SHOWN_MAX)
+}
+const SHOWN_CANDIDATE_MAX_CHARS = 6000
+
+/** The shown list the browser sent: only live candidates that read like the engine's own (a character, a reading, the gaze line and the anchor), at most nine. Anything else is left out. */
+export function parseShown(raw: unknown): ShownCharacter[] {
+  if (!Array.isArray(raw)) return []
+  const out: ShownCharacter[] = []
+  for (const item of raw.slice(0, SHOWN_MAX)) {
+    if (!isObject(item) || !isObject(item.candidate)) continue
+    const c = item.candidate as unknown as Candidate
+    const set = item.set === 1 || item.set === 2 || item.set === 3 ? item.set : null
+    const slot = c.slot === 'main' || c.slot === 'second' || c.slot === 'freestyle' ? c.slot : null
+    if (!set || !slot || c.eliminated === true) continue
+    if (typeof c.kanji !== 'string' || [...c.kanji].length !== 1 || !isText(c.reading) || !isText(c.one_line_gaze) || !isText(c.story_anchor)) continue
+    if (c.inscription_form !== null && c.inscription_form !== undefined && typeof c.inscription_form !== 'string') continue
+    if (JSON.stringify(c).length > SHOWN_CANDIDATE_MAX_CHARS) continue
+    if (out.some((o) => o.candidate.kanji === c.kanji)) continue
+    out.push({ set, slot, candidate: { ...c, inscription_form: c.inscription_form ?? null } })
+  }
+  return out
+}
+
 export interface ValidOrder {
   story: string
   /** The sender's answers to the engine's follow-up questions (each at most 600 characters), kept apart from the story. */
@@ -99,6 +139,8 @@ export interface ValidOrder {
   sender_email: string | null
   /** The short message printed on the card when shipping directly or as an e-gift (empty otherwise). */
   gift_message: string
+  /** Every character shown for this story, with its slot (see ShownCharacter); always contains the chosen one. */
+  shown: ShownCharacter[]
 }
 
 export type ParsedOrder = { ok: true; order: ValidOrder } | { ok: false; error: string; field: string }
@@ -106,6 +148,13 @@ export type ParsedOrder = { ok: true; order: ValidOrder } | { ok: false; error: 
 const fail = (field: string, error: string): ParsedOrder => ({ ok: false, field, error })
 const isObject = (v: unknown): v is Record<string, unknown> => typeof v === 'object' && v !== null && !Array.isArray(v)
 const isText = (v: unknown): v is string => typeof v === 'string' && v.trim() !== ''
+
+/** The carving check (spec v9.1 step 9) for the Simple set; null = fine. The count is the server's own (engine/strokes.csv), never the browser's. */
+export function simpleStrokeProblem(candidate: Candidate, glyph: string): string | null {
+  const max = simpleMaxStrokes()
+  const n = carvedStrokes({ kanji: candidate.kanji, inscription_form: candidate.inscription_form, strokes: strokeInfo(candidate) }, glyph)
+  return simpleAvailable(n, max) ? null : `The Simple set carves at most ${max} strokes; "${glyph}" has ${n ?? 'an unknown number of'} — choose the Standard set`
+}
 
 /** Today's date in Japan (UTC+9) as YYYY-MM-DD — deliveries are in JST. */
 export function todayJst(now: Date): string {
@@ -210,9 +259,8 @@ export function parseOrderRequest(body: unknown, now: Date = new Date(), palette
   // The carving check (spec v9.1 step 9): the Simple set takes only characters up to ICHIREI_SIMPLE_MAX_STROKES strokes (default 20). The count
   // is the SERVER's own (engine/strokes.csv), never the browser's; an unknown count is not allowed on Simple (the Standard set always is).
   if (pkg === 'simple') {
-    const max = simpleMaxStrokes()
-    const n = carvedStrokes({ kanji: candidate.kanji, inscription_form: candidate.inscription_form, strokes: strokeInfo(candidate) }, glyph)
-    if (!simpleAvailable(n, max)) return fail('package', `The Simple set carves at most ${max} strokes; "${glyph}" has ${n ?? 'an unknown number of'} — choose the Standard set`)
+    const problem = simpleStrokeProblem(candidate, glyph)
+    if (problem) return fail('package', problem)
   }
   return {
     ok: true,
@@ -233,6 +281,7 @@ export function parseOrderRequest(body: unknown, now: Date = new Date(), palette
       ship_to,
       gift_message,
       sender_email,
+      shown: withChosen(parseShown(body.shown_characters), candidate),
     },
   }
 }
@@ -321,6 +370,25 @@ export function poemAttributes(p: { type: PoemType; lines: string[]; reading: st
 
 // ---- the server-side record -----------------------------------------------------------------
 
+/** One owner action on an order, in the order's own log: who (the user name the owner typed at /ops), when, what — codes and the character, never story text. */
+export interface OpsLogEntry {
+  at: string
+  who: string
+  action: 'change_character' | 'change_poem' | 'edit_names' | 'cancel'
+  detail: string
+}
+
+/** What the owner did with the order on /ops (our own record only — nothing is written to Shopify). */
+export interface OrderOps {
+  printed_at?: string
+  shipped_at?: string
+  /** Flag only: the order leaves the print list and the workshop CSV. The refund is made in Shopify by the owner. */
+  cancelled_at?: string
+  /** The poem format may be changed once per order. */
+  poem_format_changes?: number
+  log?: OpsLogEntry[]
+}
+
 export type OrderStatus = 'pending' | 'cart_created' | 'cart_failed'
 
 export interface OrderRecord {
@@ -368,8 +436,12 @@ export interface OrderRecord {
   /** Kept here, never sent to Shopify. `story` is what the sender wrote first; `follow_ups` are their answers to the engine's questions. */
   story: string
   follow_ups: string[]
+  /** The owner's marks and changes (/ops). */
+  ops?: OrderOps
   /** The story-opener question the sender was shown (a known id; codes only) — for the report of which questions lead to which characters. */
   prompt_question_id?: string | null
+  /** Every character shown for this story, with its slot and its lines (the switch list of the 24-hour change window). */
+  shown_characters?: ShownCharacter[]
   engine_result: EngineResult
   shopify: { cart_id: string; checkout_url: string; variant_id: string } | null
   error: string | null
@@ -412,6 +484,7 @@ export function buildRecord(order: ValidOrder, orderRef: string, now: Date = new
     story: order.story,
     follow_ups: order.follow_ups,
     prompt_question_id: order.prompt_question_id ?? null,
+    shown_characters: order.shown,
     engine_result: order.engine_result,
     shopify: null,
     error: null,

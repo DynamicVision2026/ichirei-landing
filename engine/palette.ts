@@ -381,6 +381,8 @@ const rowsFor = (palette: Palette, families: Family[], c: Candidate): Found[] =>
 
 const unique = (xs: string[]) => [...new Set(xs)]
 
+export const ALREADY_SHOWN_REASON = 'palette: already shown for this story'
+
 export interface RefereeOptions {
   /** Log sink for `[ichirei-referee] en cross-check …` lines (default console.log). Never receives story text. */
   log?: (line: string) => void
@@ -402,6 +404,8 @@ export interface RefereeOptions {
    * returns false can still be shown as the second or the freestyle. Handled like a missing anchor: the primary is refused, the second is promoted.
    */
   canBeMain?: (c: Candidate) => boolean
+  /** 「別の候補を見る」: characters already shown for this story. A candidate in ANY slot whose character (either form) is in this set is removed. */
+  excluded?: ReadonlySet<string>
 }
 
 export const requireClassicalEchoFromEnv = (env: NodeJS.ProcessEnv = process.env): boolean => /^(1|true|on|yes)$/i.test((env.REQUIRE_CLASSICAL_ECHO ?? '').trim())
@@ -497,6 +501,13 @@ export function applyPalette(result: EngineResult, palette: Palette, story: stri
   //    (and, for en, the two-palette rules).
   const candidates: Candidate[] = result.candidates.map((orig) => {
     const c: Candidate = { ...orig, flags: [...(orig.flags ?? [])] }
+    if (opts.excluded && !c.eliminated && (opts.excluded.has(c.kanji) || (c.inscription_form && opts.excluded.has(c.inscription_form)))) {
+      c.flags = unique([...c.flags, 'already_shown'])
+      c.eliminated = true
+      c.eliminated_reason = ALREADY_SHOWN_REASON
+      actions.push({ kanji: c.kanji, action: 'already_shown_eliminated', detail: ALREADY_SHOWN_REASON })
+      return c
+    }
     if (opts.inLexicon && isMainSlot(c) && !c.eliminated && !opts.inLexicon(c)) {
       c.flags = unique([...c.flags, 'not_in_lexicon'])
       c.eliminated = true

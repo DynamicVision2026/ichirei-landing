@@ -27,6 +27,7 @@ function check(name: string, cond: boolean, detail?: string) {
 const GOLDEN = JSON.parse(readFileSync(join(process.cwd(), 'scripts', 'golden-fixture.json'), 'utf8'))
 const clone = <T,>(x: T): T => JSON.parse(JSON.stringify(x))
 const NOW = new Date('2026-10-23T03:00:00Z') // 12:00 JST
+const LATER = new Date(NOW.getTime() + 30 * 3_600_000) // 30 hours later: the 24-hour change window of orders made at NOW has closed
 const ENV = { ICHIREI_OPS_PASSWORD: 'correct horse' } as NodeJS.ProcessEnv
 const STORY = '父は口下手で厳しくて、駅まで送ってくれて、盆に帰るたびに車で駅まで迎えに来て、帰りも必ず送ってくれる。'
 const orderBody = (over: Record<string, unknown> = {}) => ({ story: STORY, engine_result: clone(GOLDEN), selected_kanji: '証', language: 'ja', sender_name: '山田 太郎', receiver_name: '山田 一郎', delivery_date: '2026-12-01', inscription_style: 'kyujitai', package: 'standard', ship_to: 'me', ...over })
@@ -121,7 +122,7 @@ await addOrder(opsStore, { package: 'standard', ship_to: 'me' }, 'IC-20261023-ST
 const o2 = await addOrder(opsStore, { package: 'simple', ship_to: 'egift', sender_email: 'taro@example.com' }, 'IC-20261023-SIMPLEEG')
 await addOrder(opsStore, { package: 'card', ship_to: 'direct', gift_message: '=HYPERLINK("x")' }, 'IC-20261023-CARDDIR1')
 await addOrder(opsStore, { package: 'digital' }, 'IC-20261023-DIGITAL1', undefined, true)
-const O = createOpsHandlers(() => ({ store: opsStore, env: ENV, now: () => NOW, mailer: async () => true }))
+const O = createOpsHandlers(() => ({ store: opsStore, env: ENV, now: () => LATER, mailer: async () => true }))
 const req = (path: string, init: RequestInit & { auth?: string } = {}) => new Request(`https://ichirei.soul-id.jp${path}`, { ...init, headers: { ...(init.auth ? { authorization: `Basic ${Buffer.from(init.auth).toString('base64')}` } : {}), ...(init.headers as Record<string, string> | undefined) } })
 const good = 'owner:correct horse'
 if (process.env.RENDER_SHOTS) (await import('node:fs')).writeFileSync(join(process.env.RENDER_SHOTS, 'ops.html'), await (await O.page(req('/ops', { auth: good }))).text())
@@ -150,15 +151,15 @@ await opsStore.put(o2.token, { ...o2.gift, egift: { ...o2.gift.egift!, state: 'r
 const csvRes = await O.woodenCsv(req('/ops/wooden-today.csv', { auth: good }))
 const csv = await csvRes.text()
 const lines = csv.replace(/^﻿/, '').trim().split('\r\n')
-check('(4) the CSV for the workshop: today\'s WOODEN orders only (③ and ④ — not the card or the digital one), with the character to carve, remembrance, where it goes, gift packaging and no price slip', csvRes.headers.get('content-type')?.startsWith('text/csv') === true && lines[0].split(',').join() === 'order_ref,size,character_to_carve,remembrance,ship_to,recipient_name,country,postal,region,address,phone,address_source,gift_packaging,no_price_slip' && lines.length === 3 && lines.some((l) => l.startsWith('IC-20261023-STANDARD,④ 版木,')) && lines.some((l) => l.startsWith('IC-20261023-SIMPLEEG,③ 木札,')) && !csv.includes('IC-20261023-CARDDIR1') && !csv.includes('IC-20261023-DIGITAL1'))
+check('(4) the CSV for the workshop: today\'s WOODEN orders only (③ and ④ — not the card or the digital one), with the character to carve, remembrance, where it goes, gift packaging and no price slip', csvRes.headers.get('content-type')?.startsWith('text/csv') === true && lines[0].split(',').join() === 'order_ref,size,character_to_carve,remembrance,ship_to,recipient_name,country,postal,region,address,phone,address_source,gift_packaging,no_price_slip,payment' && lines.length === 3 && lines.some((l) => l.startsWith('IC-20261023-STANDARD,④ 版木,')) && lines.some((l) => l.startsWith('IC-20261023-SIMPLEEG,③ 木札,')) && !csv.includes('IC-20261023-CARDDIR1') && !csv.includes('IC-20261023-DIGITAL1'))
 const egRow = lines.find((l) => l.startsWith('IC-20261023-SIMPLEEG'))!
 check('(4) an e-gift row carries the receiver\'s name and address as they typed them; an order shipped by Shopify says its address is at the Shopify checkout', egRow.includes('山田 花子') && egRow.includes('150-0001') && egRow.includes('渋谷区神宮前1-2-3 コーポA') && egRow.includes('e-gift form') && lines.find((l) => l.startsWith('IC-20261023-STANDARD'))!.includes('look it up in Shopify'))
 await addOrder(opsStore, { package: 'simple', ship_to: 'direct', gift_message: '=HYPERLINK("http://evil")' }, 'IC-20261023-SIMPLEDI', undefined)
 const csv2 = await (await O.woodenCsv(req('/ops/wooden-today.csv', { auth: good }))).text()
-check('(4) a direct gift is marked gift packaging + no price slip; the CSV never lets a cell read as a formula', csv2.split('\r\n').find((l) => l.startsWith('IC-20261023-SIMPLEDI'))!.endsWith(',yes,yes') && !/(^|,)[=+@]/.test(csv2.replace(/^﻿/, '').split('\r\n').slice(1).join('\r\n').replace(/\r\n/g, ',')))
+check('(4) a direct gift is marked gift packaging + no price slip; the CSV never lets a cell read as a formula', csv2.split('\r\n').find((l) => l.startsWith('IC-20261023-SIMPLEDI'))!.includes(',yes,yes,') && !/(^|,)[=+@]/.test(csv2.replace(/^﻿/, '').split('\r\n').slice(1).join('\r\n').replace(/\r\n/g, ',')))
 {
   let asked: string[] = []
-  const withShop = (r: () => Promise<import('../engine/shipping.ts').ShippingResult>) => createOpsHandlers(() => ({ store: opsStore, env: ENV, now: () => NOW, shipping: async (refs) => { asked = refs; return r() } }))
+  const withShop = (r: () => Promise<import('../engine/shipping.ts').ShippingResult>) => createOpsHandlers(() => ({ store: opsStore, env: ENV, now: () => LATER, shipping: async (refs) => { asked = refs; return r() } }))
   const addr = { name: '山田 花子', phone: '090-1111-2222', country: 'JP', postal: '150-0001', region: '東京都', address: '渋谷区 神宮前1-2-3' }
   const ok = await (await withShop(async () => ({ found: new Map([['IC-20261023-STANDARD', addr]]), failure: null })).woodenCsv(req('/ops/wooden-today.csv', { auth: good }))).text()
   const stdRow = ok.split('\r\n').find((l) => l.startsWith('IC-20261023-STANDARD'))!

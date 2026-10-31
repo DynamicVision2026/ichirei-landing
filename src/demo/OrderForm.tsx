@@ -13,6 +13,10 @@ import { certificateText } from '../order/certificate.ts'
 import { DEFAULT_STYLE, STYLES_BY_LANGUAGE, glyphFor, hasFormChoice } from '../order/inscription.ts'
 import { DEFAULT_SIMPLE_MAX_STROKES, carvedStrokes, simpleAvailable } from '../order/strokes.ts'
 import PoemAddOn, { type PoemStep } from './PoemAddOn'
+import CardPreview from './CardPreview.tsx'
+import { usePreview, type DraftRef } from './usePreview.ts'
+import { PREVIEW_COPY } from './preview-copy.ts'
+import { trackPreview } from './analytics.ts'
 import { useCurrency } from '../reveal/useCurrency.ts'
 import { approxLine } from '../reveal/currency.ts'
 import { toRevealLang } from '../reveal/lang.ts'
@@ -34,6 +38,10 @@ type Props = {
   candidate: Candidate
   copy: Copy
   onBack: () => void
+  /** The draft of this story's pictures (kept by the page, so another character or another set of candidates never draws again). */
+  draftRef: DraftRef
+  /** Every character shown for this story, by set (kept on the order: for 24 hours after payment the owner can switch to any of them). */
+  shown: { set: 1 | 2 | 3; candidate: Candidate }[]
 }
 
 const pad = (n: number) => String(n).padStart(2, '0')
@@ -50,7 +58,7 @@ const daysUntil = (iso: string) => {
 
 const FIELD_KEYS: readonly OrderField[] = ['sender_name', 'receiver_name', 'delivery_date', 'inscription_style', 'package']
 
-export default function OrderForm({ result, story, followUps = [], promptQuestionId = null, candidate, copy, onBack }: Props) {
+export default function OrderForm({ result, story, followUps = [], promptQuestionId = null, candidate, copy, onBack, draftRef, shown }: Props) {
   const reduceMotion = useReducedMotion()
   // The gift's language is the language the engine ran in (the certificate follows it).
   const language: UiLanguage = result.language ?? 'ja'
@@ -70,12 +78,17 @@ export default function OrderForm({ result, story, followUps = [], promptQuestio
   const [giftMessage, setGiftMessage] = useState('')
   const [senderEmail, setSenderEmail] = useState('')
   const [poemIds, setPoemIds] = useState<string[]>([]) // the included poem of this order (zero or one); the server reads it back by id
+  const [poemShown, setPoemShown] = useState<{ lines: string[]; reading: string } | null>(null)
   const [poemStep, setPoemStep] = useState<PoemStep>('loading') // the buyer sees the whole poem before paying: the order waits while it is being written
   const [phase, setPhase] = useState<'edit' | 'submitting' | 'redirecting'>('edit')
   const [error, setError] = useState<string | null>(null)
 
   const today = useMemo(localToday, [])
   const glyph = glyphFor(candidate, style)
+  const pc = PREVIEW_COPY[toRevealLang(language)]
+  // the pictures start NOW, the moment this character is chosen (never before): one set per story, whatever character or format is picked next
+  const shownForms = useMemo(() => [...new Set(shown.flatMap((s) => [s.candidate.kanji, s.candidate.inscription_form ?? '']).filter(Boolean))].slice(0, 24), [shown])
+  const preview = usePreview({ result, story, followUps, shown: shownForms, draftRef })
   // The carving check (spec v9.1 step 9): the Simple set only takes up to N strokes; a character above it is offered with the Standard set only.
   // The server re-checks with its own count; with no count at all (an old result) the form does not block and the server decides.
   const maxStrokes = result.simple_max_strokes ?? DEFAULT_SIMPLE_MAX_STROKES
@@ -106,6 +119,8 @@ export default function OrderForm({ result, story, followUps = [], promptQuestio
           ...(promptQuestionId ? { prompt_question_id: promptQuestionId } : {}),
           engine_result: result,
           selected_kanji: candidate.kanji,
+          shown_characters: shown.map((x) => ({ set: x.set, candidate: x.candidate })),
+          ...(preview.draftId ? { draft_id: preview.draftId } : {}),
           language,
           sender_name: sender,
           receiver_name: receiver,
@@ -139,6 +154,7 @@ export default function OrderForm({ result, story, followUps = [], promptQuestio
         return
       }
       log('order_submitted', { order_ref: data.order_ref, package: pkg, language })
+      trackPreview('preview_to_order', { language })
       clearDraft() // the story is ordered: a saved draft of it is no longer wanted
       setPhase('redirecting')
       window.location.assign(data.checkout_url)
@@ -177,6 +193,30 @@ export default function OrderForm({ result, story, followUps = [], promptQuestio
       </div>
 
       <div className="composer">
+        {/* The included poem: one format, shown in full before checkout */}
+        <PoemAddOn result={result} story={story} followUps={followUps} candidate={candidate} copy={copy} language={language} onChange={(ids, step, poem) => { setPoemIds(ids); setPoemStep(step); setPoemShown(poem ?? null) }} disabled={busy} />
+
+        {/* Inscription form: only a real choice when the character has a distinct old/traditional form */}
+        <fieldset className="cgroup">
+          <legend className="clab">{o.inscriptionLabel}</legend>
+          {distinct ? (
+            <div className="optRow">
+              {STYLES_BY_LANGUAGE[language].map((st) => (
+                <label key={st} className={`opt${style === st ? ' on' : ''}`}>
+                  <input type="radio" name="inscription_style" value={st} checked={style === st} onChange={() => setStyle(st)} />
+                  <span className="k optGlyph notranslate">{glyphFor(candidate, st)}</span>
+                  <span>{o.inscriptionStyles[st]}</span>
+                </label>
+              ))}
+            </div>
+          ) : (
+            <p className="sent">{o.inscriptionSame}</p>
+          )}
+        </fieldset>
+
+        {/* The free card preview: the character, who they are, the poem and the four scenes of the story (drawn once per story) */}
+        <CardPreview copy={pc} glyph={glyph} reading={copy.glyphReading(candidate, glyph)} who={candidate.one_line_gaze} poem={poemShown} certificateLine={cert} memorial={memorial} language={language} preview={preview} />
+
         <div className="orderGrid">
           <div>
             <label className="clab" htmlFor="sender_name">{memorial ? copy.memorial.senderLabel : o.senderLabel}</label>
@@ -216,27 +256,6 @@ export default function OrderForm({ result, story, followUps = [], promptQuestio
             {dateOk && <span className="sent block">{o.dateNotice(daysUntil(date))}</span>}
           </div>
         </div>
-
-        {/* Inscription form: only a real choice when the character has a distinct old/traditional form */}
-        <fieldset className="cgroup">
-          <legend className="clab">{o.inscriptionLabel}</legend>
-          {distinct ? (
-            <div className="optRow">
-              {STYLES_BY_LANGUAGE[language].map((st) => (
-                <label key={st} className={`opt${style === st ? ' on' : ''}`}>
-                  <input type="radio" name="inscription_style" value={st} checked={style === st} onChange={() => setStyle(st)} />
-                  <span className="k optGlyph notranslate">{glyphFor(candidate, st)}</span>
-                  <span>{o.inscriptionStyles[st]}</span>
-                </label>
-              ))}
-            </div>
-          ) : (
-            <p className="sent">{o.inscriptionSame}</p>
-          )}
-        </fieldset>
-
-        {/* The included poem: one format, shown in full before checkout */}
-        <PoemAddOn result={result} story={story} followUps={followUps} candidate={candidate} copy={copy} language={language} onChange={(ids, step) => { setPoemIds(ids); setPoemStep(step) }} disabled={busy} />
 
         <fieldset className="cgroup">
           <legend className="clab">{o.packageLabel}</legend>
@@ -308,10 +327,12 @@ export default function OrderForm({ result, story, followUps = [], promptQuestio
           </p>
         )}
 
+        <p className="sent orderNote" data-testid="order-made-to-order">{pc.madeToOrder}</p>
         <button type="button" data-testid="order-submit" className="btn primary" onClick={submit} disabled={!valid || busy}>
           {phase === 'submitting' ? o.submitting : phase === 'redirecting' ? o.redirecting : o.submit}
         </button>
         <p className="sent">{o.privacy}</p>
+        <p className="sent"><a href="/legal" data-testid="legal-link" className="legalLink">{pc.legalLink}</a></p>
         <button type="button" className="backLink" onClick={onBack} disabled={busy}>
           {o.back}
         </button>

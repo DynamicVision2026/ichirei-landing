@@ -6,7 +6,9 @@ import Reveal from './Reveal'
 import OrderForm from './OrderForm'
 import Composer from '../reveal/Composer'
 import { toRevealLang } from '../reveal/lang'
-import { sessionId, trackFlow } from './analytics'
+import { sessionId, trackFlow, trackPreview } from './analytics'
+import { PREVIEW_COPY } from './preview-copy'
+import type { DraftRef } from './usePreview'
 import { clearDraft, draftOf, loadDraft, saveDraft, type Draft } from './draft'
 import { questionSetOf, questionTextOf } from './questions'
 import { OPENER } from '../reveal/opener-copy'
@@ -214,6 +216,14 @@ export default function DemoApp({ mode = 'harness', aside }: { mode?: Mode; asid
   }, [storeLanguage])
   const [condition, setConditionState] = useState<Condition>('A')
   const [result, setResult] = useState<EngineResult | null>(null)
+  // 「別の候補を見る」 (customer page): every set of candidates shown for THIS story (at most three), which one is on screen, and the note after a retry that found nothing new.
+  const [sets, setSets] = useState<EngineResult[]>([])
+  const [setIdx, setSetIdx] = useState(0)
+  const [retryNote, setRetryNote] = useState(false)
+  const [chosenSet, setChosenSet] = useState(0)
+  const [retryCount, setRetryCount] = useState(0)
+  // The draft of this story's pictures: one set per story, kept while the visitor tries other characters or other candidates.
+  const draftRef: DraftRef = useRef(null)
   const [error, setError] = useState<string | null>(null)
   const [stage, setStage] = useState<EngineStage>('reading')
   const [followUpQuestion, setFollowUpQuestion] = useState<string | null>(null)
@@ -254,8 +264,9 @@ export default function DemoApp({ mode = 'harness', aside }: { mode?: Mode; asid
     setConditionState(c)
   }
 
-  const runEngine = async (fullStory: string, answers: string[] = [], ctx: GiftContext = context) => {
+  const runEngine = async (fullStory: string, answers: string[] = [], ctx: GiftContext = context, again: { exclude: string[]; retry: 1 | 2 } | null = null) => {
     setPhase('processing')
+    setRetryNote(false)
     setError(null)
     setStage('reading')
     if (!sessionLogged.current) {
@@ -273,7 +284,7 @@ export default function DemoApp({ mode = 'harness', aside }: { mode?: Mode; asid
       const res = await fetch('/api/select', {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ story: fullStory, ...(answers.length ? { follow_ups: answers } : {}), ...(customer && questionId ? { prompt_question: { id: questionId, text: questionTextOf(questionId, toRevealLang(ctx.language)) ?? '' } } : {}), session: sessionId, source: customer ? 'customer' : 'harness', condition, ...contextToPayload(ctx) }),
+        body: JSON.stringify({ story: fullStory, ...(answers.length ? { follow_ups: answers } : {}), ...(customer && questionId ? { prompt_question: { id: questionId, text: questionTextOf(questionId, toRevealLang(ctx.language)) ?? '' } } : {}), session: sessionId, source: customer ? 'customer' : 'harness', condition, ...contextToPayload(ctx), ...(again ? { exclude: again.exclude, retry: again.retry } : {}) }),
         signal: controller.signal,
       })
       if (!res.ok) {
@@ -291,7 +302,26 @@ export default function DemoApp({ mode = 'harness', aside }: { mode?: Mode; asid
       const engineResult: EngineResult = isStream
         ? await consumeEngineStream(res.body!, setStage)
         : ((await res.json()) as EngineResult)
+      if (again) {
+        // 「別の候補を見る」: three new characters for the same story, or — when nothing new is true to it — the note to write a little more. Never an error page.
+        const fresh = engineResult.status === 'sufficient' && engineResult.declined !== true && engineResult.primary_kanji !== null && engineResult.candidates.some((c) => !c.eliminated)
+        trackPreview('candidates_retry', { language: ctx.language, n: again.retry })
+        setRetryCount(again.retry)
+        if (fresh) {
+          setSets((list) => {
+            const next = [...list, engineResult]
+            setSetIdx(next.length - 1)
+            return next
+          })
+          setResult(engineResult)
+        } else setRetryNote(true)
+        setPhase('reveal')
+        return
+      }
       setResult(engineResult)
+      setSets([engineResult])
+      setSetIdx(0)
+      setRetryCount(0)
       log('engine_run', {
         status: engineResult.status,
         primary: engineResult.primary_kanji,
@@ -338,7 +368,7 @@ export default function DemoApp({ mode = 'harness', aside }: { mode?: Mode; asid
             ? e.message
             : String(e)
       setError(message)
-      setPhase('elicit')
+      setPhase(again ? 'reveal' : 'elicit')
     } finally {
       window.clearTimeout(deadline)
     }
@@ -354,6 +384,10 @@ export default function DemoApp({ mode = 'harness', aside }: { mode?: Mode; asid
     setStory(clipStory([story, ...followUps].join('\n\n')))
     setFollowUps([])
     setResult(null)
+    setSets([])
+    setSetIdx(0)
+    setRetryNote(false)
+    setRetryCount(0)
     setError(null)
     setFollowUpQuestion(null)
     setFollowUpAnswer('')
@@ -377,6 +411,14 @@ export default function DemoApp({ mode = 'harness', aside }: { mode?: Mode; asid
     if (customer) trackFlow('reveal_shown', { language: context.language, set: questionSetOf(context), qid: questionId })
     setPhase('reveal')
   }
+
+  // 「別の候補を見る」: three new characters for the same story, leaving out every character already shown (at most two retries).
+  const shownForms = () => [...new Set(sets.flatMap((r) => r.candidates.filter((c) => !c.eliminated).flatMap((c) => [c.kanji, c.inscription_form ?? ''])).filter(Boolean))]
+  const seeOthers = () => {
+    if (retryCount >= 2 || phase !== 'reveal') return
+    void runEngine(story, followUps, context, { exclude: shownForms(), retry: (retryCount + 1) as 1 | 2 })
+  }
+  const pc = PREVIEW_COPY[toRevealLang(context.language)]
 
   const submitFollowUp = () => {
     const answer = followUpAnswer.trim()
@@ -567,7 +609,8 @@ export default function DemoApp({ mode = 'harness', aside }: { mode?: Mode; asid
         <div hidden={phase === 'order'}>
           {result.primary_kanji !== null && result.candidates.some((c) => !c.eliminated) && (
             <Reveal
-              result={result}
+              key={setIdx}
+              result={customer && sets[setIdx] ? sets[setIdx] : result}
               story={story}
               followUps={followUps}
               condition={customer ? 'A' : condition}
@@ -578,11 +621,36 @@ export default function DemoApp({ mode = 'harness', aside }: { mode?: Mode; asid
                 customer
                   ? (c) => {
                       setChosen(c)
+                      setChosenSet(setIdx)
                       setPhase('order')
                     }
                   : undefined
               }
             />
+          )}
+          {customer && sets.length > 0 && result.primary_kanji !== null && (
+            <div className="candidateSets" data-testid="candidate-sets">
+              {sets.length > 1 && (
+                <p className="setNav sent">
+                  <button type="button" className="backLink" data-testid="set-prev" disabled={setIdx === 0} onClick={() => setSetIdx((i) => Math.max(0, i - 1))}>
+                    {pc.prevSet}
+                  </button>
+                  <span data-testid="set-label">{pc.setLabel(setIdx + 1, sets.length)}</span>
+                  <button type="button" className="backLink" data-testid="set-next" disabled={setIdx >= sets.length - 1} onClick={() => setSetIdx((i) => Math.min(sets.length - 1, i + 1))}>
+                    {pc.nextSet}
+                  </button>
+                </p>
+              )}
+              {retryCount < 2 && !retryNote ? (
+                <button type="button" className="btn ghost" data-testid="see-others" onClick={seeOthers}>
+                  {pc.another}
+                </button>
+              ) : (
+                <p className="sent" role="status" data-testid="retry-cap">
+                  {pc.addDetail}
+                </p>
+              )}
+            </div>
           )}
           <div className="mt-12 text-center">
             <button
@@ -597,7 +665,7 @@ export default function DemoApp({ mode = 'harness', aside }: { mode?: Mode; asid
       )}
 
       {customer && phase === 'order' && result && chosen && (
-        <OrderForm result={result} story={story} followUps={followUps} promptQuestionId={customer ? questionId : null} candidate={chosen} copy={copy} onBack={() => setPhase('reveal')} />
+        <OrderForm result={customer && sets[chosenSet] ? sets[chosenSet] : result} draftRef={draftRef} shown={sets.flatMap((r, i) => r.candidates.filter((c) => !c.eliminated).map((c) => ({ set: (i + 1) as 1 | 2 | 3, candidate: c })))} story={story} followUps={followUps} promptQuestionId={customer ? questionId : null} candidate={chosen} copy={copy} onBack={() => setPhase('reveal')} />
       )}
 
       {!customer && result && (phase === 'reveal' || phase === 'thin') && (

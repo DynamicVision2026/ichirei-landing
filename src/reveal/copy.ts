@@ -131,10 +131,17 @@ const EN = {
   fa4: "About 10 working days in Japan and within a month overseas. For a fixed date, order early.",
   fq5: "Do you ship to my country?",
   fa5: "We ship worldwide from Japan by EMS for a flat ¥6,000.",
+  fq6: "Can I change the character after I order?",
+  fa6: "Within 24 hours, yes: you can switch to another character you were shown.",
+  fq7: "Can I cancel?",
+  fa7: "Within 24 hours we refund you in full.",
+  fq8: "What if what I receive has a problem?",
+  fa8: "Tell us within 14 days and we will remake it or refund you.",
   clH: "Some things are hard to say. One character can hold them.",
   clP: "Start with one moment. We will find the character and carve it for you.",
   ctaClose: "Tell your story",
   foot: "Order status: /track · Questions: reply to your order email",
+  legal: "Legal notice and returns",
   dock: "Tell your story · free to try",
 } as const
 
@@ -261,9 +268,16 @@ const JA: Partial<Record<CopyKey, string>> = {
   fa4: "国内は約10営業日、海外は1か月以内が目安です。日付が決まっている場合は、お早めに。",
   fq5: "海外へ送れる？",
   fa5: "日本から世界へ、EMS 一律 ¥6,000 でお届けします。",
+  fq6: "注文後に字を変えられますか？",
+  fa6: "24時間以内なら、表示された他の字に変更できます。",
+  fq7: "キャンセルできますか？",
+  fa7: "24時間以内なら全額返金します。",
+  fq8: "届いた品物に問題があったら？",
+  fa8: "14日以内にご連絡ください。作り直しか返金をします。",
   clH: "言葉にしにくいことも、一字なら持てる。",
   clP: "ひとつの場面からはじめましょう。字を見つけ、刻んでお届けします。",
   foot: "注文状況：/track ・ お問い合わせ：ご注文確認メールへご返信",
+  legal: "特定商取引法に基づく表記・返品について",
 }
 
 const ZH: Partial<Record<CopyKey, string>> = {
@@ -387,9 +401,16 @@ const ZH: Partial<Record<CopyKey, string>> = {
   fa4: "日本國內約10個工作日，海外1個月以內。如有指定日期，請提早下單。",
   fq5: "可以寄到我的國家嗎？",
   fa5: "我們從日本寄往世界各地，EMS 統一 ¥6,000。",
+  fq6: "下單後可以換字嗎？",
+  fa6: "24 小時內，可以換成您看過的其他字。",
+  fq7: "可以取消訂單嗎？",
+  fa7: "24 小時內取消，全額退款。",
+  fq8: "收到的商品有問題怎麼辦？",
+  fa8: "請在 14 天內聯絡我們，我們會重新製作或退款。",
   clH: "有些話很難說出口，一個字卻能裝得下。",
   clP: "從一個場景開始。我們找出那個字，為你刻好送達。",
   foot: "訂單查詢：/track · 諮詢：請回覆訂單確認郵件",
+  legal: "特定商取引法標示・退換貨說明",
 }
 
 export const TEXT: Record<RevealLang, Record<CopyKey, string>> = {

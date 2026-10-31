@@ -324,6 +324,7 @@ export interface RefereeAction {
     | 'replacement_added' // a main slot was empty after the referee and the review: a replacement call filled it
     | 'replacement_rejected' // a replacement candidate was refused (duplicate, anchor not in the story, referee or review)
     | 'insufficient_no_main' // no main candidate survived: the result became `insufficient` (or a last replacement was tried first)
+    | 'already_shown_eliminated' // a retry for the same story: this character was already shown to the sender
     | 'not_in_lexicon_eliminated' // lexicon mode: a main or second character is not in the lexicon list for this gift
     | 'slot_overflow_eliminated' // more live candidates than the slot allows (one main, one second, one freestyle): the extra one was removed
   detail: string
@@ -632,4 +633,28 @@ export function validateEngineResult(raw: unknown): string[] {
   else if (primary.eliminated) problems.push('primary_kanji points at an eliminated candidate')
   else if (primary.slot === 'freestyle') problems.push('primary_kanji must not be the freestyle candidate')
   return problems
+}
+
+// ---- 「別の候補を見る」 (new candidates for the same story) -------------------------------------------------------------------------------------
+
+/** At most this many retries per story (so up to three sets of three characters). */
+export const MAX_RETRIES = 2
+/** Characters (both forms of each) the sender has already been shown for this story: a generous cap, one code point per entry. */
+export const MAX_EXCLUDED = 24
+
+export type ExcludeParse = { ok: true; exclude: string[]; retry: number } | { ok: false; error: string; code: 'bad_exclude' | 'retry_limit' }
+
+/** `exclude` = the characters already shown for this story; `retry` = which retry this is (1 or 2). Neither = a first run. */
+export function parseExclude(exclude: unknown, retry: unknown): ExcludeParse {
+  if (exclude === undefined || exclude === null) {
+    if (retry === undefined || retry === null || retry === 0) return { ok: true, exclude: [], retry: 0 }
+    return { ok: false, error: '"retry" needs "exclude"', code: 'bad_exclude' }
+  }
+  if (!Array.isArray(exclude) || exclude.length > MAX_EXCLUDED || exclude.some((x) => typeof x !== 'string' || [...x].length !== 1 || !/\p{Script=Han}/u.test(x))) {
+    return { ok: false, error: '"exclude" must be a list of single characters', code: 'bad_exclude' }
+  }
+  const list = [...new Set(exclude as string[])]
+  if (list.length === 0) return { ok: true, exclude: [], retry: 0 }
+  if (retry !== 1 && retry !== 2) return { ok: false, error: `a new set of candidates may be asked for at most ${MAX_RETRIES} times for one story`, code: 'retry_limit' }
+  return { ok: true, exclude: list, retry }
 }

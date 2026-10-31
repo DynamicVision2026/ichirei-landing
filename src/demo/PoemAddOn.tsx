@@ -22,7 +22,7 @@ type Props = {
   copy: Copy
   language: UiLanguage
   /** The poem_ids to send with the order (zero or one) and whether the step is still working. */
-  onChange: (poemIds: string[], step: PoemStep) => void
+  onChange: (poemIds: string[], step: PoemStep, poem?: { lines: string[]; reading: string }) => void
   disabled?: boolean
 }
 
@@ -107,8 +107,9 @@ export default function PoemAddOn({ result, story, followUps, candidate, copy, l
   const st = status[selected]
   const step: PoemStep = !st || st.state === 'loading' ? 'loading' : st.state === 'ready' ? 'ready' : 'none'
   const poemId = st?.state === 'ready' ? st.poemId : ''
+  const shownPoem = st?.state === 'ready' ? { lines: st.lines, reading: st.reading } : undefined
   useEffect(() => {
-    onChange(poemId ? [poemId] : [], step)
+    onChange(poemId ? [poemId] : [], step, shownPoem)
   }, [poemId, step]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const tryAgain = () => {
