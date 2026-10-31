@@ -81,7 +81,7 @@ export function createAnimationHandlers(deps: () => AnimationDeps) {
       if (rec.gift_token && d.store) {
         try {
           const g = await d.store.get(rec.gift_token)
-          if (isGiftRecord(g)) view.gift = { url: giftUrl(g.token, d.env), size_code: g.size_code, ship_to: g.ship_to, egift_state: g.egift?.state ?? null }
+          if (isGiftRecord(g)) view.gift = { url: giftUrl(g.token, d.env), size_code: g.size_code, ship_to: g.ship_to, egift_state: g.egift?.state ?? null, opens_on: g.opens_on ?? null, certificate_no: g.certificate_no ?? null, reply: g.reply ?? null }
         } catch {
           // the page works without it
         }

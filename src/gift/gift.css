@@ -1,0 +1,171 @@
+/* The receiver's gift page /g/<token> (Part 3). Dark ground, ivory type, gold accents, washi panels with soft shadows. 320–430 px first.
+   No glass, no blur. Cinnabar is only ever the main character; a remembrance page has no red at all. */
+
+.gf-page {
+  --ink: #1a1410;
+  --paper: #231c14;
+  --ivory: #f5edd8;
+  --gold: #c9a96e;
+  --cinnabar: #c0392b;
+  --washi: #efe6d2;
+  --sumi: #2a221b;
+  --muted: #a89b83;
+  --char: var(--cinnabar);
+  --f-hero: 'Zen Old Mincho', 'Hiragino Mincho ProN', 'Yu Mincho', serif;
+  --f-body: 'Noto Serif JP', 'Hiragino Mincho ProN', 'Yu Mincho', serif;
+  --f-label: 'Inter', system-ui, sans-serif;
+  box-sizing: border-box;
+  min-height: 100vh;
+  min-height: 100svh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 18px;
+  padding: 28px 18px 36px;
+  background: var(--ink);
+  color: var(--ivory);
+  font-family: var(--f-body);
+  text-align: center;
+}
+.gf-page.gf-memorial { --char: #d9d1bd; --gold: #b9ad90; background: #1a1813; }
+.gf-page[lang='zh-Hant'] { --f-hero: 'Noto Serif TC', 'Songti TC', 'PMingLiU', serif; --f-body: 'Noto Serif TC', 'Songti TC', 'PMingLiU', serif; }
+.gf-page[lang='en'] { --f-body: 'Cormorant Garamond', 'Noto Serif JP', Georgia, serif; }
+.gf-page > * { animation: gf-in 0.6s ease both; }
+@keyframes gf-in { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
+
+.gf-note { max-width: 28em; line-height: 1.8; font-size: 15px; opacity: 0.92; }
+.gf-preview { margin: 0; max-width: 30em; font-size: 12px; letter-spacing: 0.06em; color: var(--gold); border: 1px solid rgba(201, 169, 110, 0.4); padding: 6px 12px; border-radius: 2px; }
+.gf-label { margin: 0; font-family: var(--f-label); font-weight: 300; font-size: 12px; letter-spacing: 0.32em; color: var(--gold); text-transform: none; }
+.gf-page[lang='ja'] .gf-label, .gf-page[lang='zh-Hant'] .gf-label { letter-spacing: 0.4em; font-family: var(--f-body); }
+
+.gf-btn {
+  display: inline-block; min-height: 44px; padding: 11px 28px; border: 1px solid var(--gold); border-radius: 2px; background: transparent; color: var(--ivory);
+  font-family: var(--f-body); font-size: 16px; letter-spacing: 0.14em; text-decoration: none; cursor: pointer; -webkit-tap-highlight-color: transparent;
+}
+.gf-btn:focus-visible { outline: 2px solid var(--gold); outline-offset: 3px; }
+.gf-btn:disabled { opacity: 0.5; cursor: default; }
+.gf-btn-hot { background: var(--gold); color: #1a1410; }
+.gf-btn-quiet { border-color: rgba(201, 169, 110, 0.5); font-size: 14px; padding: 9px 18px; letter-spacing: 0.08em; }
+.gf-row { display: flex; flex-wrap: wrap; gap: 10px; justify-content: center; margin: 0; }
+.gf-skip { margin: 0; }
+
+/* ---------- 1. the envelope ---------- */
+.gf-env-screen { display: flex; flex-direction: column; align-items: center; gap: 18px; width: 100%; }
+.gf-env-line { margin: 0; max-width: 18em; font-size: 17px; line-height: 1.9; letter-spacing: 0.08em; }
+.gf-page[lang='en'] .gf-env-line { font-size: 21px; line-height: 1.45; letter-spacing: 0.01em; }
+
+.gf-env {
+  --paper: #e4d8bc;
+  --seal: #c9a45c;
+  position: relative; width: min(84vw, 340px); aspect-ratio: 3 / 2; margin: 34px 0 18px; perspective: 900px;
+  filter: drop-shadow(0 18px 22px rgba(0, 0, 0, 0.55));
+}
+.gf-memorial .gf-env { --paper: #cfc8ba; --seal: #a89a74; }
+.gf-env > * { position: absolute; }
+.gf-env-back { inset: 0; background: var(--liner-ground) var(--liner-image) 0 0 / var(--liner-size) var(--liner-size); border-radius: 3px; z-index: 0; }
+.gf-env-letter { left: 7%; right: 7%; top: 8%; height: 78%; background: var(--washi); border-radius: 2px; box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3); z-index: 2; opacity: 0; }
+.gf-env-front {
+  inset: 0; z-index: 3; background: var(--paper); border-radius: 3px; clip-path: polygon(0 0, 50% 54%, 100% 0, 100% 100%, 0 100%);
+  display: flex; flex-direction: column; align-items: center; justify-content: flex-end; gap: 4px; padding-bottom: 7%;
+}
+.gf-env-to { margin: 0; font-family: var(--f-hero); font-size: 22px; letter-spacing: 0.12em; color: var(--sumi); max-width: 90%; overflow-wrap: anywhere; }
+.gf-env-from { margin: 0; font-size: 13px; letter-spacing: 0.1em; color: #5b4f3d; max-width: 90%; overflow-wrap: anywhere; }
+.gf-env-flap { left: 0; top: 0; width: 100%; height: 54%; transform-origin: 50% 0; transform-style: preserve-3d; z-index: 4; }
+.gf-flap-out, .gf-flap-in { position: absolute; inset: 0; clip-path: polygon(0 0, 100% 0, 50% 100%); backface-visibility: hidden; -webkit-backface-visibility: hidden; }
+.gf-flap-out { background: var(--paper); box-shadow: inset 0 -3px 0 rgba(0, 0, 0, 0.06); }
+.gf-flap-in { background: var(--liner-ground) var(--liner-image) 0 0 / var(--liner-size) var(--liner-size); transform: rotateX(180deg); }
+
+.gf-seal {
+  left: 50%; top: 54%; width: 56px; height: 56px; margin: -28px 0 0 -28px; z-index: 6; display: flex; align-items: center; justify-content: center;
+}
+.gf-seal i { position: absolute; top: 0; width: 28px; height: 56px; background: radial-gradient(circle at 35% 30%, #e6c97e, var(--seal) 60%, #8f6f2f); }
+.gf-seal-l { left: 0; border-radius: 28px 0 0 28px; }
+.gf-seal-r { right: 0; border-radius: 0 28px 28px 0; }
+.gf-seal b { position: relative; font-family: var(--f-hero); font-weight: 700; font-size: 13px; line-height: 1.1; color: #4a3510; writing-mode: vertical-rl; letter-spacing: 0.04em; }
+
+.gf-locked { margin: 0; font-family: var(--f-hero); font-size: 20px; letter-spacing: 0.14em; color: var(--gold); }
+.gf-locked-note { margin: 0; max-width: 20em; font-size: 14px; line-height: 1.9; opacity: 0.88; }
+
+/* 2. the opening: about 1.5 s — the seal breaks, the flap lifts onto the liner, the letter slides up */
+.gf-env-opening .gf-seal i:first-child { animation: gf-break-l 0.35s ease-in forwards; }
+.gf-env-opening .gf-seal i:nth-child(2) { animation: gf-break-r 0.35s ease-in forwards; }
+.gf-env-opening .gf-seal b { animation: gf-fade-out 0.2s ease-in forwards; }
+.gf-env-opening .gf-env-flap { animation: gf-flap 0.6s 0.3s cubic-bezier(0.4, 0, 0.2, 1) forwards; }
+.gf-env-opening .gf-env-letter { animation: gf-slide 0.65s 0.85s cubic-bezier(0.2, 0.7, 0.2, 1) forwards; }
+@keyframes gf-break-l { to { transform: translate(-14px, 22px) rotate(-24deg); opacity: 0; } }
+@keyframes gf-break-r { to { transform: translate(14px, 22px) rotate(24deg); opacity: 0; } }
+@keyframes gf-fade-out { to { opacity: 0; } }
+@keyframes gf-flap { 0% { transform: rotateX(0); z-index: 4; } 49% { z-index: 4; } 50% { z-index: 1; } 100% { transform: rotateX(-180deg); z-index: 1; } }
+@keyframes gf-slide { 0% { opacity: 1; transform: translateY(0); } 100% { opacity: 1; transform: translateY(-52%); } }
+/* reduced motion: nothing moves, the envelope simply fades out and the letter fades in */
+.gf-env[data-motion='fade'].gf-env-opening { animation: gf-fade-out 0.45s ease forwards; }
+.gf-env[data-motion='fade'].gf-env-opening * { animation: none !important; }
+@media (prefers-reduced-motion: reduce) {
+  .gf-page > * { animation: gf-fade 0.4s ease both; }
+  .gf-env-opening .gf-seal i, .gf-env-opening .gf-seal b, .gf-env-opening .gf-env-flap, .gf-env-opening .gf-env-letter { animation: none !important; }
+}
+@keyframes gf-fade { from { opacity: 0; } to { opacity: 1; } }
+
+/* ---------- paper panels ---------- */
+.gf-paper { box-sizing: border-box; width: min(100%, 380px); background: var(--washi); color: var(--sumi); border-radius: 3px; padding: 30px 24px; box-shadow: 0 22px 40px -20px rgba(0, 0, 0, 0.75), 0 3px 8px rgba(0, 0, 0, 0.25); }
+.gf-memorial .gf-paper { background: #cfc8ba; }
+
+/* 3. the letter */
+.gf-letter { display: flex; flex-direction: column; align-items: center; gap: 18px; }
+.gf-to { margin: 0; align-self: flex-start; font-family: var(--f-hero); font-size: 22px; letter-spacing: 0.1em; overflow-wrap: anywhere; }
+.gf-message { margin: 0; padding: 0; text-align: left; font-size: 17px; line-height: 2; white-space: pre-wrap; overflow-wrap: anywhere; }
+.gf-lead { margin: 0; text-align: left; font-size: 15px; line-height: 2; color: #4a4030; }
+.gf-from { margin: 0; align-self: flex-end; font-size: 15px; letter-spacing: 0.1em; overflow-wrap: anywhere; }
+.gf-letter .gf-btn { color: var(--sumi); border-color: #8a7344; }
+
+/* 5. the reveal */
+.gf-reveal { display: flex; flex-direction: column; align-items: center; gap: 12px; width: 100%; }
+.gf-char { margin: 0; font-family: var(--f-hero); font-weight: 900; font-size: clamp(150px, 52vw, 230px); line-height: 1.05; color: var(--char); }
+.gf-reading { margin: 0; font-size: 18px; letter-spacing: 0.16em; color: var(--ivory); }
+.gf-gold { margin: 10px 0 0; font-family: var(--f-hero); font-size: 19px; letter-spacing: 0.1em; color: var(--gold); }
+.gf-who { margin: 0 0 12px; max-width: 20em; font-size: 15px; line-height: 2; opacity: 0.9; }
+
+/* 6. the poem */
+.gf-poem-wrap { display: flex; flex-direction: column; align-items: center; gap: 16px; width: 100%; }
+.gf-poem { display: flex; flex-direction: column; align-items: center; gap: 6px; font-family: var(--f-hero); font-size: 20px; line-height: 1.9; letter-spacing: 0.08em; }
+.gf-poem p { margin: 0; }
+.gf-poem-tanka { flex-direction: row; justify-content: center; align-items: center; width: min(100%, 320px); min-height: 300px; padding: 30px 20px; }
+.gf-vert { display: block; writing-mode: vertical-rl; -webkit-writing-mode: vertical-rl; height: 280px; letter-spacing: 0.18em; font-size: 22px; line-height: 2; }
+.gf-vert p { display: block; margin: 0 0 0 16px; }
+.gf-poem-tang, .gf-poem-ci, .gf-poem-en { font-size: 19px; }
+.gf-poem-en { font-family: var(--f-body); font-style: italic; font-size: 20px; line-height: 1.7; letter-spacing: 0.01em; }
+.gf-poem-reading { margin: 0; max-width: 24em; font-size: 14px; line-height: 1.9; color: var(--muted); }
+
+/* 7. the certificate */
+.gf-cert { display: flex; flex-direction: column; align-items: center; gap: 10px; border: 1px solid #b8a06a; outline: 1px solid rgba(184, 160, 106, 0.5); outline-offset: -8px; padding: 34px 22px 26px; }
+.gf-cert-title { margin: 0; font-family: var(--f-hero); font-weight: 700; font-size: 19px; letter-spacing: 0.2em; }
+.gf-cert-glyph { margin: 4px 0; font-family: var(--f-hero); font-weight: 900; font-size: 96px; line-height: 1.1; color: var(--cinnabar); }
+.gf-memorial .gf-cert-glyph { color: #2a221b; }
+.gf-cert-to { margin: 0; font-size: 18px; letter-spacing: 0.14em; overflow-wrap: anywhere; }
+.gf-cert-line { margin: 4px 0; font-size: 14.5px; line-height: 1.95; color: #4a4030; overflow-wrap: anywhere; }
+.gf-cert-from { margin: 0; font-size: 15px; letter-spacing: 0.1em; overflow-wrap: anywhere; }
+.gf-cert-date { margin: 0; font-family: var(--f-label); font-weight: 300; font-size: 13px; letter-spacing: 0.1em; color: #6a5d46; }
+.gf-cert-tag { margin: 8px 0 12px; font-family: var(--f-label); font-weight: 300; font-size: 10.5px; letter-spacing: 0.16em; color: #7a6c50; }
+.gf-cert .gf-btn { color: var(--sumi); border-color: #8a7344; }
+
+/* 8. keepsakes and the thank-you */
+.gf-keep { display: flex; flex-direction: column; align-items: center; gap: 22px; width: min(100%, 380px); }
+.gf-reply { display: flex; flex-direction: column; align-items: stretch; gap: 8px; width: 100%; text-align: left; }
+.gf-reply .gf-label { text-align: center; }
+.gf-reply textarea { box-sizing: border-box; width: 100%; padding: 12px; background: rgba(245, 237, 216, 0.06); border: 1px solid rgba(201, 169, 110, 0.5); border-radius: 2px; color: var(--ivory); font-family: var(--f-body); font-size: 16px; line-height: 1.7; resize: vertical; }
+.gf-reply textarea:focus-visible { outline: 2px solid var(--gold); outline-offset: 2px; }
+.gf-reply .gf-btn { align-self: center; }
+.gf-count { margin: 0; text-align: right; font-size: 12px; color: var(--muted); }
+.gf-sent { margin: 0; font-family: var(--f-hero); font-size: 18px; letter-spacing: 0.1em; color: var(--gold); }
+.gf-error { margin: 0; font-size: 13px; color: #e0a090; }
+.gf-memorial .gf-error { color: var(--ivory); }
+
+/* the e-gift address form (the wooden sizes sent as an e-gift) reuses the sender page's small form styles */
+.gf-keep .an-egift { width: 100%; padding: 0; }
+.gf-keep .an-egift .an-buttons, .gf-keep .an-egift > p { margin: 0.6rem 0; }
+
+/* lines are balanced so a last character never stands alone on a line */
+.gf-env-line, .gf-locked-note, .gf-lead, .gf-who, .gf-cert-line, .gf-poem-reading, .gf-note { text-wrap: balance; }
+.gf-env-line { max-width: 19em; }
+.gf-memorial .gf-seal i { background: radial-gradient(circle at 35% 30%, #cdc3a4, var(--seal) 60%, #7c704f); }

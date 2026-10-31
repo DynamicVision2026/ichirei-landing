@@ -417,6 +417,8 @@ export interface OrderRecord {
   animation_id?: string | null
   /** The receiver's gift page (RG-…): /g/<token>. */
   gift_token?: string | null
+  /** 「一字礼　第 NNNN 号」 — given once when the order is made (engine/certificate-no.ts), never reused. */
+  certificate_no?: number | null
   /** What production needs at a glance (also derivable from the rest of the record). */
   production: {
     language: Language

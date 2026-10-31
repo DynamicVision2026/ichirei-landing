@@ -5,7 +5,7 @@ import type { Copy, InscriptionStyle, OrderField, PackageId, UiLanguage } from '
 import { log } from './logging'
 import { sessionId } from './analytics'
 import { clearDraft } from './draft'
-import { EGIFT_JAPAN_ONLY, GIFT_MESSAGE_MAX, PACKAGE_DISPLAY_ORDER, PACKAGE_PRICE_JPY, RECOMMENDED_PACKAGE, SHIPS, SHIP_TO, WOODEN, formatYen, type ShipTo } from '../order/packages.ts'
+import { EGIFT_JAPAN_ONLY, GIFT_MESSAGE_MAX, OPEN_DATE_MAX_DAYS, PACKAGE_DISPLAY_ORDER, PACKAGE_PRICE_JPY, RECOMMENDED_PACKAGE, SHIPS, SHIP_TO, WOODEN, formatYen, type ShipTo } from '../order/packages.ts'
 import { SIZE_COPY } from './sizes-copy.ts'
 import { useSizes } from './useSizes.ts'
 import { isMemorial } from '../order/memorial.ts'
@@ -76,6 +76,7 @@ export default function OrderForm({ result, story, followUps = [], promptQuestio
   const sc = SIZE_COPY[language]
   const [shipTo, setShipTo] = useState<ShipTo>('me')
   const [giftMessage, setGiftMessage] = useState('')
+  const [openDate, setOpenDate] = useState('') // the day the receiver's envelope opens (empty = at once)
   const [senderEmail, setSenderEmail] = useState('')
   const [poemIds, setPoemIds] = useState<string[]>([]) // the included poem of this order (zero or one); the server reads it back by id
   const [poemShown, setPoemShown] = useState<{ lines: string[]; reading: string } | null>(null)
@@ -103,8 +104,14 @@ export default function OrderForm({ result, story, followUps = [], promptQuestio
   if (pkg === 'simple' && !simpleOk) setTimeout(() => setPkg(''), 0)
   const onSale = pkg !== '' && (sizes ?? []).includes(pkg)
   const messageOk = [...giftMessage].length <= GIFT_MESSAGE_MAX
+  const lastOpenDay = useMemo(() => {
+    const d = new Date(`${today}T00:00:00Z`)
+    d.setUTCDate(d.getUTCDate() + OPEN_DATE_MAX_DAYS)
+    return d.toISOString().slice(0, 10)
+  }, [today])
+  const openDateOk = openDate === '' || (/^\d{4}-\d{2}-\d{2}$/.test(openDate) && openDate >= today && openDate <= lastOpenDay)
   const emailOk = shipTo !== 'egift' || pkg === '' || !SHIPS[pkg] || /^[^\s@]{1,64}@[^\s@]{1,190}\.[^\s@]{2,}$/.test(senderEmail.trim())
-  const valid = senderOk && receiverOk && dateOk && pkg !== '' && onSale && messageOk && emailOk && !(pkg === 'simple' && !simpleOk) && poemStep !== 'loading'
+  const valid = senderOk && receiverOk && dateOk && pkg !== '' && onSale && messageOk && openDateOk && emailOk && !(pkg === 'simple' && !simpleOk) && poemStep !== 'loading'
 
   const submit = async () => {
     if (!valid || phase !== 'edit') return
@@ -128,7 +135,9 @@ export default function OrderForm({ result, story, followUps = [], promptQuestio
           ...(pkg !== 'egift' ? { delivery_date: date } : {}),
           inscription_style: style,
           package: pkg,
-          ...(SHIPS[pkg as PackageId] ? { ship_to: shipTo, ...(shipTo !== 'me' && giftMessage.trim() ? { gift_message: giftMessage.trim() } : {}), ...(shipTo === 'egift' ? { sender_email: senderEmail.trim() } : {}) } : {}),
+          ...(SHIPS[pkg as PackageId] ? { ship_to: shipTo, ...(shipTo === 'egift' ? { sender_email: senderEmail.trim() } : {}) } : {}),
+          ...(giftMessage.trim() ? { gift_message: giftMessage.trim() } : {}),
+          ...(openDate ? { open_date: openDate } : {}),
           ...(poemIds.length ? { poems: poemIds.map((poem_id) => ({ poem_id })) } : {}),
           session: sessionId,
           source: 'customer',
@@ -314,13 +323,26 @@ export default function OrderForm({ result, story, followUps = [], promptQuestio
                 <span className="sent block">{sc.emailNote}</span>
               </div>
             )}
-            {shipTo !== 'me' && (
-              <div>
-                <label className="clab" htmlFor="gift_message">{sc.messageLabel}</label>
-                <input id="gift_message" name="gift_message" type="text" maxLength={GIFT_MESSAGE_MAX} value={giftMessage} onChange={(e) => setGiftMessage([...e.target.value].slice(0, GIFT_MESSAGE_MAX).join(''))} placeholder={sc.messagePlaceholder} />
-                <span className="sent block" data-testid="gift-message-counter">{sc.messageCounter([...giftMessage].length, GIFT_MESSAGE_MAX)}</span>
-              </div>
-            )}
+          </fieldset>
+        )}
+
+        {/* The letter of the gift page: a short message and, if wanted, the day the envelope opens (every size) */}
+        {pkg !== '' && (
+          <fieldset className="cgroup" data-testid="gift-letter">
+            <div>
+              <label className="clab" htmlFor="gift_message">{sc.messageLabel}</label>
+              <input id="gift_message" name="gift_message" type="text" maxLength={GIFT_MESSAGE_MAX} value={giftMessage} onChange={(e) => setGiftMessage([...e.target.value].slice(0, GIFT_MESSAGE_MAX).join(''))} placeholder={sc.messagePlaceholder} />
+              <span className="sent block" data-testid="gift-message-counter">{sc.messageCounter([...giftMessage].length, GIFT_MESSAGE_MAX)}</span>
+              <span className="sent block">{sc.messageNote}</span>
+            </div>
+            <div>
+              <label className="clab" htmlFor="open_date">{sc.openDateLabel}</label>
+              <input id="open_date" name="open_date" type="date" min={today} max={lastOpenDay} value={openDate} onChange={(e) => setOpenDate(e.target.value)} data-testid="open-date" />
+              {openDate !== '' && (
+                <button type="button" className="backLink" data-testid="open-date-clear" onClick={() => setOpenDate('')}>{sc.openDateClear}</button>
+              )}
+              <span className="sent block">{sc.openDateNote}</span>
+            </div>
           </fieldset>
         )}
 

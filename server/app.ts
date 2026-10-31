@@ -160,16 +160,18 @@ export function createApp(config: ServerConfig): Hono {
   app.get('/api/preview/:id', limited(animationLimit), (c) => previewHandlers.view(c.req.param('id')))
   app.get('/api/film/:id/picture/:file', limited(animationLimit), (c) => animationHandlers.picture(c.req.param('id'), c.req.param('file').replace(/\.webp$/, '')))
   // The receiver's gift page (/g/<token>): its own view, pictures, render and QR; and the e-gift address (typed once, never returned by any call).
-  app.get('/api/gift/:token', limited(animationLimit), (c) => giftHandlers.view(c.req.param('token')))
+  app.get('/api/gift/:token', limited(animationLimit), (c) => giftHandlers.view(c.req.param('token'), c.req.query('preview')))
   app.get('/api/gift/:token/qr.svg', limited(animationLimit), (c) => giftHandlers.qr(c.req.param('token')))
-  app.post('/api/gift/:token/render', requireApiKey, limited(filmRenderLimit), (c) => giftHandlers.render(c.req.param('token')))
-  app.get('/api/gift/:token/picture/:file', limited(animationLimit), (c) => giftHandlers.picture(c.req.param('token'), c.req.param('file').replace(/\.webp$/, '')))
+  app.post('/api/gift/:token/render', requireApiKey, limited(filmRenderLimit), (c) => giftHandlers.render(c.req.param('token'), c.req.query('preview')))
+  app.get('/api/gift/:token/picture/:file', limited(animationLimit), (c) => giftHandlers.picture(c.req.param('token'), c.req.param('file').replace(/\.webp$/, ''), c.req.query('preview')))
   // The story scroll: an image is drawn per request (a few seconds of CPU), so a tight per-IP limit.
   const scrollLimit = envRunLimiter('ICHIREI_SCROLL_LIMIT', { max: 20, minutes: 10 })
   for (const ext of ['png', 'pdf']) {
-    app.get(`/api/gift/:token/scroll.${ext}`, limited(scrollLimit), (c) => giftHandlers.scroll(c.req.param('token'), ext))
+    app.get(`/api/gift/:token/scroll.${ext}`, limited(scrollLimit), (c) => giftHandlers.scroll(c.req.param('token'), ext, c.req.query('preview')))
     app.get(`/api/animation/:id/scroll.${ext}`, limited(scrollLimit), (c) => giftHandlers.scrollForSender(c.req.param('id'), ext))
   }
+  const replyLimit = envRunLimiter('ICHIREI_GIFT_REPLY_LIMIT', { max: 20, minutes: 60 })
+  app.post('/api/gift/:token/reply', limited(replyLimit), async (c) => giftHandlers.reply(c.req.param('token'), await c.req.json().catch(() => null)))
   const addressLimit = envRunLimiter('ICHIREI_GIFT_ADDRESS_LIMIT', { max: 20, minutes: 60 })
   app.post('/api/gift/:token/address', limited(addressLimit), async (c) => giftHandlers.address(c.req.param('token'), await c.req.json().catch(() => null)))
   // The owner's page (Basic Auth, ICHIREI_OPS_PASSWORD; refused outright without it). Never indexed, never cached.

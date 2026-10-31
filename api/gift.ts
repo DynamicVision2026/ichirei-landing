@@ -9,7 +9,7 @@
 
 import QRCode from 'qrcode'
 import { ANIMATION_ID_PATTERN, isAnimationRecord, type AnimationRecord } from '../engine/animation.ts'
-import { GIFT_TOKEN_PATTERN, checkAddress, giftUrl, giftView, isGiftRecord, type GiftRecord } from '../engine/gift.ts'
+import { GIFT_TOKEN_PATTERN, checkAddress, checkReply, giftUrl, giftView, isGiftRecord, isLocked, lockedView, type GiftRecord } from '../engine/gift.ts'
 import { readArt, picturePath, type ArtRecord } from '../engine/film-art.ts'
 import { createOrderStore, type OrderStore } from '../engine/order-store.ts'
 import { createAnimationHandlers, type AnimationDeps } from './animation.ts'
@@ -40,6 +40,13 @@ async function loadGift(token: string, d: GiftDeps): Promise<{ status: 200; gift
   }
 }
 
+/** The closed envelope: true while the opening date has not come — unless the caller holds the SENDER's own id (the sender may always look). */
+const closed = (g: GiftRecord, d: GiftDeps, preview?: string | null): boolean => !senderPreview(g, preview) && isLocked(g, d.now?.() ?? new Date())
+const senderPreview = (g: GiftRecord, preview?: string | null): boolean => !!preview && preview === g.animation_id
+/** The receiver's pictures with the sender's key attached, so a previewing sender's own browser can fetch them before the day. */
+const withPreview = <T extends { film: { pictures: string[] | null } | null }>(v: T, key: string): T =>
+  v.film?.pictures ? { ...v, film: { ...v.film, pictures: v.film.pictures.map((u) => `${u}${u.includes('?') ? '&' : '?'}preview=${key}`) } } : v
+
 const safeArt = async (store: OrderStore | null, id: string): Promise<ArtRecord | null> => {
   if (!store) return null
   try {
@@ -67,19 +74,22 @@ async function scrollResponse(gift: GiftRecord, anim: AnimationRecord, ext: stri
 export function createGiftHandlers(deps: () => GiftDeps) {
   const anim = createAnimationHandlers(deps)
   return {
-    async view(token: string): Promise<Response> {
+    async view(token: string, preview?: string | null): Promise<Response> {
       const d = deps()
       const r = await loadGift(token, d)
       if (r.status !== 200) return json(r.status, { error: r.status === 404 ? 'not_found' : 'unavailable' }, { 'cache-control': 'no-store' })
+      if (closed(r.gift, d, preview)) return json(200, lockedView(r.gift, d.now?.() ?? new Date()), noStore)
       const art = filmUsable(r.anim.film) && r.anim.film.status === 'ready' ? await safeArt(d.store, r.anim.id) : null
-      return json(200, giftView(r.gift, r.anim, art), noStore)
+      const v = giftView(r.gift, r.anim, art)
+      return json(200, senderPreview(r.gift, preview) ? withPreview(v, r.gift.animation_id) : v, noStore)
     },
 
     /** The first open: draw the pictures (the sender's own render, by the sender's id — never shown to the receiver) and answer with the receiver's view. */
-    async render(token: string): Promise<Response> {
+    async render(token: string, preview?: string | null): Promise<Response> {
       const d = deps()
       const r = await loadGift(token, d)
       if (r.status !== 200) return json(r.status, { error: r.status === 404 ? 'not_found' : 'unavailable' }, { 'cache-control': 'no-store' })
+      if (closed(r.gift, d, preview)) return json(403, { error: 'locked' }, { 'cache-control': 'no-store' })
       const res = await anim.render(r.gift.animation_id)
       if (!res.ok) return json(res.status, { error: 'unavailable' }, { 'cache-control': 'no-store' })
       const j = (await res.json()) as { state: string }
@@ -87,16 +97,18 @@ export function createGiftHandlers(deps: () => GiftDeps) {
       const fresh = await loadGift(token, d)
       const rec = fresh.status === 200 ? fresh : r
       const art = filmUsable(rec.anim.film) && rec.anim.film.status === 'ready' ? await safeArt(d.store, rec.anim.id) : null
-      return json(200, { state: j.state, view: giftView(rec.gift, rec.anim, art) }, noStore)
+      const v = giftView(rec.gift, rec.anim, art)
+      return json(200, { state: j.state, view: senderPreview(rec.gift, preview) ? withPreview(v, rec.gift.animation_id) : v }, noStore)
     },
 
-    async picture(token: string, n: string): Promise<Response> {
+    async picture(token: string, n: string, preview?: string | null): Promise<Response> {
       const d = deps()
       const k = /^[1-4]$/.test(n) ? Number(n) : 0
       if (!GIFT_TOKEN_PATTERN.test(token) || !k) return json(404, { error: 'not_found' }, { 'cache-control': 'no-store' })
       const r = await loadGift(token, d)
       if (r.status !== 200) return json(r.status, { error: r.status === 404 ? 'not_found' : 'unavailable' }, { 'cache-control': 'no-store' })
       if (!ANIMATION_ID_PATTERN.test(r.gift.animation_id)) return json(404, { error: 'not_found' }, { 'cache-control': 'no-store' })
+      if (closed(r.gift, d, preview)) return json(403, { error: 'locked' }, { 'cache-control': 'no-store' })
       let bytes: Buffer | null
       try {
         bytes = await d.store!.getObject(picturePath(r.gift.animation_id, k))
@@ -116,10 +128,11 @@ export function createGiftHandlers(deps: () => GiftDeps) {
     },
 
     /** The story scroll (PNG or PDF) of the receiver's gift. Only when all four pictures are real: never with a washi slot. */
-    async scroll(token: string, ext: string): Promise<Response> {
+    async scroll(token: string, ext: string, preview?: string | null): Promise<Response> {
       const d = deps()
       const r = await loadGift(token, d)
       if (r.status !== 200) return json(r.status, { error: r.status === 404 ? 'not_found' : 'unavailable' }, { 'cache-control': 'no-store' })
+      if (closed(r.gift, d, preview)) return json(403, { error: 'locked' }, { 'cache-control': 'no-store' })
       return scrollResponse(r.gift, r.anim, ext, d)
     },
 
@@ -135,6 +148,25 @@ export function createGiftHandlers(deps: () => GiftDeps) {
       } catch {
         return json(503, { error: 'unavailable' }, { 'cache-control': 'no-store' })
       }
+    },
+
+    /** The receiver's one thank-you (200 characters at most, once). It is shown on the sender's page; there is no e-mail and no second reply. */
+    async reply(token: string, body: unknown): Promise<Response> {
+      const d = deps()
+      const r = await loadGift(token, d)
+      if (r.status !== 200) return json(r.status, { error: r.status === 404 ? 'not_found' : 'unavailable' }, { 'cache-control': 'no-store' })
+      if (closed(r.gift, d, null)) return json(403, { error: 'locked' }, { 'cache-control': 'no-store' })
+      if (r.gift.reply) return json(409, { error: 'The reply has already been sent', code: 'already_replied' }, noStore)
+      const checked = checkReply(body)
+      if (!checked.ok) return json(400, { error: checked.error }, noStore)
+      const now = d.now?.() ?? new Date()
+      try {
+        await d.store!.put(token, { ...r.gift, reply: { text: checked.text, at: now.toISOString() } })
+      } catch {
+        return json(503, { error: 'unavailable' }, { 'cache-control': 'no-store' })
+      }
+      console.log(`[ichirei-gift] reply_sent ${JSON.stringify({ token_prefix: token.slice(0, 5) })}`) // no text
+      return json(200, { ok: true }, noStore)
     },
 
     /** The e-gift receiver types their address — once. The address is stored on the gift record and returned by NO call. */

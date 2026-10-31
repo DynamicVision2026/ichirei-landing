@@ -16,6 +16,7 @@ import { adoptDraft } from '../engine/preview.ts'
 import { mergeStory } from '../engine/contract.ts'
 import { ANIMATION_ID_PATTERN } from '../engine/animation.ts'
 import { buildGiftRecord, giftUrl, newGiftToken } from '../engine/gift.ts'
+import { allocateCertificateNo } from '../engine/certificate-no.ts'
 import { recordOrderIndex } from '../engine/egift-ops.ts'
 import { filmInputFromRecord, filmWaitMs, raceTimeout, trackFilm } from '../engine/film-store.ts'
 import { makeFilm, type FilmInput, type FilmRecord } from '../engine/film.ts'
@@ -134,6 +135,12 @@ export function createOrderHandler(deps: () => OrderDeps) {
       const animationId = anim.id
       // the receiver's own link (Part D): a second small record, so the receiver's page never carries the sender's id
       const token = newGiftToken()
+      // 「一字礼　第 NNNN 号」: the running number, given once (a store failure here must not stop the order: the gift then simply shows no number)
+      try {
+        record.certificate_no = await allocateCertificateNo(d.store, orderRef, now)
+      } catch (err) {
+        console.error('[ichirei-order] certificate number failed', orderRef, err instanceof Error ? err.message : err)
+      }
       anim.gift_token = token
       await d.store.put(animationId, anim)
       await d.store.put(token, buildGiftRecord(record, animationId, token, order.sender_email, now))

@@ -772,7 +772,7 @@ const mockPage = async (browser, { onExplain, result, order, track } = {}) => {
   const od = new Date(); od.setDate(od.getDate() + 20)
   await f.page.fill('input[name=delivery_date]', `${od.getFullYear()}-${String(od.getMonth() + 1).padStart(2, '0')}-${String(od.getDate()).padStart(2, '0')}`)
   const shipOpts = await form.locator('[data-ship-to]').evaluateAll((els) => els.map((e) => e.getAttribute('data-ship-to')))
-  check('ship-to: a wooden size asks where it goes — me / directly to them / e-gift — with 「自分に届ける」 first and no message box while "me" is chosen', shipOpts.join() === 'me,direct,egift' && (await form.locator('[data-ship-to=me] .pkgName').innerText()) === '自分に届ける' && (await form.locator('[data-ship-to=direct] .pkgName').innerText()) === '相手に直接届ける' && (await form.locator('[data-ship-to=egift] .pkgName').innerText()).startsWith('eギフトで贈る') && (await form.locator('#gift_message').count()) === 0)
+  check('ship-to: a wooden size asks where it goes — me / directly to them / e-gift — with 「自分に届ける」 first; the letter fields (message and opening date) are there for every size, "me" included', shipOpts.join() === 'me,direct,egift' && (await form.locator('[data-ship-to=me] .pkgName').innerText()) === '自分に届ける' && (await form.locator('[data-ship-to=direct] .pkgName').innerText()) === '相手に直接届ける' && (await form.locator('[data-ship-to=egift] .pkgName').innerText()).startsWith('eギフトで贈る') && (await form.locator('#gift_message').count()) === 1 && (await form.locator('#open_date').count()) === 1)
   await f.page.click('[data-ship-to=direct]')
   await f.page.fill('#gift_message', 'あ'.repeat(70))
   check('ship-to: directly to them → a message box (60 characters at most, with its counter), and a note that the receiver\'s address goes in at checkout', (await form.locator('#gift_message').inputValue()).length === 60 && (await form.locator('[data-testid=gift-message-counter]').innerText()) === '60 / 60字' && (await form.locator('[data-ship-to=direct]').innerText()).includes('チェックアウトの配送先'))
@@ -781,10 +781,16 @@ const mockPage = async (browser, { onExplain, result, order, track } = {}) => {
   await f.page.click('[data-ship-to=egift]')
   check('ship-to: entering the receiver\'s address for a wooden size says it is Japan only', (await form.locator('[data-egift-japan]').count()) === 1)
   await f.page.click('[data-ship-to=direct]')
+  const openMax = await form.locator('#open_date').getAttribute('max')
+  const inAYear = await f.page.evaluate(() => { const d = new Date(); const p = (n) => String(n).padStart(2, '0'); d.setDate(d.getDate() + 365); return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}` })
+  const soon = await f.page.evaluate(() => { const d = new Date(); const p = (n) => String(n).padStart(2, '0'); d.setDate(d.getDate() + 10); return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}` })
+  await f.page.fill('#open_date', soon)
+  check('letter fields: the opening date is optional, runs up to one year ahead, and has a clear button', Math.abs(Date.parse(openMax) - Date.parse(inAYear)) <= 2 * 86_400_000 && (await form.locator('[data-testid=open-date-clear]').count()) === 1)
   await f.page.click('[data-testid=order-submit]')
   await f.page.waitForSelector('#co', { timeout: 8000 })
   const body = f.calls.order[0]
   check('order request: package standard, ship_to direct and the message; no price anywhere', body.package === 'standard' && body.ship_to === 'direct' && body.gift_message === 'いつも、ありがとう。' && !('price' in body) && !('price_jpy' in body))
+  check('order request: the opening date travels as open_date', body.open_date === soon, String(body.open_date))
   check('no page errors (run 8c-4, sizes)', f.errors.length === 0, f.errors.join('; '))
   await f.page.close()
   // the e-gift order: no delivery date, no ship_to in the request
@@ -825,7 +831,7 @@ const mockPage = async (browser, { onExplain, result, order, track } = {}) => {
   const sp = await browser.newPage({ locale: 'ja-JP', viewport: { width: 390, height: 800 } })
   const errors = []
   sp.on('pageerror', (e) => errors.push(String(e)))
-  await sp.route('**/api/animation/AN-testtesttesttesttest', (r) => r.fulfill({ json: { ...baseView, gift: { url: GIFT, size_code: 'ICHIREI-SIMPLE', ship_to: 'egift', egift_state: 'waiting' } } }))
+  await sp.route('**/api/animation/AN-testtesttesttesttest', (r) => r.fulfill({ json: { ...baseView, gift: { url: GIFT, size_code: 'ICHIREI-SIMPLE', ship_to: 'egift', egift_state: 'waiting', opens_on: '2027-01-05', certificate_no: 12, reply: { text: 'ありがとう。大切にします。', at: '2026-11-08T00:00:00Z' } } } }))
   await sp.route('**/api/gift/RG-testtesttesttesttest/qr.svg', (r) => r.fulfill({ status: 200, contentType: 'image/svg+xml', body: '<svg xmlns="http://www.w3.org/2000/svg" width="10" height="10"/>' }))
   await sp.goto('http://localhost:5173/a/AN-testtesttesttesttest', { waitUntil: 'networkidle' })
   const panel = sp.locator('[data-testid=sender-panel]')
@@ -834,33 +840,263 @@ const mockPage = async (browser, { onExplain, result, order, track } = {}) => {
   await panel.locator('[data-testid=give-qr]').click()
   check('sender page: the QR code of the receiver\'s page shows on screen', (await panel.locator('[data-testid=give-qr-img] img').getAttribute('src')) === '/api/gift/RG-testtesttesttesttest/qr.svg')
   check('sender page: order details — size 木札, delivery e-gift, waiting for the receiver\'s address — and no price', (await panel.locator('[data-testid=status-size]').innerText()) === '木札（シンプル）' && (await panel.locator('[data-testid=status-ship]').innerText()).startsWith('eギフト') && (await panel.locator('[data-testid=status-egift]').innerText()).includes('待っています') && !/¥/.test(await panel.innerText()))
+  check('sender page (Part 3): a link to see it as the receiver will (with the sender\'s own id), the receiver\'s reply, the opening date and the certificate number', (await panel.locator('[data-testid=give-preview] a').getAttribute('href')) === `${GIFT}?preview=AN-testtesttesttesttest` && (await panel.locator('[data-testid=sender-reply]').innerText()) === 'ありがとう。大切にします。' && (await panel.locator('[data-testid=status-opens]').innerText()) === '開封日 2027-01-05' && (await panel.locator('[data-testid=status-number]').innerText()) === '0012')
   check('no page errors (run 8c-5, sender page)', errors.length === 0, errors.join('; '))
   await sp.close()
-  // the receiver's page
-  const gp = await browser.newPage({ locale: 'ja-JP', viewport: { width: 390, height: 800 } })
-  const gerrors = []
-  gp.on('pageerror', (e) => gerrors.push(String(e)))
-  const posted = []
-  await gp.route('**/api/gift/RG-testtesttesttesttest', (r) => r.fulfill({ json: { ...baseView, id: 'RG-testtesttesttesttest', token: 'RG-testtesttesttesttest', certificate_line: 'この字は、あなたの目に映る、その人です。', poem: { type: 'tanka', lines: ['朝ごとに', '蓋の花添え'], reading: 'あさごとに' }, from: '山田 太郎', to: '山田 一郎', message: 'いつも、ありがとう。', egift: { state: 'waiting', japan_only: true } } }))
-  await gp.route('**/api/gift/RG-testtesttesttesttest/address', async (r) => { posted.push(JSON.parse(r.request().postData() ?? '{}')); await r.fulfill({ json: { ok: true } }) })
-  await gp.goto('http://localhost:5173/g/RG-testtesttesttesttest', { waitUntil: 'networkidle' })
-  const gift = gp.locator('[data-testid=gift-panel]')
-  await gift.waitFor()
-  const gtext = await gift.innerText()
-  check('receiver page: the film first, then 「○○より」, the receiver\'s name, the sender\'s message, the character, the certificate line and the poem', (await gp.locator('[data-testid=gift-page]').count()) === 1 && (await gift.locator('[data-testid=gift-from]').innerText()).includes('山田 太郎 より') && (await gift.locator('[data-testid=gift-to]').innerText()) === '山田 一郎 さんへ' && (await gift.locator('[data-testid=gift-message]').innerText()) === 'いつも、ありがとう。' && (await gift.locator('[data-testid=gift-glyph]').innerText()) === '備' && (await gift.locator('[data-testid=gift-line]').innerText()).startsWith('この字は') && (await gift.locator('[data-testid=gift-poem]').innerText()).includes('朝ごとに'))
-  check('receiver page: no price, no order number, no other candidates, no sender page link', !/¥|IC-2026|AN-test/.test(gtext + (await gp.locator('body').innerText())) && (await gp.locator('a[href*="/a/"]').count()) === 0 && !(await gp.locator('main').innerHTML()).includes('AN-test'))
-  await gift.locator('[data-testid=gift-receive]').click()
-  check('e-gift: 「受け取る」 opens a short form (name, postal code, prefecture, address, phone); the Japan-only size says so and asks for no country', (await gift.locator('[data-testid=gift-form] input').count()) === 6 && (await gift.locator('[data-testid=gift-japan-only]').count()) === 1 && (await gift.locator('input[name=country]').count()) === 0)
-  await gift.locator('input[name=name]').fill('山田 一郎')
-  await gift.locator('input[name=postal]').fill('1500001')
-  await gift.locator('input[name=region]').fill('東京都')
-  await gift.locator('input[name=line1]').fill('渋谷区神宮前1-2-3')
-  await gift.locator('input[name=phone]').fill('03-1234-5678')
-  await gift.locator('[data-testid=gift-send]').click()
-  await gift.locator('[data-testid=gift-thanks]').waitFor()
-  check('e-gift: the address is posted to the receiver\'s own endpoint and the page thanks them; nothing of it stays on the page', posted.length === 1 && posted[0].postal === '1500001' && posted[0].line1 === '渋谷区神宮前1-2-3' && (await gift.locator('[data-testid=gift-form]').count()) === 0 && !(await gp.content()).includes('渋谷区'))
-  check('no page errors (run 8c-5, receiver page)', gerrors.length === 0, gerrors.join('; '))
-  await gp.close()
+}
+
+// ---------- Run 8c-6: Part 3 (2026-10-31) — the receiver's gift page /g/<token>: envelope, opening, letter, film, reveal, poem, certificate, keepsakes, thank-you ----------
+{
+  const TOKEN = 'RG-testtesttesttesttest'
+  const SENDER_ID = 'AN-testtesttesttesttest'
+  const year = new Date().getFullYear()
+  const mk = (over = {}) => ({
+    locked: false, id: TOKEN, token: TOKEN, language: 'ja', glyph: '備', reading: 'そなえる', romanization: 'sonaeru', meaning_en: 'to be ready', who: 'いつも、頼まれる前に備えている人。', memorial: false,
+    film: { status: 'fallback', lines: ['「ちょうど今詰めてたところ」', 'いつも、頼まれる前に備えている人。'], pictures: ['/film/washi-1.webp', '/film/washi-2.webp'] },
+    certificate_line: 'この字は、あなたの目に映る、その人です。', poem: { type: 'tanka', lines: ['朝ごとに', '蓋の花添え', '備えたる', '母の背中を', '今も思へる'], reading: 'あさごとに' },
+    from: '山田 太郎', to: '山田 一郎', message: 'いつも、ありがとう。', egift: null, certificate_no: 12, order_date: `${year}-11-07`, opens_on: null, replied: false, package: 'simple', ...over,
+  })
+  const lockedView = (over = {}) => ({ locked: true, token: TOKEN, language: 'ja', memorial: false, from: '山田 太郎', to: '山田 一郎', opens_on: `${year}-11-10`, days_left: 3, ...over })
+  const open = async (view, { reduced = false, width = 375, locale = 'ja-JP', search = '' } = {}) => {
+    const ctx = await browser.newContext({ locale, viewport: { width, height: 844 }, reducedMotion: reduced ? 'reduce' : 'no-preference' })
+    const page = await ctx.newPage()
+    const errs = []
+    const seen = { urls: [], reply: [], address: [] }
+    page.on('pageerror', (e) => errs.push(String(e)))
+    page.on('request', (r) => seen.urls.push(r.url()))
+    await page.route(`**/api/gift/${TOKEN}**`, async (r) => {
+      const u = new URL(r.request().url())
+      if (u.pathname === `/api/gift/${TOKEN}/reply`) { seen.reply.push(JSON.parse(r.request().postData() ?? '{}')); return r.fulfill({ json: { ok: true } }) }
+      if (u.pathname === `/api/gift/${TOKEN}/address`) { seen.address.push(JSON.parse(r.request().postData() ?? '{}')); return r.fulfill({ json: { ok: true } }) }
+      if (u.pathname === `/api/gift/${TOKEN}/render`) return r.fulfill({ json: { state: 'ready', view } })
+      if (u.pathname === `/api/gift/${TOKEN}`) return r.fulfill({ json: view })
+      return r.continue()
+    })
+    await page.goto(`http://localhost:5173/g/${TOKEN}${search}`, { waitUntil: 'networkidle' })
+    return { page, ctx, errs, seen }
+  }
+  const shot = async (page, path) => { await page.waitForTimeout(900); await page.screenshot({ path }).catch(() => {}) }
+  const T = (page, id) => page.locator(`[data-testid=${id}]`)
+  const step = (page) => page.locator('[data-testid=gift-page]').getAttribute('data-step')
+
+  // 1. the closed envelope (before the opening date)
+  {
+    const { page, ctx, errs } = await open(lockedView())
+    await T(page, 'gift-envelope').waitFor()
+    const body = await page.locator('body').innerText()
+    check('envelope (locked): the label 「一字の贈りもの」, the line, 「○○へ」 and 「○○より」 on the washi envelope, and the gold 一字礼 seal', (await T(page, 'gift-env-label').innerText()) === '一字の贈りもの' && (await T(page, 'gift-env-line').innerText()) === 'あなただけに届いた、一字の贈りもの' && (await T(page, 'gift-env-to').innerText()) === '山田 一郎へ' && (await T(page, 'gift-env-from').innerText()) === '山田 太郎より' && (await T(page, 'gift-seal').innerText()) === '一字礼')
+    check('envelope (locked): no 「封を開く」 button — the real date and the real count instead', (await T(page, 'gift-open').count()) === 0 && (await T(page, 'gift-locked-date').innerText()) === '11月10日に開きます' && (await T(page, 'gift-locked-note').innerText()) === 'あと3日。その日まで、封は閉じたままです。')
+    check('envelope (locked): nothing of the gift is on the page — no character, poem, message, film, price or order number', !/備|朝ごとに|いつも、ありがとう|ちょうど今|¥|IC-2026|AN-test/.test(body) && (await page.locator('.an-film, [data-testid=film]').count()) === 0)
+    check('envelope (locked): the page asks for the view only — no render, no pictures, no scroll', !seenHas(await pageUrls(page)), '')
+    check('no page errors (run 8c-6, locked envelope)', errs.length === 0, errs.join('; '))
+    await shot(page, 'shots/gift-locked-ja.png')
+    await ctx.close()
+  }
+  function seenHas(urls) { return urls.some((u) => /\/render|\/picture\/|\/scroll\./.test(u)) }
+  async function pageUrls(page) { return page.evaluate(() => performance.getEntriesByType('resource').map((e) => e.name)) }
+
+  // 2. the opening (full motion), 3. the letter, 4. the film, 5. the reveal, 6. the poem, 7. the certificate, 8. keepsakes and the thank-you
+  {
+    const { page, ctx, errs, seen } = await open(mk())
+    await T(page, 'gift-envelope').waitFor()
+    check('envelope: 「封を開く」 button, data-motion full; a liner pattern for the season (opened on the order day in November → autumn)', (await T(page, 'gift-open').innerText()) === '封を開く' && (await T(page, 'gift-envelope').getAttribute('data-motion')) === 'full' && (await T(page, 'gift-envelope').getAttribute('data-liner')) === 'autumn')
+    await T(page, 'gift-open').click()
+    await page.waitForSelector('[data-testid=gift-envelope][data-state=opening]')
+    const anims = await page.evaluate(() => {
+      const g = (sel) => { const el = document.querySelector(sel); const c = getComputedStyle(el); return { name: c.animationName, dur: parseFloat(c.animationDuration), delay: parseFloat(c.animationDelay) } }
+      return { seal: g('.gf-seal i'), flap: g('.gf-env-flap'), letter: g('.gf-env-letter') }
+    })
+    const endsAt = Math.max(anims.seal.delay + anims.seal.dur, anims.flap.delay + anims.flap.dur, anims.letter.delay + anims.letter.dur)
+    check('opening: the seal breaks, the flap lifts, the letter slides up — three animations that all end within about 1.5 s', anims.seal.name === 'gf-break-l' && anims.flap.name === 'gf-flap' && anims.letter.name === 'gf-slide' && endsAt <= 1.51 && endsAt >= 1.4, JSON.stringify(anims))
+    const t0 = Date.now()
+    await T(page, 'gift-letter').waitFor({ timeout: 4000 })
+    const took = Date.now() - t0
+    check('opening: then the letter — within about 1.5 s of the tap (measured with test overhead)', took < 2300 && took > 300, String(took))
+    check('letter: 「○○へ」, the sender\'s message, 「○○さんの目に映る、あなたを一字にしました。まずは、ふたりの物語から。」, 「○○より」 and the button 「物語を見る」', (await T(page, 'gift-to').innerText()) === '山田 一郎へ' && (await T(page, 'gift-message').innerText()) === 'いつも、ありがとう。' && (await T(page, 'gift-lead').innerText()) === '山田 太郎さんの目に映る、あなたを一字にしました。まずは、ふたりの物語から。' && (await T(page, 'gift-from').innerText()) === '山田 太郎より' && (await T(page, 'gift-to-film').innerText()) === '物語を見る')
+    await shot(page, 'shots/gift-letter-ja.png')
+    await T(page, 'gift-to-film').click()
+    await page.waitForSelector('[data-testid=film][data-ready=yes]', { timeout: 8000 })
+    check('film: the 30-second film plays on the receiver\'s page (no share button — the receiver has nothing to share)', (await step(page)) === 'film' && (await page.locator('[data-testid=animation-share]').count()) === 0)
+    await page.evaluate(() => window.__ichireiFilm.seek(window.__ichireiFilm.total))
+    await T(page, 'gift-reveal').waitFor({ timeout: 6000 })
+    const rv = await page.evaluate(() => ({ colour: getComputedStyle(document.querySelector('[data-testid=gift-glyph]')).color, size: parseFloat(getComputedStyle(document.querySelector('[data-testid=gift-glyph]')).fontSize) }))
+    check('reveal: the character large in cinnabar, the reading, the gold line 「○○さんの目に映る、あなた。」, the who line, and 「詩を読む」', rv.colour === 'rgb(192, 57, 43)' && rv.size >= 140 && (await T(page, 'gift-glyph').innerText()) === '備' && (await T(page, 'gift-reading').innerText()) === 'そなえる' && (await T(page, 'gift-gold').innerText()) === '山田 太郎さんの目に映る、あなた。' && (await T(page, 'gift-who').innerText()) === 'いつも、頼まれる前に備えている人。' && (await T(page, 'gift-to-poem').innerText()) === '詩を読む', JSON.stringify(rv))
+    await shot(page, 'shots/gift-reveal-ja.png')
+    await T(page, 'gift-to-poem').click()
+    await T(page, 'gift-poem').waitFor()
+    const wm = await T(page, 'gift-poem-vertical').evaluate((el) => getComputedStyle(el).writingMode)
+    check('poem: a tanka on a paper panel, written vertically (縦書き), with its reading, and 「証を見る」', wm.startsWith('vertical') && (await T(page, 'gift-poem-vertical').locator('p').count()) === 5 && (await T(page, 'gift-poem-reading').innerText()) === 'あさごとに' && (await T(page, 'gift-to-cert').innerText()) === '証を見る')
+    await shot(page, 'shots/gift-poem-ja.png')
+    await T(page, 'gift-to-cert').click()
+    await T(page, 'gift-cert').waitFor()
+    check('certificate: 「一字礼　第 0012 号」, the character, 「○○ 様」, the line, 「贈り主　○○」, the date, and the tagline', (await T(page, 'gift-cert-title').innerText()) === '一字礼　第 0012 号' && (await T(page, 'gift-cert-glyph').innerText()) === '備' && (await T(page, 'gift-cert-to').innerText()) === '山田 一郎 様' && (await T(page, 'gift-cert-line').innerText()) === 'この一字は、山田 太郎さんの目に映る、あなたです。' && (await T(page, 'gift-cert-from').innerText()) === '贈り主　山田 太郎' && (await T(page, 'gift-cert-date').innerText()) === '2026年11月7日'.replace('2026', String(year)) && (await page.locator('.gf-cert-tag').innerText()) === 'DESIGNED IN TOKYO · 世界にひとつの一字')
+    await shot(page, 'shots/gift-cert-ja.png')
+    await T(page, 'gift-to-keep').click()
+    await T(page, 'gift-keep').waitFor()
+    check('keepsakes: the thank-you box (「ありがとうを返す」, 200 characters at most) and no way to send it twice', (await T(page, 'gift-keep').locator('h3').innerText()) === 'ありがとうを返す' && (await T(page, 'gift-reply-left').innerText()) === 'あと200字')
+    await T(page, 'gift-reply-text').fill('あ'.repeat(230))
+    check('thank-you: clipped to 200 characters, with the count', (await T(page, 'gift-reply-text').inputValue()).length === 200 && (await T(page, 'gift-reply-left').innerText()) === 'あと0字')
+    await T(page, 'gift-reply-text').fill('ありがとう。大切にします。')
+    await T(page, 'gift-reply-send').click()
+    await T(page, 'gift-reply-sent').waitFor()
+    check('thank-you: sent once to the receiver\'s own endpoint, then 「○○さんに届けました。」 — and the box is gone', seen.reply.length === 1 && seen.reply[0].text === 'ありがとう。大切にします。' && (await T(page, 'gift-reply-sent').innerText()) === '山田 太郎さんに届けました。' && (await T(page, 'gift-reply').count()) === 0)
+    await shot(page, 'shots/gift-keep-ja.png')
+    const all = (await page.locator('body').innerText()) + (await page.locator('main').innerHTML())
+    check('no price, no order number, no other candidate characters, no sender page link anywhere on the receiver page', !/¥|IC-2026|AN-test/.test(all) && (await page.locator('a[href*="/a/"]').count()) === 0 && !seen.urls.some((u) => u.includes('/api/animation/') || u.includes('/api/film/')))
+    check('no page errors (run 8c-6, the receiver\'s whole path)', errs.length === 0, errs.join('; '))
+    await ctx.close()
+  }
+
+  // a reply already sent: no box, the line instead
+  {
+    const { page, ctx } = await open(mk({ replied: true }))
+    await T(page, 'gift-open').click()
+    await T(page, 'gift-to-film').click({ timeout: 4000 })
+    await page.waitForSelector('[data-testid=film][data-ready=yes]', { timeout: 8000 })
+    await page.evaluate(() => window.__ichireiFilm.seek(window.__ichireiFilm.total))
+    await T(page, 'gift-to-poem').click({ timeout: 6000 })
+    await T(page, 'gift-to-cert').click()
+    await T(page, 'gift-to-keep').click()
+    check('thank-you: when the receiver has already replied the page shows 「○○さんに届けました。」 and no box', (await T(page, 'gift-reply-sent').innerText()) === '山田 太郎さんに届けました。' && (await T(page, 'gift-reply').count()) === 0)
+    await ctx.close()
+  }
+
+  // reduced motion: the opening is a fade
+  {
+    const { page, ctx, errs } = await open(mk(), { reduced: true })
+    await T(page, 'gift-envelope').waitFor()
+    check('reduced motion: the envelope says data-motion=fade', (await T(page, 'gift-envelope').getAttribute('data-motion')) === 'fade')
+    await T(page, 'gift-open').click()
+    await page.waitForSelector('[data-testid=gift-envelope][data-state=opening]')
+    const nm = await page.evaluate(() => ({ env: getComputedStyle(document.querySelector('.gf-env')).animationName, flap: getComputedStyle(document.querySelector('.gf-env-flap')).animationName, seal: getComputedStyle(document.querySelector('.gf-seal i')).animationName, letter: getComputedStyle(document.querySelector('.gf-env-letter')).animationName }))
+    check('reduced motion: nothing moves (no seal break, flap or slide) — only a fade', nm.env === 'gf-fade-out' && nm.flap === 'none' && nm.seal === 'none' && nm.letter === 'none', JSON.stringify(nm))
+    const t0 = Date.now()
+    await T(page, 'gift-letter').waitFor({ timeout: 3000 })
+    check('reduced motion: the letter follows after a short fade (under a second)', Date.now() - t0 < 900, String(Date.now() - t0))
+    await T(page, 'gift-to-film').click()
+    check('reduced motion: the film is shown as stills and 「次へ」 goes on to the reveal', (await page.locator('[data-testid=film-still]').count()) === 1 && (await T(page, 'gift-skip').innerText()) === '次へ')
+    await T(page, 'gift-skip').click()
+    await T(page, 'gift-reveal').waitFor()
+    check('no page errors (run 8c-6, reduced motion)', errs.length === 0, errs.join('; '))
+    await ctx.close()
+  }
+
+  // the sender looks before the day: ?preview=<their own id>
+  {
+    const { page, ctx, seen } = await open(mk({ opens_on: `${year}-11-10` }), { search: `?preview=${SENDER_ID}` })
+    await T(page, 'gift-open').waitFor()
+    check('preview: with the sender\'s own id the envelope has its button and a note says this is how it will arrive', (await T(page, 'gift-preview-note').count()) === 1 && (await page.locator('[data-testid=gift-preview-note]').innerText()).includes('贈り主') && seen.urls.some((u) => u.includes(`/api/gift/${TOKEN}?preview=${SENDER_ID}`)))
+    await ctx.close()
+  }
+
+  // remembrance: its own first line, plain grey-beige envelope, no celebration words, the character never red
+  {
+    const { page, ctx, errs } = await open(mk({ memorial: true }))
+    await T(page, 'gift-envelope').waitFor()
+    check('remembrance envelope: 「一字の便り」 / 「あなたに届いた、一字の便り」, a plain grey-beige envelope with no pattern', (await T(page, 'gift-env-label').innerText()) === '一字の便り' && (await T(page, 'gift-env-line').innerText()) === 'あなたに届いた、一字の便り' && (await T(page, 'gift-envelope').getAttribute('data-liner')) === 'plain' && (await T(page, 'gift-envelope').evaluate((el) => getComputedStyle(el).getPropertyValue('--liner-image').trim())) === 'none')
+    await shot(page, 'shots/gift-envelope-memorial-ja.png')
+    const seen = []
+    seen.push(await page.locator('body').innerText())
+    await T(page, 'gift-open').click()
+    await T(page, 'gift-letter').waitFor({ timeout: 4000 })
+    seen.push(await page.locator('body').innerText())
+    await T(page, 'gift-to-film').click()
+    await page.waitForSelector('[data-testid=film][data-ready=yes]', { timeout: 8000 })
+    await page.evaluate(() => window.__ichireiFilm.seek(window.__ichireiFilm.total))
+    await T(page, 'gift-reveal').waitFor({ timeout: 6000 })
+    const colour = await T(page, 'gift-glyph').evaluate((el) => getComputedStyle(el).color)
+    seen.push(await page.locator('body').innerText())
+    await T(page, 'gift-to-poem').click()
+    await T(page, 'gift-to-cert').click()
+    await T(page, 'gift-cert').waitFor()
+    const certColour = await T(page, 'gift-cert-glyph').evaluate((el) => getComputedStyle(el).color)
+    seen.push(await page.locator('body').innerText())
+    const isRed = (c) => { const m = c.match(/\d+/g).map(Number); return m[0] > 150 && m[1] < 90 && m[2] < 90 }
+    check('remembrance: the character is never red — pale ink on the reveal, dark ink on the certificate', !isRed(colour) && !isRed(certColour), `${colour} ${certColour}`)
+    check('remembrance: no celebration words on any screen (贈りもの / おめでとう / お祝い / 祝)', !seen.some((t) => /贈りもの|おめでとう|お祝い|祝/.test(t)))
+    check('no page errors (run 8c-6, remembrance)', errs.length === 0, errs.join('; '))
+    await ctx.close()
+  }
+
+  // the liner follows the season of the opening date
+  {
+    for (const [d, want] of [[`${year}-04-02`, 'spring'], [`${year}-07-20`, 'summer'], [`${year}-10-05`, 'autumn'], [`${year}-01-15`, 'winter']]) {
+      const { page, ctx } = await open(mk({ opens_on: d }))
+      await T(page, 'gift-envelope').waitFor()
+      const li = await T(page, 'gift-envelope').getAttribute('data-liner')
+      const img = await T(page, 'gift-envelope').evaluate((el) => getComputedStyle(el).getPropertyValue('--liner-image').trim().slice(0, 30))
+      check(`liner: ${d} → ${want} (a printed pattern, not plain)`, li === want && img.startsWith('url('), `${li} ${img}`)
+      await ctx.close()
+    }
+  }
+
+  // zh-Hant and en
+  for (const [lang, locale, v] of [
+    ['zh-Hant', 'zh-TW', { language: 'zh-Hant', glyph: '備', reading: 'bèi', who: '總是比別人先一步準備好的人。' }],
+    ['en', 'en-US', { language: 'en', glyph: '備', reading: 'sonaeru', who: 'Someone who is ready before you ask.', poem: { type: 'en', lines: ['Each morning, a flower set', 'beside the cup.'], reading: '' } }],
+  ]) {
+    const want = lang === 'en'
+      ? { label: 'A gift of one character', to: 'To 山田 一郎', from: 'From 山田 太郎', open: 'Open the envelope', lockedDate: `Opens on 10 November${''}`, lockedNote: '3 days to go. The envelope stays sealed until then.', btn: 'See the story', cert: 'ICHIREI · No. 0012' }
+      : { label: '一個字的禮物', to: '致 山田 一郎', from: '山田 太郎 敬上', open: '拆開信封', lockedDate: '11月10日開啟', lockedNote: '還有 3 天。在那天之前，信封會一直封著。', btn: '看故事', cert: '一字禮　第 0012 號' }
+    {
+      const { page, ctx } = await open(lockedView({ language: lang }), { locale })
+      await T(page, 'gift-envelope').waitFor()
+      check(`${lang}: the locked envelope — label, names, the date and the count in the reader's language`, (await T(page, 'gift-env-label').innerText()) === want.label && (await T(page, 'gift-env-to').innerText()) === want.to && (await T(page, 'gift-env-from').innerText()) === want.from && (await T(page, 'gift-locked-date').innerText()) === want.lockedDate && (await T(page, 'gift-locked-note').innerText()) === want.lockedNote, `${await T(page, 'gift-locked-date').innerText()}`)
+      await page.screenshot({ path: `shots/gift-locked-${lang}.png` }).catch(() => {})
+      await ctx.close()
+    }
+    {
+      const { page, ctx, errs } = await open(mk(v), { locale })
+      await T(page, 'gift-open').waitFor()
+      check(`${lang}: the envelope's button reads 「${want.open}」`, (await T(page, 'gift-open').innerText()) === want.open)
+      await page.screenshot({ path: `shots/gift-envelope-${lang}.png` }).catch(() => {})
+      await T(page, 'gift-open').click()
+      await T(page, 'gift-letter').waitFor({ timeout: 4000 })
+      check(`${lang}: the letter — 「${want.to}」, the button 「${want.btn}」`, (await T(page, 'gift-to').innerText()) === want.to && (await T(page, 'gift-to-film').innerText()) === want.btn)
+      await page.screenshot({ path: `shots/gift-letter-${lang}.png` }).catch(() => {})
+      await T(page, 'gift-to-film').click()
+      await page.waitForSelector('[data-testid=film][data-ready=yes]', { timeout: 8000 })
+      await page.evaluate(() => window.__ichireiFilm.seek(window.__ichireiFilm.total))
+      await T(page, 'gift-reveal').waitFor({ timeout: 6000 })
+      await page.screenshot({ path: `shots/gift-reveal-${lang}.png` }).catch(() => {})
+      await T(page, 'gift-to-poem').click()
+      await T(page, 'gift-poem').waitFor()
+      await page.screenshot({ path: `shots/gift-poem-${lang}.png` }).catch(() => {})
+      await T(page, 'gift-to-cert').click()
+      await T(page, 'gift-cert').waitFor()
+      check(`${lang}: the certificate title reads 「${want.cert}」`, (await T(page, 'gift-cert-title').innerText()) === want.cert)
+      await page.screenshot({ path: `shots/gift-cert-${lang}.png` }).catch(() => {})
+      await T(page, 'gift-to-keep').click()
+      await T(page, 'gift-keep').waitFor()
+      await page.screenshot({ path: `shots/gift-keep-${lang}.png` }).catch(() => {})
+      check(`no page errors (run 8c-6, ${lang})`, errs.length === 0, errs.join('; '))
+      await ctx.close()
+    }
+  }
+
+  // the e-gift address form (a wooden size sent as an e-gift) now lives with the keepsakes
+  {
+    const { page, ctx, seen } = await open(mk({ egift: { state: 'waiting', japan_only: true } }))
+    await T(page, 'gift-open').click()
+    await T(page, 'gift-to-film').click({ timeout: 4000 })
+    await page.waitForSelector('[data-testid=film][data-ready=yes]', { timeout: 8000 })
+    await page.evaluate(() => window.__ichireiFilm.seek(window.__ichireiFilm.total))
+    await T(page, 'gift-to-poem').click({ timeout: 6000 })
+    await T(page, 'gift-to-cert').click()
+    await T(page, 'gift-to-keep').click()
+    const gift = T(page, 'gift-panel')
+    await T(page, 'gift-receive').click()
+    check('e-gift: 「受け取る」 opens a short form (name, postal code, prefecture, address, phone); the Japan-only size says so and asks for no country', (await gift.locator('[data-testid=gift-form] input').count()) === 6 && (await gift.locator('[data-testid=gift-japan-only]').count()) === 1 && (await gift.locator('input[name=country]').count()) === 0)
+    await gift.locator('input[name=name]').fill('山田 一郎')
+    await gift.locator('input[name=postal]').fill('1500001')
+    await gift.locator('input[name=region]').fill('東京都')
+    await gift.locator('input[name=line1]').fill('渋谷区神宮前1-2-3')
+    await gift.locator('input[name=phone]').fill('03-1234-5678')
+    await gift.locator('[data-testid=gift-send]').click()
+    await gift.locator('[data-testid=gift-thanks]').waitFor()
+    check('e-gift: the address is posted to the receiver\'s own endpoint and the page thanks them; nothing of it stays on the page', seen.address.length === 1 && seen.address[0].postal === '1500001' && seen.address[0].line1 === '渋谷区神宮前1-2-3' && (await gift.locator('[data-testid=gift-form]').count()) === 0 && !(await page.content()).includes('渋谷区'))
+    await ctx.close()
+  }
 }
 
 // ---------- Run 8e: Part E — the story scroll's 保存 buttons appear only when all four pictures are real ----------

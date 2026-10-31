@@ -78,6 +78,12 @@ export interface GiftRecord {
   egift: GiftEgift | null
   /** Set from the owner page when the order has shipped: the address is deleted 90 days later. */
   shipped_at?: string | null
+  /** The day the envelope may be opened (YYYY-MM-DD, JST); null/absent = at once. Until then the receiver's page shows the closed envelope only. */
+  opens_on?: string | null
+  /** 「一字礼　第 NNNN 号」 — the running number (engine/certificate-no.ts); null on gifts made before numbers existed. */
+  certificate_no?: number | null
+  /** The receiver's one reply (「ありがとうを返す」), shown on the sender's page. */
+  reply?: { text: string; at: string } | null
 }
 
 export function buildGiftRecord(record: OrderRecord, animationId: string, token: string, senderEmail: string | null, now: Date = new Date()): GiftRecord {
@@ -107,6 +113,9 @@ export function buildGiftRecord(record: OrderRecord, animationId: string, token:
     ship_to: ship,
     egift: ship === 'egift' ? { state: 'waiting', sender_email: senderEmail, reminded_at: null, received_at: null, address: null } : null,
     shipped_at: null,
+    opens_on: p.open_date ?? null,
+    certificate_no: record.certificate_no ?? null,
+    reply: null,
   }
 }
 
@@ -125,6 +134,52 @@ export interface GiftView extends AnimationView {
   message: string
   /** null: an ordinary gift (nothing to enter). Otherwise the receiver is asked for an address: worldwide, or Japan only for the wooden sizes. */
   egift: { state: 'waiting' | 'received'; japan_only: boolean } | null
+  locked: false
+  /** The running certificate number (null on old gifts). */
+  certificate_no: number | null
+  /** The day the order was made (JST, YYYY-MM-DD) and the day the envelope opens (null = at once): the certificate shows one of them. */
+  order_date: string
+  opens_on: string | null
+  /** True once the receiver has sent their reply (the reply itself is for the sender's page only). */
+  replied: boolean
+  /** Which size it is: the keepsake lines of the last screen depend on it. */
+  package: PackageId
+}
+
+/** The closed envelope: names and the date only. Nothing of the film, the character, the poem or the message leaves the server before the day. */
+export interface GiftLockedView {
+  locked: true
+  token: string
+  language: Language
+  memorial: boolean
+  from: string
+  to: string
+  opens_on: string
+  days_left: number
+}
+
+const JST = 9 * 3600_000
+export const todayJst = (now: Date): string => new Date(now.getTime() + JST).toISOString().slice(0, 10)
+const dayNumber = (d: string): number => Math.floor(Date.parse(`${d}T00:00:00Z`) / 86_400_000)
+
+/** True while the envelope may not be opened yet (the opening date has not come, in Japan time). */
+export const isLocked = (g: GiftRecord, now: Date): boolean => !!g.opens_on && todayJst(now) < g.opens_on
+
+export function lockedView(g: GiftRecord, now: Date): GiftLockedView {
+  const opens = g.opens_on ?? todayJst(now)
+  return { locked: true, token: g.token, language: g.language, memorial: g.memorial, from: g.from, to: g.to, opens_on: opens, days_left: Math.max(1, dayNumber(opens) - dayNumber(todayJst(now))) }
+}
+
+export const REPLY_MAX = 200
+
+export type ReplyCheck = { ok: true; text: string } | { ok: false; error: string }
+export function checkReply(body: unknown): ReplyCheck {
+  const raw = (body as { text?: unknown } | null)?.text
+  if (typeof raw !== 'string') return { ok: false, error: 'text is required' }
+  const text = raw.replace(/\p{Cc}+/gu, ' ').replace(/[ \t]+/g, ' ').trim()
+  if (!text) return { ok: false, error: 'text is required' }
+  if ([...text].length > REPLY_MAX) return { ok: false, error: `text is longer than ${REPLY_MAX} characters` }
+  return { ok: true, text }
 }
 
 export function giftView(g: GiftRecord, anim: AnimationRecord, art: ArtRecord | null): GiftView {
@@ -142,6 +197,12 @@ export function giftView(g: GiftRecord, anim: AnimationRecord, art: ArtRecord | 
     to: g.to,
     message: g.message,
     egift: g.egift ? { state: g.egift.state, japan_only: EGIFT_JAPAN_ONLY[g.package] } : null,
+    locked: false,
+    certificate_no: g.certificate_no ?? null,
+    order_date: todayJst(new Date(g.created_at)),
+    opens_on: g.opens_on ?? null,
+    replied: !!g.reply,
+    package: g.package,
   }
 }
 

@@ -85,7 +85,7 @@ export interface AnimationView {
    */
   film: { status: 'ready' | 'fallback'; lines: string[]; pictures: string[] | null; deferred?: boolean; incomplete?: boolean } | null
   /** The sender's page only (api/animation.ts adds it): what to share and where the order stands. */
-  gift?: { url: string; size_code: string; ship_to: string; egift_state: 'waiting' | 'received' | null } | null
+  gift?: { url: string; size_code: string; ship_to: string; egift_state: 'waiting' | 'received' | null; opens_on: string | null; certificate_no: number | null; reply: { text: string; at: string } | null } | null
 }
 
 /** A film the pictures can be drawn for: a fallback script (nothing to draw) or one with its four descriptions (older films with scene IDs are written again). */

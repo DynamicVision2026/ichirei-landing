@@ -349,6 +349,20 @@ gcloud projects add-iam-policy-binding ichirei --member="serviceAccount:$(gcloud
 
 `scripts/test-film.ts` (the script referee incl. the picture descriptions, the call with a fake model: good, retry, fallback, timeout, off, no key, logs), `scripts/test-film-art.ts` (the style, the Vertex client against a fake server — URL, token, 4:5, model hand-over, error codes, metadata server —, the picture check, a set with per-slot retry and washi, the lock across instances, the limits, the private bucket), `scripts/test-animation.ts` (records, timeline, API incl. the first open, order wiring, samples, the real server with a fake image model), `scripts/test-animation-browser.mjs` (Chromium on iPhone-class, Pixel-class and 320 × 568 screens, incl. the first-open flow). **No test calls Google or Claude; the image model's look and the picture check's judgement have not been seen.** The phones are emulated in Chromium — real iPhone Safari and Android Chrome are for the owner's check of the sample links. `ANTHROPIC_API_KEY=… node --experimental-strip-types scripts/run-film-db.mjs` runs the *script* call over ~11 stories for a human to read (picture descriptions included).
 
+## The receiver's gift page (Part 3 of 2026-10-31)
+
+`/g/<token>` is now a sequence of screens — sealed envelope → opening → letter → film → reveal → poem → certificate → keepsakes and the one thank-you — in
+`src/gift/`. No new environment variable.
+
+- **Opening date** (`open_date` on the order, up to a year ahead; empty = at once): until that day (Japan time) `GET /api/gift/<token>` answers only the closed
+  envelope (the two names, the date, the days left) and the pictures, the render, the scroll and the thank-you answer 403. The sender sees everything at any
+  time with `?preview=<their own page id>` (the link on their page).
+- **Certificate number** 「一字礼　第 NNNN 号」: one running number across all orders, from 0001, never reused. Each number is a small private object
+  `ops/certno/NNNN.json` in the order bucket, written with "only if absent" (so two simultaneous orders can never share one); `ops/certno/last.json` is only a
+  hint of where to start. The number is kept on the order record and the gift record. A number is taken when the order is made, so an order that is never paid
+  leaves a gap — numbers are never handed out twice.
+- **Thank-you**: one reply per gift (200 characters), stored on the gift record, shown on the sender's page; no e-mail is sent.
+
 ## The engine spec in this repo
 
 `docs/ICHIREI_Engine_v9_Spec.md` is the owner's spec (v9.3, 2026-10-30) — the single source of truth: if code and the document disagree, the document wins and the difference is reported. The code check of 2026-10-30 found four differences (the free poem, no main-character count in analytics, the wider freestyle teasing list, the palette-row rule); all four were settled by updating the spec, so code and spec agree. The older alignment report of the v9.1 build is `review/V9_1_alignment_report.md`.
