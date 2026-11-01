@@ -87,8 +87,63 @@ export function fillReplacePrompt(selectionFilled: string, template: string, res
   return `${selectionFilled}\n\n${template.replace(pattern, (slot) => values.get(slot) as string)}`
 }
 
+// ---- the free pick alone: a short prompt for the small, fast model ------------------------------------------------------------------------------------------------------
+// (2026-11-01) A refill for the free pick only does NOT append the long selection prompt (whose "return this exact shape" pulls a model away from a one-candidate answer) and does
+// not use the selection model: a compact prompt, the review-class model, low effort, a 10 s ceiling. Whatever comes back goes through the same referee and review.
+
+export const FREE_REFILL_TIMEOUT_MS_DEFAULT = 10_000
+export const FREE_REVIEW_TIMEOUT_MS_DEFAULT = 8_000
+export const freeRefillTimeoutMs = (env: NodeJS.ProcessEnv = process.env): number => {
+  const n = Number(env.ICHIREI_REFILL_FREE_TIMEOUT_MS)
+  return Number.isFinite(n) && n > 0 ? n : FREE_REFILL_TIMEOUT_MS_DEFAULT
+}
+
+export function loadFreePrompt(): string {
+  const override = process.env.ICHIREI_REFILL_FREE_PROMPT_PATH
+  const here = dirname(fileURLToPath(import.meta.url))
+  for (const p of override ? [override] : [join(here, 'refill-free-prompt.md'), join(process.cwd(), 'engine', 'refill-free-prompt.md')]) {
+    try {
+      return readFileSync(p, 'utf8')
+    } catch {
+      // next
+    }
+  }
+  throw new Error('refill-free-prompt.md not found')
+}
+
+const FREE_FIELDS: Record<'ja' | 'zh' | 'en', { fields: string; extra: string }> = {
+  ja: { fields: '- kanji: the modern Japanese form\n- reading: hiragana\n- inscription_form: the old-form variant, or null\n- one_line_gaze: Japanese, ONE short sentence', extra: '' },
+  zh: { fields: '- kanji: the SIMPLIFIED form\n- reading: pinyin with tone marks\n- inscription_form: the TRADITIONAL form, or null if identical to kanji\n- one_line_gaze: Chinese in the display script of the language above (zh-Hans → 简体中文, zh-Hant → 繁體中文), ONE short sentence', extra: '' },
+  en: { fields: '- kanji: the modern Japanese form\n- reading: romaji, ONE reading only\n- inscription_form: the old-form variant, or null\n- meaning: a one-phrase English meaning\n- why_this: ONE short plain-English sentence tying the character to the quoted story moment, no kanji jargon\n- one_line_gaze: English, ONE short sentence', extra: ', "meaning": …, "why_this": …' },
+}
+
+/** Fill the compact free-pick prompt: the context, the story, the cards that stand and the characters to avoid (with the reasons they were refused). */
+export function fillFreePrompt(result: EngineResult, story: string, context: EngineContext, extraAvoid: { kanji: string; reason: string }[] = []): string {
+  const standing = result.candidates.filter((c) => !c.eliminated).map((c) => ({ slot: c.slot, kanji: c.kanji, truth_type: c.truth_type, one_line_gaze: c.one_line_gaze }))
+  const avoid = [...result.candidates.map((c) => ({ kanji: c.kanji, reason: c.eliminated ? (c.eliminated_reason ?? 'refused') : 'already offered' })), ...extraAvoid]
+  const f = FREE_FIELDS[context.language === 'ja' ? 'ja' : context.language === 'en' ? 'en' : 'zh']
+  const v: Record<string, string> = {
+    LANGUAGE: context.language,
+    RELATIONSHIP: context.relationship ?? 'unspecified',
+    DIRECTION: context.direction ?? 'unspecified',
+    OCCASION: context.occasion ?? 'unspecified',
+    OCCASION_DETAIL: context.occasion_detail ?? 'unspecified',
+    STORY: story,
+    STANDING: JSON.stringify(standing, null, 2),
+    AVOID: JSON.stringify(avoid, null, 2),
+    FIELDS: f.fields,
+    EXTRA: f.extra,
+  }
+  return loadFreePrompt().replace(/\{\{ ([A-Z_]+) \}\}/g, (m, k: string) => v[k] ?? m)
+}
+
+const REQUIRED = ['kanji', 'reading', 'one_line_gaze', 'story_anchor'] as const
+const strOf = (v: unknown) => (typeof v === 'string' && v.trim() ? v.trim() : null)
+/** Which required fields an offered candidate lacks (names only). */
+export const missingFields = (obj: Record<string, unknown>): string[] => REQUIRED.filter((k) => !strOf(obj[k]))
+
 const toCandidate = (obj: Record<string, unknown>, slot: RefillSlot): Candidate | null => {
-  const str = (v: unknown) => (typeof v === 'string' && v.trim() ? v.trim() : null)
+  const str = strOf
   const kanji = str(obj.kanji)
   const reading = str(obj.reading)
   const gaze = str(obj.one_line_gaze)
@@ -112,39 +167,58 @@ const toCandidate = (obj: Record<string, unknown>, slot: RefillSlot): Candidate 
   } as Candidate
 }
 
+/** What came of the reply, in codes only (no story text): the parse verdict, the top-level keys, and for every offered element its slot, character and the required fields it lacks. */
+export interface ReplyDiag {
+  parse: 'empty' | 'no_json' | 'bad_json' | 'none' | 'no_candidates' | 'offered_unusable' | 'ok'
+  keys: string[]
+  offered: { slot: string | null; kanji: string | null; missing: string[] }[]
+}
+
 /**
  * Turn the model's reply into candidates, one per usable element, each with the slot it names (a bare candidate, or one without a valid `slot`, is given the next of `wanted`).
- * [] when the reply is "none", unreadable, or has nothing in the shape. Never throws.
+ * [] when the reply is "none", unreadable, or has nothing in the shape; `diag` says which. Never throws.
  */
-export function parseReplacements(raw: string, wanted: RefillSlot[] = ['second']): Candidate[] {
+export function parseReplacementsDiag(raw: string, wanted: RefillSlot[] = ['second']): { cands: Candidate[]; diag: ReplyDiag } {
   let text = raw.trim()
+  if (!text) return { cands: [], diag: { parse: 'empty', keys: [], offered: [] } }
   if (text.startsWith('```')) text = text.replace(/^```(?:json)?\s*/i, '').replace(/```\s*$/i, '').trim()
   const first = text.indexOf('{')
   const last = text.lastIndexOf('}')
-  if (first === -1 || last < first) return []
+  if (first === -1 || last < first) return { cands: [], diag: { parse: 'no_json', keys: [], offered: [] } }
   let parsed: Record<string, unknown>
   try {
     parsed = JSON.parse(text.slice(first, last + 1)) as Record<string, unknown>
   } catch {
-    return []
+    return { cands: [], diag: { parse: 'bad_json', keys: [], offered: [] } }
   }
-  if (parsed.none === true) return []
+  const keys = Object.keys(parsed).slice(0, 12)
+  if (parsed.none === true) return { cands: [], diag: { parse: 'none', keys, offered: [] } }
   const list: Record<string, unknown>[] = Array.isArray(parsed.candidates) ? (parsed.candidates as Record<string, unknown>[]) : [parsed.candidate && typeof parsed.candidate === 'object' ? (parsed.candidate as Record<string, unknown>) : parsed]
-  const queue = [...wanted]
   const out: Candidate[] = []
   const taken = new Set<RefillSlot>()
-  for (const obj of list) {
-    if (!obj || typeof obj !== 'object' || obj.none === true) continue
-    const named = obj.slot === 'main' || obj.slot === 'second' || obj.slot === 'freestyle' ? (obj.slot as RefillSlot) : undefined
-    const slot = named && wanted.includes(named) ? named : queue.find((q) => !taken.has(q))
-    if (!slot || taken.has(slot)) continue
-    const cand = toCandidate(obj, slot)
+  const offered: ReplyDiag['offered'] = []
+  const elems = list.filter((o) => o && typeof o === 'object' && o.none !== true)
+  const slotNamed = (o: Record<string, unknown>): RefillSlot | undefined => (o.slot === 'main' || o.slot === 'second' || o.slot === 'freestyle' ? (o.slot as RefillSlot) : undefined)
+  for (const obj of elems) offered.push({ slot: slotNamed(obj) ?? null, kanji: strOf(obj.kanji), missing: missingFields(obj) })
+  // 1. an element that names a slot we asked for takes that slot (a reply that repeats the whole selection shape — main, second, the new free pick — still yields the free pick)
+  for (const obj of elems) {
+    const named = slotNamed(obj)
+    if (!named || !wanted.includes(named) || taken.has(named)) continue
+    const cand = toCandidate(obj, named)
     if (!cand) continue
-    taken.add(slot)
+    taken.add(named)
     out.push(cand)
   }
-  return out
+  // 2. a bare candidate (one element, no usable slot name) is given the next slot asked for
+  if (out.length === 0 && elems.length === 1) {
+    const slot = wanted[0]
+    const cand = slot ? toCandidate(elems[0], slot) : null
+    if (cand) out.push(cand)
+  }
+  return { cands: out, diag: { parse: out.length > 0 ? 'ok' : offered.length > 0 ? 'offered_unusable' : 'no_candidates', keys, offered } }
 }
+
+export const parseReplacements = (raw: string, wanted: RefillSlot[] = ['second']): Candidate[] => parseReplacementsDiag(raw, wanted).cands
 
 export interface RefillReport {
   asked: RefillSlot[]
@@ -160,6 +234,8 @@ export interface ReplaceOptions {
   model: string
   /** The model that reviews them (the same one that reviews every candidate); defaults to `model`. */
   reviewModel?: string
+  /** The model for a refill of the FREE PICK alone (small and fast, with a short ceiling); defaults to `reviewModel`. */
+  freeModel?: string
   /** Injected in tests; defaults to a real Anthropic client. */
   client?: Pick<Anthropic, 'messages'>
   log?: (line: string) => void
@@ -211,22 +287,35 @@ export async function completeMains(
   }
 
   // ---- ONE call for every empty slot -----------------------------------------------------------------------------------------------------------------------------
+  // A refill for the free pick ALONE (the most often removed slot) uses a compact prompt, the small review-class model, low effort and a 10 s ceiling; a refill that includes a main or a
+  // second card keeps the selection prompt and the selection model.
+  const freeOnly = slots.length === 1 && slots[0] === 'freestyle'
   let cands: Candidate[] = []
+  const callInfo: Record<string, unknown> = { mode: freeOnly ? 'free_only' : 'full', slots }
   try {
     opts.onStage?.('replacing')
-    const prompt = fillReplacePrompt(selectionFilled, loadReplacePrompt(), result, [], slots)
+    const prompt = freeOnly ? fillFreePrompt(result, story, context) : fillReplacePrompt(selectionFilled, loadReplacePrompt(), result, [], slots)
     const client = opts.client ?? new Anthropic(opts.apiKey ? { apiKey: opts.apiKey } : {})
-    const effort = (process.env.ICHIREI_REPLACE_EFFORT ?? 'medium') as 'low' | 'medium' | 'high'
-    const signal = callSignal(opts.signal, replaceTimeoutMs())
+    const effort = (freeOnly ? 'low' : (process.env.ICHIREI_REPLACE_EFFORT ?? 'medium')) as 'low' | 'medium' | 'high'
+    const callModel = freeOnly ? (process.env.ICHIREI_REFILL_FREE_MODEL ?? opts.freeModel ?? opts.reviewModel ?? opts.model) : opts.model
+    const signal = callSignal(opts.signal, freeOnly ? freeRefillTimeoutMs() : replaceTimeoutMs())
     const stream = client.messages.stream(
-      { model: opts.model, max_tokens: Number(process.env.ICHIREI_REPLACE_MAX_TOKENS ?? 9000), output_config: { effort }, messages: [{ role: 'user', content: prompt }] },
+      { model: callModel, max_tokens: freeOnly ? 1500 : Number(process.env.ICHIREI_REPLACE_MAX_TOKENS ?? 9000), output_config: { effort }, messages: [{ role: 'user', content: prompt }] },
       { signal },
     )
     const message = await stream.finalMessage()
-    opts.onUsage?.('replace', { model: opts.model, input_tokens: message.usage?.input_tokens ?? 0, output_tokens: message.usage?.output_tokens ?? 0 })
-    cands = parseReplacements(message.content.filter((b): b is Anthropic.TextBlock => b.type === 'text').map((b) => b.text).join(''), slots)
+    opts.onUsage?.('replace', { model: callModel, input_tokens: message.usage?.input_tokens ?? 0, output_tokens: message.usage?.output_tokens ?? 0 })
+    const text = message.content.filter((b): b is Anthropic.TextBlock => b.type === 'text').map((b) => b.text).join('')
+    const parsed = parseReplacementsDiag(text, slots)
+    cands = parsed.cands
+    // the line a failed refill is diagnosed from: what the call was, how long the reply was, how it parsed, what was offered (codes and character only — never a story fragment)
+    Object.assign(callInfo, { model: callModel, effort, ms: Date.now() - t0, stop_reason: message.stop_reason, output_tokens: message.usage?.output_tokens ?? null, blocks: message.content.map((b) => b.type), reply_chars: [...text].length, parse: message.stop_reason === 'refusal' ? 'refusal' : parsed.diag.parse, keys: parsed.diag.keys, offered: parsed.diag.offered })
+    log(`[ichirei-refill] ${JSON.stringify(callInfo)}`)
   } catch (err) {
-    log(`[ichirei-engine] replacement ${JSON.stringify({ slots, ok: false, ms: Date.now() - t0, error: (err instanceof Error ? err.message : String(err)).slice(0, 160) })}`)
+    const msg = (err instanceof Error ? err.message : String(err)).slice(0, 160)
+    Object.assign(callInfo, { ms: Date.now() - t0, parse: 'call_failed', error: msg })
+    log(`[ichirei-refill] ${JSON.stringify(callInfo)}`)
+    log(`[ichirei-engine] replacement ${JSON.stringify({ slots, ok: false, ms: Date.now() - t0, error: msg })}`)
     for (const s of slots) report.rejected.push({ slot: s, reason: 'the refill call failed' })
     return finish(result)
   }
@@ -269,7 +358,7 @@ export async function completeMains(
   let judged = refereed
   if (refereed.status === 'sufficient' && refereed.candidates.some((c) => newKanji.has(c.kanji) && !c.eliminated)) {
     opts.onStage?.('checking')
-    const review = await runReview(refereed, palette, story, context, { apiKey: opts.apiKey, signal: opts.signal, model: opts.reviewModel ?? opts.model, client: opts.client, log, onUsage: opts.onUsage ? (u) => opts.onUsage!('review', u) : undefined })
+    const review = await runReview(refereed, palette, story, context, { apiKey: opts.apiKey, signal: freeOnly ? callSignal(opts.signal, FREE_REVIEW_TIMEOUT_MS_DEFAULT) : opts.signal, model: opts.reviewModel ?? opts.model, client: opts.client, log, onUsage: opts.onUsage ? (u) => opts.onUsage!('review', u) : undefined })
     judged = applyReviewVerdicts(refereed, palette, story, review, { deferInsufficient: true, canBeMain: opts.mainOk })
     for (const c of judged.candidates) if (newKanji.has(c.kanji) && c.eliminated && !refereed.candidates.find((r) => r.kanji === c.kanji)?.eliminated) reject(c.slot as RefillSlot, c.kanji, reasonOf(judged, c.kanji))
   }

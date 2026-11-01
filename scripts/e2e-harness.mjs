@@ -1529,7 +1529,7 @@ const mockPage = async (browser, { onExplain, result, order, track } = {}) => {
     n++
     idOf[b.type] = `PM-20261028-abcdefghj${n}`
     if (b.type === 'en') await new Promise((r) => setTimeout(r, 1500)) // slow: the order button must wait for it
-    await route.fulfill({ json: { poem_id: idOf[b.type], type: b.type, lines: [`${b.type} 一行目です`, `${b.type} 二行目です`, `${b.type} 三行目です`], reading: b.type === 'tang' ? '書き下しです' : '', aids: {}, preview: 'x' } })
+    await route.fulfill({ json: { poem_id: idOf[b.type], type: b.type, lines: [`${b.type} 一行目です`, `${b.type} 二行`, `${b.type} 三行目です`], reading: b.type === 'tang' ? '書き下しです' : '', aids: {}, preview: 'x' } })
   })
   await f.page.goto('http://localhost:5173/', { waitUntil: 'networkidle' })
   await f.page.locator('#write [data-testid=story-input]').fill(STORY)
@@ -1549,9 +1549,10 @@ check('included poem: the Japanese site starts with the tanka (the default forma
   await addon.locator('[data-poem-result=tanka][data-state=ready]').waitFor({ timeout: 5000 })
   const full = await addon.locator('[data-poem-full]').innerText()
   // ticket 2026-11-01: 短歌 and 俳句 are set vertically (縦書き) on the card preview, first line on the right; 漢詩 / 宋詞 / English stay horizontal
-  const vert = () => f.page.locator('[data-testid=card-poem]').evaluate((el) => ({ mode: getComputedStyle(el).writingMode, kind: el.getAttribute('data-poem-type'), xs: [...el.querySelectorAll('.cardPoemLine')].map((s) => s.getBoundingClientRect().left) }))
+  const vert = () => f.page.locator('[data-testid=card-poem]').evaluate((el) => ({ mode: getComputedStyle(el).writingMode, kind: el.getAttribute('data-poem-type'), xs: [...el.querySelectorAll('.cardPoemLine')].map((s) => s.getBoundingClientRect().left), tops: [...el.querySelectorAll('.cardPoemLine')].map((s) => { const r = document.createRange(); r.selectNodeContents(s); return r.getBoundingClientRect().top }), lens: [...el.querySelectorAll('.cardPoemLine')].map((s) => [...(s.textContent ?? '')].length) }))
   const vt = await vert()
   check('card preview: the tanka is vertical (縦書き, vertical-rl) and the first line is the rightmost column', vt.kind === 'tanka' && vt.mode.startsWith('vertical') && vt.xs.length === 3 && vt.xs[0] > vt.xs[1] && vt.xs[1] > vt.xs[2], JSON.stringify(vt))
+  check('card preview: every column of the vertical poem starts at the SAME line (the top) although the lines differ in length — none is centred', new Set(vt.lens).size > 1 && vt.tops.every((t) => Math.abs(t - vt.tops[0]) <= 1.5), JSON.stringify(vt))
   check('included poem: the WHOLE poem is shown before checkout (all three lines), with "this poem is printed on your card"', full.includes('tanka 一行目です') && full.includes('tanka 三行目です') && (await addon.innerText()).includes('カードに印刷されます'))
   check('included poem: /api/poem got the story, the context, the chosen character, its card line and the type — and the session', poemCalls[0].story === STORY && poemCalls[0].kanji === '証' && typeof poemCalls[0].gaze === 'string' && poemCalls[0].gaze.length > 0 && poemCalls[0].relationship === 'parent_father' && typeof poemCalls[0].session === 'string')
   const callsBeforeTang = poemCalls.length

@@ -192,6 +192,7 @@ check('(5) isVerticalPoem: tanka and haiku are vertical; tang (漢詩 / 唐詩),
   const xs = tanka.map((l) => v.cells.find((c) => c.ch === l[0] && c.y === 100)!.x)
   check('(5) vertical layout: the first line is the RIGHTMOST column, each next line one column to its left, centred on the given x', xs.every((x, i) => i === 0 || x < xs[i - 1]) && Math.abs((xs[0] + xs[4]) / 2 - 300) < 0.001 && v.cells.length === tanka.join('').length)
   const first = v.cells.filter((c) => c.x === xs[0])
+  check('(5) every column starts at the SAME top, whatever its length (top-aligned, the usual Japanese setting)', new Set(tanka.map((l) => v.cells.find((c) => c.ch === l[0] && c.x === xs[tanka.indexOf(l)])!.y)).size === 1 && new Set(tanka.map((l) => l.length)).size > 1)
   check('(5) inside a line the characters run top to bottom from the same top, one step apart', first.map((c) => c.ch).join('') === tanka[0] && first.every((c, i) => i === 0 || c.y > first[i - 1].y) && first[0].y === 100 && col(0).length === 4)
   const odd = verticalCells(['初ーは、今'], 0, 0, 8).cells
   check('(5) the long vowel mark is rotated a quarter turn and 、 sits in the corner of its cell', odd.find((c) => c.ch === 'ー')?.rotate === true && odd.find((c) => c.ch === '、')?.offset === true && odd.find((c) => c.ch === '初')?.rotate === false)

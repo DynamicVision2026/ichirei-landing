@@ -351,8 +351,9 @@
 .rv .cardWho{margin:.2rem 0 0;font-size:.92rem;line-height:1.7}
 .rv .cardWhoLabel{color:#7A6F5E;font-size:.78rem;margin-right:.3rem}
 .rv .cardPoem{margin:.5rem 0 0;white-space:pre-line;line-height:1.95;font-size:.98rem}
-.rv .cardPoemVert{writing-mode:vertical-rl;-webkit-writing-mode:vertical-rl;white-space:normal;letter-spacing:.16em;line-height:1.9;margin:.5rem auto 0;min-height:7.5em}
-.rv .cardPoemLine{display:block}
+.rv .cardPoemVert{writing-mode:vertical-rl;-webkit-writing-mode:vertical-rl;white-space:normal;letter-spacing:.16em;line-height:1.9;margin:.5rem auto 0;min-height:7.5em;text-align:start}
+/* every column starts at the same line (the top): the usual Japanese setting; the card's text-align:center must not centre a column along its length */
+.rv .cardPoemLine{display:block;text-align:start}
 .rv .cardCert{margin:.5rem 0 0;font-size:.74rem;color:#7A6F5E}
 .rv .cardStatus{min-height:1.4em;margin:0}
 @media (min-width:760px){

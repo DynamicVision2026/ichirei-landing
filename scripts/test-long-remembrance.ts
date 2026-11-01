@@ -35,13 +35,17 @@ let refillReply: unknown = { none: true }
 let refillCalls = 0
 let gazeCalls = 0
 let gazeFail = false
+let refillHang = false
+const lastBody: Record<string, any> = {}
 let vetoed = new Set<string>()
 const upstream = http.createServer(async (req, res) => {
   let raw = ''
   for await (const c of req) raw += c
-  const prompt = String(JSON.parse(raw).messages[0].content)
+  const body = JSON.parse(raw)
+  const prompt = String(body.messages[0].content)
   const kind = prompt.includes('Independent Review Prompt') ? 'review' : prompt.includes('Gaze Line Rewrite Prompt') ? 'gaze' : prompt.includes('Replacement Prompt (v9') ? 'replace' : 'select'
-  if (kind === 'replace') refillCalls++
+  lastBody[kind] = { model: body.model, effort: body.output_config?.effort, max_tokens: body.max_tokens, prompt }
+  if (kind === 'replace') { refillCalls++; if (refillHang) return }
   if (kind === 'gaze') { gazeCalls++; if (gazeFail) { res.writeHead(500); res.end('boom'); return } }
   let reply: unknown
   if (kind === 'review') {
@@ -150,8 +154,67 @@ try {
   await run(BIRTHDAY)
   const mk = JSON.parse(cardsLog().slice('[ichirei-cards] '.length))
   check('(8) a request with three cards and good lines makes no refill and no gaze call: calls {select 1, review 1, refill 0, gaze 0}, refill null', mk.calls.refill === 0 && mk.calls.gaze === 0 && mk.refill === null && mk.ms.gaze_failing === 0, cardsLog())
+  // ---- FREE-PICK REFILL (2026-11-01): the live fault — a removed free pick (寒, review: insult) was refilled with "no usable replacement" twice out of two ------------------------------
+  const INFO = (l: string) => origLog(`INFO  ${l.slice(0, 900)}`)
+  const refillLog = () => logs.find((l) => l.startsWith('[ichirei-refill]')) ?? ''
+  const free寒 = { ...FREE('寒', 'さむい'), one_line_gaze: GOOD_GAZE_3 }
+  const goodMain = { ...MAIN(), one_line_gaze: GOOD_GAZE_3 }
+  const goodSecond = { ...SECOND(), one_line_gaze: GOOD_GAZE_3 }
+  modelReply = replyOf(goodMain, goodSecond, free寒)
+  vetoed = new Set(['寒'])
+  const NEW_FREE = { slot: 'freestyle', kanji: '待', reading: 'まつ', inscription_form: null, truth_type: 'Play', one_line_gaze: GOOD_GAZE_3, story_anchor: '少しだけ嬉しそう' }
+  refillReply = { candidate: NEW_FREE }
+  const t0 = Date.now()
+  const f1 = await run(BIRTHDAY)
+  const dt1 = Date.now() - t0
+  const cj = JSON.parse(cardsLog().slice('[ichirei-cards] '.length))
+  check('(9) birthday story, the free pick 寒 is removed by the review (insult): ONE refill call asks for the free pick only and the refilled free pick 待 is shown — three cards, in well under 10 s', live(f1).map((c) => `${c.slot}:${c.kanji}`).join() === 'main:誠,second:灯,freestyle:待' && refillCalls === 1 && cj.refill.asked.join() === 'freestyle' && cj.refill.filled.join() === 'freestyle' && dt1 < 10_000, cardsLog())
+  check('(9) …the free-pick-only refill uses the compact prompt, the small review-class model (claude-haiku-5-5) at LOW effort with a short answer limit — not the long selection prompt, not the selection model', lastBody.replace.model === 'claude-haiku-5-5' && lastBody.replace.effort === 'low' && lastBody.replace.max_tokens <= 2000 && lastBody.replace.prompt.includes('free pick only') && !lastBody.replace.prompt.includes('Return this exact shape') && lastBody.replace.prompt.includes('寒'), JSON.stringify({ ...lastBody.replace, prompt: undefined }))
+  const rl = JSON.parse(refillLog().slice('[ichirei-refill] '.length))
+  check('(9) …and the [ichirei-refill] line says what came back, in codes only: mode free_only, parse ok, the reply length, stop reason, the offered slot and character, nothing missing', rl.mode === 'free_only' && rl.parse === 'ok' && rl.reply_chars > 20 && rl.stop_reason === 'end_turn' && rl.offered[0].slot === 'freestyle' && rl.offered[0].kanji === '待' && rl.offered[0].missing.length === 0 && !refillLog().includes('少しだけ') && !refillLog().includes('嬉しそう'), refillLog())
+  INFO(cardsLog())
+  INFO(refillLog())
+
+  // the refill finds nothing / fails: two cards, no error — whichever way it fails, and the log says which
+  const failures: [string, unknown, string][] = [
+    ['nothing at all (empty reply)', '', 'empty'],
+    ['prose with no JSON', 'I could not find one.', 'no_json'],
+    ['broken JSON', '{"candidate": {"kanji": "待", ', 'no_json'],
+    ['an honest "none"', { none: true }, 'none'],
+    ['an element missing its reading', { candidate: { ...NEW_FREE, reading: '' } }, 'offered_unusable'],
+  ]
+  for (const [label, reply, want] of failures) {
+    refillReply = reply
+    const r = await run(BIRTHDAY)
+    const j = JSON.parse(refillLog().slice('[ichirei-refill] '.length) || '{}')
+    check(`(10) the refill answers ${label}: two cards (誠, 灯), status sufficient, no error, ONE refill call — and the log names the cause (parse ${want})`, r.status === 'sufficient' && live(r).map((c) => c.kanji).join() === '誠,灯' && refillCalls === 1 && j.parse === want && validateEngineResult(r).length === 0, refillLog())
+  }
+  refillReply = { candidate: { ...NEW_FREE, reading: '' } }
+  await run(BIRTHDAY)
+  check('(10) …an offer with a missing field is logged with the field NAME (not its text): missing ["reading"]', JSON.parse(refillLog().slice('[ichirei-refill] '.length)).offered[0].missing.join() === 'reading')
+  // the reply repeats the WHOLE selection shape (main, second and the new free pick): the free pick is still found, the others are ignored
+  refillReply = { status: 'sufficient', candidates: [{ ...goodMain, slot: 'main' }, { ...goodSecond, slot: 'second' }, NEW_FREE], primary_kanji: '誠' }
+  const whole = await run(BIRTHDAY)
+  check('(10) a reply that repeats the whole selection shape still yields the new free pick (the element that names the free pick slot) — three cards', live(whole).map((c) => c.kanji).join() === '誠,灯,待', JSON.stringify(live(whole).map((c) => [c.slot, c.kanji])))
+  // the call hangs: the 10 s ceiling (here 0.3 s) cuts it off; two cards, no error, and it does not wait for the long default
+  process.env.ICHIREI_REFILL_FREE_TIMEOUT_MS = '300'
+  refillHang = true
+  const t1 = Date.now()
+  const hung = await run(BIRTHDAY)
+  const dt2 = Date.now() - t1
+  refillHang = false
+  delete process.env.ICHIREI_REFILL_FREE_TIMEOUT_MS
+  check('(11) the refill hangs: it is cut off at the ceiling, the sender sees TWO cards, no error — within about a second here (10 s in production), the log says call_failed', hung.status === 'sufficient' && live(hung).length === 2 && dt2 < 3000 && JSON.parse(refillLog().slice('[ichirei-refill] '.length)).parse === 'call_failed', `${dt2} ms ${refillLog()}`)
+  // a refill that includes a removed MAIN or SECOND keeps the selection prompt and the selection model
+  modelReply = replyOf(goodMain, goodSecond, FREE())
+  vetoed = new Set(['灯'])
+  refillReply = { candidates: [{ ...cand('second', '守', 'まもる', GOOD_GAZE_3, '玄関の灯りをつけて', 'Hidden Cost') }] }
+  await run(BIRTHDAY)
+  vetoed = new Set()
+  check('(12) a refill for a removed SECOND card keeps the current model (the selection model, not claude-haiku-5-5), the selection prompt, and the long answer limit', refillCalls === 1 && lastBody.replace.model !== 'claude-haiku-5-5' && lastBody.replace.effort === 'medium' && lastBody.replace.max_tokens > 2000 && lastBody.replace.prompt.includes('Return this exact shape') && JSON.parse(refillLog().slice('[ichirei-refill] '.length)).mode === 'full', JSON.stringify({ ...lastBody.replace, prompt: undefined }))
   check('(7) every request logs one [ichirei-cards] line with the story length and codes only — no story text', cardsLog().includes('"story_chars":4105') && !cardsLog().includes('帰省'))
 } finally {
+  upstream.closeAllConnections?.()
   upstream.close()
 }
 console.log(failures ? `\n${failures} check(s) FAILED` : '\nAll long-remembrance checks passed.')

@@ -132,7 +132,7 @@
 .gf-poem { display: flex; flex-direction: column; align-items: center; gap: 6px; font-family: var(--f-body); font-size: 20px; line-height: 1.9; letter-spacing: 0.08em; }
 .gf-poem p { margin: 0; }
 .gf-poem-tanka, .gf-poem-haiku { flex-direction: row; justify-content: center; align-items: center; width: min(100%, 320px); min-height: 300px; padding: 30px 20px; }
-.gf-vert { display: block; writing-mode: vertical-rl; -webkit-writing-mode: vertical-rl; height: 280px; letter-spacing: 0.18em; font-size: 22px; line-height: 2; }
+.gf-vert { text-align: start; display: block; writing-mode: vertical-rl; -webkit-writing-mode: vertical-rl; height: 280px; letter-spacing: 0.18em; font-size: 22px; line-height: 2; }
 .gf-vert p { display: block; margin: 0 0 0 16px; }
 .gf-poem-tang, .gf-poem-ci, .gf-poem-en { font-size: 19px; }
 .gf-poem-en { font-family: var(--f-body); font-style: italic; font-size: 20px; line-height: 1.7; letter-spacing: 0.01em; }
