@@ -255,6 +255,17 @@ interface PipelineOut {
  * second, selection-only call asks what the lexicon would have chosen, which is only logged; on = main and second characters come from
  * engine/lexicon.csv, the palette engine is the fallback after a second "nothing fits".
  */
+/** One line per request: the story's length, how many live cards of each kind leave the engine, and the reason every removed candidate was removed (codes only). */
+function logCards(story: string, context: EngineContext, before: EngineResult, after: EngineResult): void {
+  try {
+    const live = (r: EngineResult, slot: string) => r.candidates.filter((c) => !c.eliminated && c.slot === slot).length
+    const removed = after.candidates.filter((c) => c.eliminated).map((c) => ({ slot: c.slot, reason: (c.eliminated_reason ?? 'unknown').slice(0, 80) }))
+    console.log(`[ichirei-cards] ${JSON.stringify({ story_chars: [...story].length, language: context.language, occasion: context.occasion, status: after.status, live: { main: live(after, 'main'), second: live(after, 'second'), freestyle: live(after, 'freestyle') }, before_final: before.candidates.filter((c) => !c.eliminated).length, removed })}`)
+  } catch {
+    // (a log line must never break a request)
+  }
+}
+
 export async function runEngine(story: string, condition: 'A' | 'B' | 'C', opts: RunEngineOptions = {}): Promise<EngineResult> {
   const result = attachStrokes(await runEngineInner(story, condition, opts)) // the carving check's stroke counts (engine/strokes.ts)
   logMainCharacter(result) // the day's repeats, visible in the logs (engine/main-count.ts)
@@ -595,9 +606,19 @@ async function runPipeline(a: PipelineArgs): Promise<PipelineOut> {
   })
   // The last gate: at most one main, one second, one freestyle — and never zero cards without a question.
   // The gaze line must complete 「その人は、」 as one sentence about the person (spec v9.4): a line that does not is rewritten once (one small call,
-  // only when a line fails); a rewrite that fails the same check is dropped and the original stays.
-  const gazeFixes = await fixGazes(completed.candidates, story, context.language, { apiKey: opts.apiKey, signal: opts.signal, onUsage: opts.onUsage ? (u) => opts.onUsage!('review', u) : undefined })
-  const final = finalizeResult(applyGazes(completed, gazeFixes))
+  // only when a line fails). The better of the two lines is kept; a failed or useless rewrite leaves the original. A line is NEVER a reason to lose a card:
+  // this step only replaces text, and any error in it leaves `completed` exactly as it was.
+  let withGazes = completed
+  try {
+    const gazeFixes = await fixGazes(completed.candidates, story, context.language, { apiKey: opts.apiKey, signal: opts.signal, onUsage: opts.onUsage ? (u) => opts.onUsage!('review', u) : undefined })
+    const applied = applyGazes(completed, gazeFixes)
+    if (applied.candidates.length === completed.candidates.length) withGazes = applied
+  } catch {
+    withGazes = completed
+  }
+  const final = finalizeResult(withGazes)
+  // Which cards leave the engine, and why a card is missing (reasons are the referee / review codes, no story text and no character): the log a missing card is traced from.
+  logCards(story, context, completed, final)
   timing({ review_ms: reviewMs, replace_ms: Date.now() - tReplace, status: final.status })
   // Lexicon mode: a sufficient answer that ended with no usable lexicon character (the model chose outside the list) is a miss like any other.
   if (view && final.status === 'insufficient') return { result: finishLexicon(final), miss: { reason: 'no_valid_choice', register: registerOf(extracted) } }

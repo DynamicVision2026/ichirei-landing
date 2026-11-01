@@ -26,25 +26,29 @@ const EN_ABSTRACT_START = /^(the |a |an )?(silence|words?|feelings?|love|memor(y
 
 const strip = (s: string): string => s.trim().replace(/[。.！!？?」』”"’'\s]+$/u, '')
 
-/** null = the line is a sentence about the person; otherwise why it is not (a short English sentence, also the feedback for the rewrite). */
-export function gazeProblem(gaze: string, language: Language): string | null {
+/** Every way the line fails the shape check (empty = it is a sentence about the person). Short English sentences, also the feedback for the rewrite. */
+export function gazeIssues(gaze: string, language: Language): string[] {
   const t = strip(gaze)
-  if (!t) return 'it is empty'
+  if (!t) return ['it is empty']
+  const out: string[] = []
   if (language === 'ja') {
     const last = [...t].at(-1) ?? ''
-    if (HIRAGANA_END.test(last) && !NOUNISH_END.test(t)) return 'it ends on a verb or an adjective, not on a noun phrase (it must end on the person, e.g. 〜人 / 〜父)'
-    if (JA_ABSTRACT_SUBJECT.test(t)) return 'its subject is a word, a feeling or a time, not the person'
-    return null
+    if (HIRAGANA_END.test(last) && !NOUNISH_END.test(t)) out.push('it ends on a verb or an adjective, not on a noun phrase (it must end on the person, e.g. 〜人 / 〜父)')
+    if (JA_ABSTRACT_SUBJECT.test(t)) out.push('its subject is a word, a feeling or a time, not the person')
+  } else if (language === 'en') {
+    if (EN_ABSTRACT_START.test(t)) out.push('its subject is a word, a feeling or a thing, not the person ("Someone who…")')
+    if (!/\b(who|whose)\b/i.test(t) || !/^(someone|somebody|one|the one|he|she|they|a |an |my |our |the )/i.test(t)) out.push('it does not describe the person ("Someone who…", "A father who…")')
+  } else {
+    if (/[了著着過过呢吧啊嗎吗]$/u.test(t)) out.push('it ends on a verb or a particle, not on a noun phrase (…的人 / …的父親)')
+    if (ZH_ABSTRACT_SUBJECT.test(t) || ZH_ABSTRACT_END.test(t)) out.push('its subject is a word or a feeling, not the person')
+    if (!t.includes('的')) out.push('it is not a noun phrase about the person (…的人 / …的父親)')
   }
-  if (language === 'en') {
-    if (EN_ABSTRACT_START.test(t)) return 'its subject is a word, a feeling or a thing, not the person ("Someone who…")'
-    if (!/\b(who|whose)\b/i.test(t) || !/^(someone|somebody|one|the one|he|she|they|a |an |my |our |the )/i.test(t)) return 'it does not describe the person ("Someone who…", "A father who…")'
-    return null
-  }
-  if (/[了著着過过呢吧啊嗎吗]$/u.test(t)) return 'it ends on a verb or a particle, not on a noun phrase (…的人 / …的父親)'
-  if (ZH_ABSTRACT_SUBJECT.test(t) || ZH_ABSTRACT_END.test(t)) return 'its subject is a word or a feeling, not the person'
-  if (!t.includes('的')) return 'it is not a noun phrase about the person (…的人 / …的父親)'
-  return null
+  return out
+}
+
+/** null = the line is a sentence about the person; otherwise the first reason it is not. */
+export function gazeProblem(gaze: string, language: Language): string | null {
+  return gazeIssues(gaze, language)[0] ?? null
 }
 
 // ---- the rewrite --------------------------------------------------------------------------------------------------------------------------------
@@ -108,12 +112,21 @@ export async function fixGazes(cands: Candidate[], story: string, language: Lang
     opts.onUsage?.({ model, input_tokens: message.usage?.input_tokens ?? 0, output_tokens: message.usage?.output_tokens ?? 0 })
     const raw = parseJson(message.content.filter((b): b is Anthropic.TextBlock => b.type === 'text').map((b) => b.text).join(''))
     const list = Array.isArray(raw?.gazes) ? (raw!.gazes as { kanji?: unknown; one_line_gaze?: unknown }[]) : []
+    let improved = 0
     for (const b of bad) {
       const hit = list.find((x) => x.kanji === b.kanji)
       const next = typeof hit?.one_line_gaze === 'string' ? hit.one_line_gaze.trim() : ''
-      if (next && next !== b.gaze && gazeProblem(next, language) === null && [...next].length <= [...b.gaze].length + 24) out.set(b.kanji, next)
+      if (!next || next === b.gaze || [...next].length > [...b.gaze].length + 24) continue
+      const before = gazeIssues(b.gaze, language).length
+      const after = gazeIssues(next, language).length
+      // The better of the two lines: a rewrite that passes is taken; one that still fails is taken only when it fails FEWER checks than the original; otherwise the original
+      // stays. Either way the character keeps its card: a line is never a reason to drop a character.
+      if (after === 0 || after < before) {
+        out.set(b.kanji, next)
+        if (after > 0) improved++
+      }
     }
-    log(`[ichirei-gaze] ${JSON.stringify({ event: 'gaze_rewritten', failing: bad.length, fixed: out.size, ms: Date.now() - t0 })}`)
+    log(`[ichirei-gaze] ${JSON.stringify({ event: 'gaze_rewritten', failing: bad.length, fixed: out.size - improved, improved, ms: Date.now() - t0 })}`)
   } catch {
     log(`[ichirei-gaze] ${JSON.stringify({ event: 'gaze_rewrite_failed', failing: bad.length, ms: Date.now() - t0 })}`)
   }

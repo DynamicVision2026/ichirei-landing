@@ -755,6 +755,23 @@ const mockPage = async (browser, { onExplain, result, order, track } = {}) => {
   check('reader: …and a remembrance request never carries one', !('reader' in m.calls.select[0]))
   check('no page errors (run 8c-3, reader)', errors.length === 0 && m.errors.length === 0)
   await m.page.close()
+
+  // 2026-11-01: a 4,105-character Japanese remembrance story (father, 目上, 偲ぶ) came back with ONE card. A long remembrance story must show all three
+  // (the mock server returns the three-card fixture; the page must send the whole story, wait for the result and lay out main, second and freestyle).
+  {
+    const long = await mockPage(browser)
+    await long.page.goto('http://localhost:5173/', { waitUntil: 'networkidle' })
+    const LONG_MEM = ('父は、私が帰省するたびに玄関の灯りをつけて待っていた。去年の冬に亡くなったけれど、帰省すると少しだけ嬉しそうだった顔を、今も思い出す。'.repeat(60)).slice(0, 4105)
+    await pickContext(long.page, { relationship: 'parent_father', occasion: 'memorial' })
+    await long.page.locator('#write [data-testid=story-input]').fill(LONG_MEM)
+    check('long remembrance: 4105 characters in the box — "4105 / 5000字", no over-limit line, the button is enabled', [...LONG_MEM].length === 4105 && (await long.page.locator('#write [data-testid=story-counter]').innerText()) === '4105 / 5000字' && (await long.page.locator('#write [data-testid=story-over]').count()) === 0 && !(await long.page.locator('#write button[type=submit]').isDisabled()))
+    await long.page.click(`#write >> text=${GO.ja}`)
+    await long.page.waitForSelector('article[data-slot=main]', { timeout: 15000 })
+    const slots = await long.page.locator('article[data-slot]').evaluateAll((els) => els.map((e) => e.getAttribute('data-slot')))
+    check('long remembrance: the whole 4105-character story is sent (occasion memorial, father, up) and THREE cards come back: main, second, freestyle', long.calls.select.length === 1 && [...long.calls.select[0].story].length === 4105 && long.calls.select[0].occasion === 'memorial' && slots.join() === 'main,second,freestyle', JSON.stringify([long.calls.select.length, slots]))
+    check('no page errors (run 8c-3, long remembrance)', long.errors.length === 0, JSON.stringify(long.errors))
+    await long.page.close()
+  }
 }
 
 // ---------- Run 8c-4: the three sizes (eギフト / 木札 / 版木), the badges, where it goes, the message ----------
