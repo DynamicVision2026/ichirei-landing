@@ -117,7 +117,7 @@ const upstream = http.createServer(async (req, res) => {
   const prompt = Array.isArray(content) ? content.map((b: any) => b.text).join('\n') : String(content)
   const isLex = Array.isArray(content)
   const cached = isLex && content[0]?.cache_control?.type === 'ephemeral'
-  const kind: Seen['kind'] = prompt.includes('Independent Review Prompt') ? 'review' : prompt.includes('Replacement Prompt (v8)') ? 'replace' : isLex ? 'lexicon_select' : 'select'
+  const kind: Seen['kind'] = prompt.includes('Independent Review Prompt') ? 'review' : prompt.includes('Replacement Prompt (v9') ? 'replace' : isLex ? 'lexicon_select' : 'select'
   seen.push({ kind, prompt, cached, content })
   const sse = (event: string, data: unknown) => res.write(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`)
   const start = () => {
@@ -210,9 +210,9 @@ const noStory = () => !logs.some((l) => STORY.split(/[。、\n]/).filter((p) => 
   const r = await run({ mode: 'on', lex: reply(cand('main', '花', 'はな', A1), cand('second', '守', 'まもる', A2)), replacements: [{ ...cand('second', '恒', 'つねに', A1) }] })
   const flower = r.candidates.find((c) => c.kanji === '花')!
   check('(5) on: a main character outside the list (花) is rejected by the code: "palette: not_in_lexicon", flagged, never shown', flower.eliminated && flower.eliminated_reason === 'palette: not_in_lexicon' && flower.flags.includes('not_in_lexicon') && r.referee!.actions.some((a) => a.action === 'not_in_lexicon_eliminated' && a.kanji === '花'))
-  check('(5) on: slot 2 (守) is promoted to primary; the empty SECOND slot is NOT refilled (spec step 8: replacement is for the main slot only) — one main card, no replacement call', r.primary_kanji === '守' && r.runner_up_kanji === null && !r.referee!.actions.some((a) => a.action === 'replacement_added') && count('replace') === 0, JSON.stringify([r.primary_kanji, r.candidates.map((c) => [c.slot, c.kanji, c.eliminated_reason])]))
+  check('(5) on: slot 2 (守) is promoted to primary; the empty SECOND slot IS refilled by ONE call (spec step 8, changed 2026-11-01): 恒, a lexicon character, becomes the second', r.primary_kanji === '守' && r.runner_up_kanji === '恒' && r.referee!.actions.some((a) => a.action === 'replacement_added' && a.kanji === '恒') && count('replace') === 1, JSON.stringify([r.primary_kanji, r.candidates.map((c) => [c.slot, c.kanji, c.eliminated_reason])]))
   const r2 = await run({ mode: 'on', lex: reply(cand('main', '待', 'まつ', A1), cand('second', '花', 'はな', A2)), replacements: [cand('second', '詰', 'つめる', A2)] })
-  check('(5) on: a removed second card (花, not in the list) is not replaced (no replacement call, even though one is on offer); the sender keeps the one valid main card', r2.status === 'sufficient' && slotKanji(r2, 'main') === '待' && slotKanji(r2, 'second') === null && count('replace') === 0, JSON.stringify(r2.candidates.map((c) => [c.slot, c.kanji, c.eliminated_reason])))
+  check('(5) on: a removed second card (花, not in the list) is refilled by ONE call, but the refill must be a lexicon character too: 詰 is not, so it is rejected and the sender keeps the one valid main card', r2.status === 'sufficient' && slotKanji(r2, 'main') === '待' && slotKanji(r2, 'second') === null && count('replace') === 1 && (r2.referee?.actions.some((a) => a.action === 'replacement_rejected' && a.kanji === '詰') ?? false), JSON.stringify(r2.candidates.map((c) => [c.slot, c.kanji, c.eliminated_reason])))
   // both mains off the list → the main slot IS empty: ONE replacement is tried, and it must be a lexicon character too
   const r3 = await run({ mode: 'on', lex: reply(cand('main', '花', 'はな', A1), cand('second', '詰', 'つめる', A2)), replacements: [cand('second', '恒', 'つねに', A1)] })
   check('(5) on: when BOTH mains are off the list the main slot is empty, so one replacement is tried; a lexicon character (恒) becomes the main', r3.status === 'sufficient' && slotKanji(r3, 'main') === '恒' && count('replace') === 1, JSON.stringify(r3.candidates.map((c) => [c.slot, c.kanji, c.eliminated_reason])))
@@ -283,7 +283,7 @@ process.env.ICHIREI_SHADOW_GRACE_MS = '1500'
 {
   const r = await run({ mode: 'shadow' })
   check('(8) shadow: the customer sees today\'s result (備 / 支, from the palette engine) — no lexicon field, no change', slotKanji(r, 'main') === '備' && slotKanji(r, 'second') === '支' && r.lexicon === undefined && !live(r).some((c) => c.flags.includes('lexicon_miss')))
-  check('(8) shadow: one extra, selection-only call (lexicon prompt, cached); the palette run keeps its own review; the shadow has no review and no replacement', count('select') === 1 && count('lexicon_select') === 1 && count('review') === 1 && count('replace') === 0 && seen.find((s) => s.kind === 'lexicon_select')!.cached)
+  check('(8) shadow: one extra, selection-only call (lexicon prompt, cached); the palette run keeps its own review; the shadow has no review and no refill (the palette run asks ONE refill call for the free pick its reply left out)', count('select') === 1 && count('lexicon_select') === 1 && count('review') === 1 && count('replace') === 1 && seen.find((s) => s.kind === 'lexicon_select')!.cached)
   const sh = logJson('shadow')
   check('(8) shadow: ONE log line says what lexicon mode would have chosen next to what the customer got — kanji only, no story text', sh.length === 1 && sh[0].lexicon_main === '待' && sh[0].lexicon_second === '守' && sh[0].today_main === '備' && sh[0].today_second === '支' && sh[0].same_main === false && sh[0].relationship === 'parent_mother' && sh[0].occasion === 'parent_day' && sh[0].result === 'chosen' && noStory(), JSON.stringify(sh))
 }

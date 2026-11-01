@@ -21,18 +21,22 @@ const BAD_GAZE_2 = '何も言わずに、玄関の灯りをつけてくれた。
 const GOOD_GAZE_3 = 'いつも、帰ると少しだけ嬉しそうだった人。'
 const cand = (slot: string, kanji: string, reading: string, gaze: string, anchor: string) => ({ slot, kanji, inscription_form: null, reading, truth_type: 'Essence', one_line_gaze: gaze, story_anchor: anchor, unique_truth: 'u', eliminated: false, eliminated_reason: null, suitability_flag: null, palette_status: 'ok', flags: [] })
 const modelReply = { ...fx.model_reply, primary_kanji: '誠', runner_up_kanji: '灯', freestyle_kanji: '待', candidates: [cand('main', '誠', 'まこと', BAD_GAZE_1, '帰省するたびに'), { ...cand('second', '灯', 'あかり', BAD_GAZE_2, '玄関の灯りをつけて'), truth_type: 'Private Symbol' }, { ...cand('freestyle', '待', 'まつ', GOOD_GAZE_3, '少しだけ嬉しそう'), truth_type: 'Play' }] }
-const reviewReply = { verdicts: [{ slot: 'main', kanji: '誠', pass: true, reason: 'ok' }, { slot: 'second', kanji: '灯', pass: true, reason: 'ok' }, { slot: 'freestyle', kanji: '待', pass: true, reason: 'ok' }] }
+let reviewReply: any = { verdicts: [{ slot: 'main', kanji: '誠', pass: true, reason: 'ok' }, { slot: 'second', kanji: '灯', pass: true, reason: 'ok' }, { slot: 'freestyle', kanji: '待', pass: true, reason: 'ok' }] }
 
 let gazeReply: unknown = 'not json at all'
+let refillReply: unknown = { none: true }
+let refillCalls = 0
 let gazeCalls = 0
 let gazeFail = false
 const upstream = http.createServer(async (req, res) => {
   let raw = ''
   for await (const c of req) raw += c
   const prompt = String(JSON.parse(raw).messages[0].content)
-  const kind = prompt.includes('Independent Review Prompt') ? 'review' : prompt.includes('Gaze Line Rewrite Prompt') ? 'gaze' : 'select'
+  const kind = prompt.includes('Independent Review Prompt') ? 'review' : prompt.includes('Gaze Line Rewrite Prompt') ? 'gaze' : prompt.includes('Replacement Prompt (v9') ? 'replace' : 'select'
+  if (kind === 'replace') refillCalls++
   if (kind === 'gaze') { gazeCalls++; if (gazeFail) { res.writeHead(500); res.end('boom'); return } }
-  const reply = kind === 'review' ? reviewReply : kind === 'gaze' ? gazeReply : modelReply
+  if (kind === 'review') { const items = [...prompt.matchAll(/"slot": "(main|second|freestyle)",\s*"kanji": "([^"]+)"/g)].map((m) => ({ slot: m[1], kanji: m[2], pass: true, rule: null, reason: 'ok' })); reviewReply = { verdicts: items } }
+  const reply = kind === 'review' ? reviewReply : kind === 'gaze' ? gazeReply : kind === 'replace' ? refillReply : modelReply
   const text = typeof reply === 'string' ? reply : JSON.stringify(reply)
   res.writeHead(200, { 'content-type': 'text/event-stream' })
   const sse = (event: string, data: unknown) => res.write(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`)
@@ -83,6 +87,39 @@ try {
   gazeReply = { gazes: [{ kanji: '誠', one_line_gaze: WORSE }] }
   const r4 = await run()
   check('(4) a rewrite that fails MORE checks than the original is ignored: the original line stays, three cards', live(r4).length === 3 && gazeIssues(WORSE, 'ja').length >= gazeIssues(BAD_GAZE_1, 'ja').length && (gazeOf(r4, '誠') === BAD_GAZE_1 || gazeIssues(gazeOf(r4, '誠') ?? '', 'ja').length < gazeIssues(BAD_GAZE_1, 'ja').length))
+
+  // 5. REFILL (spec step 8, changed 2026-11-01): the free pick the model chose (喜) is blocked in remembrance → ONE refill call, a quieter free pick, THREE cards
+  const blockedFree = { ...modelReply, freestyle_kanji: '喜', candidates: [modelReply.candidates[0], modelReply.candidates[1], { ...cand('freestyle', '喜', 'よろこぶ', GOOD_GAZE_3, '少しだけ嬉しそう'), truth_type: 'Play' }] }
+  const saved = modelReply
+  Object.assign(modelReply, blockedFree)
+  gazeReply = 'not json at all'
+  refillReply = { candidates: [{ ...cand('freestyle', '待', 'まつ', GOOD_GAZE_3, '少しだけ嬉しそう'), truth_type: 'Play' }] }
+  refillCalls = 0
+  const r5 = await run()
+  const log5 = logs.find((l) => l.startsWith('[ichirei-cards]')) ?? ''
+  check('(5) remembrance story whose free pick (喜) is blocked: THREE live cards after the refill (誠, 灯, and the replacement free pick 待), contract-valid', live(r5).length === 3 && live(r5).map((c) => c.kanji).join() === '誠,灯,待' && validateEngineResult(r5).length === 0, JSON.stringify(r5.candidates.map((c) => [c.slot, c.kanji, c.eliminated_reason])) + validateEngineResult(r5).join('; '))
+  check('(5) …with exactly ONE refill call, and the blocked 喜 is not shown', refillCalls === 1 && !live(r5).some((c) => c.kanji === '喜'), String(refillCalls))
+  check('(5) …and the [ichirei-cards] line logs the refill: asked [freestyle], filled [freestyle], nothing rejected', log5.includes('"refill":{"asked":["freestyle"],"filled":["freestyle"],"rejected":[]') && log5.includes('"freestyle":1') && log5.includes('palette: blocked_occasion'), log5)
+  // the refill finds nothing: the sender sees what is left (two cards), no error
+  refillReply = { none: true }
+  refillCalls = 0
+  const r6 = await run()
+  const log6 = logs.find((l) => l.startsWith('[ichirei-cards]')) ?? ''
+  check('(6) …when the refill cannot fill the slot ("none"): the two cards that stand are shown, status sufficient, no error, ONE refill call at most', r6.status === 'sufficient' && live(r6).map((c) => c.kanji).join() === '誠,灯' && refillCalls === 1 && validateEngineResult(r6).length === 0 && log6.includes('"filled":[]') && log6.includes('"rejected":[{"slot":"freestyle"'), log6)
+  // the refill offers another blocked character: rejected by the same referee, still no error and still one call
+  refillReply = { candidates: [{ ...cand('freestyle', '祝', 'いわう', GOOD_GAZE_3, '少しだけ嬉しそう'), truth_type: 'Play' }] }
+  refillCalls = 0
+  const r7 = await run()
+  check('(7) …a refill that offers another blocked character is refused by the same rules: two cards, no error, ONE call', r7.status === 'sufficient' && live(r7).map((c) => c.kanji).join() === '誠,灯' && refillCalls === 1)
+  // a second card the review removed is refilled in the SAME call as the free pick
+  const noSecondFree = { ...modelReply, candidates: [modelReply.candidates[0], { ...modelReply.candidates[1], eliminated: true, eliminated_reason: 'review: dignity' }, modelReply.candidates[2]] }
+  Object.assign(modelReply, noSecondFree)
+  refillReply = { candidates: [{ ...cand('second', '守', 'まもる', GOOD_GAZE_3, '玄関の灯りをつけて'), truth_type: 'Private Symbol' }, { ...cand('freestyle', '待', 'まつ', GOOD_GAZE_3, '少しだけ嬉しそう'), truth_type: 'Play' }] }
+  refillCalls = 0
+  const r8 = await run()
+  const log8 = logs.find((l) => l.startsWith('[ichirei-cards]')) ?? ''
+  check('(8) a removed SECOND and a blocked FREE pick are refilled by the SAME single call: three cards', refillCalls === 1 && live(r8).length === 3 && live(r8).some((c) => c.kanji === '守') && live(r8).some((c) => c.kanji === '待') && log8.includes('"asked":["second","freestyle"]'), log8 + JSON.stringify(r8.candidates.map((c) => [c.slot, c.kanji, c.eliminated_reason])))
+  Object.assign(modelReply, saved)
 
   // 4. the log line that tells a missing card from a dropped one
   const cardsLog = logs.find((l) => l.startsWith('[ichirei-cards]'))

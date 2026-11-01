@@ -51,7 +51,7 @@ for (const file of ['engine/prompt.en.md', 'engine/prompt.ja.md', 'engine/prompt
 const reviewPrompt = read('engine/review-prompt.md')
 check('(1) review-prompt.md: a SAFETY check — vetoes only under named safety rules, concerns (scene noun, voice, invention, generic …) never fail', reviewPrompt.includes('SAFETY RULES') && reviewPrompt.includes('THE CONCERNS') && /Scene noun/.test(reviewPrompt.slice(reviewPrompt.lastIndexOf('THE CONCERNS'))) && reviewPrompt.includes('A candidate with only concerns is a PASS') && !/When in doubt, FAIL\./.test(reviewPrompt) && ['`palette`', '`occasion`', '`memorial`', '`dignity`', '`register`', '`insult`'].every((r) => reviewPrompt.includes(r)))
 check('(1) review-prompt.md: the memorial veto is only celebration / birth characters and death-talk as such (not voice, not consolation)', reviewPrompt.includes('Nothing else is a reason to fail a memorial candidate'))
-check('(1) replace-prompt.md carries the person test, the slots the engine fills, and the empty-list case', read('engine/replace-prompt.md').includes('PERSON TEST') && read('engine/replace-prompt.md').includes('{{ SURVIVING }}') && read('engine/replace-prompt.md').includes('{{ AVOID }}') && read('engine/replace-prompt.md').includes('If this list is EMPTY'))
+check('(1) replace-prompt.md carries the person test, the slots the engine fills, and the empty-list case', read('engine/replace-prompt.md').includes('PERSON TEST') && read('engine/replace-prompt.md').includes('{{ SURVIVING }}') && read('engine/replace-prompt.md').includes('{{ AVOID }}') && read('engine/replace-prompt.md').includes('{{ SLOTS }}') && read('engine/replace-prompt.md').includes('REMEMBRANCE') && read('engine/replace-prompt.md').includes('freestyle'))
 
 // ---- 1b. Chrome auto-translate must not touch the page ---------------------------------------------------------------------------
 const html = read('index.html')
@@ -74,7 +74,7 @@ const upstream = http.createServer(async (req, res) => {
   for await (const c of req) raw += c
   const body = JSON.parse(raw)
   const prompt = String(body.messages[0].content)
-  const kind: Kind = prompt.includes('Independent Review Prompt') ? 'review' : prompt.includes('Replacement Prompt (v8)') ? 'replace' : 'select'
+  const kind: Kind = prompt.includes('Independent Review Prompt') ? 'review' : prompt.includes('Replacement Prompt (v9') ? 'replace' : 'select'
   seen.push({ kind, prompt, model: String(body.model) })
   const hang = (kind === 'select' && (selectBehaviors.shift() ?? 'ok') === 'hang') || (kind === 'review' && reviewBehavior === 'hang')
   if (hang) {
@@ -146,17 +146,23 @@ try {
   for (const name of Object.keys(FIX).sort()) {
     const f = FIX[name]
     const e = f.expect
-    const r = await run(name)
+    // Spec step 8 (changed 2026-11-01): EVERY empty slot is refilled by ONE call — a second or a free pick the model never produced counts too.
+    const gen = new Set<string>(f.model_reply.candidates.map((c: any) => c.slot))
+    const asks = [...(gen.has('second') ? [] : ['second']), ...(gen.has('freestyle') ? [] : ['freestyle'])]
+    const rep = asks.length > 0
+    const e2 = asks.includes('second') ? f.replacements[0].kanji : e.second // (the fixture's first replacement is a second-type candidate)
+    const reps = asks.includes('second') ? undefined : [] // (nothing on offer for a free pick: the model says "none")
+    const r = await run(name, { replacements: reps })
     const liveMains = live(r).filter((c) => c.slot !== 'freestyle')
-    check(`(2) ${name}: main ${e.main}, second ${e.second ?? '—'}, freestyle ${e.freestyle ?? '—'}`, r.status === 'sufficient' && r.primary_kanji === e.main && (e.second === null ? r.runner_up_kanji === null : r.runner_up_kanji === e.second) && r.freestyle_kanji === e.freestyle, JSON.stringify({ p: r.primary_kanji, s: r.runner_up_kanji, f: r.freestyle_kanji, status: r.status }))
-    check(`(2) ${name}: contract-valid after normalisation, at most three cards`, (e.cause === 'not_generated' ? validateEngineResult(r).every((p) => p.includes('"second"')) : validateEngineResult(r).length === 0) && sound(r) === null && liveMains.length === (e.second === null ? 1 : 2), `${validateEngineResult(r).join('; ')} / ${sound(r)}`)
-    check(`(2) ${name}: ${e.replacement ? 'exactly one replacement call, for the empty slot' : 'no replacement call'}; one selection, one review (two with a replacement)`, count('replace') === (e.replacement ? 1 : 0) && count('review') === (e.replacement ? 2 : 1) && count('select') === 1, JSON.stringify(seen.map((s) => s.kind)))
+    check(`(2) ${name}: main ${e.main}, second ${e2 ?? '—'}, freestyle ${e.freestyle ?? '—'}`, r.status === 'sufficient' && r.primary_kanji === e.main && (e2 === null ? r.runner_up_kanji === null : r.runner_up_kanji === e2) && r.freestyle_kanji === e.freestyle, JSON.stringify({ p: r.primary_kanji, s: r.runner_up_kanji, f: r.freestyle_kanji, status: r.status }))
+    check(`(2) ${name}: contract-valid after normalisation, at most three cards`, (e.cause === 'not_generated' ? validateEngineResult(r).every((p) => p.includes('"second"')) : validateEngineResult(r).length === 0) && sound(r) === null && liveMains.length === (e2 === null ? 1 : 2), `${validateEngineResult(r).join('; ')} / ${sound(r)}`)
+    check(`(2) ${name}: ${rep ? `exactly one refill call, for the empty slot(s) ${asks.join('+')}` : 'no refill call'}; one selection, one review (two when a refill candidate is reviewed)`, count('replace') === (rep ? 1 : 0) && count('review') === (asks.includes('second') ? 2 : 1) && count('select') === 1, JSON.stringify(seen.map((s) => s.kind)))
     const empty = [...logJson('[ichirei-engine] main_slot_empty '), ...logJson('[ichirei-engine] second_slot_empty ')]
     check(`(2) ${name}: the reason is logged (cause ${e.cause ?? 'none'}), with no story text`, e.cause === null ? empty.length === 0 : empty.length === 1 && empty[0].missing.some((m: any) => m.cause === e.cause) && noStory(name), logs.join('\n'))
-    check(`(2) ${name}: stage events reading → choosing → checking${e.replacement ? ' → replacing' : ''}`, stages[0] === 'reading' && stages.indexOf('choosing') > 0 && stages.indexOf('checking') > stages.indexOf('choosing') && (e.replacement ? stages.includes('replacing') : !stages.includes('replacing')), stages.join())
+    check(`(2) ${name}: stage events reading → choosing → checking${rep ? ' → replacing' : ''}`, stages[0] === 'reading' && stages.indexOf('choosing') > 0 && stages.indexOf('checking') > stages.indexOf('choosing') && (rep ? stages.includes('replacing') : !stages.includes('replacing')), stages.join())
     check(`(2) ${name}: one [ichirei-timing] line, no story text; the review ran on the review model (claude-haiku-5-5)`, logJson('[ichirei-timing] ').length === 1 && noStory(name) && seen.filter((s) => s.kind === 'review').every((s) => s.model === 'claude-haiku-5-5'))
     // the old shape (full echo, particulars, fingerprint) still works: nothing depends on the model writing them
-    const old = await run(name, { slimShape: false })
+    const old = await run(name, { slimShape: false, replacements: reps })
     check(`(2) ${name}: the old, long output shape gives the same cards (the slim contract is only a saving)`, old.primary_kanji === r.primary_kanji && old.runner_up_kanji === r.runner_up_kanji && old.freestyle_kanji === r.freestyle_kanji)
   }
   // size of the answer the model has to write, before and after (JSON characters; the fixtures are real-shaped, see the report)
@@ -170,13 +176,13 @@ try {
   check('(2) normalizeModelOutput fills what the slim contract leaves out (particulars [], fingerprint with emotional_register, eliminated false, palette_status ok, flags []) and invents nothing', Array.isArray(norm.particulars) && norm.fingerprint.emotional_register?.length === 2 && norm.fingerprint.relationship_note === null && norm.candidates.every((c) => c.eliminated === false && c.eliminated_reason === null && c.palette_status === 'ok' && Array.isArray(c.flags) && c.suitability_flag === null) && norm.candidates.map((c) => c.kanji).join() === '労,寛,煙')
 
   // ---- 3. the review is a SAFETY check: a veto needs a named safety rule; taste is only a concern ------------------------------------
-  const taste = await run('s0004-mother-memorial', { vetoes: { 包: { rule: null, reason: 'third-person gaze' }, 庇: { rule: 'voice', reason: 'consoles the sender' } } })
-  check('(3) 0004 (the dead end of the live test): the review "rejects" both for taste → neither is a veto, BOTH cards stand (包 main, 庇 second), no replacement call', taste.status === 'sufficient' && taste.primary_kanji === '包' && taste.runner_up_kanji === '庇' && count('replace') === 0 && taste.referee?.actions.filter((a) => a.action === 'review_veto_ignored').length === 2, JSON.stringify(taste.referee?.actions))
+  const taste = await run('s0004-mother-memorial', { replacements: [], vetoes: { 包: { rule: null, reason: 'third-person gaze' }, 庇: { rule: 'voice', reason: 'consoles the sender' } } })
+  check('(3) 0004 (the dead end of the live test): the review "rejects" both for taste → neither is a veto, BOTH cards stand (包 main, 庇 second); the only refill call is for the free pick the model never wrote', taste.status === 'sufficient' && taste.primary_kanji === '包' && taste.runner_up_kanji === '庇' && count('replace') === 1 && taste.referee?.actions.filter((a) => a.action === 'review_veto_ignored').length === 2, JSON.stringify(taste.referee?.actions))
   check('(3) …and the ignored vetoes are logged with their reason (the verdict line carries rule and concern, no story text)', logs.some((l) => l.startsWith('[ichirei-review]') && l.includes('third-person gaze')) && noStory('s0004-mother-memorial'))
   const scene = await run('s0032-friend-thanks', { vetoes: { 誓: { rule: null, reason: 'Scene noun' } } })
   check('(3) a "scene noun" fail is a concern, not a veto: the scene-noun test lives in the selection prompt (the main stays)', scene.primary_kanji === '誓' && scene.runner_up_kanji === '待' && count('replace') === 0)
   const safe = await run('s0032-friend-thanks', { vetoes: { 誓: { rule: 'dignity', reason: 'closes the receiver into a verdict' } } })
-  check('(3) a veto under a safety rule (dignity) removes the main: the second is promoted; the now-empty second slot is NOT refilled (spec step 8: the replacement is for the main slot only) — no replacement call', safe.status === 'sufficient' && safe.primary_kanji === '待' && safe.runner_up_kanji === null && safe.freestyle_kanji === '靴' && count('replace') === 0, JSON.stringify({ p: safe.primary_kanji, s: safe.runner_up_kanji, replace: count('replace') }))
+  check('(3) a veto under a safety rule (dignity) removes the main: the second is promoted and the now-empty second slot IS refilled (spec step 8, changed 2026-11-01) by ONE call: 待 main, 信 second, 靴 free pick', safe.status === 'sufficient' && safe.primary_kanji === '待' && safe.runner_up_kanji === '信' && safe.freestyle_kanji === '靴' && count('replace') === 1, JSON.stringify({ p: safe.primary_kanji, s: safe.runner_up_kanji, replace: count('replace') }))
   check('(3) …and the result is sound (at most 1 main + 1 second + 1 freestyle)', sound(safe) === null, String(sound(safe)))
   for (const rule of ['palette', 'occasion', 'memorial', 'dignity', 'register', 'insult']) {
     const r = await run('s0080-wife-anniversary', { vetoes: { 煙: { rule, reason: 'x' } } })
@@ -235,15 +241,15 @@ try {
 
   // ---- 6. replacement edge cases ---------------------------------------------------------------------------------------------------
   const base = 's0020-mother-thanks'
-  // the 0020 reply has NO second card: the second slot stays empty — no replacement call, only the log line (spec step 8, owner decision 2026-10-30)
+  // the 0020 reply has NO second card: the second slot is refilled by ONE call (spec step 8, changed 2026-11-01; it was left empty from 2026-10-30)
   const noSecond = await run(base)
-  check('(6) a reply with NO second at all (the 0020 case) is detected (cause not_generated) and logged as second_slot_empty with will_replace=false — but NOT refilled: main + freestyle, no replacement call', noSecond.status === 'sufficient' && count('replace') === 0 && live(noSecond).length === 2 && logJson('[ichirei-engine] second_slot_empty ')[0]?.missing.some((m: any) => m.cause === 'not_generated') && logJson('[ichirei-engine] second_slot_empty ')[0]?.will_replace === false && logJson('[ichirei-engine] main_slot_empty ').length === 0)
+  check('(6) a reply with NO second at all (the 0020 case) is detected (cause not_generated) and logged as second_slot_empty with will_replace=true and REFILLED by one call (支): main + second + freestyle', noSecond.status === 'sufficient' && count('replace') === 1 && live(noSecond).length === 3 && noSecond.runner_up_kanji === FIX[base].replacements[0].kanji && logJson('[ichirei-engine] second_slot_empty ')[0]?.missing.some((m: any) => m.cause === 'not_generated') && logJson('[ichirei-engine] second_slot_empty ')[0]?.will_replace === true && logJson('[ichirei-engine] main_slot_empty ').length === 0)
   // a MISSING MAIN is refilled: the model's reply has no main and no second (here: a reply with only the freestyle), or both are removed
   const noMains = (r: any) => { r.candidates = r.candidates.filter((c: any) => c.slot === 'freestyle'); r.primary_kanji = null; r.runner_up_kanji = null }
   const noneR = await run(base, { mutate: noMains, replacements: [] })
   check('(6) no live main and the model honestly finds no replacement ("none") → ONE replacement call, no forced card (never a freestyle alone)', count('replace') === 1 && !noneR.referee?.actions.some((a) => a.action === 'replacement_added') && noneR.candidates.every((c) => c.slot !== 'main' || c.eliminated) , JSON.stringify([noneR.status, noneR.candidates.map((c) => [c.slot, c.kanji, c.eliminated])]))
   const bad = await run(base, { mutate: noMains, replacements: [{ ...FIX[base].replacements[0], story_anchor: 'この文は物語にありません' }, { ...FIX[base].replacements[0], story_anchor: 'これも物語にありません' }] })
-  check('(6) a main replacement whose story_anchor is not verbatim in the story is rejected; ONE attempt by default (no second 40-second round)', count('replace') === 1 && bad.referee?.actions.filter((a) => a.action === 'replacement_rejected').length === 1)
+  check('(6) a main replacement whose story_anchor is not verbatim in the story is rejected; ONE refill call only (no second 40-second round)', count('replace') === 1 && bad.referee?.actions.some((a) => a.action === 'replacement_rejected' && /verbatim/.test(a.detail ?? '')) === true)
   process.env.ICHIREI_REPLACE_ATTEMPTS = '2'
   const two = await run(base, { mutate: noMains, replacements: [{ ...FIX[base].replacements[0], story_anchor: 'この文は物語にありません' }, FIX[base].replacements[0]] })
   delete process.env.ICHIREI_REPLACE_ATTEMPTS

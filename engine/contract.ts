@@ -566,7 +566,7 @@ export function validateEngineResult(raw: unknown): string[] {
   }
   const cands = Array.isArray(r.candidates) ? r.candidates : []
   // 2 or 3 candidates (2 main + optional freestyle); a replacement call (engine/replace.ts) can add a fourth, leaving the removed one in place, eliminated
-  if (cands.length < 2 || cands.length > 4) problems.push(`expected 2 to 4 candidates (2 main + optional freestyle, + at most one replacement), got ${cands.length}`)
+  if (cands.length < 2 || cands.length > 6) problems.push(`expected 2 to 6 candidates (2 main + optional freestyle, + one refill for each empty slot), got ${cands.length}`)
   const bySlot = (slot: Slot) => cands.filter((c) => c?.slot === slot)
   for (const slot of ['main', 'second'] as const) {
     // one per slot — except that a replacement (engine/replace.ts) may sit next to the candidate it replaced, which is then eliminated
@@ -576,7 +576,7 @@ export function validateEngineResult(raw: unknown): string[] {
   const liveMains = cands.filter((c) => c?.slot !== 'freestyle' && !c?.eliminated)
   if (liveMains.length > 2) problems.push(`more than two live main candidates (${liveMains.length}): at most one main and one second`)
   if (cands.filter((c) => !c?.eliminated).length > 3) problems.push('more than three live candidates')
-  if (bySlot('freestyle').length > 1) problems.push('more than one freestyle candidate')
+  if (bySlot('freestyle').filter((c) => !c?.eliminated).length > 1 || bySlot('freestyle').length > 2) problems.push('more than one freestyle candidate') // (a refill may sit beside the free pick it replaced, which is then eliminated)
   cands.forEach((c, i) => {
     const at = `candidates[${i}]${c?.kanji ? ` (${c.kanji})` : ''}`
     if (!(SLOTS as readonly string[]).includes(c?.slot as string)) problems.push(`${at}.slot invalid`)
@@ -611,7 +611,7 @@ export function validateEngineResult(raw: unknown): string[] {
   const livePrimary = cands.find((c) => c.kanji === r.primary_kanji)
   const liveRunnerUp = r.runner_up_kanji ? cands.find((c) => c.kanji === r.runner_up_kanji && !c.eliminated) : undefined
   if (livePrimary && liveRunnerUp && livePrimary.truth_type === liveRunnerUp.truth_type) problems.push('main and second must be different truth types')
-  const freestyle = bySlot('freestyle')[0]
+  const freestyle = bySlot('freestyle').find((c) => !c?.eliminated) ?? bySlot('freestyle')[0]
   if (freestyle && cands.some((m) => m.slot !== 'freestyle' && !m.eliminated && m.kanji === freestyle.kanji)) problems.push('freestyle repeats a main kanji')
 
   const primary = cands.find((c) => c.kanji === r.primary_kanji)

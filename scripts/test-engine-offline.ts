@@ -65,6 +65,7 @@ process.env.ANTHROPIC_BASE_URL = `http://127.0.0.1:${(upstream.address() as { po
 process.env.ANTHROPIC_API_KEY = 'test-key-not-real'
 process.env.ICHIREI_LEXICON_MODE = 'off' // these suites pin the palette engine's own call sequence; the lexicon modes have their own suite (test-v9.ts)
 process.env.ICHIREI_GAZE_FIX = 'off' // ...and so does the gaze-line rewrite (its own suite: test-gaze.ts)
+process.env.ICHIREI_REPLACE = 'off' // ...and the refill of empty slots (spec step 8; its suites: test-v8.ts, test-v9.ts, test-long-remembrance.ts)
 
 const lastSelect = () => seen.filter((x) => x.kind === 'select').at(-1)!
 const lastPrompt = () => lastSelect().body.messages[0].content as string

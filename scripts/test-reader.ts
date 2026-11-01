@@ -91,7 +91,7 @@ const upstream = http.createServer(async (req, res) => {
   let raw = ''
   for await (const c of req) raw += c
   const prompt = String(JSON.parse(raw).messages[0].content)
-  const kind = prompt.includes('Independent Review Prompt') ? 'review' : prompt.includes('Replacement Prompt (v8)') ? 'replace' : 'select'
+  const kind = prompt.includes('Independent Review Prompt') ? 'review' : prompt.includes('Replacement Prompt (v9') ? 'replace' : 'select'
   seen.push({ kind, prompt })
   let payload: unknown
   if (kind === 'select') {
@@ -136,7 +136,7 @@ const tw = await selectRun({ reader: 'zh' })
 check('(5) ja buyer, Taiwan reader, both mains (匂, 断) blocked in zh → both refused, ONE replacement call for the empty main slot, and the replacement (守) becomes the main', tw.status === 200 && seen.filter((s) => s.kind === 'replace').length === 1 && tw.result?.primary_kanji === '守' && tw.result?.reader === 'zh' && tw.lines.filter((l) => l.startsWith('[ichirei-referee] reader cross-check')).length >= 2, JSON.stringify([tw.result?.primary_kanji, seen.map((s) => s.kind), tw.lines.filter((l) => l.includes('cross-check')).length]))
 mains = ['匂', '守']
 const one = await selectRun({ reader: 'zh' })
-check('(5) only the main is blocked: the second (守) is promoted and NO replacement is asked (replacement is for a missing main only)', one.result?.primary_kanji === '守' && seen.filter((s) => s.kind === 'replace').length === 0, JSON.stringify([one.result?.primary_kanji, seen.map((s) => s.kind)]))
+check('(5) only the main is blocked: the second (守) is promoted and the now-empty second slot gets ONE refill call (spec step 8, 2026-11-01; the fake model offers 守 again, which is refused as already offered)', one.result?.primary_kanji === '守' && seen.filter((s) => s.kind === 'replace').length === 1, JSON.stringify([one.result?.primary_kanji, seen.map((s) => s.kind)]))
 const none = await selectRun({})
 check('(5) the same story with no reader choice keeps 匂 as the main (the check only applies when the sender says where it will be read)', none.result?.primary_kanji === '匂' || !!none.result?.candidates.find((c) => c.kanji === '匂' && !c.eliminated), JSON.stringify([none.result?.primary_kanji]))
 check('(5) an invalid reader is a 400 before any model call', (await (async () => { seen.length = 0; const r = await selectPost(new Request('http://x/api/select', { method: 'POST', body: JSON.stringify({ story: FIX.story, language: 'ja', reader: 'mars' }) })); return r.status === 400 && seen.length === 0 })()))

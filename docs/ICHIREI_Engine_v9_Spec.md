@@ -96,7 +96,7 @@ From one true story, find **one character** that shows how the sender honestly s
 
 **Step 8. If something is missing**
 - Main removed: the second becomes the main.
-- One replacement may be chosen from the eligible list, **for the main slot only**. A removed second or freestyle card is not replaced: one true card shown quickly beats a weaker card shown slowly (owner decision, 2026-10-30).
+- **Refill (changed 2026-11-01; it was main-only from 2026-10-30).** If the referee or the review removes any card (main, second or free pick), or the model never wrote one, the engine requests replacements for **all empty slots in one call**, with the same rules (remembrance blocks, the truth check, readability, the lexicon). Each goes through the same referee and review. **At most one refill call per request.** If it still cannot fill a slot, the sender sees what is left, with no error. The refill is logged on the request's `[ichirei-cards]` line.
 - Still nothing: ask one follow-up question.
 - Still nothing: fall back to the wider palette (marked `lexicon_miss`, no classical line).
 - **Never zero cards without a question. Never an error page from a timeout.**

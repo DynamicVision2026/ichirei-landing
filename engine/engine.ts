@@ -24,7 +24,7 @@ import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { applyPalette, applyReviewVerdicts, loadPalette } from './palette.ts'
 import { runReview } from './review.ts'
-import { completeMains } from './replace.ts'
+import { completeMains, type RefillReport } from './replace.ts'
 import { applyGazes, fixGazes } from './gaze.ts'
 import {
   DECLINE_MESSAGE,
@@ -256,11 +256,11 @@ interface PipelineOut {
  * engine/lexicon.csv, the palette engine is the fallback after a second "nothing fits".
  */
 /** One line per request: the story's length, how many live cards of each kind leave the engine, and the reason every removed candidate was removed (codes only). */
-function logCards(story: string, context: EngineContext, before: EngineResult, after: EngineResult): void {
+function logCards(story: string, context: EngineContext, before: EngineResult, after: EngineResult, refill: RefillReport | null): void {
   try {
     const live = (r: EngineResult, slot: string) => r.candidates.filter((c) => !c.eliminated && c.slot === slot).length
     const removed = after.candidates.filter((c) => c.eliminated).map((c) => ({ slot: c.slot, reason: (c.eliminated_reason ?? 'unknown').slice(0, 80) }))
-    console.log(`[ichirei-cards] ${JSON.stringify({ story_chars: [...story].length, language: context.language, occasion: context.occasion, status: after.status, live: { main: live(after, 'main'), second: live(after, 'second'), freestyle: live(after, 'freestyle') }, before_final: before.candidates.filter((c) => !c.eliminated).length, removed })}`)
+    console.log(`[ichirei-cards] ${JSON.stringify({ story_chars: [...story].length, language: context.language, occasion: context.occasion, status: after.status, live: { main: live(after, 'main'), second: live(after, 'second'), freestyle: live(after, 'freestyle') }, before_final: before.candidates.filter((c) => !c.eliminated).length, removed, refill: refill ? { asked: refill.asked, filled: refill.filled.map((f) => f.slot), rejected: refill.rejected, ms: refill.ms } : null })}`)
   } catch {
     // (a log line must never break a request)
   }
@@ -592,6 +592,7 @@ async function runPipeline(a: PipelineArgs): Promise<PipelineOut> {
 
   // A main slot that is EMPTY (never produced, or removed by the referee or the review) is replaced — never an extra card beside a filled one.
   const tReplace = Date.now()
+  let refill: RefillReport | null = null
   const completed = await completeMains(reviewed, palette, story, context, view ? `${view.parts.staticBlock}\n\n${prompt}\n\n${view.parts.dynamicBlock}` : prompt, {
     apiKey: opts.apiKey,
     signal: opts.signal,
@@ -603,6 +604,7 @@ async function runPipeline(a: PipelineArgs): Promise<PipelineOut> {
     inLexicon: onList,
     mainOk: canBeMain,
     excluded,
+    onRefill: (r) => { refill = r },
   })
   // The last gate: at most one main, one second, one freestyle — and never zero cards without a question.
   // The gaze line must complete 「その人は、」 as one sentence about the person (spec v9.4): a line that does not is rewritten once (one small call,
@@ -618,7 +620,7 @@ async function runPipeline(a: PipelineArgs): Promise<PipelineOut> {
   }
   const final = finalizeResult(withGazes)
   // Which cards leave the engine, and why a card is missing (reasons are the referee / review codes, no story text and no character): the log a missing card is traced from.
-  logCards(story, context, completed, final)
+  logCards(story, context, completed, final, refill)
   timing({ review_ms: reviewMs, replace_ms: Date.now() - tReplace, status: final.status })
   // Lexicon mode: a sufficient answer that ended with no usable lexicon character (the model chose outside the list) is a miss like any other.
   if (view && final.status === 'insufficient') return { result: finishLexicon(final), miss: { reason: 'no_valid_choice', register: registerOf(extracted) } }
