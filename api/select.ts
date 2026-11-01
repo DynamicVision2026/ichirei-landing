@@ -9,6 +9,7 @@
 // gets live progress). Protocol, one JSON object per line:
 //   {"type":"stage","stage":"reading|choosing|checking|replacing"}  ...as the engine moves on (honest progress steps)
 //   {"type":"delta","chars":<cumulative model output chars>}   ...repeated
+//   {"type":"card","result":<engine JSON contract, the cards so far>}  ...as each card passes its checks (main; then main+second; then all three), parallel cards only
 //   {"type":"result","result":<engine JSON contract>}          ...terminal
 //   {"type":"error","error":"<message>","code"?:"model_timeout","seconds"?:<n>}  ...terminal
 
@@ -105,6 +106,7 @@ export async function POST(req: Request): Promise<Response> {
           exclude: ex.exclude,
           followUpsUsed: fu.followUps.length,
           onStage: (stage) => send({ type: 'stage', stage }),
+          onCard: (partial) => send({ type: 'card', result: partial }),
           onDelta: (text) => {
             received += text.length
             // Throttle progress lines: one per ~200 chars of model output.

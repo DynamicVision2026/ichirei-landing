@@ -63,6 +63,7 @@ class StreamCutError extends Error {}
 async function consumeEngineStream(
   body: ReadableStream<Uint8Array>,
   onStage: (stage: EngineStage) => void,
+  onCard?: (partial: EngineResult) => void,
 ): Promise<EngineResult> {
   const reader = body.getReader()
   const decoder = new TextDecoder()
@@ -73,6 +74,7 @@ async function consumeEngineStream(
     const msg = JSON.parse(trimmed) as
       | { type: 'delta'; chars: number } // model output progress — the stage events carry the real steps
       | { type: 'stage'; stage: EngineStage }
+      | { type: 'card'; result: EngineResult } // a card has passed its checks: the result as it stands (main; main + second; all three)
       | { type: 'ping' } // server heartbeat during silent reasoning — ignore
       | { type: 'result'; result: EngineResult }
       | { type: 'error'; error: string; code?: string; seconds?: number }
@@ -80,6 +82,10 @@ async function consumeEngineStream(
     if (msg.type === 'delta') return null
     if (msg.type === 'stage') {
       onStage(msg.stage)
+      return null
+    }
+    if (msg.type === 'card') {
+      onCard?.(msg.result)
       return null
     }
     if (msg.type === 'error') throw msg.code === 'model_timeout' ? new ModelTimeoutStreamError(msg.error, msg.seconds ?? 150) : new Error(msg.error)
@@ -304,10 +310,17 @@ export default function DemoApp({ mode = 'harness', aside }: { mode?: Mode; asid
         }
         throw new Error(message ?? copy.serverError(res.status))
       }
+      // Cards appear as they pass their checks (main first, then second, then the free pick): the page opens the reveal with the cards so far. The terminal result
+      // still replaces it with the whole set, and a sender who has already moved on (chosen a card, opened the order form) is not pulled back.
+      const showEarly = (partial: EngineResult) => {
+        if (partial.status !== 'sufficient' || partial.suggest_memorial === true || partial.primary_kanji === null || !partial.candidates.some((c) => !c.eliminated)) return
+        setResult(partial)
+        setPhase((p) => (p === 'processing' || p === 'reveal' ? 'reveal' : p))
+      }
       const isStream =
         (res.headers.get('content-type') ?? '').includes('ndjson') && res.body
       const engineResult: EngineResult = isStream
-        ? await consumeEngineStream(res.body!, setStage)
+        ? await consumeEngineStream(res.body!, setStage, again ? undefined : showEarly)
         : ((await res.json()) as EngineResult)
       if (again) {
         // 「別の候補を見る」: three new characters for the same story, or — when nothing new is true to it — the note to write a little more. Never an error page.
@@ -362,7 +375,7 @@ export default function DemoApp({ mode = 'harness', aside }: { mode?: Mode; asid
         setPhase('suggest')
       } else {
         if (customer) trackFlow('reveal_shown', { language: ctx.language, set: questionSetOf(ctx), qid: questionId })
-        setPhase('reveal')
+        setPhase((p) => (p === 'order' ? p : 'reveal'))
       }
     } catch (e) {
       const message = e instanceof ModelTimeoutStreamError

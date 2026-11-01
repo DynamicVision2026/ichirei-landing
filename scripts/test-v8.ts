@@ -12,6 +12,7 @@ import { join } from 'node:path'
 import { runEngine, normalizeModelOutput } from '../engine/engine.ts'
 import { DEFAULT_FOLLOW_UP, validateEngineResult, type EngineResult } from '../engine/contract.ts'
 import { ModelTimeoutError } from '../engine/limits.ts'
+process.env.ICHIREI_CARDS = 'single' // these checks drive the single-selection-call engine with one fake reply; the parallel cards have scripts/test-parallel.ts
 
 let failures = 0
 function check(name: string, cond: boolean, detail?: string) {

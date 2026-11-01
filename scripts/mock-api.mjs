@@ -37,6 +37,22 @@ const server = createServer(async (req, res) => {
       res.write(JSON.stringify({ type: 'error', error: 'Engine failed: simulated model parse failure' }) + '\n')
       return res.end()
     }
+    if (mode === 'cards') {
+      // Parallel cards: each card is announced as it passes its checks (main; main + second; all three), then the terminal result.
+      const partial = (n) => ({ ...FIXTURE, candidates: FIXTURE.candidates.slice(0, n), runner_up_kanji: n >= 2 ? FIXTURE.runner_up_kanji : null, freestyle_kanji: n >= 3 ? FIXTURE.freestyle_kanji : null })
+      res.write(JSON.stringify({ type: 'stage', stage: 'reading' }) + '\n')
+      await sleep(300)
+      res.write(JSON.stringify({ type: 'stage', stage: 'choosing' }) + '\n')
+      await sleep(400)
+      res.write(JSON.stringify({ type: 'stage', stage: 'checking' }) + '\n')
+      for (const n of [1, 2, 3]) {
+        await sleep(1500)
+        res.write(JSON.stringify({ type: 'card', result: partial(n) }) + '\n')
+      }
+      await sleep(800)
+      res.write(JSON.stringify({ type: 'result', result: FIXTURE }) + '\n')
+      return res.end()
+    }
     // Simulate the model streaming: 10 progress lines spread over TOTAL_MS.
     const steps = 10
     res.write(JSON.stringify({ type: 'stage', stage: 'reading' }) + '\n')

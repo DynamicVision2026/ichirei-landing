@@ -16,6 +16,7 @@ import { generatePoem, type PoemInput } from '../engine/poem.ts'
 import { loadPalette } from '../engine/palette.ts'
 import { POST as selectPost } from '../api/select.ts'
 import { appendSpoken, storyLength } from '../src/demo/i18n.ts'
+process.env.ICHIREI_CARDS = 'single' // these checks drive the single-selection-call engine with one fake reply; the parallel cards have scripts/test-parallel.ts
 
 let failures = 0
 function check(name: string, cond: boolean, detail?: string) {

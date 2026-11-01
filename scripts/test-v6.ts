@@ -16,6 +16,7 @@ import { applyPalette, applyReviewVerdicts, classicalEchoOf, loadPalette, parseF
 import { REVIEW_SLOTS, fillReviewPrompt, loadReviewPrompt, parseVerdicts, reviewItems } from '../engine/review.ts'
 import { parseOrderRequest } from '../engine/order.ts'
 import { POST as selectPost } from '../api/select.ts'
+process.env.ICHIREI_CARDS = 'single' // these checks drive the single-selection-call engine with one fake reply; the parallel cards have scripts/test-parallel.ts
 
 let failures = 0
 function check(name: string, cond: boolean, detail?: string) {

@@ -18,6 +18,7 @@ import { nextQuestionId, questionSetOf, questionTextOf, questionsOf, randomFirst
 import { OPENER, STORY_MIN } from '../src/reveal/opener-copy.ts'
 // @ts-expect-error untyped report script
 import { formatFunnel, formatQuestionMains, parseJsonObjects, summarizeFunnel, summarizeQuestionMains } from './report-choices.mjs'
+process.env.ICHIREI_CARDS = 'single' // these checks drive the single-selection-call engine with one fake reply; the parallel cards have scripts/test-parallel.ts
 
 let failures = 0
 function check(name: string, cond: boolean, detail?: string) {

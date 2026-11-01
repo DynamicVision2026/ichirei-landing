@@ -11,6 +11,7 @@ import { join } from 'node:path'
 import { runEngine } from '../engine/engine.ts'
 import { validateEngineResult, type EngineResult } from '../engine/contract.ts'
 import { FREESTYLE_CATEGORIES, loadPalette, parseCsv } from '../engine/palette.ts'
+process.env.ICHIREI_CARDS = 'single' // these checks drive the single-selection-call engine with one fake reply; the parallel cards have scripts/test-parallel.ts
 
 let failures = 0
 function check(name: string, cond: boolean, detail?: string) {

@@ -17,6 +17,7 @@ import { createOrderHandler } from '../api/order.ts'
 import type { EngineResult } from '../engine/contract.ts'
 // @ts-expect-error — plain .mjs script with named exports
 import { format, parseJsonl, summarize } from './report-choices.mjs'
+process.env.ICHIREI_CARDS = 'single' // these checks drive the single-selection-call engine with one fake reply; the parallel cards have scripts/test-parallel.ts
 process.env.ICHIREI_FILM = 'off' // (the film-script call is switched off in this suite: orders here never reach the model)
 
 let failures = 0

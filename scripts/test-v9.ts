@@ -21,6 +21,7 @@ import { simpleAvailable } from '../src/order/strokes.ts'
 import { COPY, carvedGlyph } from '../src/demo/i18n.ts'
 // @ts-expect-error untyped test helper
 import { startServer } from './server-fixtures.mjs'
+process.env.ICHIREI_CARDS = 'single' // these checks drive the single-selection-call engine with one fake reply; the parallel cards have scripts/test-parallel.ts
 
 let failures = 0
 function check(name: string, cond: boolean, detail?: string) {

@@ -12,6 +12,7 @@
 //   5. hands it to the palette referee (engine/palette.ts) and returns the refereed result.
 // Editing a prompt file changes the engine's behavior with no change to this code.
 
+import { cardsMode, runCards, type CardsReport } from './cards.ts'
 import { thinkingTokensOf, watchThinkingTokens } from './usage.ts'
 import Anthropic from '@anthropic-ai/sdk'
 import { callSignal, callTimeoutMs, ModelTimeoutError, reviewTimeoutMs, runBudgetMs, shadowGraceMs, timedOut } from './limits.ts'
@@ -225,6 +226,11 @@ export interface RunEngineOptions {
    * writing the characters, 'checking' while the separate review runs, 'replacing' while a missing main card is replaced.
    */
   onStage?: (stage: 'reading' | 'choosing' | 'checking' | 'replacing') => void
+  /**
+   * Parallel cards: called each time another card has passed its checks, with the result as it stands (a valid result with the cards so far: main, then
+   * main + second, then all three — always in that order). The terminal result still carries everything; this is only for showing a card early.
+   */
+  onCard?: (partial: EngineResult) => void
   /** How many follow-up answers the sender has already given (the API layer passes it). Lexicon mode: after one, a second "no lexicon character fits" falls back to the palette engine. */
   followUpsUsed?: number
   /** ICHIREI_LEXICON_MODE for this run (tests); default: the environment. */
@@ -280,17 +286,19 @@ export function selectCallInfo(message: Pick<Anthropic.Message, 'usage' | 'stop_
   return { output_tokens: message.usage?.output_tokens ?? null, thinking_tokens: thinkingTokensOf(message), stop_reason: message.stop_reason ?? null }
 }
 
-function logCards(story: string, context: EngineContext, before: EngineResult, after: EngineResult, refill: RefillReport | null, ms: StepTimes, select?: SelectCallInfo): void {
+function logCards(story: string, context: EngineContext, before: EngineResult, after: EngineResult, refill: RefillReport | null, ms: StepTimes, select?: SelectCallInfo, parallel?: CardsReport): void {
   try {
     const live = (r: EngineResult, slot: string) => r.candidates.filter((c) => !c.eliminated && c.slot === slot).length
     const removed = after.candidates.filter((c) => c.eliminated).map((c) => ({ slot: c.slot, reason: (c.eliminated_reason ?? 'unknown').slice(0, 80) }))
-    console.log(`[ichirei-cards] ${JSON.stringify({ story_chars: [...story].length, language: context.language, occasion: context.occasion, status: after.status, live: { main: live(after, 'main'), second: live(after, 'second'), freestyle: live(after, 'freestyle') }, before_final: before.candidates.filter((c) => !c.eliminated).length, freestyle: context.occasion === 'memorial' ? 'not_offered' : undefined, ms, select: select ?? undefined, calls: { select: ms.select_attempts, review: ms.review > 0 ? 1 : 0, refill: refill ? 1 : 0, gaze: ms.gaze_failing > 0 ? 1 : 0 }, removed, refill: refill ? { asked: refill.asked, filled: refill.filled.map((f) => f.slot), rejected: refill.rejected, rescued: refill.rescued.map((f) => f.slot), ms: refill.ms } : null })}`)
+    console.log(`[ichirei-cards] ${JSON.stringify({ story_chars: [...story].length, language: context.language, occasion: context.occasion, status: after.status, live: { main: live(after, 'main'), second: live(after, 'second'), freestyle: live(after, 'freestyle') }, before_final: before.candidates.filter((c) => !c.eliminated).length, freestyle: context.occasion === 'memorial' ? 'not_offered' : undefined, ms, select: select ?? undefined, ...(parallel ? { parallel: { first_card_ms: parallel.first_card_ms, all_cards_ms: parallel.all_cards_ms, calls: parallel.calls, reviews: parallel.reviews, collisions: parallel.collisions, runner_up_used: parallel.runner_up_used, free_dropped: parallel.free_dropped } } : {}), calls: parallel ? { select: parallel.calls.reduce((n, c) => n + c.attempts, 0), review: parallel.reviews.length, refill: refill ? 1 : 0, gaze: ms.gaze_failing > 0 ? 1 : 0 } : { select: ms.select_attempts, review: ms.review > 0 ? 1 : 0, refill: refill ? 1 : 0, gaze: ms.gaze_failing > 0 ? 1 : 0 }, removed, refill: refill ? { asked: refill.asked, filled: refill.filled.map((f) => f.slot), rejected: refill.rejected, rescued: refill.rescued.map((f) => f.slot), ms: refill.ms } : null })}`)
   } catch {
     // (a log line must never break a request)
   }
 }
 
 export async function runEngine(story: string, condition: 'A' | 'B' | 'C', opts: RunEngineOptions = {}): Promise<EngineResult> {
+  const onCard = opts.onCard
+  if (onCard) opts = { ...opts, onCard: (partial) => onCard(attachStrokes(partial)) } // (a card shown early carries its stroke counts like the final one)
   const result = attachStrokes(await runEngineInner(story, condition, opts)) // the carving check's stroke counts (engine/strokes.ts)
   logMainCharacter(result) // the day's repeats, visible in the logs (engine/main-count.ts)
   logSafetyRemovals(result) // every card removed for safety, with the reason (no story text)
@@ -559,6 +567,8 @@ function logIdeal(extracted: EngineResult, a: PipelineArgs, chosen: string | nul
 }
 
 async function runPipeline(a: PipelineArgs): Promise<PipelineOut> {
+  // The palette engine writes the cards in parallel (engine/cards.ts); the single selection call remains for lexicon mode and as ICHIREI_CARDS=single.
+  if (!a.view && cardsMode() === 'parallel') return runCardsPipeline(a)
   const { story, context, palette, opts, tStart, prompt, view } = a
   opts.onStage?.('reading')
   const { message, extracted, attempts, maxTokens } = await selectWithRetry(a, opts.signal, false, opts.onUsage)
@@ -663,6 +673,97 @@ async function runPipeline(a: PipelineArgs): Promise<PipelineOut> {
   // Lexicon mode: a sufficient answer that ended with no usable lexicon character (the model chose outside the list) is a miss like any other.
   if (view && final.status === 'insufficient') return { result: finishLexicon(final), miss: { reason: 'no_valid_choice', register: registerOf(extracted) } }
   return { result: finishLexicon(final), miss: null }
+}
+
+/**
+ * Parallel cards (engine/cards.ts): the main, second and free-pick calls start together; each card is refereed, reviewed and gaze-checked as soon as it is
+ * written; a rejected or doubled character falls back to its own call's runner-up. What is left empty goes to the existing refill (main and second; never the
+ * free pick). From here on the path is the single-call engine's own: referee over the joined result, the refill, the last gate.
+ */
+async function runCardsPipeline(a: PipelineArgs): Promise<PipelineOut> {
+  const { story, context, palette, opts, tStart, prompt, client } = a
+  const canBeMain = context.language === 'ja' ? (c: Candidate) => isJoyo(c.kanji) : undefined
+  const excluded = opts.exclude?.length ? new Set(opts.exclude) : undefined
+  const out = await runCards({
+    story,
+    context,
+    palette,
+    client,
+    prompt,
+    tStart,
+    models: { select: MODEL, review: REVIEW_MODEL, free: process.env.ICHIREI_FREE_MODEL ?? process.env.ICHIREI_REFILL_FREE_MODEL ?? REVIEW_MODEL },
+    opts: { apiKey: opts.apiKey, signal: opts.signal, onUsage: opts.onUsage, onStage: opts.onStage, onDelta: opts.onDelta, onCard: opts.onCard, exclude: opts.exclude },
+    deps: { extractJson, stamp: (r) => stampResult(r, context) },
+    canBeMain,
+    excluded,
+  })
+  const selectMs = out.report.main_call_ms
+  const mainCall = out.report.calls.find((c) => c.slot === 'main')
+  const timing = (t: { review_ms: number; replace_ms: number; status: string }) =>
+    logTiming({ attempts: mainCall?.attempts ?? 1, max_tokens_used: 0, select_ms: selectMs, ...t, total_ms: Date.now() - tStart, stop_reason: mainCall?.stop_reason ?? null, output_tokens: mainCall?.output_tokens ?? null, lexicon: false })
+  // Goodwill check (selection or review): a polite decline, no cards.
+  if (out.early?.kind === 'declined') {
+    console.log(`[ichirei-safety] goodwill_decline ${JSON.stringify({ stage: out.early.stage, language: context.language, relationship: context.relationship, occasion: context.occasion, direction: context.direction })}`)
+    timing({ review_ms: 0, replace_ms: 0, status: 'declined' })
+    return { result: declinedResult(out.early.stamped, context), miss: null }
+  }
+  if (out.early || !out.base) {
+    const closed = finalizeResult(out.early?.stamped ?? stampResult({ status: 'insufficient', candidates: [] } as unknown as EngineResult, context))
+    timing({ review_ms: 0, replace_ms: 0, status: closed.status })
+    return { result: closed, miss: null }
+  }
+  const tops = (slot: 'main' | 'second' | 'freestyle') => out.candidates.filter((c) => c.slot === slot)
+  const standing = (slot: 'main' | 'second' | 'freestyle') => tops(slot).find((c) => !c.eliminated)
+  const joined: EngineResult = {
+    ...out.base,
+    status: 'sufficient',
+    candidates: out.candidates,
+    primary_kanji: (standing('main') ?? tops('main')[0])?.kanji ?? null,
+    runner_up_kanji: (standing('second') ?? tops('second')[0])?.kanji ?? null,
+    freestyle_kanji: standing('freestyle')?.kanji ?? null,
+  }
+  const refereed = applyPalette(joined, palette, story, { deferInsufficient: true, canBeMain, excluded })
+  if (refereed.status !== 'sufficient') {
+    const closed = finalizeResult(refereed)
+    timing({ review_ms: 0, replace_ms: 0, status: closed.status })
+    return { result: closed, miss: null }
+  }
+  const reviewed = applyReviewVerdicts(refereed, palette, story, out.review, { deferInsufficient: true, canBeMain })
+  const reviewMs = out.report.reviews.reduce((m, r) => Math.max(m, r.ms), 0)
+
+  // An EMPTY main or second (both of the call's characters were set aside) is refilled — one call, as before. The free pick is never refilled: two cards.
+  const tReplace = Date.now()
+  let refill: RefillReport | null = null
+  const completed = await completeMains(reviewed, palette, story, context, prompt, {
+    apiKey: opts.apiKey,
+    signal: opts.signal,
+    model: process.env.ICHIREI_REPLACE_MODEL ?? MODEL,
+    reviewModel: REVIEW_MODEL,
+    onUsage: opts.onUsage,
+    onStage: opts.onStage,
+    mainOk: canBeMain,
+    excluded,
+    refillFree: false,
+    onRefill: (r) => { refill = r },
+  })
+  // Every card already had its gaze line checked when it passed; a refilled card (or any line that still fails) gets the one rewrite here. Never a reason to lose a card.
+  let withGazes = completed
+  const tGaze = Date.now()
+  const gazeFailing = failingGazes(completed.candidates, context.language).length
+  try {
+    const gazeFixes = await fixGazes(completed.candidates, story, context.language, { apiKey: opts.apiKey, signal: opts.signal, onUsage: opts.onUsage ? (u) => opts.onUsage!('review', u) : undefined })
+    const applied = applyGazes(completed, gazeFixes)
+    if (applied.candidates.length === completed.candidates.length) withGazes = applied
+  } catch {
+    withGazes = completed
+  }
+  const gazeMs = Date.now() - tGaze + out.report.gaze_ms
+  const final = finalizeResult(withGazes)
+  const refillMs = tGaze - tReplace
+  out.report.all_cards_ms = Math.max(out.report.all_cards_ms, Date.now() - tStart)
+  logCards(story, context, completed, final, refill, { total: Date.now() - tStart, select: selectMs, select_attempts: mainCall?.attempts ?? 1, referee: 0, review: reviewMs, refill: refillMs, gaze: gazeMs, gaze_failing: gazeFailing + out.report.gaze_failing }, undefined, out.report)
+  timing({ review_ms: reviewMs, replace_ms: refillMs, status: final.status })
+  return { result: final, miss: null }
 }
 
 /** The palette engine answered after a lexicon miss: say so (`lexicon_miss`), and show no classical line. */

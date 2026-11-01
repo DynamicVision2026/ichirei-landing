@@ -13,6 +13,7 @@ import { eligibleFor } from '../engine/lexicon.ts'
 import { loadLexicon } from '../engine/lexicon.ts'
 import { contextToPayload, DEFAULT_GIFT_CONTEXT, READER_CHOICES } from '../src/demo/i18n.ts'
 import { OPENER } from '../src/reveal/opener-copy.ts'
+process.env.ICHIREI_CARDS = 'single' // these checks drive the single-selection-call engine with one fake reply; the parallel cards have scripts/test-parallel.ts
 
 let failures = 0
 function check(name: string, cond: boolean, detail?: string) {

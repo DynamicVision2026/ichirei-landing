@@ -17,6 +17,7 @@ import { createOrderHandler } from '../api/order.ts'
 import { lineAttributes, parseOrderRequest } from '../engine/order.ts'
 import { COPY, OCCASION_CODES, UI_LANGUAGES } from '../src/demo/i18n.ts'
 import { CERTIFICATE_LINE_EN, certificateText } from '../src/order/certificate.ts'
+process.env.ICHIREI_CARDS = 'single' // these checks drive the single-selection-call engine with one fake reply; the parallel cards have scripts/test-parallel.ts
 process.env.ICHIREI_FILM = 'off' // (the film-script call is switched off in this suite: orders here never reach the model)
 
 let failures = 0

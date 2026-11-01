@@ -12,6 +12,7 @@ import { runEngine, STORY_SLOT, CONTEXT_SLOTS } from '../engine/engine.ts'
 import { validateEngineResult } from '../engine/contract.ts'
 import { applyPalette, applyReviewVerdicts, loadPalette } from '../engine/palette.ts'
 import { POST } from '../api/select.ts'
+process.env.ICHIREI_CARDS = 'single' // these checks drive the single-selection-call engine with one fake reply; the parallel cards have scripts/test-parallel.ts
 
 let failures = 0
 function check(name: string, cond: boolean, detail?: string) {

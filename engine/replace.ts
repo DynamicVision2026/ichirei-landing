@@ -113,7 +113,7 @@ export function loadFreePrompt(): string {
   throw new Error('refill-free-prompt.md not found')
 }
 
-const FREE_FIELDS: Record<'ja' | 'zh' | 'en', { fields: string; extra: string }> = {
+export const FREE_FIELDS: Record<'ja' | 'zh' | 'en', { fields: string; extra: string }> = {
   ja: { fields: '- kanji: the modern Japanese form\n- reading: hiragana\n- inscription_form: the old-form variant, or null\n- one_line_gaze: Japanese, ONE short sentence', extra: '' },
   zh: { fields: '- kanji: the SIMPLIFIED form\n- reading: pinyin with tone marks\n- inscription_form: the TRADITIONAL form, or null if identical to kanji\n- one_line_gaze: Chinese in the display script of the language above (zh-Hans → 简体中文, zh-Hant → 繁體中文), ONE short sentence', extra: '' },
   en: { fields: '- kanji: the modern Japanese form\n- reading: romaji, ONE reading only\n- inscription_form: the old-form variant, or null\n- meaning: a one-phrase English meaning\n- why_this: ONE short plain-English sentence tying the character to the quoted story moment, no kanji jargon\n- one_line_gaze: English, ONE short sentence', extra: ', "meaning": …, "why_this": …' },
@@ -144,7 +144,7 @@ const strOf = (v: unknown) => (typeof v === 'string' && v.trim() ? v.trim() : nu
 /** Which required fields an offered candidate lacks (names only). */
 export const missingFields = (obj: Record<string, unknown>): string[] => REQUIRED.filter((k) => !strOf(obj[k]))
 
-const toCandidate = (obj: Record<string, unknown>, slot: RefillSlot): Candidate | null => {
+export const toCandidate = (obj: Record<string, unknown>, slot: RefillSlot): Candidate | null => {
   const str = strOf
   const kanji = str(obj.kanji)
   const reading = str(obj.reading)
@@ -251,6 +251,8 @@ export interface ReplaceOptions {
   mainOk?: (c: Candidate) => boolean
   /** Characters already shown for this story (a retry): a replacement may not be one of them. */
   excluded?: ReadonlySet<string>
+  /** Parallel cards (2026-11-01): the free pick is written by its own call at the start and is never refilled. Default: it is refilled when empty (the single-call engine). */
+  refillFree?: boolean
   /** Called once with what the refill asked for and what came of it (the [ichirei-cards] log line). */
   onRefill?: (report: RefillReport) => void
 }
@@ -270,7 +272,7 @@ export async function completeMains(
   const log = opts.log ?? ((l: string) => console.log(l))
   if (result.status !== 'sufficient') return result
   const { live, gone } = missingMains(result)
-  const slots = emptySlots(result)
+  const slots = emptySlots(result).filter((sl) => sl !== 'freestyle' || opts.refillFree !== false)
   const freeGone = result.candidates.filter((c) => c.slot === 'freestyle' && c.eliminated).map((c) => ({ slot: 'freestyle', kanji: c.kanji, cause: (c.eliminated_reason?.startsWith('palette:') ? 'referee' : c.eliminated_reason?.startsWith('review:') ? 'review' : 'model') as MissingCause, reason: c.eliminated_reason ?? '' }))
   if (live.length < 2) log(`[ichirei-engine] ${slots.includes('main') ? 'main_slot_empty' : 'second_slot_empty'} ${JSON.stringify({ live: live.map((c) => ({ slot: c.slot, kanji: c.kanji })), missing: gone, will_replace: slots.length > 0 && replaceEnabled() })}`)
   if (slots.includes('freestyle')) log(`[ichirei-engine] free_slot_empty ${JSON.stringify({ missing: freeGone, will_replace: replaceEnabled() })}`)

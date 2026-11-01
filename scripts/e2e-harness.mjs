@@ -265,6 +265,31 @@ const browser = await chromium.launch({
   await page.close()
 }
 
+// ---------- Run 3b: parallel cards — each card appears as it passes its checks (main, then second, then the free pick) ----------
+{
+  const page = await browser.newPage({ locale: 'ja-JP', viewport: { width: 1100, height: 950 } })
+  const errors = []
+  page.on('pageerror', (e) => errors.push(String(e)))
+  await page.route('**/api/log', (route) => route.fulfill({ status: 204, body: '' }))
+  await page.route('**/api/select', (route) => route.continue({ url: route.request().url() + '?mode=cards' }))
+  await page.goto('http://localhost:5173/demo', { waitUntil: 'networkidle' })
+  await page.locator('textarea').first().fill(STORY)
+  await pickContext(page)
+  await page.click('text=その一字を、探しにいく')
+  await page.waitForSelector('article', { timeout: 10000 })
+  const first = await page.locator('article').count()
+  check('cards: the main card appears on its own, before the others and before the terminal result (1 card on screen, the processing view is gone)', first === 1 && !(await page.locator('[data-testid=processing-steps]').isVisible().catch(() => false)), String(first))
+  await page.waitForFunction(() => document.querySelectorAll('article').length === 2, null, { timeout: 5000 })
+  check('cards: then the second card joins (2 cards)', (await page.locator('article').count()) === 2)
+  await page.waitForFunction(() => document.querySelectorAll('article').length === 3, null, { timeout: 5000 })
+  check('cards: then the free pick (3 cards), in the order main, second, free', (await page.locator('article').count()) === 3 && (await page.locator('article').first().locator('span').first().textContent()) === '証')
+  await page.waitForTimeout(1600) // the terminal result lands and replaces the partial one
+  check('cards: the terminal result keeps the three cards and the reveal on screen (nobody is sent back to the processing view)', (await page.locator('article').count()) === 3 && !(await page.locator('[data-testid=processing-steps]').isVisible().catch(() => false)))
+  check('no page errors (run 3b, cards)', errors.length === 0)
+  if (errors.length) console.log('page errors:', errors)
+  await page.close()
+}
+
 // ---------- Run 4: client-side hard timeout -> visible error, no hang ----------
 {
   const page = await browser.newPage({ locale: 'ja-JP', viewport: { width: 1100, height: 950 } })

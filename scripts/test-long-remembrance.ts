@@ -11,6 +11,7 @@ import { join } from 'node:path'
 import { runEngine } from '../engine/engine.ts'
 import { validateEngineResult } from '../engine/contract.ts'
 import { gazeIssues } from '../engine/gaze.ts'
+process.env.ICHIREI_CARDS = 'single' // these checks drive the single-selection-call engine with one fake reply; the parallel cards have scripts/test-parallel.ts
 
 let failures = 0
 const check = (name: string, cond: boolean, detail = '') => { console.log(`${cond ? 'PASS' : 'FAIL'}  ${name}${!cond && detail ? `  -> ${detail.slice(0, 700)}` : ''}`); if (!cond) failures++ }

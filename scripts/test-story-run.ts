@@ -9,6 +9,7 @@ import { join } from 'node:path'
 import { parseCsv } from '../engine/palette.ts'
 // @ts-expect-error — a plain .mjs module
 import { describeRun, directionFor, estimate, occasionFor, relationshipFor, sameness, selectRows, summarize, toCsv } from './run-story-db.mjs'
+process.env.ICHIREI_CARDS = 'single' // these checks drive the single-selection-call engine with one fake reply; the parallel cards have scripts/test-parallel.ts
 
 let failures = 0
 function check(name: string, cond: boolean, detail?: string) {
