@@ -7,6 +7,7 @@
 // Env: ICHIREI_REPLACE=off disables it; ICHIREI_REPLACE_MODEL, ICHIREI_REPLACE_EFFORT (default medium), ICHIREI_REPLACE_MAX_TOKENS (default 9000: up to three candidates),
 // ICHIREI_REPLACE_PROMPT_PATH.
 
+import { thinkingTokensOf, watchThinkingTokens } from './usage.ts'
 import Anthropic from '@anthropic-ai/sdk'
 import { readFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
@@ -306,13 +307,14 @@ export async function completeMains(
       { model: callModel, max_tokens: freeOnly ? 1500 : Number(process.env.ICHIREI_REPLACE_MAX_TOKENS ?? 9000), output_config: { effort }, messages: [{ role: 'user', content: prompt }] },
       { signal },
     )
+    const thinking = watchThinkingTokens(stream)
     const message = await stream.finalMessage()
     opts.onUsage?.('replace', { model: callModel, input_tokens: message.usage?.input_tokens ?? 0, output_tokens: message.usage?.output_tokens ?? 0 })
     const text = message.content.filter((b): b is Anthropic.TextBlock => b.type === 'text').map((b) => b.text).join('')
     const parsed = parseReplacementsDiag(text, slots)
     cands = parsed.cands
     // the line a failed refill is diagnosed from: what the call was, how long the reply was, how it parsed, what was offered (codes and character only — never a story fragment)
-    Object.assign(callInfo, { model: callModel, effort, ms: Date.now() - t0, stop_reason: message.stop_reason, output_tokens: message.usage?.output_tokens ?? null, blocks: message.content.map((b) => b.type), reply_chars: [...text].length, parse: message.stop_reason === 'refusal' ? 'refusal' : parsed.diag.parse, keys: parsed.diag.keys, offered: parsed.diag.offered })
+    Object.assign(callInfo, { model: callModel, effort, ms: Date.now() - t0, stop_reason: message.stop_reason, output_tokens: message.usage?.output_tokens ?? null, thinking_tokens: thinkingTokensOf(message, thinking()), blocks: message.content.map((b) => b.type), reply_chars: [...text].length, parse: message.stop_reason === 'refusal' ? 'refusal' : parsed.diag.parse, keys: parsed.diag.keys, offered: parsed.diag.offered })
     log(`[ichirei-refill] ${JSON.stringify(callInfo)}`)
   } catch (err) {
     const msg = (err instanceof Error ? err.message : String(err)).slice(0, 160)

@@ -182,6 +182,8 @@ Purpose: the playful or raw truth of the relationship — classmates teasing eac
 5. It must pass the substitution test (gate 1) and the dignity boundary (gate 4), and its one_line_gaze obeys HARD PROCESS RULE 5: one light line, built only from details in the story, saying why this is them.
 6. Concrete objects and actions from the story (the flower, the shoes, the lunch box, the ticket) belong HERE, not in the main slots: the freestyle is the one place where a scene noun is welcome, as long as it is shared play and obeys rules 1–5.
 7. Light only. The card must make the two of them smile together — a joke, a running gag, a habit, told with warmth. It is never a hard memory, a hardship, a wound, a secret, or anything the receiver or the sender was ashamed of, hurt by or hid — even when it is told kindly. When the vivid details are of that kind, look for a smaller, lighter true detail elsewhere in the story; only when there is none at all, output no freestyle.
+8. Never a negative trait. The freestyle must not be a character that could read as a negative trait of the person, even as a joke — for example 寒, 冷, 頑, 怠 (and likewise 鈍, 愚, 弱, 暗, 臭). The test: read the character alone — could it sound like a complaint about who they are? If so, choose another. A cold day, cold hands or a cold drink in the story is a scene, not a reason to name the person 寒 or 冷.
+9. A different angle from the two main cards. The mains carry the feeling (warmth, care, strength); the freestyle looks somewhere else: a habit, a place, an object, a playful detail from the story. Not another word for the same feeling: if the mains are about warmth or care, the freestyle is not 温, 暖, 優, 愛 or the like.
 STEP 6 — Output
 Produce, in this order:
 

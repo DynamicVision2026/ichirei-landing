@@ -17,6 +17,8 @@ CHARACTERS YOU MUST NOT USE (already offered, or refused — with the reason, so
 
 TRUTH. Every claim in a candidate's `one_line_gaze` must be stated in the story. No superlative or comparison the story does not support (“earlier than anyone”, “the best”, “always”, “never”, “every time”, “nobody else”): keep the story's own words for time and comparison — “before me” stays “before me”. When unsure, say less.
 
+FREE PICK. If the slot to fill is the freestyle: never a character that could read as a negative trait of the person, even as a joke (寒, 冷, 頑, 怠 and the like), and a different angle from the cards that stand — a habit, a place, an object, a playful detail, not another word for the same feeling (warmth, care).
+
 Do the work again from STEP 1's findings: for each empty slot find the strongest remaining LIVED finding the standing candidates do not already own, name what it proves, and check it against the gates (gate 8, readability: for a Japanese buyer, a character that becomes the main must be a 常用漢字). If you honestly cannot find a candidate that passes for a slot, leave that slot out — do not force one.
 
 OUTPUT. Reply with exactly one JSON object and nothing else — no prose, no code fence: {"candidates": [ … ]} with one element per slot you could fill. Each element has the same fields as one element of "candidates" in the selection prompt's shape, with "slot" set to the empty slot's name (main, second or freestyle), "eliminated": false and "eliminated_reason": null. If there is no honest candidate for any slot, reply exactly {"none": true}.

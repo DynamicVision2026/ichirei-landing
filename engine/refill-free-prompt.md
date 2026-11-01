@@ -22,7 +22,9 @@ The playful or raw truth of the relationship: a smile, a shared joke, a habit th
 4. Register follows direction and the story's emotion: across → playful; up (parent, mentor, a milestone birthday) → gentle, affectionate humour; bittersweet stories → tender rather than funny.
 5. Respect the occasion: a wedding has no parting, ending or returning words; a kanreki or milestone birthday means rebirth and a fresh start, never decline or old age; thanks and parent's day have no debt or burden; never illness, death or ending words.
 6. TRUTH. Every claim in `one_line_gaze` must be stated in the story. No superlative or comparison the story does not support (“earlier than anyone”, “the best”, “always”, “never”, “every time”, “nobody else”): keep the story's own words for time and comparison — if the story says “before me”, write “before me”, not “earlier than anyone”. When unsure, say less.
-7. `one_line_gaze`: ONE short sentence that describes the PERSON (it completes 「その人は、」 / "They are"): built only from details stated in the story, never an invented object, place, time or habit.
+7. NEVER A NEGATIVE TRAIT. Not a character that could read as a negative trait of the person, even as a joke — for example 寒, 冷, 頑, 怠 (and likewise 鈍, 愚, 弱, 暗, 臭). Read the character alone: could it sound like a complaint about who they are? Then choose another. A cold day or cold hands in the story is a scene, not their card.
+8. A DIFFERENT ANGLE from the cards that stand: a habit, a place, an object, a playful detail. Not another word for the same feeling (if they carry warmth or care, not 温, 暖, 優, 愛).
+9. `one_line_gaze`: ONE short sentence that describes the PERSON (it completes 「その人は、」 / "They are"): built only from details stated in the story, never an invented object, place, time or habit.
 
 THE CARDS THAT STAND (do not repeat their character or their truth):
 {{ STANDING }}

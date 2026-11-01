@@ -12,6 +12,7 @@
 //   5. hands it to the palette referee (engine/palette.ts) and returns the refereed result.
 // Editing a prompt file changes the engine's behavior with no change to this code.
 
+import { thinkingTokensOf, watchThinkingTokens } from './usage.ts'
 import Anthropic from '@anthropic-ai/sdk'
 import { callSignal, callTimeoutMs, ModelTimeoutError, reviewTimeoutMs, runBudgetMs, shadowGraceMs, timedOut } from './limits.ts'
 import { finalizeResult } from './slots.ts'
@@ -268,11 +269,22 @@ interface StepTimes {
   gaze_failing: number
 }
 
-function logCards(story: string, context: EngineContext, before: EngineResult, after: EngineResult, refill: RefillReport | null, ms: StepTimes): void {
+/** What the selection call itself cost, from the last attempt that answered: the output tokens, the part of them the model spent reasoning (null when the API does not report it), and why it stopped. Numbers and a code only. */
+export interface SelectCallInfo {
+  output_tokens: number | null
+  thinking_tokens: number | null
+  stop_reason: string | null
+}
+
+export function selectCallInfo(message: Pick<Anthropic.Message, 'usage' | 'stop_reason'>): SelectCallInfo {
+  return { output_tokens: message.usage?.output_tokens ?? null, thinking_tokens: thinkingTokensOf(message), stop_reason: message.stop_reason ?? null }
+}
+
+function logCards(story: string, context: EngineContext, before: EngineResult, after: EngineResult, refill: RefillReport | null, ms: StepTimes, select?: SelectCallInfo): void {
   try {
     const live = (r: EngineResult, slot: string) => r.candidates.filter((c) => !c.eliminated && c.slot === slot).length
     const removed = after.candidates.filter((c) => c.eliminated).map((c) => ({ slot: c.slot, reason: (c.eliminated_reason ?? 'unknown').slice(0, 80) }))
-    console.log(`[ichirei-cards] ${JSON.stringify({ story_chars: [...story].length, language: context.language, occasion: context.occasion, status: after.status, live: { main: live(after, 'main'), second: live(after, 'second'), freestyle: live(after, 'freestyle') }, before_final: before.candidates.filter((c) => !c.eliminated).length, freestyle: context.occasion === 'memorial' ? 'not_offered' : undefined, ms, calls: { select: ms.select_attempts, review: ms.review > 0 ? 1 : 0, refill: refill ? 1 : 0, gaze: ms.gaze_failing > 0 ? 1 : 0 }, removed, refill: refill ? { asked: refill.asked, filled: refill.filled.map((f) => f.slot), rejected: refill.rejected, rescued: refill.rescued.map((f) => f.slot), ms: refill.ms } : null })}`)
+    console.log(`[ichirei-cards] ${JSON.stringify({ story_chars: [...story].length, language: context.language, occasion: context.occasion, status: after.status, live: { main: live(after, 'main'), second: live(after, 'second'), freestyle: live(after, 'freestyle') }, before_final: before.candidates.filter((c) => !c.eliminated).length, freestyle: context.occasion === 'memorial' ? 'not_offered' : undefined, ms, select: select ?? undefined, calls: { select: ms.select_attempts, review: ms.review > 0 ? 1 : 0, refill: refill ? 1 : 0, gaze: ms.gaze_failing > 0 ? 1 : 0 }, removed, refill: refill ? { asked: refill.asked, filled: refill.filled.map((f) => f.slot), rejected: refill.rejected, rescued: refill.rescued.map((f) => f.slot), ms: refill.ms } : null })}`)
   } catch {
     // (a log line must never break a request)
   }
@@ -400,6 +412,7 @@ async function selectWithRetry(a: PipelineArgs, signal: AbortSignal | undefined,
       },
       { signal: callSig },
     )
+    const thinking = watchThinkingTokens(stream)
     let firstDelta = true
     stream.on('text', (text) => {
       if (quiet) return
@@ -410,7 +423,10 @@ async function selectWithRetry(a: PipelineArgs, signal: AbortSignal | undefined,
       opts.onDelta?.(text)
     })
     try {
-      return await stream.finalMessage()
+      const done = await stream.finalMessage()
+      const tt = thinkingTokensOf(done, thinking())
+      if (tt !== null) (done.usage as { output_tokens_details?: unknown }).output_tokens_details = { thinking_tokens: tt }
+      return done
     } catch (err) {
       if (timedOut(callSig)) throw new ModelTimeoutError(Math.round(Math.min(limitMs, callTimeoutMs()) / 1000))
       throw err
@@ -642,7 +658,7 @@ async function runPipeline(a: PipelineArgs): Promise<PipelineOut> {
   const final = finalizeResult(withGazes)
   // Which cards leave the engine, and why a card is missing (reasons are the referee / review codes, no story text and no character): the log a missing card is traced from.
   const refillMs = tGaze - tReplace
-  logCards(story, context, completed, final, refill, { total: Date.now() - tStart, select: selectMs, select_attempts: attempts, referee: refereeMs, review: reviewMs, refill: refillMs, gaze: gazeMs, gaze_failing: gazeFailing })
+  logCards(story, context, completed, final, refill, { total: Date.now() - tStart, select: selectMs, select_attempts: attempts, referee: refereeMs, review: reviewMs, refill: refillMs, gaze: gazeMs, gaze_failing: gazeFailing }, selectCallInfo(message))
   timing({ review_ms: reviewMs, replace_ms: refillMs, status: final.status })
   // Lexicon mode: a sufficient answer that ended with no usable lexicon character (the model chose outside the list) is a miss like any other.
   if (view && final.status === 'insufficient') return { result: finishLexicon(final), miss: { reason: 'no_valid_choice', register: registerOf(extracted) } }

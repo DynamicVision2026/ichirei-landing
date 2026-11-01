@@ -39,6 +39,7 @@ let refillHang = false
 const lastBody: Record<string, any> = {}
 let vetoed = new Set<string>()
 let lineVeto: { text: string; kanji: string } | null = null
+let selectHook: ((prompt: string) => unknown) | null = null
 const upstream = http.createServer(async (req, res) => {
   let raw = ''
   for await (const c of req) raw += c
@@ -55,7 +56,7 @@ const upstream = http.createServer(async (req, res) => {
       return { slot: m[1], kanji: m[2], pass: !vetoed.has(m[2]) && !lineBad, rule: vetoed.has(m[2]) ? 'dignity' : lineBad ? 'truth' : null, reason: lineBad ? 'says more than the story: earlier than anyone' : 'ok' }
     })
     reply = { verdicts: items }
-  } else reply = kind === 'gaze' ? gazeReply : kind === 'replace' ? refillReply : modelReply
+  } else reply = kind === 'gaze' ? gazeReply : kind === 'replace' ? refillReply : kind === 'select' && selectHook ? selectHook(prompt) : modelReply
   const text = typeof reply === 'string' ? reply : JSON.stringify(reply)
   res.writeHead(200, { 'content-type': 'text/event-stream' })
   const sse = (event: string, data: unknown) => res.write(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`)
@@ -63,7 +64,7 @@ const upstream = http.createServer(async (req, res) => {
   sse('content_block_start', { type: 'content_block_start', index: 0, content_block: { type: 'text', text: '' } })
   sse('content_block_delta', { type: 'content_block_delta', index: 0, delta: { type: 'text_delta', text } })
   sse('content_block_stop', { type: 'content_block_stop', index: 0 })
-  sse('message_delta', { type: 'message_delta', delta: { stop_reason: 'end_turn', stop_sequence: null }, usage: { output_tokens: 1 } })
+  sse('message_delta', { type: 'message_delta', delta: { stop_reason: 'end_turn', stop_sequence: null }, usage: { output_tokens: 42, output_tokens_details: { thinking_tokens: 30 } } })
   sse('message_stop', { type: 'message_stop' })
   res.end()
 })
@@ -257,6 +258,23 @@ try {
   check('(14) a refilled free pick rejected for the CHARACTER itself (a safety rule, not truth) is dropped with no rewrite call', live(k4).length === 2 && gazeCalls === 0 && refillCalls === 1)
   lineVeto = null
   gazeReply = 'not json at all'
+  // ---- THE FREE PICK MUST NOT BE A NEGATIVE TRAIT, AND LOOKS FROM A DIFFERENT ANGLE; THE SELECTION CALL IS MEASURED (2026-11-01) ------------------------------------------------------------
+  const SAMU = '父は冬になると「寒い寒い」と言いながら、毎年同じ手袋をはめて、私の誕生日にはケーキの箱を抱えて帰ってくる。'
+  check('(15) the selection prompts (ja / zh / en) forbid a free pick that could read as a negative trait of the person, even as a joke (寒, 冷, 頑, 怠), and ask for a different angle from the two main cards — a habit, a place, an object, a playful detail — not another word for the same feeling (warmth, care)', ['ja', 'zh', 'en'].every((l) => { const t = readFileSync(join(process.cwd(), 'engine', `prompt.${l}.md`), 'utf8'); return t.includes('Never a negative trait') && /寒, 冷, 頑, 怠/.test(t) && t.includes('A different angle from the two main cards') && t.includes('a habit, a place, an object, a playful detail') && t.includes('not 温, 暖, 優, 愛') }))
+  check('(15) …and the refill prompts say the same (free-pick-only and the full one)', ['refill-free-prompt.md', 'replace-prompt.md'].every((f) => { const t = readFileSync(join(process.cwd(), 'engine', f), 'utf8'); return /寒, 冷, 頑, 怠/.test(t) && t.includes('a habit, a place, an object, a playful detail') }))
+  // The fake model obeys the rule only when the prompt carries it: with the rule it gives a positive free pick (箱, the cake box), without it the obvious joke 寒 that the review would remove as an insult.
+  selectHook = (prompt) => replyOf({ ...MAIN(), one_line_gaze: GOOD_GAZE_3 }, { ...SECOND(), one_line_gaze: GOOD_GAZE_3 }, prompt.includes('Never a negative trait')
+    ? { ...FREE('箱', 'はこ'), one_line_gaze: GOOD_GAZE_3, story_anchor: 'ケーキの箱' }
+    : { ...FREE('寒', 'さむ'), one_line_gaze: GOOD_GAZE_3, story_anchor: '寒い寒い' })
+  vetoed = new Set(['寒'])
+  refillReply = { none: true }
+  const n1 = await run(BIRTHDAY, SAMU)
+  const nj = JSON.parse(cardsLog().slice('[ichirei-cards] '.length))
+  check('(15) a story where 寒 is the obvious joke: the selection gives a different, positive free pick (箱), three cards, 寒 is never offered, NO refill call', live(n1).map((c) => `${c.slot}:${c.kanji}`).join() === 'main:誠,second:灯,freestyle:箱' && !n1.candidates.some((c) => c.kanji === '寒') && refillCalls === 0 && nj.refill === null && nj.removed.length === 0, cardsLog())
+  // the selection call is measured in the [ichirei-cards] line: output tokens, thinking tokens, stop reason (numbers and a code, same as [ichirei-refill])
+  check('(15) the [ichirei-cards] line carries the selection call: output_tokens 42, thinking_tokens 30, stop_reason end_turn — numbers and a code only, no story text', nj.select && nj.select.output_tokens === 42 && nj.select.thinking_tokens === 30 && nj.select.stop_reason === 'end_turn' && !cardsLog().includes('ケーキ') && Object.keys(nj.select).sort().join() === 'output_tokens,stop_reason,thinking_tokens', JSON.stringify(nj.select))
+  selectHook = null
+  vetoed = new Set()
 } finally {
   upstream.closeAllConnections?.()
   upstream.close()
