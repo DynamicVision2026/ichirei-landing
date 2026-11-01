@@ -320,6 +320,8 @@ export async function runCards(a: CardsArgs): Promise<CardsOut> {
     ? null
     : modelCall('freestyle', freeCardPrompt(story, context, [...(opts.exclude ?? [])]), models.free, 'low', 1500, freeCallMs(), false, freeSignal, (text) => ({ cands: parseRanked(text, 'freestyle'), raw: null }))
 
+  const ctxBase = deps.stamp({ status: 'sufficient', candidates: [] } as unknown as EngineResult)
+
   // ---- per-card checks ----------------------------------------------------------------------------------------------------------------------------------------------------------------
   const picked: Partial<Record<CardSlot, Candidate>> = {} // the candidate each card is currently putting forward (a lower card avoids these without waiting)
 
@@ -400,9 +402,8 @@ export async function runCards(a: CardsArgs): Promise<CardsOut> {
           return { slot, chosen: null, tried, done_ms: at() }
         }
       }
-      const base = mainRaw
-      // (the second and the free pick need the main call's answer only for the context they are stamped with — which is the request's own)
-      const stampBase = base ?? ({ language: context.language, relationship: context.relationship, direction: context.direction, occasion: context.occasion, occasion_detail: context.occasion_detail, inscription_script: context.inscription_script, status: 'sufficient' } as unknown as EngineResult)
+      // (every card is checked against the request's own context — language, occasion, reader — stamped here; the main call's answer only supplies the result's other fields)
+      const stampBase = ctxBase
       let n = 0
       for (const cand of out.cands) {
         if (early || sig.aborted) break
