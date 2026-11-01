@@ -823,6 +823,17 @@ const mockPage = async (browser, { onExplain, result, order, track } = {}) => {
   const gifts = await f.page.locator('#gifts article.gift').evaluateAll((els) => els.map((e) => e.getAttribute('data-size')))
   check('sizes (landing): the gift section lists the three sizes left to right: eギフト, 木札 (simple), 版木 (standard)', gifts.join() === 'egift,simple,standard', gifts.join())
   check('sizes (landing): 木札 is marked おすすめ, the e-gift is marked 「今すぐ贈れる」; the prices are ¥3,980 / ¥9,800 / ¥18,850', (await f.page.locator('#gifts article[data-size=simple] [data-badge=recommended]').textContent()) === 'おすすめ' && (await f.page.locator('#gifts article[data-size=egift] [data-badge=now]').textContent()) === '今すぐ贈れる' && (await f.page.locator('#gifts [data-price=egift]').textContent()) === '¥3,980' && (await f.page.locator('#gifts [data-price=simple]').textContent()) === '¥9,800' && (await f.page.locator('#gifts [data-price=standard]').textContent()) === '¥18,850' && (await f.page.locator('#gifts [data-price=card], #gifts [data-price=digital]').count()) === 0)
+  // ticket v9.5 Part 4: the three prices sit in the same place in every card — under the name, left-aligned with it — at every width (the 版木 price used to sit beside its title)
+  for (const w of [1280, 1000, 820, 390]) {
+    await f.page.setViewportSize({ width: w, height: 900 })
+    await f.page.locator('#gifts').scrollIntoViewIfNeeded()
+    const geo = await f.page.evaluate(() => [...document.querySelectorAll('#gifts article.gift')].map((a) => { const box = a.getBoundingClientRect(); const h = a.querySelector('h3').getBoundingClientRect(); const p = a.querySelector('.price').getBoundingClientRect(); return { size: a.getAttribute('data-size'), cardTop: box.top, hBottom: h.bottom, hLeft: h.left, pTop: p.top, pLeft: p.left, pBottom: p.bottom, relTop: p.top - box.top, relH: h.top - box.top } }))
+    const below = geo.every((g) => g.pTop >= g.hBottom - 1 && Math.abs(g.pLeft - g.hLeft) <= 1)
+    const sameRel = geo.every((g) => Math.abs(g.relTop - geo[0].relTop) <= 1 && Math.abs(g.relH - geo[0].relH) <= 1)
+    const sameRow = w >= 900 ? geo.every((g) => Math.abs(g.pTop - geo[0].pTop) <= 2) : true
+    check(`sizes (landing, ${w}px): all three prices sit directly under the name, left-aligned with it, at the same distance from the top of every card${w >= 900 ? ' — and on one line across the three columns' : ''}`, geo.length === 3 && below && sameRel && sameRow, JSON.stringify(geo))
+  }
+  await f.page.setViewportSize({ width: 1100, height: 950 })
   await f.page.locator('#write [data-testid=story-input]').fill('父は、駅の改札でいつも黙って手を振った。')
   await pickContext(f.page)
   await f.page.click(`#write >> text=${GO.ja}`)

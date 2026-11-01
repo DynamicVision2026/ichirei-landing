@@ -111,7 +111,8 @@
 .rv .gift{background:var(--card);border:1px solid var(--line);border-radius:18px;overflow:hidden;display:flex;flex-direction:column;min-width:0}
 .rv .gift img{display:block;width:100%;aspect-ratio:4/3;object-fit:cover;max-width:100%}
 .rv .gift .body{padding:1.5rem;display:flex;flex-direction:column;gap:.9rem;flex:1}
-.rv .gift .row{display:flex;justify-content:space-between;align-items:baseline;gap:1rem;flex-wrap:wrap}
+.rv .gift .row{display:flex;flex-direction:column;align-items:flex-start;gap:.3rem}
+.rv .gift .badgeSlot{display:block;min-height:1.7rem}
 .rv .gift h3{font-size:1.5rem}
 .rv .gift .price{font-family:var(--display);font-weight:700;font-size:1.6rem;font-variant-numeric:tabular-nums}
 .rv .gift .approx{font-size:.85rem;color:var(--mute);font-variant-numeric:tabular-nums}

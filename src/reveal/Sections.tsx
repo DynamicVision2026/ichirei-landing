@@ -331,10 +331,10 @@ export function Gifts({
             <article className="gift" key={c.id} data-size={c.id}>
               <Picture name={c.img} width={1600} height={1000} alt={GIFT_ALT[c.id]} sizes="(max-width: 860px) 100vw, 380px" />
               <div className="body">
+                {/* badge line (reserved even when there is no badge), then the name, then the price: the same stack in all three cards at every width */}
                 <div className="row">
-                  <h3>
-                    {c.title} {c.badge && <span className="badge" data-badge={c.id === 'egift' ? 'now' : 'recommended'}>{c.badge}</span>}
-                  </h3>
+                  <span className="badgeSlot">{c.badge && <span className="badge" data-badge={c.id === 'egift' ? 'now' : 'recommended'}>{c.badge}</span>}</span>
+                  <h3>{c.title}</h3>
                   <span className="price" data-price={c.id}>
                     {formatYen(PACKAGE_PRICE_JPY[c.id])}
                   </span>
