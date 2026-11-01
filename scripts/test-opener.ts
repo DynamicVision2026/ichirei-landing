@@ -98,15 +98,28 @@ const unknown = await post({ prompt_question: { id: 'made-up', text: 'x' } })
 const none = await post({})
 check('(2) an unknown id, a wrong type or no question at all is simply ignored: 200 and no QUESTION line in the prompt (the question is optional context)', unknown.status === 200 && !unknown.prompt.includes('QUESTION SHOWN TO THE SENDER (context only):') && none.status === 200 && !none.prompt.includes('QUESTION SHOWN TO THE SENDER (context only):') && (await post({ prompt_question: 'up-habit' })).status === 200)
 check('(2) the question does not count toward the 5,000-character limit (a 5,000-character story with a question is accepted)', (await post({ story: FIX.story + 'あ'.repeat(5000 - [...FIX.story].length), prompt_question: { id: 'up-habit' } })).status === 200)
+// ticket v9.5 Part 3: the question is only a HINT. A 1,500-character story that ignores it still gets its cards (the hint is context; the story is read as written).
+const long15 = FIX.story + '\n' + 'あの冬、父は何も言わずに私の自転車のチェーンに油をさしてくれた。'.repeat(42)
+const ignoring = await post({ story: long15, prompt_question: { id: 'up-habit' } })
+const ignoringRes = await (async () => {
+  console.log = (...x: unknown[]) => { if (!String(x[0]).startsWith('[ichirei-')) origLog(...x) }
+  try {
+    const r = await selectPost(new Request('http://x/api/select', { method: 'POST', body: JSON.stringify({ story: long15, language: 'ja', ...FIX.context, prompt_question: { id: 'up-habit' } }) }))
+    const lines = (await r.text()).trim().split('\n').map((l) => JSON.parse(l))
+    return lines.at(-1)?.result ?? lines.at(-1)
+  } finally { console.log = origLog }
+})()
+check('(3b) a ~1,500-character story that ignores the hint still gets its cards: 200, the whole story and the hint line both reach the prompt, three live cards come back', [...long15].length >= 1450 && [...long15].length <= 1600 && ignoring.status === 200 && ignoring.prompt.includes(long15) && ignoring.prompt.includes('QUESTION SHOWN TO THE SENDER (context only):') && ignoringRes?.status === 'sufficient' && ignoringRes.candidates.filter((c: any) => !c.eliminated).length === 3, JSON.stringify([[...long15].length, ignoringRes?.status, ignoringRes?.candidates?.length]))
 for (const lang of ['ja', 'en', 'zh-Hant'] as const) {
   const p = loadPrompt(lang)
+  check(`(3b) prompt.${lang}.md: the question is only a HINT — if the story does not answer it, ignore the hint and read the story as written`, p.includes('The question is only a HINT') && p.includes('ignore the hint and read the story as written'))
   check(`(2) prompt.${lang}.md: the question slot, and "the sender saw this question; the story may answer it or be about something else; choose the character only from what the story says"`, p.includes('{{ SENDER QUESTION }}') && p.includes('The sender saw this question. The story may answer it or may be about something else. Choose the character only from what the story says.') && !p.includes('The story answers this question') && p.includes('never quote it as a story_anchor'))
 }
 check('(2) parsePromptQuestion / questionText: known ids only, the server\'s wording', parsePromptQuestion({ id: 'memorial-habit' }, 'zh-Hans')?.text === qf.sets.memorial[0]['zh-Hant'] && parsePromptQuestion({ id: 'x' }, 'ja') === null && parsePromptQuestion(null, 'ja') === null && questionText('work-said', 'en') === qf.sets.work[2].en && findQuestion(5) === null)
 upstream.close()
 
 // ---- 3. the 10-character minimum ---------------------------------------------------------------------------------------------------------
-check('(3) the minimum is 10 characters (the submit button is enabled from the 10th); the soft hint is untouched and the maximum is 5,000; the note is in all three languages', STORY_MIN === 10 && LANGS.every((l) => OPENER[l].tooShort.length > 0 && /10/.test(OPENER[l].tooShort)) && read('src/demo/i18n.ts').includes('50〜300字くらいで十分です') && read('engine/contract.ts').includes('STORY_MAX = 5000'))
+check('(3) the minimum is 10 characters (the submit button is enabled from the 10th); the length line is the new one (2026-11-01) and the maximum is 5,000; the note is in all three languages', STORY_MIN === 10 && LANGS.every((l) => OPENER[l].tooShort.length > 0 && /10/.test(OPENER[l].tooShort)) && read('src/demo/i18n.ts').includes('ひとつの場面なら50字ほどから、物語なら5000字まで') && read('engine/contract.ts').includes('STORY_MAX = 5000'))
 
 // ---- 4. drafts ---------------------------------------------------------------------------------------------------------------------------------
 const mem = () => { const m = new Map<string, string>(); return { m, getItem: (k: string) => m.get(k) ?? null, setItem: (k: string, v: string) => void m.set(k, v), removeItem: (k: string) => void m.delete(k) } }

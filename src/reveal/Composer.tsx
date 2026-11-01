@@ -253,22 +253,25 @@ export default function Composer({ story, onStoryChange, onSubmit, copy, lang, c
         placeholder={copy.occasionDetailPlaceholder}
       />
 
-      {question ? (
+      {/* The box captures the scene or story the sender remembers most. The random question is only a HINT, small, under the headline. */}
+      <label className="qHeadline" htmlFor="moment" data-testid="story-headline">
+        {o.headline}
+      </label>
+      {question && (
         <>
-          <label className="qPrompt" htmlFor="moment" data-testid="story-question" data-question-id={question.id}>
-            {question.text}
-          </label>
-          <p className="qNote" data-testid="question-optional">
-            {o.optionalNote}
+          <p className="qHint" data-testid="story-hint-line">
+            <span className="qHintLabel">{o.hintLabel}</span>
+            <span data-testid="story-question" data-question-id={question.id}>
+              {question.text}
+            </span>
           </p>
           <button type="button" className="qSwitch" data-testid="question-switch" onClick={switchQuestion}>
             {o.switchQuestion}
           </button>
+          <p className="qNote" data-testid="question-optional">
+            {o.optionalNote}
+          </p>
         </>
-      ) : (
-        <label className="clab" htmlFor="moment">
-          {t.cMom}
-        </label>
       )}
       <textarea
         id="moment"
@@ -277,7 +280,7 @@ export default function Composer({ story, onStoryChange, onSubmit, copy, lang, c
         value={story}
         onChange={(e) => onStoryChange(e.target.value)}
         aria-invalid={over || undefined}
-        placeholder={question ? o.answerHint : copy.storyPlaceholder}
+        placeholder={o.answerHint}
       />
       <div className="cmeta">
         <span data-testid="story-hint">{copy.storyHint}</span>

@@ -556,7 +556,7 @@ const mockPage = async (browser, { onExplain, result, order, track } = {}) => {
   const counter = page.locator('#write [data-testid=story-counter]')
   const goBtn = page.locator('#write button[type=submit]')
   const paste = (loc, text) => loc.evaluate((el, t) => { const set = Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, 'value').set; set.call(el, t); el.dispatchEvent(new Event('input', { bubbles: true })) }, text)
-  check('story: the soft hint 50〜300 is under the box (ja), the live counter reads "0 / 5000字" from the start (the Reveal composer), and the box has NO maxlength (nothing is ever cut by the browser)', (await page.locator('#write [data-testid=story-hint]').innerText()) === '50〜300字くらいで十分です' && (await counter.innerText()) === '0 / 5000字' && (await box.getAttribute('maxlength')) === null)
+  check('story: the length line is under the box (ja: 「短くても長くても。ひとつの場面なら50字ほどから、物語なら5000字まで。」), the live counter reads "0 / 5000字" from the start (the Reveal composer), and the box has NO maxlength (nothing is ever cut by the browser)', (await page.locator('#write [data-testid=story-hint]').innerText()) === '短くても長くても。ひとつの場面なら50字ほどから、物語なら5000字まで。' && (await counter.innerText()) === '0 / 5000字' && (await box.getAttribute('maxlength')) === null)
   await box.fill('あ'.repeat(1499))
   check('story: the counter follows the length at 1499 characters', (await counter.innerText()) === '1499 / 5000字')
   await box.fill('あ'.repeat(4999))
@@ -646,7 +646,7 @@ const mockPage = async (browser, { onExplain, result, order, track } = {}) => {
   await p2.route('**/api/log', (route) => route.fulfill({ status: 204, body: '' }))
   await p2.route('**/api/select', (route) => route.fulfill({ status: 400, contentType: 'application/json', body: JSON.stringify({ error: '"story" is longer than 5000 characters (got 5100)', code: 'story_too_long', max: 5000 }) }))
   await p2.goto('http://localhost:5173/?lang=en', { waitUntil: 'networkidle' })
-  check('story (en): hint "50–300 characters is plenty", no maxlength on the box', (await p2.locator('#write [data-testid=story-hint]').innerText()) === '50–300 characters is plenty' && (await p2.locator('#write [data-testid=story-input]').getAttribute('maxlength')) === null)
+  check('story (en): the length line, no maxlength on the box', (await p2.locator('#write [data-testid=story-hint]').innerText()) === 'Short or long: a single scene from about 50 characters, a whole story up to 5,000.' && (await p2.locator('#write [data-testid=story-input]').getAttribute('maxlength')) === null)
   await p2.locator('#write [data-testid=story-input]').fill('My mum left the porch light on.')
   await pickContext(p2, { relationship: 'parent_mother' })
   await p2.click(`#write >> text=${GO.en}`)
@@ -663,16 +663,36 @@ const mockPage = async (browser, { onExplain, result, order, track } = {}) => {
   await page.goto('http://localhost:5173/', { waitUntil: 'networkidle' })
   const qEl = page.locator('#write [data-testid=story-question]')
   const box = page.locator('#write [data-testid=story-input]')
-  check('opener: before a relationship and an occasion are picked there is no question (the plain label stays)', (await qEl.count()) === 0)
+  check('opener: before a relationship and an occasion are picked there is no hint, but the headline is already there', (await qEl.count()) === 0 && (await page.locator('#write [data-testid=story-headline]').count()) === 1)
   check('opener: a browser without speech recognition hides the voice button and shows one line instead (「キーボードのマイクでも…」)', (await page.locator('#write button.voice').count()) === 0 && (await page.locator('#write [data-testid=voice-none]').innerText()).includes('キーボードのマイク'))
   await pickContext(page) // parent_father · up · birthday_milestone
   await qEl.waitFor()
   const first = await qEl.getAttribute('data-question-id')
-  check('opener: after the chips, ONE specific question stands above the box in large type (a question of the "up" set), and the box placeholder becomes an answer hint', first in QJA && (await qEl.innerText()) === QJA[first] && (await box.getAttribute('placeholder')) === 'ひとつの場面や、ひと言だけでも大丈夫です。' && (await qEl.evaluate((el) => parseFloat(getComputedStyle(el).fontSize))) >= 19)
-  check('opener: one quiet line under the question says answering it is optional (「この問いに答えなくても、思い浮かぶ場面を自由に書いて大丈夫です。」), after the question and before the box', (await page.locator('#write [data-testid=question-optional]').innerText()) === 'この問いに答えなくても、思い浮かぶ場面を自由に書いて大丈夫です。' && (await page.evaluate(() => { const q = document.querySelector('#write [data-testid=story-question]'); const n = document.querySelector('#write [data-testid=question-optional]'); return q?.nextElementSibling === n })))
+  const headline = page.locator('#write [data-testid=story-headline]')
+  const fs = (loc) => loc.evaluate((el) => parseFloat(getComputedStyle(el).fontSize))
+  check('story box (2026-11-01): a LARGE headline names what the box is for — 「その人との、いちばん心に残っている場面を。」 — and it labels the textarea', (await headline.innerText()) === 'その人との、いちばん心に残っている場面を。' && (await fs(headline)) >= 20 && (await headline.getAttribute('for')) === 'moment')
+  check('story box: the random question is a small HINT under the headline — 「ヒント：」 + a question of the "up" set — much smaller than the headline, and the box placeholder is 「ひとつの場面でも、ふたりの物語まるごとでも。」', first in QJA && (await qEl.innerText()) === QJA[first] && (await page.locator('#write .qHintLabel').innerText()) === 'ヒント：' && (await fs(qEl)) <= 16 && (await fs(qEl)) < (await fs(headline)) && (await box.getAttribute('placeholder')) === 'ひとつの場面でも、ふたりの物語まるごとでも。')
+  check('story box: the line 「ヒントに答えなくても大丈夫。…」 sits under the hint (and its 「別のヒントにする」 link), before the box', (await page.locator('#write [data-testid=question-optional]').innerText()) === 'ヒントに答えなくても大丈夫。思い浮かぶ場面や、ふたりの物語を、そのまま書いてください。' && (await page.evaluate(() => { const order = ['story-headline', 'story-hint-line', 'question-switch', 'question-optional', 'story-input'].map((id) => document.querySelector(`#write [data-testid=${id}]`)); return order.every((el, i) => el && (i === 0 || (order[i - 1].compareDocumentPosition(el) & Node.DOCUMENT_POSITION_FOLLOWING) !== 0)) })) && (await page.locator('#write [data-testid=question-switch]').innerText()) === '別のヒントにする')
   const seenIds = [first]
   for (let i = 0; i < 4; i++) { await page.click('#write [data-testid=question-switch]'); seenIds.push(await qEl.getAttribute('data-question-id')) }
-  check('opener: 「別の問いにする」 cycles the four angles of the same set and returns to the first', new Set(seenIds.slice(0, 4)).size === 4 && seenIds[4] === first && seenIds.every((id) => id in QJA))
+  check('opener: 「別のヒントにする」 cycles the four angles of the same set and returns to the first', new Set(seenIds.slice(0, 4)).size === 4 && seenIds[4] === first && seenIds.every((id) => id in QJA))
+  // ticket v9.5 Part 3: a 1,500-character story that ignores the hint still gets its cards, and the counter still reads 「/ 5000字」
+  {
+    const ign = await mockPage(browser)
+    await ign.page.goto('http://localhost:5173/', { waitUntil: 'networkidle' })
+    await pickContext(ign.page)
+    await ign.page.locator('#write [data-testid=story-question]').waitFor()
+    const hintId = await ign.page.locator('#write [data-testid=story-question]').getAttribute('data-question-id')
+    const STORY1500 = 'あの冬、父は何も言わずに私の自転車のチェーンに油をさしてくれた。'.repeat(60).slice(0, 1500)
+    await ign.page.locator('#write [data-testid=story-input]').fill(STORY1500)
+    check('story box: a 1,500-character story that does not answer the hint — the counter reads 「1500 / 5000字」 and the button is enabled', (await ign.page.locator('#write [data-testid=story-counter]').innerText()) === '1500 / 5000字' && !(await ign.page.locator('#write button[type=submit]').isDisabled()))
+    await ign.page.click(`#write >> text=${GO.ja}`)
+    await ign.page.waitForSelector('article[data-slot=freestyle]', { timeout: 15000 })
+    const slots = await ign.page.locator('article[data-slot]').evaluateAll((els) => els.map((e) => e.getAttribute('data-slot')))
+    check('story box: …it still gets its three cards; the whole story is sent, and the hint travels only as context (prompt_question id), never inside the story', slots.join() === 'main,second,freestyle' && ign.calls.select.length === 1 && [...ign.calls.select[0].story].length === 1500 && ign.calls.select[0].story === STORY1500 && ign.calls.select[0].prompt_question?.id === hintId, JSON.stringify([slots, ign.calls.select[0]?.prompt_question]))
+    check('no page errors (run 8c-2, hint)', ign.errors.length === 0, JSON.stringify(ign.errors))
+    await ign.page.close()
+  }
   // a memorial gift gets the remembering-voice set
   await page.click('[data-chip="occasion:memorial"]')
   await page.waitForFunction(() => document.querySelector('#write [data-testid=story-question]')?.getAttribute('data-question-id')?.startsWith('memorial-'))
@@ -725,6 +745,8 @@ const mockPage = async (browser, { onExplain, result, order, track } = {}) => {
     let found = false
     for (let i = 0; i < 4 && !found; i++) { found = (await e.page.locator('#write [data-testid=story-question]').innerText()) === q0; if (!found) await e.page.click('#write [data-testid=question-switch]') }
     check(`opener (${lang}): the "up" set is shown in the page language (the habit question found within four angles)`, found)
+    const HL = { en: ['The moment with them you remember most.', 'Hint:', 'Another hint', "You don't have to answer the hint. Write the scene or the story that comes to mind, just as it is.", 'One scene, or your whole story together.', 'Short or long: a single scene from about 50 characters, a whole story up to 5,000.'], 'zh-Hant': ['寫下你和那個人之間，最難忘的一個場景。', '提示：', '換一個提示', '不必回答提示。想到的場景、你們之間的故事，直接寫下來就好。', '一個場景，或你們完整的故事都可以。', '長短都可以。一個場景約50字起，完整故事最多5000字。'] }[lang]
+    check(`story box (${lang}): headline, 「${HL[1]}」 label, switch link, the "you don't have to answer" line, placeholder and length line, exactly as specified`, (await e.page.locator('#write [data-testid=story-headline]').innerText()) === HL[0] && (await e.page.locator('#write .qHintLabel').innerText()) === HL[1] && (await e.page.locator('#write [data-testid=question-switch]').innerText()) === HL[2] && (await e.page.locator('#write [data-testid=question-optional]').innerText()) === HL[3] && (await e.page.locator('#write [data-testid=story-input]').getAttribute('placeholder')) === HL[4] && (await e.page.locator('#write [data-testid=story-hint]').innerText()) === HL[5], `${await e.page.locator('#write [data-testid=story-headline]').innerText()} | ${await e.page.locator('#write .qHintLabel').innerText()}`)
     await e.page.close()
   }
 }
@@ -1583,7 +1605,7 @@ const SECTION_ORDER = ['.hero', '.strip', '.philo', '#shape', '#angles', '#write
   check('landing ja: honesty — no native-speaker claim, no AI, no payment methods, no review counts or ratings', !/ネイティブ|\bAI\b|人工知能|VISA|Visa|PayPal|クレジット|★|⭐/.test(t) && t.includes('本物のレビューが、ここに並びます'))
   check('landing ja: the trust strip has three items (no "checked by native speakers")', (await page.locator('.strip li').count()) === 3)
   check('landing ja: no test controls (no A/B/C, no log export, no golden fixture, no harness label)', !/condition|ログ書き出し|golden fixture|VALIDATION HARNESS|raw contract/.test(t))
-  check('landing ja: the composer is the real flow — chips for relationship, direction and occasion, the textarea, the "0 / 5000字" counter, the soft hint', (await page.locator('[data-chip^="relationship:"]').count()) === 13 && (await page.locator('[data-chip^="direction:"]').count()) === 3 && (await page.locator('[data-chip^="occasion:"]').count()) === 8 && (await page.locator('#moment').count()) === 1 && (await page.locator('[data-testid=story-counter]').innerText()) === '0 / 5000字' && (await page.locator('[data-testid=story-hint]').innerText()) === '50〜300字くらいで十分です')
+  check('landing ja: the composer is the real flow — chips for relationship, direction and occasion, the textarea, the "0 / 5000字" counter, the soft hint', (await page.locator('[data-chip^="relationship:"]').count()) === 13 && (await page.locator('[data-chip^="direction:"]').count()) === 3 && (await page.locator('[data-chip^="occasion:"]').count()) === 8 && (await page.locator('#moment').count()) === 1 && (await page.locator('[data-testid=story-counter]').innerText()) === '0 / 5000字' && (await page.locator('[data-testid=story-hint]').innerText()) === '短くても長くても。ひとつの場面なら50字ほどから、物語なら5000字まで。')
   check('landing ja: no language pills inside the flow (the nav switch is the one control) and no inscription-script toggle', (await page.locator('#write [data-language]').count()) === 0 && (await page.locator('[data-inscription-script]').count()) === 0)
   check('landing ja: the nav switch shows exactly EN, 日本語, 繁中', (await page.locator('.lang button').allInnerTexts()).join('|') === 'EN|日本語|繁中')
   await page.locator('#gifts').scrollIntoViewIfNeeded()
@@ -1666,9 +1688,9 @@ const SECTION_ORDER = ['.hero', '.strip', '.philo', '#shape', '#angles', '#write
   await page.reload({ waitUntil: 'networkidle' })
   check('landing: three language buttons (EN, 日本語, 繁中); with no stored choice an ja-JP browser gets 日本語', (await page.locator('.lang button').count()) === 3 && (await page.locator('.lang [data-lang=ja][aria-pressed=true]').count()) === 1)
   const LANGS = {
-    en: { title: 'ICHIREI 一字礼 — A Gift of One Character', h1: 'Between you and me, one character.', cta: 'Tell your story', go: GO.en, htmlLang: 'en', hint: '50–300 characters is plenty', desc: 'ICHIREI (一字礼) — the person you see' },
-    ja: { title: 'ICHIREI 一字礼 — 一字の贈りもの', h1: 'あなたとわたし、一字の距離。', cta: '物語を書く', go: GO.ja, htmlLang: 'ja', hint: '50〜300字くらいで十分です', desc: 'ICHIREI（一字礼）— あなたの目に映る、その人を、一文字に。' },
-    'zh-Hant': { title: 'ICHIREI 一字禮 — 一個字的禮物', h1: '你和我之間，只隔一個字。', cta: '寫下故事', go: GO['zh-Hant'], htmlLang: 'zh-Hant', hint: '50〜300字就足夠', desc: 'ICHIREI（一字禮）— 把你眼中的那個人' },
+    en: { title: 'ICHIREI 一字礼 — A Gift of One Character', h1: 'Between you and me, one character.', cta: 'Tell your story', go: GO.en, htmlLang: 'en', hint: 'Short or long: a single scene from about 50 characters, a whole story up to 5,000.', desc: 'ICHIREI (一字礼) — the person you see' },
+    ja: { title: 'ICHIREI 一字礼 — 一字の贈りもの', h1: 'あなたとわたし、一字の距離。', cta: '物語を書く', go: GO.ja, htmlLang: 'ja', hint: '短くても長くても。ひとつの場面なら50字ほどから、物語なら5000字まで。', desc: 'ICHIREI（一字礼）— あなたの目に映る、その人を、一文字に。' },
+    'zh-Hant': { title: 'ICHIREI 一字禮 — 一個字的禮物', h1: '你和我之間，只隔一個字。', cta: '寫下故事', go: GO['zh-Hant'], htmlLang: 'zh-Hant', hint: '長短都可以。一個場景約50字起，完整故事最多5000字。', desc: 'ICHIREI（一字禮）— 把你眼中的那個人' },
   }
   for (const [l, want] of Object.entries(LANGS)) {
     await page.click(`.lang [data-lang="${l}"]`)
