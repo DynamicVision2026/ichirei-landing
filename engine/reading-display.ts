@@ -1,12 +1,12 @@
 // The reading printed under a character (Japanese), from the model's reading and the palette's readings for that character.
 //
 // The palette lists the on-reading in katakana ("ボ", "サツ") and the kun-reading in hiragana with the okurigana boundary marked ("した-う", "さっ.する", "まも-る").
-// A card shows ONE reading under a single character. A kun reading with okurigana reads like a word and a model sometimes writes only its stem ("さっ"), so:
-//   * the dictionary markers are removed and nothing else is cut (さっ.する → さっする);
-//   * where the palette gives an on-reading and the model's reading is a verb or adjective okurigana form (or a stem of one), the on-reading is shown (察: さつ, 慕: ぼ, 守: しゅ);
-//   * a kun reading without okurigana (まこと, あかり) is kept: it is the natural reading;
-//   * with no on-reading to prefer, a truncated stem is completed from the palette (した → したう).
-// ICHIREI_READING_PREFER_ON=off keeps the (complete) kun reading instead of preferring the on-reading.
+//   * Only the dictionary markers are removed and nothing else is cut (さっ.する → さっする, した-う → したう, まも.る → まもる).
+//   * A complete reading the palette lists is shown as it is (the owner's golden example shows 守 as まもる).
+//   * A stem the model cut short (した) is completed from the palette (したう).
+//   * A reading the palette does not list that looks like a verb form or a cut-off geminate stem (察: さっ, さっする) is shown as the character's on-reading where the
+//     palette gives one (さつ). ICHIREI_READING_PREFER_ON=off shows the reading as the model wrote it (markers removed).
+// (Accepting a rule that prefers the on-reading everywhere would turn 守 into しゅ; the owner has approved まもる.)
 
 import type { Candidate, EngineResult } from './contract.ts'
 import type { Palette } from './palette.ts'
@@ -21,16 +21,15 @@ export function displayReadingJa(modelReading: string, paletteReadings: readonly
   const entries = paletteReadings
     .map((r) => r.trim())
     .filter(Boolean)
-    .map((raw) => ({ raw, on: /^[ァ-ヶー]+$/.test(raw), marker: /[-.‐－．]/.test(raw), kana: hira(cleanReading(raw)), stem: hira(raw.split(/[-.‐－．]/)[0]) }))
+    .map((raw) => ({ raw, on: /^[ァ-ヶー]+$/.test(raw), marker: /[-.\u2010\uFF0D\uFF0E]/.test(raw), kana: hira(cleanReading(raw)), stem: hira(raw.split(/[-.\u2010\uFF0D\uFF0E]/)[0]) }))
+  // a complete reading the palette lists: as it is
+  if (entries.some((e) => e.kana === cleaned)) return cleaned
+  // a stem the model cut short: the full reading
+  const whole = entries.find((e) => e.marker && e.stem === cleaned && e.kana !== cleaned)
+  if (whole) return whole.kana
+  // not a reading the palette lists, and it looks like a verb form or a cut-off geminate stem: the on-reading, where there is one
   const on = entries.find((e) => e.on)
-  const okuri = entries.find((e) => e.marker && (e.kana === cleaned || e.stem === cleaned))
-  const exact = entries.find((e) => e.kana === cleaned)
-  // a complete reading the palette lists, without okurigana (the on-reading, or a noun kun such as まこと): kept as it is
-  if (exact && !exact.marker) return cleaned
-  // (a noun kun that the dictionary marks too, such as あか.り, is a natural reading and stays; only a verb or adjective form, which reads like a word on a one-character card, gives way to the on-reading)
-  if (okuri) return on && preferOn() && /(?:[るうくぐすつぬぶむ]|しい)$/.test(okuri.kana) ? on.kana : okuri.kana
-  // not a reading the palette lists: a verb-like form or a geminate stem (さっ, さっする) of a character that has an on-reading is shown as its on-reading
-  if (!exact && on && preferOn() && (/っ$/.test(cleaned) || /[るうくぐすつぬぶむ]$/.test(cleaned))) return on.kana
+  if (on && preferOn() && (/っ$/.test(cleaned) || /[るうくぐすつぬぶむ]$/.test(cleaned))) return on.kana
   return cleaned
 }
 

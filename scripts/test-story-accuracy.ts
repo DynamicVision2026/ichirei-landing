@@ -34,7 +34,7 @@ const poemText = TANKA.lines.join('')
 check('…and names a concrete image from the turning point (the developed photographs / the rock the son photographed), which the story itself contains', /写真/.test(poemText) && /岩場|岩/.test(poemText) && FISH.includes('写真') && /岩/.test(FISH))
 
 // 3. the gaze line: one sentence about the person (the father), a noun phrase that completes 「その人は、」
-const goodGaze = '言葉にせず、息子が撮った場所を一人で歩いていた父。'
+const goodGaze = '言葉にせず、私が撮った場所を一人で歩いていた父。'
 const badGaze = '「そうか」という短い一言の中に、父の十年分の想いが詰まっていた。'
 check('the gaze line for the fisherman story completes 「その人は、」 as a sentence about the father (…いた父。)', gazeProblem(goodGaze, 'ja') === null && /父。?$/.test(goodGaze))
 check('the live-test line (subject: the feelings in a short word) is rejected', gazeProblem(badGaze, 'ja') !== null, String(gazeProblem(badGaze, 'ja')))

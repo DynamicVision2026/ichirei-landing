@@ -428,9 +428,9 @@ try {
   const rd = (k: string) => pal.lookup('ja', k)?.readings ?? []
   check('(T1) cleanReading keeps everything but the markers: した-う → したう, さっ.する → さっする, まも.る → まもる (nothing after the marker is cut)', cleanReading('した-う') === 'したう' && cleanReading('さっ.する') === 'さっする' && cleanReading('まも.る') === 'まもる' && cleanReading('さっ-する') === 'さっする')
   check('(T1) 察 (the palette gives サツ): the cut-off "さっ" and the full "さっ.する" / "さっする" all display as the on-reading さつ; an on-reading stays', displayReadingJa('さっ', rd('察')) === 'さつ' && displayReadingJa('さっ.する', rd('察')) === 'さつ' && displayReadingJa('さっする', rd('察')) === 'さつ' && displayReadingJa('さつ', rd('察')) === 'さつ', JSON.stringify([rd('察'), displayReadingJa('さっ', rd('察'))]))
-  check('(T1) 慕 (ボ | した-う) and 守 (シュ | まも-る): the okurigana form shows the on-reading (ぼ, しゅ); a noun kun without okurigana is kept (誠: まこと)', displayReadingJa('した-う', rd('慕')) === 'ぼ' && displayReadingJa('まも.る', rd('守')) === 'しゅ' && displayReadingJa('まこと', rd('誠')) === 'まこと', JSON.stringify([rd('慕'), rd('守'), rd('誠')]))
+  check('(T1) 慕 (ボ | した-う), 守 (シュ | まも-る), 誠: a complete reading the palette lists is kept with its text (したう, まもる — as the owner\'s golden example shows 守), a stem the model cut short is completed (した → したう), a noun kun is kept (まこと)', displayReadingJa('した-う', rd('慕')) === 'したう' && displayReadingJa('まも.る', rd('守')) === 'まもる' && displayReadingJa('した', rd('慕')) === 'したう' && displayReadingJa('まこと', rd('誠')) === 'まこと' && displayReadingJa('ボ', rd('慕')) === 'ぼ', JSON.stringify([rd('慕'), rd('守'), rd('誠')]))
   process.env.ICHIREI_READING_PREFER_ON = 'off'
-  check('(T1) ICHIREI_READING_PREFER_ON=off keeps the whole kun reading instead: したう, まもる', displayReadingJa('した-う', rd('慕')) === 'したう' && displayReadingJa('まも.る', rd('守')) === 'まもる' && displayReadingJa('さっ.する', rd('察')) === 'さっする')
+  check('(T1) ICHIREI_READING_PREFER_ON=off shows an unlisted reading as the model wrote it (markers removed): さっ.する → さっする', displayReadingJa('さっ.する', rd('察')) === 'さっする' && displayReadingJa('した-う', rd('慕')) === 'したう')
   delete process.env.ICHIREI_READING_PREFER_ON
   replies = { main: sel({ ...cand('main', '察', 'さっ', GOOD, '車の窓の霜をお湯で溶かして', 'Essence') }, M2()), second: sel(S1(), S2()), free: free(F1(), F2()) }
   delay = { main: 40, second: 30, free: 20, review: 10, refill: 10 }
