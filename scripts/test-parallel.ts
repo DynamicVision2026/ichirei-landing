@@ -9,6 +9,9 @@ import { validateEngineResult, type EngineResult } from '../engine/contract.ts'
 import { eligibleFor, lexiconEchoOf, loadLexicon } from '../engine/lexicon.ts'
 import { loadPalette } from '../engine/palette.ts'
 import { readCardReply, readJsonObject } from '../engine/cards.ts'
+import { cleanReading } from '../src/order/reading.ts'
+import { COPY } from '../src/demo/i18n.ts'
+import { buildCertificate } from '../engine/order.ts'
 import { isJoyo } from '../engine/joyo.ts'
 
 let failures = 0
@@ -44,6 +47,7 @@ const bodies: Record<string, any> = {}
 let t0 = 0
 let replyFor: ((kind: string, prompt: string) => unknown) | null = null
 let stopFor: Record<string, string> = {}
+let hedgeScript: ('ok' | 'hang')[] = [] // the free pick is asked twice: what each arriving call does
 
 const upstream = http.createServer(async (req, res) => {
   let raw = ''
@@ -55,7 +59,7 @@ const upstream = http.createServer(async (req, res) => {
   const kind = prompt.includes('Independent Review Prompt') ? 'review' : prompt.includes('Gaze Line Rewrite Prompt') ? 'gaze' : prompt.includes('Free Pick Card Prompt') ? 'free' : prompt.includes('Replacement Prompt (v9') ? 'refill' : prompt.includes('* CARD: second.') ? 'second' : prompt.includes('* CARD: main.') ? 'main' : 'other'
   ;(counts as any)[kind] = ((counts as any)[kind] ?? 0) + 1
   ;(starts[kind] ??= []).push(Date.now() - t0)
-  bodies[kind] = { cached, blocks: Array.isArray(content) ? content.length : 0, model: body.model, effort: body.output_config?.effort, max_tokens: body.max_tokens, prompt }
+  bodies[kind] = { thinking: body.thinking, cached, blocks: Array.isArray(content) ? content.length : 0, model: body.model, effort: body.output_config?.effort, max_tokens: body.max_tokens, prompt }
   let reply: unknown
   if (kind === 'review') {
     const items = [...prompt.matchAll(/"slot": "(main|second|freestyle)",\s*"kanji": "([^"]+)"/g)].map((m) => ({ slot: m[1], kanji: m[2], pass: !vetoed.has(m[2]), rule: vetoed.has(m[2]) ? 'dignity' : null, reason: vetoed.has(m[2]) ? 'could read as a negative trait' : 'ok' }))
@@ -64,7 +68,8 @@ const upstream = http.createServer(async (req, res) => {
   else if (kind === 'gaze') reply = { gazes: [] }
   else if (kind === 'main' || kind === 'second') reply = replyFor ? replyFor(kind, prompt) : (replies as any)[kind]
   else reply = (replies as any)[kind] ?? (replies as any).other ?? {}
-  const ms = (delay as any)[kind] ?? 10
+  let ms = (delay as any)[kind] ?? 10
+  if (kind === 'free' && hedgeScript.length > 0 && hedgeScript.shift() === 'hang') ms = 6000
   await new Promise((r) => setTimeout(r, ms))
   ;(ends[kind] ??= []).push(Date.now() - t0)
   const text = typeof reply === 'string' ? reply : JSON.stringify(reply)
@@ -111,7 +116,7 @@ try {
   delay = { main: 300, second: 200, free: 100, review: 40, refill: 10 }
   const r1 = await run()
   const startsAt = [starts.main[0], starts.second[0], starts.free[0]]
-  check('(1) three calls — main, second, free — start at the same moment (within 60 ms of each other), and none has answered before all have started', Math.max(...startsAt) - Math.min(...startsAt) < 60 && Math.max(...startsAt) < Math.min(ends.main[0], ends.second[0], ends.free[0]) && counts.main === 1 && counts.second === 1 && counts.free === 1, JSON.stringify({ starts: startsAt, ends: [ends.main[0], ends.second[0], ends.free[0]] }))
+  check('(1) three calls — main, second, free — start at the same moment (within 60 ms of each other), and none has answered before all have started', Math.max(...startsAt) - Math.min(...startsAt) < 60 && Math.max(...startsAt) < Math.min(ends.main[0], ends.second[0], ends.free[0]) && counts.main === 1 && counts.second === 1 && counts.free === 2, JSON.stringify({ starts: startsAt, ends: [ends.main[0], ends.second[0], ends.free[0]] }))
   check('(1) …a card is reviewed as soon as it is written: the free pick\'s review starts before the main call has even answered; the three reviews overlap', starts.review.length === 3 && Math.min(...starts.review) < ends.main[0] && starts.review.filter((t) => t >= ends.main[0] - 5).length <= 1, JSON.stringify({ review_starts: starts.review, main_end: ends.main[0] }))
   check('(1) …three cards in the order main, second, free; no refill; contract-valid', sum(r1) === 'main:誠,second:灯,freestyle:朝' && counts.refill === 0 && validateEngineResult(r1).length === 0, sum(r1) + validateEngineResult(r1).join('; '))
   check('(1) …every call asks for the TOP TWO, ranked: the prompts say so; the main and the second carry their own lens', /TOP TWO/.test(bodies.main.prompt) && /deepest truth, from the story's turning point/.test(bodies.main.prompt) && /a different side of the person, from another scene or habit than the turning point/.test(bodies.second.prompt) && /TOP TWO/.test(bodies.free.prompt) && /\* CARD: main\./.test(bodies.main.prompt) && /\* CARD: second\./.test(bodies.second.prompt))
@@ -130,20 +135,20 @@ try {
   const callOf = (slot: string) => L.parallel?.calls?.find((c: any) => c.slot === slot)
   check('(4) [ichirei-cards]: ms per call, output_tokens, thinking_tokens and stop_reason per call; every review with its ms; the time to the first card and to all cards', ['main', 'second', 'freestyle'].every((s) => { const c = callOf(s); return c && typeof c.ms === 'number' && c.stop_reason === 'end_turn' && typeof c.output_tokens === 'number' && c.model && c.effort && c.attempts === 1 }) && callOf('main').output_tokens === 900 && callOf('main').thinking_tokens === 600 && L.parallel.reviews.length === 3 && L.parallel.reviews.every((r: any) => typeof r.ms === 'number' && r.pass === true) && typeof L.parallel.first_card_ms === 'number' && typeof L.parallel.all_cards_ms === 'number' && L.parallel.first_card_ms <= L.parallel.all_cards_ms, JSON.stringify(L.parallel).slice(0, 700))
   check('(4) …no story text and no kanji in the parallel part of the log line besides what was already logged (codes, numbers, slots)', !JSON.stringify(L.parallel).includes('霜') && !JSON.stringify(L.parallel).includes('新聞'))
-  check('(4) …calls: select 3 (one per card), review 3, refill 0', L.calls.select === 3 && L.calls.review === 3 && L.calls.refill === 0, JSON.stringify(L.calls))
+  check('(4) …calls: select 4 (main, second and the free pick asked twice), review 3, refill 0', L.calls.select === 4 && L.calls.review === 3 && L.calls.refill === 0, JSON.stringify(L.calls))
 
   // ---- (5) a collision uses the runner-up, with no extra selection call ------------------------------------------------------------------------------------------------
   delay = { main: 60, second: 120, free: 90, review: 20, refill: 10 }
   replies = { main: sel(M1(), M2()), second: sel(cand('second', '誠', 'まこと', GOOD2, '黙って新聞を読んで', 'Private Symbol'), S1()), free: free(F1(), F2()) }
   const r5 = await run()
   const L5 = cardsLine()
-  check('(5) the second card puts forward the main\'s character (誠): it uses its own runner-up (灯) — three cards, still exactly one call per card (3 selection calls), no refill', sum(r5) === 'main:誠,second:灯,freestyle:朝' && counts.main + counts.second + counts.free === 3 && counts.refill === 0, sum(r5) + JSON.stringify(counts))
+  check('(5) the second card puts forward the main\'s character (誠): it uses its own runner-up (灯) — three cards, still exactly one call per card (3 selection calls), no refill', sum(r5) === 'main:誠,second:灯,freestyle:朝' && counts.main + counts.second === 2 && counts.free === 2 && counts.refill === 0, sum(r5) + JSON.stringify(counts))
   check('(5) …the collision is resolved without spending a review on the doubled character (3 reviews for 3 cards), and the log names it: collisions [{second, runner_up}], runner_up_used [second]', counts.review === 3 && L5.parallel.collisions.some((c: any) => c.slot === 'second' && c.resolved === 'runner_up') && L5.parallel.runner_up_used.join() === 'second', JSON.stringify({ counts, p: L5.parallel.collisions, u: L5.parallel.runner_up_used }))
   // the free pick doubles the second's character: it uses its runner-up (箱)
   replies = { main: sel(M1(), M2()), second: sel(S1(), S2()), free: free(cand('freestyle', '灯', 'あかり', GOOD, '毎朝', 'Play'), F2()) }
   delay = { main: 60, second: 60, free: 30, review: 20, refill: 10 }
   const r5b = await run()
-  check('(5) the free pick doubles the second\'s character (灯): the free pick uses its runner-up (箱), again no extra selection call', sum(r5b) === 'main:誠,second:灯,freestyle:箱' && counts.main + counts.second + counts.free === 3 && counts.refill === 0, sum(r5b) + JSON.stringify(counts))
+  check('(5) the free pick doubles the second\'s character (灯): the free pick uses its runner-up (箱), again no extra selection call', sum(r5b) === 'main:誠,second:灯,freestyle:箱' && counts.main + counts.second === 2 && counts.free === 2 && counts.refill === 0, sum(r5b) + JSON.stringify(counts))
   // both collide with nothing left: the lower card stays empty (main/second would be refilled; the free pick is simply not shown)
   replies = { main: sel(M1()), second: sel(cand('second', '誠', 'まこと', GOOD2, '黙って新聞を読んで', 'Private Symbol')), free: free(F1()) }
   const r5c = await run()
@@ -218,7 +223,7 @@ try {
   replies = { main: lexSel(lexCand('main', LA), lexCand('main', LC)), second: lexSel(lexCand('second', LB, GOOD2, '台所の湯気の向こう'), lexCand('second', LD, GOOD2, '黙って新聞を読んで')), free: free(F1(), F2()) }
   const l1 = await run(BIRTHDAY, STORY, { lexiconMode: 'on' })
   const LL = cardsLine()
-  check('(L1) lexicon on: three calls start together, three cards main:' + LA + ', second:' + LB + ', free 朝 (the free pick is not limited to the list), no refill', sum(l1) === `main:${LA},second:${LB},freestyle:朝` && counts.main === 1 && counts.second === 1 && counts.free === 1 && counts.refill === 0 && Math.max(starts.main[0], starts.second[0], starts.free[0]) - Math.min(starts.main[0], starts.second[0], starts.free[0]) < 60, sum(l1) + JSON.stringify(counts))
+  check('(L1) lexicon on: three calls start together, three cards main:' + LA + ', second:' + LB + ', free 朝 (the free pick is not limited to the list), no refill', sum(l1) === `main:${LA},second:${LB},freestyle:朝` && counts.main === 1 && counts.second === 1 && counts.free === 2 && counts.refill === 0 && Math.max(starts.main[0], starts.second[0], starts.free[0]) - Math.min(starts.main[0], starts.second[0], starts.free[0]) < 60, sum(l1) + JSON.stringify(counts))
   check('(L1) …[ichirei-cards] says cards_mode "parallel" (and "single" is what the rollback logs, see below)', LL.cards_mode === 'parallel' && !!LL.parallel, String(LL.cards_mode))
   check('(L2) the main and the second call carry the lexicon: the static table FIRST as its own cached block, then the language prompt + the one-card block + the gift\'s list and rules; the card block says the lexicon rules apply to the card', bodies.main.cached === true && bodies.main.blocks === 2 && bodies.second.cached === true && bodies.main.prompt.indexOf('THE LEXICON (every entry') < bodies.main.prompt.indexOf('* CARD: main.') && bodies.main.prompt.indexOf('* CARD: main.') < bodies.main.prompt.indexOf('CLASSICAL LEXICON — THIS GIFT') && /LEXICON MODE: the lexicon rules after this block apply to your card/.test(bodies.main.prompt) && /RULES FOR THIS MODE/.test(bodies.second.prompt) && bodies.main.prompt.includes(LA), bodies.main.prompt.slice(-600))
   check('(L2) …the free-pick call is the compact prompt only (no lexicon table, no list: the free pick is not limited to it, lexicon rule 4); it still gets the "no negative trait" rule', !bodies.free.cached && bodies.free.blocks === 0 && !bodies.free.prompt.includes('THE LEXICON') && !bodies.free.prompt.includes('CLASSICAL LEXICON — THIS GIFT') && /NEVER A NEGATIVE TRAIT/.test(bodies.free.prompt))
@@ -270,7 +275,7 @@ try {
   const s1 = await run()
   const S = cardsLine()
   const cc = cardCallLine('second')
-  check('(S1) the second call returns unparseable text: the second card is the MAIN call\'s runner-up (守), after its own review — NO refill call, 3 selection calls', sum(s1) === 'main:誠,second:守,freestyle:朝' && counts.refill === 0 && counts.main + counts.second + counts.free === 3 && counts.review === 3 && validateEngineResult(s1).length === 0, sum(s1) + JSON.stringify(counts) + validateEngineResult(s1).join(';'))
+  check('(S1) the second call returns unparseable text: the second card is the MAIN call\'s runner-up (守), after its own review — NO refill call, 3 selection calls', sum(s1) === 'main:誠,second:守,freestyle:朝' && counts.refill === 0 && counts.main + counts.second === 2 && counts.free === 2 && counts.review === 3 && validateEngineResult(s1).length === 0, sum(s1) + JSON.stringify(counts) + validateEngineResult(s1).join(';'))
   check('(S1) …the total time is about the main call plus ONE review (600 + 200 ms, not a refill on top): between 780 and 1000 ms', S.ms.total >= 780 && S.ms.total <= 1000, JSON.stringify(S.ms))
   check('(S1) …the log says second_source "main_runner_up", and the second call\'s line carries its parse result (no_json), its keys, its reply length, tokens and stop reason — no story text', S.second_source === 'main_runner_up' && S.parallel.second_source === 'main_runner_up' && cc && cc.parse === 'no_json' && Array.isArray(cc.keys) && cc.keys.length === 0 && cc.reply_chars > 10 && cc.stop_reason === 'end_turn' && typeof cc.output_tokens === 'number' && !JSON.stringify(cc).includes('霜') && S.parallel.calls.find((c: any) => c.slot === 'second').parse === 'no_json', JSON.stringify(cc))
   check('(S1) …the cards appear in order main, main+second, all three; the second is shown right after its review (together with the main\'s)', cardEvents.map((e) => e.slots).join('|') === 'main|main,second|main,second,freestyle', JSON.stringify(cardEvents))
@@ -339,6 +344,60 @@ try {
   // the reader itself
   check('(R1) readJsonObject: fence + prose + comment + trailing comma are read; two objects: the one that looks like an answer; nothing: no_json; a cut-off object: bad_json; empty: empty', readJsonObject('x ```json\n{"a":1,}\n``` y').obj?.a === 1 && readJsonObject('{"zzz":1} then {"candidates":[]}').obj !== null && readJsonObject('plain words').parse === 'no_json' && readJsonObject('{"a": [1, ').parse === 'bad_json' && readJsonObject('  ').parse === 'empty')
   check('(R1) readCardReply: two candidates at most, different characters; a candidate needs its character and its line', readCardReply(JSON.stringify(sel(S1(), S1(), S2())), 'second').cands.length === 2 && readCardReply(JSON.stringify(sel({ slot: 'second', kanji: 'x' })), 'second').parse === 'offered_unusable')
+  // ---- THE FREE PICK IS ASKED TWICE AT ONCE (a hedge), WITHOUT EXTENDED THINKING ------------------------------------------------------------------------------------------------
+  vetoed = new Set()
+  refillReply = { none: true }
+  stopFor = {}
+  delay = { main: 150, second: 150, free: 40, review: 30, refill: 20 }
+  replies = { main: sel(M1(), M2()), second: sel(S1(), S2()), free: free(F1(), F2()) }
+  hedgeScript = []
+  const h1 = await run()
+  const freeLines = logs.filter((x) => x.startsWith('[ichirei-card-call]')).map((x) => JSON.parse(x.slice('[ichirei-card-call] '.length))).filter((o) => o.slot === 'freestyle')
+  const HC = cardsLine().parallel.calls.filter((c: any) => c.slot === 'freestyle')
+  check('(H1) the free pick is asked twice at the same moment: two identical calls start together (within 40 ms, with the main and second); three cards', counts.free === 2 && Math.abs(starts.free[0] - starts.free[1]) < 40 && Math.max(starts.main[0], starts.second[0], starts.free[0], starts.free[1]) - Math.min(starts.main[0], starts.second[0], starts.free[0], starts.free[1]) < 60 && sum(h1) === 'main:誠,second:灯,freestyle:朝', JSON.stringify({ starts: starts.free, counts }))
+  check('(H2) no extended thinking on the free-pick call (thinking: disabled), low effort, 1,500 output tokens, the small model — and the main and second calls are unchanged (no thinking override)', bodies.free.thinking?.type === 'disabled' && bodies.free.effort === 'low' && bodies.free.max_tokens === 1500 && bodies.free.model === 'claude-haiku-5-5' && bodies.main.thinking === undefined && bodies.second.thinking === undefined)
+  check('(H3) [ichirei-card-call] notes hedge 1 and 2 on the free-pick lines, and a line says which one won; [ichirei-cards] has both calls with hedge and won', freeLines.some((o) => o.hedge === 1) && freeLines.some((o) => o.hedge === 2) && freeLines.some((o) => o.hedged === 2 && (o.hedge_winner === 1 || o.hedge_winner === 2)) && HC.length === 2 && HC.filter((c: any) => c.won === true).length === 1 && HC.filter((c: any) => c.won === false).length === 1 && HC.every((c: any) => c.hedge === 1 || c.hedge === 2), JSON.stringify(freeLines))
+
+  // one of the two calls hangs (a one-off slow call): the other answers, three cards, the slow one is cancelled
+  process.env.ICHIREI_FREE_CALL_TIMEOUT_MS = '400'
+  hedgeScript = ['hang', 'ok']
+  const h4 = await run()
+  const t4 = cardsLine().ms.total
+  const HC4 = cardsLine().parallel.calls.filter((c: any) => c.slot === 'freestyle')
+  check('(H4) the first free-pick call hangs and the second answers: three cards, no refill, the winner is hedge 2 and the hung call is cancelled — no waiting for the 400 ms ceiling', sum(h4) === 'main:誠,second:灯,freestyle:朝' && counts.refill === 0 && HC4.find((c: any) => c.hedge === 2)?.won === true && HC4.find((c: any) => c.hedge === 1)?.won === false && HC4.find((c: any) => c.hedge === 1)?.error === 'cancelled' && t4 < 380, JSON.stringify({ t4, HC4: HC4.map((c: any) => [c.hedge, c.won, c.error, c.parse]) }))
+  // the other way round: the second call hangs, the first answers
+  hedgeScript = ['ok', 'hang']
+  const h4b = await run()
+  check('(H4) …the second call hangs and the first answers: three cards (winner hedge 1)', sum(h4b) === 'main:誠,second:灯,freestyle:朝' && cardsLine().parallel.calls.find((c: any) => c.slot === 'freestyle' && c.hedge === 1)?.won === true)
+
+  // both calls hang: two cards, and nothing waits beyond the existing limit (the call ceiling, here 400 ms)
+  process.env.ICHIREI_FREE_CALL_TIMEOUT_MS = '250'
+  delay = { main: 60, second: 60, free: 40, review: 20, refill: 20 }
+  hedgeScript = ['hang', 'hang']
+  const h5 = await run()
+  const t5 = cardsLine().ms.total
+  const HC5 = cardsLine().parallel.calls.filter((c: any) => c.slot === 'freestyle')
+  check('(H5) both free-pick calls time out: two cards, no refill, and the request ends at the call ceiling (250 ms) — not later; both calls are logged as timeouts', sum(h5) === 'main:誠,second:灯' && counts.refill === 0 && t5 >= 240 && t5 < 400 && HC5.length === 2 && HC5.every((c: any) => c.parse === 'failed' && c.error === 'timeout' && c.won === false), JSON.stringify({ t5, HC5: HC5.map((c: any) => [c.hedge, c.won, c.error]) }))
+  delete process.env.ICHIREI_FREE_CALL_TIMEOUT_MS
+  hedgeScript = []
+  // the first reply that is READABLE wins: one call answers rubbish quickly, the other a card a little later
+  delay = { main: 200, second: 200, free: 60, review: 20, refill: 20 }
+  replies = { main: sel(M1(), M2()), second: sel(S1(), S2()), free: 'not json at all' as any }
+  const h6 = await run()
+  check('(H6) both free-pick calls answer unreadable text: two cards, no refill, each call logged with its parse code', sum(h6) === 'main:誠,second:灯' && counts.refill === 0 && cardsLine().parallel.calls.filter((c: any) => c.slot === 'freestyle').every((c: any) => c.parse === 'no_json' && c.won === false))
+  replies = { main: sel(M1(), M2()), second: sel(S1(), S2()), free: free(F1(), F2()) }
+
+  // ---- THE READING, WITHOUT THE DICTIONARY MARKERS (慕: した-う → したう) ---------------------------------------------------------------------------------------------------------
+  check('(D1) cleanReading removes the okurigana markers "-" and "." (and their fullwidth look-alikes) and nothing else', cleanReading('した-う') === 'したう' && cleanReading('した.う') === 'したう' && cleanReading('した－う') === 'したう' && cleanReading('した・う') === 'した・う' && cleanReading('shi-ta.u') === 'shitau' && cleanReading('') === '')
+  replies = { main: sel({ ...M1(), reading: 'ま-こと' }, M2()), second: sel({ ...S1(), reading: 'あか.り' }, S2()), free: free({ ...F1(), reading: 'あ-さ' }, F2()) }
+  const d2 = await run()
+  check('(D2) the engine writes the readings plain: ま-こと → まこと, あか.り → あかり, あ-さ → あさ on the result (cards, early cards and the final result)', liveOf(d2).map((c) => c.reading).sort().join() === ['あかり', 'あさ', 'まこと'].sort().join() && !JSON.stringify(d2).includes('ま-こと'), liveOf(d2).map((c) => c.reading).join())
+  replies = { main: sel(M1(), M2()), second: sel(S1(), S2()), free: free(F1(), F2()) }
+  const sh = (COPY.ja as any).glyphReading({ kanji: '慕', inscription_form: null, reading: 'した-う', meaning: null, reading_zh: null }, '慕')
+  const shEn = (COPY.en as any).glyphReading({ kanji: '慕', inscription_form: null, reading: 'shita-u', meaning: null, reading_zh: null }, '慕')
+  check('(D3) the cards show 慕 as したう (ja) and shitau (en): the display strips the markers even from a reading that was stored with them', sh === 'したう' && shEn.includes('shitau') && !shEn.includes('shita-u'), `${sh} | ${shEn}`)
+  const cert = buildCertificate({ ...cand('main', '慕', 'した-う', GOOD, '車の窓の霜'), meaning: null } as any, '慕', 'ja', palette)
+  check('(D4) the certificate (and so the gift page, the card and scroll PDFs, the film, which read it) carries the reading and the romanization plain', !/[-.]/.test(cert.reading) && !/[-.]/.test(cert.romanization), JSON.stringify([cert.reading, cert.romanization]))
 } finally {
   upstream.closeAllConnections?.()
   upstream.close()

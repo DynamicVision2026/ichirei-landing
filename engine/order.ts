@@ -4,6 +4,7 @@
 //
 // Plumbing only — nothing here selects or judges a character.
 
+import { cleanReading } from '../src/order/reading.ts'
 import { findQuestion } from './story-questions.ts'
 import { randomBytes } from 'node:crypto'
 import { LANGUAGES, STORY_MAX as ENGINE_STORY_MAX, countChars, parseFollowUps, type Candidate, type EngineResult, type Language } from './contract.ts'
@@ -52,8 +53,8 @@ export function buildCertificate(candidate: Candidate, glyph: string, language: 
   const find = (family: 'ja' | 'zh') => palette.lookup(family, candidate.kanji) ?? (candidate.inscription_form ? palette.lookup(family, candidate.inscription_form) : undefined)
   const zhBuyer = language === 'zh-Hans' || language === 'zh-Hant'
   const row = zhBuyer ? find('zh') : find('ja')
-  let reading = candidate.reading
-  let romanization = candidate.reading
+  let reading = cleanReading(candidate.reading)
+  let romanization = cleanReading(candidate.reading)
   if (zhBuyer) {
     if (row && row.readings.length > 0) reading = romanization = row.readings.slice(0, 3).join(' / ')
   } else if (row && row.readings.length > 0) {
@@ -66,8 +67,8 @@ export function buildCertificate(candidate: Candidate, glyph: string, language: 
   const meaning = row ? plainMeaning(row.raw.core_meanings, zhBuyer ? 'zh' : 'ja') : ''
   return {
     character: glyph,
-    reading,
-    romanization,
+    reading: cleanReading(reading),
+    romanization: cleanReading(romanization),
     meaning_en: meaning || candidate.meaning?.trim() || null,
     line: certificateText(language),
     line_en: CERTIFICATE_LINE_EN,

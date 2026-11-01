@@ -8,6 +8,7 @@
 // Plain TS with no imports, so the Node tests can load it. The code lists below mirror
 // engine/contract.ts (src/ and engine/ compile separately); scripts/test-copy.ts keeps them in sync.
 
+import { cleanReading } from '../order/reading.ts'
 import { SIZE_COPY } from './sizes-copy.ts'
 
 export type UiLanguage = 'ja' | 'zh-Hans' | 'zh-Hant' | 'en'
@@ -339,7 +340,7 @@ const ja: Copy = {
   finalized: (k) => `「${k}」に決めました`,
   chooseHint: '字を開いて「この一字を選ぶ」を押すと決定できます',
   chooseHintCustomer: 'ひとつ選ぶと、先へ進めます。',
-  glyphReading: (c) => c.reading,
+  glyphReading: (c) => cleanReading(c.reading),
   inscriptionNote: () => null, // Japanese buyers: the carved form is the modern one (新字体) — nothing to explain
   previewNote: () => null,
   slotLabels: { main: '本命', second: '次点', freestyle: '遊び字' },
@@ -485,7 +486,7 @@ const zhHans: Copy = {
   finalized: (k) => `「${k}」已选定`,
   chooseHint: '打开一个字并点“选择这个字”即可决定',
   chooseHintCustomer: '请先选择其中一个字，再继续。',
-  glyphReading: (c, carved) => `${c.inscription_form ? `${carved === c.kanji ? c.inscription_form : c.kanji} ・ ` : ''}${c.reading}`,
+  glyphReading: (c, carved) => `${c.inscription_form ? `${carved === c.kanji ? c.inscription_form : c.kanji} ・ ` : ''}${cleanReading(c.reading)}`,
   inscriptionNote: (c, script) =>
     c.inscription_form
       ? script === 'simplified'
@@ -636,7 +637,7 @@ const zhHant: Copy = {
   finalized: (k) => `「${k}」已選定`,
   chooseHint: '打開一個字並點「選擇這個字」即可決定',
   chooseHintCustomer: '請先選擇其中一個字，再繼續。',
-  glyphReading: (c, carved) => `${c.inscription_form ? `${carved === c.kanji ? c.inscription_form : c.kanji} ・ ` : ''}${c.reading}`,
+  glyphReading: (c, carved) => `${c.inscription_form ? `${carved === c.kanji ? c.inscription_form : c.kanji} ・ ` : ''}${cleanReading(c.reading)}`,
   inscriptionNote: (c, script) =>
     c.inscription_form
       ? script === 'simplified'
@@ -793,7 +794,7 @@ const en: Copy = {
   chooseHint: 'Open a character and press “Choose this character” to decide',
   chooseHintCustomer: 'Choose one of the characters to continue.',
   glyphReading: (c, carved) =>
-    `${c.inscription_form && carved !== c.kanji ? `${c.kanji} · ` : ''}${c.reading}${c.reading_zh ? ` · pinyin ${c.reading_zh}` : ''}${c.meaning ? ` — ${c.meaning}` : ''}`,
+    `${c.inscription_form && carved !== c.kanji ? `${c.kanji} · ` : ''}${cleanReading(c.reading)}${c.reading_zh ? ` · pinyin ${c.reading_zh}` : ''}${c.meaning ? ` — ${c.meaning}` : ''}`,
   inscriptionNote: () => null, // the character is carved in its modern Japanese form
   previewNote: () => null,
   slotLabels: { main: 'Main', second: 'Second', freestyle: 'Freestyle' },

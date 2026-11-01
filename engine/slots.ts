@@ -5,6 +5,7 @@
 
 import type { Candidate, EngineResult, RefereeAction } from './contract.ts'
 import { questionFor, toInsufficient } from './palette.ts'
+import { cleanReading } from '../src/order/reading.ts'
 
 export const SLOT_OVERFLOW_REASON = 'slots: more candidates than the slot allows'
 export const SAME_CHARACTER_REASON = 'slots: same character as another card'
@@ -81,7 +82,9 @@ export function finalizeResult(result: EngineResult, log?: (line: string) => voi
   if (result.status === 'insufficient') {
     return typeof result.follow_up_question === 'string' && result.follow_up_question.trim() ? result : { ...result, follow_up_question: questionFor(result) }
   }
-  const slotted = enforceSlots(enforceDistinct(result), log)
+  // a reading is shown plain: no dictionary okurigana markers (しだい-う → したう), whichever path wrote the card
+  const plain: EngineResult = { ...result, candidates: result.candidates.map((c) => (typeof c.reading === 'string' && c.reading !== cleanReading(c.reading) ? { ...c, reading: cleanReading(c.reading) } : c)) }
+  const slotted = enforceSlots(enforceDistinct(plain), log)
   const primary = slotted.candidates.find((c) => !c.eliminated && isMain(c) && c.kanji === slotted.primary_kanji)
   if (primary) return slotted
   return toInsufficient(slotted)

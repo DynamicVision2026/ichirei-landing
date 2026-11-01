@@ -9,6 +9,7 @@
 // receiver types their address here: it is kept on our side only (this record), goes onto the owner's daily list, and is never shown to the sender or
 // to anyone else; it is deleted 90 days after the order ships.
 
+import { cleanReading } from '../src/order/reading.ts'
 import { randomBytes } from 'node:crypto'
 import { animationView, publicUrl, type AnimationRecord, type AnimationView } from './animation.ts'
 import { certificateText } from '../src/order/certificate.ts'
@@ -98,8 +99,8 @@ export function buildGiftRecord(record: OrderRecord, animationId: string, token:
     created_at: now.toISOString(),
     language: p.language,
     glyph: p.glyph_to_carve,
-    reading: p.certificate.reading,
-    romanization: p.certificate.romanization,
+    reading: cleanReading(p.certificate.reading),
+    romanization: cleanReading(p.certificate.romanization),
     meaning_en: p.certificate.meaning_en,
     who: p.gaze_line,
     memorial: p.certificate.memorial === true,

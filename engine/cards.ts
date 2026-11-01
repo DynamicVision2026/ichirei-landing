@@ -23,6 +23,7 @@ import { SAME_CHARACTER_REASON, finalizeResult } from './slots.ts'
 import { failingGazes, fixGazes } from './gaze.ts'
 import { ModelTimeoutError, callSignal, callTimeoutMs, runBudgetMs, timedOut } from './limits.ts'
 import { thinkingTokensOf, watchThinkingTokens } from './usage.ts'
+import { cleanReading } from '../src/order/reading.ts'
 
 export type CardSlot = 'main' | 'second' | 'freestyle'
 
@@ -110,6 +111,9 @@ export interface CardCallInfo {
    */
   parse: 'ok' | 'none' | 'no_candidates' | 'offered_unusable' | 'empty' | 'no_json' | 'bad_json' | 'refusal' | 'failed'
   offered: number
+  /** the free pick is asked twice at the same moment (a hedge against one slow call): which of the two calls this is, and whether its answer was the one used */
+  hedge?: 1 | 2
+  won?: boolean
   /** the top-level keys of the answer and its length in characters — never any text */
   keys: string[]
   reply_chars: number
@@ -314,7 +318,7 @@ export function readCardReply(text: string, slot: CardSlot): ReplyRead {
       ...(o as object),
       slot,
       kanji,
-      reading: s(o.reading) ?? '',
+      reading: cleanReading(s(o.reading) ?? ''),
       inscription_form: s(o.inscription_form),
       truth_type: (s(o.truth_type) ?? (slot === 'freestyle' ? 'Play' : 'Essence')) as Candidate['truth_type'],
       one_line_gaze: String(o.one_line_gaze).trim(),
@@ -369,15 +373,15 @@ export async function runCards(a: CardsArgs): Promise<CardsOut> {
   // ---- the calls: all started now ---------------------------------------------------------------------------------------------------------------------------------------------
   const room = () => runBudgetMs() - at() - RESERVE_MS
 
-  const modelCall = async (slot: CardSlot, content: string | Anthropic.TextBlockParam[], model: string, effort: string, maxTokens: number, ceilingMs: number, retryable: boolean, sig: AbortSignal): Promise<CallOut> => {
-    const info: CardCallInfo = { slot, model, effort, ms: 0, attempts: 0, output_tokens: null, thinking_tokens: null, stop_reason: null, parse: 'failed', offered: 0, keys: [], reply_chars: 0 }
+  const modelCall = async (slot: CardSlot, content: string | Anthropic.TextBlockParam[], model: string, effort: string, maxTokens: number, ceilingMs: number, retryable: boolean, sig: AbortSignal, extra: { noThinking?: boolean; hedge?: 1 | 2 } = {}): Promise<CallOut> => {
+    const info: CardCallInfo = { slot, model, effort, ms: 0, attempts: 0, output_tokens: null, thinking_tokens: null, stop_reason: null, parse: 'failed', offered: 0, keys: [], reply_chars: 0, ...(extra.hedge ? { hedge: extra.hedge } : {}) }
     report.calls.push(info)
     const t0 = Date.now()
     let limit = ceilingMs
     let tokens = maxTokens
     // One line per call, codes only: what the answer was (parse, keys, length), what was offered (character and the fields it lacks), and how the call ended. Never any story text.
-    const logCall = (extra: Record<string, unknown> = {}, offered: ReplyRead['offered'] = []) =>
-      log(`[ichirei-card-call] ${JSON.stringify({ slot, model, effort, ms: info.ms, attempts: info.attempts, stop_reason: info.stop_reason, output_tokens: info.output_tokens, thinking_tokens: info.thinking_tokens, parse: info.parse, keys: info.keys, reply_chars: info.reply_chars, offered, ...extra })}`)
+    const logCall = (more: Record<string, unknown> = {}, offered: ReplyRead['offered'] = []) =>
+      log(`[ichirei-card-call] ${JSON.stringify({ slot, ...(extra.hedge ? { hedge: extra.hedge } : {}), model, effort, ms: info.ms, attempts: info.attempts, stop_reason: info.stop_reason, output_tokens: info.output_tokens, thinking_tokens: info.thinking_tokens, parse: info.parse, keys: info.keys, reply_chars: info.reply_chars, offered, ...more })}`)
     try {
       for (;;) {
         info.attempts++
@@ -385,7 +389,7 @@ export async function runCards(a: CardsArgs): Promise<CardsOut> {
         let message: Anthropic.Message
         let seen: () => number | null
         try {
-          const stream = client.messages.stream({ model, max_tokens: tokens, output_config: { effort: effort as 'low' }, messages: [{ role: 'user', content }] }, { signal: callSig })
+          const stream = client.messages.stream({ model, max_tokens: tokens, output_config: { effort: effort as 'low' }, messages: [{ role: 'user', content }], ...(extra.noThinking ? { thinking: { type: 'disabled' as const } } : {}) }, { signal: callSig })
           seen = watchThinkingTokens(stream)
           if (slot === 'main') {
             let first = true
@@ -452,7 +456,7 @@ export async function runCards(a: CardsArgs): Promise<CardsOut> {
     } catch (err) {
       info.ms = Date.now() - t0
       info.parse = 'failed'
-      info.error = String((err as { status?: unknown })?.status ?? (err as Error)?.name ?? 'error').slice(0, 40)
+      info.error = (err as Error)?.name === 'ModelTimeoutError' ? 'timeout' : sig.aborted ? 'cancelled' : String((err as { status?: unknown })?.status ?? (err as Error)?.name ?? 'error').slice(0, 40)
       logCall({ error: info.error })
       return { cands: [], raw: null, err }
     }
@@ -468,9 +472,37 @@ export async function runCards(a: CardsArgs): Promise<CardsOut> {
       : p
   const callMain = modelCall('main', contentOf(cardPrompt(a.prompt, 'main', !!a.lexicon)), models.select, CARD_EFFORT(), CARD_MAX_TOKENS(), callTimeoutMs(), true, signal)
   const callSecond = modelCall('second', contentOf(cardPrompt(a.prompt, 'second', !!a.lexicon)), models.select, CARD_EFFORT(), CARD_MAX_TOKENS(), callTimeoutMs(), true, signal)
-  const callFree = memorial
-    ? null
-    : modelCall('freestyle', freeCardPrompt(story, context, [...(opts.exclude ?? [])]), models.free, 'low', 1500, freeCallMs(), false, freeSignal)
+  // The free pick is asked TWICE at the same moment (the same prompt, the small model, low effort, no extended thinking, 1,500 tokens, the same ceiling): the first answer that is
+  // readable and offers a card wins and the other call is cancelled. If both fail or time out, the sender sees two cards, as before.
+  const hedgedFree = (): Promise<CallOut> => {
+    const content = freeCardPrompt(story, context, [...(opts.exclude ?? [])])
+    const stops = [new AbortController(), new AbortController()]
+    return new Promise<CallOut>((resolve) => {
+      const results: (CallOut | null)[] = [null, null]
+      let decided = false
+      const infoOf = (h: 1 | 2) => report.calls.find((c) => c.slot === 'freestyle' && c.hedge === h)
+      const done = (winner: 1 | 2 | null, out: CallOut) => {
+        decided = true
+        const w = infoOf(1)
+        const v = infoOf(2)
+        if (w) w.won = winner === 1
+        if (v) v.won = winner === 2
+        log(`[ichirei-card-call] ${JSON.stringify({ slot: 'freestyle', hedged: 2, hedge_winner: winner })}`)
+        resolve(out)
+      }
+      ;([1, 2] as const).forEach((h, i) => {
+        void modelCall('freestyle', content, models.free, 'low', 1500, freeCallMs(), false, AbortSignal.any([freeSignal, stops[i].signal]), { noThinking: true, hedge: h }).then((out) => {
+          results[i] = out
+          if (decided) return
+          if (out.cands.length > 0) {
+            stops[1 - i].abort() // the other call is cancelled
+            done(h, out)
+          } else if (results[0] && results[1]) done(null, results[0])
+        })
+      })
+    })
+  }
+  const callFree = memorial ? null : hedgedFree()
 
   const ctxBase = deps.stamp({ status: 'sufficient', candidates: [] } as unknown as EngineResult)
 

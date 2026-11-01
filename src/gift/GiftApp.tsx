@@ -1,3 +1,4 @@
+import { cleanReading } from '../order/reading.ts'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { COPY as FILM_COPY, pageLang, type PageLang } from '../animation/copy.ts'
 import { Film } from '../animation/AnimationApp.tsx'
@@ -239,8 +240,8 @@ export default function GiftApp() {
 
 /** The character's reading under it: the kana reading (ja), the pinyin (zh), the romanization and meaning (en). */
 function readingLine(view: GiftView): string {
-  if (view.language === 'en') return [view.romanization.split(' / ')[0], view.meaning_en].filter(Boolean).join(' · ')
-  return view.reading
+  if (view.language === 'en') return [cleanReading(view.romanization.split(' / ')[0]), view.meaning_en].filter(Boolean).join(' · ')
+  return cleanReading(view.reading)
 }
 
 function Envelope({ copy, lang, to, from, memorial, date, reduced, state, locked, onOpen }: {

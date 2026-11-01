@@ -39,7 +39,9 @@ const server = createServer(async (req, res) => {
     }
     if (mode === 'cards') {
       // Parallel cards: each card is announced as it passes its checks (main; main + second; all three), then the terminal result.
-      const partial = (n) => ({ ...FIXTURE, candidates: FIXTURE.candidates.slice(0, n), runner_up_kanji: n >= 2 ? FIXTURE.runner_up_kanji : null, freestyle_kanji: n >= 3 ? FIXTURE.freestyle_kanji : null })
+      // the main card's reading carries a dictionary okurigana marker (しょ-う): the page must show it plain
+      const dashed = (list) => list.map((c, i) => (i === 0 ? { ...c, reading: c.reading.slice(0, -1) + '-' + c.reading.slice(-1) } : c))
+      const partial = (n) => ({ ...FIXTURE, candidates: dashed(FIXTURE.candidates.slice(0, n)), runner_up_kanji: n >= 2 ? FIXTURE.runner_up_kanji : null, freestyle_kanji: n >= 3 ? FIXTURE.freestyle_kanji : null })
       res.write(JSON.stringify({ type: 'stage', stage: 'reading' }) + '\n')
       await sleep(300)
       res.write(JSON.stringify({ type: 'stage', stage: 'choosing' }) + '\n')
@@ -50,7 +52,7 @@ const server = createServer(async (req, res) => {
         res.write(JSON.stringify({ type: 'card', result: partial(n) }) + '\n')
       }
       await sleep(800)
-      res.write(JSON.stringify({ type: 'result', result: FIXTURE }) + '\n')
+      res.write(JSON.stringify({ type: 'result', result: { ...FIXTURE, candidates: dashed(FIXTURE.candidates) } }) + '\n')
       return res.end()
     }
     // Simulate the model streaming: 10 progress lines spread over TOTAL_MS.

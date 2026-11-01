@@ -2,6 +2,7 @@
 // beyond the film's own four lines, never the price): the four pictures in story order with their lines, the character with its reading and the "who they
 // are" line, the poem, the certificate line, 「○○より」 / 「＿＿さんへ」, the short message, and the receiver page's address for the QR code.
 
+import { cleanReading } from '../../src/order/reading.ts'
 import sharp from 'sharp'
 import type { AnimationRecord } from '../animation.ts'
 import { filmUsable } from '../animation.ts'
@@ -53,7 +54,7 @@ export async function loadArtwork(store: OrderStore, gift: GiftRecord, anim: Ani
   return {
     language: gift.language,
     glyph: gift.glyph,
-    reading: gift.reading,
+    reading: cleanReading(gift.reading),
     who: gift.who,
     certificateLine: gift.certificate_line,
     lines,

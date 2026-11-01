@@ -1,3 +1,4 @@
+import { cleanReading } from '../order/reading.ts'
 import { quoteScene } from '../order/quote.ts'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { AnimatePresence, motion, useReducedMotion } from 'framer-motion'
@@ -194,7 +195,7 @@ export default function Reveal({ result, story, followUps = [], condition, copy,
           candidate: {
             kanji: c.kanji,
             inscription_form: c.inscription_form,
-            reading: c.reading,
+            reading: cleanReading(c.reading),
             meaning: c.meaning ?? null,
             one_line_gaze: c.one_line_gaze,
             story_anchor: c.story_anchor,

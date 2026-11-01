@@ -1,3 +1,4 @@
+import { cleanReading } from '../order/reading.ts'
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { COPY, pageLang, type PageCopy } from './copy.ts'
 import { clamp, frameAt, makeFilmTimeline, phrases, type FilmTimeline } from '../order/film-timeline.ts'
@@ -130,8 +131,8 @@ export default function AnimationApp() {
 
 /** The character's reading under it: the kana reading (ja), the pinyin (zh), the romanization and meaning (en: a reader of English cannot read kana). */
 function readingLine(view: AnimationView): string {
-  if (view.language === 'en') return [view.romanization.split(' / ')[0], view.meaning_en].filter(Boolean).join(' · ')
-  return view.reading
+  if (view.language === 'en') return [cleanReading(view.romanization.split(' / ')[0]), view.meaning_en].filter(Boolean).join(' · ')
+  return cleanReading(view.reading)
 }
 
 type ReadyFilm = Omit<NonNullable<AnimationView['film']>, 'pictures'> & { pictures: string[] }

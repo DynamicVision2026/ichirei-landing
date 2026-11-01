@@ -284,6 +284,8 @@ const browser = await chromium.launch({
   await page.waitForFunction(() => document.querySelectorAll('article').length === 3, null, { timeout: 5000 })
   check('cards: then the free pick (3 cards), in the order main, second, free', (await page.locator('article').count()) === 3 && (await page.locator('article').first().locator('span').first().textContent()) === '証')
   await page.waitForTimeout(1600) // the terminal result lands and replaces the partial one
+  const firstCard = await page.locator('article').first().innerText()
+  check('reading: the main card shows its reading plain (しょう) although the engine\'s answer carried a dictionary marker (しょ-う)', firstCard.includes('しょう') && !firstCard.includes('しょ-う') && !/しょ[-.]う/.test(await page.locator('body').innerText()), firstCard.slice(0, 80))
   check('cards: the terminal result keeps the three cards and the reveal on screen (nobody is sent back to the processing view)', (await page.locator('article').count()) === 3 && !(await page.locator('[data-testid=processing-steps]').isVisible().catch(() => false)))
   check('no page errors (run 3b, cards)', errors.length === 0)
   if (errors.length) console.log('page errors:', errors)
@@ -975,7 +977,7 @@ const mockPage = async (browser, { onExplain, result, order, track } = {}) => {
 
 // ---------- Run 8c-5: Part D — the sender's page (「贈る」) and the receiver's gift page (/g/<token>), the e-gift address form ----------
 {
-  const baseView = { id: 'AN-testtesttesttesttest', language: 'ja', glyph: '備', reading: 'そなえる', romanization: 'sonaeru', meaning_en: 'to be ready', who: 'いつも、頼まれる前に備えている人。', memorial: false, film: { status: 'fallback', lines: ['「ちょうど今詰めてたところ」', 'いつも、頼まれる前に備えている人。'], pictures: ['/film/washi-1.webp', '/film/washi-2.webp'] } }
+  const baseView = { id: 'AN-testtesttesttesttest', language: 'ja', glyph: '備', reading: 'そな.える', romanization: 'sonaeru', meaning_en: 'to be ready', who: 'いつも、頼まれる前に備えている人。', memorial: false, film: { status: 'fallback', lines: ['「ちょうど今詰めてたところ」', 'いつも、頼まれる前に備えている人。'], pictures: ['/film/washi-1.webp', '/film/washi-2.webp'] } }
   const GIFT = 'https://ichirei.soul-id.jp/g/RG-testtesttesttesttest'
   // the sender's page
   const sp = await browser.newPage({ locale: 'ja-JP', viewport: { width: 390, height: 800 } })
@@ -1001,7 +1003,7 @@ const mockPage = async (browser, { onExplain, result, order, track } = {}) => {
   const SENDER_ID = 'AN-testtesttesttesttest'
   const year = new Date().getFullYear()
   const mk = (over = {}) => ({
-    locked: false, id: TOKEN, token: TOKEN, language: 'ja', glyph: '備', reading: 'そなえる', romanization: 'sonaeru', meaning_en: 'to be ready', who: 'いつも、頼まれる前に備えている人。', memorial: false,
+    locked: false, id: TOKEN, token: TOKEN, language: 'ja', glyph: '備', reading: 'そな-える', romanization: 'sonaeru', meaning_en: 'to be ready', who: 'いつも、頼まれる前に備えている人。', memorial: false,
     film: { status: 'fallback', lines: ['「ちょうど今詰めてたところ」', 'いつも、頼まれる前に備えている人。'], pictures: ['/film/washi-1.webp', '/film/washi-2.webp'] },
     certificate_line: 'この字は、あなたの目に映る、その人です。', poem: { type: 'tanka', lines: ['朝ごとに', '蓋の花添え', '備えたる', '母の背中を', '今も思へる'], reading: 'あさごとに' },
     from: '山田 太郎', to: '山田 一郎', message: 'いつも、ありがとう。', egift: null, certificate_no: 12, order_date: `${year}-11-07`, opens_on: null, replied: false, package: 'simple', ...over,
