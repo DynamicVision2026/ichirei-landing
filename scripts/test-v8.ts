@@ -148,7 +148,8 @@ try {
     const e = f.expect
     // Spec step 8 (changed 2026-11-01): EVERY empty slot is refilled by ONE call — a second or a free pick the model never produced counts too.
     const gen = new Set<string>(f.model_reply.candidates.map((c: any) => c.slot))
-    const asks = [...(gen.has('second') ? [] : ['second']), ...(gen.has('freestyle') ? [] : ['freestyle'])]
+    // (remembrance has no free pick: it is never asked for, 2026-11-01)
+    const asks = [...(gen.has('second') ? [] : ['second']), ...(gen.has('freestyle') || f.context.occasion === 'memorial' ? [] : ['freestyle'])]
     const rep = asks.length > 0
     const e2 = asks.includes('second') ? f.replacements[0].kanji : e.second // (the fixture's first replacement is a second-type candidate)
     const reps = asks.includes('second') ? undefined : [] // (nothing on offer for a free pick: the model says "none")
@@ -177,7 +178,7 @@ try {
 
   // ---- 3. the review is a SAFETY check: a veto needs a named safety rule; taste is only a concern ------------------------------------
   const taste = await run('s0004-mother-memorial', { replacements: [], vetoes: { 包: { rule: null, reason: 'third-person gaze' }, 庇: { rule: 'voice', reason: 'consoles the sender' } } })
-  check('(3) 0004 (the dead end of the live test): the review "rejects" both for taste → neither is a veto, BOTH cards stand (包 main, 庇 second); the only refill call is for the free pick the model never wrote', taste.status === 'sufficient' && taste.primary_kanji === '包' && taste.runner_up_kanji === '庇' && count('replace') === 1 && taste.referee?.actions.filter((a) => a.action === 'review_veto_ignored').length === 2, JSON.stringify(taste.referee?.actions))
+  check('(3) 0004 (the dead end of the live test): the review "rejects" both for taste → neither is a veto, BOTH cards stand (包 main, 庇 second); remembrance has no free pick, so NO refill call is made', taste.status === 'sufficient' && taste.primary_kanji === '包' && taste.runner_up_kanji === '庇' && count('replace') === 0 && taste.referee?.actions.filter((a) => a.action === 'review_veto_ignored').length === 2, JSON.stringify(taste.referee?.actions))
   check('(3) …and the ignored vetoes are logged with their reason (the verdict line carries rule and concern, no story text)', logs.some((l) => l.startsWith('[ichirei-review]') && l.includes('third-person gaze')) && noStory('s0004-mother-memorial'))
   const scene = await run('s0032-friend-thanks', { vetoes: { 誓: { rule: null, reason: 'Scene noun' } } })
   check('(3) a "scene noun" fail is a concern, not a veto: the scene-noun test lives in the selection prompt (the main stays)', scene.primary_kanji === '誓' && scene.runner_up_kanji === '待' && count('replace') === 0)

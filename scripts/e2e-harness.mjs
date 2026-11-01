@@ -772,6 +772,26 @@ const mockPage = async (browser, { onExplain, result, order, track } = {}) => {
     check('no page errors (run 8c-3, long remembrance)', long.errors.length === 0, JSON.stringify(long.errors))
     await long.page.close()
   }
+
+  // 2026-11-01: remembrance is TWO cards (main + second, no free pick). While 偲ぶ / 追思 / In memory is picked, the steps and the examples say so; every other occasion is unchanged.
+  for (const [lang, st2, st2p, note, st2Other, noteOther] of [
+    ['ja', '二つの字に出会う', '本命の二字。読み方、意味、選ばれた理由とともに。選ぶのはあなたです。', '見本です。あなたの物語には、本命の二字が届きます。', '三つの字に出会う', '見本です。あなたの物語には、本命の二字と遊び字の一字が届きます。'],
+    ['zh-Hant', '遇見兩個字', '兩個本命字，各附讀音、意思和選擇的理由。由你來選。', '以上為範例。你的故事會得到屬於自己的兩個本命字。', '遇見三個字', '以上為範例。你的故事會得到屬於自己的三個字：兩個本命字，加上一個玩心字。'],
+    ['en', 'Meet two characters', 'Two main characters, each with its reading, its meaning and why it fits. You choose.', 'Examples for illustration. Your story gets two main characters of its own.', 'Meet three characters', 'Examples for illustration. Your story gets three characters of its own: two main ones and one freestyle.'],
+  ]) {
+    const c = await mockPage(browser)
+    await c.page.goto(`http://localhost:5173/?lang=${lang}`, { waitUntil: 'networkidle' })
+    const h3 = () => c.page.locator('#how ol.steps li:nth-child(2) h3').innerText()
+    const p2 = () => c.page.locator('#how ol.steps li:nth-child(2) p').innerText()
+    const mm = () => c.page.locator('p.from').first().innerText()
+    check(`copy (${lang}): before an occasion is picked the steps and the examples are unchanged — 「${st2Other}」 and the three-card note`, (await h3()) === st2Other && (await mm()) === noteOther, `${await h3()} | ${await mm()}`)
+    await pickContext(c.page, { occasion: 'memorial' })
+    check(`copy (${lang}): with 偲ぶ picked the second step reads 「${st2}」 and says two main characters only, and the examples note says two (no free pick)`, (await h3()) === st2 && (await p2()) === st2p && (await mm()) === note, `${await h3()} | ${await p2()} | ${await mm()}`)
+    await pickContext(c.page, { occasion: 'birthday_milestone' })
+    check(`copy (${lang}): picking another occasion again restores the three-card wording`, (await h3()) === st2Other && (await mm()) === noteOther)
+    check(`no page errors (run 8c-3, remembrance copy ${lang})`, c.errors.length === 0, JSON.stringify(c.errors))
+    await c.page.close()
+  }
 }
 
 // ---------- Run 8c-4: the three sizes (eギフト / 木札 / 版木), the badges, where it goes, the message ----------

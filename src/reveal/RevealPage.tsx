@@ -5,6 +5,7 @@ import { Angles, Closing, Dock, Faq, Footer, Gifts, Moments, Philosophy, Reviews
 import Hero from './Hero'
 import { useCurrency } from './useCurrency'
 import { toRevealLang } from './lang'
+import { useMemorialSelected } from './occasion-store'
 
 // The story flow (composer → cards → order) is the heaviest part of the page and sits below the fold: it loads
 // right after the first paint, so the hero shows without waiting for it.
@@ -25,6 +26,7 @@ export default function RevealPage() {
   const lang = toRevealLang(uiLang)
   const t = TEXT[lang]
   const { currency, rates, setCurrency } = useCurrency(lang)
+  const memorial = useMemorialSelected() // 偲ぶ picked in the form → the copy says two cards, no free pick
 
   // A visitor whose stored language is Simplified Chinese (from /demo) gets the page in Traditional Chinese.
   useEffect(() => {
@@ -103,8 +105,8 @@ export default function RevealPage() {
         >
           <DemoApp mode="customer" aside={aside} />
         </Suspense>
-        <Steps t={t} />
-        <Moments t={t} />
+        <Steps t={t} memorial={memorial} />
+        <Moments t={t} memorial={memorial} />
         <Reviews t={t} />
         <Gifts t={t} lang={lang} currency={currency} rates={rates} onCurrency={setCurrency} />
         <Faq t={t} />

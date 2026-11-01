@@ -65,7 +65,8 @@ export function emptySlots(result: EngineResult): RefillSlot[] {
   if (live.length === 0) out.push('main', 'second')
   else if (result.primary_kanji === null) out.push('main')
   else if (live.length < 2) out.push('second')
-  if (!result.candidates.some((c) => c.slot === 'freestyle' && !c.eliminated)) out.push('freestyle')
+  // Remembrance has no free pick: it is never asked for and never counted as an empty slot (2026-11-01).
+  if (result.occasion !== 'memorial' && !result.candidates.some((c) => c.slot === 'freestyle' && !c.eliminated)) out.push('freestyle')
   return out
 }
 

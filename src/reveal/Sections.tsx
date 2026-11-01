@@ -172,10 +172,11 @@ export function Angles({ t, lang }: { t: T; lang: RevealLang }) {
   )
 }
 
-export function Steps({ t }: { t: T }) {
+export function Steps({ t, memorial = false }: { t: T; memorial?: boolean }) {
+  // remembrance (偲ぶ picked in the form): two cards, no free pick
   const steps = [
     [t.st1, t.st1p, t.st1t],
-    [t.st2, t.st2p, t.st2t],
+    memorial ? [t.st2M, t.st2pM, t.st2t] : [t.st2, t.st2p, t.st2t],
     [t.st3, t.st3p, t.st3t],
   ] as const
   return (
@@ -215,7 +216,7 @@ const MOMENTS = [
 ] as const
 
 /** Everyday moments mosaic: photo frames with a caption; a missing photo leaves the coloured frame. */
-export function Moments({ t }: { t: T }) {
+export function Moments({ t, memorial = false }: { t: T; memorial?: boolean }) {
   return (
     <section id="moments">
       <div className="wrap center">
@@ -250,7 +251,7 @@ export function Moments({ t }: { t: T }) {
         ))}
       </div>
       <p className="wrap center from" style={{ marginTop: '1.4rem' }}>
-        {t.mmNote}
+        {memorial ? t.mmNoteM : t.mmNote}
       </p>
     </section>
   )

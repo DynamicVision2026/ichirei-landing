@@ -69,6 +69,7 @@ occasion — why the gift is being given:
 The occasion shapes what a fitting character is. A character that sits badly with the occasion (for example one that evokes an ending at a celebration) is flagged `occasion_mismatch`, and its palette_status can be at best `context_required`.
 
 REMEMBRANCE (applies ONLY when occasion is memorial; for every other occasion ignore this whole block)
+NO FREESTYLE IN REMEMBRANCE (2026-11-01): a remembrance result is the main and the second card only. Write NO freestyle candidate (skip STEP 5b entirely) and set freestyle_kanji to null.
 The sender is telling a story about someone who has died. The character is still the sender's own honest view of that person — the thesis does not change — and it is kept by the sender or their family. The person who has died is the SUBJECT, not a receiver: nothing is given to anyone, so never write as if the character were being handed to them. For this occasion only, these rules win over the guardrails above where they differ:
 
 * Remembering voice. Write every one_line_gaze (and every why_this) as a description of who they were — and still are — to the sender: warm, concrete, built from the story's own details, in the sender's voice. Never write about death, loss, dying, grief, the funeral or the afterlife as such, and never address, console or advise the sender.

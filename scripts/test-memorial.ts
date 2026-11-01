@@ -107,7 +107,7 @@ try {
   check('memorial: the contract still validates', validateEngineResult(mem).length === 0, validateEngineResult(mem).join('; '))
   check('memorial: the main 祝 (celebration) is eliminated by the referee with the blocked-occasion reason and the memorial flags', mem.candidates.find((c) => c.kanji === '祝')?.eliminated === true && mem.candidates.find((c) => c.kanji === '祝')?.eliminated_reason === 'palette: blocked_occasion' && (mem.candidates.find((c) => c.kanji === '祝')?.flags ?? []).includes('memorial_default_block'), JSON.stringify(mem.candidates.find((c) => c.kanji === '祝')))
   check('memorial: the second (灯) is promoted to primary', mem.primary_kanji === '灯' && mem.referee?.primary_changed === true && mem.referee?.promoted_from === 'second')
-  check('memorial: the FREESTYLE 喜 (celebration) is removed too — the default block covers every slot; there is no freestyle', mem.candidates.find((c) => c.kanji === '喜')?.eliminated === true && mem.freestyle_kanji === null)
+  check('memorial: there is NO free pick in remembrance (2026-11-01) — a freestyle the model writes anyway (here 喜, a celebration character) is dropped before the referee; the result is main + second', !mem.candidates.some((c) => c.slot === 'freestyle' && !c.eliminated) && !mem.candidates.some((c) => c.kanji === '喜' && !c.eliminated) && mem.freestyle_kanji === null)
   check('memorial: no celebration character in any surviving candidate', live4.length === 1 && live4.every((c) => !CELEBRATION.test(c.kanji) && !CELEBRATION.test(c.inscription_form ?? '')))
   check('memorial: the referee log names the occasion', (mem.referee?.actions ?? []).some((a) => a.kanji === '祝' && a.detail.includes('(memorial)')))
   check('memorial: the echo says memorial and no suggestion is made (the sender already chose it)', mem.occasion === 'memorial' && mem.suggest_memorial === undefined)
@@ -127,7 +127,7 @@ try {
     r.candidates[2] = { ...r.candidates[2], kanji: '誕', reading: 'うまれる', story_anchor: '少しだけ嬉しそう' }
     r.freestyle_kanji = '誕'
   })
-  check('memorial: a birth / new-beginning character in the freestyle (誕, no matter whether the palette has a row) is removed', noRow.candidates.find((c) => c.kanji === '誕')?.eliminated === true && noRow.freestyle_kanji === null)
+  check('memorial: a birth / new-beginning character the model offers as a free pick (誕) is not shown either (there is no free pick in remembrance)', !noRow.candidates.some((c) => c.kanji === '誕' && !c.eliminated) && noRow.freestyle_kanji === null)
 
   // ---- 5. the suggestion: only ever a suggestion --------------------------------------------------------------------------
   const sug = await run('suggest-memorial')

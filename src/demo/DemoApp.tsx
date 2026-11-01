@@ -13,6 +13,7 @@ import { clearDraft, draftOf, loadDraft, saveDraft, type Draft } from './draft'
 import { questionSetOf, questionTextOf } from './questions'
 import { OPENER } from '../reveal/opener-copy'
 import { exportEvents, log, setCondition as logSetCondition, setStory as logSetStory } from './logging'
+import { setMemorialSelected } from '../reveal/occasion-store'
 import { COPY, DEFAULT_GIFT_CONTEXT, FOLLOW_UP_COUNTER_FROM, FOLLOW_UP_MAX, clipStory, contextToPayload, storyLength, type Copy, type GiftContext } from './i18n'
 import { getLanguage, setLanguage } from '../lang-store'
 import { useLanguage } from '../useLanguage'
@@ -206,6 +207,12 @@ export default function DemoApp({ mode = 'harness', aside }: { mode?: Mode; asid
     if (next.language !== context.language) setLanguage(next.language)
     setContextState(next)
   }
+  // The landing page's steps and examples say "two cards" while 偲ぶ is picked (a remembrance result is main + second, no free pick).
+  useEffect(() => {
+    if (!customer) return
+    setMemorialSelected(context.occasion === 'memorial')
+    return () => setMemorialSelected(false)
+  }, [customer, context.occasion])
   const copy = COPY[context.language]
   const [chosen, setChosen] = useState<Candidate | null>(null)
 

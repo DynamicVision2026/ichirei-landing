@@ -260,7 +260,7 @@ function logCards(story: string, context: EngineContext, before: EngineResult, a
   try {
     const live = (r: EngineResult, slot: string) => r.candidates.filter((c) => !c.eliminated && c.slot === slot).length
     const removed = after.candidates.filter((c) => c.eliminated).map((c) => ({ slot: c.slot, reason: (c.eliminated_reason ?? 'unknown').slice(0, 80) }))
-    console.log(`[ichirei-cards] ${JSON.stringify({ story_chars: [...story].length, language: context.language, occasion: context.occasion, status: after.status, live: { main: live(after, 'main'), second: live(after, 'second'), freestyle: live(after, 'freestyle') }, before_final: before.candidates.filter((c) => !c.eliminated).length, removed, refill: refill ? { asked: refill.asked, filled: refill.filled.map((f) => f.slot), rejected: refill.rejected, ms: refill.ms } : null })}`)
+    console.log(`[ichirei-cards] ${JSON.stringify({ story_chars: [...story].length, language: context.language, occasion: context.occasion, status: after.status, live: { main: live(after, 'main'), second: live(after, 'second'), freestyle: live(after, 'freestyle') }, before_final: before.candidates.filter((c) => !c.eliminated).length, freestyle: context.occasion === 'memorial' ? 'not_offered' : undefined, removed, refill: refill ? { asked: refill.asked, filled: refill.filled.map((f) => f.slot), rejected: refill.rejected, ms: refill.ms } : null })}`)
   } catch {
     // (a log line must never break a request)
   }
@@ -477,6 +477,11 @@ function stampResult(extracted: EngineResult, context: EngineContext): EngineRes
   else delete stamped.suggest_memorial
   // Fields the engine reads from the model's answer for its own logs and flow — never passed on to the page.
   for (const k of ['lexicon_miss', 'goodwill_declined', 'truth', 'ideal_character']) delete (stamped as unknown as Record<string, unknown>)[k]
+  // Remembrance has no free pick (2026-11-01): the result is the main and the second card. A freestyle the model wrote anyway is dropped here, before the referee, the review or any refill sees it.
+  if (context.occasion === 'memorial') {
+    stamped.candidates = (stamped.candidates ?? []).filter((c) => c.slot !== 'freestyle')
+    stamped.freestyle_kanji = null
+  }
   return stamped
 }
 
