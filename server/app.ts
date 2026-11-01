@@ -28,6 +28,7 @@ import explainHandler from '../api/explain.ts'
 import logHandler from '../api/log.ts'
 import { ENGINE_CONFIG } from '../engine/engine.ts'
 import { lexiconModeFromEnv } from '../engine/lexicon.ts'
+import { cardsMode } from '../engine/cards.ts'
 import { simpleMaxStrokes } from '../engine/strokes.ts'
 import { adaptVercelHandler } from './vercel-compat.ts'
 import { envRunLimiter } from '../engine/rate-limit.ts'
@@ -111,6 +112,7 @@ export function createApp(config: ServerConfig): Hono {
       callTimeoutMs: ENGINE_CONFIG.CALL_TIMEOUT_MS,
       reviewTimeoutMs: ENGINE_CONFIG.REVIEW_TIMEOUT_MS,
       lexiconMode: lexiconModeFromEnv(),
+      cardsMode: cardsMode(), // parallel | single (ICHIREI_CARDS=single is the rollback)
       filmPictures: { model: process.env.ICHIREI_FILM_IMAGE_MODEL || 'gemini-3.1-flash-image|gemini-2.5-flash-image', location: process.env.ICHIREI_FILM_IMAGE_LOCATION || 'global', dailyMax: process.env.ICHIREI_FILM_DAILY_MAX || '200' },
       simpleMaxStrokes: simpleMaxStrokes(),
       configured: config,

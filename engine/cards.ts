@@ -62,9 +62,18 @@ function readEngineFile(file: string, override?: string): string {
 }
 
 /** The language prompt plus the one-card block (the block is appended: it names the card, the lens and the ranked output). */
-export function cardPrompt(basePrompt: string, slot: 'main' | 'second'): string {
+export function cardPrompt(basePrompt: string, slot: 'main' | 'second', lexicon = false): string {
   const block = readEngineFile('card-block.md', process.env.ICHIREI_CARD_BLOCK_PATH)
-  const extra = slot === 'second' ? '* The `unique_truth` of each candidate is required, as for any main-slot card.' : '* The `unique_truth` of each candidate is required.'
+  let extra = '* The `unique_truth` of each candidate is required' + (slot === 'second' ? ', as for any main-slot card.' : '.')
+  if (lexicon) {
+    // Lexicon mode (ICHIREI_LEXICON_MODE=on): the lexicon's rules, which follow this block, apply to this card. The pair wording of those rules is split between the calls.
+    extra +=
+      '\n* LEXICON MODE: the lexicon rules after this block apply to your card. Both of your candidates are characters from the list given there, written as there (rule 1), and they differ from each other. Write `truth` and `ideal_character` first, as rule 0 says. The other main card is written by another call at this moment; where those rules speak of the two main cards, read "your card".' +
+      (slot === 'main'
+        ? ' If NO listed character truly fits this person, answer as rule 6 says (status "insufficient" with "lexicon_miss": true).'
+        : ' If NO listed character truly fits this lens, return status "sufficient" with "candidates": [] and do NOT write lexicon_miss: the main card decides about a miss.') +
+      ' The free pick is written by a third call and is not limited to the list (rule 4).'
+  }
   return basePrompt + block.replace(/\{\{ SLOT \}\}/g, slot).replace('{{ LENS }}', LENS[slot]).replace('{{ EXTRA }}', extra)
 }
 
@@ -145,11 +154,20 @@ export interface CardsArgs {
   }
   canBeMain?: (c: Candidate) => boolean
   excluded?: ReadonlySet<string>
+  /**
+   * Lexicon mode: the lexicon blocks go around the main and second prompts (the static table first, cached; the gift's list and the rules last), a main or
+   * second character outside the list is refused by the referee, and the free pick is exempt. null/absent = the palette engine.
+   */
+  lexicon?: { staticBlock: string; dynamicBlock: string; inList: (c: Candidate) => boolean } | null
+  /** Applied to every result this module hands out while it works (the cards shown early): lexicon mode puts the lexicon's classical line on a card here. */
+  finish?: (r: EngineResult) => EngineResult
 }
 
 export interface CardsOut {
-  /** The main call said the story is insufficient, or the goodwill check declined (stage says where). */
-  early: null | { kind: 'declined' | 'insufficient'; stage: 'selection' | 'review'; stamped: EngineResult }
+  /** The main call said the story is insufficient, or the goodwill check declined (stage says where). `miss`: lexicon mode, "no listed character truly fits". */
+  early: null | { kind: 'declined' | 'insufficient'; stage: 'selection' | 'review'; stamped: EngineResult; miss: boolean }
+  /** The main call's answer as the model wrote it (before stamping): the truth / ideal_character / lexicon_miss fields the logs and the miss flow read. */
+  mainExtracted: EngineResult | null
   /** The main call's answer, stamped (status, emotional register, fallback question…); candidates replaced by `candidates`. */
   base: EngineResult | null
   /** Every candidate that was tried, in slot order; the one that stands is not eliminated, the others carry the reason they were set aside. */
@@ -172,6 +190,9 @@ interface CallOut {
   err?: unknown
   /** the goodwill check failed in this answer */
   declined?: boolean
+  /** lexicon mode: the model says no listed character fits */
+  miss?: boolean
+  extracted?: EngineResult
 }
 
 interface LaneOut {
@@ -225,6 +246,7 @@ export async function runCards(a: CardsArgs): Promise<CardsOut> {
   let skipped: string | null = null
   let early: CardsOut['early'] = null
   let mainRaw: EngineResult | null = null
+  let mainExtracted: EngineResult | null = null
   let freeClosed = false
 
   // progress for the page: only ever forward (reading → choosing → checking)
@@ -242,7 +264,7 @@ export async function runCards(a: CardsArgs): Promise<CardsOut> {
   // ---- the calls: all started now ---------------------------------------------------------------------------------------------------------------------------------------------
   const room = () => runBudgetMs() - at() - RESERVE_MS
 
-  const modelCall = async (slot: CardSlot, content: string, model: string, effort: string, maxTokens: number, ceilingMs: number, retryable: boolean, sig: AbortSignal, parse: (text: string) => { cands: Candidate[]; raw: EngineResult | null; declined?: boolean }): Promise<CallOut> => {
+  const modelCall = async (slot: CardSlot, content: string | Anthropic.TextBlockParam[], model: string, effort: string, maxTokens: number, ceilingMs: number, retryable: boolean, sig: AbortSignal, parse: (text: string) => { cands: Candidate[]; raw: EngineResult | null; declined?: boolean; miss?: boolean; extracted?: EngineResult }): Promise<CallOut> => {
     const info: CardCallInfo = { slot, model, effort, ms: 0, attempts: 0, output_tokens: null, thinking_tokens: null, stop_reason: null, parse: 'failed', offered: 0 }
     report.calls.push(info)
     const t0 = Date.now()
@@ -283,7 +305,7 @@ export async function runCards(a: CardsArgs): Promise<CardsOut> {
         info.stop_reason = message.stop_reason ?? null
         if (message.stop_reason === 'refusal') throw new Error('Model refused the request')
         const text = message.content.filter((b): b is Anthropic.TextBlock => b.type === 'text').map((b) => b.text).join('')
-        let parsed: { cands: Candidate[]; raw: EngineResult | null; declined?: boolean }
+        let parsed: { cands: Candidate[]; raw: EngineResult | null; declined?: boolean; miss?: boolean; extracted?: EngineResult }
         try {
           parsed = parse(text)
         } catch (err) {
@@ -311,11 +333,19 @@ export async function runCards(a: CardsArgs): Promise<CardsOut> {
     const stamped = deps.stamp(raw)
     const cands = (stamped.candidates ?? []).filter((c) => !c.eliminated && typeof c.kanji === 'string' && c.kanji.trim() !== '').map((c) => ({ ...c, slot }) as Candidate)
     const dedup = cands.filter((c, i) => cands.findIndex((x) => x.kanji === c.kanji) === i).slice(0, 2)
-    return { cands: stamped.status === 'sufficient' ? dedup : [], raw: stamped as EngineResult | null, declined: (raw as { goodwill_declined?: unknown }).goodwill_declined === true }
+    return { cands: stamped.status === 'sufficient' ? dedup : [], raw: stamped as EngineResult | null, declined: (raw as { goodwill_declined?: unknown }).goodwill_declined === true, miss: (raw as { lexicon_miss?: unknown }).lexicon_miss === true, extracted: raw }
   }
 
-  const callMain = modelCall('main', cardPrompt(a.prompt, 'main'), models.select, CARD_EFFORT(), CARD_MAX_TOKENS(), callTimeoutMs(), true, signal, parseSelection('main'))
-  const callSecond = modelCall('second', cardPrompt(a.prompt, 'second'), models.select, CARD_EFFORT(), CARD_MAX_TOKENS(), callTimeoutMs(), true, signal, parseSelection('second'))
+  // main and second: the language prompt + the one-card block; in lexicon mode the static lexicon table goes first (cached) and the gift's list and rules last (as the single call did)
+  const contentOf = (p: string): string | Anthropic.TextBlockParam[] =>
+    a.lexicon
+      ? [
+          { type: 'text', text: a.lexicon.staticBlock, cache_control: { type: 'ephemeral' } },
+          { type: 'text', text: `${p}\n\n${a.lexicon.dynamicBlock}` },
+        ]
+      : p
+  const callMain = modelCall('main', contentOf(cardPrompt(a.prompt, 'main', !!a.lexicon)), models.select, CARD_EFFORT(), CARD_MAX_TOKENS(), callTimeoutMs(), true, signal, parseSelection('main'))
+  const callSecond = modelCall('second', contentOf(cardPrompt(a.prompt, 'second', !!a.lexicon)), models.select, CARD_EFFORT(), CARD_MAX_TOKENS(), callTimeoutMs(), true, signal, parseSelection('second'))
   const callFree = memorial
     ? null
     : modelCall('freestyle', freeCardPrompt(story, context, [...(opts.exclude ?? [])]), models.free, 'low', 1500, freeCallMs(), false, freeSignal, (text) => ({ cands: parseRanked(text, 'freestyle'), raw: null }))
@@ -339,7 +369,7 @@ export async function runCards(a: CardsArgs): Promise<CardsOut> {
 
   /** The code referee for one card (the same applyPalette the whole result used to go through). */
   const refereeOne = (base: EngineResult, c: Candidate): { ok: boolean; card: Candidate; mini: EngineResult } => {
-    const mini = applyPalette(miniOf(base, c), palette, story, { deferInsufficient: true, canBeMain: c.slot === 'main' ? a.canBeMain : undefined, excluded: a.excluded, log: () => {} })
+    const mini = applyPalette(miniOf(base, c), palette, story, { deferInsufficient: true, canBeMain: c.slot === 'main' ? a.canBeMain : undefined, excluded: a.excluded, inLexicon: a.lexicon?.inList, log: () => {} })
     const card = mini.candidates[0] ?? c
     const ok = !card.eliminated && (c.slot !== 'main' || mini.primary_kanji === card.kanji)
     if (!ok && !card.eliminated) return { ok, card: eliminate(card, 'palette: not eligible as the main (readability or anchor)', 'not_eligible_main'), mini }
@@ -360,7 +390,7 @@ export async function runCards(a: CardsArgs): Promise<CardsOut> {
     if (rep.ran) anyReviewRan = true
     else skipped = skipped ?? rep.skipped_reason
     if (rep.verdicts.some((v) => !v.pass && v.rule === 'goodwill') && !early) {
-      early = { kind: 'declined', stage: 'review', stamped: base }
+      early = { kind: 'declined', stage: 'review', stamped: base, miss: false }
       stop.abort()
     }
     const r2 = applyReviewVerdicts(mini, palette, story, rep, { deferInsufficient: true, canBeMain: slot === 'main' ? a.canBeMain : undefined })
@@ -396,8 +426,9 @@ export async function runCards(a: CardsArgs): Promise<CardsOut> {
         report.main_call_ms = at()
         if (out.err) return { slot, chosen: null, tried, done_ms: at() } // the caller rethrows
         mainRaw = out.raw
+        mainExtracted = out.extracted ?? null
         if (out.raw && out.raw.status !== 'sufficient') {
-          early = { kind: out.declined ? 'declined' : 'insufficient', stage: 'selection', stamped: out.raw }
+          early = { kind: out.declined ? 'declined' : 'insufficient', stage: 'selection', stamped: out.raw, miss: out.miss === true }
           stop.abort()
           return { slot, chosen: null, tried, done_ms: at() }
         }
@@ -460,7 +491,8 @@ export async function runCards(a: CardsArgs): Promise<CardsOut> {
     const b = mainRaw
     if (!b || cards.length === 0) return null
     const free = cards.find((c) => c.slot === 'freestyle')
-    return finalizeResult({ ...b, status: 'sufficient', candidates: cards, primary_kanji: cards[0].kanji, runner_up_kanji: cards.find((c) => c.slot === 'second')?.kanji ?? null, freestyle_kanji: free?.kanji ?? null, referee: undefined, review: undefined }, () => {})
+    const done = finalizeResult({ ...b, status: 'sufficient', candidates: cards, primary_kanji: cards[0].kanji, runner_up_kanji: cards.find((c) => c.slot === 'second')?.kanji ?? null, freestyle_kanji: free?.kanji ?? null, referee: undefined, review: undefined }, () => {})
+    return a.finish ? a.finish(done) : done
   }
   const fire = (cards: Candidate[]) => {
     try {
@@ -510,8 +542,8 @@ export async function runCards(a: CardsArgs): Promise<CardsOut> {
 
   if (early) {
     const e = early as NonNullable<CardsOut['early']>
-    return { early: e, base: e.stamped, candidates: [], review: { ran: anyReviewRan, skipped_reason: skipped, verdicts }, report, mainRaw }
+    return { early: e, base: e.stamped, candidates: [], review: { ran: anyReviewRan, skipped_reason: skipped, verdicts }, report, mainRaw, mainExtracted }
   }
   const candidates = [...lm.tried, ...ls.tried, ...(lf?.tried ?? [])]
-  return { early: null, base: mainRaw, candidates, review: { ran: anyReviewRan, skipped_reason: anyReviewRan ? null : skipped, verdicts }, report, mainRaw }
+  return { early: null, base: mainRaw, candidates, review: { ran: anyReviewRan, skipped_reason: anyReviewRan ? null : skipped, verdicts }, report, mainRaw, mainExtracted }
 }
