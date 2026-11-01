@@ -1924,7 +1924,7 @@ const SECTION_ORDER = ['.hero', '.strip', '.philo', '#shape', '#angles', '#write
   check('…and the choice is remembered across a reload', (await page.locator('h1').innerText()) === 'Between you and me, one character.' && (await page.getAttribute('html', 'lang')) === 'en')
 
   // -- the customer flow
-  check('en customer page: the flow is English, no language pills inside it, no test controls', (await page.locator('#write').innerText()).includes('One moment with them') && (await page.locator('#write [data-language]').count()) === 0 && (await page.locator('text=VALIDATION HARNESS').count()) === 0)
+  check('en customer page: the flow is English, no language pills inside it, no test controls', (await page.locator('#write').innerText()).includes('The moment with them you remember most.') && (await page.locator('#write [data-language]').count()) === 0 && (await page.locator('text=VALIDATION HARNESS').count()) === 0)
   check('en: the chips are English (relationship, direction, occasion)', (await page.locator('[data-chip="relationship:parent_mother"]').innerText()) === 'Mother' && (await page.locator('[data-chip="occasion:wedding"]').innerText()) === 'Wedding or anniversary')
   await page.locator('#moment').fill('My mum left the porch light on every night until I got home.')
   await pickContext(page, { relationship: 'parent_mother', direction: 'up', occasion: 'birthday_milestone' })
