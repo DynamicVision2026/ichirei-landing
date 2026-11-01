@@ -9,7 +9,6 @@ import {
   STORY_COUNTER_FROM,
   STORY_MAX,
   appendSpoken,
-  clipStory,
   storyLength,
   UI_LANGUAGES,
   contextComplete,
@@ -85,7 +84,8 @@ export default function Elicitation({
   showInscriptionScript = true,
 }: Props) {
   const setCtx = (patch: Partial<GiftContext>) => onContextChange({ ...context, ...patch })
-  const ready = contextComplete(context) && story.trim() !== ''
+  const over = storyLength(story) > STORY_MAX // never cut silently: the text stays, the counter turns red, one line says why, the button waits
+  const ready = contextComplete(context) && story.trim() !== '' && !over
   const [activeAngle, setActiveAngle] = useState<string | null>(null)
   const [angleText, setAngleText] = useState('')
   const [listening, setListening] = useState(false)
@@ -123,7 +123,7 @@ export default function Elicitation({
             const next = appendSpoken(storyRef.current, t)
             storyRef.current = next.text
             onStoryChange(next.text)
-            if (next.clipped) setVoiceLimit(true)
+            if (next.over) setVoiceLimit(true)
             if (next.full) rec.stop()
           }
         } else {
@@ -150,7 +150,7 @@ export default function Elicitation({
     const t = angleText.trim()
     if (!t || !activeAngle) return
     const line = `【${activeAngle}】${t}`
-    onStoryChange(clipStory(story ? `${story}\n${line}` : line))
+    onStoryChange(story ? `${story}\n${line}` : line)
     setAngleText('')
     setActiveAngle(null)
   }
@@ -310,8 +310,7 @@ export default function Elicitation({
 
       <textarea
         value={story}
-        onChange={(e) => onStoryChange(clipStory(e.target.value))}
-        maxLength={STORY_MAX}
+        onChange={(e) => onStoryChange(e.target.value)}
         data-testid="story-input"
         rows={7}
         placeholder={copy.storyPlaceholder}
@@ -325,11 +324,16 @@ export default function Elicitation({
           </p>
         )}
         {storyLength(story) >= STORY_COUNTER_FROM && (
-          <p data-testid="story-counter" className={`font-label text-[11px] ${storyLength(story) >= STORY_MAX ? 'text-gold' : 'text-ivory/60'}`}>
+          <p data-testid="story-counter" className={`font-label text-[11px] ${over ? 'text-red-400' : 'text-ivory/60'}`}>
             {copy.storyCounter(storyLength(story), STORY_MAX)}
           </p>
         )}
       </div>
+      {over && (
+        <p role="alert" data-testid="story-over" className="font-label mt-2 text-[12px] text-red-400">
+          {copy.storyOver}
+        </p>
+      )}
 
       {/* Five memory angles — each opens an aimed input box */}
       <p className="font-label mt-6 mb-2 text-[11px] tracking-[0.2em] text-gold/70">

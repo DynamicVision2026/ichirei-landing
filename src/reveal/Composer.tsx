@@ -10,7 +10,6 @@ import {
   RELATIONSHIP_CODES,
   STORY_MAX,
   appendSpoken,
-  clipStory,
   contextComplete,
   storyLength,
   type Copy,
@@ -106,7 +105,9 @@ export default function Composer({ story, onStoryChange, onSubmit, copy, lang, c
   const n = storyLength(story)
   // A short sentence is enough, but not an empty or junk try: every submit costs real AI money (Part A3).
   const longEnough = storyLength(story.trim()) >= STORY_MIN
-  const ready = contextComplete(context) && longEnough
+  // Never cut silently: past STORY_MAX the text stays exactly as pasted, the counter turns red, one line says why, and the button waits.
+  const over = n > STORY_MAX
+  const ready = contextComplete(context) && longEnough && !over
   const set = questionSetOf(context)
   const questions = set ? questionsOf(set, lang) : []
   const question = questions.find((q) => q.id === questionId) ?? null
@@ -189,7 +190,7 @@ export default function Composer({ story, onStoryChange, onSubmit, copy, lang, c
             const next = appendSpoken(storyRef.current, text)
             storyRef.current = next.text
             onStoryChange(next.text)
-            if (next.clipped) setVoiceLimit(true)
+            if (next.over) setVoiceLimit(true)
             if (next.full) rec.stop()
           }
         } else {
@@ -274,17 +275,22 @@ export default function Composer({ story, onStoryChange, onSubmit, copy, lang, c
         data-testid="story-input"
         rows={6}
         value={story}
-        maxLength={STORY_MAX}
-        onChange={(e) => onStoryChange(clipStory(e.target.value))}
+        onChange={(e) => onStoryChange(e.target.value)}
+        aria-invalid={over || undefined}
         placeholder={question ? o.answerHint : copy.storyPlaceholder}
       />
       <div className="cmeta">
         <span data-testid="story-hint">{copy.storyHint}</span>
         {n > 0 && !longEnough && <span data-testid="story-too-short">{o.tooShort}</span>}
-        <span className="cnt" data-testid="story-counter" aria-live="off">
+        <span className={`cnt${over ? ' over' : ''}`} data-testid="story-counter" aria-live="off">
           {copy.storyCounter(n, STORY_MAX)}
         </span>
       </div>
+      {over && (
+        <p className="storyOver" role="alert" data-testid="story-over">
+          {copy.storyOver}
+        </p>
+      )}
 
       {!speechSupported && (
         <span className="sent" data-testid="voice-none">

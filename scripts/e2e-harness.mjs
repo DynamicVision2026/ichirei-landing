@@ -548,28 +548,43 @@ const mockPage = async (browser, { onExplain, result, order, track } = {}) => {
   await page.close()
 }
 
-// ---------- Run 8c: v6 — the story hint, the 2000-character limit, the counter from 1500, follow-up answers 600 each ----------
+// ---------- Run 8c: v6 — the story hint, the 5000-character limit (never cut silently), the counter, follow-up answers 600 each ----------
 {
   const { page, calls } = await mockPage(browser)
   await page.goto('http://localhost:5173/', { waitUntil: 'networkidle' })
   const box = page.locator('#write [data-testid=story-input]')
-  check('story: the soft hint 50〜300 is under the box (ja), the live counter reads "0 / 2000字" from the start (the Reveal composer), and the box has a hard maximum of 2000', (await page.locator('#write [data-testid=story-hint]').innerText()) === '50〜300字くらいで十分です' && (await page.locator('#write [data-testid=story-counter]').innerText()) === '0 / 2000字' && (await box.getAttribute('maxlength')) === '2000')
+  const counter = page.locator('#write [data-testid=story-counter]')
+  const goBtn = page.locator('#write button[type=submit]')
+  const paste = (loc, text) => loc.evaluate((el, t) => { const set = Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, 'value').set; set.call(el, t); el.dispatchEvent(new Event('input', { bubbles: true })) }, text)
+  check('story: the soft hint 50〜300 is under the box (ja), the live counter reads "0 / 5000字" from the start (the Reveal composer), and the box has NO maxlength (nothing is ever cut by the browser)', (await page.locator('#write [data-testid=story-hint]').innerText()) === '50〜300字くらいで十分です' && (await counter.innerText()) === '0 / 5000字' && (await box.getAttribute('maxlength')) === null)
   await box.fill('あ'.repeat(1499))
-  check('story: the counter follows the length at 1499 characters', (await page.locator('#write [data-testid=story-counter]').innerText()) === '1499 / 2000字')
-  await box.fill('あ'.repeat(1500))
-  check('story: the counter at 1500 reads "1500 / 2000字"', (await page.locator('#write [data-testid=story-counter]').innerText()) === '1500 / 2000字')
+  check('story: the counter follows the length at 1499 characters', (await counter.innerText()) === '1499 / 5000字')
+  await box.fill('あ'.repeat(4999))
+  check('story: 4999 characters — counter normal, no over-limit line', (await counter.innerText()) === '4999 / 5000字' && (await page.locator('#write [data-testid=story-over]').count()) === 0)
   await box.fill('あ'.repeat(523))
-  check('story: the counter follows the length', (await page.locator('#write [data-testid=story-counter]').innerText()) === '523 / 2000字')
-  // a paste of 2100 characters is cut to 2000 and can never be submitted over the limit
-  await box.evaluate((el, text) => { const set = Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, 'value').set; set.call(el, text); el.dispatchEvent(new Event('input', { bubbles: true })) }, '長'.repeat(2100))
-  check('story: a 2100-character paste is clipped to exactly 2000 characters', (await box.inputValue()).length === 2000 && (await page.locator('#write [data-testid=story-counter]').innerText()) === '2000 / 2000字')
+  check('story: the counter follows the length', (await counter.innerText()) === '523 / 5000字')
+  // 2026-11-01: a 4,295-character live story was cut at 2,000 (just before its turning point). Nothing is cut now.
+  const long43 = '長'.repeat(4300)
+  await paste(box, long43)
+  check('story: a 4300-character paste keeps ALL of its text (limit 5000) — no cut, no message, nothing red', (await box.inputValue()) === long43 && (await counter.innerText()) === '4300 / 5000字' && (await page.locator('#write [data-testid=story-over]').count()) === 0)
+  const long53 = '長'.repeat(5300)
+  await paste(box, long53)
+  const redColour = await counter.evaluate((el) => getComputedStyle(el).color)
+  check('story: a 5300-character paste stays exactly as pasted (all 5300 characters), the counter turns red and reads "5300 / 5000字"', (await box.inputValue()) === long53 && (await counter.innerText()) === '5300 / 5000字' && redColour === 'rgb(179, 38, 30)', redColour)
+  check('story: over the limit ONE line says why — 「5000字を超えています。いちばん大切な場面が残るように、少し短くしてください。」 — and the button is disabled', (await page.locator('#write [data-testid=story-over]').innerText()) === '5000字を超えています。いちばん大切な場面が残るように、少し短くしてください。' && (await goBtn.isDisabled()))
   await pickContext(page)
+  check('story: even with the context chosen the button stays disabled while the story is over the limit, and no request was made', (await goBtn.isDisabled()) && calls.select.length === 0)
+  // shorten (the owner's edit): the line goes, the button wakes up, and what is sent is exactly the 4900 characters — the turning point in the last third is in it
+  const TURN = 'その夜、父の古いカメラの中から、現像されていない一本のフィルムが出てきた。'
+  const story49 = '朝の港で、父は黙って網を繕っていた。'.repeat(240).slice(0, 4900 - TURN.length) + TURN
+  await paste(box, story49)
+  check('story: a 4900-character story is accepted — counter "4900 / 5000字", no over-limit line, button enabled', [...story49].length === 4900 && (await counter.innerText()) === '4900 / 5000字' && (await page.locator('#write [data-testid=story-over]').count()) === 0 && !(await goBtn.isDisabled()))
   await page.click(`#write >> text=${GO.ja}`)
   await page.waitForSelector(`button:has-text("${FINALIZE.ja}")`, { timeout: 15000 })
-  check('story: what is sent is at most 2000 characters', [...calls.select[0].story].length === 2000 && !('follow_ups' in calls.select[0]))
+  check('story: what is sent is the whole 4900-character story, uncut — its turning point (last third) included — and no follow-ups', [...calls.select[0].story].length === 4900 && calls.select[0].story === story49 && calls.select[0].story.indexOf('現像されていない') / calls.select[0].story.length > 0.66 && !('follow_ups' in calls.select[0]))
   await page.close()
 
-  // voice input (「声で話す」): stops at 2000, keeps the first 2000 characters and says so — never mid-sentence without a word
+  // voice input (「声で話す」): never cuts either — at 5000 it stops listening, keeps everything said, and the same over-limit line appears
   {
     const v = await mockPage(browser)
     await v.page.addInitScript(() => {
@@ -578,11 +593,11 @@ const mockPage = async (browser, { onExplain, result, order, track } = {}) => {
     await v.page.goto('http://localhost:5173/', { waitUntil: 'networkidle' })
     const speak = (text) => v.page.evaluate((t) => window.__rec.onresult({ resultIndex: 0, results: { length: 1, 0: { isFinal: true, 0: { transcript: t } } } }), text)
     await v.page.locator('#write button.voice').click()
-    await speak('あ'.repeat(1995))
-    check('voice: speech that fits is added whole, no limit note, and the page keeps listening', (await v.page.locator('#write [data-testid=story-input]').inputValue()).length === 1995 && (await v.page.locator('[data-testid=voice-limit-note]').count()) === 0 && (await v.page.evaluate(() => window.__stopped)) === false)
+    await speak('あ'.repeat(4995))
+    check('voice: speech that fits is added whole, no limit note, and the page keeps listening', (await v.page.locator('#write [data-testid=story-input]').inputValue()).length === 4995 && (await v.page.locator('[data-testid=voice-limit-note]').count()) === 0 && (await v.page.evaluate(() => window.__stopped)) === false)
     await speak('い'.repeat(30))
     const got = await v.page.locator('#write [data-testid=story-input]').inputValue()
-    check('voice: speech past 2000 keeps the first 2000 characters, shows the short note and stops listening', got.length === 2000 && got.startsWith('あ'.repeat(1995) + 'い') && (await v.page.locator('[data-testid=voice-limit-note]').innerText()) === '2000字までです。それ以降の音声は入っていません。' && (await v.page.evaluate(() => window.__stopped)) === true && (await v.page.locator('#write [data-testid=story-counter]').innerText()) === '2000 / 2000字')
+    check('voice: speech past 5000 is KEPT WHOLE (5025 characters), shows the short note and the over-limit line, stops listening, and the button waits', got.length === 5025 && got === 'あ'.repeat(4995) + 'い'.repeat(30) && (await v.page.locator('[data-testid=voice-limit-note]').innerText()) === '5000字までです。音声入力を止めました（話した内容はすべて残っています）。' && (await v.page.evaluate(() => window.__stopped)) === true && (await v.page.locator('#write [data-testid=story-counter]').innerText()) === '5025 / 5000字' && (await v.page.locator('#write [data-testid=story-over]').count()) === 1 && (await v.page.locator('#write button[type=submit]').isDisabled()))
     check('no page errors (run 8c, voice)', v.errors.length === 0)
     await v.page.close()
   }
@@ -629,13 +644,13 @@ const mockPage = async (browser, { onExplain, result, order, track } = {}) => {
   // the server's story_too_long answer is shown in the sender's language (not the raw English message)
   const p2 = await browser.newPage({ locale: 'ja-JP', viewport: { width: 1100, height: 950 } })
   await p2.route('**/api/log', (route) => route.fulfill({ status: 204, body: '' }))
-  await p2.route('**/api/select', (route) => route.fulfill({ status: 400, contentType: 'application/json', body: JSON.stringify({ error: '"story" is longer than 2000 characters (got 2100)', code: 'story_too_long', max: 2000 }) }))
+  await p2.route('**/api/select', (route) => route.fulfill({ status: 400, contentType: 'application/json', body: JSON.stringify({ error: '"story" is longer than 5000 characters (got 5100)', code: 'story_too_long', max: 5000 }) }))
   await p2.goto('http://localhost:5173/?lang=en', { waitUntil: 'networkidle' })
-  check('story (en): hint "50–300 characters is plenty", cap 2000', (await p2.locator('#write [data-testid=story-hint]').innerText()) === '50–300 characters is plenty' && (await p2.locator('#write [data-testid=story-input]').getAttribute('maxlength')) === '2000')
+  check('story (en): hint "50–300 characters is plenty", no maxlength on the box', (await p2.locator('#write [data-testid=story-hint]').innerText()) === '50–300 characters is plenty' && (await p2.locator('#write [data-testid=story-input]').getAttribute('maxlength')) === null)
   await p2.locator('#write [data-testid=story-input]').fill('My mum left the porch light on.')
   await pickContext(p2, { relationship: 'parent_mother' })
   await p2.click(`#write >> text=${GO.en}`)
-  await p2.waitForSelector('text=Stories can be up to 2,000 characters', { timeout: 6000 })
+  await p2.waitForSelector('text=Stories can be up to 5,000 characters', { timeout: 6000 })
   check('story (en): a story_too_long answer from the server is shown as the localized message and the form stays', await p2.locator('#write [data-testid=story-input]').isVisible())
   await p2.close()
 }
@@ -1530,7 +1545,7 @@ const SECTION_ORDER = ['.hero', '.strip', '.philo', '#shape', '#angles', '#write
   check('landing ja: honesty — no native-speaker claim, no AI, no payment methods, no review counts or ratings', !/ネイティブ|\bAI\b|人工知能|VISA|Visa|PayPal|クレジット|★|⭐/.test(t) && t.includes('本物のレビューが、ここに並びます'))
   check('landing ja: the trust strip has three items (no "checked by native speakers")', (await page.locator('.strip li').count()) === 3)
   check('landing ja: no test controls (no A/B/C, no log export, no golden fixture, no harness label)', !/condition|ログ書き出し|golden fixture|VALIDATION HARNESS|raw contract/.test(t))
-  check('landing ja: the composer is the real flow — chips for relationship, direction and occasion, the textarea, the "0 / 2000字" counter, the soft hint', (await page.locator('[data-chip^="relationship:"]').count()) === 13 && (await page.locator('[data-chip^="direction:"]').count()) === 3 && (await page.locator('[data-chip^="occasion:"]').count()) === 8 && (await page.locator('#moment').count()) === 1 && (await page.locator('[data-testid=story-counter]').innerText()) === '0 / 2000字' && (await page.locator('[data-testid=story-hint]').innerText()) === '50〜300字くらいで十分です')
+  check('landing ja: the composer is the real flow — chips for relationship, direction and occasion, the textarea, the "0 / 5000字" counter, the soft hint', (await page.locator('[data-chip^="relationship:"]').count()) === 13 && (await page.locator('[data-chip^="direction:"]').count()) === 3 && (await page.locator('[data-chip^="occasion:"]').count()) === 8 && (await page.locator('#moment').count()) === 1 && (await page.locator('[data-testid=story-counter]').innerText()) === '0 / 5000字' && (await page.locator('[data-testid=story-hint]').innerText()) === '50〜300字くらいで十分です')
   check('landing ja: no language pills inside the flow (the nav switch is the one control) and no inscription-script toggle', (await page.locator('#write [data-language]').count()) === 0 && (await page.locator('[data-inscription-script]').count()) === 0)
   check('landing ja: the nav switch shows exactly EN, 日本語, 繁中', (await page.locator('.lang button').allInnerTexts()).join('|') === 'EN|日本語|繁中')
   await page.locator('#gifts').scrollIntoViewIfNeeded()

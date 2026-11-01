@@ -380,8 +380,8 @@ export default function DemoApp({ mode = 'harness', aside }: { mode?: Mode; asid
     log('retry_clicked', { story_chars: story.length })
     followUpsUsed.current = 0
     memorialDeclined.current = false
-    // The story box gets the story with the answers folded in (cut to the story limit), so nothing the sender wrote is lost.
-    setStory(clipStory([story, ...followUps].join('\n\n')))
+    // The story box gets the story with the answers folded in (the box then shows the over-limit line if it is past the limit; nothing is ever cut), so nothing the sender wrote is lost.
+    setStory([story, ...followUps].join('\n\n'))
     setFollowUps([])
     setResult(null)
     setSets([])

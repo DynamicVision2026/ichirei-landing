@@ -207,6 +207,9 @@
 .rv .composer textarea:focus-visible{outline:2px solid var(--gold);outline-offset:1px}
 .rv .cmeta{display:flex;justify-content:space-between;gap:1rem;flex-wrap:wrap;font-size:.84rem;color:var(--mute)}
 .rv .cnt{font-variant-numeric:tabular-nums}
+.rv .cnt.over{color:#b3261e;font-weight:600}
+.rv .storyOver{margin:0;font-size:.92rem;line-height:1.7;color:#b3261e}
+.rv textarea[aria-invalid=true]{border-color:#b3261e}
 .rv .composer .btn{align-self:flex-start;margin-top:.4rem}
 .rv .sent{margin:0;font-size:.9rem;color:var(--mute)}
 @media (max-width:860px){

@@ -39,7 +39,7 @@ From one true story, find **one character** that shows how the sender honestly s
 ## D. The process, from story to cards
 
 **Step 0. Input (page and code)**
-- Story: max 2,000 characters (raised from 600 on 2026-10-30 so spoken stories are never cut off). The page still says 50–300 characters is enough.
+- Story: max **5,000** characters (600 → 2,000 on 2026-10-30; → 5,000 on 2026-11-01 because a 4,295-character story was cut at 2,000, before its turning point). The page still says 50–300 characters is enough. **Never cut silently:** the story box has no `maxlength`; over the limit the counter turns red, one line asks the sender to shorten it so the most important scene stays, the button is disabled and the text is left as pasted. The API never truncates: an over-limit story is rejected with `story_too_long`. The whole story reaches every model call that reads it (selection, review, poem, film script).
 - Choices: language, relationship, direction (up / across / down), occasion.
 - If the story clearly says the person has died, the page asks the sender whether to switch to remembrance (偲ぶ). It never switches silently.
 

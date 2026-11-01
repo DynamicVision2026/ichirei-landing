@@ -1,4 +1,4 @@
-// A story of about 2,000 characters (the limit since 2026-10-30; spec step 0) through the three model calls that read the story: the selection
+// A story of about 4,900 characters (the limit is 5,000 since 2026-11-01, 2,000 before; spec step 0) through the three model calls that read the story: the selection
 // (+ its safety review), the poem (+ its review) and the film script. A FAKE model stands in: this suite proves the plumbing — the whole story
 // reaches each prompt, each call asks for the output room it is configured with, and each answer is accepted — NOT how long the real model
 // reasons about a long story (that is for the owner's live test; the output ceilings are 14000/20000 selection, 6000 explain, 4000 poem, review
@@ -15,7 +15,7 @@ import { makeFilm, type FilmInput } from '../engine/film.ts'
 import { generatePoem, type PoemInput } from '../engine/poem.ts'
 import { loadPalette } from '../engine/palette.ts'
 import { POST as selectPost } from '../api/select.ts'
-import { appendSpoken, clipStory, storyLength } from '../src/demo/i18n.ts'
+import { appendSpoken, storyLength } from '../src/demo/i18n.ts'
 
 let failures = 0
 function check(name: string, cond: boolean, detail?: string) {
@@ -25,12 +25,14 @@ function check(name: string, cond: boolean, detail?: string) {
 const read = (p: string) => JSON.parse(readFileSync(join(process.cwd(), p), 'utf8'))
 const palette = loadPalette()
 
-// pad a real story to ~2,000 characters with plain added sentences (the original stays at the front, so every verbatim anchor still holds)
+// pad a real story to ~4,900 characters with plain added sentences (the original stays at the front, so every verbatim anchor still holds)
 const FILLER = '話しているうちに思い出したことも、ここに足しておきます。あの頃の家の匂いや、台所の窓から入る夕方の光、帰りの電車で考えていたことまで、一つひとつ覚えています。'
-const pad = (story: string, to = 1990): string => {
+// A turning point placed LAST (so it sits in the final third of a long story: the part the old 4,900-character box cut away on 2026-10-31).
+const TURNING = '\n\nその夜、父の古いカメラの中から、現像されていない一本のフィルムが出てきた。'
+const pad = (story: string, to = 4900): string => {
   let s = story
-  while (countChars(s) < to) s += (s.endsWith('\n') ? '' : '\n') + FILLER
-  return clipStory(s, STORY_MAX)
+  while (countChars(s) + countChars(FILLER) + 1 <= to - countChars(TURNING)) s += (s.endsWith('\n') ? '' : '\n') + FILLER
+  return s + TURNING // (never cut: the result is at most `to` characters)
 }
 
 const fxA = read('scripts/fixtures-v6/a-solemn-parent.json')
@@ -75,7 +77,7 @@ const tokensOf = (s: string) => Math.ceil(countChars(s) * 1.1) // generous for J
 try {
   // ---- 1. the selection call (+ review), through the real /api/select handler ------------------------------------------------------------------
   const storyA = pad(fxA.story)
-  check('(1) the test story is about 2,000 characters and within the limit', countChars(storyA) >= 1950 && countChars(storyA) <= STORY_MAX, String(countChars(storyA)))
+  check('(1) the test story is about 4,900 characters (turning point in the last third) and within the limit', countChars(storyA) >= 4800 && countChars(storyA) <= STORY_MAX && storyA.indexOf('現像されていない') / storyA.length > 0.66, String(countChars(storyA)))
   phase = 'select'
   replies = { select: fxA.model_reply, 'select-review': fxA.review_reply }
   seen.length = 0
@@ -84,9 +86,9 @@ try {
   const sel = seen.find((s) => s.which === 'select')
   const rev = seen.find((s) => s.which === 'select-review')
   const last = text.trim().split('\n').map((l) => JSON.parse(l)).pop()
-  check('(1) /api/select accepts the 2,000-character story (200) and streams a finished answer', res.status === 200 && JSON.stringify(last).includes('sufficient'), text.slice(-300))
+  check('(1) /api/select accepts the 4,900-character story (200) and streams a finished answer', res.status === 200 && JSON.stringify(last).includes('sufficient'), text.slice(-300))
   check('(1) the whole story reaches the selection prompt and the review prompt', !!sel && sel.prompt.includes(storyA) && !!rev && rev.prompt.includes(storyA))
-  check('(1) output room: selection 14000 (retry 20000), review 4000; the 2,000-character prompt is ~2,000–4,000 tokens of input, far under any context limit', sel?.max_tokens === 14000 && rev?.max_tokens === 4000 && tokensOf(sel!.prompt) < 100000, `${sel?.max_tokens} ${rev?.max_tokens}`)
+  check('(1) output room: selection 14000 (retry 20000), review 4000; the 4,900-character prompt is ~2,000–4,000 tokens of input, far under any context limit', sel?.max_tokens === 14000 && rev?.max_tokens === 4000 && tokensOf(sel!.prompt) < 100000, `${sel?.max_tokens} ${rev?.max_tokens}`)
 
   // ---- 2. the poem call (+ review), through generatePoem ---------------------------------------------------------------------------------------
   const storyP = pad(fxP.story)
@@ -97,12 +99,12 @@ try {
   const poem = await quiet(() => generatePoem(pin, palette))
   const pp = seen.find((s) => s.which === 'poem')
   const pr = seen.find((s) => s.which === 'poem-review')
-  check('(2) the poem call and its review accept a 2,000-character story and the poem is ok', poem.ok === true, JSON.stringify(poem).slice(0, 300))
+  check('(2) the poem call and its review accept a 4,900-character story and the poem is ok', poem.ok === true, JSON.stringify(poem).slice(0, 300))
   check('(2) the whole story reaches the poem prompt and the poem review prompt; output room 4000 each', !!pp && pp.prompt.includes(storyP) && !!pr && pr.prompt.includes(storyP) && pp.max_tokens === 4000 && pr.max_tokens === 4000, `${pp?.max_tokens} ${pr?.max_tokens}`)
   // the poem endpoint's own check on the stored story shares the same constant (engine/contract.ts STORY_MAX)
   const { POST: poemPost } = await import('../api/poem.ts')
   const tooLong = await poemPost(new Request('http://x/api/poem', { method: 'POST', body: JSON.stringify({ story: 'あ'.repeat(STORY_MAX + 1), type: 'tanka', kanji: fxP.kanji, language: 'ja' }) }))
-  check('(2) /api/poem refuses a story over 2,000 characters (400 story_too_long) — the same constant as the other endpoints', tooLong.status === 400)
+  check('(2) /api/poem refuses a story over 5,000 characters (400 story_too_long) — the same constant as the other endpoints', tooLong.status === 400)
 
   // ---- 3. the film-script call ----------------------------------------------------------------------------------------------------------------
   const storyF = pad(fxF.story)
@@ -115,19 +117,20 @@ try {
   seen.length = 0
   const f = await quiet(() => makeFilm(film, { log: () => {}, now: () => new Date('2026-10-30T03:00:00Z') }))
   const fp = seen.find((s) => s.which === 'film')
-  check('(3) the film-script call accepts a 2,000-character story and the script is ready (not the fallback)', f.status === 'ready', JSON.stringify(f).slice(0, 300))
+  check('(3) the film-script call accepts a 4,900-character story and the script is ready (not the fallback)', f.status === 'ready', JSON.stringify(f).slice(0, 300))
   check('(3) the whole story reaches the film prompt; output room 4000', !!fp && fp.prompt.includes(storyF) && fp.max_tokens === 4000, `${fp?.max_tokens}`)
+  check('(3) the turning point (in the last third of the 4,900-character story) reaches the film script call, uncut, in the last third of what the model reads', !!fp && fp.prompt.includes('現像されていない一本のフィルムが出てきた。') && fp.prompt.lastIndexOf('現像されていない') > fp.prompt.indexOf(storyF) + storyF.length * 0.66, String(fp?.prompt.length))
 
-  // ---- 4. voice input never overruns the limit without a word ----------------------------------------------------------------------------------
-  const near = 'あ'.repeat(1990)
+  // ---- 4. voice input never cuts anything either (2026-11-01) --------------------------------------------------------------------------------
+  const near = 'あ'.repeat(4990)
   const a1 = appendSpoken(near, 'い'.repeat(5))
   const a2 = appendSpoken(near, 'い'.repeat(30))
   const a3 = appendSpoken('', 'う'.repeat(10))
-  const a4 = appendSpoken('𠮷'.repeat(1995), '𠮷'.repeat(10))
-  check('(4) voice: speech that fits is added whole (not full, no note)', storyLength(a1.text) === 1995 && !a1.clipped && !a1.full)
-  check('(4) voice: speech that lands exactly on 2,000 is kept whole, not clipped, and listening stops (full)', storyLength(appendSpoken(near, 'い'.repeat(10)).text) === 2000 && !appendSpoken(near, 'い'.repeat(10)).clipped && appendSpoken(near, 'い'.repeat(10)).full)
-  check('(4) voice: speech past the limit keeps the first 2,000 characters, says so (clipped) and stops listening', storyLength(a2.text) === 2000 && a2.text.startsWith(near) && a2.clipped && a2.full)
-  check('(4) voice: ordinary speech into an empty box is unchanged; characters count as code points (𠮷 = 1)', a3.text === 'う'.repeat(10) && !a3.clipped && storyLength(a4.text) === 2000 && a4.clipped)
+  const a4 = appendSpoken('𠮷'.repeat(4995), '𠮷'.repeat(10))
+  check('(4) voice: speech that fits is added whole (not over, not full)', storyLength(a1.text) === 4995 && !a1.over && !a1.full)
+  check('(4) voice: speech that lands exactly on 5,000 is kept whole and listening stops (full), not over', storyLength(appendSpoken(near, 'い'.repeat(10)).text) === 5000 && !appendSpoken(near, 'い'.repeat(10)).over && appendSpoken(near, 'い'.repeat(10)).full)
+  check('(4) voice: speech past the limit is KEPT WHOLE (nothing cut), flagged over, and listening stops', storyLength(a2.text) === 5020 && a2.text === near + 'い'.repeat(30) && a2.over && a2.full)
+  check('(4) voice: ordinary speech into an empty box is unchanged; characters count as code points (𠮷 = 1)', a3.text === 'う'.repeat(10) && !a3.over && storyLength(a4.text) === 5005 && a4.over)
 } finally {
   upstream.close()
 }

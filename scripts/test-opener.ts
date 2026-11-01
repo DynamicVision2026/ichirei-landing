@@ -97,7 +97,7 @@ check('(2) the wording follows the buyer\'s language (en → the English questio
 const unknown = await post({ prompt_question: { id: 'made-up', text: 'x' } })
 const none = await post({})
 check('(2) an unknown id, a wrong type or no question at all is simply ignored: 200 and no QUESTION line in the prompt (the question is optional context)', unknown.status === 200 && !unknown.prompt.includes('QUESTION SHOWN TO THE SENDER (context only):') && none.status === 200 && !none.prompt.includes('QUESTION SHOWN TO THE SENDER (context only):') && (await post({ prompt_question: 'up-habit' })).status === 200)
-check('(2) the question does not count toward the 2,000-character limit (a 2,000-character story with a question is accepted)', (await post({ story: FIX.story + 'あ'.repeat(2000 - [...FIX.story].length), prompt_question: { id: 'up-habit' } })).status === 200)
+check('(2) the question does not count toward the 5,000-character limit (a 5,000-character story with a question is accepted)', (await post({ story: FIX.story + 'あ'.repeat(5000 - [...FIX.story].length), prompt_question: { id: 'up-habit' } })).status === 200)
 for (const lang of ['ja', 'en', 'zh-Hant'] as const) {
   const p = loadPrompt(lang)
   check(`(2) prompt.${lang}.md: the question slot, and "the sender saw this question; the story may answer it or be about something else; choose the character only from what the story says"`, p.includes('{{ SENDER QUESTION }}') && p.includes('The sender saw this question. The story may answer it or may be about something else. Choose the character only from what the story says.') && !p.includes('The story answers this question') && p.includes('never quote it as a story_anchor'))
@@ -106,7 +106,7 @@ check('(2) parsePromptQuestion / questionText: known ids only, the server\'s wor
 upstream.close()
 
 // ---- 3. the 10-character minimum ---------------------------------------------------------------------------------------------------------
-check('(3) the minimum is 10 characters (the submit button is enabled from the 10th); the soft hint and the 2,000 maximum are untouched; the note is in all three languages', STORY_MIN === 10 && LANGS.every((l) => OPENER[l].tooShort.length > 0 && /10/.test(OPENER[l].tooShort)) && read('src/demo/i18n.ts').includes('50〜300字くらいで十分です') && read('engine/contract.ts').includes('STORY_MAX = 2000'))
+check('(3) the minimum is 10 characters (the submit button is enabled from the 10th); the soft hint is untouched and the maximum is 5,000; the note is in all three languages', STORY_MIN === 10 && LANGS.every((l) => OPENER[l].tooShort.length > 0 && /10/.test(OPENER[l].tooShort)) && read('src/demo/i18n.ts').includes('50〜300字くらいで十分です') && read('engine/contract.ts').includes('STORY_MAX = 5000'))
 
 // ---- 4. drafts ---------------------------------------------------------------------------------------------------------------------------------
 const mem = () => { const m = new Map<string, string>(); return { m, getItem: (k: string) => m.get(k) ?? null, setItem: (k: string, v: string) => void m.set(k, v), removeItem: (k: string) => void m.delete(k) } }
