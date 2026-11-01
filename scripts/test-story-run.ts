@@ -97,7 +97,7 @@ if (csvName) {
   check('end to end: the memorial row — the referee removed the celebration characters (祝, 喜), 灯 is the main, no flag; the living row keeps 祝', t2.kanji_main === '灯' && t2.eliminated.includes('祝:palette: blocked_occasion') && t2.eliminated.includes('喜:') && t2.flags === '' && t1.kanji_main === '祝' && t1.flags === '', JSON.stringify([t1, t2]))
   check('end to end: tokens and cost are summed from the model\'s usage (2 calls per run: select + review), the review verdicts are in the row', Number(t1.input_tokens) === 2000 && Number(t1.output_tokens) === 4000 && Number(t1.cost_usd_est) > 0 && t1.review.includes('祝:pass'), JSON.stringify(t1))
 }
-check('end to end: four model calls for two stories — select + review each; a removed second card is not replaced any more (spec step 8, main-only)', calls === 4, String(calls))
+check('end to end: five model calls for two stories — select + review each, plus ONE refill call for the empty slot of the second story (spec step 8, changed 2026-11-01: every empty slot is refilled, at most one call per request)', calls === 5, String(calls))
 upstream.close()
 
 // ---- end to end against a fake /api/select (the --target path: streaming NDJSON, no key) ------------------------------------
