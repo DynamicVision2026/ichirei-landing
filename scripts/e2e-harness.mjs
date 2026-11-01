@@ -676,6 +676,20 @@ const mockPage = async (browser, { onExplain, result, order, track } = {}) => {
   const seenIds = [first]
   for (let i = 0; i < 4; i++) { await page.click('#write [data-testid=question-switch]'); seenIds.push(await qEl.getAttribute('data-question-id')) }
   check('opener: 「別のヒントにする」 cycles the four angles of the same set and returns to the first', new Set(seenIds.slice(0, 4)).size === 4 && seenIds[4] === first && seenIds.every((id) => id in QJA))
+  // a scene quote that already carries 「」 is not wrapped in a second set: 「「そっちは寒いか」とだけ聞く」 → 「『そっちは寒いか』とだけ聞く」
+  {
+    const NESTED = '「そっちは寒いか」とだけ聞く'
+    const q = await mockPage(browser, { result: () => ({ ...clone(FIXTURE), candidates: clone(FIXTURE).candidates.map((c) => (c.slot === 'main' ? { ...c, story_anchor: NESTED } : c)) }) })
+    await q.page.goto('http://localhost:5173/', { waitUntil: 'networkidle' })
+    await pickContext(q.page)
+    await q.page.locator('#write [data-testid=story-input]').fill('父は、電話をかけると「そっちは寒いか」とだけ聞く人だった。')
+    await q.page.click(`#write >> text=${GO.ja}`)
+    await q.page.waitForSelector('article[data-slot=main]', { timeout: 15000 })
+    const txt = await q.page.locator('article[data-slot=main]').innerText()
+    check('quotes: the card shows 「『そっちは寒いか』とだけ聞く」 — one outer 「」, the inner quote as 『』 — never 「「…」…」', txt.includes('「『そっちは寒いか』とだけ聞く」') && !txt.includes('「「'), txt.slice(0, 400))
+    check('no page errors (run 8c-2, nested quote)', q.errors.length === 0, JSON.stringify(q.errors))
+    await q.page.close()
+  }
   // ticket v9.5 Part 3: a 1,500-character story that ignores the hint still gets its cards, and the counter still reads 「/ 5000字」
   {
     const ign = await mockPage(browser)

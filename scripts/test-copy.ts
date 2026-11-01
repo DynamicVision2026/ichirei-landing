@@ -4,6 +4,7 @@
 //
 //   node --experimental-strip-types scripts/test-copy.ts
 
+import { quoteScene } from '../src/order/quote.ts'
 import {
   COPY,
   DEFAULT_GIFT_CONTEXT,
@@ -63,6 +64,7 @@ check('i18n: language codes = contract LANGUAGES', JSON.stringify([...UI_LANGUAG
 check('i18n: relationship / direction / occasion codes = contract lists', JSON.stringify([...RELATIONSHIP_CODES]) === JSON.stringify([...RELATIONSHIPS]) && JSON.stringify([...DIRECTION_CODES]) === JSON.stringify([...DIRECTIONS]) && JSON.stringify([...OCCASION_CODES]) === JSON.stringify([...OCCASIONS]))
 check('i18n: occasion_detail length cap = engine cap', OCCASION_DETAIL_MAX === ENGINE_DETAIL_MAX)
 check('i18n: story cap = engine cap = 5000 (raised from 2000 on 2026-11-01 because a 4,295-character story was cut at 2,000); each follow-up answer stays 600; the live counter starts at 3750 (75%)', UI_STORY_MAX === ENGINE_STORY_MAX && UI_STORY_MAX === 5000 && UI_FOLLOW_UP_MAX === ENGINE_FOLLOW_UP_MAX && UI_FOLLOW_UP_MAX === 600 && STORY_COUNTER_FROM === 3750)
+check('quotes (2026-11-01): a scene quote never stacks a second 「」 — plain text is wrapped once; a fragment that is ONE quotation is shown as it is; a fragment with a quotation inside gets one outer 「」 and the inner one becomes 『』', quoteScene('朝、霜を溶かしてくれた') === '「朝、霜を溶かしてくれた」' && quoteScene('「そっちは寒いか」') === '「そっちは寒いか」' && quoteScene('「そっちは寒いか」とだけ聞く') === '「『そっちは寒いか』とだけ聞く」' && quoteScene('父は「そっちは寒いか」と聞く') === '「父は『そっちは寒いか』と聞く」' && quoteScene('「あ」と「い」') === '「『あ』と『い』」' && quoteScene('  ') === '' && !/「「|」」/.test(quoteScene('「そっちは寒いか」とだけ聞く') + quoteScene('「あ」')))
 check('i18n: clipStory (used only for the 600-character follow-up answers, never for the story box) cuts by code point; shorter text is untouched', storyLength(clipStory('長'.repeat(700), 600)) === 600 && clipStory('短い物語') === '短い物語' && storyLength(clipStory('𠮷'.repeat(700), 600)) === 600 && clipStory('', 600) === '')
 check('i18n (2026-11-01): over the limit the story is NEVER cut — each language has a storyOver line naming 5000; the ja line is exactly the one the owner wrote', UI_LANGUAGES.every((l) => /5000|5,000/.test(COPY[l].storyOver) && /5000|5,000/.test(COPY[l].storyTooLong) && !/2000|2,000/.test(COPY[l].storyOver + COPY[l].storyTooLong + COPY[l].voiceLimit)) && COPY.ja.storyOver === '5000字を超えています。いちばん大切な場面が残るように、少し短くしてください。')
 check('v6 copy (changed 2026-11-01, ticket v9.5 Part 3: the length line): the story hint under the box, exactly as specified in all four languages (no minimum is promised)', COPY.ja.storyHint === '短くても長くても。ひとつの場面なら50字ほどから、物語なら5000字まで。' && COPY['zh-Hans'].storyHint === '长短都可以。一个场景约50字起，完整故事最多5000字。' && COPY['zh-Hant'].storyHint === '長短都可以。一個場景約50字起，完整故事最多5000字。' && COPY.en.storyHint === 'Short or long: a single scene from about 50 characters, a whole story up to 5,000.')

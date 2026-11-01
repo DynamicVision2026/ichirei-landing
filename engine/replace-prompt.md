@@ -15,6 +15,8 @@ THE CANDIDATES THAT STAND (do not repeat their truth or their character):
 CHARACTERS YOU MUST NOT USE (already offered, or refused — with the reason, so you do not walk into the same wall; a refused free pick such as a celebration character in a remembrance story must be replaced by a different, quieter character):
 {{ AVOID }}
 
+TRUTH. Every claim in a candidate's `one_line_gaze` must be stated in the story. No superlative or comparison the story does not support (“earlier than anyone”, “the best”, “always”, “never”, “every time”, “nobody else”): keep the story's own words for time and comparison — “before me” stays “before me”. When unsure, say less.
+
 Do the work again from STEP 1's findings: for each empty slot find the strongest remaining LIVED finding the standing candidates do not already own, name what it proves, and check it against the gates (gate 8, readability: for a Japanese buyer, a character that becomes the main must be a 常用漢字). If you honestly cannot find a candidate that passes for a slot, leave that slot out — do not force one.
 
 OUTPUT. Reply with exactly one JSON object and nothing else — no prose, no code fence: {"candidates": [ … ]} with one element per slot you could fill. Each element has the same fields as one element of "candidates" in the selection prompt's shape, with "slot" set to the empty slot's name (main, second or freestyle), "eliminated": false and "eliminated_reason": null. If there is no honest candidate for any slot, reply exactly {"none": true}.

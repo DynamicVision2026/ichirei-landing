@@ -21,7 +21,8 @@ The playful or raw truth of the relationship: a smile, a shared joke, a habit th
 3. A concrete object or action from the story (the flower, the shoes, the lunch box, the ticket) is welcome here.
 4. Register follows direction and the story's emotion: across → playful; up (parent, mentor, a milestone birthday) → gentle, affectionate humour; bittersweet stories → tender rather than funny.
 5. Respect the occasion: a wedding has no parting, ending or returning words; a kanreki or milestone birthday means rebirth and a fresh start, never decline or old age; thanks and parent's day have no debt or burden; never illness, death or ending words.
-6. `one_line_gaze`: ONE short sentence that describes the PERSON (it completes 「その人は、」 / "They are"): built only from details stated in the story, never an invented object, place, time or habit.
+6. TRUTH. Every claim in `one_line_gaze` must be stated in the story. No superlative or comparison the story does not support (“earlier than anyone”, “the best”, “always”, “never”, “every time”, “nobody else”): keep the story's own words for time and comparison — if the story says “before me”, write “before me”, not “earlier than anyone”. When unsure, say less.
+7. `one_line_gaze`: ONE short sentence that describes the PERSON (it completes 「その人は、」 / "They are"): built only from details stated in the story, never an invented object, place, time or habit.
 
 THE CARDS THAT STAND (do not repeat their character or their truth):
 {{ STANDING }}

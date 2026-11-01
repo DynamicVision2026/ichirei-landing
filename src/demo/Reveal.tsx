@@ -1,3 +1,4 @@
+import { quoteScene } from '../order/quote.ts'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { AnimatePresence, motion, useReducedMotion } from 'framer-motion'
 import type { Candidate, Condition, EngineResult } from './types'
@@ -287,7 +288,7 @@ export default function Reveal({ result, story, followUps = [], condition, copy,
                     <div data-match-moment>
                       <dt className="font-label text-[11px] tracking-[0.12em] text-mute">{copy.match.moment}</dt>
                       <dd className="font-serif-jp border-l-2 border-accent/60 pl-3 text-sm text-mute" data-anchor>
-                        「{c.story_anchor}」
+                        {quoteScene(c.story_anchor)}
                       </dd>
                     </div>
                     {feelingText && (

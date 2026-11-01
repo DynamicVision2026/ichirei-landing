@@ -133,6 +133,45 @@ export async function fixGazes(cands: Candidate[], story: string, language: Lang
   return out
 }
 
+export interface LineRewriteOptions extends GazeFixOptions {
+  /** The model for the rewrite (default: the small review-class model). */
+  model?: string
+  /** The ceiling for the call, in ms (default GAZE_TIMEOUT_MS). */
+  timeoutMs?: number
+}
+
+/**
+ * Rewrite named lines ONCE (the free-pick rescue: the review rejected a refilled free pick only because its line claimed something the story does not state). Returns kanji → a new line
+ * that passes the shape check, differs from the old one and is not much longer; never throws; an empty map when nothing usable came back.
+ */
+export async function rewriteLines(items: { kanji: string; gaze: string; why: string }[], story: string, language: Language, opts: LineRewriteOptions = {}): Promise<Map<string, string>> {
+  const out = new Map<string, string>()
+  if (items.length === 0 || !gazeFixEnabled()) return out
+  const log = opts.log ?? ((l: string) => console.log(l))
+  const t0 = Date.now()
+  try {
+    const signal = callSignal(opts.signal, opts.timeoutMs ?? GAZE_TIMEOUT_MS)
+    const client = opts.client ?? new Anthropic({ maxRetries: 0, ...(opts.apiKey ? { apiKey: opts.apiKey } : {}) })
+    const listed = items.map((b, i) => `${i + 1}. ${b.kanji}\n   line: ${b.gaze}\n   failed because: ${b.why}`).join('\n')
+    const prompt = readPrompt().replace(/\{\{ (LANGUAGE|STORY|ITEMS) \}\}/g, (_m, k: string) => ({ LANGUAGE: language, STORY: story, ITEMS: listed })[k] ?? '')
+    const model = opts.model ?? process.env.ICHIREI_GAZE_MODEL ?? process.env.ICHIREI_REVIEW_MODEL ?? 'claude-haiku-5-5'
+    const stream = client.messages.stream({ model, max_tokens: 1500, output_config: { effort: 'low' }, messages: [{ role: 'user', content: prompt }] }, { signal })
+    const message = await stream.finalMessage()
+    opts.onUsage?.({ model, input_tokens: message.usage?.input_tokens ?? 0, output_tokens: message.usage?.output_tokens ?? 0 })
+    const raw = parseJson(message.content.filter((b): b is Anthropic.TextBlock => b.type === 'text').map((b) => b.text).join(''))
+    const list = Array.isArray(raw?.gazes) ? (raw!.gazes as { kanji?: unknown; one_line_gaze?: unknown }[]) : []
+    for (const b of items) {
+      const hit = list.find((x) => x.kanji === b.kanji)
+      const next = typeof hit?.one_line_gaze === 'string' ? hit.one_line_gaze.trim() : ''
+      if (next && next !== b.gaze && gazeIssues(next, language).length === 0 && [...next].length <= [...b.gaze].length + 24) out.set(b.kanji, next)
+    }
+    log(`[ichirei-gaze] ${JSON.stringify({ event: 'line_rewritten', asked: items.length, fixed: out.size, ms: Date.now() - t0 })}`)
+  } catch {
+    log(`[ichirei-gaze] ${JSON.stringify({ event: 'line_rewrite_failed', asked: items.length, ms: Date.now() - t0 })}`)
+  }
+  return out
+}
+
 export function applyGazes(result: EngineResult, fixes: Map<string, string>): EngineResult {
   if (fixes.size === 0) return result
   return { ...result, candidates: result.candidates.map((c) => (fixes.has(c.kanji) ? { ...c, one_line_gaze: fixes.get(c.kanji)! } : c)) }

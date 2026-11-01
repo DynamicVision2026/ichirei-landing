@@ -13,6 +13,7 @@ import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { anchorPresent, applyPalette, applyReviewVerdicts, type Palette } from './palette.ts'
 import { runReview } from './review.ts'
+import { rewriteLines } from './gaze.ts'
 import { callSignal, replaceTimeoutMs } from './limits.ts'
 import type { Candidate, EngineContext, EngineResult, RefereeAction } from './contract.ts'
 
@@ -224,6 +225,8 @@ export interface RefillReport {
   asked: RefillSlot[]
   filled: { slot: RefillSlot; kanji: string }[]
   rejected: { slot: RefillSlot; reason: string }[]
+  /** Cards the review first rejected only for their line (truth) and kept after ONE line rewrite and a second review. */
+  rescued: { slot: RefillSlot; kanji: string }[]
   ms: number
 }
 
@@ -274,7 +277,7 @@ export async function completeMains(
 
   const t0 = Date.now()
   const actions: RefereeAction[] = [...(result.referee?.actions ?? [])]
-  const report: RefillReport = { asked: slots, filled: [], rejected: [], ms: 0 }
+  const report: RefillReport = { asked: slots, filled: [], rejected: [], rescued: [], ms: 0 }
   const finish = (r: EngineResult): EngineResult => {
     report.ms = Date.now() - t0
     opts.onRefill?.(report)
@@ -358,8 +361,32 @@ export async function completeMains(
   let judged = refereed
   if (refereed.status === 'sufficient' && refereed.candidates.some((c) => newKanji.has(c.kanji) && !c.eliminated)) {
     opts.onStage?.('checking')
-    const review = await runReview(refereed, palette, story, context, { apiKey: opts.apiKey, signal: freeOnly ? callSignal(opts.signal, FREE_REVIEW_TIMEOUT_MS_DEFAULT) : opts.signal, model: opts.reviewModel ?? opts.model, client: opts.client, log, onUsage: opts.onUsage ? (u) => opts.onUsage!('review', u) : undefined })
+    const reviewOpts = { apiKey: opts.apiKey, model: opts.reviewModel ?? opts.model, client: opts.client, log, onUsage: opts.onUsage ? (u: { model: string; input_tokens: number; output_tokens: number }) => opts.onUsage!('review', u) : undefined }
+    const review = await runReview(refereed, palette, story, context, { ...reviewOpts, signal: freeOnly ? callSignal(opts.signal, FREE_REVIEW_TIMEOUT_MS_DEFAULT) : opts.signal })
     judged = applyReviewVerdicts(refereed, palette, story, review, { deferInsufficient: true, canBeMain: opts.mainOk })
+    // A good character is not dropped for its line (2026-11-01): when the review rejects a refilled card ONLY under `truth` (its line says something the story does not), the line is rewritten ONCE by the
+    // small model and the card is reviewed again — within the same ceilings (the rewrite 10 s, the second review 8 s). Only if the character itself fails, or the second review still fails, is it dropped.
+    const truthOnly = (c: Candidate) => newKanji.has(c.kanji) && c.eliminated && !refereed.candidates.find((r) => r.kanji === c.kanji)?.eliminated && /^review: truth\b/.test(c.eliminated_reason ?? '')
+    const rescue = judged.candidates.filter(truthOnly)
+    if (rescue.length > 0) {
+      const t1 = Date.now()
+      const items = rescue.map((c) => ({ kanji: c.kanji, gaze: c.one_line_gaze, why: `the review found a claim the story does not state (${(c.eliminated_reason ?? '').replace(/^review: truth:?\s*/, '').slice(0, 160)}): say only what the story states` }))
+      const fixes = await rewriteLines(items, story, context.language, { apiKey: opts.apiKey, signal: opts.signal, client: opts.client, log, timeoutMs: freeRefillTimeoutMs(), model: process.env.ICHIREI_GAZE_MODEL ?? opts.freeModel ?? opts.reviewModel ?? opts.model, onUsage: opts.onUsage ? (u) => opts.onUsage!('review', u) : undefined })
+      const rewritten = refereed.candidates.map((c) => (fixes.has(c.kanji) && newKanji.has(c.kanji) ? { ...c, one_line_gaze: fixes.get(c.kanji)! } : c))
+      let second: EngineResult | null = null
+      if (fixes.size > 0) {
+        const again: EngineResult = { ...refereed, candidates: rewritten }
+        const review2 = await runReview(again, palette, story, context, { ...reviewOpts, signal: callSignal(opts.signal, FREE_REVIEW_TIMEOUT_MS_DEFAULT), slots: [...new Set(rescue.map((c) => c.slot))] })
+        second = applyReviewVerdicts(again, palette, story, review2, { deferInsufficient: true, canBeMain: opts.mainOk })
+      }
+      const saved = new Set<string>()
+      if (second) for (const c of rescue) if (!second.candidates.find((x) => x.kanji === c.kanji)?.eliminated) saved.add(c.kanji)
+      log(`[ichirei-engine] line_rescue ${JSON.stringify({ asked: rescue.map((c) => c.slot), rewritten: fixes.size, saved: saved.size, ms: Date.now() - t1 })}`)
+      if (saved.size > 0 && second) {
+        report.rescued.push(...rescue.filter((c) => saved.has(c.kanji)).map((c) => ({ slot: c.slot as RefillSlot, kanji: c.kanji })))
+        judged = { ...judged, candidates: judged.candidates.map((c) => (saved.has(c.kanji) ? { ...(second!.candidates.find((x) => x.kanji === c.kanji) ?? c) } : c)), review: second.review ?? judged.review }
+      }
+    }
     for (const c of judged.candidates) if (newKanji.has(c.kanji) && c.eliminated && !refereed.candidates.find((r) => r.kanji === c.kanji)?.eliminated) reject(c.slot as RefillSlot, c.kanji, reasonOf(judged, c.kanji))
   }
   const added = judged.candidates.filter((c) => newKanji.has(c.kanji) && !c.eliminated)

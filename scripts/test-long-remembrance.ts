@@ -38,6 +38,7 @@ let gazeFail = false
 let refillHang = false
 const lastBody: Record<string, any> = {}
 let vetoed = new Set<string>()
+let lineVeto: { text: string; kanji: string } | null = null
 const upstream = http.createServer(async (req, res) => {
   let raw = ''
   for await (const c of req) raw += c
@@ -49,7 +50,10 @@ const upstream = http.createServer(async (req, res) => {
   if (kind === 'gaze') { gazeCalls++; if (gazeFail) { res.writeHead(500); res.end('boom'); return } }
   let reply: unknown
   if (kind === 'review') {
-    const items = [...prompt.matchAll(/"slot": "(main|second|freestyle)",\s*"kanji": "([^"]+)"/g)].map((m) => ({ slot: m[1], kanji: m[2], pass: !vetoed.has(m[2]), rule: vetoed.has(m[2]) ? 'dignity' : null, reason: 'ok' }))
+    const items = [...prompt.matchAll(/"slot": "(main|second|freestyle)",\s*"kanji": "([^"]+)"/g)].map((m) => {
+      const lineBad = lineVeto !== null && m[2] === lineVeto.kanji && prompt.includes(lineVeto.text) // the review rejects a LINE that says more than the story does
+      return { slot: m[1], kanji: m[2], pass: !vetoed.has(m[2]) && !lineBad, rule: vetoed.has(m[2]) ? 'dignity' : lineBad ? 'truth' : null, reason: lineBad ? 'says more than the story: earlier than anyone' : 'ok' }
+    })
     reply = { verdicts: items }
   } else reply = kind === 'gaze' ? gazeReply : kind === 'replace' ? refillReply : modelReply
   const text = typeof reply === 'string' ? reply : JSON.stringify(reply)
@@ -74,10 +78,10 @@ const origLog = console.log
 type Ctx = typeof fx.context
 const MEMORIAL: Ctx = fx.context
 const BIRTHDAY: Ctx = { ...fx.context, occasion: 'birthday_milestone' }
-const run = async (ctx: Ctx = MEMORIAL) => {
+const run = async (ctx: Ctx = MEMORIAL, storyText: string = story) => {
   logs.length = 0; refillCalls = 0; gazeCalls = 0
   console.log = (...a: unknown[]) => { logs.push(a.map(String).join(' ')) }
-  try { return await runEngine(story, 'A', { context: ctx }) } finally { console.log = origLog }
+  try { return await runEngine(storyText, 'A', { context: ctx }) } finally { console.log = origLog }
 }
 type R = Awaited<ReturnType<typeof run>>
 const live = (r: R) => r.candidates.filter((c) => !c.eliminated)
@@ -213,6 +217,46 @@ try {
   vetoed = new Set()
   check('(12) a refill for a removed SECOND card keeps the current model (the selection model, not claude-haiku-5-5), the selection prompt, and the long answer limit', refillCalls === 1 && lastBody.replace.model !== 'claude-haiku-5-5' && lastBody.replace.effort === 'medium' && lastBody.replace.max_tokens > 2000 && lastBody.replace.prompt.includes('Return this exact shape') && JSON.parse(refillLog().slice('[ichirei-refill] '.length)).mode === 'full', JSON.stringify({ ...lastBody.replace, prompt: undefined }))
   check('(7) every request logs one [ichirei-cards] line with the story length and codes only — no story text', cardsLog().includes('"story_chars":4105') && !cardsLog().includes('帰省'))
+  // ---- ASK FOR THE FREE PICK UP FRONT, AND DO NOT LOSE A GOOD ONE OVER ITS LINE (2026-11-01) ----------------------------------------------------------------------------------------
+  const SHORT = '父は毎朝、私より先に起きて、車の窓の霜をお湯で溶かしてくれた。「そっちは寒いか」とだけ、電話でいつも聞く人だ。'
+  check('(13) the selection prompts (ja / zh / en) ask for the free pick up front for every occasion except remembrance — "ALWAYS written", the lightest TRUE detail, never invented — and no longer say "no free pick is better than a forced one"', ['ja', 'zh', 'en'].every((l) => { const t = readFileSync(join(process.cwd(), 'engine', `prompt.${l}.md`), 'utf8'); return t.includes('STEP 5b — The freestyle character (遊び字): ALWAYS written, except in remembrance') && t.includes('find the lightest TRUE thing in the story') && !t.includes('never force one') && t.includes('NO FREESTYLE IN REMEMBRANCE') && t.includes('3 when sufficient (main, second, freestyle); 2 in remembrance') }))
+  modelReply = replyOf({ ...MAIN(), one_line_gaze: GOOD_GAZE_3 }, { ...SECOND(), one_line_gaze: GOOD_GAZE_3 }, { ...FREE('朝', 'あさ'), story_anchor: '毎朝' })
+  vetoed = new Set()
+  lineVeto = null
+  const u1 = await run(BIRTHDAY, SHORT)
+  const uj = JSON.parse(cardsLog().slice('[ichirei-cards] '.length))
+  check('(13) a short birthday story: the selection itself returns the free pick (朝), three cards, NO refill call, refill null in the log', live(u1).map((c) => c.slot).join() === 'main,second,freestyle' && refillCalls === 0 && uj.refill === null && uj.calls.refill === 0, cardsLog())
+
+  // the refilled free pick 朝 says "earlier than anyone" where the story says "before me": the review rejects the LINE (truth); ONE rewrite by the small model, a second review, and the card is kept
+  const REFILL_朝 = { slot: 'freestyle', kanji: '朝', reading: 'あさ', inscription_form: null, truth_type: 'Play', one_line_gaze: '誰よりも早く起きている人。', story_anchor: '毎朝' }
+  modelReply = replyOf({ ...MAIN(), one_line_gaze: GOOD_GAZE_3 }, { ...SECOND(), one_line_gaze: GOOD_GAZE_3 })
+  refillReply = { candidate: REFILL_朝 }
+  lineVeto = { text: '誰よりも早く', kanji: '朝' }
+  gazeReply = { gazes: [{ kanji: '朝', one_line_gaze: 'いつも、私より先に起きている人。' }] }
+  const rt0 = Date.now()
+  const k1 = await run(BIRTHDAY, SHORT)
+  const rdt = Date.now() - rt0
+  const kj = JSON.parse(cardsLog().slice('[ichirei-cards] '.length))
+  const kept = k1.candidates.find((c) => c.kanji === '朝' && !c.eliminated)
+  check('(14) a refilled free pick whose LINE exaggerates ("earlier than anyone") is KEPT after ONE line rewrite by the small model and a second review — three cards, the line now says "before me", within the ceilings', !!kept && kept.one_line_gaze === 'いつも、私より先に起きている人。' && live(k1).length === 3 && refillCalls === 1 && gazeCalls === 1 && rdt < 10_000 && kj.refill.rescued.join() === 'freestyle' && kj.refill.filled.join() === 'freestyle' && kj.refill.rejected.length === 0, cardsLog())
+  check('(14) …the rewrite goes to the SMALL model (claude-haiku-5-5), the gaze-fix prompt carries the truth rule (no superlative the story does not support; "before me" stays "before me"), and the second review runs on the new line', lastBody.gaze.model === 'claude-haiku-5-5' && lastBody.gaze.prompt.includes('no superlative or comparison the story does not support') && lastBody.gaze.prompt.includes('誰よりも早く起きている人。') && logs.some((l) => l.includes('line_rescue') && l.includes('"rewritten":1') && l.includes('"saved":1')), JSON.stringify(logs.filter((l) => l.includes('line_rescue'))))
+  INFO(cardsLog())
+  // the rewrite is unusable, or the second review still fails: the card is dropped — two cards, no error, still ONE refill call
+  gazeReply = 'not json at all'
+  const k2 = await run(BIRTHDAY, SHORT)
+  check('(14) the rewrite comes back unusable: the free pick is dropped (the line could not be fixed) — two cards, no error, one refill call', k2.status === 'sufficient' && live(k2).length === 2 && refillCalls === 1 && JSON.parse(cardsLog().slice('[ichirei-cards] '.length)).refill.rescued.length === 0)
+  gazeReply = { gazes: [{ kanji: '朝', one_line_gaze: '誰よりも早く、私の前に起きる人。' }] }
+  const k3 = await run(BIRTHDAY, SHORT)
+  check('(14) the rewrite still says the exaggerated thing: the second review rejects it too — dropped, two cards, no error', k3.status === 'sufficient' && live(k3).length === 2 && refillCalls === 1)
+  // the CHARACTER itself fails (insult / dignity, not truth): no rewrite is tried
+  lineVeto = null
+  vetoed = new Set(['朝'])
+  gazeReply = { gazes: [{ kanji: '朝', one_line_gaze: 'いつも、私より先に起きている人。' }] }
+  const k4 = await run(BIRTHDAY, SHORT)
+  vetoed = new Set()
+  check('(14) a refilled free pick rejected for the CHARACTER itself (a safety rule, not truth) is dropped with no rewrite call', live(k4).length === 2 && gazeCalls === 0 && refillCalls === 1)
+  lineVeto = null
+  gazeReply = 'not json at all'
 } finally {
   upstream.closeAllConnections?.()
   upstream.close()
