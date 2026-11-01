@@ -10,6 +10,7 @@ import { eligibleFor, lexiconEchoOf, loadLexicon } from '../engine/lexicon.ts'
 import { loadPalette } from '../engine/palette.ts'
 import { readCardReply, readJsonObject } from '../engine/cards.ts'
 import { cleanReading } from '../src/order/reading.ts'
+import { POST as selectPost } from '../api/select.ts'
 import { COPY } from '../src/demo/i18n.ts'
 import { buildCertificate } from '../engine/order.ts'
 import { isJoyo } from '../engine/joyo.ts'
@@ -398,6 +399,26 @@ try {
   check('(D3) the cards show 慕 as したう (ja) and shitau (en): the display strips the markers even from a reading that was stored with them', sh === 'したう' && shEn.includes('shitau') && !shEn.includes('shita-u'), `${sh} | ${shEn}`)
   const cert = buildCertificate({ ...cand('main', '慕', 'した-う', GOOD, '車の窓の霜'), meaning: null } as any, '慕', 'ja', palette)
   check('(D4) the certificate (and so the gift page, the card and scroll PDFs, the film, which read it) carries the reading and the romanization plain', !/[-.]/.test(cert.reading) && !/[-.]/.test(cert.romanization), JSON.stringify([cert.reading, cert.romanization]))
+  // ---- /api/select?debug=1: this request's own timings, nothing else changes without it ------------------------------------------------------------------------------------
+  delay = { main: 80, second: 60, free: 30, review: 20, refill: 20 }
+  replies = { main: sel(M1(), M2()), second: 'unreadable second answer' as any, free: free(F1(), F2()) }
+  vetoed = new Set(['朝', '箱'])
+  const callSelect = async (query: string) => {
+    const res = await selectPost(new Request('http://localhost/api/select' + query, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ story: STORY, condition: 'A', language: BIRTHDAY.language, relationship: BIRTHDAY.relationship, direction: BIRTHDAY.direction, occasion: BIRTHDAY.occasion }) }))
+    const text = await res.text()
+    return text.trim().split('\n').map((l) => JSON.parse(l)) as any[]
+  }
+  console.log = (...a: unknown[]) => { logs.push(a.map(String).join(' ')) }
+  const dbgLines = await callSelect('?debug=1')
+  const plainLines = await callSelect('')
+  console.log = origLog
+  const dres = dbgLines.find((l) => l.type === 'result')
+  const pres = plainLines.find((l) => l.type === 'result')
+  const D = dres?.debug
+  check('(G1) ?debug=1: the terminal line carries a debug object — cards_mode, the per-call ms / parse / offered / error, the reviews (ms, pass), first_card_ms, all_cards_ms, second_source, free_dropped and the refill', D && D.cards_mode === 'parallel' && D.parallel.calls.every((c: any) => typeof c.ms === 'number' && typeof c.parse === 'string' && typeof c.offered === 'number' && 'error' in c || c.error === undefined) && D.parallel.calls.find((c: any) => c.slot === 'second').parse === 'no_json' && D.parallel.reviews.every((r: any) => typeof r.ms === 'number' && typeof r.pass === 'boolean') && typeof D.parallel.first_card_ms === 'number' && typeof D.parallel.all_cards_ms === 'number' && D.parallel.second_source === 'main_runner_up' && 'free_dropped' in D.parallel && 'refill' in D, JSON.stringify(D)?.slice(0, 500))
+  check('(G1) …a normal request returns no debug object (the same stream otherwise: cards, then the result)', pres && !('debug' in pres) && plainLines.some((l) => l.type === 'card'), JSON.stringify(Object.keys(pres ?? {})))
+  check('(G1) …the debug object has no story text and no reason text: removed cards show codes only ("review: dignity"), never the reviewer\'s words', !JSON.stringify(D).includes('霜') && !JSON.stringify(D).includes('新聞') && !JSON.stringify(D).includes('negative trait') && D.removed.every((r: any) => /^[a-z_ ]+(: [a-z_ ]+)?$/.test(r.reason)) && D.removed.some((r: any) => r.reason === 'review: dignity'), JSON.stringify(D.removed))
+  vetoed = new Set()
 } finally {
   upstream.closeAllConnections?.()
   upstream.close()

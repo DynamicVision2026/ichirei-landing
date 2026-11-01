@@ -231,6 +231,11 @@ export interface RunEngineOptions {
    * main + second, then all three — always in that order). The terminal result still carries everything; this is only for showing a card early.
    */
   onCard?: (partial: EngineResult) => void
+  /**
+   * Called once with this request's own timings and outcome, codes and numbers only (the same facts as the [ichirei-cards] line, without any reason text): the API hands it back when the
+   * request asked for `?debug=1`. Never story text, never another customer's data.
+   */
+  onDebug?: (info: Record<string, unknown>) => void
   /** How many follow-up answers the sender has already given (the API layer passes it). Lexicon mode: after one, a second "no lexicon character fits" falls back to the palette engine. */
   followUpsUsed?: number
   /** ICHIREI_LEXICON_MODE for this run (tests); default: the environment. */
@@ -286,11 +291,26 @@ export function selectCallInfo(message: Pick<Anthropic.Message, 'usage' | 'stop_
   return { output_tokens: message.usage?.output_tokens ?? null, thinking_tokens: thinkingTokensOf(message), stop_reason: message.stop_reason ?? null }
 }
 
-function logCards(story: string, context: EngineContext, before: EngineResult, after: EngineResult, refill: RefillReport | null, ms: StepTimes, select?: SelectCallInfo, parallel?: CardsReport): void {
+/** A reason is kept as its code ("review: truth", "palette: hard_block"): the model's own words after the second colon can quote the story. */
+const reasonCode = (r: unknown): string => String(r ?? '').split(':').slice(0, 2).join(':').trim().slice(0, 60)
+
+/** The [ichirei-cards] facts as they are handed back for `?debug=1`: numbers, codes, characters of the cards — no reason text, no story. */
+function debugOf(payload: Record<string, unknown>): Record<string, unknown> {
+  const p = payload as { removed?: { slot: string; reason: string }[]; refill?: { rejected?: { slot: string; reason: string }[] } | null }
+  return {
+    ...payload,
+    removed: (p.removed ?? []).map((r) => ({ slot: r.slot, reason: reasonCode(r.reason) })),
+    refill: p.refill ? { ...p.refill, rejected: (p.refill.rejected ?? []).map((r) => ({ slot: r.slot, reason: reasonCode(r.reason) })) } : null,
+  }
+}
+
+function logCards(story: string, context: EngineContext, before: EngineResult, after: EngineResult, refill: RefillReport | null, ms: StepTimes, select?: SelectCallInfo, parallel?: CardsReport, onDebug?: (info: Record<string, unknown>) => void): void {
   try {
     const live = (r: EngineResult, slot: string) => r.candidates.filter((c) => !c.eliminated && c.slot === slot).length
     const removed = after.candidates.filter((c) => c.eliminated).map((c) => ({ slot: c.slot, reason: (c.eliminated_reason ?? 'unknown').slice(0, 80) }))
-    console.log(`[ichirei-cards] ${JSON.stringify({ cards_mode: parallel ? 'parallel' : 'single', ...(parallel ? { second_source: parallel.second_source } : {}), story_chars: [...story].length, language: context.language, occasion: context.occasion, status: after.status, live: { main: live(after, 'main'), second: live(after, 'second'), freestyle: live(after, 'freestyle') }, before_final: before.candidates.filter((c) => !c.eliminated).length, freestyle: context.occasion === 'memorial' ? 'not_offered' : undefined, ms, select: select ?? undefined, ...(parallel ? { parallel: { first_card_ms: parallel.first_card_ms, all_cards_ms: parallel.all_cards_ms, calls: parallel.calls, reviews: parallel.reviews, collisions: parallel.collisions, runner_up_used: parallel.runner_up_used, free_dropped: parallel.free_dropped, second_source: parallel.second_source } } : {}), calls: parallel ? { select: parallel.calls.reduce((n, c) => n + c.attempts, 0), review: parallel.reviews.length, refill: refill ? 1 : 0, gaze: ms.gaze_failing > 0 ? 1 : 0 } : { select: ms.select_attempts, review: ms.review > 0 ? 1 : 0, refill: refill ? 1 : 0, gaze: ms.gaze_failing > 0 ? 1 : 0 }, removed, refill: refill ? { asked: refill.asked, filled: refill.filled.map((f) => f.slot), rejected: refill.rejected, rescued: refill.rescued.map((f) => f.slot), ms: refill.ms } : null })}`)
+    const payload = { cards_mode: parallel ? 'parallel' : 'single', ...(parallel ? { second_source: parallel.second_source } : {}), story_chars: [...story].length, language: context.language, occasion: context.occasion, status: after.status, live: { main: live(after, 'main'), second: live(after, 'second'), freestyle: live(after, 'freestyle') }, before_final: before.candidates.filter((c) => !c.eliminated).length, freestyle: context.occasion === 'memorial' ? 'not_offered' : undefined, ms, select: select ?? undefined, ...(parallel ? { parallel: { first_card_ms: parallel.first_card_ms, all_cards_ms: parallel.all_cards_ms, calls: parallel.calls, reviews: parallel.reviews, collisions: parallel.collisions, runner_up_used: parallel.runner_up_used, free_dropped: parallel.free_dropped, second_source: parallel.second_source } } : {}), calls: parallel ? { select: parallel.calls.reduce((n, c) => n + c.attempts, 0), review: parallel.reviews.length, refill: refill ? 1 : 0, gaze: ms.gaze_failing > 0 ? 1 : 0 } : { select: ms.select_attempts, review: ms.review > 0 ? 1 : 0, refill: refill ? 1 : 0, gaze: ms.gaze_failing > 0 ? 1 : 0 }, removed, refill: refill ? { asked: refill.asked, filled: refill.filled.map((f) => f.slot), rejected: refill.rejected, rescued: refill.rescued.map((f) => f.slot), ms: refill.ms } : null }
+    console.log(`[ichirei-cards] ${JSON.stringify(payload)}`)
+    onDebug?.(debugOf(payload))
   } catch {
     // (a log line must never break a request)
   }
@@ -668,7 +688,7 @@ async function runPipeline(a: PipelineArgs): Promise<PipelineOut> {
   const final = finalizeResult(withGazes)
   // Which cards leave the engine, and why a card is missing (reasons are the referee / review codes, no story text and no character): the log a missing card is traced from.
   const refillMs = tGaze - tReplace
-  logCards(story, context, completed, final, refill, { total: Date.now() - tStart, select: selectMs, select_attempts: attempts, referee: refereeMs, review: reviewMs, refill: refillMs, gaze: gazeMs, gaze_failing: gazeFailing }, selectCallInfo(message))
+  logCards(story, context, completed, final, refill, { total: Date.now() - tStart, select: selectMs, select_attempts: attempts, referee: refereeMs, review: reviewMs, refill: refillMs, gaze: gazeMs, gaze_failing: gazeFailing }, selectCallInfo(message), undefined, opts.onDebug)
   timing({ review_ms: reviewMs, replace_ms: refillMs, status: final.status })
   // Lexicon mode: a sufficient answer that ended with no usable lexicon character (the model chose outside the list) is a miss like any other.
   if (view && final.status === 'insufficient') return { result: finishLexicon(final), miss: { reason: 'no_valid_choice', register: registerOf(extracted) } }
@@ -711,14 +731,17 @@ async function runCardsPipeline(a: PipelineArgs): Promise<PipelineOut> {
   const mainCall = out.report.calls.find((c) => c.slot === 'main')
   const timing = (t: { review_ms: number; replace_ms: number; status: string }) =>
     logTiming({ attempts: mainCall?.attempts ?? 1, max_tokens_used: 0, select_ms: selectMs, ...t, total_ms: Date.now() - tStart, stop_reason: mainCall?.stop_reason ?? null, output_tokens: mainCall?.output_tokens ?? null, lexicon: view !== null })
+  const earlyDebug = (status: string) => opts.onDebug?.(debugOf({ cards_mode: 'parallel', status, ms: { total: Date.now() - tStart, select: selectMs }, parallel: { first_card_ms: out.report.first_card_ms, all_cards_ms: out.report.all_cards_ms, calls: out.report.calls, reviews: out.report.reviews, collisions: out.report.collisions, runner_up_used: out.report.runner_up_used, free_dropped: out.report.free_dropped, second_source: out.report.second_source } }))
   // Goodwill check (selection or review): a polite decline, no cards.
   if (out.early?.kind === 'declined') {
+    earlyDebug('declined')
     console.log(`[ichirei-safety] goodwill_decline ${JSON.stringify({ stage: out.early.stage, language: context.language, relationship: context.relationship, occasion: context.occasion, direction: context.direction })}`)
     timing({ review_ms: 0, replace_ms: 0, status: 'declined' })
     return { result: finishLexicon(declinedResult(out.early.stamped, context)), miss: null }
   }
   if (out.early || !out.base) {
     const closed = finalizeResult(out.early?.stamped ?? stampResult({ status: 'insufficient', candidates: [] } as unknown as EngineResult, context))
+    earlyDebug(closed.status)
     timing({ review_ms: 0, replace_ms: 0, status: closed.status })
     // lexicon mode: "no listed character truly fits" is a miss (the sender is asked one question; after the answer the palette engine takes over)
     if (view && out.early?.miss) return { result: finishLexicon(closed), miss: { reason: 'model_no_fit', register: out.mainExtracted ? registerOf(out.mainExtracted) : null } }
@@ -779,7 +802,7 @@ async function runCardsPipeline(a: PipelineArgs): Promise<PipelineOut> {
   const refillFilled = (refill as RefillReport | null)?.filled ?? []
   const secondLive = final.candidates.some((c) => !c.eliminated && c.slot === 'second')
   out.report.second_source = !secondLive ? null : refillFilled.some((f) => f.slot === 'second') ? 'refill' : out.report.second_source
-  logCards(story, context, completed, final, refill, { total: Date.now() - tStart, select: selectMs, select_attempts: mainCall?.attempts ?? 1, referee: 0, review: reviewMs, refill: refillMs, gaze: gazeMs, gaze_failing: gazeFailing + out.report.gaze_failing }, undefined, out.report)
+  logCards(story, context, completed, final, refill, { total: Date.now() - tStart, select: selectMs, select_attempts: mainCall?.attempts ?? 1, referee: 0, review: reviewMs, refill: refillMs, gaze: gazeMs, gaze_failing: gazeFailing + out.report.gaze_failing }, undefined, out.report, opts.onDebug)
   timing({ review_ms: reviewMs, replace_ms: refillMs, status: final.status })
   // Lexicon mode: a sufficient answer that ended with no usable lexicon character (the model chose outside the list) is a miss like any other.
   if (view && final.status === 'insufficient') return { result: finishLexicon(final), miss: { reason: 'no_valid_choice', register: out.mainExtracted ? registerOf(out.mainExtracted) : null } }

@@ -10,7 +10,7 @@
 //   {"type":"stage","stage":"reading|choosing|checking|replacing"}  ...as the engine moves on (honest progress steps)
 //   {"type":"delta","chars":<cumulative model output chars>}   ...repeated
 //   {"type":"card","result":<engine JSON contract, the cards so far>}  ...as each card passes its checks (main; then main+second; then all three), parallel cards only
-//   {"type":"result","result":<engine JSON contract>}          ...terminal
+//   {"type":"result","result":<engine JSON contract>[,"debug":{…}]}  ...terminal (`debug`: only with ?debug=1 — this request's timings, codes and numbers, no story text)
 //   {"type":"error","error":"<message>","code"?:"model_timeout","seconds"?:<n>}  ...terminal
 
 import { runEngine } from '../engine/engine.ts'
@@ -92,6 +92,12 @@ export async function POST(req: Request): Promise<Response> {
     })
   }
 
+  let wantsDebug = false
+  try {
+    wantsDebug = new URL(req.url, 'http://localhost').searchParams.get('debug') === '1'
+  } catch {
+    wantsDebug = false
+  }
   const encoder = new TextEncoder()
   const stream = new ReadableStream<Uint8Array>({
     async start(controller) {
@@ -99,6 +105,8 @@ export async function POST(req: Request): Promise<Response> {
         controller.enqueue(encoder.encode(JSON.stringify(obj) + '\n'))
       let received = 0
       let lastSent = 0
+      // `?debug=1`: this request's own timings and outcome (engine onDebug: numbers and codes, no story text) ride along on the terminal line. Without it nothing changes.
+      let debug: Record<string, unknown> | null = null
       try {
         const result = await runEngine(mergeStory(story, fu.followUps), cond, {
           context: parsed.context,
@@ -107,6 +115,7 @@ export async function POST(req: Request): Promise<Response> {
           followUpsUsed: fu.followUps.length,
           onStage: (stage) => send({ type: 'stage', stage }),
           onCard: (partial) => send({ type: 'card', result: partial }),
+          ...(wantsDebug ? { onDebug: (d: Record<string, unknown>) => { debug = d } } : {}),
           onDelta: (text) => {
             received += text.length
             // Throttle progress lines: one per ~200 chars of model output.
@@ -119,7 +128,7 @@ export async function POST(req: Request): Promise<Response> {
         // Learning loop: codes and booleans only, tied to a random browser session id (engine/analytics.ts). Never awaited.
         const sessionId = cleanSession(session)
         if (sessionId) void recordEvent(shownEvent(result, sessionId, cleanSource(source), new Date()))
-        send({ type: 'result', result })
+        send({ type: 'result', result, ...(wantsDebug && debug ? { debug } : {}) })
       } catch (err) {
         const message = err instanceof Error ? err.message : String(err)
         send({ type: 'error', error: `Engine failed: ${message}`, ...(err instanceof ModelTimeoutError ? { code: 'model_timeout', seconds: Math.round(callTimeoutMs() / 1000) } : {}) })

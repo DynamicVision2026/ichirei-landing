@@ -63,6 +63,25 @@ try {
   check('timeout: Node socket timeout applied = 300000ms', health.applied?.socketTimeout === 300_000, JSON.stringify(health.applied))
   check('timeout: keep-alive outlasts front end (>=600s)', (health.applied?.keepAliveTimeout ?? 0) >= 600_000)
 
+  // ---- B2. Which build is live (/api/health commit + deployedAt) and the per-request ?debug=1 -------
+  check('health: without deploy settings (a local run) commit and deployedAt are null', health.commit === null && health.deployedAt === null, JSON.stringify([health.commit, health.deployedAt]))
+  {
+    const stamped = await startServer({ upstreamUrl: upstream.url, env: { ICHIREI_COMMIT: 'ab12cd3', ICHIREI_DEPLOYED_AT: '2026-11-01T12:00:00Z', ICHIREI_RATES: 'off' } })
+    try {
+      const h = await (await fetch(stamped.url + '/api/health')).json()
+      check('health: shows the deployed commit (the short SHA passed in at deploy) and deployedAt', h.commit === 'ab12cd3' && h.deployedAt === '2026-11-01T12:00:00Z' && h.cardsMode, JSON.stringify([h.commit, h.deployedAt, h.cardsMode]))
+    } finally {
+      await stamped.stop()
+    }
+  }
+  upstream.state.mode = { kind: 'stream', gapMs: 0, totalMs: 200 }
+  const plain = await readNdjson(await post(base, '/api/select', { story: STORY, condition: 'A', ...GOLDEN_CONTEXT }))
+  const plainResult = plain.find((l) => l.msg.type === 'result')?.msg
+  const dbg = await readNdjson(await post(base, '/api/select?debug=1', { story: STORY, condition: 'A', ...GOLDEN_CONTEXT }))
+  const dbgResult = dbg.find((l) => l.msg.type === 'result')?.msg
+  check('debug: a normal request returns no debug object', plainResult && !('debug' in plainResult), JSON.stringify(Object.keys(plainResult ?? {})))
+  check('debug: ?debug=1 returns this request\'s own timing object on the terminal line (cards_mode, ms, the final facts) — numbers and codes, no story text', dbgResult?.debug?.cards_mode && typeof dbgResult.debug.ms?.total === 'number' && typeof dbgResult.debug.ms?.select === 'number' && !JSON.stringify(dbgResult.debug).includes(STORY.slice(0, 12)), JSON.stringify(dbgResult?.debug ?? null).slice(0, 300))
+
   // ---- C. /api/select streams through the REAL engine ------------------
   upstream.state.requests.length = 0
   upstream.state.mode = { kind: 'stream', gapMs: 0, totalMs: 2500 }

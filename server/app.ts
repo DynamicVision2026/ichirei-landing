@@ -113,6 +113,9 @@ export function createApp(config: ServerConfig): Hono {
       reviewTimeoutMs: ENGINE_CONFIG.REVIEW_TIMEOUT_MS,
       lexiconMode: lexiconModeFromEnv(),
       cardsMode: cardsMode(), // parallel | single (ICHIREI_CARDS=single is the rollback)
+      // Which build is live: the short commit SHA (Cloud Build's SHORT_SHA, passed at deploy) and when it was deployed. null when the deploy did not set them (a local run).
+      commit: process.env.ICHIREI_COMMIT?.trim() || null,
+      deployedAt: process.env.ICHIREI_DEPLOYED_AT?.trim() || null,
       filmPictures: { model: process.env.ICHIREI_FILM_IMAGE_MODEL || 'gemini-3.1-flash-image|gemini-2.5-flash-image', location: process.env.ICHIREI_FILM_IMAGE_LOCATION || 'global', dailyMax: process.env.ICHIREI_FILM_DAILY_MAX || '200' },
       simpleMaxStrokes: simpleMaxStrokes(),
       configured: config,
