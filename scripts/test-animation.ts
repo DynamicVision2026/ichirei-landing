@@ -278,7 +278,7 @@ const READY: FilmRecord = { status: 'ready', made_at: NOW.toISOString(), picture
     const f = r.film!
     // the samples' own stories are not stored; the lines stand in for them, so every check except "quotations are in the story" is real
     const input: FilmInput = { story: f.lines.join('\n'), language: r.language, relationship: null, direction: null, occasion: r.memorial ? 'memorial' : null, occasion_detail: null, memorial: r.memorial, glyph: r.glyph, forms: [r.glyph], who: r.who, moment: r.moment, names: [] }
-    for (const p of checkFilmScript({ lines: f.lines, pictures: f.pictures }, input, palette)) probs.push(`${r.id}: ${p.code} ${p.detail}`)
+    for (const p of checkFilmScript({ turning_point: f.turning_point, lines: f.lines, pictures: f.pictures }, input, palette)) probs.push(`${r.id}: ${p.code} ${p.detail}`)
   }
   check('(4) every sample script passes the same referee a real one has to pass (lengths, no digits, no character in the lines, no illness words, no blocked characters, scene rules)', probs.length === 0, probs.join(' | '))
   check('(4) …and the Japanese sample\'s pictures are written from story 0020 (a bento with one spring flower, a lunch box passed across a desk) — only what the story says', /bento box/.test(SAMPLE_RECORDS[SAMPLE_IDS.ja].film!.pictures[0]) && /lunch box/.test(SAMPLE_RECORDS[SAMPLE_IDS.ja].film!.pictures[2]) && SAMPLE_RECORDS[SAMPLE_IDS.memorial].film!.pictures.every((d) => !/cake|candle|party|festival/i.test(d)))

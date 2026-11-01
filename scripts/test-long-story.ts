@@ -111,7 +111,7 @@ try {
     glyph: '備', forms: ['備'], who: 'いつも、頼まれる前に備えている人。', moment: '「ちょうど今詰めてたところ」', names: ['山田 太郎', '山田 花子'],
   }
   phase = 'film'
-  replies = { film: { lines: SAMPLE_RECORDS[SAMPLE_IDS.ja].film!.lines, pictures: SAMPLE_RECORDS[SAMPLE_IDS.ja].film!.pictures } }
+  replies = { film: { turning_point: SAMPLE_RECORDS[SAMPLE_IDS.ja].film!.turning_point, lines: SAMPLE_RECORDS[SAMPLE_IDS.ja].film!.lines, pictures: SAMPLE_RECORDS[SAMPLE_IDS.ja].film!.pictures } }
   seen.length = 0
   const f = await quiet(() => makeFilm(film, { log: () => {}, now: () => new Date('2026-10-30T03:00:00Z') }))
   const fp = seen.find((s) => s.which === 'film')

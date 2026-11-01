@@ -167,11 +167,13 @@ paidAt['IC-20261023-CLOSED01'] = paid(-30) // paid 30 hours before T0 → at T0+
   check('(4) a poem that cannot be written changes NOTHING (the character stays, no half-change)', pf.status === 422 && pf.json.code === 'poem_failed' && afterFail.production.kanji === '証' && afterFail.production.poems[0].lines[0] === '証の一行')
 }
 {
-  const r = await change({ order_ref: 'IC-20261023-INWINDOW', action: 'poem', poem_type: 'en' })
+  const notOffered = await change({ order_ref: 'IC-20261023-INWINDOW', action: 'poem', poem_type: 'en' })
+  check('(5) spec v9.4: a Japanese story offers 短歌 and 漢詩 only — switching to English free verse or 宋詞 is refused (format_not_offered) and nothing is written', notOffered.status === 422 && notOffered.json.code === 'format_not_offered' && (await change({ order_ref: 'IC-20261023-INWINDOW', action: 'poem', poem_type: 'ci' })).json.code === 'format_not_offered' && (await get('IC-20261023-INWINDOW')).ops?.poem_format_changes === undefined)
+  const r = await change({ order_ref: 'IC-20261023-INWINDOW', action: 'poem', poem_type: 'tang' })
   const after = await get('IC-20261023-INWINDOW')
-  check('(5) CHANGE POEM FORMAT: once — the poem is written in the new format for the same character', r.status === 200 && after.production.poems[0].type === 'en' && after.production.kanji === '証' && after.ops?.poem_format_changes === 1 && poemsWritten.at(-1)?.type === 'en')
-  const again = await change({ order_ref: 'IC-20261023-INWINDOW', action: 'poem', poem_type: 'tang' })
-  check('(5) a second change of format is refused (poem_format_used)', again.status === 422 && again.json.code === 'poem_format_used' && (await get('IC-20261023-INWINDOW')).production.poems[0].type === 'en')
+  check('(5) CHANGE POEM FORMAT: once — the poem is written in the new format for the same character', r.status === 200 && after.production.poems[0].type === 'tang' && after.production.kanji === '証' && after.ops?.poem_format_changes === 1 && poemsWritten.at(-1)?.type === 'tang')
+  const again = await change({ order_ref: 'IC-20261023-INWINDOW', action: 'poem', poem_type: 'tanka' })
+  check('(5) a second change of format is refused (poem_format_used)', again.status === 422 && again.json.code === 'poem_format_used' && (await get('IC-20261023-INWINDOW')).production.poems[0].type === 'tang')
 }
 {
   const r = await change({ order_ref: 'IC-20261023-INWINDOW', action: 'names', sender: '山田 次郎', receiver: '山田 三郎', message: 'いつも ありがとう' })

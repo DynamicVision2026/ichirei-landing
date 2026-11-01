@@ -10,6 +10,7 @@ import { join } from 'node:path'
 import { SAMPLE_IDS, SAMPLE_RECORDS } from '../engine/animation.ts'
 import { PICTURE_WORDS, buildFilmPrompt, checkFilmScript, checkPictures, fallbackFilm, lineLimits, lineSize, loadFilmPrompt, makeFilm, pictureWords, type FilmInput } from '../engine/film.ts'
 import { loadPalette } from '../engine/palette.ts'
+import { animationView, type AnimationRecord } from '../engine/animation.ts'
 
 delete process.env.ICHIREI_FILM
 let failures = 0
@@ -28,6 +29,7 @@ const input = (over: Partial<FilmInput> = {}): FilmInput => ({
   glyph: '備', forms: ['備'], who: 'いつも、頼まれる前に備えている人。', moment: '「ちょうど今詰めてたところ」', names: ['山田 太郎', '山田 花子'], ...over,
 })
 const GOOD = {
+  turning_point: '母が毎朝、庭の花を一輪お弁当にのせていたこと',
   lines: ['春には、お弁当に\n庭の花を一輪のせてくれた母。', '「もういらない」と断った日も、\n母は静かに台所へ戻った。', '教師になり、生徒に\n自分のお弁当を分けた日、母を思った。', '帰る日の弁当を頼むと、「ちょうど今詰めてたところ」。'],
   pictures: [...SAMPLE_RECORDS[SAMPLE_IDS.ja].film!.pictures],
 }
@@ -56,15 +58,15 @@ const withLine = (n: number, line: string) => ({ ...GOOD, lines: GOOD.lines.map(
   check('(2) the picture prompt carries the two new rules (clothes and setting by language; no religious symbols, a window frame cross included, "most important in a remembrance film")', (() => { const p = loadFilmPrompt(); return p.includes('CLOTHES AND SETTING') && p.includes('contemporary everyday clothes') && p.includes('never a kimono, yukata, hanbok, qipao') && p.includes('ja → a modern Japanese home and town') && p.includes('modern Taiwanese, Hong Kong or Chinese home and street') && p.includes('never Japanese houses, paper lanterns, tatami') && p.includes('en → a neutral modern home') && p.includes('follow the story') && p.includes('NO RELIGIOUS SYMBOLS') && p.includes('made by a window frame') && p.includes('most in a remembrance film') && !p.includes('neutral East Asian') })())
   check('(2) checkPictures stands alone too (the same function the referee calls) and the sample scripts pass it', checkPictures(GOOD.pictures, input()).length === 0 && Object.values(SAMPLE_RECORDS).every((r) => checkPictures(r.film!.pictures, { glyph: r.glyph, forms: [r.glyph], names: [], memorial: r.memorial, occasion: r.memorial ? 'memorial' : null }).length === 0))
   const lim = lineLimits('ja')
-  check('(2) line length: ja 12–28 characters, zh 10–24 characters, en 4–14 words (a line break and spaces do not count)', lim.min === 12 && lim.max === 28 && lineLimits('zh-Hant').min === 10 && lineLimits('zh-Hant').max === 24 && lineLimits('en').min === 4 && lineLimits('en').max === 14 && lineSize('春には、お弁当に\n庭の花を一輪のせてくれた母。', 'ja') === 22 && lineSize('one two  three\nfour', 'en') === 4)
-  check('(2) …a ja line of 11 or 29 characters is refused, 12 and 28 pass', codes(withLine(0, '春にはお弁当に庭の花を一輪')).length === 0 && !codes(withLine(0, '短い一行です')).every((c) => c !== 'line_length') && codes(withLine(0, 'あ'.repeat(28))).includes('character') === false && codes(withLine(0, 'あ'.repeat(29))).includes('line_length') && codes(withLine(0, 'あ'.repeat(11))).includes('line_length') && !codes(withLine(0, 'あ'.repeat(12))).includes('line_length') && !codes(withLine(0, 'あ'.repeat(28))).includes('line_length'))
+  check('(2) line length: ja 12–40 characters, zh 10–32 characters, en 4–20 words (a line break and spaces do not count)', lim.min === 12 && lim.max === 40 && lineLimits('zh-Hant').min === 10 && lineLimits('zh-Hant').max === 32 && lineLimits('en').min === 4 && lineLimits('en').max === 20 && lineSize('春には、お弁当に\n庭の花を一輪のせてくれた母。', 'ja') === 22 && lineSize('one two  three\nfour', 'en') === 4)
+  check('(2) …a ja line of 11 or 41 characters is refused, 12 and 40 pass', codes(withLine(0, '春にはお弁当に庭の花を一輪')).length === 0 && !codes(withLine(0, '短い一行です')).every((c) => c !== 'line_length') && codes(withLine(0, 'あ'.repeat(40))).includes('character') === false && codes(withLine(0, 'あ'.repeat(41))).includes('line_length') && codes(withLine(0, 'あ'.repeat(11))).includes('line_length') && !codes(withLine(0, 'あ'.repeat(12))).includes('line_length') && !codes(withLine(0, 'あ'.repeat(40))).includes('line_length'))
   check('(2) …a line with two line breaks is refused (one at most)', codes(withLine(0, '春には、\nお弁当に\n庭の花を一輪のせた母。')).includes('line_length'))
   const zh = input({ language: 'zh-Hant', occasion: 'parent_day', glyph: '守', forms: ['守'], story: '每次晚歸，媽媽都替我留一盞燈。她說：「家裡的燈還亮著。」' })
-  const zhGood = { lines: ['每次晚歸，玄關總有一盞燈亮著。', '下雨的夜裡，媽媽撐著傘在門口等。', '我出門念書，她在月台上揮著手。', '她只說：「家裡的燈還亮著。」'], pictures: [...SAMPLE_RECORDS[SAMPLE_IDS.zh].film!.pictures] }
+  const zhGood = { turning_point: '她每晚都為我留著門口的燈', lines: ['每次晚歸，玄關總有一盞燈亮著。', '下雨的夜裡，媽媽撐著傘在門口等。', '我出門念書，她在月台上揮著手。', '她只說：「家裡的燈還亮著。」'], pictures: [...SAMPLE_RECORDS[SAMPLE_IDS.zh].film!.pictures] }
   const en = input({ language: 'en', occasion: 'parent_day', glyph: '待', forms: ['待'], story: 'My mother waited at the station every time. She only said, "The tea is ready."' })
-  const enGood = { lines: ['Every time I left, she stood\nat the station and waved.', 'When it rained, she was there\nwith an umbrella, before I asked.', 'I came home late, and the shoes\nwere already set by the door.', 'She only said, "The tea is ready."'], pictures: [...SAMPLE_RECORDS[SAMPLE_IDS.en].film!.pictures] }
+  const enGood = { turning_point: 'She was always at the station before I asked', lines: ['Every time I left, she stood\nat the station and waved.', 'When it rained, she was there\nwith an umbrella, before I asked.', 'I came home late, and the shoes\nwere already set by the door.', 'She only said, "The tea is ready."'], pictures: [...SAMPLE_RECORDS[SAMPLE_IDS.en].film!.pictures] }
   check('(2) the Chinese and the English golden scripts pass too (zh with its exact quotation, en with straight quotation marks)', codes(zhGood, zh).length === 0 && codes(enGood, en).length === 0, JSON.stringify([checkFilmScript(zhGood, zh, palette), checkFilmScript(enGood, en, palette)]))
-  check('(2) en length counts words: 3 words and 15 words are refused', codes({ ...enGood, lines: ['too few words', ...enGood.lines.slice(1)] }, en).includes('line_length') && codes({ ...enGood, lines: ['one two three four five six seven eight nine ten eleven twelve thirteen fourteen fifteen', ...enGood.lines.slice(1)] }, en).includes('line_length'))
+  check('(2) en length counts words: 3 words and 21 words are refused', codes({ ...enGood, lines: ['too few words', ...enGood.lines.slice(1)] }, en).includes('line_length') && codes({ ...enGood, lines: ['one two three four five six seven eight nine ten eleven twelve thirteen fourteen fifteen sixteen seventeen eighteen nineteen twenty twentyone', ...enGood.lines.slice(1)] }, en).includes('line_length'))
   check('(2) quotations must be word for word in the story: a changed word, an added comma, an invented quotation in 「」, “ ” or "" are refused; no quotation at all is fine', codes(withLine(1, '「もう要らない」と断った日も、\n母は静かに台所へ戻った。')).includes('quote') && codes(withLine(3, '「帰るとき、お弁当作って」と頼むと、母は笑った。')).includes('quote') && codes(withLine(2, '教師になり、生徒に\n「お腹すいたでしょ」と言った日。')).includes('quote') && codes({ ...enGood, lines: [...enGood.lines.slice(0, 3), 'She only said, "The tea is hot."'] }, en).includes('quote') && codes({ ...enGood, lines: [...enGood.lines.slice(0, 3), 'She only said, “The tea is ready.”'] }, en).length === 0 && codes(withLine(1, '中学に上がった頃、断った日も、\n母は静かに台所へ戻った。')).length === 0)
   check('(2) the chosen character is not in lines 1–4 — in any form (the carved form, the engine form, the old form)', codes(withLine(0, '春には、備えてお弁当に庭の花の母。')).includes('character') && codes(withLine(0, '春には、燈のお弁当に庭の花の母。'), input({ glyph: '灯', forms: ['灯', '燈'] })).includes('character') && codes(zhGood, { ...zh, glyph: '燈', forms: ['燈', '灯'] }).includes('character'))
   check('(2) no digits at all (ASCII or full-width)', codes(withLine(0, '春には、お弁当に庭の花を2輪のせてくれた母。')).includes('digits') && codes(withLine(0, '春には、お弁当に庭の花を２輪のせてくれた母。')).includes('digits'))
@@ -104,6 +106,7 @@ await new Promise<void>((r) => upstream.listen(0, '127.0.0.1', r))
 process.env.ANTHROPIC_BASE_URL = `http://127.0.0.1:${(upstream.address() as { port: number }).port}`
 process.env.ANTHROPIC_API_KEY = 'test-key-not-real'
 process.env.ICHIREI_FILM_TIMEOUT_MS = '600'
+process.env.ICHIREI_FILM_ARC = 'off' // the arc review has its own section below; these tests count the script calls
 const logs: string[] = []
 const run = async (reps: unknown[], i = input(), m: 'ok' | 'hang' | 'error' = 'ok') => {
   replies = reps
@@ -112,11 +115,11 @@ const run = async (reps: unknown[], i = input(), m: 'ok' | 'hang' | 'error' = 'o
   logs.length = 0
   return makeFilm(i, { log: (l) => logs.push(l), now: () => new Date('2026-10-28T03:00:00Z') })
 }
-const noStory = () => !logs.some((l) => STORY.split(/[。、\n]/).filter((p) => p.length >= 6).some((p) => l.includes(p)) || l.includes('もういらない'))
+const noStory = () => !logs.filter((l) => !l.includes('"event":"film_turning_point"')).some((l) => STORY.split(/[。、\n]/).filter((p) => p.length >= 6).some((p) => l.includes(p)) || l.includes('もういらない'))
 {
   const f = await run([GOOD])
   check('(3) a good script: one call to claude-haiku-5-5, saved as {status: ready, lines, pictures}; logged as film_generated with the picture count and the time — no story text', f.status === 'ready' && f.lines.join('|') === GOOD.lines.join('|') && f.pictures.join('|') === GOOD.pictures.join('|') && seen.length === 1 && seen[0].model === 'claude-haiku-5-5' && logs.some((l) => l.includes('"event":"film_generated"') && l.includes('"pictures":4') && l.includes('"ms"')) && noStory() && !logs.some((l) => l.includes('bento')), JSON.stringify([f, logs]))
-  check('(3) the prompt carries the story, the language and context, the character and its who-they-are line, the line limits and the picture rules; nothing about a library any more', seen[0].prompt.includes(STORY) && seen[0].prompt.includes('language: ja') && seen[0].prompt.includes('parent_mother') && seen[0].prompt.includes('Japanese: each line 12–28 characters') && seen[0].prompt.includes('いつも、頼まれる前に備えている人。') && seen[0].prompt.includes('RETELL, NEVER INVENT') && seen[0].prompt.includes('PICTURE DESCRIPTION') && seen[0].prompt.includes('NO FACES') && !/LIBRARY|scene ID|S-0\d/.test(seen[0].prompt) && !/\{\{ [A-Z_]+ \}\}/.test(seen[0].prompt))
+  check('(3) the prompt carries the story, the language and context, the character and its who-they-are line, the line limits and the picture rules; nothing about a library any more', seen[0].prompt.includes(STORY) && seen[0].prompt.includes('language: ja') && seen[0].prompt.includes('parent_mother') && seen[0].prompt.includes('Japanese: each line 12–40 characters') && seen[0].prompt.includes('いつも、頼まれる前に備えている人。') && seen[0].prompt.includes('RETELL, NEVER INVENT') && seen[0].prompt.includes('PICTURE DESCRIPTION') && seen[0].prompt.includes('NO FACES') && !/LIBRARY|scene ID|S-0\d/.test(seen[0].prompt) && !/\{\{ [A-Z_]+ \}\}/.test(seen[0].prompt))
   await run([GOOD], input({ memorial: true, occasion: 'memorial' }))
   check('(3) a remembrance film: the prompt says the receiver has died, asks for the remembering voice and for no celebration image', seen[0].prompt.includes('remembering voice') && seen[0].prompt.includes('no celebration image either') && seen[0].prompt.includes('remembrance: yes'))
   const r = await run([withLine(1, '「もう要らない」と断った日も、\n母は静かに台所へ戻った。'), GOOD])
@@ -179,6 +182,76 @@ const noStory = () => !logs.some((l) => STORY.split(/[。、\n]/).filter((p) => 
   } else {
     console.log('SKIP  (5) the story database is not in this checkout')
   }
+}
+
+
+const animationViewFor = (film: Awaited<ReturnType<typeof makeFilm>>) => animationView({ schema: 'animation', id: 'AN-aaaaaaaaaaaaaaaaaaaa', language: 'ja', glyph: '深', reading: '', romanization: '', meaning_en: null, who: 'x', moment: 'x', memorial: false, film } as unknown as AnimationRecord, null)
+
+// ---- (6) the arc review (spec v9.4): turning point, scene 3, scene 4, the whole story ---------------------------------------------------------------------------
+{
+  process.env.ICHIREI_FILM_ARC = 'on'
+  const FISH = readFileSync(join(process.cwd(), 'scripts', 'fixtures-v94', 'fisherman-memorial.txt'), 'utf8').trim()
+  const fishInput = input({ story: FISH, memorial: true, occasion: 'memorial', glyph: '深', forms: ['深'], who: '(chosen after the film)', moment: 'x' })
+  // what the script should be (the arc: before, lead-up, TURNING POINT, resolved ending) and what the live test produced (all four from the first half, a cliff-hanger last)
+  const ARC_GOOD = {
+    turning_point: '現像した写真は、私が撮った場所に父が立って撮ったものだった',
+    lines: ['口数の少ない父は、私の写真のことを一度も口にしなかった。', '船小屋の棚の木箱に、父の古いカメラと一本のフィルムがあった。', '現像した写真は、私が撮った場所に父が立って撮ったものだった。', '私は父のカメラを首に下げ、あの岬の岩の上で入り江を見下ろした。'],
+    pictures: [
+      'a fisherman seen from behind mending a net on a quiet harbour wharf at dawn, a small boat tied beside him, an old camera case on the bollard',
+      'hands lifting an old single-lens camera out of a wooden box on a shelf in a boathouse, salt-whitened camera strap hanging over the edge',
+      'a stack of developed photographs on a photo shop counter, each print showing the same headland rock and inlet, a pencil lying across them',
+      'a young man seen from behind standing on a flat rock at the mouth of an inlet at sunrise, an old camera hanging on his chest',
+    ],
+  }
+  const ARC_BAD = {
+    turning_point: '現像していないフィルムが一本あった',
+    lines: ['父は朝早く港に出て、一人で網を繕っていた。', '電話をかけても、父は「元気か」とだけ言った。', '船小屋の棚に、古い木箱があった。', 'まだ現像していない、一本のフィルムがあった。'],
+    pictures: [
+      'a fisherman seen from behind mending a net on a harbour wharf at dawn, a small boat tied beside him, ropes coiled on the planks',
+      'a hand holding an old telephone receiver beside a kitchen window, a cup of tea going cold on the table in morning light',
+      'hands opening a wooden box on a boathouse shelf, an old single-lens camera lying inside on faded cloth, salt on the lid',
+      'an undeveloped film canister resting in an open camera back, held in two hands over a wooden box, dust on the shelf behind it',
+    ],
+  }
+  const PASS = { scene3: true, scene4: true, concrete: true, reason: '' }
+  const g1 = await run([ARC_GOOD, PASS], fishInput)
+  check('(6) the script comes back with its turning point; one more call (the arc reader, claude-haiku-5-5) checks it against the whole story', g1.status === 'ready' && g1.turning_point === ARC_GOOD.turning_point && seen.length === 2 && seen[1].model === 'claude-haiku-5-5' && seen[1].prompt.includes('second, independent reader') && seen[1].prompt.includes(ARC_GOOD.turning_point) && seen[1].prompt.includes('Scene 3:') && seen[1].prompt.includes(FISH.slice(0, 30)), JSON.stringify([g1, seen.length]))
+  check('(6) the turning point is logged (80 characters at most) and the arc verdict with it; neither line is part of the saved film shown to the receiver', logs.some((l) => l.includes('"event":"film_turning_point"') && l.includes('現像した写真')) && logs.some((l) => l.includes('"event":"film_arc"') && l.includes('"ok":true')) && !JSON.stringify(animationViewFor(g1)).includes('turning'))
+  check('(6) the film prompt asks for the whole story first, the turning point, the arc (before, lead-up, turning point, after), a resolved scene 4 and concrete story objects', seen[0].prompt.includes('TURNING POINT') && seen[0].prompt.includes('TO ITS LAST WORD') && seen[0].prompt.includes('BEFORE') && seen[0].prompt.includes('LEAD-UP') && seen[0].prompt.includes('Scene 4 must be RESOLVED') && seen[0].prompt.includes('CONCRETE, STORY-SPECIFIC OBJECTS') && seen[0].prompt.includes('"turning_point"') && seen[0].prompt.includes('Japanese: each line 12–40 characters'))
+  check('(6) a harbour or river "mouth" is a place, not a face: "mouth of an inlet" is allowed, "her mouth" still is not', checkPictures(['a flat rock at the mouth of an inlet at sunrise with an old camera resting on it and a coil of rope beside it'], input()).length === 0 && checkPictures(['a close view of a woman\'s mouth speaking softly beside an old camera and a coil of rope on a table'], input()).length > 0)
+  check('(6) the ideal script for the live-test story passes the referee (lines ≤ 40, no illness or death words, no faces or text, four different moments)', codes(ARC_GOOD, fishInput).length === 0, JSON.stringify(checkFilmScript(ARC_GOOD, fishInput, palette)))
+  check('(6) the live failure (four scenes from the first half, the last an undeveloped film) is something only the arc reader can catch: the referee lets it through', codes(ARC_BAD, fishInput).length === 0, JSON.stringify(checkFilmScript(ARC_BAD, fishInput, palette)))
+
+  const r1 = await run([ARC_BAD, { scene3: false, scene4: false, concrete: true, reason: 'Scene 3 should show the prints of the places; scene 4 should be the son on the rock with the camera.' }, ARC_GOOD], fishInput)
+  check('(6) a script whose scene 3 misses the turning point and whose scene 4 is a cliff-hanger is rejected; ONE rewrite is asked for with the reader\'s note, and the rewrite is kept', r1.lines.join('|') === ARC_GOOD.lines.join('|') && seen.length === 3 && seen[2].prompt.includes('A SECOND READER CHECKED') && seen[2].prompt.includes('Scene 3 must show the turning point itself') && seen[2].prompt.includes('Scene 4 must be resolved') && seen[2].prompt.includes('the prints of the places') && logs.some((l) => l.includes('"event":"film_arc"') && l.includes('"ok":false') && l.includes('scene3')) && logs.some((l) => l.includes('"event":"film_generated"') && l.includes('"attempts":2')), JSON.stringify([seen.length, logs]))
+  check('(6) the rewrite is not reviewed again (the time the review may add stays about one reader call): three calls, no fourth', seen.length === 3)
+  const r2 = await run([ARC_BAD, { scene3: false, scene4: true, concrete: true, reason: 'x' }, 'not json'], fishInput)
+  check('(6) when the rewrite cannot be read, the best script in hand is kept (a film is never lost to its review)', r2.status === 'ready' && r2.lines.join('|') === ARC_BAD.lines.join('|') && r2.turning_point === ARC_BAD.turning_point)
+  const r3 = await run([ARC_GOOD, 'the reader is confused'], fishInput)
+  check('(6) a reader that cannot be understood is a pass (nothing is blocked)', r3.status === 'ready' && seen.length === 2)
+  const r4 = await run([{ ...ARC_GOOD, turning_point: '' }, { ...ARC_GOOD }, PASS], fishInput)
+  check('(6) a script without a turning point is refused by the referee (the field is required) and asked again', r4.status === 'ready' && seen.length >= 2 && logs.some((l) => l.includes('turning_point')) && seen[1].prompt.includes('Return `turning_point`'), JSON.stringify(logs))
+  const r5 = await run([ARC_BAD, { scene3: false, scene4: false, concrete: false, reason: 'x' }, ARC_GOOD.lines.map(() => 'x')], fishInput)
+  check('(6) a rewrite the referee refuses leaves the first script in hand, still kept (and logged as kept)', r5.status === 'ready' && r5.lines.join('|') === ARC_BAD.lines.join('|') && logs.some((l) => l.includes('"arc":"kept"')))
+  process.env.ICHIREI_FILM_ARC = 'off'
+  await run([ARC_GOOD], fishInput)
+  check('(6) ICHIREI_FILM_ARC=off: no reader call', seen.length === 1)
+  // a short story: nothing changes (one script call, one reader call, same record shape)
+  const short = readFileSync(join(process.cwd(), 'scripts', 'fixtures-v94', 'father-frost-short.txt'), 'utf8').trim()
+  process.env.ICHIREI_FILM_ARC = 'on'
+  const SHORT = {
+    turning_point: '父が黙って、毎朝フロントガラスの霜を溶かしてくれていたこと',
+    lines: ['霜の降りた朝にも、父は私より先に起きていた。', 'お湯を入れたやかんを持って、静かに玄関を出て行った。', '私が眠い目で外に出ると、ガラスはもう透き通っていた。', '父は何も言わず、車の横でやかんを片づけていた。'],
+    pictures: [
+      'a frosted car windscreen on a cold morning in a quiet suburban driveway, a house door standing slightly open in the grey light',
+      'a hand holding a metal kettle with rising steam, seen from behind a man walking towards a parked car over frosty ground',
+      'the car windscreen cleared and clear of frost while the rest of the car is still white, a house door opening in the background',
+      'a man seen from behind beside the car, the empty kettle in his hand, frost melting into a dark patch on the ground at his feet',
+    ],
+  }
+  const s1 = await run([SHORT, PASS], input({ story: short, glyph: '温', forms: ['温'] }))
+  check('(6) regression, the short father story: the same script shape, one script call and one arc call, status ready', s1.status === 'ready' && seen.length === 2 && s1.lines.length === 4, JSON.stringify(checkFilmScript(SHORT, input({ story: short, glyph: '温', forms: ['温'] }), palette)))
+  process.env.ICHIREI_FILM_ARC = 'off'
 }
 
 upstream.closeAllConnections?.()

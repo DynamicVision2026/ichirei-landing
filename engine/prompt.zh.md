@@ -144,7 +144,7 @@ reading:          (pinyin with tone marks — the natural Mandarin reading)
 truth_type:       
 scarce_asset_it_preserves:
 story_anchor:     (verbatim fragment — the evidence)
-one_line_gaze:    (Chinese in the display_script — how the sender sees them, in ONE sentence; built ONLY from details stated in the story — see HARD PROCESS RULE 5)
+one_line_gaze:    (Chinese in the display_script — how the sender sees them, in ONE sentence; built ONLY from details stated in the story — see HARD PROCESS RULE 5. THE SHAPE (spec v9.4): the card prints 「這個人是」 before it, so the line must COMPLETE it as ONE sentence DESCRIBING THE PERSON and END on a noun phrase (…的人 / …的父親 / …的媽媽). GOOD: 「總是在我開口之前就準備好的人。」 BAD: a sentence whose subject is a word, a feeling, a thing or a scene, or one that ends on a verb or 了 — 「那句『知道了』裡，裝著他十年的心意。」)
 why_not_generic:  (what binds this to THIS story specifically)
 
 ```

@@ -1,4 +1,4 @@
-ICHIREI — Film Script Prompt (v1)
+ICHIREI — Film Script Prompt (v2, spec v9.4)
 
 This prompt writes the SCRIPT of a 30-second film that retells the sender's own story in four short scenes: four lines of text and, for each, a description of the picture a painter will paint for it. The film ends with the chosen character as the answer. Nothing here picks a character; it tells the story that leads to it. Reply with one JSON object only.
 
@@ -23,7 +23,14 @@ THE STORY (the sender's own words; the receiver is the person they describe)
 ```
 
 WHAT TO WRITE
-Four lines, one for each scene, in the order the story happened. Each line tells what happened at one moment — a scene a painter could draw. For each line, also one PICTURE DESCRIPTION (rule 7).
+STEP 1 — READ THE WHOLE STORY, TO ITS LAST WORD, BEFORE YOU CHOOSE ANYTHING. A long story is not its first half. Then name the TURNING POINT: the moment the sender saw who this person really was — a discovery, an act, a sentence. Return it as `turning_point`: ONE short line, in the language of the lines, using the story's own words (no names). It is kept in a log and never shown.
+STEP 2 — FOUR SCENES, FOLLOWING THIS ARC (not just "the first four things that happen"):
+  1. BEFORE — the relationship as it seemed, before the turning point.
+  2. LEAD-UP — the moment that leads to the discovery.
+  3. THE TURNING POINT (required) — scene 3 shows `turning_point` directly: the discovery, the act or the sentence itself.
+  4. AFTER — the image the story ends on, or what remains. Scene 4 must be RESOLVED: never end on a setup, a question, a cliff-hanger or an object still waiting to be opened, developed or answered. If the story ends on such a moment, scene 4 is the answer the story gives afterwards.
+  A story that is only one moment (a single short anecdote) has no arc to find: use that same moment from four different distances (far, near, an object, what is left). Nothing else changes for it.
+STEP 3 — Each line tells what happened at one moment — a scene a painter could draw — complete and readable on its own, in the sender's view and voice. For each line, also one PICTURE DESCRIPTION (rule 7).
 
 RULES
 1. RETELL, NEVER INVENT. Use only events, words and feelings that are in the story. Add no fact, no detail, no cause, no ending the story does not have. If the story says a visit is next month, it stays in the future ("来月" / "next month" — never "today" or "already"). If you are unsure whether something happened, leave it out.
@@ -40,14 +47,15 @@ RULES
    - Never mention a machine, a computer program or "AI".
 7. FOUR PICTURES, FOUR DIFFERENT MOMENTS. For each line write one picture description, in ENGLISH whatever the language of the lines, 15–40 words. It describes ONE moment from the story, the moment of its line, for an ink-wash painter: the people (only as silhouettes, as hands, or seen from behind), the key object or action, the place, the season and the light. Example: "a mother's hand placing one spring flower on an open bento box, soft morning window light". Rules for the pictures:
    - ONLY WHAT THE STORY SAYS. No new object, place or person.
+   - CONCRETE, STORY-SPECIFIC OBJECTS. Each description names at least one object or place that appears in the story's own words (for example "a stack of prints with handwritten place names", "a flat rock at the edge of an inlet", "an old film camera on a boat shelf"). No generic props (a window, a table, a cup of tea, flowers, a path, a sunset) unless the story itself names them.
    - CLOTHES AND SETTING. People wear contemporary everyday clothes — never a kimono, yukata, hanbok, qipao or any other traditional dress unless the story mentions it. The setting is the buyer's own modern world, by the language above: ja → a modern Japanese home and town; zh-Hant / zh-Hans → a modern Taiwanese, Hong Kong or Chinese home and street (never Japanese houses, paper lanterns, tatami, shoji or torii); en → a neutral modern home. If the story names a place or a culture, follow the story.
    - NO RELIGIOUS SYMBOLS: no cross (also not one made by a window frame or a shadow), no Buddhist altar, shrine, temple, torii, prayer beads or any other religious sign — unless the story itself mentions it. This matters most in a remembrance film: show a quiet table, a window, hands, a chair, never an altar.
    - NO FACES. A person appears ONLY as hands, or seen from behind, or from far away as a small silhouette — never close enough to show a face. Never show a face, not even in profile. Never write smile, eyes, expression, profile, looking at, facing or any feature of a face.
    - NO TEXT of any kind in the picture: no letters, signs, writing, screens with words, logos or brands. (A letter or a card may appear as a folded paper, never as writing.)
    - No names, no real place names, no schools or companies; no digits; no Japanese or Chinese characters.
    - NO illness, hospital, injury, blood, funeral or decline image, even if the story mentions it — paint the moment around it. For a remembrance film, no celebration image either (no party, cake, candles, festival, wedding).
-   - Four different moments, in the story's order. Do not name or hint at the chosen character.
+   - Four different moments, following the arc above. Do not name or hint at the chosen character.
 {{ FEEDBACK }}
 
 OUTPUT. Reply with exactly one JSON object and nothing else (no code fence, no commentary):
-{ "lines": ["…", "…", "…", "…"], "pictures": ["…", "…", "…", "…"] }
+{ "turning_point": "…", "lines": ["…", "…", "…", "…"], "pictures": ["…", "…", "…", "…"] }

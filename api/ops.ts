@@ -23,10 +23,10 @@ import type { OrderRecord } from '../engine/order.ts'
 import { readPayments, readShippingAddresses, SHIPPING_SOURCE, type PaymentResult, type ShippingResult } from '../engine/shipping.ts'
 import { cancelOrder, changeCharacter, changePoemFormat, editNames, windowOf, type ChangeDeps, type WindowInfo } from '../engine/change-window.ts'
 import { createPoemHandler } from './poem.ts'
-import type { Candidate } from '../engine/contract.ts'
+import { mergeStory, type Candidate } from '../engine/contract.ts'
 import type { Palette } from '../engine/palette.ts'
 import type { generatePoem } from '../engine/poem.ts'
-import { POEM_TYPES, PRINTED_CARD, type PoemType } from '../src/order/packages.ts'
+import { POEM_TYPES, PRINTED_CARD, poemTypesFor, type PoemType } from '../src/order/packages.ts'
 import type { StoredPoem } from '../engine/order.ts'
 import { AdminTokenCache, loadTrackConfig, readAdminSecret, readSecret, type TrackDeps } from '../engine/track.ts'
 import { loadArtwork } from '../engine/render/artwork.ts'
@@ -273,7 +273,8 @@ export function createOpsHandlers(deps: () => OpsDeps) {
         const charOpts = shown.map((x) => `<option value="${esc(x.candidate.kanji)}">${esc(x.candidate.kanji)}（候補${x.set}）</option>`).join('')
         const poemUsed = (rec?.ops?.poem_format_changes ?? 0) >= 1
         const hasPoem = (p?.poems.length ?? 0) > 0
-        const poemOpts = Object.entries(POEM_LABEL).filter(([k]) => k !== p?.poems[0]?.type).map(([k, v]) => `<option value="${k}">${v}</option>`).join('')
+        const offered = p ? poemTypesFor(p.language, mergeStory(rec?.story ?? '', rec?.follow_ups ?? [])) : []
+        const poemOpts = Object.entries(POEM_LABEL).filter(([k]) => k !== p?.poems[0]?.type && (offered as readonly string[]).includes(k)).map(([k, v]) => `<option value="${k}">${v}</option>`).join('')
         const log = (rec?.ops?.log ?? []).map((l) => `<li>${esc(l.at.slice(0, 16).replace('T', ' '))} ${esc(l.who)} ${esc(l.action)} ${esc(l.detail)}</li>`).join('')
         const canMsg = !!p && SHIPS[p.package] && p.ship_to !== 'me' && p.ship_to !== 'none'
         return `<tr class="inwindow"><td>${esc(r.entry.order_ref)}</td><td>${esc(SIZE_LABEL[r.entry.size_code] ?? r.entry.size_code)}</td><td>${r.entry.memorial ? '偲ぶ' : ''}</td>` +

@@ -139,7 +139,7 @@ reading:          (hiragana — the natural Japanese reading)
 truth_type:       
 scarce_asset_it_preserves:
 story_anchor:     (verbatim fragment — the evidence)
-one_line_gaze:    (Japanese — how the sender sees them, in ONE sentence; built ONLY from details stated in the story — see HARD PROCESS RULE 5)
+one_line_gaze:    (Japanese — how the sender sees them, in ONE sentence; built ONLY from details stated in the story — see HARD PROCESS RULE 5. THE SHAPE (spec v9.4): the card prints 「その人は、」 before it, so the line must COMPLETE 「その人は、」 as one sentence DESCRIBING THE PERSON, and it must END in a noun phrase or in 〜人 (a relative clause that ends on the person). GOOD: 「言葉にせず、息子が撮った場所を一人で歩いていた父。」「いつも、頼まれる前に備えている人。」 BAD: any sentence whose subject is a word, a feeling, a thing or a scene, or one that ends on a verb — 「『そうか』という短い一言の中に、父の十年分の想いが詰まっていた。」 (the subject is the feelings), 「その手は、いつも温かかった。」 (the subject is the hand))
 why_not_generic:  (what binds this to THIS story specifically)
 
 ```

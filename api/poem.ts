@@ -15,7 +15,7 @@ import { POEM_ID_PATTERN, todayJst, type StoredPoem } from '../engine/order.ts'
 import { createOrderStore, type OrderStore } from '../engine/order-store.ts'
 import { loadPalette, type Palette } from '../engine/palette.ts'
 import { generatePoem, type GenerateOptions } from '../engine/poem.ts'
-import { POEM_TYPES, type PoemType } from '../src/order/packages.ts'
+import { POEM_TYPES, poemTypeAllowed, poemTypesFor, type PoemType } from '../src/order/packages.ts'
 
 const MAX_BODY_BYTES = 40_000
 const GAZE_MAX = 300
@@ -63,6 +63,8 @@ export function createPoemHandler(deps: () => PoemDeps) {
     const ctx = parseContext({ language: body.language, relationship: body.relationship, direction: body.direction, occasion: body.occasion, occasion_detail: body.occasion_detail })
     if (!ctx.ok) return json(400, { error: ctx.error })
     const { language, relationship, direction, occasion, occasion_detail } = ctx.context
+    // the formats follow the story's language (spec v9.4): 短歌 / 漢詩 for a Japanese story, 漢詩 / 宋詞 for a Chinese one, free verse for an English one
+    if (!poemTypeAllowed(language, type, mergeStory(body.story, fu.followUps))) return json(400, { error: `The format "${type}" is not offered for this story's language; offered: ${poemTypesFor(language, mergeStory(body.story, fu.followUps)).join(' | ')}`, code: 'poem_type_not_offered', field: 'type' })
     const kanji = typeof body.kanji === 'string' ? body.kanji.trim() : ''
     if ([...kanji].length !== 1 || !/[㐀-鿿豈-﫿]/u.test(kanji)) return json(400, { error: '"kanji" must be one character', field: 'kanji' })
     const gaze = typeof body.gaze === 'string' ? body.gaze.trim() : ''

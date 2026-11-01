@@ -25,7 +25,7 @@ import { POEM_ID_PATTERN, buildRecord, lineAttributes, newOrderRef, parseOrderRe
 import { createOrderStore, type OrderStore } from '../engine/order-store.ts'
 import type { Palette } from '../engine/palette.ts'
 import { ShopifyError, createCart, loadShopifyConfig, type ShopifyConfig } from '../engine/shopify.ts'
-import { MAX_POEMS, POEM_TYPES } from '../src/order/packages.ts'
+import { MAX_POEMS, POEM_TYPES, poemTypeAllowed } from '../src/order/packages.ts'
 
 const MAX_BODY_BYTES = 300_000
 
@@ -68,6 +68,7 @@ async function resolvePoems(raw: unknown, store: OrderStore, order: ValidOrder):
       return { ok: false, code: 'store_failed', error: 'Could not read the poem. Please try again.' }
     }
     if (!rec || rec.schema !== 'poem' || !Array.isArray(rec.lines) || !(POEM_TYPES as readonly string[]).includes(rec.type)) return { ok: false, code: 'poem_not_found', error: 'A poem in the order was not found; please make it again.' }
+    if (!poemTypeAllowed(order.language, rec.type, mergeStory(order.story, order.follow_ups))) return { ok: false, code: 'poem_type_not_offered', error: 'That poem format is not offered for this story\'s language.' }
     if (rec.language !== order.language || !rec.forms.some((f) => f === order.candidate.kanji || f === order.candidate.inscription_form)) return { ok: false, code: 'poem_mismatch', error: 'A poem does not belong to the chosen character.' }
     poems.push(rec)
   }

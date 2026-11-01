@@ -25,6 +25,7 @@ import { fileURLToPath } from 'node:url'
 import { applyPalette, applyReviewVerdicts, loadPalette } from './palette.ts'
 import { runReview } from './review.ts'
 import { completeMains } from './replace.ts'
+import { applyGazes, fixGazes } from './gaze.ts'
 import {
   DECLINE_MESSAGE,
   DEFAULT_CONTEXT,
@@ -593,7 +594,10 @@ async function runPipeline(a: PipelineArgs): Promise<PipelineOut> {
     excluded,
   })
   // The last gate: at most one main, one second, one freestyle — and never zero cards without a question.
-  const final = finalizeResult(completed)
+  // The gaze line must complete 「その人は、」 as one sentence about the person (spec v9.4): a line that does not is rewritten once (one small call,
+  // only when a line fails); a rewrite that fails the same check is dropped and the original stays.
+  const gazeFixes = await fixGazes(completed.candidates, story, context.language, { apiKey: opts.apiKey, signal: opts.signal, onUsage: opts.onUsage ? (u) => opts.onUsage!('review', u) : undefined })
+  const final = finalizeResult(applyGazes(completed, gazeFixes))
   timing({ review_ms: reviewMs, replace_ms: Date.now() - tReplace, status: final.status })
   // Lexicon mode: a sufficient answer that ended with no usable lexicon character (the model chose outside the list) is a miss like any other.
   if (view && final.status === 'insufficient') return { result: finishLexicon(final), miss: { reason: 'no_valid_choice', register: registerOf(extracted) } }

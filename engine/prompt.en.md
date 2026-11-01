@@ -144,7 +144,7 @@ why_this:         (ONE plain-English sentence that connects what the character m
 truth_type:       
 scarce_asset_it_preserves:
 story_anchor:     (verbatim fragment — the evidence)
-one_line_gaze:    (English — how the sender sees them, in ONE sentence; built ONLY from details stated in the story and referencing at least one of them — see HARD PROCESS RULES 5 and 6)
+one_line_gaze:    (English — how the sender sees them, in ONE sentence; built ONLY from details stated in the story and referencing at least one of them — see HARD PROCESS RULES 5 and 6. THE SHAPE (spec v9.4): the card prints “They are” before it, so the line must be ONE sentence DESCRIBING THE PERSON and begin with the person: “Someone who…”, “A father who…”, “The one who…”. GOOD: “Someone who walked, alone and in silence, to every place his son had photographed.” BAD: a sentence whose subject is a word, a feeling, a thing or a scene — “In that short ‘I see’ was ten years of love.”)
 why_not_generic:  (what binds this to THIS story specifically)
 
 ```

@@ -3,7 +3,7 @@ import type { Candidate, EngineResult } from './types'
 import type { Copy, UiLanguage } from './i18n'
 import { log } from './logging'
 import { sessionId } from './analytics'
-import { DEFAULT_POEM_TYPE, POEM_TYPES, type PoemType } from '../order/packages.ts'
+import { defaultPoemType, poemTypesFor, type PoemType } from '../order/packages.ts'
 
 // The poem (歌の添え書き): ONE poem is included free in every order. After the character is chosen the buyer picks a format (the first one
 // shown follows the site language: ja → tanka, zh → ci, en → en), the poem is written at once and shown IN FULL before checkout; another
@@ -31,7 +31,9 @@ const CALL_TIMEOUT_MS = 60_000
 
 export default function PoemAddOn({ result, story, followUps, candidate, copy, language, onChange, disabled }: Props) {
   const p = copy.order.poem
-  const [selected, setSelected] = useState<PoemType>(DEFAULT_POEM_TYPE[language])
+  // the formats follow the story's language (spec v9.4): 短歌 / 漢詩 for a Japanese story, 漢詩 / 宋詞 for a Chinese one, free verse for an English one
+  const offered = poemTypesFor(language, [story, ...followUps].join('\n'))
+  const [selected, setSelected] = useState<PoemType>(defaultPoemType(language, [story, ...followUps].join('\n')))
   const [status, setStatus] = useState<Partial<Record<PoemType, Status>>>({})
   const inflight = useRef<{ type: PoemType; ac: AbortController } | null>(null)
   const started = useRef<Set<PoemType>>(new Set())
@@ -124,7 +126,7 @@ export default function PoemAddOn({ result, story, followUps, candidate, copy, l
       <legend className="clab">{p.heading}</legend>
       <p className="sent">{p.note}</p>
       <div className="optRow">
-        {POEM_TYPES.map((t) => (
+        {offered.map((t) => (
           <label key={t} className={`opt${selected === t ? ' on' : ''}`}>
             <input type="radio" name="poem_type" value={t} data-poem-type={t} checked={selected === t} disabled={disabled} onChange={() => setSelected(t)} />
             <span>{p.types[t]}</span>

@@ -257,9 +257,22 @@ export async function generatePoem(input: PoemInput, palette: Palette, opts: Gen
         ...checkPalette(draft, palette, input.occasion, families, [...exempt, ...forms.flatMap((f) => [...f])]),
         ...(wantsG && !freeText(raw.gendaigo) ? ['gendaigo is missing: add a short modern Japanese 現代語訳 of the whole poem'] : []),
       ]
+      let imageNote: string | null = null // the one quality rule (story_image): one rewrite is asked for, then the poem in hand is kept
       if (problems.length === 0 && reviewEnabled()) {
         const verdict = await review(draft, input, callText)
-        if (verdict) problems.push(verdict)
+        if (verdict && verdict.startsWith('review (story_image)')) imageNote = verdict
+        else if (verdict) problems.push(verdict)
+      }
+      if (imageNote && problems.length === 0) {
+        if (attempt === 2) {
+          log(`[ichirei-poem] ${JSON.stringify({ type: input.type, event: 'story_image_kept', language: input.language })}`)
+        } else {
+          spare = build(raw, draft)
+          spareSoft = []
+          feedback = `\nA SECOND READER FOUND THAT YOUR POEM'S IMAGERY DOES NOT COME FROM THIS STORY — write a new poem (read the whole story again; carry its turning point through one concrete image the story itself gives):\n- ${imageNote}\n`
+          if (Date.now() - t0 > poemTimeoutMs() * 0.55) break
+          continue
+        }
       }
       if (problems.length === 0) {
         const soft = checkCraft(draft, forms)
@@ -327,7 +340,7 @@ async function review(
     const raw = parseJson(await callText('review', process.env.ICHIREI_REVIEW_MODEL ?? DEFAULT_REVIEW_MODEL, prompt, Number(process.env.ICHIREI_REVIEW_MAX_TOKENS ?? 4000), 'low'))
     if (!raw || typeof raw.pass !== 'boolean' || raw.pass) return null
     const rule = typeof raw.rule === 'string' ? raw.rule.toLowerCase() : ''
-    if (!(REVIEW_VETO_RULES as readonly string[]).includes(rule) && rule !== 'attribution') return null // not a safety rule: a concern, not a veto
+    if (!(REVIEW_VETO_RULES as readonly string[]).includes(rule) && rule !== 'attribution' && rule !== 'story_image') return null // not a rule: a concern, not a veto (story_image is the one quality rule: the imagery must come from the story)
     return `review (${rule}): ${typeof raw.reason === 'string' ? raw.reason.slice(0, 120) : 'did not pass'}`
   } catch {
     return null

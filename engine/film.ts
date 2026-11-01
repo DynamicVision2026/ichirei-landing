@@ -27,6 +27,8 @@ export interface FilmRecord {
   status: 'ready' | 'fallback'
   lines: string[]
   pictures: string[]
+  /** The moment the sender saw who this person really was (one line; kept with the order and logged, never shown). */
+  turning_point?: string
   made_at: string
   /** fallback only: why (a code, never story text). */
   reason?: string
@@ -54,11 +56,11 @@ export interface FilmInput {
 
 // ---- the referee --------------------------------------------------------------------------------------------------------------------------------
 
-/** Line length by language, as the ticket sets it: ja 12–28 characters, zh 10–24, en 4–14 words (the line break and spaces do not count). */
+/** Line length by language (spec v9.4): ja 12–40 characters, zh 10–32, en 4–20 words (the line break and spaces do not count). A line is a complete sentence, readable on its own. */
 export function lineLimits(language: Language): { unit: 'chars' | 'words'; min: number; max: number } {
-  if (language === 'ja') return { unit: 'chars', min: 12, max: 28 }
-  if (language === 'en') return { unit: 'words', min: 4, max: 14 }
-  return { unit: 'chars', min: 10, max: 24 }
+  if (language === 'ja') return { unit: 'chars', min: 12, max: 40 }
+  if (language === 'en') return { unit: 'words', min: 4, max: 20 }
+  return { unit: 'chars', min: 10, max: 32 }
 }
 
 export function lineLimitText(language: Language): string {
@@ -83,7 +85,7 @@ const QUOTES: RegExp[] = [/「([^」]*)」/g, /『([^』]*)』/g, /“([^”]*)�
 export const PICTURE_WORDS = { min: 15, max: 40 }
 
 /** Words that ask the painter for a face, for writing, or for what a picture must never show. */
-const PICTURE_FACE_TEXT = /\b(faces?|facial|smil\w+|eyes?|eyebrows?|expressions?|profile|lips|mouth|text|words?|captions?|subtitles?|signboards?|signs?|logos?|brands?|labels?|letters? of|handwriting|calligraphy|writing on|poster|banner|screens? (with|showing|displaying))\b/i
+const PICTURE_FACE_TEXT = /\b(faces?|facial|smil\w+|eyes?|eyebrows?|expressions?|profile|lips|(?<!river |harbou?r |bay |inlet |cove |cave |tunnel )mouth(?! of)|text|words?|captions?|subtitles?|signboards?|signs?|logos?|brands?|labels?|letters? of|handwriting|calligraphy|writing on|poster|banner|screens? (with|showing|displaying))\b/i
 const PICTURE_UNSAFE = /\b(blood|bloody|injur\w+|wounds?|bandages?|funeral|coffin|casket|cremation|corpse|naked|nude|weapons?|knife|gun|violen\w+|fight\w*|hospital|hospice|clinic|sickbed|wheelchair|stretcher|ill|illness|sick|cancer|dementia|dying|death|dead|grave|tombstone|passed away|passing away|nursing home|old age|elderly|aging|ageing|decline|frail|surgery|stroke|chemo\w*|terminal)\b/i
 const PICTURE_CELEBRATION = /\b(celebrat\w+|festiv\w+|party|birthday|wedding|bride|groom|cake|candles?|confetti|toast\w*|cheers|balloons?|fireworks|festival|lanterns?|congratulat\w+)\b/i
 // traditional dress, a setting from another country's world, and religious symbols: not allowed in a picture unless the STORY itself mentions them
@@ -130,12 +132,14 @@ export interface FilmProblem {
 
 export function checkFilmScript(raw: unknown, input: FilmInput, palette: Palette): FilmProblem[] {
   const out: FilmProblem[] = []
-  const r = raw as { lines?: unknown; pictures?: unknown } | null
+  const r = raw as { lines?: unknown; pictures?: unknown; turning_point?: unknown } | null
   if (!r || !Array.isArray(r.lines) || !Array.isArray(r.pictures) || r.lines.length !== 4 || r.pictures.length !== 4 || r.lines.some((l) => typeof l !== 'string') || r.pictures.some((s) => typeof s !== 'string')) {
-    return [{ code: 'shape', detail: 'Reply with exactly four lines and exactly four picture descriptions: {"lines":[4 strings],"pictures":[4 strings]}.' }]
+    return [{ code: 'shape', detail: 'Reply with exactly four lines and exactly four picture descriptions: {"turning_point":"…","lines":[4 strings],"pictures":[4 strings]}.' }]
   }
   const lines = (r.lines as string[]).map((l) => l.trim())
   const pictures = (r.pictures as string[]).map((p) => p.trim())
+  const tp = typeof r.turning_point === 'string' ? r.turning_point.trim() : ''
+  if (!tp || tp.length > 240) out.push({ code: 'turning_point', detail: 'Return `turning_point`: ONE short line (at most 240 characters) naming the moment the sender saw who this person really was.' })
   out.push(...checkPictures(pictures, input))
   const lim = lineLimits(input.language)
   lines.forEach((l, i) => {
@@ -183,6 +187,42 @@ function readSibling(file: string, override?: string): string {
     }
   }
   throw new Error(`${file} not found`)
+}
+
+// ---- the arc review (spec v9.4): scene 3 shows the turning point, scene 4 is resolved, the pictures hold the story's own objects -----------------------------------
+
+export const ARC_SLOTS = ['STORY', 'TURNING_POINT', 'SCENES'] as const
+export const arcEnabled = (env: NodeJS.ProcessEnv = process.env): boolean => !/^(off|0|false|no)$/i.test((env.ICHIREI_FILM_ARC ?? '').trim())
+export const ARC_TIMEOUT_MS = 12_000
+
+export function loadArcPrompt(): string {
+  const text = readSibling('film-arc-prompt.md', process.env.ICHIREI_FILM_ARC_PROMPT_PATH)
+  const missing = ARC_SLOTS.filter((x) => !text.includes(`{{ ${x} }}`))
+  if (missing.length > 0) throw new Error(`film-arc-prompt.md is missing slot(s) ${missing.join(', ')}`)
+  return text
+}
+
+export interface ArcVerdict {
+  ok: boolean
+  /** The failed checks, as codes (scene3, scene4, concrete) with the reviewer's words for the rewrite. */
+  failed: string[]
+  reason: string
+}
+
+/** The reviewer's JSON → a verdict. An unreadable reply is a pass (a film is never blocked by its review). */
+export function parseArcVerdict(raw: Record<string, unknown> | null): ArcVerdict {
+  if (!raw) return { ok: true, failed: [], reason: '' }
+  const failed = (['scene3', 'scene4', 'concrete'] as const).filter((k) => raw[k] === false)
+  return { ok: failed.length === 0, failed: [...failed], reason: typeof raw.reason === 'string' ? raw.reason.trim().slice(0, 300) : '' }
+}
+
+export function arcFeedback(v: ArcVerdict): string {
+  const what: Record<string, string> = {
+    scene3: 'Scene 3 must show the turning point itself (the discovery, the act or the sentence where the sender saw who this person really was), in both its line and its picture.',
+    scene4: 'Scene 4 must be resolved: the image the story ends on or what remains — never a setup, a question, a cliff-hanger or something still waiting to be opened or developed; and it must come from the END of the story, not the first half.',
+    concrete: 'Each picture description must name at least one concrete object or place from the story\'s own words — no generic props.',
+  }
+  return `\nA SECOND READER CHECKED YOUR SCRIPT AGAINST THE STORY'S ARC AND IT FAILED — write a new script (read the whole story to its last word again) that fixes this:\n${v.failed.map((f) => `- ${what[f]}`).join('\n')}\n${v.reason ? `- The reader's note: ${v.reason}\n` : ''}`
 }
 
 export const FILM_SLOTS = ['LANGUAGE', 'RELATIONSHIP', 'DIRECTION', 'OCCASION', 'OCCASION_DETAIL', 'MEMORIAL', 'KANJI', 'WHO', 'STORY', 'LINE_LIMITS', 'FEEDBACK'] as const
@@ -244,6 +284,21 @@ export function fallbackFilm(input: Pick<FilmInput, 'moment' | 'who'>, reason: s
   return { status: 'fallback', lines: [input.moment.trim(), input.who.trim()].filter(Boolean).slice(0, 2), pictures: [], made_at: now.toISOString(), reason }
 }
 
+/** One independent reader: do scene 3 and scene 4 follow the arc? Never throws; a failed or slow review is a pass. */
+export async function reviewArc(a: { client: Pick<Anthropic, 'messages'>; signal?: AbortSignal; story: string; turning_point: string; lines: string[]; pictures: string[] }): Promise<ArcVerdict> {
+  const signal = callSignal(a.signal, ARC_TIMEOUT_MS)
+  try {
+    const scenes = a.lines.map((l, i) => `Scene ${i + 1}: ${l.replace(/\n/g, ' ')}\n  picture: ${a.pictures[i]}`).join('\n')
+    const prompt = fill(loadArcPrompt(), { STORY: a.story, TURNING_POINT: a.turning_point, SCENES: scenes })
+    const stream = a.client.messages.stream({ model: process.env.ICHIREI_FILM_ARC_MODEL ?? DEFAULT_REVIEW_MODEL, max_tokens: 1000, output_config: { effort: 'low' }, messages: [{ role: 'user', content: prompt }] }, { signal })
+    const message = await stream.finalMessage()
+    const text = message.content.filter((b): b is Anthropic.TextBlock => b.type === 'text').map((b) => b.text).join('')
+    return parseArcVerdict(parseJson(text))
+  } catch {
+    return { ok: true, failed: [], reason: '' }
+  }
+}
+
 /**
  * Write the film script for one order. Never throws and never blocks an order: a failed call or two failed checks give the fallback script.
  * One try, one retry (with the failed checks fed back), 30 s per call.
@@ -274,6 +329,7 @@ export async function makeFilm(input: FilmInput, opts: FilmOptions = {}): Promis
   const timeoutMs = Number(process.env.ICHIREI_FILM_TIMEOUT_MS) > 0 ? Number(process.env.ICHIREI_FILM_TIMEOUT_MS) : FILM_TIMEOUT_MS
   let feedback = ''
   let lastReason = 'call'
+  let spare: FilmRecord | null = null // a script that passed the checks but not the arc review: kept if the rewrite cannot be made
   for (let attempt = 1; attempt <= 2; attempt++) {
     const signal = callSignal(opts.signal, timeoutMs)
     try {
@@ -292,11 +348,24 @@ export async function makeFilm(input: FilmInput, opts: FilmOptions = {}): Promis
         if (problems.length === 0) {
           const lines = (raw.lines as string[]).map((l) => l.trim())
           const pictures = (raw.pictures as string[]).map((p) => p.trim())
-          logLine(log, 'film_generated', { attempts: attempt, pictures: pictures.length, ms: Date.now() - t0 })
-          return { status: 'ready', lines, pictures, made_at: now.toISOString() }
+          const turning_point = String(raw.turning_point).trim()
+          // the arc review (one reader, a few seconds): after the first try only — a rewrite was told exactly what to fix and is kept
+          let verdict: ArcVerdict = { ok: true, failed: [], reason: '' }
+          if (attempt === 1 && arcEnabled()) verdict = await reviewArc({ client, signal: opts.signal, story: input.story, turning_point, lines, pictures })
+          // the one place a line of the story reaches the logs, asked for by the owner (spec v9.4): the turning point the script was built on, 80 characters at most
+          logLine(log, 'film_turning_point', { attempt, turning_point: turning_point.slice(0, 80) })
+          if (attempt === 1 && arcEnabled()) logLine(log, 'film_arc', { ok: verdict.ok, failed: verdict.failed, ms: Date.now() - t0 })
+          if (verdict.ok || attempt === 2) {
+            logLine(log, 'film_generated', { attempts: attempt, pictures: pictures.length, arc: verdict.ok ? 'ok' : 'kept', ms: Date.now() - t0 })
+            return { status: 'ready', lines, pictures, turning_point, made_at: now.toISOString() }
+          }
+          spare = { status: 'ready', lines, pictures, turning_point, made_at: now.toISOString() }
+          lastReason = `arc:${verdict.failed.join('+')}`
+          feedback = arcFeedback(verdict)
+        } else {
+          lastReason = [...new Set(problems.map((p) => p.code))].join('+')
+          feedback = `\nYOUR PREVIOUS SCRIPT FAILED THESE CHECKS — write a new one that fixes every one of them:\n${problems.map((p) => `- ${p.detail}`).join('\n')}\n`
         }
-        lastReason = [...new Set(problems.map((p) => p.code))].join('+')
-        feedback = `\nYOUR PREVIOUS SCRIPT FAILED THESE CHECKS — write a new one that fixes every one of them:\n${problems.map((p) => `- ${p.detail}`).join('\n')}\n`
       }
     } catch (err) {
       lastReason = timedOut(signal) ? 'timeout' : 'call'
@@ -304,6 +373,10 @@ export async function makeFilm(input: FilmInput, opts: FilmOptions = {}): Promis
       void err
     }
     if (attempt === 1) logLine(log, 'film_retry', { reason: lastReason, ms: Date.now() - t0 })
+  }
+  if (spare) {
+    logLine(log, 'film_generated', { attempts: 2, pictures: spare.pictures.length, arc: 'kept', ms: Date.now() - t0 })
+    return spare
   }
   return fallback(lastReason)
 }

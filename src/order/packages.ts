@@ -48,5 +48,40 @@ export const POEM_TYPES = ['tanka', 'tang', 'ci', 'en'] as const
 export type PoemType = (typeof POEM_TYPES)[number]
 /** One poem per order. */
 export const MAX_POEMS = 1
-/** The format offered first, by site language: Japanese → tanka, Chinese → ci, English → en. */
-export const DEFAULT_POEM_TYPE: Record<'ja' | 'zh-Hans' | 'zh-Hant' | 'en', PoemType> = { ja: 'tanka', 'zh-Hans': 'ci', 'zh-Hant': 'ci', en: 'en' }
+/** The format offered first, by the story's language (spec v9.4): Japanese → tanka, Chinese → 漢詩 (tang), English → free verse. */
+export const DEFAULT_POEM_TYPE: Record<'ja' | 'zh-Hans' | 'zh-Hant' | 'en', PoemType> = { ja: 'tanka', 'zh-Hans': 'tang', 'zh-Hant': 'tang', en: 'en' }
+
+/**
+ * The formats offered follow the STORY's language (spec v9.4, owner decision): a Japanese story offers 短歌 (default) or 漢詩 with its 書き下し — no 宋詞, no English;
+ * a Chinese story offers 漢詩 (default) or 宋詞; an English story offers free verse only. An order made before this rule keeps the format it has.
+ */
+export type StoryLanguage = 'ja' | 'zh' | 'en'
+export const POEM_TYPES_BY_STORY_LANGUAGE: Record<StoryLanguage, readonly PoemType[]> = { ja: ['tanka', 'tang'], zh: ['tang', 'ci'], en: ['en'] }
+
+/** The language most of the story's text is written in (kana → Japanese; else Han characters → Chinese; else Latin letters → English), or null when it is too short to tell. */
+export function detectStoryLanguage(text: string): StoryLanguage | null {
+  let kana = 0
+  let han = 0
+  let latin = 0
+  for (const ch of text) {
+    const c = ch.codePointAt(0) ?? 0
+    if ((c >= 0x3040 && c <= 0x30ff) || c === 0x30fc) kana++
+    else if ((c >= 0x3400 && c <= 0x9fff) || (c >= 0xf900 && c <= 0xfaff)) han++
+    else if ((c >= 0x41 && c <= 0x5a) || (c >= 0x61 && c <= 0x7a)) latin++
+  }
+  const total = kana + han + latin
+  if (total < 8) return null
+  // Japanese prose is full of kana (about half of its letters); Chinese has none
+  if (kana / total >= 0.12) return 'ja'
+  if (han >= latin) return 'zh'
+  return 'en'
+}
+
+const orderFamily = (language: 'ja' | 'zh-Hans' | 'zh-Hant' | 'en'): StoryLanguage => (language === 'ja' ? 'ja' : language === 'en' ? 'en' : 'zh')
+
+/** The story's language for the poem step: the language the text is mostly written in, else the language the engine ran in (the order's language). */
+export const storyLanguageOf = (language: 'ja' | 'zh-Hans' | 'zh-Hant' | 'en', story?: string): StoryLanguage => (story ? detectStoryLanguage(story) : null) ?? orderFamily(language)
+
+export const poemTypesFor = (language: 'ja' | 'zh-Hans' | 'zh-Hant' | 'en', story?: string): readonly PoemType[] => POEM_TYPES_BY_STORY_LANGUAGE[storyLanguageOf(language, story)]
+export const poemTypeAllowed = (language: 'ja' | 'zh-Hans' | 'zh-Hant' | 'en', type: string, story?: string): boolean => (poemTypesFor(language, story) as readonly string[]).includes(type)
+export const defaultPoemType = (language: 'ja' | 'zh-Hans' | 'zh-Hant' | 'en', story?: string): PoemType => poemTypesFor(language, story)[0]

@@ -166,6 +166,15 @@ function count(k: 'poem' | 'review') { return seen.filter((s) => s.kind === k).l
   check('(4) …vetoed twice → an error for that type', !rv2.ok && rv2.code === 'poem_failed')
   const rv3 = await gen(C20, 'en', [C20.poems.en], [{ pass: false, rule: 'taste', reason: 'a bit plain' }])
   check('(4) a "fail" for taste (not a safety rule) is a concern, not a veto', rv3.ok)
+  const si = await gen(C20, 'en', [C20.poems.en], [{ pass: false, rule: 'story_image', reason: 'generic sea at dusk; carry the prints of the places' }, { pass: true, rule: null, reason: 'ok' }])
+  check('(4) spec v9.4: the review rejects imagery that does not come from the story (story_image) → ONE rewrite asked for, with the reader\'s note; the second poem passes', si.ok && count('poem') === 2 && count('review') === 2 && seen[2].prompt.includes('IMAGERY DOES NOT COME FROM THIS STORY') && seen[2].prompt.includes('the prints of the places'))
+  const si2 = await gen(C20, 'en', [C20.poems.en], [{ pass: false, rule: 'story_image', reason: 'still generic' }])
+  check('(4) …rejected again after the rewrite: the poem in hand is kept (a poem is never lost to the quality rule) — and the safety rules still veto', si2.ok && count('poem') === 2 && logs.some((l) => l.includes('story_image_kept')))
+  for (const t of POEM_TYPES) {
+    const prompt = loadPoemPrompt(t)
+    check(`(4) spec v9.4: the ${t} prompt asks the poem to carry the TURNING POINT through one concrete image of the story and forbids generic scenery`, prompt.includes('carry the TURNING POINT') && prompt.includes('ONE concrete image') && prompt.includes('NO generic scenery') && prompt.includes('Remembrance stories stay quiet'))
+  }
+  check('(4) the review prompt carries the story_image rule', loadPoemReviewPrompt().includes('`story_image`') && loadPoemReviewPrompt().includes('does not come from THIS story'))
   const rv4 = await gen(C20, 'en', [C20.poems.en], ['not json at all'])
   check('(4) an unusable review lets the poem through (the code checks still ran)', rv4.ok)
   const dec = await gen(C20, 'en', [{ declined: true }])
@@ -251,12 +260,19 @@ let poemIdEn = ''
   poemId20 = j.poem_id
   check('(5) /api/poem: 200 with the FULL poem (every line), the reading aids and the poem_id — and no price anywhere', res.status === 200 && j.lines.length === 5 && j.lines.join() === C20.poems.tanka.lines.join() && typeof j.reading === 'string' && /^PM-20261028-[a-z2-9]{10}$/.test(j.poem_id) && !('price_jpy' in j) && !('max' in j), JSON.stringify(j).slice(0, 200))
   check('(5) …the poem is stored on the server under poem_id (the order reads it back); the stored record has the character forms', (store.records.get(j.poem_id) as any)?.lines?.length === 5 && (store.records.get(j.poem_id) as any)?.kanji === '備')
+  const EN_STORY = { ...C20, story: 'My mother waited at the station every time I left. She only said, "The tea is ready."', context: { ...C20.context, language: 'en' } }
+  const ZH_STORY = { ...C20, story: '每次晚歸，玄關總有一盞燈亮著。下雨的夜裡，媽媽撐著傘在門口等，她只說家裡的燈還亮著。', context: { ...C20.context, language: 'zh-Hant' } }
   replies = [C20.poems.en]
-  const en = await quiet(() => post(handler(), body(C20, 'en')))
+  const en = await quiet(() => post(handler(), body(EN_STORY, 'en')))
   poemIdEn = ((await en.json()) as any).poem_id
-  const all4: number[] = []
-  for (const t of POEM_TYPES) { replies = [C20.poems[t]]; all4.push((await quiet(() => post(handler(), body(C20, t)))).status) }
-  check('(5) all four formats are always available (no variant, no switch): tanka, tang, ci and en each answer 200', all4.join() === '200,200,200,200', all4.join())
+  const offeredFor = async (c: typeof C20) => { const out: string[] = []; for (const t of POEM_TYPES) { replies = [C20.poems[t]]; if ((await quiet(() => post(handler(), body(c, t)))).status === 200) out.push(t) } return out.join() }
+  const ja2 = await offeredFor(C20)
+  const zh2 = await offeredFor(ZH_STORY)
+  const en1 = await offeredFor(EN_STORY)
+  check('(5) spec v9.4, the formats follow the story\'s language: a Japanese story answers tanka and tang only (2), a Chinese story tang and ci only (2), an English story en only (1)', ja2 === 'tanka,tang' && zh2 === 'tang,ci' && en1 === 'en', [ja2, zh2, en1].join(' | '))
+  replies = [C20.poems.ci]
+  const ciJa = await quiet(() => post(handler(), body(C20, 'ci')))
+  check('(5) …and a format that is not offered is refused with a clear code (400 poem_type_not_offered) — the model is not called', ciJa.status === 400 && ((await ciJa.json()) as any).code === 'poem_type_not_offered')
   const results = await Promise.all([
     post(handler(), body(C20, 'sonnet')),
     post(handler(), { ...body(C20, 'tanka'), story: '' }),
@@ -310,7 +326,7 @@ const postOrder = (h: (r: Request) => Promise<Response>, b: unknown) => h(new Re
   const noAnim = store.records.get(jn.animation_url.split('/').pop()) as any
   check('(6) an order with no poem (the buyer\'s poem failed twice) goes through: one line item, no poem attributes, certificate.poems = [], and its film is the same as any other', none.status === 200 && shopSeen.at(-1).variables.input.lines.length === 1 && !noAttrs.some((k: string) => k.startsWith('ichirei_poem')) && jn.certificate.poems.length === 0 && !('poem' in noAnim))
   const en = await quiet(() => postOrder(orderHandler(), orderBody({ language: 'en', inscription_style: 'modern', engine_result: { ...orderBody().engine_result, language: 'en' }, poems: [{ poem_id: poemIdEn }] })))
-  check('(6) …and an English poem is refused for a Japanese gift (the poem belongs to a language), so the page asks for the poem again', en.status === 400 && ((await en.json()) as any).code === 'poem_mismatch')
+  check('(6) …and an English poem is refused for a Japanese gift (the poem belongs to a language), so the page asks for the poem again', en.status === 400 && ['poem_mismatch', 'poem_type_not_offered'].includes(((await en.json()) as any).code))
 }
 {
   const r1 = await postOrder(orderHandler(), orderBody({ poems: [{ poem_id: poemId20 }, { poem_id: poemIdEn }] }))
@@ -356,8 +372,8 @@ const postOrder = (h: (r: Request) => Promise<Response>, b: unknown) => h(new Re
   const form = read('src/demo/OrderForm.tsx')
   const addon = read('src/demo/PoemAddOn.tsx')
   check('(8) the order form mounts the step, sends only the poem_id with the order, and waits while the poem is being written', form.includes('<PoemAddOn') && form.includes("poems: poemIds.map((poem_id) => ({ poem_id }))") && !/poems:.*lines/.test(form) && form.includes("poemStep !== 'loading'"))
-  check('(8) the step is always visible: four formats as radio buttons, no call to a type list, no price', addon.includes('POEM_TYPES.map') && addon.includes('type="radio"') && !addon.includes('/api/poem-types') && !addon.includes('formatYen'))
-  check('(8) the default format follows the site language: ja → tanka, zh → ci (both scripts), en → en', DEFAULT_POEM_TYPE.ja === 'tanka' && DEFAULT_POEM_TYPE['zh-Hans'] === 'ci' && DEFAULT_POEM_TYPE['zh-Hant'] === 'ci' && DEFAULT_POEM_TYPE.en === 'en' && addon.includes('DEFAULT_POEM_TYPE[language]'))
+  check('(8) the step is always visible: the formats of the story\'s language as radio buttons, no call to a type list, no price', addon.includes('offered.map') && addon.includes('type="radio"') && !addon.includes('/api/poem-types') && !addon.includes('formatYen'))
+  check('(8) the default format follows the story\'s language: ja → tanka, zh → tang / 漢詩 (both scripts), en → en; the step offers poemTypesFor(...)', DEFAULT_POEM_TYPE.ja === 'tanka' && DEFAULT_POEM_TYPE['zh-Hans'] === 'tang' && DEFAULT_POEM_TYPE['zh-Hant'] === 'tang' && DEFAULT_POEM_TYPE.en === 'en' && addon.includes('poemTypesFor(language') && addon.includes('defaultPoemType(language'))
   check('(8) the whole poem is shown before checkout (every line, then the reading aids), not just a first line', addon.includes('data-poem-full') && addon.includes('st.lines.join') && !addon.includes('.preview') && addon.includes('data-poem-reading'))
   check('(8) a poem that fails is tried twice, then given up politely and the order goes ahead without one (the step reports "none", not "loading")', addon.includes('const TRIES = 2') && addon.includes("'none'") && addon.includes('failedFinal'))
   check('(8) the copy exists in all four languages: the heading, "included, no extra charge", the four format names, the failure note and the retry button — and mentions no price', (['ja', 'zh-Hans', 'zh-Hant', 'en'] as const).every((l) => { const c = COPY[l].order.poem; return c.heading.length > 3 && c.note.length > 10 && POEM_TYPES.every((t) => c.types[t].length > 1) && c.loading.length > 2 && c.printedOnCard.length > 3 && c.failedFinal.length > 15 && c.tryAgain.length > 1 && !/[¥￥]|円|\d{3,}|yen/i.test(c.note + c.heading) }))

@@ -10,14 +10,14 @@
 import { isAnimationRecord, type AnimationRecord } from './animation.ts'
 import type { Candidate } from './contract.ts'
 import { isGiftRecord, type GiftRecord } from './gift.ts'
-import { GIFT_MESSAGE_MAX, SHIPS, type PoemType } from '../src/order/packages.ts'
+import { GIFT_MESSAGE_MAX, SHIPS, poemTypeAllowed, type PoemType } from '../src/order/packages.ts'
 import { glyphFor } from '../src/order/inscription.ts'
 import { isMemorial } from '../src/order/memorial.ts'
 import { NAME_MAX, buildCertificate, cleanName, simpleStrokeProblem, type OpsLogEntry, type OrderRecord, type StoredPoem } from './order.ts'
 import type { OrderStore } from './order-store.ts'
 import { loadPalette, type Palette } from './palette.ts'
 import type { PaymentInfo } from './shipping.ts'
-import { countChars } from './contract.ts'
+import { countChars, mergeStory } from './contract.ts'
 
 export const WINDOW_MS = 24 * 3_600_000
 
@@ -149,6 +149,8 @@ export async function changePoemFormat(d: ChangeDeps, rec: OrderRecord, type: Po
   const current = currentPoemType(rec)
   if (!current) return refuse('no_poem', 'This order has no poem to change.')
   if (type === current) return refuse('same_format', 'That is the format of the poem already.')
+  // the formats follow the story's language (spec v9.4); an order made before keeps the format it has, and may switch only to one that is offered now
+  if (!poemTypeAllowed(rec.production.language, type, mergeStory(rec.story, rec.follow_ups))) return refuse('format_not_offered', 'That format is not offered for this story\'s language.')
   if ((rec.ops?.poem_format_changes ?? 0) >= 1) return refuse('poem_format_used', 'The poem format can be changed once per order, and it was.')
   const cand = rec.shown_characters?.find((s) => s.candidate.kanji === rec.production.kanji)?.candidate ?? rec.engine_result.candidates.find((c) => c.kanji === rec.production.kanji)
   if (!cand) return refuse('no_candidate', 'The character of this order could not be found in its record.')

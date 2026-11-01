@@ -154,7 +154,7 @@ export async function startFakeAnthropic() {
 /** Boot the real server as a child process; resolves once it is listening. */
 export async function startServer({ upstreamUrl, env = {}, withKey = true } = {}) {
   const port = await freePort()
-  const childEnv = { ...process.env, PORT: String(port), ICHIREI_LEXICON_MODE: 'off', ICHIREI_FILM: 'off', ...env } // (these suites pin the palette engine's call sequence; test-v9 covers the lexicon modes; the film-script call is off unless a test turns it on)
+  const childEnv = { ...process.env, PORT: String(port), ICHIREI_LEXICON_MODE: 'off', ICHIREI_FILM: 'off', ICHIREI_GAZE_FIX: 'off', ...env } // (these suites pin the palette engine's call sequence; test-v9 covers the lexicon modes; the film-script call and the gaze-line rewrite are off unless a test turns them on)
   delete childEnv.ANTHROPIC_API_KEY
   if (withKey) childEnv.ANTHROPIC_API_KEY = 'test-key-not-real'
   if (upstreamUrl) childEnv.ANTHROPIC_BASE_URL = upstreamUrl
