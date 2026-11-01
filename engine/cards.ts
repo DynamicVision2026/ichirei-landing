@@ -18,7 +18,7 @@ import { fileURLToPath } from 'node:url'
 import type { Candidate, EngineContext, EngineResult, ReviewVerdict } from './contract.ts'
 import { applyPalette, applyReviewVerdicts, type Palette } from './palette.ts'
 import { runReview } from './review.ts'
-import { FREE_FIELDS, toCandidate, FREE_REVIEW_TIMEOUT_MS_DEFAULT } from './replace.ts'
+import { FREE_FIELDS, FREE_REVIEW_TIMEOUT_MS_DEFAULT } from './replace.ts'
 import { SAME_CHARACTER_REASON, finalizeResult } from './slots.ts'
 import { failingGazes, fixGazes } from './gaze.ts'
 import { ModelTimeoutError, callSignal, callTimeoutMs, runBudgetMs, timedOut } from './limits.ts'
@@ -46,7 +46,7 @@ const MIN_RETRY_MS = 30_000
 const LENS: Record<'main' | 'second', string> = {
   main: "the person's deepest truth, from the story's turning point. Candidate 1 is the character you would choose as the primary (the cinnabar one).",
   second:
-    "a different side of the person, from another scene or habit than the turning point. The MAIN card (written by another call at this moment) takes the person's deepest truth from the turning point: do NOT offer that character. Look at what else in the story shows who they are (a habit, a way of being, an everyday scene). Prefer a truth_type other than \"Turning Point\".",
+    "a different side of the person, from another scene or habit than the turning point. The turning point and the person's deepest truth belong to the MAIN card, which another call writes at this moment; yours come from elsewhere in the story: a habit, a way of being, an everyday scene that shows who they are. A second side is almost always there; choose the two characters that show it best. Prefer a truth_type other than \"Turning Point\".",
 }
 
 function readEngineFile(file: string, override?: string): string {
@@ -71,7 +71,7 @@ export function cardPrompt(basePrompt: string, slot: 'main' | 'second', lexicon 
       '\n* LEXICON MODE: the lexicon rules after this block apply to your card. Both of your candidates are characters from the list given there, written as there (rule 1), and they differ from each other. Write `truth` and `ideal_character` first, as rule 0 says. The other main card is written by another call at this moment; where those rules speak of the two main cards, read "your card".' +
       (slot === 'main'
         ? ' If NO listed character truly fits this person, answer as rule 6 says (status "insufficient" with "lexicon_miss": true).'
-        : ' If NO listed character truly fits this lens, return status "sufficient" with "candidates": [] and do NOT write lexicon_miss: the main card decides about a miss.') +
+        : ' Give the one or two listed characters that show this other side of the person best (rule 2 chooses by the person, not by the tag). Never write lexicon_miss or "insufficient": the main card decides about a miss. Only if truly none shows another side, reply exactly {"none": true}.') +
       ' The free pick is written by a third call and is not limited to the list (rule 4).'
   }
   return basePrompt + block.replace(/\{\{ SLOT \}\}/g, slot).replace('{{ LENS }}', LENS[slot]).replace('{{ EXTRA }}', extra)
@@ -104,9 +104,17 @@ export interface CardCallInfo {
   output_tokens: number | null
   thinking_tokens: number | null
   stop_reason: string | null
-  /** 'ok' = usable candidates; 'none' = the model offered none (or the story is insufficient); 'failed' = the call failed */
-  parse: 'ok' | 'none' | 'failed'
+  /**
+   * What came of the answer, in codes: ok | none (the model offered none, or said insufficient) | no_candidates (a JSON object without any) | offered_unusable (candidates without a character) |
+   * empty | no_json | bad_json (the text was not a JSON object we could read) | refusal | failed (the call itself failed: network, timeout, limit).
+   */
+  parse: 'ok' | 'none' | 'no_candidates' | 'offered_unusable' | 'empty' | 'no_json' | 'bad_json' | 'refusal' | 'failed'
   offered: number
+  /** the top-level keys of the answer and its length in characters — never any text */
+  keys: string[]
+  reply_chars: number
+  /** for parse "failed": the kind of error (a name or an HTTP status), never a message */
+  error?: string
 }
 export interface CardReviewInfo {
   slot: CardSlot
@@ -127,6 +135,8 @@ export interface CardsReport {
   gaze_ms: number
   gaze_failing: number
   free_dropped: 'late' | null
+  /** where the second card came from: its own call, the main call's runner-up, or the refill (set by the engine); null = no second card */
+  second_source: 'second_call' | 'main_runner_up' | 'refill' | null
 }
 
 export interface CardsArgs {
@@ -200,31 +210,126 @@ interface LaneOut {
   chosen: Candidate | null
   tried: Candidate[]
   done_ms: number
+  /** the second card only: from its own call, or from the main call's runner-up */
+  source?: 'second_call' | 'main_runner_up'
 }
 
-/** Parse the free pick's reply: {"candidates":[…]} (or one candidate); [] for {"none":true} or anything unreadable. Up to two, different characters. */
-export function parseRanked(raw: string, slot: CardSlot): Candidate[] {
+/** The text of an answer → its JSON object, tolerantly: code fences, prose around it, comment lines and trailing commas are forgiven; the first balanced object that looks like an answer wins. */
+export function readJsonObject(raw: string): { obj: Record<string, unknown> | null; parse: 'ok' | 'empty' | 'no_json' | 'bad_json' } {
   let text = raw.trim()
+  if (!text) return { obj: null, parse: 'empty' }
   if (text.startsWith('```')) text = text.replace(/^```(?:json)?\s*/i, '').replace(/```\s*$/i, '').trim()
+  const asObject = (v: unknown): Record<string, unknown> | null => (v && typeof v === 'object' && !Array.isArray(v) ? (v as Record<string, unknown>) : null)
+  const tidy = (t: string) => t.replace(/^\s*\/\/.*$/gm, '').replace(/,(\s*[}\]])/g, '$1')
   const first = text.indexOf('{')
   const last = text.lastIndexOf('}')
-  if (first === -1 || last < first) return []
-  let parsed: Record<string, unknown>
-  try {
-    parsed = JSON.parse(text.slice(first, last + 1)) as Record<string, unknown>
-  } catch {
-    return []
+  if (first === -1) {
+    // a bare array of candidates
+    const a0 = text.indexOf('[')
+    const a1 = text.lastIndexOf(']')
+    if (a0 !== -1 && a1 > a0) {
+      try {
+        const arr = JSON.parse(tidy(text.slice(a0, a1 + 1)))
+        if (Array.isArray(arr)) return { obj: { candidates: arr }, parse: 'ok' }
+      } catch {
+        return { obj: null, parse: 'bad_json' }
+      }
+    }
+    return { obj: null, parse: 'no_json' }
   }
-  if (parsed.none === true) return []
-  const list = Array.isArray(parsed.candidates) ? (parsed.candidates as unknown[]) : parsed.candidate ? [parsed.candidate] : [parsed]
+  if (last > first) {
+    for (const t of [text.slice(first, last + 1), tidy(text.slice(first, last + 1))]) {
+      try {
+        const o = asObject(JSON.parse(t))
+        if (o) return { obj: o, parse: 'ok' }
+      } catch {
+        // next
+      }
+    }
+  }
+  // several objects, or prose between them: the first balanced {…} that parses and looks like an answer
+  for (let start = first; start !== -1; start = text.indexOf('{', start + 1)) {
+    let depth = 0
+    let inStr = false
+    for (let k = start; k < text.length; k++) {
+      const ch = text[k]
+      if (inStr) {
+        if (ch === '\\') k++
+        else if (ch === '"') inStr = false
+      } else if (ch === '"') inStr = true
+      else if (ch === '{') depth++
+      else if (ch === '}' && --depth === 0) {
+        try {
+          const o = asObject(JSON.parse(tidy(text.slice(start, k + 1))))
+          if (o && ('candidates' in o || 'candidate' in o || 'kanji' in o || 'none' in o || 'status' in o)) return { obj: o, parse: 'ok' }
+        } catch {
+          // next start
+        }
+        break
+      }
+    }
+  }
+  return { obj: null, parse: 'bad_json' }
+}
+
+export interface ReplyRead {
+  cands: Candidate[]
+  /** the JSON object as the model wrote it */
+  obj: Record<string, unknown> | null
+  parse: CardCallInfo['parse']
+  keys: string[]
+  offered: { kanji: string | null; missing: string[] }[]
+  insufficient: boolean
+}
+
+const hasText = (v: unknown): boolean => typeof v === 'string' && v.trim() !== ''
+const CARD_FIELDS = ['kanji', 'reading', 'one_line_gaze', 'story_anchor'] as const
+
+/**
+ * Read one card's answer: the object, the elements that are candidates (in any of the shapes a model writes them: `candidates`, `candidate`, one candidate, a bare array, or an
+ * object keyed by the slot) and a verdict in codes. Never throws. Two candidates at most, different characters. A candidate needs its character and its line; a missing reading or
+ * anchor is left to the referee (a free pick without a verbatim anchor is dropped there).
+ */
+export function readCardReply(text: string, slot: CardSlot): ReplyRead {
+  const j = readJsonObject(text)
+  if (!j.obj) return { cands: [], obj: null, parse: j.parse === 'ok' ? 'no_json' : j.parse, keys: [], offered: [], insufficient: false }
+  const obj = j.obj
+  const keys = Object.keys(obj).slice(0, 14)
+  if (obj.none === true) return { cands: [], obj, parse: 'none', keys, offered: [], insufficient: false }
+  const insufficient = obj.status === 'insufficient'
+  const asList = (v: unknown): unknown[] => (Array.isArray(v) ? v : v && typeof v === 'object' ? [v] : [])
+  let list: unknown[] = asList(obj.candidates)
+  if (list.length === 0) list = asList(obj.candidate)
+  if (list.length === 0) list = asList(obj[slot])
+  if (list.length === 0 && hasText(obj.kanji)) list = [obj]
+  const elems = list.filter((o): o is Record<string, unknown> => !!o && typeof o === 'object' && (o as { none?: unknown }).none !== true)
+  const offered = elems.map((o) => ({ kanji: hasText(o.kanji) ? String(o.kanji).trim() : null, missing: CARD_FIELDS.filter((k) => !hasText(o[k])) as string[] }))
   const out: Candidate[] = []
-  for (const o of list) {
-    if (!o || typeof o !== 'object' || (o as { none?: unknown }).none === true) continue
-    const cand = toCandidate(o as Record<string, unknown>, slot)
-    if (cand && !out.some((x) => x.kanji === cand.kanji)) out.push(cand)
+  for (const o of elems) {
+    if (!hasText(o.kanji) || !hasText(o.one_line_gaze)) continue
+    const kanji = String(o.kanji).trim()
+    if (out.some((x) => x.kanji === kanji)) continue
+    const s = (v: unknown) => (hasText(v) ? String(v).trim() : null)
+    out.push({
+      ...(o as object),
+      slot,
+      kanji,
+      reading: s(o.reading) ?? '',
+      inscription_form: s(o.inscription_form),
+      truth_type: (s(o.truth_type) ?? (slot === 'freestyle' ? 'Play' : 'Essence')) as Candidate['truth_type'],
+      one_line_gaze: String(o.one_line_gaze).trim(),
+      story_anchor: s(o.story_anchor) ?? '',
+      unique_truth: s(o.unique_truth) ?? '',
+      eliminated: false,
+      eliminated_reason: null,
+      suitability_flag: s(o.suitability_flag),
+      palette_status: 'ok',
+      flags: Array.isArray(o.flags) ? (o.flags as unknown[]).filter((f): f is string => typeof f === 'string') : [],
+    } as Candidate)
     if (out.length === 2) break
   }
-  return out
+  const parse: CardCallInfo['parse'] = insufficient ? 'none' : out.length > 0 ? 'ok' : elems.length > 0 ? 'offered_unusable' : 'no_candidates'
+  return { cands: insufficient ? [] : out, obj, parse, keys, offered, insufficient }
 }
 
 export async function runCards(a: CardsArgs): Promise<CardsOut> {
@@ -240,7 +345,7 @@ export async function runCards(a: CardsArgs): Promise<CardsOut> {
   const freeStop = new AbortController()
   const freeSignal = AbortSignal.any([signal, freeStop.signal, AbortSignal.timeout(freeLaneMs())])
 
-  const report: CardsReport = { calls: [], reviews: [], collisions: [], runner_up_used: [], first_card_ms: null, all_cards_ms: 0, main_call_ms: 0, gaze_ms: 0, gaze_failing: 0, free_dropped: null }
+  const report: CardsReport = { calls: [], reviews: [], collisions: [], runner_up_used: [], first_card_ms: null, all_cards_ms: 0, main_call_ms: 0, gaze_ms: 0, gaze_failing: 0, free_dropped: null, second_source: null }
   const verdicts: ReviewVerdict[] = []
   let anyReviewRan = false
   let skipped: string | null = null
@@ -264,12 +369,15 @@ export async function runCards(a: CardsArgs): Promise<CardsOut> {
   // ---- the calls: all started now ---------------------------------------------------------------------------------------------------------------------------------------------
   const room = () => runBudgetMs() - at() - RESERVE_MS
 
-  const modelCall = async (slot: CardSlot, content: string | Anthropic.TextBlockParam[], model: string, effort: string, maxTokens: number, ceilingMs: number, retryable: boolean, sig: AbortSignal, parse: (text: string) => { cands: Candidate[]; raw: EngineResult | null; declined?: boolean; miss?: boolean; extracted?: EngineResult }): Promise<CallOut> => {
-    const info: CardCallInfo = { slot, model, effort, ms: 0, attempts: 0, output_tokens: null, thinking_tokens: null, stop_reason: null, parse: 'failed', offered: 0 }
+  const modelCall = async (slot: CardSlot, content: string | Anthropic.TextBlockParam[], model: string, effort: string, maxTokens: number, ceilingMs: number, retryable: boolean, sig: AbortSignal): Promise<CallOut> => {
+    const info: CardCallInfo = { slot, model, effort, ms: 0, attempts: 0, output_tokens: null, thinking_tokens: null, stop_reason: null, parse: 'failed', offered: 0, keys: [], reply_chars: 0 }
     report.calls.push(info)
     const t0 = Date.now()
     let limit = ceilingMs
     let tokens = maxTokens
+    // One line per call, codes only: what the answer was (parse, keys, length), what was offered (character and the fields it lacks), and how the call ended. Never any story text.
+    const logCall = (extra: Record<string, unknown> = {}, offered: ReplyRead['offered'] = []) =>
+      log(`[ichirei-card-call] ${JSON.stringify({ slot, model, effort, ms: info.ms, attempts: info.attempts, stop_reason: info.stop_reason, output_tokens: info.output_tokens, thinking_tokens: info.thinking_tokens, parse: info.parse, keys: info.keys, reply_chars: info.reply_chars, offered, ...extra })}`)
     try {
       for (;;) {
         info.attempts++
@@ -303,37 +411,51 @@ export async function runCards(a: CardsArgs): Promise<CardsOut> {
         info.output_tokens = message.usage?.output_tokens ?? null
         info.thinking_tokens = thinkingTokensOf(message, seen())
         info.stop_reason = message.stop_reason ?? null
-        if (message.stop_reason === 'refusal') throw new Error('Model refused the request')
         const text = message.content.filter((b): b is Anthropic.TextBlock => b.type === 'text').map((b) => b.text).join('')
-        let parsed: { cands: Candidate[]; raw: EngineResult | null; declined?: boolean; miss?: boolean; extracted?: EngineResult }
-        try {
-          parsed = parse(text)
-        } catch (err) {
-          if (message.stop_reason === 'max_tokens' && retryable && info.attempts < 2 && CARD_MAX_TOKENS_RETRY() > tokens && room() >= MIN_RETRY_MS) {
-            tokens = CARD_MAX_TOKENS_RETRY()
-            limit = Math.min(callTimeoutMs(), room())
-            continue
-          }
-          if (message.stop_reason === 'max_tokens') throw new Error(`The model ran out of output room (max_tokens ${tokens}) before finishing its answer`)
-          throw err
+        info.reply_chars = [...text].length
+        if (message.stop_reason === 'refusal') {
+          info.parse = 'refusal'
+          logCall()
+          // the main card is the request: a refusal there is an error, as in the single call; for the others the slot is simply empty
+          return slot === 'main' ? { cands: [], raw: null, err: new Error('Model refused the request') } : { cands: [], raw: null }
         }
-        info.offered = parsed.cands.length
-        info.parse = parsed.cands.length > 0 ? 'ok' : 'none'
-        return { ...parsed }
+        const read = readCardReply(text, slot)
+        info.keys = read.keys
+        const unreadable = read.parse === 'empty' || read.parse === 'no_json' || read.parse === 'bad_json'
+        if (unreadable && message.stop_reason === 'max_tokens' && retryable && info.attempts < 2 && CARD_MAX_TOKENS_RETRY() > tokens && room() >= MIN_RETRY_MS) {
+          tokens = CARD_MAX_TOKENS_RETRY()
+          limit = Math.min(callTimeoutMs(), room())
+          continue
+        }
+        let cands = read.cands
+        // the free pick is shown with its character, its reading and a verbatim anchor, or not at all
+        if (slot === 'freestyle') cands = cands.filter((c) => c.reading !== '' && c.story_anchor !== '')
+        let parse = read.parse
+        if (parse === 'ok' && cands.length === 0) parse = 'offered_unusable'
+        info.parse = parse
+        info.offered = cands.length
+        let out: CallOut = { cands, raw: null }
+        if (slot !== 'freestyle') {
+          if (unreadable) {
+            const why = message.stop_reason === 'max_tokens' ? `The model ran out of output room (max_tokens ${tokens}) before finishing its answer` : 'Model reply contained no JSON object'
+            if (slot === 'main') out = { cands: [], raw: null, err: new Error(why) }
+          } else {
+            const obj = read.obj ?? {}
+            const stamped = deps.stamp({ ...obj, status: read.insufficient ? 'insufficient' : 'sufficient', candidates: cands } as unknown as EngineResult)
+            const mine = (stamped.candidates ?? []).filter((c) => !c.eliminated && hasText(c.kanji)).map((c) => ({ ...c, slot }) as Candidate)
+            out = { cands: read.insufficient ? [] : mine, raw: stamped, declined: obj.goodwill_declined === true, miss: obj.lexicon_miss === true, extracted: obj as unknown as EngineResult }
+          }
+        }
+        logCall({}, read.offered)
+        return out
       }
     } catch (err) {
       info.ms = Date.now() - t0
       info.parse = 'failed'
+      info.error = String((err as { status?: unknown })?.status ?? (err as Error)?.name ?? 'error').slice(0, 40)
+      logCall({ error: info.error })
       return { cands: [], raw: null, err }
     }
-  }
-
-  const parseSelection = (slot: 'main' | 'second') => (text: string) => {
-    const raw = deps.extractJson(text)
-    const stamped = deps.stamp(raw)
-    const cands = (stamped.candidates ?? []).filter((c) => !c.eliminated && typeof c.kanji === 'string' && c.kanji.trim() !== '').map((c) => ({ ...c, slot }) as Candidate)
-    const dedup = cands.filter((c, i) => cands.findIndex((x) => x.kanji === c.kanji) === i).slice(0, 2)
-    return { cands: stamped.status === 'sufficient' ? dedup : [], raw: stamped as EngineResult | null, declined: (raw as { goodwill_declined?: unknown }).goodwill_declined === true, miss: (raw as { lexicon_miss?: unknown }).lexicon_miss === true, extracted: raw }
   }
 
   // main and second: the language prompt + the one-card block; in lexicon mode the static lexicon table goes first (cached) and the gift's list and rules last (as the single call did)
@@ -344,11 +466,11 @@ export async function runCards(a: CardsArgs): Promise<CardsOut> {
           { type: 'text', text: `${p}\n\n${a.lexicon.dynamicBlock}` },
         ]
       : p
-  const callMain = modelCall('main', contentOf(cardPrompt(a.prompt, 'main', !!a.lexicon)), models.select, CARD_EFFORT(), CARD_MAX_TOKENS(), callTimeoutMs(), true, signal, parseSelection('main'))
-  const callSecond = modelCall('second', contentOf(cardPrompt(a.prompt, 'second', !!a.lexicon)), models.select, CARD_EFFORT(), CARD_MAX_TOKENS(), callTimeoutMs(), true, signal, parseSelection('second'))
+  const callMain = modelCall('main', contentOf(cardPrompt(a.prompt, 'main', !!a.lexicon)), models.select, CARD_EFFORT(), CARD_MAX_TOKENS(), callTimeoutMs(), true, signal)
+  const callSecond = modelCall('second', contentOf(cardPrompt(a.prompt, 'second', !!a.lexicon)), models.select, CARD_EFFORT(), CARD_MAX_TOKENS(), callTimeoutMs(), true, signal)
   const callFree = memorial
     ? null
-    : modelCall('freestyle', freeCardPrompt(story, context, [...(opts.exclude ?? [])]), models.free, 'low', 1500, freeCallMs(), false, freeSignal, (text) => ({ cands: parseRanked(text, 'freestyle'), raw: null }))
+    : modelCall('freestyle', freeCardPrompt(story, context, [...(opts.exclude ?? [])]), models.free, 'low', 1500, freeCallMs(), false, freeSignal)
 
   const ctxBase = deps.stamp({ status: 'sufficient', candidates: [] } as unknown as EngineResult)
 
@@ -420,6 +542,7 @@ export async function runCards(a: CardsArgs): Promise<CardsOut> {
   const lane = async (slot: CardSlot, call: Promise<CallOut>, higher: () => Promise<LaneOut>[], sig: AbortSignal): Promise<LaneOut> => {
     const tried: Candidate[] = []
     let chosen: Candidate | null = null
+    let source: LaneOut['source']
     try {
       const out = await call
       if (slot === 'main') {
@@ -435,47 +558,63 @@ export async function runCards(a: CardsArgs): Promise<CardsOut> {
       }
       // (every card is checked against the request's own context — language, occasion, reader — stamped here; the main call's answer only supplies the result's other fields)
       const stampBase = ctxBase
-      let n = 0
-      for (const cand of out.cands) {
-        if (early || sig.aborted) break
-        n++
-        const ref = refereeOne(stampBase, cand)
-        if (!ref.ok) {
-          tried.push(ref.card)
-          continue
+      const taken = (): Candidate[] => (slot === 'main' ? [] : slot === 'second' ? [picked.main] : [picked.main, picked.second]).filter((x): x is Candidate => !!x)
+      /** Try a list of candidates in order: referee, a higher card's character, review, the final check against the higher cards, the gaze line. The first that stands is the card. */
+      const attempt = async (list: Candidate[], from: NonNullable<LaneOut['source']>): Promise<void> => {
+        let n = 0
+        for (const cand of list) {
+          if (early || sig.aborted || chosen) break
+          n++
+          const ref = refereeOne(stampBase, cand)
+          if (!ref.ok) {
+            tried.push(ref.card)
+            continue
+          }
+          // a higher card is already putting this character forward: take our runner-up (no review spent on it)
+          if (taken().some((t) => sameChar(ref.card, t))) {
+            tried.push(eliminate(ref.card, SAME_CHARACTER_REASON, 'same_character'))
+            report.collisions.push({ slot, resolved: n < list.length ? 'runner_up' : 'none' })
+            continue
+          }
+          picked[slot] = ref.card
+          const rv = await reviewOne(stampBase, ref.mini, slot)
+          if (!rv.ok) {
+            tried.push(rv.card)
+            if (picked[slot] === ref.card) delete picked[slot]
+            continue
+          }
+          // the final check against what the higher cards ended up with
+          const finals = await Promise.all(higher())
+          if (finals.some((f) => f.chosen && sameChar(rv.card, f.chosen))) {
+            tried.push(eliminate(rv.card, SAME_CHARACTER_REASON, 'same_character'))
+            report.collisions.push({ slot, resolved: n < list.length ? 'runner_up' : 'none' })
+            if (picked[slot] === ref.card) delete picked[slot]
+            continue
+          }
+          chosen = await gazeOne(rv.card, sig)
+          picked[slot] = chosen
+          tried.push(chosen)
+          source = from
+          if (n > 1 && from === 'second_call') report.runner_up_used.push(slot)
+          break
         }
-        // a higher card is already putting this character forward: take our runner-up (no review spent on it)
-        const taken = (): Candidate[] => (slot === 'main' ? [] : slot === 'second' ? [picked.main] : [picked.main, picked.second]).filter((x): x is Candidate => !!x)
-        if (taken().some((t) => sameChar(ref.card, t))) {
-          tried.push(eliminate(ref.card, SAME_CHARACTER_REASON, 'same_character'))
-          report.collisions.push({ slot, resolved: n < out.cands.length ? 'runner_up' : 'none' })
-          continue
+      }
+      await attempt(out.cands, 'second_call')
+      // The second card: when its own call could not deliver (a failed or unreadable answer, nothing offered, or everything it offered was set aside), the MAIN call's runner-up
+      // becomes the second card, after its own referee and review — no refill. It is reviewed in parallel with the main card's own review. The refill is for when this fails too.
+      if (slot === 'second' && !chosen && !early && !sig.aborted) {
+        const mo = await callMain
+        const spare = mo.err ? [] : mo.cands.slice(1).map((c) => ({ ...c, slot: 'second' }) as Candidate)
+        if (spare.length > 0) {
+          log(`[ichirei-engine] second_from_main_runner_up ${JSON.stringify({ second_call: report.calls.find((c) => c.slot === 'second')?.parse ?? null, spare: spare.length })}`)
+          await attempt(spare, 'main_runner_up')
+          if (chosen) report.runner_up_used.push('second')
         }
-        picked[slot] = ref.card
-        const rv = await reviewOne(stampBase, ref.mini, slot)
-        if (!rv.ok) {
-          tried.push(rv.card)
-          if (picked[slot] === ref.card) delete picked[slot]
-          continue
-        }
-        // the final check against what the higher cards ended up with
-        const finals = await Promise.all(higher())
-        if (finals.some((f) => f.chosen && sameChar(rv.card, f.chosen))) {
-          tried.push(eliminate(rv.card, SAME_CHARACTER_REASON, 'same_character'))
-          report.collisions.push({ slot, resolved: n < out.cands.length ? 'runner_up' : 'none' })
-          if (picked[slot] === ref.card) delete picked[slot]
-          continue
-        }
-        chosen = await gazeOne(rv.card, sig)
-        picked[slot] = chosen
-        tried.push(chosen)
-        if (n > 1) report.runner_up_used.push(slot)
-        break
       }
     } catch (err) {
       log(`[ichirei-engine] card_lane_failed ${JSON.stringify({ slot, error: (err instanceof Error ? err.message : String(err)).slice(0, 120) })}`)
     }
-    return { slot, chosen, tried, done_ms: at() }
+    return { slot, chosen, tried, done_ms: at(), source }
   }
 
   // The lanes. Each starts as soon as its call is done; none waits for a lower card. (`higher` is read lazily so a lane can wait for the cards above it.)
@@ -544,6 +683,7 @@ export async function runCards(a: CardsArgs): Promise<CardsOut> {
     const e = early as NonNullable<CardsOut['early']>
     return { early: e, base: e.stamped, candidates: [], review: { ran: anyReviewRan, skipped_reason: skipped, verdicts }, report, mainRaw, mainExtracted }
   }
+  report.second_source = ls.chosen ? (ls.source ?? 'second_call') : null
   const candidates = [...lm.tried, ...ls.tried, ...(lf?.tried ?? [])]
   return { early: null, base: mainRaw, candidates, review: { ran: anyReviewRan, skipped_reason: anyReviewRan ? null : skipped, verdicts }, report, mainRaw, mainExtracted }
 }
