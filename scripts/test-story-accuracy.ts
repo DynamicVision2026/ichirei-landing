@@ -18,12 +18,12 @@ const ZH = '我爸是個漁夫，每天清晨四點就出海，很少說話。�
 const EN = 'My father was a fisherman and a man of few words. He never once asked about my photographs, but after he died I found a roll of film in his boathouse, and the prints showed he had stood at every place I had ever photographed.'
 
 // 1. formats follow the story's language (owner decision)
-check('the fisherman story (Japanese) is read as Japanese; the step offers exactly 短歌 and 漢詩, 短歌 first (the default); 宋詞 and English are refused', detectStoryLanguage(FISH) === 'ja' && poemTypesFor('ja', FISH).join() === 'tanka,tang' && defaultPoemType('ja', FISH) === 'tanka' && !poemTypeAllowed('ja', 'ci', FISH) && !poemTypeAllowed('ja', 'en', FISH))
-check('the short father story (Japanese): the same two formats', poemTypesFor('ja', FROST).length === 2 && defaultPoemType('ja', FROST) === 'tanka', detectStoryLanguage(FROST) ?? 'null')
+check('the fisherman story (Japanese) is read as Japanese; the step offers exactly 短歌, 俳句 and 漢詩, 短歌 first (the default); 宋詞 and English are refused', detectStoryLanguage(FISH) === 'ja' && poemTypesFor('ja', FISH).join() === 'tanka,haiku,tang' && defaultPoemType('ja', FISH) === 'tanka' && !poemTypeAllowed('ja', 'ci', FISH) && !poemTypeAllowed('ja', 'en', FISH))
+check('the short father story (Japanese): the same three formats', poemTypesFor('ja', FROST).length === 3 && defaultPoemType('ja', FROST) === 'tanka', detectStoryLanguage(FROST) ?? 'null')
 check('a Chinese story → 漢詩 (default) or 宋詞, nothing else — for both scripts', ['zh-Hant', 'zh-Hans'].every((l) => poemTypesFor(l as 'zh-Hant', ZH).join() === 'tang,ci' && defaultPoemType(l as 'zh-Hant', ZH) === 'tang'))
 check('an English story → free verse only', poemTypesFor('en', EN).join() === 'en' && !poemTypeAllowed('en', 'tanka', EN) && !poemTypeAllowed('en', 'tang', EN) && !poemTypeAllowed('en', 'ci', EN))
-check('the story decides, not the page language: a Japanese story written on the English page offers the Japanese formats; an English story on the Japanese page offers free verse', poemTypesFor('en', FISH).join() === 'tanka,tang' && poemTypesFor('ja', EN).join() === 'en')
-check('a mixed-language story uses the language of most of its text', poemTypesFor('en', `${FISH}\n(English note.)`).join() === 'tanka,tang' && poemTypesFor('ja', `${EN} ${EN} ありがとう`).join() === 'en')
+check('the story decides, not the page language: a Japanese story written on the English page offers the Japanese formats; an English story on the Japanese page offers free verse', poemTypesFor('en', FISH).join() === 'tanka,haiku,tang' && poemTypesFor('ja', EN).join() === 'en')
+check('a mixed-language story uses the language of most of its text', poemTypesFor('en', `${FISH}\n(English note.)`).join() === 'tanka,haiku,tang' && poemTypesFor('ja', `${EN} ${EN} ありがとう`).join() === 'en')
 check('with no story to read yet, the page language gives the default', defaultPoemType('ja') === DEFAULT_POEM_TYPE.ja && defaultPoemType('en') === 'en' && poemTypesFor('zh-Hant').join() === 'tang,ci')
 
 // 2. the poem for the fisherman story: 短歌 by default, well formed, and carries the turning point through one concrete image of THIS story (the prints / the headland rock),
