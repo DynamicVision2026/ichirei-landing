@@ -576,7 +576,7 @@ const mockPage = async (browser, { onExplain, result, order, track } = {}) => {
   check('story: even with the context chosen the button stays disabled while the story is over the limit, and no request was made', (await goBtn.isDisabled()) && calls.select.length === 0)
   // shorten (the owner's edit): the line goes, the button wakes up, and what is sent is exactly the 4900 characters — the turning point in the last third is in it
   const TURN = 'その夜、父の古いカメラの中から、現像されていない一本のフィルムが出てきた。'
-  const story49 = '朝の港で、父は黙って網を繕っていた。'.repeat(240).slice(0, 4900 - TURN.length) + TURN
+  const story49 = '朝の港で、父は黙って網を繕っていた。'.repeat(300).slice(0, 4900 - TURN.length) + TURN
   await paste(box, story49)
   check('story: a 4900-character story is accepted — counter "4900 / 5000字", no over-limit line, button enabled', [...story49].length === 4900 && (await counter.innerText()) === '4900 / 5000字' && (await page.locator('#write [data-testid=story-over]').count()) === 0 && !(await goBtn.isDisabled()))
   await page.click(`#write >> text=${GO.ja}`)
