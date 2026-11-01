@@ -20,7 +20,8 @@ import { applyPalette, applyReviewVerdicts, type Palette } from './palette.ts'
 import { runReview } from './review.ts'
 import { FREE_FIELDS, FREE_REVIEW_TIMEOUT_MS_DEFAULT } from './replace.ts'
 import { SAME_CHARACTER_REASON, finalizeResult } from './slots.ts'
-import { failingGazes, fixGazes } from './gaze.ts'
+import { failingGazes, fixGazes, inventedFacts } from './gaze.ts'
+import { withDisplayReading } from './reading-display.ts'
 import { ModelTimeoutError, callSignal, callTimeoutMs, runBudgetMs, timedOut } from './limits.ts'
 import { thinkingTokensOf, watchThinkingTokens } from './usage.ts'
 import { cleanReading } from '../src/order/reading.ts'
@@ -130,7 +131,7 @@ export interface CardReviewInfo {
 export interface CardsReport {
   calls: CardCallInfo[]
   reviews: CardReviewInfo[]
-  collisions: { slot: CardSlot; resolved: 'runner_up' | 'none' }[]
+  collisions: { slot: CardSlot; resolved: 'runner_up' | 'none'; why?: 'character' | 'anchor' }[]
   runner_up_used: CardSlot[]
   /** from the start of the request */
   first_card_ms: number | null
@@ -334,6 +335,27 @@ export function readCardReply(text: string, slot: CardSlot): ReplyRead {
   }
   const parse: CardCallInfo['parse'] = insufficient ? 'none' : out.length > 0 ? 'ok' : elems.length > 0 ? 'offered_unusable' : 'no_candidates'
   return { cands: insufficient ? [] : out, obj, parse, keys, offered, insufficient }
+}
+
+export const SAME_ANCHOR_REASON = 'slots: same story detail as the main card'
+export const INVENTED_FACT_REASON = 'review: truth: states a fact about the sender or a relative that the story does not give'
+
+const plain = (s: string): string => s.replace(/\s+/g, '').replace(/[「」『』“”"'、，,。.！!？?…・]/g, '')
+
+/**
+ * Do two story quotes come from the same place? True when one contains the other, or when both sit in the same sentence of the story. The free pick must anchor on a different
+ * sentence or detail than the main card (which stands on the turning point). A one-sentence story has no "different sentence": only the overlap test applies.
+ */
+export function anchorsClash(a: string, b: string, story: string): boolean {
+  const x = plain(a)
+  const y = plain(b)
+  if (!x || !y) return false
+  if (x.includes(y) || y.includes(x)) return true
+  const sentences = story.split(/(?<=[。！？!?\n])/).map(plain).filter(Boolean)
+  if (sentences.length < 2) return false
+  const ia = sentences.findIndex((s) => s.includes(x))
+  const ib = sentences.findIndex((s) => s.includes(y))
+  return ia !== -1 && ia === ib
 }
 
 export async function runCards(a: CardsArgs): Promise<CardsOut> {
@@ -556,7 +578,7 @@ export async function runCards(a: CardsArgs): Promise<CardsOut> {
 
   /** A line that does not read as a sentence about the person is rewritten once (small model, only when it fails): never a reason to lose the card. */
   const gazeOne = async (card: Candidate, sig: AbortSignal): Promise<Candidate> => {
-    const failing = failingGazes([card], context.language).length
+    const failing = failingGazes([card], context.language, story).length
     if (failing === 0) return card
     report.gaze_failing += failing
     const t0 = Date.now()
@@ -605,7 +627,13 @@ export async function runCards(a: CardsArgs): Promise<CardsOut> {
           // a higher card is already putting this character forward: take our runner-up (no review spent on it)
           if (taken().some((t) => sameChar(ref.card, t))) {
             tried.push(eliminate(ref.card, SAME_CHARACTER_REASON, 'same_character'))
-            report.collisions.push({ slot, resolved: n < list.length ? 'runner_up' : 'none' })
+            report.collisions.push({ slot, resolved: n < list.length ? 'runner_up' : 'none', why: 'character' })
+            continue
+          }
+          // the free pick must stand on a different sentence or detail than the main card: the same place in the story → its runner-up
+          if (slot === 'freestyle' && picked.main && anchorsClash(ref.card.story_anchor, picked.main.story_anchor, story)) {
+            tried.push(eliminate(ref.card, SAME_ANCHOR_REASON, 'same_anchor'))
+            report.collisions.push({ slot, resolved: n < list.length ? 'runner_up' : 'none', why: 'anchor' })
             continue
           }
           picked[slot] = ref.card
@@ -619,11 +647,26 @@ export async function runCards(a: CardsArgs): Promise<CardsOut> {
           const finals = await Promise.all(higher())
           if (finals.some((f) => f.chosen && sameChar(rv.card, f.chosen))) {
             tried.push(eliminate(rv.card, SAME_CHARACTER_REASON, 'same_character'))
-            report.collisions.push({ slot, resolved: n < list.length ? 'runner_up' : 'none' })
+            report.collisions.push({ slot, resolved: n < list.length ? 'runner_up' : 'none', why: 'character' })
             if (picked[slot] === ref.card) delete picked[slot]
             continue
           }
-          chosen = await gazeOne(rv.card, sig)
+          const mainFinal = finals.find((f) => f.slot === 'main')?.chosen
+          if (slot === 'freestyle' && mainFinal && anchorsClash(rv.card.story_anchor, mainFinal.story_anchor, story)) {
+            tried.push(eliminate(rv.card, SAME_ANCHOR_REASON, 'same_anchor'))
+            report.collisions.push({ slot, resolved: n < list.length ? 'runner_up' : 'none', why: 'anchor' })
+            if (picked[slot] === ref.card) delete picked[slot]
+            continue
+          }
+          const lined = await gazeOne(rv.card, sig)
+          // the line still states a fact about the sender or a relative that the story does not give (after its one rewrite): it is a `truth` failure, the next candidate is tried
+          const invented = inventedFacts(lined.one_line_gaze, story, context.language)
+          if (invented.length > 0) {
+            tried.push(eliminate(lined, INVENTED_FACT_REASON, 'invented_fact'))
+            if (picked[slot] === ref.card) delete picked[slot]
+            continue
+          }
+          chosen = context.language === 'ja' ? withDisplayReading(lined, palette) : lined
           picked[slot] = chosen
           tried.push(chosen)
           source = from

@@ -46,6 +46,27 @@ export function gazeIssues(gaze: string, language: Language): string[] {
   return out
 }
 
+// Words that state a fact about the SENDER (or a relative) which the story and the form do not give: the form gives the receiver's relationship ("father"), never the sender's
+// gender, age or family role. A line that uses one of these when the story itself does not is an invented fact (a `truth` failure) and is rewritten once.
+const INVENTED_TERMS: Record<'ja' | 'zh' | 'en', RegExp> = {
+  ja: /娘|息子|長男|長女|次男|次女|孫|嫁|婿|姪|甥/u,
+  zh: /女儿|女兒|儿子|兒子|长子|長子|长女|長女|孙子|孫子|孙女|孫女|外孙|外孫/u,
+  en: /\b(daughter|daughters|son|sons|grandson|granddaughter|grandchild|grandchildren|nephew|niece)\b/i,
+}
+
+/** The words in `gaze` that state a sender/relative fact the story does not state. [] = none. */
+export function inventedFacts(gaze: string, story: string, language: Language): string[] {
+  const re = INVENTED_TERMS[language === 'ja' ? 'ja' : language === 'en' ? 'en' : 'zh']
+  const found = new Set<string>()
+  for (const m of gaze.matchAll(new RegExp(re.source, re.flags.includes('g') ? re.flags : re.flags + 'g'))) {
+    const term = m[0]
+    if (!story.toLowerCase().includes(term.toLowerCase())) found.add(term)
+  }
+  return [...found]
+}
+
+export const inventedWhy = (terms: string[]): string => `it states a fact about the sender or a relative that the story does not give (${terms.join(', ')}): the form gives the receiver's relationship, never the sender's gender, age or family role. Use 「私」 or neutral wording`
+
 /** null = the line is a sentence about the person; otherwise the first reason it is not. */
 export function gazeProblem(gaze: string, language: Language): string | null {
   return gazeIssues(gaze, language)[0] ?? null
@@ -66,10 +87,11 @@ function readPrompt(): string {
   throw new Error('gaze-fix-prompt.md not found')
 }
 
-export const failingGazes = (cands: Candidate[], language: Language): { kanji: string; gaze: string; why: string }[] =>
+export const failingGazes = (cands: Candidate[], language: Language, story?: string): { kanji: string; gaze: string; why: string }[] =>
   cands.flatMap((c) => {
     if (c.eliminated || !c.one_line_gaze) return []
-    const why = gazeProblem(c.one_line_gaze, language)
+    const invented = story !== undefined ? inventedFacts(c.one_line_gaze, story, language) : []
+    const why = invented.length > 0 ? inventedWhy(invented) : gazeProblem(c.one_line_gaze, language)
     return why ? [{ kanji: c.kanji, gaze: c.one_line_gaze, why }] : []
   })
 
@@ -98,7 +120,7 @@ export interface GazeFixOptions {
 export async function fixGazes(cands: Candidate[], story: string, language: Language, opts: GazeFixOptions = {}): Promise<Map<string, string>> {
   const out = new Map<string, string>()
   const log = opts.log ?? ((l: string) => console.log(l))
-  const bad = failingGazes(cands, language)
+  const bad = failingGazes(cands, language, story)
   if (bad.length === 0 || !gazeFixEnabled()) return out
   const t0 = Date.now()
   const signal = callSignal(opts.signal, GAZE_TIMEOUT_MS)
@@ -117,8 +139,9 @@ export async function fixGazes(cands: Candidate[], story: string, language: Lang
       const hit = list.find((x) => x.kanji === b.kanji)
       const next = typeof hit?.one_line_gaze === 'string' ? hit.one_line_gaze.trim() : ''
       if (!next || next === b.gaze || [...next].length > [...b.gaze].length + 24) continue
-      const before = gazeIssues(b.gaze, language).length
-      const after = gazeIssues(next, language).length
+      // (an invented sender/relative fact counts as a failed check, so a rewrite that removes it is better than the original and one that keeps it is not)
+      const before = gazeIssues(b.gaze, language).length + inventedFacts(b.gaze, story, language).length
+      const after = gazeIssues(next, language).length + inventedFacts(next, story, language).length
       // The better of the two lines: a rewrite that passes is taken; one that still fails is taken only when it fails FEWER checks than the original; otherwise the original
       // stays. Either way the character keeps its card: a line is never a reason to drop a character.
       if (after === 0 || after < before) {
@@ -163,7 +186,7 @@ export async function rewriteLines(items: { kanji: string; gaze: string; why: st
     for (const b of items) {
       const hit = list.find((x) => x.kanji === b.kanji)
       const next = typeof hit?.one_line_gaze === 'string' ? hit.one_line_gaze.trim() : ''
-      if (next && next !== b.gaze && gazeIssues(next, language).length === 0 && [...next].length <= [...b.gaze].length + 24) out.set(b.kanji, next)
+      if (next && next !== b.gaze && gazeIssues(next, language).length === 0 && inventedFacts(next, story, language).length === 0 && [...next].length <= [...b.gaze].length + 24) out.set(b.kanji, next)
     }
     log(`[ichirei-gaze] ${JSON.stringify({ event: 'line_rewritten', asked: items.length, fixed: out.size, ms: Date.now() - t0 })}`)
   } catch {

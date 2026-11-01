@@ -12,7 +12,8 @@
 //   5. hands it to the palette referee (engine/palette.ts) and returns the refereed result.
 // Editing a prompt file changes the engine's behavior with no change to this code.
 
-import { cardsMode, runCards, type CardsReport } from './cards.ts'
+import { cardsMode, runCards, INVENTED_FACT_REASON, type CardsReport } from './cards.ts'
+import { withDisplayReadings } from './reading-display.ts'
 import { thinkingTokensOf, watchThinkingTokens } from './usage.ts'
 import Anthropic from '@anthropic-ai/sdk'
 import { callSignal, callTimeoutMs, ModelTimeoutError, reviewTimeoutMs, runBudgetMs, shadowGraceMs, timedOut } from './limits.ts'
@@ -27,7 +28,7 @@ import { fileURLToPath } from 'node:url'
 import { applyPalette, applyReviewVerdicts, loadPalette } from './palette.ts'
 import { runReview } from './review.ts'
 import { completeMains, type RefillReport } from './replace.ts'
-import { applyGazes, failingGazes, fixGazes } from './gaze.ts'
+import { applyGazes, failingGazes, fixGazes, inventedFacts } from './gaze.ts'
 import {
   DECLINE_MESSAGE,
   DEFAULT_CONTEXT,
@@ -289,6 +290,18 @@ export interface SelectCallInfo {
 
 export function selectCallInfo(message: Pick<Anthropic.Message, 'usage' | 'stop_reason'>): SelectCallInfo {
   return { output_tokens: message.usage?.output_tokens ?? null, thinking_tokens: thinkingTokensOf(message), stop_reason: message.stop_reason ?? null }
+}
+
+/** The last guard on a line: a card whose line still states a fact about the sender or a relative that the story does not give (after the one rewrite) is set aside — never shown. */
+function dropInvented(result: EngineResult, story: string, language: Language): EngineResult {
+  if (result.status !== 'sufficient') return result
+  let changed = false
+  const candidates = result.candidates.map((c) => {
+    if (c.eliminated || !c.one_line_gaze || inventedFacts(c.one_line_gaze, story, language).length === 0) return c
+    changed = true
+    return { ...c, eliminated: true, eliminated_reason: INVENTED_FACT_REASON, flags: [...new Set([...c.flags, 'invented_fact'])] }
+  })
+  return changed ? { ...result, candidates } : result
 }
 
 /** A reason is kept as its code ("review: truth", "palette: hard_block"): the model's own words after the second colon can quote the story. */
@@ -685,7 +698,7 @@ async function runPipeline(a: PipelineArgs): Promise<PipelineOut> {
     withGazes = completed
   }
   const gazeMs = Date.now() - tGaze
-  const final = finalizeResult(withGazes)
+  const final = withDisplayReadings(finalizeResult(dropInvented(withGazes, story, context.language)), palette)
   // Which cards leave the engine, and why a card is missing (reasons are the referee / review codes, no story text and no character): the log a missing card is traced from.
   const refillMs = tGaze - tReplace
   logCards(story, context, completed, final, refill, { total: Date.now() - tStart, select: selectMs, select_attempts: attempts, referee: refereeMs, review: reviewMs, refill: refillMs, gaze: gazeMs, gaze_failing: gazeFailing }, selectCallInfo(message), undefined, opts.onDebug)
@@ -795,7 +808,7 @@ async function runCardsPipeline(a: PipelineArgs): Promise<PipelineOut> {
     withGazes = completed
   }
   const gazeMs = Date.now() - tGaze + out.report.gaze_ms
-  const final = finalizeResult(withGazes)
+  const final = withDisplayReadings(finalizeResult(dropInvented(withGazes, story, context.language)), palette)
   const refillMs = tGaze - tReplace
   out.report.all_cards_ms = Math.max(out.report.all_cards_ms, Date.now() - tStart)
   // where the second card came from: its own call, the main call's runner-up, or (only when both could not deliver) the refill

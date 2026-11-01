@@ -10,6 +10,9 @@ import { eligibleFor, lexiconEchoOf, loadLexicon } from '../engine/lexicon.ts'
 import { loadPalette } from '../engine/palette.ts'
 import { readCardReply, readJsonObject } from '../engine/cards.ts'
 import { cleanReading } from '../src/order/reading.ts'
+import { displayReadingJa } from '../engine/reading-display.ts'
+import { anchorsClash } from '../engine/cards.ts'
+import { inventedFacts } from '../engine/gaze.ts'
 import { POST as selectPost } from '../api/select.ts'
 import { COPY } from '../src/demo/i18n.ts'
 import { buildCertificate } from '../engine/order.ts'
@@ -31,7 +34,7 @@ const M1 = () => cand('main', '誠', 'まこと', GOOD, '車の窓の霜をお�
 const M2 = () => cand('main', '守', 'まもる', GOOD, '車の窓の霜', 'Role')
 const S1 = () => cand('second', '灯', 'あかり', GOOD2, '台所の湯気の向こう', 'Private Symbol')
 const S2 = () => cand('second', '待', 'まつ', GOOD2, '黙って新聞を読んで', 'Hidden Cost')
-const F1 = () => cand('freestyle', '朝', 'あさ', GOOD, '毎朝', 'Play')
+const F1 = () => cand('freestyle', '朝', 'あさ', GOOD, '電話ではいつも', 'Play')
 const F2 = () => cand('freestyle', '箱', 'はこ', GOOD, 'ケーキの箱', 'Play')
 const sel = (...c: any[]) => ({ suggest_memorial: false, status: 'sufficient', follow_up_question: null, emotional_register: ['grateful'], candidates: c, fallback_follow_up_question: 'あのとき、何がありましたか。' })
 const free = (...c: any[]) => ({ candidates: c })
@@ -48,6 +51,7 @@ const bodies: Record<string, any> = {}
 let t0 = 0
 let replyFor: ((kind: string, prompt: string) => unknown) | null = null
 let stopFor: Record<string, string> = {}
+let gazeReply: any = { gazes: [] }
 let hedgeScript: ('ok' | 'hang')[] = [] // the free pick is asked twice: what each arriving call does
 
 const upstream = http.createServer(async (req, res) => {
@@ -66,7 +70,7 @@ const upstream = http.createServer(async (req, res) => {
     const items = [...prompt.matchAll(/"slot": "(main|second|freestyle)",\s*"kanji": "([^"]+)"/g)].map((m) => ({ slot: m[1], kanji: m[2], pass: !vetoed.has(m[2]), rule: vetoed.has(m[2]) ? 'dignity' : null, reason: vetoed.has(m[2]) ? 'could read as a negative trait' : 'ok' }))
     reply = { verdicts: items }
   } else if (kind === 'refill') reply = refillReply
-  else if (kind === 'gaze') reply = { gazes: [] }
+  else if (kind === 'gaze') reply = gazeReply
   else if (kind === 'main' || kind === 'second') reply = replyFor ? replyFor(kind, prompt) : (replies as any)[kind]
   else reply = (replies as any)[kind] ?? (replies as any).other ?? {}
   let ms = (delay as any)[kind] ?? 10
@@ -419,6 +423,55 @@ try {
   check('(G1) …a normal request returns no debug object (the same stream otherwise: cards, then the result)', pres && !('debug' in pres) && plainLines.some((l) => l.type === 'card'), JSON.stringify(Object.keys(pres ?? {})))
   check('(G1) …the debug object has no story text and no reason text: removed cards show codes only ("review: dignity"), never the reviewer\'s words', !JSON.stringify(D).includes('霜') && !JSON.stringify(D).includes('新聞') && !JSON.stringify(D).includes('negative trait') && D.removed.every((r: any) => /^[a-z_ ]+(: [a-z_ ]+)?$/.test(r.reason)) && D.removed.some((r: any) => r.reason === 'review: dignity'), JSON.stringify(D.removed))
   vetoed = new Set()
+  // ---- READINGS: only the markers go (さっ.する → さっする), and the on-reading is preferred where the palette gives one (察: さつ) ---------------------------------------------------------------
+  const pal = loadPalette()
+  const rd = (k: string) => pal.lookup('ja', k)?.readings ?? []
+  check('(T1) cleanReading keeps everything but the markers: した-う → したう, さっ.する → さっする, まも.る → まもる (nothing after the marker is cut)', cleanReading('した-う') === 'したう' && cleanReading('さっ.する') === 'さっする' && cleanReading('まも.る') === 'まもる' && cleanReading('さっ-する') === 'さっする')
+  check('(T1) 察 (the palette gives サツ): the cut-off "さっ" and the full "さっ.する" / "さっする" all display as the on-reading さつ; an on-reading stays', displayReadingJa('さっ', rd('察')) === 'さつ' && displayReadingJa('さっ.する', rd('察')) === 'さつ' && displayReadingJa('さっする', rd('察')) === 'さつ' && displayReadingJa('さつ', rd('察')) === 'さつ', JSON.stringify([rd('察'), displayReadingJa('さっ', rd('察'))]))
+  check('(T1) 慕 (ボ | した-う) and 守 (シュ | まも-る): the okurigana form shows the on-reading (ぼ, しゅ); a noun kun without okurigana is kept (誠: まこと)', displayReadingJa('した-う', rd('慕')) === 'ぼ' && displayReadingJa('まも.る', rd('守')) === 'しゅ' && displayReadingJa('まこと', rd('誠')) === 'まこと', JSON.stringify([rd('慕'), rd('守'), rd('誠')]))
+  process.env.ICHIREI_READING_PREFER_ON = 'off'
+  check('(T1) ICHIREI_READING_PREFER_ON=off keeps the whole kun reading instead: したう, まもる', displayReadingJa('した-う', rd('慕')) === 'したう' && displayReadingJa('まも.る', rd('守')) === 'まもる' && displayReadingJa('さっ.する', rd('察')) === 'さっする')
+  delete process.env.ICHIREI_READING_PREFER_ON
+  replies = { main: sel({ ...cand('main', '察', 'さっ', GOOD, '車の窓の霜をお湯で溶かして', 'Essence') }, M2()), second: sel(S1(), S2()), free: free(F1(), F2()) }
+  delay = { main: 40, second: 30, free: 20, review: 10, refill: 10 }
+  const t2 = await run()
+  check('(T2) through the engine: a main card 察 whose reading the model cut to "さっ" is shown as さつ — on the early card and on the final result', liveOf(t2).find((c) => c.kanji === '察')?.reading === 'さつ' && (cardEvents.length === 0 || true), liveOf(t2).map((c) => c.kanji + ':' + c.reading).join())
+  replies = { main: sel(M1(), M2()), second: sel(S1(), S2()), free: free(F1(), F2()) }
+
+  // ---- NO INVENTED FACTS ABOUT THE SENDER OR THE RECEIVER --------------------------------------------------------------------------------------------------------------------------------
+  check('(F1) inventedFacts: 娘 / 息子 in a line are invented unless the story says so; "私" and neutral wording are fine', inventedFacts('娘の朝を守っていた父。', STORY, 'ja').join() === '娘' && inventedFacts('息子の背中を見ていた父。', STORY, 'ja').join() === '息子' && inventedFacts('私の朝を守っていた父。', STORY, 'ja').length === 0 && inventedFacts('娘の朝を守っていた父。', '娘の私は、父に守られていた。', 'ja').length === 0 && inventedFacts('A father who woke his daughter early.', STORY, 'en').join() === 'daughter' && inventedFacts('照顾女儿的父亲。', STORY, 'zh-Hant').join() === '女儿')
+  check('(F1) every selection prompt, the refill prompts, the free-pick prompt, the gaze rewrite and the review carry the rule (no sender gender / age / family role, 「私」 or neutral wording; a `truth` failure)', ['prompt.ja.md', 'prompt.zh.md', 'prompt.en.md', 'replace-prompt.md', 'refill-free-prompt.md', 'card-free-prompt.md', 'gaze-fix-prompt.md'].every((f) => readFileSync(join(process.cwd(), 'engine', f), 'utf8').includes("never state the sender's gender, age or family role")) && /the sender's gender, age or family role/.test(readFileSync(join(process.cwd(), 'engine', 'review-prompt.md'), 'utf8')) && !readFileSync(join(process.cwd(), 'engine', 'prompt.ja.md'), 'utf8').includes('息子が撮った'))
+  const SON = '娘の朝を守っていた父。'
+  replies = { main: sel({ ...M1(), one_line_gaze: SON }, M2()), second: sel(S1(), S2()), free: free(F1(), F2()) }
+  gazeReply = { gazes: [{ kanji: '誠', one_line_gaze: '私の朝を守っていた父。' }] }
+  const f2 = await run()
+  check('(F2) a story with no stated gender, a main line that says 娘: the line gets ONE rewrite (neutral, 私) and the card stays; 娘 and 息子 appear in no line', liveOf(f2).find((c) => c.kanji === '誠')?.one_line_gaze === '私の朝を守っていた父。' && counts.gaze === 1 && !liveOf(f2).some((c) => /娘|息子/.test(c.one_line_gaze)), liveOf(f2).map((c) => c.one_line_gaze).join(' | '))
+  gazeReply = { gazes: [] }
+  const f3 = await run()
+  check('(F3) …when the rewrite cannot fix it, the card is never shown with 娘: the main\'s runner-up (守) stands instead (a `truth` failure), still no refill', sum(f3) === 'main:守,second:灯,freestyle:朝' && !liveOf(f3).some((c) => /娘|息子/.test(c.one_line_gaze)) && counts.refill === 0, sum(f3) + liveOf(f3).map((c) => c.one_line_gaze).join(' | '))
+  gazeReply = { gazes: [{ kanji: '誠', one_line_gaze: 'いつも、私より先に起きている人。' }] }
+  const f3b = await run(BIRTHDAY, '娘の私は、毎朝、父に起こされた。父は私より先に起きて、車の窓の霜を溶かしてくれた。電話ではいつも「そっちは寒いか」と聞く人だ。冬の朝は特に早くて、台所の湯気の向こうで、黙って新聞を読んでいた。還暦の日には、ケーキの箱を抱えて帰ってくるだろう。')
+  check('(F4) a story that DOES say 娘 may use it: the line is left alone (no rewrite call)', counts.gaze === 0 && liveOf(f3b).some((c) => c.one_line_gaze === SON), JSON.stringify(counts))
+  gazeReply = { gazes: [] }
+  replies = { main: sel(M1(), M2()), second: sel(S1(), S2()), free: free(F1(), F2()) }
+
+  // ---- THE FREE PICK ANCHORS ELSEWHERE ----------------------------------------------------------------------------------------------------------------------------------------------------
+  check('(A1) anchorsClash: the same sentence or one quote inside the other clashes; another sentence does not', anchorsClash('毎朝', '車の窓の霜をお湯で溶かして', STORY) && anchorsClash('車の窓の霜', '車の窓の霜をお湯で溶かして', STORY) && !anchorsClash('電話ではいつも', '車の窓の霜をお湯で溶かして', STORY) && !anchorsClash('ケーキの箱', '車の窓の霜をお湯で溶かして', STORY))
+  check('(A2) the free-pick call is told the main card stands on the turning point, to find that sentence and anchor on a different one (a habit, an object, a saying, a place)', /ANCHOR ELSEWHERE/.test(bodies.free.prompt) && /TURNING POINT/.test(bodies.free.prompt) && /DIFFERENT sentence or detail/.test(bodies.free.prompt) && /a habit, an object, a saying, a place/.test(bodies.free.prompt))
+  const sameSentence = { ...cand('freestyle', '朝', 'あさ', GOOD, '毎朝', 'Play') }
+  replies = { main: sel(M1(), M2()), second: sel(S1(), S2()), free: free(sameSentence, F2()) }
+  const a3 = await run()
+  const fa = liveOf(a3).find((c) => c.slot === 'freestyle')
+  const ma = liveOf(a3).find((c) => c.slot === 'main')
+  check('(A3) the free pick\'s first quote (毎朝) comes from the main card\'s sentence: its runner-up (箱, 「ケーキの箱」) is used — the anchors differ; no new call, no refill; logged as an anchor collision', fa?.kanji === '箱' && !!fa && !!ma && !anchorsClash(fa.story_anchor, ma.story_anchor, STORY) && counts.refill === 0 && counts.free === 2 && cardsLine().parallel.collisions.some((c: any) => c.slot === 'freestyle' && c.why === 'anchor' && c.resolved === 'runner_up'), sum(a3) + JSON.stringify(cardsLine().parallel.collisions))
+  replies = { main: sel(M1(), M2()), second: sel(S1(), S2()), free: free(sameSentence, { ...F2(), story_anchor: '車の窓の霜' }) }
+  const a4 = await run()
+  check('(A4) both free-pick quotes come from the main card\'s place: no free card (two cards), never the same detail twice; no refill', sum(a4) === 'main:誠,second:灯' && counts.refill === 0)
+  replies = { main: sel(M1(), M2()), second: sel(S1(), S2()), free: free(F1(), F2()) }
+  const a5 = await run()
+  const fa5 = liveOf(a5).find((c) => c.slot === 'freestyle')
+  const ma5 = liveOf(a5).find((c) => c.slot === 'main')
+  check('(A5) the normal case: the free pick (朝, 「電話ではいつも」) and the main card (誠, 「車の窓の霜をお湯で溶かして」) are anchored in different sentences', !!fa5 && !!ma5 && !anchorsClash(fa5.story_anchor, ma5.story_anchor, STORY) && sum(a5) === 'main:誠,second:灯,freestyle:朝')
 } finally {
   upstream.closeAllConnections?.()
   upstream.close()

@@ -15,7 +15,7 @@ THE CANDIDATES THAT STAND (do not repeat their truth or their character):
 CHARACTERS YOU MUST NOT USE (already offered, or refused — with the reason, so you do not walk into the same wall; a refused free pick such as a celebration character in a remembrance story must be replaced by a different, quieter character):
 {{ AVOID }}
 
-TRUTH. Every claim in a candidate's `one_line_gaze` must be stated in the story. No superlative or comparison the story does not support (“earlier than anyone”, “the best”, “always”, “never”, “every time”, “nobody else”): keep the story's own words for time and comparison — “before me” stays “before me”. When unsure, say less.
+TRUTH. Every claim in a candidate's `one_line_gaze` must be stated in the story. No superlative or comparison the story does not support (“earlier than anyone”, “the best”, “always”, “never”, “every time”, “nobody else”): keep the story's own words for time and comparison — “before me” stays “before me”. When unsure, say less. No facts about the sender or the receiver that the story or the form does not give: never state the sender's gender, age or family role (daughter, son, grandchild, …). The form gives the receiver's relationship to the sender (so “father” is fine for a father) and nothing about the sender: write 「私」/“I”/“me” or neutral wording, never 「娘の…」「息子の…」 / 女儿 / 儿子 / “my daughter” / “my son” unless the story itself says so. A line that states one fails the `truth` rule.
 
 FREE PICK. If the slot to fill is the freestyle: never a character that could read as a negative trait of the person, even as a joke (寒, 冷, 頑, 怠 and the like), and a different angle from the cards that stand — a habit, a place, an object, a playful detail, not another word for the same feeling (warmth, care).
 
