@@ -25,7 +25,7 @@ import { fileURLToPath } from 'node:url'
 import { applyPalette, applyReviewVerdicts, loadPalette } from './palette.ts'
 import { runReview } from './review.ts'
 import { completeMains, type RefillReport } from './replace.ts'
-import { applyGazes, fixGazes } from './gaze.ts'
+import { applyGazes, failingGazes, fixGazes } from './gaze.ts'
 import {
   DECLINE_MESSAGE,
   DEFAULT_CONTEXT,
@@ -256,11 +256,23 @@ interface PipelineOut {
  * engine/lexicon.csv, the palette engine is the fallback after a second "nothing fits".
  */
 /** One line per request: the story's length, how many live cards of each kind leave the engine, and the reason every removed candidate was removed (codes only). */
-function logCards(story: string, context: EngineContext, before: EngineResult, after: EngineResult, refill: RefillReport | null): void {
+/** Where the time of one request went (milliseconds), step by step — measured, not changed: the selection call (with its retries), the referee (code), the review call, the one refill call (with its own review), the gaze-line check (a rewrite call only when a line fails), and the total. */
+interface StepTimes {
+  total: number
+  select: number
+  select_attempts: number
+  referee: number
+  review: number
+  refill: number
+  gaze: number
+  gaze_failing: number
+}
+
+function logCards(story: string, context: EngineContext, before: EngineResult, after: EngineResult, refill: RefillReport | null, ms: StepTimes): void {
   try {
     const live = (r: EngineResult, slot: string) => r.candidates.filter((c) => !c.eliminated && c.slot === slot).length
     const removed = after.candidates.filter((c) => c.eliminated).map((c) => ({ slot: c.slot, reason: (c.eliminated_reason ?? 'unknown').slice(0, 80) }))
-    console.log(`[ichirei-cards] ${JSON.stringify({ story_chars: [...story].length, language: context.language, occasion: context.occasion, status: after.status, live: { main: live(after, 'main'), second: live(after, 'second'), freestyle: live(after, 'freestyle') }, before_final: before.candidates.filter((c) => !c.eliminated).length, freestyle: context.occasion === 'memorial' ? 'not_offered' : undefined, removed, refill: refill ? { asked: refill.asked, filled: refill.filled.map((f) => f.slot), rejected: refill.rejected, ms: refill.ms } : null })}`)
+    console.log(`[ichirei-cards] ${JSON.stringify({ story_chars: [...story].length, language: context.language, occasion: context.occasion, status: after.status, live: { main: live(after, 'main'), second: live(after, 'second'), freestyle: live(after, 'freestyle') }, before_final: before.candidates.filter((c) => !c.eliminated).length, freestyle: context.occasion === 'memorial' ? 'not_offered' : undefined, ms, calls: { select: ms.select_attempts, review: ms.review > 0 ? 1 : 0, refill: refill ? 1 : 0, gaze: ms.gaze_failing > 0 ? 1 : 0 }, removed, refill: refill ? { asked: refill.asked, filled: refill.filled.map((f) => f.slot), rejected: refill.rejected, ms: refill.ms } : null })}`)
   } catch {
     // (a log line must never break a request)
   }
@@ -534,7 +546,7 @@ async function runPipeline(a: PipelineArgs): Promise<PipelineOut> {
   const { story, context, palette, opts, tStart, prompt, view } = a
   opts.onStage?.('reading')
   const { message, extracted, attempts, maxTokens } = await selectWithRetry(a, opts.signal, false, opts.onUsage)
-  const selectMs = Date.now() - tStart
+  const selectMs = Date.now() - tStart // (from the start of the request: the selection call, with its retries)
   const stamped = stampResult(extracted, context)
   const modelSaidMiss = view !== null && stamped.status === 'insufficient' && (extracted as { lexicon_miss?: unknown }).lexicon_miss === true
   const onList = view ? (c: Candidate) => inEligible(view.set, c) !== undefined : undefined
@@ -581,6 +593,7 @@ async function runPipeline(a: PipelineArgs): Promise<PipelineOut> {
   // The review checks ALL cards (spec v9.1 step 7) — lexicon characters included: the lexicon vouches for a character's classical sense, not for this gift.
   opts.onStage?.('checking')
   const tReview = Date.now()
+  const refereeMs = tReview - tStart - selectMs // the code referee (and the stamping before it): no model call
   // (No live main candidate left → nothing to review: a freestyle cannot be shown alone, so it is dropped and the replacement is tried at once.)
   const hasMain = refereed.candidates.some((c) => !c.eliminated && c.slot !== 'freestyle')
   const review = hasMain
@@ -616,6 +629,8 @@ async function runPipeline(a: PipelineArgs): Promise<PipelineOut> {
   // only when a line fails). The better of the two lines is kept; a failed or useless rewrite leaves the original. A line is NEVER a reason to lose a card:
   // this step only replaces text, and any error in it leaves `completed` exactly as it was.
   let withGazes = completed
+  const tGaze = Date.now()
+  const gazeFailing = failingGazes(completed.candidates, context.language).length
   try {
     const gazeFixes = await fixGazes(completed.candidates, story, context.language, { apiKey: opts.apiKey, signal: opts.signal, onUsage: opts.onUsage ? (u) => opts.onUsage!('review', u) : undefined })
     const applied = applyGazes(completed, gazeFixes)
@@ -623,10 +638,12 @@ async function runPipeline(a: PipelineArgs): Promise<PipelineOut> {
   } catch {
     withGazes = completed
   }
+  const gazeMs = Date.now() - tGaze
   const final = finalizeResult(withGazes)
   // Which cards leave the engine, and why a card is missing (reasons are the referee / review codes, no story text and no character): the log a missing card is traced from.
-  logCards(story, context, completed, final, refill)
-  timing({ review_ms: reviewMs, replace_ms: Date.now() - tReplace, status: final.status })
+  const refillMs = tGaze - tReplace
+  logCards(story, context, completed, final, refill, { total: Date.now() - tStart, select: selectMs, select_attempts: attempts, referee: refereeMs, review: reviewMs, refill: refillMs, gaze: gazeMs, gaze_failing: gazeFailing })
+  timing({ review_ms: reviewMs, replace_ms: refillMs, status: final.status })
   // Lexicon mode: a sufficient answer that ended with no usable lexicon character (the model chose outside the list) is a miss like any other.
   if (view && final.status === 'insufficient') return { result: finishLexicon(final), miss: { reason: 'no_valid_choice', register: registerOf(extracted) } }
   return { result: finishLexicon(final), miss: null }

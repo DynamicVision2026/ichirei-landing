@@ -79,7 +79,7 @@ export default function OrderForm({ result, story, followUps = [], promptQuestio
   const [openDate, setOpenDate] = useState('') // the day the receiver's envelope opens (empty = at once)
   const [senderEmail, setSenderEmail] = useState('')
   const [poemIds, setPoemIds] = useState<string[]>([]) // the included poem of this order (zero or one); the server reads it back by id
-  const [poemShown, setPoemShown] = useState<{ lines: string[]; reading: string } | null>(null)
+  const [poemShown, setPoemShown] = useState<{ lines: string[]; reading: string; type?: string } | null>(null)
   const [poemStep, setPoemStep] = useState<PoemStep>('loading') // the buyer sees the whole poem before paying: the order waits while it is being written
   const [phase, setPhase] = useState<'edit' | 'submitting' | 'redirecting'>('edit')
   const [error, setError] = useState<string | null>(null)

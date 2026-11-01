@@ -68,6 +68,48 @@ function glyph(doc: Doc, a: Artwork, cx: number, top: number, size: number) {
   else doc.text(a.glyph, cx - w / 2, top, { lineBreak: false })
 }
 
+/** 短歌 and 俳句 are set vertically (縦書き) on the card — and on the preview and the gift page; 漢詩 (the Tang quatrain), 宋詞 and free verse stay horizontal. */
+export const isVerticalPoem = (type: string | undefined): boolean => type === 'tanka' || type === 'haiku'
+
+export interface VCell { ch: string; x: number; y: number; rotate: boolean; offset: boolean }
+const ROTATED = new Set([...'ー―—–～〜…‥（）()「」『』[]{}〈〉《》【】'])
+const PUNCT_CORNER = new Set([...'、。，．,.'])
+
+/**
+ * The cells of a vertically set poem: the first line is the rightmost column, each next line one column to its left; inside a line the characters run top to bottom.
+ * (x, y) is the centre-top of the cell. The long vowel mark and brackets are rotated a quarter turn; 、。 sit in the top-right corner of their cell. Pure: tested without a PDF.
+ */
+export function verticalCells(lines: string[], cx: number, top: number, size: number): { cells: VCell[]; width: number; height: number } {
+  const colGap = size * 1.75
+  const step = size * 1.18
+  const n = lines.length
+  const width = Math.max(0, n - 1) * colGap
+  const cells: VCell[] = []
+  let maxChars = 0
+  lines.forEach((line, i) => {
+    const chars = [...line.replace(/\s+/g, '')]
+    maxChars = Math.max(maxChars, chars.length)
+    const x = cx + width / 2 - i * colGap
+    chars.forEach((ch, j) => cells.push({ ch, x, y: top + j * step, rotate: ROTATED.has(ch), offset: PUNCT_CORNER.has(ch) }))
+  })
+  return { cells, width: width + size, height: maxChars * step }
+}
+
+/** Draw a vertically set poem centred on cx, starting at `top`; returns its height. */
+function verticalPoem(doc: Doc, lines: string[], cx: number, top: number, size: number, color: string): number {
+  const { cells, height } = verticalCells(lines, cx, top, size)
+  doc.font(names.body).fontSize(size).fillColor(color)
+  for (const c of cells) {
+    if (c.rotate) {
+      doc.save()
+      doc.translate(c.x, c.y + size / 2).rotate(90).text(c.ch, -size / 2, -size / 2 + size * 0.08, { width: size, align: 'center', lineBreak: false })
+      doc.restore()
+    } else if (c.offset) doc.text(c.ch, c.x - size / 2 + size * 0.5, c.y - size * 0.45, { width: size, align: 'center', lineBreak: false })
+    else doc.text(c.ch, c.x - size / 2, c.y, { width: size, align: 'center', lineBreak: false })
+  }
+  return height
+}
+
 function centred(doc: Doc, text: string, cx: number, y: number, width: number, size: number, color: string, opts: { lineGap?: number } = {}) {
   doc.font(names.body).fontSize(size).fillColor(color)
   doc.text(text, cx - width / 2, y, { width, align: 'center', lineGap: opts.lineGap ?? 2 })
@@ -122,11 +164,17 @@ function drawInside(doc: Doc, a: Artwork) {
   centred(doc, a.who, rcx, y, rw, 8.6, INK)
   y += whoH + 10
   if (a.poem.length) {
-    const poem = a.poem.join('\n')
-    doc.font(names.body).fontSize(7.8)
-    const ph = doc.heightOfString(poem, { width: rw, align: 'center', lineGap: 2 })
-    centred(doc, poem, rcx, y, rw, 7.8, INK)
-    y += ph + 9
+    if (isVerticalPoem(a.poemType)) {
+      // 短歌 / 俳句: vertical, the first line on the right
+      const ph = verticalPoem(doc, a.poem, rcx, y, 8.2, INK)
+      y += ph + 9
+    } else {
+      const poem = a.poem.join('\n')
+      doc.font(names.body).fontSize(7.8)
+      const ph = doc.heightOfString(poem, { width: rw, align: 'center', lineGap: 2 })
+      centred(doc, poem, rcx, y, rw, 7.8, INK)
+      y += ph + 9
+    }
   }
   centred(doc, a.certificateLine, rcx, y, rw, 6.8, MUTED)
   // to / from, and the short message (when it ships directly or as an e-gift)

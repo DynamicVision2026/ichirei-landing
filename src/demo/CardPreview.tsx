@@ -11,7 +11,7 @@ type Props = {
   glyph: string
   reading: string
   who: string
-  poem: { lines: string[]; reading: string } | null
+  poem: { lines: string[]; reading: string; type?: string } | null
   certificateLine: string
   memorial: boolean
   language: string
@@ -53,11 +53,18 @@ export default function CardPreview({ copy: c, glyph, reading, who, poem, certif
           <span className="cardGlyph k notranslate" data-testid="card-glyph">{glyph}</span>
           <span className="cardReading notranslate">{reading}</span>
           <p className="cardWho notranslate"><span className="cardWhoLabel">{c.who}</span> {who}</p>
-          {poem && (
-            <p className="cardPoem notranslate" data-testid="card-poem">
+          {poem && (poem.type === 'tanka' || poem.type === 'haiku' ? (
+            // 短歌 / 俳句: vertical (縦書き), the first line on the right — the same as the gift page and the printed card
+            <p className="cardPoem cardPoemVert notranslate" data-testid="card-poem" data-poem-type={poem.type} data-vertical="yes">
+              {poem.lines.map((l, i) => (
+                <span key={i} className="cardPoemLine">{l}</span>
+              ))}
+            </p>
+          ) : (
+            <p className="cardPoem notranslate" data-testid="card-poem" data-poem-type={poem.type}>
               {poem.lines.join('\n')}
             </p>
-          )}
+          ))}
           <p className="cardCert">{certificateLine}</p>
         </div>
       </div>

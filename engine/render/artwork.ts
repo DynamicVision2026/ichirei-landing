@@ -19,6 +19,8 @@ export interface Artwork {
   /** Full-size JPEGs (1080×1350), or null where the slot is plain washi (no real picture). */
   pictures: (Buffer | null)[]
   poem: string[]
+  /** The poem's format code (tanka, haiku, tang, ci, en): 短歌 and 俳句 are set vertically (縦書き) on the card, the others stay horizontal. */
+  poemType?: string
   memorial: boolean
   /** Names printed on the card. Empty strings mean the line stays blank, for handwriting (the sender hands it over). */
   from: string
@@ -57,6 +59,7 @@ export async function loadArtwork(store: OrderStore, gift: GiftRecord, anim: Ani
     lines,
     pictures,
     poem: gift.poem?.lines ?? [],
+    poemType: gift.poem?.type ?? '',
     memorial: gift.memorial,
     from: blank ? '' : gift.from,
     to: blank ? '' : gift.to,

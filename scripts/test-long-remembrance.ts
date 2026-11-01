@@ -138,6 +138,18 @@ try {
   const b2 = await run(BIRTHDAY)
   check('(6) a birthday story whose reply has no free pick: ONE refill call asks for the free pick and fills it — three cards', live(b2).length === 3 && refillCalls === 1 && cardsLog().includes('"asked":["freestyle"]') && cardsLog().includes('"filled":["freestyle"]'), cardsLog())
 
+  // ---- the speed measure (2026-11-01): total time and the time of every step on the [ichirei-cards] line; behaviour unchanged -------------------------------------
+  modelReply = replyOf(MAIN(), SECOND())
+  refillReply = { candidates: [FREE()] }
+  const m1 = await run(BIRTHDAY)
+  const mj = JSON.parse(cardsLog().slice('[ichirei-cards] '.length))
+  const parts = mj.ms.select + mj.ms.referee + mj.ms.review + mj.ms.refill + mj.ms.gaze
+  check('(8) the [ichirei-cards] line carries the total and the time of each step — selection, referee, review, refill, gaze check — as numbers, and the steps add up to no more than the total', ['total', 'select', 'referee', 'review', 'refill', 'gaze'].every((k) => typeof mj.ms[k] === 'number' && mj.ms[k] >= 0) && parts <= mj.ms.total + 5 && mj.ms.select_attempts === 1, cardsLog())
+  check('(8) …and the calls made: one selection, one review, one refill (the free pick the reply left out), one gaze rewrite (the fake model\'s lines fail the shape) — and the cards are the same three as before', mj.calls.select === 1 && mj.calls.review === 1 && mj.calls.refill === 1 && mj.calls.gaze === 1 && live(m1).length === 3, JSON.stringify(mj.calls))
+  modelReply = replyOf({ ...MAIN(), one_line_gaze: GOOD_GAZE_3 }, { ...SECOND(), one_line_gaze: GOOD_GAZE_3 }, FREE())
+  await run(BIRTHDAY)
+  const mk = JSON.parse(cardsLog().slice('[ichirei-cards] '.length))
+  check('(8) a request with three cards and good lines makes no refill and no gaze call: calls {select 1, review 1, refill 0, gaze 0}, refill null', mk.calls.refill === 0 && mk.calls.gaze === 0 && mk.refill === null && mk.ms.gaze_failing === 0, cardsLog())
   check('(7) every request logs one [ichirei-cards] line with the story length and codes only — no story text', cardsLog().includes('"story_chars":4105') && !cardsLog().includes('帰省'))
 } finally {
   upstream.close()

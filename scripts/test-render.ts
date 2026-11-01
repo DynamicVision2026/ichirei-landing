@@ -16,7 +16,7 @@ import { buildGiftRecord, newGiftToken, type GiftRecord } from '../engine/gift.t
 import { buildRecord, parseOrderRequest } from '../engine/order.ts'
 import { MemoryOrderStore } from '../engine/order-store.ts'
 import { loadArtwork, scrollReady, type Artwork } from '../engine/render/artwork.ts'
-import { PAGE_H, PAGE_W, cardsPdf } from '../engine/render/card.ts'
+import { PAGE_H, PAGE_W, cardsPdf, homePrintPdf, isVerticalPoem, verticalCells } from '../engine/render/card.ts'
 import { makeScroll, scrollPdf } from '../engine/render/scroll.ts'
 
 let failures = 0
@@ -182,6 +182,34 @@ check('(4) printed / shipped are marked on our own record; a cross-site POST is 
 })())
 check('(4) the e-gift run sends the due reminders and deletes expired addresses; it says plainly when no mail service is configured', await (async () => { const r = await O.egiftRun(req('/ops/egift/run', { method: 'POST', auth: good, headers: { 'sec-fetch-site': 'same-origin' } })); const t = await r.text(); return r.status === 200 && /お知らせの対象/.test(t) && /メール送信サービスが未設定/.test(t) })())
 check('(4) sameSitePost: only this very site may POST', sameSitePost(req('/ops/mark', { method: 'POST', headers: { 'sec-fetch-site': 'same-origin' } })) && !sameSitePost(req('/ops/mark', { method: 'POST', headers: { 'sec-fetch-site': 'cross-site' } })) && !sameSitePost(req('/ops/mark', { method: 'POST' })) && sameSitePost(req('/ops/mark', { method: 'POST', headers: { origin: 'https://ichirei.soul-id.jp' } })) && !sameSitePost(req('/ops/mark', { method: 'POST', headers: { origin: 'https://evil.example' } })))
+
+// ---- 5. the poem on the card: 短歌 and 俳句 are set vertically (縦書き), the rest stay horizontal (2026-11-01) --------------------------------------------------
+check('(5) isVerticalPoem: tanka and haiku are vertical; tang (漢詩 / 唐詩), ci (宋詞), en (free verse) and an unknown or missing type are horizontal', isVerticalPoem('tanka') && isVerticalPoem('haiku') && !isVerticalPoem('tang') && !isVerticalPoem('ci') && !isVerticalPoem('en') && !isVerticalPoem('') && !isVerticalPoem(undefined))
+{
+  const tanka = ['朝ごとに', '蓋の花添え', '備へたる', '母の背中を', '今も思える']
+  const v = verticalCells(tanka, 300, 100, 8)
+  const col = (i: number) => v.cells.filter((c) => c.x === v.cells.find((k) => k.ch === tanka[i][0] && k.y === 100)?.x)
+  const xs = tanka.map((l) => v.cells.find((c) => c.ch === l[0] && c.y === 100)!.x)
+  check('(5) vertical layout: the first line is the RIGHTMOST column, each next line one column to its left, centred on the given x', xs.every((x, i) => i === 0 || x < xs[i - 1]) && Math.abs((xs[0] + xs[4]) / 2 - 300) < 0.001 && v.cells.length === tanka.join('').length)
+  const first = v.cells.filter((c) => c.x === xs[0])
+  check('(5) inside a line the characters run top to bottom from the same top, one step apart', first.map((c) => c.ch).join('') === tanka[0] && first.every((c, i) => i === 0 || c.y > first[i - 1].y) && first[0].y === 100 && col(0).length === 4)
+  const odd = verticalCells(['初ーは、今'], 0, 0, 8).cells
+  check('(5) the long vowel mark is rotated a quarter turn and 、 sits in the corner of its cell', odd.find((c) => c.ch === 'ー')?.rotate === true && odd.find((c) => c.ch === '、')?.offset === true && odd.find((c) => c.ch === '初')?.rotate === false)
+  const h = verticalCells(['蓋の花', '備えて待てる', '母の春'], 0, 0, 8)
+  check('(5) a haiku is three columns, the first line on the right; its height is that of the longest line', h.cells.filter((c) => c.y === 0).length === 3 && Math.abs(h.height - 6 * 8 * 1.18) < 0.001)
+  const poemWork = (poemType: string, poem: string[]): Artwork => ({ ...work, poemType, poem })
+  const pdfs = await Promise.all([
+    cardsPdf([poemWork('tanka', tanka)]),
+    cardsPdf([poemWork('haiku', ['蓋の花', '備えて待てる', '母の春'])]),
+    cardsPdf([poemWork('tang', ['晨起折庭花', '盒中春色輕', '廿載備朝飯', '不言惟在家'])]),
+    homePrintPdf(poemWork('tanka', tanka)),
+    homePrintPdf(poemWork('haiku', ['蓋の花', '備えて待てる', '母の春'])),
+    homePrintPdf(poemWork('tang', ['晨起折庭花', '盒中春色輕', '廿載備朝飯', '不言惟在家'])),
+  ])
+  check('(5) the printed card PDF and the A4 home-print PDF are made for 短歌, 俳句 and 漢詩 (two pages each, valid PDFs)', pdfs.every((b) => b.subarray(0, 5).toString() === '%PDF-' && b.byteLength > 20000) && (pdfs[0].toString('latin1').match(/\/Type \/Page\b/g) ?? []).length === 2 && (pdfs[3].toString('latin1').match(/\/Type \/Page\b/g) ?? []).length === 2)
+  const per = (b: Buffer) => inflateAll(b).split('\n').length
+  check('(5) the vertical poem is drawn character by character (many more text operations than the horizontal one with the same lines)', inflateAll(pdfs[0]).match(/\bTj\b|\bTJ\b/g)!.length > inflateAll(pdfs[2]).match(/\bTj\b|\bTJ\b/g)!.length + 8 && per(pdfs[0]) > 0)
+}
 
 console.log(failures ? `\n${failures} check(s) FAILED` : '\nAll render and ops checks passed.')
 process.exit(failures ? 1 : 0)

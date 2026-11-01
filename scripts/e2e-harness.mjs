@@ -1548,6 +1548,10 @@ const mockPage = async (browser, { onExplain, result, order, track } = {}) => {
 check('included poem: the Japanese site starts with the tanka (the default format) and writes it at once', await addon.locator('input[data-poem-type=tanka]').isChecked() && poemCalls.length >= 1 && poemCalls.every((c) => c.type === 'tanka'))
   await addon.locator('[data-poem-result=tanka][data-state=ready]').waitFor({ timeout: 5000 })
   const full = await addon.locator('[data-poem-full]').innerText()
+  // ticket 2026-11-01: 短歌 and 俳句 are set vertically (縦書き) on the card preview, first line on the right; 漢詩 / 宋詞 / English stay horizontal
+  const vert = () => f.page.locator('[data-testid=card-poem]').evaluate((el) => ({ mode: getComputedStyle(el).writingMode, kind: el.getAttribute('data-poem-type'), xs: [...el.querySelectorAll('.cardPoemLine')].map((s) => s.getBoundingClientRect().left) }))
+  const vt = await vert()
+  check('card preview: the tanka is vertical (縦書き, vertical-rl) and the first line is the rightmost column', vt.kind === 'tanka' && vt.mode.startsWith('vertical') && vt.xs.length === 3 && vt.xs[0] > vt.xs[1] && vt.xs[1] > vt.xs[2], JSON.stringify(vt))
   check('included poem: the WHOLE poem is shown before checkout (all three lines), with "this poem is printed on your card"', full.includes('tanka 一行目です') && full.includes('tanka 三行目です') && (await addon.innerText()).includes('カードに印刷されます'))
   check('included poem: /api/poem got the story, the context, the chosen character, its card line and the type — and the session', poemCalls[0].story === STORY && poemCalls[0].kanji === '証' && typeof poemCalls[0].gaze === 'string' && poemCalls[0].gaze.length > 0 && poemCalls[0].relationship === 'parent_father' && typeof poemCalls[0].session === 'string')
   const callsBeforeTang = poemCalls.length
@@ -1556,6 +1560,8 @@ check('included poem: the Japanese site starts with the tanka (the default forma
   check('included poem: while a poem is being written the order button waits (the buyer sees the poem before paying)', waited === true)
   await addon.locator('[data-poem-result=tang][data-state=ready]').waitFor({ timeout: 6000 })
   check('included poem: choosing another format writes that one; the order button is back', poemCalls.length === callsBeforeTang + 1 && poemCalls.at(-1).type === 'tang' && (await addon.locator('[data-poem-full]').innerText()).includes('tang 一行目です'))
+  const ht = await f.page.locator('[data-testid=card-poem]').evaluate((el) => ({ mode: getComputedStyle(el).writingMode, kind: el.getAttribute('data-poem-type') }))
+  check('card preview: the Tang quatrain (漢詩) stays horizontal', ht.kind === 'tang' && ht.mode.startsWith('horizontal'), JSON.stringify(ht))
   await addon.locator('input[data-poem-type=tanka]').click()
   await f.page.waitForTimeout(300)
   check('included poem: going back to a format already written shows it again without another call', poemCalls.length === callsBeforeTang + 1 && (await addon.locator('[data-poem-full]').innerText()).includes('tanka 一行目です'))
