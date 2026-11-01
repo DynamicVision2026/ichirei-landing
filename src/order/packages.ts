@@ -44,19 +44,19 @@ export const formatYen = (n: number): string => `¥${n.toLocaleString('en-US')}`
 // ONE poem is included in every order, free: after choosing a character the buyer picks a format (the default follows the site language).
 // It travels as attributes on the main ICHIREI line item and in certificate.poems; there is no price and no extra line item.
 
-export const POEM_TYPES = ['tanka', 'tang', 'ci', 'en'] as const
+export const POEM_TYPES = ['tanka', 'haiku', 'tang', 'ci', 'en'] as const
 export type PoemType = (typeof POEM_TYPES)[number]
 /** One poem per order. */
 export const MAX_POEMS = 1
-/** The format offered first, by the story's language (spec v9.4): Japanese → tanka, Chinese → 漢詩 (tang), English → free verse. */
+/** The format offered first, by the story's language (spec v9.5): Japanese → tanka, Chinese → the Tang quatrain (tang), English → free verse. */
 export const DEFAULT_POEM_TYPE: Record<'ja' | 'zh-Hans' | 'zh-Hant' | 'en', PoemType> = { ja: 'tanka', 'zh-Hans': 'tang', 'zh-Hant': 'tang', en: 'en' }
 
 /**
- * The formats offered follow the STORY's language (spec v9.4, owner decision): a Japanese story offers 短歌 (default) or 漢詩 with its 書き下し — no 宋詞, no English;
- * a Chinese story offers 漢詩 (default) or 宋詞; an English story offers free verse only. An order made before this rule keeps the format it has.
+ * The formats offered follow the STORY's language (spec v9.5, owner decision): a Japanese story offers 短歌 (default), 俳句 or the Tang-style quatrain (漢詩) with its 書き下し — no 宋詞, no English;
+ * a Chinese story offers the Tang quatrain (唐詩, default) or 宋詞; an English story offers free verse only. The first format is the default. An order made before this rule keeps the format it has.
  */
 export type StoryLanguage = 'ja' | 'zh' | 'en'
-export const POEM_TYPES_BY_STORY_LANGUAGE: Record<StoryLanguage, readonly PoemType[]> = { ja: ['tanka', 'tang'], zh: ['tang', 'ci'], en: ['en'] }
+export const POEM_TYPES_BY_STORY_LANGUAGE: Record<StoryLanguage, readonly PoemType[]> = { ja: ['tanka', 'haiku', 'tang'], zh: ['tang', 'ci'], en: ['en'] }
 
 /** The language most of the story's text is written in (kana → Japanese; else Han characters → Chinese; else Latin letters → English), or null when it is too short to tell. */
 export function detectStoryLanguage(text: string): StoryLanguage | null {

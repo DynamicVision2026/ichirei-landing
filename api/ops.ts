@@ -226,7 +226,7 @@ const isCardSize = (r: Row) => {
 /** 製作に進めるもの: the window has closed and the order is not cancelled. */
 const ready = (r: Classified) => r.win.phase === 'closed'
 
-const POEM_LABEL: Record<string, string> = { tanka: '短歌', tang: '漢詩', ci: '宋詞', en: 'English' }
+const POEM_LABEL: Record<string, string> = { tanka: '短歌', haiku: '俳句', tang: '漢詩（唐詩の形）', ci: '宋詞', en: '自由詩' }
 
 export function createOpsHandlers(deps: () => OpsDeps) {
   const guard = async (req: Request): Promise<{ d: OpsDeps; env: NodeJS.ProcessEnv; now: Date; store: OrderStore } | Response> => {

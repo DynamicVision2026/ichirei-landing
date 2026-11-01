@@ -14,7 +14,7 @@ export type UiLanguage = 'ja' | 'zh-Hans' | 'zh-Hant' | 'en'
 export type InscriptionScript = 'traditional' | 'simplified'
 export type Condition = 'A' | 'B' | 'C'
 export type PackageId = 'egift' | 'simple' | 'standard'
-export type PoemType = 'tanka' | 'tang' | 'ci' | 'en'
+export type PoemType = 'tanka' | 'haiku' | 'tang' | 'ci' | 'en'
 export type InscriptionStyle = 'kyujitai' | 'modern' | 'traditional' | 'simplified'
 export type OrderField = 'sender_name' | 'receiver_name' | 'delivery_date' | 'inscription_style' | 'package'
 
@@ -357,7 +357,7 @@ const ja: Copy = {
     inscriptionStyles: { kyujitai: '古体字（旧字体）', modern: '現代字', traditional: '繁体字', simplified: '簡体字' },
     inscriptionSame: 'この字は、現代の字体（新字体）で刻みます。',
     simpleUnavailable: (n) => `この字は画数が${n}画を超えるため、スタンダードのみお選びいただけます。`,
-    poem: { heading: 'この一字に、歌を一首添えます', note: 'お好きな形をひとつお選びください。ご注文に含まれています（追加料金はありません）。', types: {tanka:'短歌（五七五七七）',tang:'漢詩（五言・七言絶句）',ci:'宋詞',en:'英語の詩'}, loading: '歌を詠んでいます…', printedOnCard: 'この歌が、カードに印刷されます', failedFinal: '申し訳ありません。今回は歌をお作りできませんでした。歌なしで、そのままご注文いただけます（一字とカードはいつもどおりお届けします）。', tryAgain: 'もう一度試す' },
+    poem: { heading: 'この一字に、歌を一首添えます', note: 'お好きな形をひとつお選びください。ご注文に含まれています（追加料金はありません）。', types: {tanka:'短歌（五七五七七）',haiku:'俳句（五七五）',tang:'漢詩（唐詩の形・五言／七言絶句）',ci:'宋詞',en:'自由詩'}, loading: '歌を詠んでいます…', printedOnCard: 'この歌が、カードに印刷されます', failedFinal: '申し訳ありません。今回は歌をお作りできませんでした。歌なしで、そのままご注文いただけます（一字とカードはいつもどおりお届けします）。', tryAgain: 'もう一度試す' },
     packageLabel: 'パッケージ',
     packages: SIZE_COPY['ja'].names,
     shippingNote: '国内送料無料・海外送料 ¥6,000',
@@ -508,7 +508,7 @@ const zhHans: Copy = {
     inscriptionStyles: { kyujitai: '古体字', modern: '现代字', traditional: '繁體字', simplified: '简体字' },
     inscriptionSame: '这个字的繁体与简体写法相同。',
     simpleUnavailable: (n) => `这个字的笔画超过${n}画，仅能选择标准款。`,
-    poem: { heading: '为这个字添一首诗', note: '请选一种喜欢的形式。已包含在订单中，不另收费。', types: {tanka:'和歌・短歌',tang:'唐诗・绝句',ci:'宋词',en:'英文短诗'}, loading: '正在写诗…', printedOnCard: '这首诗将印在卡片上', failedFinal: '很抱歉，这次没能写成。您可以不带诗直接下单（一字与卡片照常寄出）。', tryAgain: '再试一次' },
+    poem: { heading: '为这个字添一首诗', note: '请选一种喜欢的形式。已包含在订单中，不另收费。', types: {tanka:'短歌（五七五七七）',haiku:'俳句（五七五）',tang:'唐诗（五言／七言绝句）',ci:'宋词',en:'自由诗'}, loading: '正在写诗…', printedOnCard: '这首诗将印在卡片上', failedFinal: '很抱歉，这次没能写成。您可以不带诗直接下单（一字与卡片照常寄出）。', tryAgain: '再试一次' },
     packageLabel: '套餐',
     packages: SIZE_COPY['zh-Hans'].names,
     shippingNote: '日本国内免运费・海外运费 ¥6,000',
@@ -659,7 +659,7 @@ const zhHant: Copy = {
     inscriptionStyles: { kyujitai: '古體字', modern: '現代字', traditional: '繁體字', simplified: '簡體字' },
     inscriptionSame: '這個字的繁體與簡體寫法相同。',
     simpleUnavailable: (n) => `這個字的筆畫超過${n}畫，僅能選擇標準款。`,
-    poem: { heading: '為這個字添一首詩', note: '請選一種喜歡的形式。已包含在訂單中，不另收費。', types: {tanka:'和歌・短歌',tang:'唐詩・絕句',ci:'宋詞',en:'英文短詩'}, loading: '正在寫詩…', printedOnCard: '這首詩將印在卡片上', failedFinal: '很抱歉，這次沒能寫成。您可以不帶詩直接下單（一字與卡片照常寄出）。', tryAgain: '再試一次' },
+    poem: { heading: '為這個字添一首詩', note: '請選一種喜歡的形式。已包含在訂單中，不另收費。', types: {tanka:'短歌（五七五七七）',haiku:'俳句（五七五）',tang:'唐詩（五言／七言絕句）',ci:'宋詞',en:'自由詩'}, loading: '正在寫詩…', printedOnCard: '這首詩將印在卡片上', failedFinal: '很抱歉，這次沒能寫成。您可以不帶詩直接下單（一字與卡片照常寄出）。', tryAgain: '再試一次' },
     packageLabel: '方案',
     packages: SIZE_COPY['zh-Hant'].names,
     shippingNote: '日本國內免運費・海外運費 ¥6,000',
@@ -816,7 +816,7 @@ const en: Copy = {
     },
     inscriptionSame: 'This character is carved in its modern Japanese form.',
     simpleUnavailable: (n) => `This character has more than ${n} strokes, so only the Standard set can carve it.`,
-    poem: { heading: 'A poem for this character', note: 'Choose the form you like. It is included with your order — no extra charge.', types: {tanka:'Japanese tanka',tang:'Tang-style quatrain',ci:'Song-style ci',en:'English poem'}, loading: 'Writing the poem…', printedOnCard: 'This poem is printed on your card', failedFinal: 'We are sorry — we could not write the poem this time. You can order without it (the character and the card arrive as usual).', tryAgain: 'Try again' },
+    poem: { heading: 'A poem for this character', note: 'Choose the form you like. It is included with your order — no extra charge.', types: {tanka:'Tanka (5-7-5-7-7)',haiku:'Haiku (5-7-5)',tang:'Tang-style quatrain (5 or 7 characters per line)',ci:'Song-dynasty ci',en:'Free verse'}, loading: 'Writing the poem…', printedOnCard: 'This poem is printed on your card', failedFinal: 'We are sorry — we could not write the poem this time. You can order without it (the character and the card arrive as usual).', tryAgain: 'Try again' },
     packageLabel: 'Package',
     packages: SIZE_COPY['en'].names,
     shippingNote: 'Free shipping in Japan · ¥6,000 international shipping',

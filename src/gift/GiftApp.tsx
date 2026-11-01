@@ -198,7 +198,7 @@ export default function GiftApp() {
       <section className="gf-poem-wrap" data-testid="gift-poem-screen">
         <h2 className="gf-label">{copy.poemLabel}</h2>
         <div className={`gf-paper gf-poem gf-poem-${view.poem.type}`} data-testid="gift-poem" data-poem-type={view.poem.type}>
-          {view.poem.type === 'tanka' ? (
+          {view.poem.type === 'tanka' || view.poem.type === 'haiku' ? (
             <div className="gf-vert" data-testid="gift-poem-vertical">{view.poem.lines.map((l, i) => <p key={i} className="notranslate" translate="no">{l}</p>)}</div>
           ) : (
             view.poem.lines.map((l, i) => <p key={i} className="notranslate" translate="no">{l}</p>)

@@ -17,7 +17,7 @@ import { MemoryOrderStore } from '../engine/order-store.ts'
 import { loadPalette } from '../engine/palette.ts'
 import { checkRhyme, lineRhyme } from '../engine/rhyme.ts'
 import { loadShopifyConfig } from '../engine/shopify.ts'
-import { DEFAULT_POEM_TYPE, MAX_POEMS, POEM_TYPES, type PoemType } from '../src/order/packages.ts'
+import { DEFAULT_POEM_TYPE, MAX_POEMS, POEM_TYPES, poemTypesFor, type PoemType } from '../src/order/packages.ts'
 import { COPY } from '../src/demo/i18n.ts'
 // @ts-expect-error untyped test helper
 import { startServer } from './server-fixtures.mjs'
@@ -170,6 +170,17 @@ function count(k: 'poem' | 'review') { return seen.filter((s) => s.kind === k).l
   check('(4) spec v9.4: the review rejects imagery that does not come from the story (story_image) → ONE rewrite asked for, with the reader\'s note; the second poem passes', si.ok && count('poem') === 2 && count('review') === 2 && seen[2].prompt.includes('IMAGERY DOES NOT COME FROM THIS STORY') && seen[2].prompt.includes('the prints of the places'))
   const si2 = await gen(C20, 'en', [C20.poems.en], [{ pass: false, rule: 'story_image', reason: 'still generic' }])
   check('(4) …rejected again after the rewrite: the poem in hand is kept (a poem is never lost to the quality rule) — and the safety rules still veto', si2.ok && count('poem') === 2 && logs.some((l) => l.includes('story_image_kept')))
+  // ---- 俳句 (spec v9.5, Japanese stories only): 5-7-5, one image from the story, the same review as the tanka --------------------------------------------------------
+  const hk = (lines: string[], reading_kana?: string[]) => ({ type: 'haiku' as const, lines, reading_kana })
+  check('(1) haiku: 3 lines, 5-7-5 morae counted from the kana reading — valid', checkForm(hk(C20.poems.haiku.lines, C20.poems.haiku.reading_kana)).length === 0 && checkForm(hk(C04.poems.haiku.lines, C04.poems.haiku.reading_kana)).length === 0)
+  check('(1) haiku: a wrong mora count, a wrong line count (a tanka is not a haiku), a missing reading are all form errors', checkForm(hk(C20.poems.haiku.lines, ['ふたのはな', 'そなえてまて', 'ははのはる'])).some((p) => p.includes('line 2 has 6 morae')) && checkForm(hk(C20.poems.tanka.lines, C20.poems.tanka.reading_kana)).some((p) => p.includes('3 lines')) && checkForm(hk(C20.poems.haiku.lines)).some((p) => p.includes('kana reading')))
+  const haikuOk = await gen(C20, 'haiku', [C20.poems.haiku])
+  check('(4) a generated haiku (through the real pipeline, fake model) is 5-7-5, holds the chosen character, and uses an image from THIS story (the flower on the lunch-box lid: 花 is in the story)', haikuOk.ok && haikuOk.poem.lines.length === 3 && moraCount(C20.poems.haiku.reading_kana[0]) === 5 && moraCount(C20.poems.haiku.reading_kana[1]) === 7 && moraCount(C20.poems.haiku.reading_kana[2]) === 5 && haikuOk.poem.lines.join('').includes('備') && haikuOk.poem.lines.join('').includes('花') && C20.story.includes('花') && haikuOk.poem.type === 'haiku')
+  const haikuSi = await gen(C20, 'haiku', [C20.poems.haiku], [{ pass: false, rule: 'story_image', reason: 'generic spring scenery' }, { pass: true, rule: null, reason: 'ok' }])
+  check('(4) a haiku gets the tanka\'s review: generic imagery (story_image) → ONE rewrite with the reader\'s note, then it passes', haikuSi.ok && count('poem') === 2 && count('review') === 2 && seen[2].prompt.includes('IMAGERY DOES NOT COME FROM THIS STORY'))
+  const hp = loadPoemPrompt('haiku')
+  check('(4) the haiku prompt: 5-7-5, ONE concrete image from the turning point, a season word (季語) only when the story\'s season is clear and never forced, no explaining of feelings, quiet in remembrance', hp.includes('5-7-5') && hp.includes('ONE concrete image') && hp.includes('季語') && hp.includes('do NOT force one') && hp.includes('do NOT explain feelings') && hp.includes('Remembrance: quiet'))
+  check('(4) a haiku\'s buyer aids and palette follow the tanka (Japanese reader: none; other readers: romaji + English; judged by the ja palette)', poemFamilies('haiku', 'ja').join() === 'ja' && buyerAids('haiku', 'ja') === buyerAids('tanka', 'ja') && buyerAids('haiku', 'en').includes('romaji'))
   for (const t of POEM_TYPES) {
     const prompt = loadPoemPrompt(t)
     check(`(4) spec v9.4: the ${t} prompt asks the poem to carry the TURNING POINT through one concrete image of the story and forbids generic scenery`, prompt.includes('carry the TURNING POINT') && prompt.includes('ONE concrete image') && prompt.includes('NO generic scenery') && prompt.includes('Remembrance stories stay quiet'))
@@ -269,7 +280,7 @@ let poemIdEn = ''
   const ja2 = await offeredFor(C20)
   const zh2 = await offeredFor(ZH_STORY)
   const en1 = await offeredFor(EN_STORY)
-  check('(5) spec v9.4, the formats follow the story\'s language: a Japanese story answers tanka and tang only (2), a Chinese story tang and ci only (2), an English story en only (1)', ja2 === 'tanka,tang' && zh2 === 'tang,ci' && en1 === 'en', [ja2, zh2, en1].join(' | '))
+  check('(5) spec v9.5, the formats follow the story\'s language: a Japanese story answers tanka, haiku and tang only (3, tanka first), a Chinese story tang and ci only (2), an English story en only (1)', ja2 === 'tanka,haiku,tang' && zh2 === 'tang,ci' && en1 === 'en', [ja2, zh2, en1].join(' | '))
   replies = [C20.poems.ci]
   const ciJa = await quiet(() => post(handler(), body(C20, 'ci')))
   check('(5) …and a format that is not offered is refused with a clear code (400 poem_type_not_offered) — the model is not called', ciJa.status === 400 && ((await ciJa.json()) as any).code === 'poem_type_not_offered')
@@ -377,6 +388,12 @@ const postOrder = (h: (r: Request) => Promise<Response>, b: unknown) => h(new Re
   check('(8) the whole poem is shown before checkout (every line, then the reading aids), not just a first line', addon.includes('data-poem-full') && addon.includes('st.lines.join') && !addon.includes('.preview') && addon.includes('data-poem-reading'))
   check('(8) a poem that fails is tried twice, then given up politely and the order goes ahead without one (the step reports "none", not "loading")', addon.includes('const TRIES = 2') && addon.includes("'none'") && addon.includes('failedFinal'))
   check('(8) the copy exists in all four languages: the heading, "included, no extra charge", the four format names, the failure note and the retry button — and mentions no price', (['ja', 'zh-Hans', 'zh-Hant', 'en'] as const).every((l) => { const c = COPY[l].order.poem; return c.heading.length > 3 && c.note.length > 10 && POEM_TYPES.every((t) => c.types[t].length > 1) && c.loading.length > 2 && c.printedOnCard.length > 3 && c.failedFinal.length > 15 && c.tryAgain.length > 1 && !/[¥￥]|円|\d{3,}|yen/i.test(c.note + c.heading) }))
+  // spec v9.5: every label is shown in the PAGE language; the Tang quatrain is never called 漢詩 on a zh page (it is the normal word only in Japanese)
+  const L = (l: 'ja' | 'zh-Hans' | 'zh-Hant' | 'en') => COPY[l].order.poem.types
+  check('(8) labels, ja page: 短歌（五七五七七）/ 俳句（五七五）/ 漢詩（唐詩の形・五言／七言絶句）/ 宋詞 / 自由詩', L('ja').tanka === '短歌（五七五七七）' && L('ja').haiku === '俳句（五七五）' && L('ja').tang === '漢詩（唐詩の形・五言／七言絶句）' && L('ja').ci === '宋詞' && L('ja').en === '自由詩')
+  check('(8) labels, zh-Hant page: 短歌（五七五七七）/ 俳句（五七五）/ 唐詩（五言／七言絕句）/ 宋詞 / 自由詩 — and 漢詩 is not shown as a format name', L('zh-Hant').tanka === '短歌（五七五七七）' && L('zh-Hant').haiku === '俳句（五七五）' && L('zh-Hant').tang === '唐詩（五言／七言絕句）' && L('zh-Hant').ci === '宋詞' && L('zh-Hant').en === '自由詩' && !Object.values(L('zh-Hant')).some((v) => v.includes('漢詩')) && !Object.values(L('zh-Hans')).some((v) => v.includes('汉诗') || v.includes('漢詩')))
+  check('(8) labels, en page: Tanka (5-7-5-7-7) / Haiku (5-7-5) / Tang-style quatrain (5 or 7 characters per line) / Song-dynasty ci / Free verse', L('en').tanka === 'Tanka (5-7-5-7-7)' && L('en').haiku === 'Haiku (5-7-5)' && L('en').tang === 'Tang-style quatrain (5 or 7 characters per line)' && L('en').ci === 'Song-dynasty ci' && L('en').en === 'Free verse')
+  check('(8) the step shows the labels of the PAGE language for the formats of the STORY language (a Japanese story on a zh-Hant page: 短歌 / 俳句 / 唐詩, never 漢詩)', addon.includes('p.types[t]') && poemTypesFor('zh-Hant', C20.story).map((t) => L('zh-Hant')[t]).join('|') === '短歌（五七五七七）|俳句（五七五）|唐詩（五言／七言絕句）' && poemTypesFor('en', C20.story).map((t) => L('en')[t]).join('|') === 'Tanka (5-7-5-7-7)|Haiku (5-7-5)|Tang-style quatrain (5 or 7 characters per line)')
   check('(8) the prompts are all in place (one file per type) and load', POEM_TYPES.every((t) => loadPoemPrompt(t).length > 1500))
 }
 

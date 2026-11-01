@@ -110,9 +110,9 @@ function fill(template: string, values: Record<string, string>): string {
   return template.replace(pattern, (m) => values[m.slice(3, -3).trim()] ?? m)
 }
 
-/** Which palettes judge a poem's script (tanka → ja; tang / ci → zh, and ja too for a Japanese buyer; en → the character only). */
+/** Which palettes judge a poem's script (tanka / haiku → ja; tang / ci → zh, and ja too for a Japanese buyer; en → the character only). */
 export function poemFamilies(type: PoemType, language: Language): ('ja' | 'zh')[] {
-  if (type === 'tanka') return ['ja']
+  if (type === 'tanka' || type === 'haiku') return ['ja']
   if (type === 'en') return []
   return familyOf(language) === 'ja' ? ['zh', 'ja'] : ['zh']
 }
@@ -121,7 +121,7 @@ export function poemFamilies(type: PoemType, language: Language): ('ja' | 'zh')[
 export function buyerAids(type: PoemType, language: Language): string {
   const ja = language === 'ja'
   const zh = language === 'zh-Hans' || language === 'zh-Hant'
-  if (type === 'tanka') return ja ? 'The buyer reads Japanese: `romaji` and `english` are null.' : 'The buyer does not read Japanese: also give `romaji` (the reading of each line in Latin letters, one string per line) and `english` (a short English rendering, one string).'
+  if (type === 'tanka' || type === 'haiku') return ja ? 'The buyer reads Japanese: `romaji` and `english` are null.' : 'The buyer does not read Japanese: also give `romaji` (the reading of each line in Latin letters, one string per line) and `english` (a short English rendering, one string).'
   if (type === 'en') return 'No reading aids.'
   if (ja) return 'The buyer reads Japanese: also give `kakikudashi` — the 書き下し文 (Japanese reading), one string per line of the poem — and `gendaigo` — a short modern Japanese 現代語訳 of the whole poem (one or two plain sentences in today\'s everyday Japanese, not a word-for-word gloss), one string; `english` is null.'
   if (zh) return 'The buyer reads Chinese: `kakikudashi`, `gendaigo` and `english` are null.'
@@ -223,10 +223,11 @@ export async function generatePoem(input: PoemInput, palette: Palette, opts: Gen
   }
 
   // The aids this buyer is meant to get (only those are kept).
-  const wantsK = input.type !== 'tanka' && input.type !== 'en' && input.language === 'ja'
+  const jaForm = input.type === 'tanka' || input.type === 'haiku'
+  const wantsK = !jaForm && input.type !== 'en' && input.language === 'ja'
   const wantsG = wantsK
-  const wantsR = input.type === 'tanka' && input.language !== 'ja'
-  const wantsE = (input.type === 'tanka' && input.language !== 'ja') || ((input.type === 'tang' || input.type === 'ci') && input.language === 'en')
+  const wantsR = jaForm && input.language !== 'ja'
+  const wantsE = (jaForm && input.language !== 'ja') || ((input.type === 'tang' || input.type === 'ci') && input.language === 'en')
   const build = (raw: Record<string, unknown>, draft: PoemDraft): Poem => {
     const text = freeText
     const kept = { kakikudashi: wantsK ? strArray(raw.kakikudashi) : null, romaji: wantsR ? strArray(raw.romaji) : null, english: wantsE ? text(raw.english) : null, gendaigo: wantsG ? text(raw.gendaigo) : null }

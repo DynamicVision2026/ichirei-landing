@@ -11,7 +11,7 @@ import { checkFilmScript, makeFilm } from '../engine/film.ts'
 import { generatePoem } from '../engine/poem.ts'
 import { loadPalette } from '../engine/palette.ts'
 import { gazeProblem } from '../engine/gaze.ts'
-import { defaultPoemType } from '../src/order/packages.ts'
+import { defaultPoemType, poemTypesFor } from '../src/order/packages.ts'
 
 const argv = process.argv.slice(2)
 const opt = (n, d) => { const i = argv.indexOf(`--${n}`); return i >= 0 && argv[i + 1] !== undefined ? argv[i + 1] : d }
@@ -43,10 +43,12 @@ for (const set of SETS) {
   film.pictures.forEach((d, i) => console.log(`  picture ${i + 1}: ${d}`))
   if (film.status === 'ready') console.log(`  referee again: ${checkFilmScript({ lines: film.lines, pictures: film.pictures, turning_point: film.turning_point }, input, palette).map((p) => p.code).join(', ') || 'clean'}`)
   if (argv.includes('--no-poem')) continue
-  const type = defaultPoemType('ja', set.story)
-  t = Date.now()
-  const poem = await generatePoem({ story: set.story, language: 'ja', relationship: set.context.relationship, direction: set.context.direction, occasion: set.context.occasion, occasion_detail: null, kanji: main.kanji, inscription_form: main.inscription_form ?? null, gaze: main.one_line_gaze, type }, palette, {})
-  console.log(`poem (${type}): ${sec(t)} s`)
-  if (poem.ok) { poem.poem.lines.forEach((l) => console.log(`  ${l}`)); console.log(`  (aids: ${JSON.stringify(poem.poem.aids)})`) } else console.log(`  failed: ${JSON.stringify(poem)}`)
+  // every format the story offers (a Japanese story: 短歌, 俳句, 漢詩), default first — one real poem of each
+  for (const type of poemTypesFor('ja', set.story)) {
+    t = Date.now()
+    const poem = await generatePoem({ story: set.story, language: 'ja', relationship: set.context.relationship, direction: set.context.direction, occasion: set.context.occasion, occasion_detail: null, kanji: main.kanji, inscription_form: main.inscription_form ?? null, gaze: main.one_line_gaze, type }, palette, {})
+    console.log(`poem (${type}${type === defaultPoemType('ja', set.story) ? ', default' : ''}): ${sec(t)} s`)
+    if (poem.ok) { poem.poem.lines.forEach((l) => console.log(`  ${l}`)); console.log(`  (aids: ${JSON.stringify(poem.poem.aids)})`) } else console.log(`  failed: ${JSON.stringify(poem)}`)
+  }
 }
 console.log('\nRead the scenes against the story: scene 3 must show the turning point, scene 4 must be resolved; the poem must name a concrete image from the story.')

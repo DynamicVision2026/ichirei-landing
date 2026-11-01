@@ -29,6 +29,7 @@ export const CI_PATTERNS: Record<string, number[]> = {
   長相思: [3, 3, 7, 5, 3, 3, 7, 5],
 }
 export const TANKA_MORAE = [5, 7, 5, 7, 7]
+export const HAIKU_MORAE = [5, 7, 5]
 /** The English poem's lines are meant to be short (12 words); 13–16 is only a craft note (checkCraft), more than 16 is a form error. */
 export const EN_MAX_WORDS_PER_LINE = 12
 export const EN_MAX_HARD_WORDS_PER_LINE = 16
@@ -79,6 +80,20 @@ export function checkForm(d: PoemDraft, palette?: Palette): string[] {
         if (!isKanaOnly(k)) p.push(`reading line ${i + 1} is not kana only`)
         const n = moraCount(k)
         if (lines.length === 5 && n !== TANKA_MORAE[i]) p.push(`line ${i + 1} has ${n} morae, expected ${TANKA_MORAE[i]}`)
+      })
+      break
+    }
+    case 'haiku': {
+      if (lines.length !== 3) p.push(`a haiku has 3 lines (got ${lines.length})`)
+      const kana = d.reading_kana
+      if (!Array.isArray(kana) || kana.length !== lines.length) {
+        p.push('the kana reading must have one entry per line')
+        break
+      }
+      kana.forEach((k, i) => {
+        if (!isKanaOnly(k)) p.push(`reading line ${i + 1} is not kana only`)
+        const n = moraCount(k)
+        if (lines.length === 3 && n !== HAIKU_MORAE[i]) p.push(`line ${i + 1} has ${n} morae, expected ${HAIKU_MORAE[i]}`)
       })
       break
     }
@@ -189,7 +204,7 @@ const MODERN_WORDS = ['電話', '电话', '手機', '手机', '電腦', '电脑'
 export function checkCraft(d: PoemDraft, forms: string[]): string[] {
   const out: string[] = []
   const text = d.lines.join('')
-  if (d.type === 'tanka') {
+  if (d.type === 'tanka' || d.type === 'haiku') {
     const counts = new Map<string, number>()
     for (const ch of [...text]) if (/[㐀-鿿豈-﫿]/u.test(ch) && !forms.includes(ch)) counts.set(ch, (counts.get(ch) ?? 0) + 1)
     const twice = [...counts].filter(([, n]) => n >= 2).map(([c]) => c)

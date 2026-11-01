@@ -69,6 +69,18 @@
             "備 — to be ready before anyone asks —",
             "twenty years late, I am learning to say it."
           ]
+        },
+        "haiku": {
+          "lines": [
+            "蓋の花",
+            "備えて待てる",
+            "母の春"
+          ],
+          "reading_kana": [
+            "ふたのはな",
+            "そなえてまてる",
+            "ははのはる"
+          ]
         }
       }
     },
@@ -143,6 +155,18 @@
             "綴 — to stitch a daughter's words by hand —",
             "She spoke for me, and never said so.",
             "I read them again tonight, slowly."
+          ]
+        },
+        "haiku": {
+          "lines": [
+            "母の文字",
+            "綴る手紙の",
+            "束となる"
+          ],
+          "reading_kana": [
+            "ははのもじ",
+            "つづるてがみの",
+            "たばとなる"
           ]
         }
       }
