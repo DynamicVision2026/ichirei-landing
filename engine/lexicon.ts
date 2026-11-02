@@ -59,6 +59,7 @@ export const TAGS_OF_RELATIONSHIP: Record<Relationship, readonly FitTag[]> = {
   work: ['work'],
   mentor: ['mentor'],
   community: ['friend', 'work'],
+  caregiver: ['mentor'],
 }
 const PARTNER_RELATIONSHIPS: readonly Relationship[] = ['spouse', 'romance']
 

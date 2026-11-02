@@ -10,6 +10,8 @@ export interface AnimationView {
   meaning_en: string | null
   who: string
   memorial: boolean
+  /** v9.6: why the gift is given (absent on older gifts). */
+  purpose?: string | null
   /** null = the script is still being written; pictures null = drawn on the first open (the page asks POST /api/film/<id>/render); deferred = the daily limit. */
   film: { status: 'ready' | 'fallback'; lines: string[]; pictures: string[] | null; deferred?: boolean; incomplete?: boolean } | null
   /** The sender's page only: what to share with the receiver and where the order stands. */
@@ -42,6 +44,7 @@ export interface GiftLockedView {
   token: string
   language: OrderLanguage
   memorial: boolean
+  purpose?: string | null
   from: string
   to: string
   opens_on: string

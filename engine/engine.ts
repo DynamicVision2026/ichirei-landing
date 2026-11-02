@@ -12,6 +12,7 @@
 //   5. hands it to the palette referee (engine/palette.ts) and returns the refereed result.
 // Editing a prompt file changes the engine's behavior with no change to this code.
 
+import { purposeFrame, toneLine, effectivePurpose, effectiveState, mapOtherPurpose, mapOtherRelationship, mapOtherState, type Purpose } from './purpose.ts'
 import { cardsMode, runCards, INVENTED_FACT_REASON, type CardsReport } from './cards.ts'
 import { withDisplayReadings } from './reading-display.ts'
 import { thinkingTokensOf, watchThinkingTokens } from './usage.ts'
@@ -321,12 +322,32 @@ function logCards(story: string, context: EngineContext, before: EngineResult, a
   try {
     const live = (r: EngineResult, slot: string) => r.candidates.filter((c) => !c.eliminated && c.slot === slot).length
     const removed = after.candidates.filter((c) => c.eliminated).map((c) => ({ slot: c.slot, reason: (c.eliminated_reason ?? 'unknown').slice(0, 80) }))
-    const payload = { cards_mode: parallel ? 'parallel' : 'single', ...(parallel ? { second_source: parallel.second_source } : {}), story_chars: [...story].length, language: context.language, occasion: context.occasion, status: after.status, live: { main: live(after, 'main'), second: live(after, 'second'), freestyle: live(after, 'freestyle') }, before_final: before.candidates.filter((c) => !c.eliminated).length, freestyle: context.occasion === 'memorial' ? 'not_offered' : undefined, ms, select: select ?? undefined, ...(parallel ? { parallel: { first_card_ms: parallel.first_card_ms, all_cards_ms: parallel.all_cards_ms, calls: parallel.calls, reviews: parallel.reviews, collisions: parallel.collisions, runner_up_used: parallel.runner_up_used, free_dropped: parallel.free_dropped, second_source: parallel.second_source } } : {}), calls: parallel ? { select: parallel.calls.reduce((n, c) => n + c.attempts, 0), review: parallel.reviews.length, refill: refill ? 1 : 0, gaze: ms.gaze_failing > 0 ? 1 : 0 } : { select: ms.select_attempts, review: ms.review > 0 ? 1 : 0, refill: refill ? 1 : 0, gaze: ms.gaze_failing > 0 ? 1 : 0 }, removed, refill: refill ? { asked: refill.asked, filled: refill.filled.map((f) => f.slot), rejected: refill.rejected, rescued: refill.rescued.map((f) => f.slot), ms: refill.ms } : null }
+    const payload = { cards_mode: parallel ? 'parallel' : 'single', purpose: purposeCodeOf(context), state: effectiveState(context), ...(otherTextMapped(context) ? { other_text_mapped: otherTextMapped(context) } : {}), ...(parallel ? { second_source: parallel.second_source } : {}), story_chars: [...story].length, language: context.language, occasion: context.occasion, status: after.status, live: { main: live(after, 'main'), second: live(after, 'second'), freestyle: live(after, 'freestyle') }, before_final: before.candidates.filter((c) => !c.eliminated).length, freestyle: context.occasion === 'memorial' ? 'not_offered' : undefined, ms, select: select ?? undefined, ...(parallel ? { parallel: { first_card_ms: parallel.first_card_ms, all_cards_ms: parallel.all_cards_ms, calls: parallel.calls, reviews: parallel.reviews, collisions: parallel.collisions, runner_up_used: parallel.runner_up_used, free_dropped: parallel.free_dropped, second_source: parallel.second_source } } : {}), calls: parallel ? { select: parallel.calls.reduce((n, c) => n + c.attempts, 0), review: parallel.reviews.length, refill: refill ? 1 : 0, gaze: ms.gaze_failing > 0 ? 1 : 0 } : { select: ms.select_attempts, review: ms.review > 0 ? 1 : 0, refill: refill ? 1 : 0, gaze: ms.gaze_failing > 0 ? 1 : 0 }, removed, refill: refill ? { asked: refill.asked, filled: refill.filled.map((f) => f.slot), rejected: refill.rejected, rescued: refill.rescued.map((f) => f.slot), ms: refill.ms } : null }
     console.log(`[ichirei-cards] ${JSON.stringify(payload)}`)
     onDebug?.(debugOf(payload))
   } catch {
     // (a log line must never break a request)
   }
+}
+
+/** The purpose as the rules use it (the nearest code for an "other" text); "other" when its text could not be mapped, null when none was given. */
+function purposeCodeOf(context: EngineContext): Purpose | null {
+  const p = effectivePurpose(context)
+  return p ?? (context.purpose === 'other' ? 'other' : null)
+}
+
+/** Which code each 「その他」 text was mapped to for the tone rules (codes only — the text itself is never logged). null = unmappable: a neutral warm tone. */
+function otherTextMapped(context: EngineContext): { relationship?: string | null; purpose?: string | null; state?: string | null } | null {
+  const out: { relationship?: string | null; purpose?: string | null; state?: string | null } = {}
+  if (context.relationship_other) out.relationship = mapOtherRelationship(context.relationship_other)
+  if (context.purpose === 'other') out.purpose = mapOtherPurpose(context.purpose_other)
+  if (context.state === 'other') out.state = mapOtherState(context.state_other)
+  return Object.keys(out).length > 0 ? out : null
+}
+
+function logOtherTexts(context: EngineContext): void {
+  const m = otherTextMapped(context)
+  if (m) console.log(`[ichirei-context] other_text_mapped ${JSON.stringify(m)}`)
 }
 
 export async function runEngine(story: string, condition: 'A' | 'B' | 'C', opts: RunEngineOptions = {}): Promise<EngineResult> {
@@ -350,7 +371,9 @@ async function runEngineInner(
   if (!parsed.ok) throw new Error(parsed.error)
   const context = parsed.context
 
-  const prompt = fillPrompt(loadPrompt(context.language), trimmed, context, opts.promptQuestion ?? null, opts.exclude ?? [])
+  // The reading frame (five questions, the tone of the purpose, the free-pick mode) is the first block of the prompt; every call built from it (cards, refill) carries it.
+  const prompt = `${purposeFrame(context)}\n\n${fillPrompt(loadPrompt(context.language), trimmed, context, opts.promptQuestion ?? null, opts.exclude ?? [])}`
+  logOtherTexts(context)
   // Load the palette BEFORE spending a reasoning pass: no palette, no blocklist, no run.
   const palette = loadPalette()
   const client = new Anthropic(opts.apiKey ? { apiKey: opts.apiKey } : {})
@@ -536,6 +559,8 @@ function stampResult(extracted: EngineResult, context: EngineContext): EngineRes
     relationship: context.relationship,
     direction: context.direction,
     occasion: context.occasion,
+    ...(context.purpose || context.purpose_other ? { purpose: purposeCodeOf(context) } : {}),
+    ...(context.state ? { state: context.state } : {}),
     occasion_detail: context.occasion_detail,
     inscription_script: context.inscription_script,
     ...(context.reader ? { reader: context.reader } : {}),
@@ -691,7 +716,7 @@ async function runPipeline(a: PipelineArgs): Promise<PipelineOut> {
   const tGaze = Date.now()
   const gazeFailing = failingGazes(completed.candidates, context.language).length
   try {
-    const gazeFixes = await fixGazes(completed.candidates, story, context.language, { apiKey: opts.apiKey, signal: opts.signal, onUsage: opts.onUsage ? (u) => opts.onUsage!('review', u) : undefined })
+    const gazeFixes = await fixGazes(completed.candidates, story, context.language, { tone: toneLine(context), apiKey: opts.apiKey, signal: opts.signal, onUsage: opts.onUsage ? (u) => opts.onUsage!('review', u) : undefined })
     const applied = applyGazes(completed, gazeFixes)
     if (applied.candidates.length === completed.candidates.length) withGazes = applied
   } catch {
@@ -801,7 +826,7 @@ async function runCardsPipeline(a: PipelineArgs): Promise<PipelineOut> {
   const tGaze = Date.now()
   const gazeFailing = failingGazes(completed.candidates, context.language).length
   try {
-    const gazeFixes = await fixGazes(completed.candidates, story, context.language, { apiKey: opts.apiKey, signal: opts.signal, onUsage: opts.onUsage ? (u) => opts.onUsage!('review', u) : undefined })
+    const gazeFixes = await fixGazes(completed.candidates, story, context.language, { tone: toneLine(context), apiKey: opts.apiKey, signal: opts.signal, onUsage: opts.onUsage ? (u) => opts.onUsage!('review', u) : undefined })
     const applied = applyGazes(completed, gazeFixes)
     if (applied.candidates.length === completed.candidates.length) withGazes = applied
   } catch {

@@ -65,6 +65,8 @@ export interface GiftRecord {
   meaning_en: string | null
   who: string
   memorial: boolean
+  /** v9.6: why the gift is given; absent on older gifts. */
+  purpose?: string | null
   /** The one line that comes with the character (the certificate line), in the sender's language. */
   certificate_line: string
   poem: { type: string; lines: string[]; reading: string } | null
@@ -104,6 +106,7 @@ export function buildGiftRecord(record: OrderRecord, animationId: string, token:
     meaning_en: p.certificate.meaning_en,
     who: p.gaze_line,
     memorial: p.certificate.memorial === true,
+    ...(p.certificate.purpose ? { purpose: p.certificate.purpose } : {}),
     certificate_line: certificateText(p.language),
     poem: poem ? { type: String((poem as { type?: unknown }).type ?? ''), lines: [...((poem as { lines?: string[] }).lines ?? [])], reading: String((poem as { reading?: unknown }).reading ?? '') } : null,
     from: p.sender_name,
@@ -153,6 +156,7 @@ export interface GiftLockedView {
   token: string
   language: Language
   memorial: boolean
+  purpose?: string | null
   from: string
   to: string
   opens_on: string
@@ -168,7 +172,7 @@ export const isLocked = (g: GiftRecord, now: Date): boolean => !!g.opens_on && t
 
 export function lockedView(g: GiftRecord, now: Date): GiftLockedView {
   const opens = g.opens_on ?? todayJst(now)
-  return { locked: true, token: g.token, language: g.language, memorial: g.memorial, from: g.from, to: g.to, opens_on: opens, days_left: Math.max(1, dayNumber(opens) - dayNumber(todayJst(now))) }
+  return { locked: true, token: g.token, language: g.language, memorial: g.memorial, ...(g.purpose ? { purpose: g.purpose } : {}), from: g.from, to: g.to, opens_on: opens, days_left: Math.max(1, dayNumber(opens) - dayNumber(todayJst(now))) }
 }
 
 export const REPLY_MAX = 200

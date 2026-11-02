@@ -4,7 +4,7 @@
 //   tanka  5 lines of 5-7-5-7-7 morae, counted from the kana reading the model returns
 //   tang   4 lines, all 5 or all 7 characters, traditional characters, lines 2 and 4 rhyme (engine/rhyme.ts, pinyin-pro)
 //   ci     one of three patterns only (憶江南 3-5-7-7-5, 如夢令 6-6-5-6-2-2-6, 長相思 3-3-7-5 ×2), line lengths of the chosen pattern
-//   en     4–6 short lines of free verse
+//   en     4–8 short lines of free verse
 //   all    the chosen character (or its traditional / modern variant) appears in the poem; no character that the palette blocks for this
 //          gift (level 1 hard blocks, level 3 occasion blocks, the remembrance default block); no death / decline / parting words in English
 //          when the occasion forbids them
@@ -116,7 +116,7 @@ export function checkForm(d: PoemDraft, palette?: Palette): string[] {
       break
     }
     case 'en': {
-      if (lines.length < 4 || lines.length > 6) p.push(`an English poem has 4–6 lines (got ${lines.length})`)
+      if (lines.length < 4 || lines.length > 8) p.push(`an English poem has 4–8 lines (got ${lines.length})`)
       lines.forEach((l, i) => {
         const words = l.trim().split(/\s+/).filter((w) => /[\p{L}\p{N}]/u.test(w)).length
         if (words > EN_MAX_HARD_WORDS_PER_LINE) p.push(`line ${i + 1} is not short (${words} words; at most ${EN_MAX_WORDS_PER_LINE})`)
@@ -132,10 +132,57 @@ export function checkForm(d: PoemDraft, palette?: Palette): string[] {
   return p
 }
 
-/** The chosen character (in any of its forms) must appear in the poem text. */
-export function checkContainsCharacter(d: PoemDraft, forms: string[]): string | null {
+/** The words of the character's plain meaning ("to be ready" → ready; "trust" → trust) that count as the character in an English poem (v9.6: "its meaning word once"). */
+export function meaningWords(meaning: string | null | undefined): string[] {
+  const m = (meaning ?? '').toLowerCase().replace(/\(.*?\)/g, '').trim()
+  if (!m || m.startsWith('(')) return []
+  const stop = new Set(['to', 'be', 'of', 'the', 'a', 'an', 'and', 'or', 'in', 'on', 'one', 'with'])
+  const words = m.split(/[^a-z]+/).filter((w) => w.length >= 3 && !stop.has(w))
+  return [...new Set([m, ...words])]
+}
+
+const countOf = (text: string, needle: string): number => (needle ? text.split(needle).length - 1 : 0)
+
+/**
+ * The chosen character (in any of its forms) must appear in the poem text. An English poem may carry it as its MEANING word instead (the glyph is then optional):
+ * pass the words from `meaningWords`.
+ */
+export function checkContainsCharacter(d: PoemDraft, forms: string[], enWords: string[] = []): string | null {
   const text = d.lines.join('')
-  return forms.filter(Boolean).some((f) => text.includes(f)) ? null : `the chosen character (${forms.filter(Boolean).join(' / ')}) does not appear in the poem`
+  if (forms.filter(Boolean).some((f) => text.includes(f))) return null
+  if (d.type === 'en' && enWords.length > 0) {
+    const low = d.lines.join(' ').toLowerCase()
+    if (enWords.some((w) => new RegExp(`(^|[^a-z])${w.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}([^a-z]|$)`).test(low))) return null
+  }
+  return `the chosen character (${forms.filter(Boolean).join(' / ')}) does not appear in the poem`
+}
+
+/**
+ * v9.6: the character appears EXACTLY once (any of its forms, counted together). Tanka, haiku, tang and ci are checked; an English poem is checked for the glyph only
+ * (its meaning word is asked for once in the prompt and the review: a common English word cannot be counted reliably).
+ */
+export function checkCharacterOnce(d: PoemDraft, forms: string[]): string | null {
+  const text = d.lines.join('')
+  const distinct = [...new Set(forms.filter(Boolean))]
+  const n = distinct.reduce((sum, f) => sum + countOf(text, f), 0)
+  if (n <= 1) return null
+  return `the chosen character (${distinct.join(' / ')}) appears ${n} times: it must appear exactly once, naturally, inside a real word`
+}
+
+/**
+ * v9.6: the character must live in a real word, never a bare label line that only announces it (「父察す」, 「誠見ゆ」). Checked for the Japanese forms (tanka, haiku):
+ * a line of at most four characters of which the character is all but one or two.
+ */
+export function checkForcedLabel(d: PoemDraft, forms: string[]): string | null {
+  if (d.type !== 'tanka' && d.type !== 'haiku') return null
+  for (const line of d.lines) {
+    const bare = line.replace(/[\s、。，．,.!?！？「」『』（）()・…—-]/g, '')
+    const f = forms.filter(Boolean).find((x) => bare.includes(x))
+    if (!f) continue
+    const rest = [...bare.replace(f, '')]
+    if ([...bare].length <= 4 && rest.length <= 2) return `the line 「${line}」 only announces the character like a label: put it inside a natural word in a line that tells the story's image`
+  }
+  return null
 }
 
 /** English words the occasion forbids (the AI's own rules are in the prompt and the review; this is the cheap backstop). */

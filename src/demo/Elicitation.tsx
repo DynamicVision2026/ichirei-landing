@@ -3,8 +3,10 @@ import { motion } from 'framer-motion'
 import {
   COPY,
   DIRECTION_CODES,
-  OCCASION_CODES,
   OCCASION_DETAIL_MAX,
+  PURPOSE_CODES,
+  STATE_CODES,
+  purposeOf,
   RELATIONSHIP_CODES,
   STORY_COUNTER_FROM,
   STORY_MAX,
@@ -16,6 +18,8 @@ import {
   type Copy,
   type GiftContext,
 } from './i18n'
+import { PURPOSE_COPY } from './purpose-copy'
+import { PURPOSE_OTHER_MAX, RELATIONSHIP_OTHER_MAX, STATE_OTHER_MAX } from '../order/purpose'
 
 // Elicitation UI (build spec §7, v5): language + the gift's context (relationship,
 // direction, occasion, optional occasion_detail), then the opening ask, a voice-foregrounded
@@ -84,6 +88,7 @@ export default function Elicitation({
   showInscriptionScript = true,
 }: Props) {
   const setCtx = (patch: Partial<GiftContext>) => onContextChange({ ...context, ...patch })
+  const pc = PURPOSE_COPY[context.language]
   const over = storyLength(story) > STORY_MAX // never cut silently: the text stays, the counter turns red, one line says why, the button waits
   const ready = contextComplete(context) && story.trim() !== '' && !over
   const [activeAngle, setActiveAngle] = useState<string | null>(null)
@@ -209,7 +214,11 @@ export default function Elicitation({
                   {copy.relationships[c]}
                 </option>
               ))}
+              <option value="other">{pc.other}</option>
             </select>
+            {context.relationship === 'other' && (
+              <input name="relationship_other" type="text" value={context.relationshipOther ?? ''} maxLength={RELATIONSHIP_OTHER_MAX} onChange={(e) => setCtx({ relationshipOther: e.target.value })} placeholder={pc.relationshipOtherPlaceholder} className={`${SELECT_CLASS} mt-2 placeholder:text-ivory/25`} />
+            )}
           </label>
           <label className="block">
             <span className="font-label mb-1.5 block text-[11px] text-ivory/60">{copy.directionLabel}</span>
@@ -228,32 +237,51 @@ export default function Elicitation({
             </select>
           </label>
           <label className="block">
-            <span className="font-label mb-1.5 block text-[11px] text-ivory/60">{copy.occasionLabel}</span>
+            <span className="font-label mb-1.5 block text-[11px] text-ivory/60">{pc.purposeLabel}</span>
             <select
-              name="occasion"
-              value={context.occasion}
-              onChange={(e) => setCtx({ occasion: e.target.value as GiftContext['occasion'] })}
+              name="purpose"
+              value={purposeOf(context)}
+              onChange={(e) => setCtx({ purpose: e.target.value as GiftContext['purpose'], occasion: '' })}
               className={SELECT_CLASS}
             >
               <option value="">{copy.choose}</option>
-              {OCCASION_CODES.map((c) => (
+              {PURPOSE_CODES.map((c) => (
                 <option key={c} value={c}>
-                  {copy.occasions[c]}
+                  {pc.purposes[c]}
                 </option>
               ))}
             </select>
+            {purposeOf(context) === 'other' && (
+              <input name="purpose_other" type="text" value={context.purposeOther ?? ''} maxLength={PURPOSE_OTHER_MAX} onChange={(e) => setCtx({ purposeOther: e.target.value })} placeholder={pc.purposeOtherPlaceholder} className={`${SELECT_CLASS} mt-2 placeholder:text-ivory/25`} />
+            )}
           </label>
+          {(purposeOf(context) === 'celebrate' || purposeOf(context) === 'other') && (
+            <label className="block">
+              <span className="font-label mb-1.5 block text-[11px] text-ivory/60">{copy.occasionDetailLabel}</span>
+              <input
+                name="occasion_detail"
+                type="text"
+                value={context.occasionDetail}
+                maxLength={OCCASION_DETAIL_MAX}
+                onChange={(e) => setCtx({ occasionDetail: e.target.value })}
+                placeholder={copy.occasionDetailPlaceholder}
+                className={`${SELECT_CLASS} placeholder:text-ivory/25`}
+              />
+            </label>
+          )}
           <label className="block">
-            <span className="font-label mb-1.5 block text-[11px] text-ivory/60">{copy.occasionDetailLabel}</span>
-            <input
-              name="occasion_detail"
-              type="text"
-              value={context.occasionDetail}
-              maxLength={OCCASION_DETAIL_MAX}
-              onChange={(e) => setCtx({ occasionDetail: e.target.value })}
-              placeholder={copy.occasionDetailPlaceholder}
-              className={`${SELECT_CLASS} placeholder:text-ivory/25`}
-            />
+            <span className="font-label mb-1.5 block text-[11px] text-ivory/60">{pc.stateLabel}</span>
+            <select name="state" value={context.state ?? ''} onChange={(e) => setCtx({ state: e.target.value as GiftContext['state'] })} className={SELECT_CLASS}>
+              <option value="">—</option>
+              {STATE_CODES.map((c) => (
+                <option key={c} value={c}>
+                  {pc.states[c]}
+                </option>
+              ))}
+            </select>
+            {context.state === 'other' && (
+              <input name="state_other" type="text" value={context.stateOther ?? ''} maxLength={STATE_OTHER_MAX} onChange={(e) => setCtx({ stateOther: e.target.value })} placeholder={pc.stateOtherPlaceholder} className={`${SELECT_CLASS} mt-2 placeholder:text-ivory/25`} />
+            )}
           </label>
         </div>
         {showInscriptionScript && isChineseUi(context.language) && (

@@ -25,6 +25,7 @@ import { withDisplayReading } from './reading-display.ts'
 import { ModelTimeoutError, callSignal, callTimeoutMs, runBudgetMs, timedOut } from './limits.ts'
 import { thinkingTokensOf, watchThinkingTokens } from './usage.ts'
 import { cleanReading } from '../src/order/reading.ts'
+import { purposeFrame, toneLine } from './purpose.ts'
 
 export type CardSlot = 'main' | 'second' | 'freestyle'
 
@@ -93,7 +94,7 @@ export function freeCardPrompt(story: string, context: EngineContext, avoid: str
     FIELDS: f.fields,
     EXTRA: f.extra,
   }
-  return readEngineFile('card-free-prompt.md', process.env.ICHIREI_CARD_FREE_PROMPT_PATH).replace(/\{\{ ([A-Z_]+) \}\}/g, (m, k: string) => v[k] ?? m)
+  return `${purposeFrame(context)}\n\n${readEngineFile('card-free-prompt.md', process.env.ICHIREI_CARD_FREE_PROMPT_PATH).replace(/\{\{ ([A-Z_]+) \}\}/g, (m, k: string) => v[k] ?? m)}`
 }
 
 // ---- types -------------------------------------------------------------------------------------------------------------------------------------------------------------------------
@@ -583,7 +584,7 @@ export async function runCards(a: CardsArgs): Promise<CardsOut> {
     report.gaze_failing += failing
     const t0 = Date.now()
     try {
-      const fixes = await fixGazes([card], story, context.language, { apiKey: opts.apiKey, signal: sig, onUsage: opts.onUsage ? (u) => opts.onUsage!('review', u) : undefined })
+      const fixes = await fixGazes([card], story, context.language, { tone: toneLine(context), apiKey: opts.apiKey, signal: sig, onUsage: opts.onUsage ? (u) => opts.onUsage!('review', u) : undefined })
       const line = fixes.get(card.kanji)
       return line ? { ...card, one_line_gaze: line } : card
     } catch {

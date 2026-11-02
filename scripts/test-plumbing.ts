@@ -49,9 +49,9 @@ const count = (hay: string, needle: string) => hay.split(needle).length - 1
 // 1. The code lists match the v5 spec exactly (literal copies of the spec).
 // ---------------------------------------------------------------------------
 check(
-  'relationship codes = the 13 in the spec',
+  'relationship codes = the 14 in the spec (v9.6 added caregiver)',
   JSON.stringify([...RELATIONSHIPS]) ===
-    JSON.stringify(['parent_mother', 'parent_father', 'child', 'grandparent', 'spouse', 'romance', 'sibling', 'friend', 'work', 'pet', 'in_law', 'mentor', 'community']),
+    JSON.stringify(['parent_mother', 'parent_father', 'child', 'grandparent', 'spouse', 'romance', 'sibling', 'friend', 'work', 'pet', 'in_law', 'mentor', 'community', 'caregiver']),
 )
 check(
   'occasion codes = the 7 in the spec + memorial (remembrance)',

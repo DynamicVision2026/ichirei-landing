@@ -109,6 +109,8 @@ function parseJson(raw: string): Record<string, unknown> | null {
 }
 
 export interface GazeFixOptions {
+  /** v9.6: the tone line of the gift's purpose (engine/purpose.ts toneLine), put first in the rewrite prompt. */
+  tone?: string
   apiKey?: string
   signal?: AbortSignal
   client?: Pick<Anthropic, 'messages'>
@@ -127,7 +129,7 @@ export async function fixGazes(cands: Candidate[], story: string, language: Lang
   try {
     const client = opts.client ?? new Anthropic({ maxRetries: 0, ...(opts.apiKey ? { apiKey: opts.apiKey } : {}) })
     const items = bad.map((b, i) => `${i + 1}. ${b.kanji}\n   line: ${b.gaze}\n   failed because: ${b.why}`).join('\n')
-    const prompt = readPrompt().replace(/\{\{ (LANGUAGE|STORY|ITEMS) \}\}/g, (_m, k: string) => ({ LANGUAGE: language, STORY: story, ITEMS: items })[k] ?? '')
+    const prompt = `${opts.tone ? opts.tone + '\n\n' : ''}${readPrompt().replace(/\{\{ (LANGUAGE|STORY|ITEMS) \}\}/g, (_m, k: string) => ({ LANGUAGE: language, STORY: story, ITEMS: items })[k] ?? '')}`
     const model = process.env.ICHIREI_GAZE_MODEL ?? process.env.ICHIREI_REVIEW_MODEL ?? 'claude-haiku-5-5'
     const stream = client.messages.stream({ model, max_tokens: 1500, output_config: { effort: 'low' }, messages: [{ role: 'user', content: prompt }] }, { signal })
     const message = await stream.finalMessage()
@@ -176,7 +178,7 @@ export async function rewriteLines(items: { kanji: string; gaze: string; why: st
     const signal = callSignal(opts.signal, opts.timeoutMs ?? GAZE_TIMEOUT_MS)
     const client = opts.client ?? new Anthropic({ maxRetries: 0, ...(opts.apiKey ? { apiKey: opts.apiKey } : {}) })
     const listed = items.map((b, i) => `${i + 1}. ${b.kanji}\n   line: ${b.gaze}\n   failed because: ${b.why}`).join('\n')
-    const prompt = readPrompt().replace(/\{\{ (LANGUAGE|STORY|ITEMS) \}\}/g, (_m, k: string) => ({ LANGUAGE: language, STORY: story, ITEMS: listed })[k] ?? '')
+    const prompt = `${opts.tone ? opts.tone + '\n\n' : ''}${readPrompt().replace(/\{\{ (LANGUAGE|STORY|ITEMS) \}\}/g, (_m, k: string) => ({ LANGUAGE: language, STORY: story, ITEMS: listed })[k] ?? '')}`
     const model = opts.model ?? process.env.ICHIREI_GAZE_MODEL ?? process.env.ICHIREI_REVIEW_MODEL ?? 'claude-haiku-5-5'
     const stream = client.messages.stream({ model, max_tokens: 1500, output_config: { effort: 'low' }, messages: [{ role: 'user', content: prompt }] }, { signal })
     const message = await stream.finalMessage()

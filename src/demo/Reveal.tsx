@@ -6,7 +6,8 @@ import type { Candidate, Condition, EngineResult } from './types'
 import { log } from './logging'
 import { choiceOf, track } from './analytics'
 import { isMemorial } from '../order/memorial.ts'
-import { carvedGlyph, contextToPayload, isChineseUi, type Copy, type GiftContext, type InscriptionScript, type UiLanguage } from './i18n'
+import { isQuietPurpose } from '../order/purpose.ts'
+import { carvedGlyph, contextToPayload, isChineseUi, occasionOf, purposeOf, type Copy, type GiftContext, type InscriptionScript, type UiLanguage } from './i18n'
 
 // Progressive reveal (build spec §8) + condition presentation (§5) + the
 // behavioral instrumentation that makes this an experiment (§6).
@@ -78,7 +79,9 @@ export default function Reveal({ result, story, followUps = [], condition, copy,
     isChineseUi(language) ? (result.inscription_script ?? context.inscriptionScript) : null
   const reduceMotion = useReducedMotion()
   // Remembrance: the main character is ink (never cinnabar — a red name on a grave means a living person) and nothing is "given".
-  const memorial = isMemorial(result.occasion ?? context.occasion)
+  const memorial = isMemorial(result.occasion ?? occasionOf(context))
+  // v9.6: an apology, an encouragement and a remembrance never use red or celebration: the main character is ink there
+  const quiet = memorial || isQuietPurpose(result.purpose ?? purposeOf(context))
 
   const { revealOrder, eliminated } = useMemo(() => {
     const alive = result.candidates.filter((c) => !c.eliminated)
@@ -250,14 +253,14 @@ export default function Reveal({ result, story, followUps = [], condition, copy,
               className={`rounded-2xl px-6 ${alwaysOpen ? '' : 'cursor-pointer'} ${
                 isFreestyle
                   ? 'border border-dashed border-accent/60 bg-transparent py-6'
-                  : `border border-line bg-surface py-8 ${diagnostics ? PAPER_SHADOW : CARD_SHADOW} ${isPrimary ? (memorial ? 'border-t-4 border-t-fg' : 'border-t-4 border-t-seal') : ''}`
+                  : `border border-line bg-surface py-8 ${diagnostics ? PAPER_SHADOW : CARD_SHADOW} ${isPrimary ? (quiet ? 'border-t-4 border-t-fg' : 'border-t-4 border-t-seal') : ''}`
               } ${isSelected ? 'ring-2 ring-accent' : ''}`}
               onClick={alwaysOpen ? undefined : () => toggleOpen(c)}
             >
               <p
                 data-slot-label
                 className={`font-label mb-4 inline-block rounded-full px-3 py-1 text-[12px] tracking-[0.12em] ${
-                  isPrimary ? (memorial ? 'bg-fg text-page' : 'bg-seal text-white') : isFreestyle ? 'border border-dashed border-accent text-accent' : 'bg-fg/10 text-fg'
+                  isPrimary ? (quiet ? 'bg-fg text-page' : 'bg-seal text-white') : isFreestyle ? 'border border-dashed border-accent text-accent' : 'bg-fg/10 text-fg'
                 }`}
               >
                 {slotLabel}
@@ -271,7 +274,7 @@ export default function Reveal({ result, story, followUps = [], condition, copy,
                     script={script}
                     customerGlyph={!diagnostics}
                     size={isFreestyle ? 'text-6xl' : 'text-7xl'}
-                    color={isPrimary ? (memorial ? 'text-fg' : 'text-seal') : isFreestyle ? 'text-mute' : 'text-fg'}
+                    color={isPrimary ? (quiet ? 'text-fg' : 'text-seal') : isFreestyle ? 'text-mute' : 'text-fg'}
                   />
                 </div>
                 <div className="w-full min-w-0 flex-1 text-left">
@@ -460,7 +463,7 @@ export default function Reveal({ result, story, followUps = [], condition, copy,
               <div
                 className={`paper-texture flex aspect-[3/4] w-full flex-col items-center justify-center rounded-sm bg-surface ${PAPER_SHADOW}`}
               >
-                <span className={`font-mincho text-[9rem] leading-none ${memorial ? 'text-fg' : 'text-seal'}`}>
+                <span className={`font-mincho text-[9rem] leading-none ${quiet ? 'text-fg' : 'text-seal'}`}>
                   {carvedGlyph(previewFor, language, script)}
                 </span>
                 <span className="font-label mt-6 text-xs tracking-[0.35em] text-accent">

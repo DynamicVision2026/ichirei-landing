@@ -40,6 +40,7 @@ relationship — who the RECEIVER is to the SENDER:
 * in_law — a relative by marriage
 * mentor — a teacher, master or guide
 * community — a neighbour or fellow member of a shared community (club, village, congregation)
+* caregiver — someone who cared for the sender: medical, care or support (a nurse, a doctor, a helper)
 
 direction — the social direction of the gift:
 

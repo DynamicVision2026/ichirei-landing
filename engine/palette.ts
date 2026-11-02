@@ -518,7 +518,8 @@ export function applyPalette(result: EngineResult, palette: Palette, story: stri
     const found = rowsFor(palette, families, c)
     const rows = found.filter((f): f is Found & { row: PaletteRow } => f.row !== undefined)
     // Remembrance: the default block (celebration / new-beginning characters) applies to every slot, row or no row.
-    const memorialHit = result.occasion === 'memorial' ? palette.memorialCategory([c.kanji, c.inscription_form]) : undefined
+    // Remembrance (and, v9.6, an apology): no celebration characters. The default block is the same list.
+    const memorialHit = result.occasion === 'memorial' || result.purpose === 'apology' ? palette.memorialCategory([c.kanji, c.inscription_form]) : undefined
     const noRows = rows.length === 0 && !(cross && isMainSlot(c))
     if (noRows && !memorialHit) return c
     const eliminate = (reason: string, flag: string, already: RefereeAction['action'], fresh: RefereeAction['action'], blockedBy: Family[]) => {

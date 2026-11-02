@@ -169,7 +169,7 @@ async function makePoemFor(store: OrderStore, d: OpsDeps, now: Date, rec: OrderR
   const handler = createPoemHandler(() => ({ store, now: () => now, generate: d.generatePoem, palette: d.palette }))
   const res = await handler(new Request('http://internal/api/poem', {
     method: 'POST',
-    body: JSON.stringify({ story: rec.story, ...(rec.follow_ups?.length ? { follow_ups: rec.follow_ups } : {}), language: rec.production.language, relationship: er.relationship ?? undefined, direction: er.direction ?? undefined, occasion: er.occasion ?? undefined, occasion_detail: er.occasion_detail ?? undefined, kanji: cand.kanji, gaze: cand.one_line_gaze, type, source: 'ops' }),
+    body: JSON.stringify({ story: rec.story, ...(rec.follow_ups?.length ? { follow_ups: rec.follow_ups } : {}), language: rec.production.language, relationship: er.relationship ?? undefined, direction: er.direction ?? undefined, occasion: er.occasion ?? undefined, purpose: er.purpose ?? undefined, state: er.state ?? undefined, occasion_detail: er.occasion_detail ?? undefined, kanji: cand.kanji, gaze: cand.one_line_gaze, type, source: 'ops' }),
   }))
   if (!res.ok) return null
   const out = (await res.json()) as { poem_id?: string }

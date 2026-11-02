@@ -1,0 +1,165 @@
+{
+ "note": "Internal test collection for ICHIREI v9.6 (two stories per purpose). Never shown publicly, never used in promotion. The 春子 apology story and the camera remembrance story are drafts written for this set: the owner's originals were not attached to the ticket.",
+ "stories": [
+  {
+   "id": "celebrate-1",
+   "purpose": "celebrate",
+   "relationship": "parent_father",
+   "direction": "up",
+   "state": null,
+   "occasion_detail": "還暦",
+   "language": "ja",
+   "story": "父は還暦の日も、いつもの時間に起きて、庭の水やりをしていた。ケーキを買って帰ったら、ろうそくは吹かずに「孫に取っておけ」と言った。それでも、写真を撮るときだけは、いちばん真ん中に立ってくれた。"
+  },
+  {
+   "id": "celebrate-2",
+   "purpose": "celebrate",
+   "relationship": "friend",
+   "direction": "across",
+   "state": null,
+   "occasion_detail": "30歳",
+   "language": "ja",
+   "story": "同級生のミナトは、毎年、私の誕生日にだけ早起きして、駅のホームで待っている。プレゼントは決まって、自分で焼いた不格好なクッキー。今年は焦げていて、二人で笑った。"
+  },
+  {
+   "id": "thanks-1",
+   "purpose": "thanks",
+   "relationship": "mentor",
+   "direction": "up",
+   "state": null,
+   "occasion_detail": null,
+   "language": "ja",
+   "story": "高校の担任は、進路で迷っていた私に、答えを言わず、毎週金曜の放課後に黙って付き合ってくれた。三か月目に「で、どうしたい？」と一度だけ聞いた。"
+  },
+  {
+   "id": "thanks-2",
+   "purpose": "thanks",
+   "relationship": "parent_mother",
+   "direction": "up",
+   "state": null,
+   "occasion_detail": "母の日",
+   "language": "ja",
+   "story": "母は、私が夜遅く帰る日は、玄関の電気をつけたまま、台所の椅子で眠っていた。起こすと「今来たところ」と言う。いつもそうだった。"
+  },
+  {
+   "id": "apology-1",
+   "purpose": "apology",
+   "relationship": "friend",
+   "direction": "across",
+   "state": "strained",
+   "occasion_detail": null,
+   "language": "ja",
+   "story": "春子とは大学からの友だちだった。去年、彼女の結婚の相談を、忙しいからと途中で遮ってしまった。それきり連絡が途絶えた。春子はいつも、私が約束を破っても、次の日には「大丈夫」と先に言ってくれる人だった。"
+  },
+  {
+   "id": "apology-2",
+   "purpose": "apology",
+   "relationship": "sibling",
+   "direction": "across",
+   "state": "strained",
+   "occasion_detail": null,
+   "language": "ja",
+   "story": "兄と喧嘩したのは、父の遺品を整理していたときだった。私が勝手に捨てたことを、兄は怒った。それでも兄は、翌朝、黙って私の好きな玉子焼きを作って置いていった。"
+  },
+  {
+   "id": "encourage-1",
+   "purpose": "encourage",
+   "relationship": "grandparent",
+   "direction": "up",
+   "state": null,
+   "occasion_detail": null,
+   "language": "ja",
+   "story": "入院している祖母のベッドの横には、いつも毛糸の帽子が置いてある。自分で編んだ帽子を、看護師さんにも配るのだと言って、手を動かし続けている。"
+  },
+  {
+   "id": "encourage-2",
+   "purpose": "encourage",
+   "relationship": "friend",
+   "direction": "across",
+   "state": null,
+   "occasion_detail": null,
+   "language": "ja",
+   "story": "友人のカナは、三度目の試験を控えている。落ちるたびに、翌日には図書館の同じ席に座っていた。去年は、その席に付箋で「今日もここ」と貼っていた。"
+  },
+  {
+   "id": "farewell-1",
+   "purpose": "farewell",
+   "relationship": "work",
+   "direction": "up",
+   "state": null,
+   "occasion_detail": "退職",
+   "language": "ja",
+   "story": "部長は退職の前日まで、新人の席を回って、電話の取り方を教えていた。最終日、デスクには何も残っていなかったが、引き出しの奥に、新人全員の名前を書いたメモだけが入っていた。"
+  },
+  {
+   "id": "farewell-2",
+   "purpose": "farewell",
+   "relationship": "friend",
+   "direction": "across",
+   "state": "apart",
+   "occasion_detail": "引っ越し",
+   "language": "ja",
+   "story": "隣の家のサチは来月、海外へ引っ越す。毎朝ゴミ出しの時間に、塀越しに「今日も寒いね」と声をかけてくれた。段ボールだらけの庭でも、その挨拶だけは変わらなかった。"
+  },
+  {
+   "id": "reconnect-1",
+   "purpose": "reconnect",
+   "relationship": "friend",
+   "direction": "across",
+   "state": "lapsed",
+   "occasion_detail": null,
+   "language": "ja",
+   "story": "十年ぶりに連絡した大学の友人は、返事の最初に「元気？」ではなく「あの時のカレー、まだ作ってる？」と書いてきた。時間が空いても、私の癖を覚えていた。"
+  },
+  {
+   "id": "reconnect-2",
+   "purpose": "reconnect",
+   "relationship": "parent_mother",
+   "direction": "up",
+   "state": "apart",
+   "occasion_detail": null,
+   "language": "ja",
+   "story": "離れて暮らす母に三年ぶりに会った。駅で私を見つけると、手を振る前にまず鞄から折り畳み傘を出して、「降るって聞いたから」と言った。"
+  },
+  {
+   "id": "confess-1",
+   "purpose": "confess",
+   "relationship": "romance",
+   "direction": "across",
+   "state": null,
+   "occasion_detail": null,
+   "language": "ja",
+   "story": "十五年、同じ職場で隣の席だった人は、私の書類のミスを、いつも朝一番に黙って直してくれた。ありがとうも、好きも、一度も言えないまま異動が決まった。"
+  },
+  {
+   "id": "confess-2",
+   "purpose": "confess",
+   "relationship": "parent_father",
+   "direction": "up",
+   "state": null,
+   "occasion_detail": null,
+   "language": "ja",
+   "story": "父に「ごめん」も「ありがとう」も言えないまま三十年が過ぎた。父は運動会の日だけ仕事を休んで、一番後ろの木の下で見ていた。声は出さず、帽子を少し上げるだけだった。"
+  },
+  {
+   "id": "memorial-1",
+   "purpose": "memorial",
+   "relationship": "parent_father",
+   "direction": "up",
+   "state": null,
+   "occasion_detail": null,
+   "language": "ja",
+   "story": "父のカメラには、家族の写真がほとんどない。現像すると、空と、駅のホームと、私の後ろ姿ばかりだった。遺品のフィルムの最後の一枚は、ピントの合っていない、笑っている私だった。"
+  },
+  {
+   "id": "memorial-2",
+   "purpose": "memorial",
+   "relationship": "friend",
+   "direction": "across",
+   "state": "lost",
+   "occasion_detail": null,
+   "language": "ja",
+   "story": "亡くなった同僚のヤマダさんは、締切の前の夜、私の机にこっそりおにぎりを置いていく人だった。名前も書かないのに、海苔の巻き方でわかった。"
+  }
+ ]
+}

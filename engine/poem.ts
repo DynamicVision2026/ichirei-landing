@@ -16,7 +16,7 @@ import { ENGINE_CONFIG, DEFAULT_REVIEW_MODEL } from './engine.ts'
 import { REVIEW_VETO_RULES, familyOf, type Language, type Occasion, type Relationship, type Direction } from './contract.ts'
 import { plainMeaning, type Palette } from './palette.ts'
 import { reviewEnabled } from './review.ts'
-import { blockedCharacters, checkContainsCharacter, checkCraft, checkForm, checkPalette, type PoemDraft } from './poem-check.ts'
+import { blockedCharacters, checkCharacterOnce, checkContainsCharacter, checkCraft, checkForcedLabel, checkForm, checkPalette, meaningWords, type PoemDraft } from './poem-check.ts'
 
 export const POEM_TIMEOUT_MS = 45_000
 export const poemTimeoutMs = (env: NodeJS.ProcessEnv = process.env): number => {
@@ -31,6 +31,10 @@ export interface PoemInput {
   direction: Direction | null
   occasion: Occasion | null
   occasion_detail: string | null
+  /** v9.6: the tone line of the gift's purpose (engine/purpose.ts toneLine), put first in the prompts. */
+  tone?: string
+  /** v9.6: a quiet gift (apology, encouragement, remembrance, or the state "lost"): the remembrance palette blocks (celebration characters, death words) apply to the poem too. */
+  quiet?: boolean
   /** The chosen character as the card shows it (ja: modern form; zh: simplified). */
   kanji: string
   /** Its other form, when it has one (ja: old form; zh: traditional). */
@@ -242,7 +246,7 @@ export async function generatePoem(input: PoemInput, palette: Palette, opts: Gen
   let spareSoft: string[] = []
   for (let attempt = 1; attempt <= 2; attempt++) {
     try {
-      const prompt = fill(template, { ...base, FEEDBACK: feedback })
+      const prompt = (input.tone ? `${input.tone}\n\n` : '') + fill(template, { ...base, FEEDBACK: feedback })
       const raw = parseJson(await callText('poem', model, prompt, Number(process.env.ICHIREI_POEM_MAX_TOKENS ?? 4000), effort))
       if (!raw) throw new Error('the reply was not a JSON object')
       if (raw.declined === true) {
@@ -254,14 +258,15 @@ export async function generatePoem(input: PoemInput, palette: Palette, opts: Gen
       const draft: PoemDraft = { type: input.type, lines, reading_kana: strArray(raw.reading_kana) ?? undefined, pattern: typeof raw.pattern === 'string' ? raw.pattern : undefined }
       const problems = [
         ...checkForm(draft, palette),
-        ...[checkContainsCharacter(draft, forms)].filter((x): x is string => x !== null),
-        ...checkPalette(draft, palette, input.occasion, families, [...exempt, ...forms.flatMap((f) => [...f])]),
+        ...[checkContainsCharacter(draft, forms, input.type === 'en' ? meaningWords(meaning) : [])].filter((x): x is string => x !== null),
+        ...[checkCharacterOnce(draft, forms), checkForcedLabel(draft, forms)].filter((x): x is string => x !== null),
+        ...checkPalette(draft, palette, input.occasion ?? (input.quiet ? 'memorial' : null), families, [...exempt, ...forms.flatMap((f) => [...f])]),
         ...(wantsG && !freeText(raw.gendaigo) ? ['gendaigo is missing: add a short modern Japanese 現代語訳 of the whole poem'] : []),
       ]
       let imageNote: string | null = null // the one quality rule (story_image): one rewrite is asked for, then the poem in hand is kept
       if (problems.length === 0 && reviewEnabled()) {
         const verdict = await review(draft, input, callText)
-        if (verdict && verdict.startsWith('review (story_image)')) imageNote = verdict
+        if (verdict && (verdict.startsWith('review (story_image)') || verdict.startsWith('review (character)'))) imageNote = verdict
         else if (verdict) problems.push(verdict)
       }
       if (imageNote && problems.length === 0) {
@@ -270,7 +275,9 @@ export async function generatePoem(input: PoemInput, palette: Palette, opts: Gen
         } else {
           spare = build(raw, draft)
           spareSoft = []
-          feedback = `\nA SECOND READER FOUND THAT YOUR POEM'S IMAGERY DOES NOT COME FROM THIS STORY — write a new poem (read the whole story again; carry its turning point through one concrete image the story itself gives):\n- ${imageNote}\n`
+          feedback = imageNote.startsWith('review (character)')
+            ? `\nA SECOND READER FOUND THAT THE CHOSEN CHARACTER IS NOT USED NATURALLY (it is missing, or it is only a label that announces it) — write a new poem that keeps the story's image and puts the character, once, inside a real word of that image:\n- ${imageNote}\n`
+            : `\nA SECOND READER FOUND THAT YOUR POEM'S IMAGERY DOES NOT COME FROM THIS STORY — write a new poem (read the whole story again; carry its turning point through one concrete image the story itself gives; no scenery, object or feeling the story does not give):\n- ${imageNote}\n`
           if (Date.now() - t0 > poemTimeoutMs() * 0.55) break
           continue
         }
@@ -327,7 +334,7 @@ async function review(
   callText: (stage: 'poem' | 'review', mdl: string, prompt: string, maxTokens: number, eff: 'low' | 'medium' | 'high') => Promise<string>,
 ): Promise<string | null> {
   try {
-    const prompt = fill(loadPoemReviewPrompt(), {
+    const prompt = (input.tone ? `${input.tone}\n\n` : '') + fill(loadPoemReviewPrompt(), {
       LANGUAGE: input.language,
       RELATIONSHIP: input.relationship ?? 'unspecified',
       DIRECTION: input.direction ?? 'unspecified',
@@ -341,7 +348,7 @@ async function review(
     const raw = parseJson(await callText('review', process.env.ICHIREI_REVIEW_MODEL ?? DEFAULT_REVIEW_MODEL, prompt, Number(process.env.ICHIREI_REVIEW_MAX_TOKENS ?? 4000), 'low'))
     if (!raw || typeof raw.pass !== 'boolean' || raw.pass) return null
     const rule = typeof raw.rule === 'string' ? raw.rule.toLowerCase() : ''
-    if (!(REVIEW_VETO_RULES as readonly string[]).includes(rule) && rule !== 'attribution' && rule !== 'story_image') return null // not a rule: a concern, not a veto (story_image is the one quality rule: the imagery must come from the story)
+    if (!(REVIEW_VETO_RULES as readonly string[]).includes(rule) && rule !== 'attribution' && rule !== 'story_image' && rule !== 'character') return null // not a rule: a concern, not a veto (story_image is the one quality rule: the imagery must come from the story)
     return `review (${rule}): ${typeof raw.reason === 'string' ? raw.reason.slice(0, 120) : 'did not pass'}`
   } catch {
     return null

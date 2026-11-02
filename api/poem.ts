@@ -8,6 +8,7 @@
 //
 // Web-standard handler like api/order.ts. Cost brake: the server mounts it behind ICHIREI_POEM_LIMIT (20 per hour per IP).
 
+import { noCelebration, toneLine } from '../engine/purpose.ts'
 import { randomBytes } from 'node:crypto'
 import { cleanSession, cleanSource, recordEvent } from '../engine/analytics.ts'
 import { STORY_MAX, countChars, mergeStory, parseContext, parseFollowUps, type Language } from '../engine/contract.ts'
@@ -60,7 +61,7 @@ export function createPoemHandler(deps: () => PoemDeps) {
     if (countChars(body.story) > STORY_MAX) return json(400, { error: `"story" is longer than ${STORY_MAX} characters`, field: 'story' })
     const fu = parseFollowUps(body.follow_ups)
     if (!fu.ok) return json(400, { error: fu.error, field: 'follow_ups' })
-    const ctx = parseContext({ language: body.language, relationship: body.relationship, direction: body.direction, occasion: body.occasion, occasion_detail: body.occasion_detail })
+    const ctx = parseContext({ language: body.language, relationship: body.relationship, direction: body.direction, occasion: body.occasion, occasion_detail: body.occasion_detail, purpose: body.purpose, purpose_other: body.purpose_other, state: body.state, state_other: body.state_other, relationship_other: body.relationship_other })
     if (!ctx.ok) return json(400, { error: ctx.error })
     const { language, relationship, direction, occasion, occasion_detail } = ctx.context
     // the formats follow the story's language (spec v9.4): 短歌 / 漢詩 for a Japanese story, 漢詩 / 宋詞 for a Chinese one, free verse for an English one
@@ -82,7 +83,7 @@ export function createPoemHandler(deps: () => PoemDeps) {
 
     const gen = d.generate ?? generatePoem
     const result = await gen(
-      { story: mergeStory(body.story, fu.followUps), language: language as Language, relationship, direction, occasion, occasion_detail, kanji, inscription_form: forms.find((f) => f !== kanji) ?? null, gaze, type: type as PoemType },
+      { story: mergeStory(body.story, fu.followUps), language: language as Language, relationship, direction, occasion, occasion_detail, tone: toneLine(ctx.context), quiet: noCelebration(ctx.context), kanji, inscription_form: forms.find((f) => f !== kanji) ?? null, gaze, type: type as PoemType },
       palette,
       d.generateOptions,
     )

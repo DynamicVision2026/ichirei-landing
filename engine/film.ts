@@ -43,6 +43,9 @@ export interface FilmInput {
   occasion: string | null
   occasion_detail: string | null
   memorial: boolean
+  /** v9.6: the tone line of the gift's purpose (engine/purpose.ts toneLine) and whether it is a quiet gift (apology, encouragement, remembrance: no celebration imagery). */
+  tone?: string
+  quiet?: boolean
   /** The carved form shown at the end, and the other forms of the same character (none of them may appear in the lines). */
   glyph: string
   forms: string[]
@@ -100,7 +103,7 @@ const CJK = /[\u3040-\u30ff\u3400-\u9fff\uf900-\ufaff]/u
 export const pictureWords = (d: string): number => d.split(/\s+/).filter((w) => /[\p{L}\p{N}]/u.test(w)).length
 
 /** The checks the ticket asks of each description (15–40 words, no digits, no level 1 words, not the chosen character) and the rules the prompt gives (no face, no text, no illness, no celebration in a remembrance film). */
-export function checkPictures(pictures: string[], input: Pick<FilmInput, 'glyph' | 'forms' | 'names' | 'memorial' | 'occasion'> & Partial<Pick<FilmInput, 'language' | 'story'>>): FilmProblem[] {
+export function checkPictures(pictures: string[], input: Pick<FilmInput, 'glyph' | 'forms' | 'names' | 'memorial' | 'occasion'> & Partial<Pick<FilmInput, 'language' | 'story' | 'quiet'>>): FilmProblem[] {
   const out: FilmProblem[] = []
   const add = (i: number, code: string, detail: string) => out.push({ code, detail: `Picture ${i + 1}: ${detail}` })
   const forms = [...new Set(input.forms.concat(input.glyph).filter(Boolean))]
@@ -117,7 +120,7 @@ export function checkPictures(pictures: string[], input: Pick<FilmInput, 'glyph'
     if (PICTURE_TRADITIONAL.test(d) && !STORY_TRADITIONAL.test(story)) add(i, 'pic_blocked', 'people wear contemporary everyday clothes — no kimono, yukata or other traditional dress (the story does not mention it).')
     if (input.language && input.language !== 'ja' && PICTURE_JAPANESE_INTERIOR.test(d) && !STORY_JAPANESE.test(story)) add(i, 'pic_blocked', 'the setting must be this buyer\'s modern world: no Japanese interior, lantern, tatami or torii (the story does not name Japan).')
     if (PICTURE_RELIGIOUS.test(d) && !STORY_RELIGIOUS.test(story)) add(i, 'pic_blocked', 'no religious symbol (cross, altar, shrine, temple, incense …) — the story does not mention one.')
-    if (input.memorial && PICTURE_CELEBRATION.test(d)) add(i, 'pic_blocked', 'no celebration image in a remembrance film.')
+    if ((input.memorial || input.quiet) && PICTURE_CELEBRATION.test(d)) add(i, 'pic_blocked', input.memorial ? 'no celebration image in a remembrance film.' : 'no celebration image in a quiet film (apology, encouragement).')
     if (input.occasion && EN_FORBIDDEN[input.occasion]?.test(d)) add(i, 'pic_blocked', `a word that does not suit this occasion (${input.occasion}) is in it.`)
   })
   if (new Set(pictures.map((d) => d.toLowerCase())).size !== pictures.length) out.push({ code: 'pic_same', detail: 'The four pictures must be four different moments.' })
@@ -239,7 +242,7 @@ const fill = (template: string, values: Record<string, string>): string =>
   template.replace(new RegExp(Object.keys(values).map((k) => `\\{\\{ ${k} \\}\\}`).join('|'), 'g'), (m) => values[m.slice(3, -3).trim()] ?? m)
 
 export function buildFilmPrompt(input: FilmInput, feedback = ''): string {
-  return fill(loadFilmPrompt(), {
+  return (input.tone ? `${input.tone}\n\n` : '') + fill(loadFilmPrompt(), {
     LANGUAGE: input.language,
     RELATIONSHIP: input.relationship ?? 'unspecified',
     DIRECTION: input.direction ?? 'unspecified',

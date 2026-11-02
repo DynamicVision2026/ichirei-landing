@@ -3,7 +3,7 @@
 
 import data from '../../engine/story-questions.json' with { type: 'json' }
 import type { RevealLang } from '../reveal/copy.ts'
-import type { GiftContext } from './i18n.ts'
+import { occasionOf, purposeOf, type GiftContext } from './i18n.ts'
 
 export type QuestionSet = 'up' | 'across' | 'down' | 'work' | 'memorial'
 export interface Question {
@@ -25,11 +25,12 @@ const DEFAULT_DIRECTION: Record<string, 'up' | 'across' | 'down'> = {
  * Which set of questions fits this gift: remembrance has its own (remembering voice); a boss or colleague gets the work set; everyone
  * else by direction (up: parent, mentor, 還暦 · across: partner, friend · down: child). Null until a relationship and an occasion are picked.
  */
-export function questionSetOf(ctx: Pick<GiftContext, 'relationship' | 'direction' | 'occasion'>): QuestionSet | null {
-  if (ctx.relationship === '' || ctx.occasion === '') return null
-  if (ctx.occasion === 'memorial') return 'memorial'
+export function questionSetOf(ctx: Pick<GiftContext, 'relationship' | 'direction' | 'occasion' | 'occasionDetail' | 'purpose' | 'purposeOther' | 'state' | 'stateOther' | 'relationshipOther'>): QuestionSet | null {
+  // (v9.6: a purpose is chosen instead of an occasion; remembrance — the purpose "in memory", or the state "no longer here" — has its own questions)
+  if (ctx.relationship === '' || purposeOf(ctx) === '') return null
+  if (occasionOf(ctx) === 'memorial') return 'memorial'
   if (ctx.relationship === 'work') return 'work'
-  const dir = ctx.direction !== '' ? ctx.direction : DEFAULT_DIRECTION[ctx.relationship]
+  const dir = ctx.direction !== '' ? ctx.direction : ctx.relationship === 'other' ? 'across' : DEFAULT_DIRECTION[ctx.relationship]
   return dir === 'up' || dir === 'down' || dir === 'across' ? dir : null
 }
 

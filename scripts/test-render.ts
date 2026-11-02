@@ -71,7 +71,7 @@ const scroll = await makeScroll(work)
 const redPixels = async (png: Buffer) => { const { data, info } = await sharp(png).raw().toBuffer({ resolveWithObject: true }); let n = 0; for (let i = 0; i < data.length; i += info.channels) if (data[i] > 170 && data[i + 1] < 90 && data[i + 2] < 80) n++; return n }
 check('(1) the scroll is ONE PNG, 2400 px wide and tall enough for four pictures with their lines and the character', scroll.png.subarray(0, 8).equals(Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a])) && scroll.width === 2400 && scroll.height > 8000 && (await sharp(scroll.png).metadata()).width === 2400)
 check('(1) the character is cinnabar (many red pixels) for an ordinary gift', (await redPixels(scroll.png)) > 5000)
-const memWork: Artwork = { ...work, memorial: true }
+const memWork: Artwork = { ...work, memorial: true, quiet: true }
 check('(1) remembrance: ink black, NO red anywhere on the scroll', (await redPixels((await makeScroll(memWork)).png)) === 0)
 const pdf = await scrollPdf(scroll)
 check('(1) the same scroll as a PDF: one page of the same size', pdf.subarray(0, 5).toString() === '%PDF-' && (pdf.toString('latin1').match(/\/Type \/Page\b/g) ?? []).length === 1 && /\/MediaBox \[0 0 2400 \d+\]/.test(pdf.toString('latin1')))

@@ -43,7 +43,7 @@ export async function makeScroll(a: Artwork, env: NodeJS.ProcessEnv = process.en
     y += 210
   }
   // the character
-  const color = a.memorial ? INK : CINNABAR
+  const color = a.quiet ? INK : CINNABAR
   const cs = 640
   const g = textPaths(charFont, a.glyph, cs, WIDTH / 2, y + cs * 0.82, color, 'middle', f.stroke)
   svg += g.svg

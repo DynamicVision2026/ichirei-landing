@@ -45,11 +45,13 @@ export interface Certificate {
    * carves in black or gold — no red seal, no red-and-white cord (in Japan a red name on a grave means a living person).
    */
   memorial: boolean
+  /** v9.6: why the gift is given (the effective purpose code, or "other"); null on older orders. Decides the gift page's opening words and whether red is used (apology, encourage and remembrance never). */
+  purpose?: string | null
   /** The poems bought with this character (the add-on), printed on the card: type, lines, reading aids. Empty when none. */
   poems: { type: PoemType; lines: string[]; reading: string }[]
 }
 
-export function buildCertificate(candidate: Candidate, glyph: string, language: Language, palette: Palette, memorial = false): Certificate {
+export function buildCertificate(candidate: Candidate, glyph: string, language: Language, palette: Palette, memorial = false, purpose: string | null = null): Certificate {
   const find = (family: 'ja' | 'zh') => palette.lookup(family, candidate.kanji) ?? (candidate.inscription_form ? palette.lookup(family, candidate.inscription_form) : undefined)
   const zhBuyer = language === 'zh-Hans' || language === 'zh-Hant'
   const row = zhBuyer ? find('zh') : find('ja')
@@ -73,6 +75,7 @@ export function buildCertificate(candidate: Candidate, glyph: string, language: 
     line: certificateText(language),
     line_en: CERTIFICATE_LINE_EN,
     memorial,
+    ...(purpose ? { purpose } : {}),
     poems: [],
   }
 }
@@ -288,7 +291,7 @@ export function parseOrderRequest(body: unknown, now: Date = new Date(), palette
       language: lang,
       candidate,
       glyph,
-      certificate: buildCertificate(candidate, glyph, lang, palette ?? loadPalette(), isMemorial(result.occasion as string | null)),
+      certificate: buildCertificate(candidate, glyph, lang, palette ?? loadPalette(), isMemorial(result.occasion as string | null), (result.purpose as string | null | undefined) ?? null),
       sender_name: sender,
       receiver_name: receiver,
       delivery_date: date,

@@ -17,6 +17,8 @@
  * en = English-speaking sender: the story and all explanatory text are English, but the
  * character is still Japanese (carved in Japan), so en uses the ja palette rows.
  */
+import { PURPOSES, STATES, PURPOSE_OTHER_MAX, STATE_OTHER_MAX, RELATIONSHIP_OTHER_MAX, effectivePurpose, effectiveState, mapOtherRelationship, occasionFromPurpose, type Purpose, type State } from '../src/order/purpose.ts'
+
 export const LANGUAGES = ['ja', 'zh-Hans', 'zh-Hant', 'en'] as const
 export type Language = (typeof LANGUAGES)[number]
 
@@ -58,6 +60,8 @@ export const RELATIONSHIPS = [
   'in_law',
   'mentor',
   'community',
+  // v9.6: someone who cared for the sender (medical, care, support)
+  'caregiver',
 ] as const
 export type Relationship = (typeof RELATIONSHIPS)[number]
 
@@ -97,6 +101,15 @@ export interface EngineContext {
   inscription_script: InscriptionScript | null
   /** Where the receiver will read the gift, when that differs from the buyer's language (Part B). Absent / null: the same as the buyer. */
   reader?: Reader | null
+  /** v9.6: WHY the gift is given (the chip). `occasion` above is derived from it for the rules that key on the old codes. */
+  purpose?: Purpose | null
+  /** The sender's own words behind the purpose chip 「その他」 (max 30); context for the engine, never shown on a card or the gift. */
+  purpose_other?: string | null
+  /** v9.6, optional: where the two stand now. */
+  state?: State | null
+  state_other?: string | null
+  /** The sender's own words behind the relationship chip 「その他」 (max 20); `relationship` then holds the nearest code, or null. */
+  relationship_other?: string | null
 }
 
 /** Longest occasion_detail accepted — it is a short label, not a second story. */
@@ -149,6 +162,11 @@ export function parseContext(input: {
   occasion_detail?: unknown
   inscription_script?: unknown
   reader?: unknown
+  purpose?: unknown
+  purpose_other?: unknown
+  state?: unknown
+  state_other?: unknown
+  relationship_other?: unknown
 }): Parsed {
   const pick = <T extends string>(
     name: string,
@@ -164,8 +182,27 @@ export function parseContext(input: {
 
   const language = pick('language', input.language, LANGUAGES)
   if ('error' in language) return { ok: false, error: language.error }
-  const relationship = pick('relationship', input.relationship, RELATIONSHIPS)
+  // v9.6: the relationship chip 「その他」 arrives as "other" with a short free text; the engine reads the text and uses the nearest relationship code (null = unspecified).
+  const relationshipIsOther = input.relationship === 'other'
+  const relationship = pick('relationship', relationshipIsOther ? null : input.relationship, RELATIONSHIPS)
   if ('error' in relationship) return { ok: false, error: relationship.error }
+  const purposeIn = pick('purpose', input.purpose, PURPOSES)
+  if ('error' in purposeIn) return { ok: false, error: purposeIn.error }
+  const stateIn = pick('state', input.state, STATES)
+  if ('error' in stateIn) return { ok: false, error: stateIn.error }
+  const other = (name: string, v: unknown, max: number): { value: string | null } | { error: string } => {
+    if (v === undefined || v === null) return { value: null }
+    if (typeof v !== 'string') return { error: `Invalid "${name}": expected a string` }
+    const flat = v.replace(/\s+/g, ' ').trim()
+    if ([...flat].length > max) return { error: `Invalid "${name}": at most ${max} characters` }
+    return { value: flat || null }
+  }
+  const relationshipOther = other('relationship_other', input.relationship_other, RELATIONSHIP_OTHER_MAX)
+  if ('error' in relationshipOther) return { ok: false, error: relationshipOther.error }
+  const purposeOther = other('purpose_other', input.purpose_other, PURPOSE_OTHER_MAX)
+  if ('error' in purposeOther) return { ok: false, error: purposeOther.error }
+  const stateOther = other('state_other', input.state_other, STATE_OTHER_MAX)
+  if ('error' in stateOther) return { ok: false, error: stateOther.error }
   const direction = pick('direction', input.direction, DIRECTIONS)
   if ('error' in direction) return { ok: false, error: direction.error }
   const occasion = pick('occasion', input.occasion, OCCASIONS)
@@ -190,18 +227,33 @@ export function parseContext(input: {
   }
 
   const resolvedLanguage = language.value ?? DEFAULT_CONTEXT.language
+  // The relationship: a code, or the nearest code for the 「その他」 text.
+  const resolvedRelationship = relationship.value ?? (relationshipIsOther ? mapOtherRelationship(relationshipOther.value) : null)
+  // The purpose: the chip, or — from an older client / draft that still sends an occasion — the purpose that occasion stands for.
+  const purposeChip: Purpose | null = purposeIn.value
+  // (an older client that still sends only an occasion keeps it as it is; the rules read the purpose that occasion stands for)
+  const purposeFacts = { purpose: purposeChip, occasion: occasion.value, purpose_other: purposeIn.value === 'other' ? purposeOther.value : null, state: stateIn.value, state_other: stateIn.value === 'other' ? stateOther.value : null }
+  const effective = effectivePurpose(purposeFacts)
+  // The old occasion code the rules still key on: derived from the purpose when one was given; a posted occasion is kept as it is (the state "lost" still turns remembrance on).
+  let derivedOccasion = purposeIn.value !== null ? occasionFromPurpose(effective, resolvedRelationship, occasionDetail) : occasion.value
+  if (effectiveState(purposeFacts) === 'lost') derivedOccasion = 'memorial'
   return {
     ok: true,
     context: {
       language: resolvedLanguage,
-      relationship: relationship.value,
+      relationship: resolvedRelationship,
       direction: direction.value,
-      occasion: occasion.value,
+      occasion: derivedOccasion,
       occasion_detail: occasionDetail,
+      ...(purposeChip !== null ? { purpose: purposeChip } : {}),
+      ...(purposeFacts.purpose_other ? { purpose_other: purposeFacts.purpose_other } : {}),
+      ...(stateIn.value !== null ? { state: stateIn.value } : {}),
+      ...(purposeFacts.state_other ? { state_other: purposeFacts.state_other } : {}),
+      ...(relationshipIsOther && relationshipOther.value ? { relationship_other: relationshipOther.value } : {}),
       // Chinese: the supplied script, else traditional. ja and en: not applicable, so a supplied value is ignored.
       inscription_script: isChinese(resolvedLanguage) ? (script.value ?? DEFAULT_INSCRIPTION_SCRIPT) : null,
       // Remembrance never asks where the receiver will read it (nothing is given): the choice is dropped there.
-      reader: occasion.value === 'memorial' ? null : reader.value,
+      reader: derivedOccasion === 'memorial' ? null : reader.value,
     },
   }
 }
@@ -431,7 +483,8 @@ export const DECLINE_MESSAGE: Record<Language, string> = {
   en: 'We could not find in this story the regard for the person that a character is meant to carry. A character shows how you truly see someone. If you have another story to tell, we would be glad to read it.',
 }
 
-export const REVIEW_VETO_RULES = ['palette', 'occasion', 'memorial', 'dignity', 'register', 'insult', 'illness', 'relationship', 'goodwill', 'truth'] as const
+// v9.6: `subject` = the line is about the sender, not the receiver; `tone` = it breaks the tone rules of the gift's purpose.
+export const REVIEW_VETO_RULES = ['palette', 'occasion', 'memorial', 'dignity', 'register', 'insult', 'illness', 'relationship', 'goodwill', 'truth', 'subject', 'tone'] as const
 export type ReviewVetoRule = (typeof REVIEW_VETO_RULES)[number]
 export interface ReviewVerdict {
   slot: Slot
@@ -450,6 +503,9 @@ export interface EngineResult {
   relationship: Relationship | null
   direction: Direction | null
   occasion: Occasion | null
+  /** v9.6: the gift's purpose and state as the engine used them (the chip; "other" stays "other" when its text could not be mapped). Absent on older results. */
+  purpose?: Purpose | null
+  state?: State | null
   /** v5: echo of the optional free-text occasion detail, null when not supplied. */
   occasion_detail: string | null
   /** Part B: where the receiver will read the gift when that differs from the buyer's language (echo of the context); absent = the same. */

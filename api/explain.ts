@@ -24,7 +24,12 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     }
   }
 
-  const { story, follow_ups, candidate, language, relationship, direction, occasion, occasion_detail, inscription_script } = (body ?? {}) as {
+  const { story, follow_ups, candidate, language, relationship, direction, occasion, occasion_detail, inscription_script, purpose, purpose_other, state, state_other, relationship_other } = (body ?? {}) as {
+    purpose?: unknown
+    purpose_other?: unknown
+    state?: unknown
+    state_other?: unknown
+    relationship_other?: unknown
     story?: unknown
     follow_ups?: unknown
     candidate?: Partial<ExplainCandidate>
@@ -56,7 +61,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     })
   }
   // v5 context, same codes and validation as /api/select. All optional; language defaults to ja.
-  const parsed = parseContext({ language, relationship, direction, occasion, occasion_detail, inscription_script })
+  const parsed = parseContext({ language, relationship, direction, occasion, occasion_detail, inscription_script, purpose, purpose_other, state, state_other, relationship_other })
   if (!parsed.ok) return res.status(400).json({ error: parsed.error })
   if (!process.env.ANTHROPIC_API_KEY) {
     return res.status(500).json({ error: 'ANTHROPIC_API_KEY is not set on the server.' })

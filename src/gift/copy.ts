@@ -14,6 +14,9 @@ export interface GiftCopy {
   envLabel: string
   envLabelMemorial: string
   envLine: string
+  /** v9.6: the opening line by purpose. 「おめでとう」 belongs to a celebration only. */
+  envLineCelebrate: string
+  envLineThanks: string
   envLineMemorial: string
   to: (name: string) => string
   from: (name: string) => string
@@ -89,6 +92,8 @@ export const GIFT_COPY: Record<PageLang, GiftCopy> = {
     envLabel: '一字の贈りもの',
     envLabelMemorial: '一字の便り',
     envLine: 'あなただけに届いた、一字の贈りもの',
+    envLineCelebrate: 'おめでとう。あなただけに届いた、一字の贈りもの',
+    envLineThanks: 'ありがとうを込めて。あなただけに届いた、一字の贈りもの',
     envLineMemorial: 'あなたに届いた、一字の便り',
     to: (n) => `${n}へ`,
     from: (n) => `${n}より`,
@@ -136,6 +141,8 @@ export const GIFT_COPY: Record<PageLang, GiftCopy> = {
     envLabel: '一個字的禮物',
     envLabelMemorial: '一個字的來信',
     envLine: '只為你送達的，一個字的禮物',
+    envLineCelebrate: '恭喜。只為你送達的，一個字的禮物',
+    envLineThanks: '謝謝你。只為你送達的，一個字的禮物',
     envLineMemorial: '送到你手上的，一個字的來信',
     to: (n) => `致 ${n}`,
     from: (n) => `${n} 敬上`,
@@ -183,6 +190,8 @@ export const GIFT_COPY: Record<PageLang, GiftCopy> = {
     envLabel: 'A gift of one character',
     envLabelMemorial: 'A letter of one character',
     envLine: 'A gift of one character, arrived for you alone',
+    envLineCelebrate: 'Congratulations. A gift of one character, arrived for you alone',
+    envLineThanks: 'With thanks. A gift of one character, arrived for you alone',
     envLineMemorial: 'A letter of one character, arrived for you',
     to: (n) => `To ${n}`,
     from: (n) => `From ${n}`,

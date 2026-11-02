@@ -7,6 +7,7 @@
 //   POST /api/gift/<token>/address         — the e-gift receiver types their address (once). Kept on our side only; never returned by any call.
 // Possession of the link is the only access control, as for the sender's page. Never cached by shared caches, never indexed.
 
+import { isQuietPurpose } from '../src/order/purpose.ts'
 import QRCode from 'qrcode'
 import { ANIMATION_ID_PATTERN, isAnimationRecord, type AnimationRecord } from '../engine/animation.ts'
 import { GIFT_TOKEN_PATTERN, checkAddress, checkReply, giftUrl, giftView, isGiftRecord, isLocked, lockedView, type GiftRecord } from '../engine/gift.ts'
@@ -202,7 +203,7 @@ export function createGiftHandlers(deps: () => GiftDeps) {
       }
       if (!bytes) {
         try {
-          bytes = await makeOgImage({ to: g.to, from: g.from, memorial: g.memorial, language: g.language }, d.env)
+          bytes = await makeOgImage({ to: g.to, from: g.from, memorial: g.memorial || isQuietPurpose(g.purpose), language: g.language }, d.env)
         } catch (err) {
           console.error('[ichirei-og] failed', err instanceof Error ? err.message : err)
           return json(500, { error: 'og_failed' }, { 'cache-control': 'no-store' })

@@ -59,7 +59,7 @@ function qr(doc: Doc, url: string, x: number, y: number, size: number) {
 
 /** Draw the main character big and centred in a box; stroke thickens a regular-weight font into a bold one (the Chinese font has one weight). */
 function glyph(doc: Doc, a: Artwork, cx: number, top: number, size: number) {
-  const color = a.memorial ? INK : CINNABAR
+  const color = a.quiet ? INK : CINNABAR
   const stroke = fontsFor(a.language).stroke
   doc.font(names.char).fontSize(size)
   const w = doc.widthOfString(a.glyph)

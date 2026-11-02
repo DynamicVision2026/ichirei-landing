@@ -4,8 +4,11 @@ import { nextQuestionId, questionSetOf, questionsOf, randomFirst, setOfQuestionI
 import { OPENER, STORY_MIN } from './opener-copy'
 import {
   DIRECTION_CODES,
-  OCCASION_CODES,
   OCCASION_DETAIL_MAX,
+  PURPOSE_CODES,
+  STATE_CODES,
+  occasionOf,
+  purposeOf,
   READER_CHOICES,
   RELATIONSHIP_CODES,
   STORY_MAX,
@@ -15,6 +18,8 @@ import {
   type Copy,
   type GiftContext,
 } from '../demo/i18n.ts'
+import { PURPOSE_COPY } from '../demo/purpose-copy.ts'
+import { PURPOSE_OTHER_MAX, RELATIONSHIP_OTHER_MAX, STATE_OTHER_MAX } from '../order/purpose.ts'
 import type { RevealLang } from './copy.ts'
 import { TEXT } from './copy.ts'
 
@@ -58,13 +63,16 @@ function Chips<T extends string>({
   value,
   onPick,
   name,
+  optional,
 }: {
   label: string
   codes: readonly T[]
   labels: Record<T, string>
   value: T | ''
-  onPick: (c: T) => void
+  onPick: (c: T | '') => void
   name: string
+  /** An optional group: pressing the chosen chip again clears it. */
+  optional?: boolean
 }) {
   return (
     <div className="cgroup" role="group" aria-labelledby={`cg-${name}`}>
@@ -73,7 +81,7 @@ function Chips<T extends string>({
       </span>
       <div className="cchips">
         {codes.map((c) => (
-          <button key={c} type="button" className="cchip" data-chip={`${name}:${c}`} aria-pressed={value === c} onClick={() => onPick(c)}>
+          <button key={c} type="button" className="cchip" data-chip={`${name}:${c}`} aria-pressed={value === c} onClick={() => onPick(optional && value === c ? '' : c)}>
             {labels[c]}
           </button>
         ))}
@@ -112,7 +120,15 @@ export default function Composer({ story, onStoryChange, onSubmit, copy, lang, c
   const questions = set ? questionsOf(set, lang) : []
   const question = questions.find((q) => q.id === questionId) ?? null
   // Remembrance: the wording stops speaking of gifts (the person has died; the character is kept, not given).
-  const memorial = context.occasion === 'memorial'
+  const memorial = occasionOf(context) === 'memorial'
+  const pc = PURPOSE_COPY[context.language]
+  const purpose = purposeOf(context)
+  const OtherText = ({ name, value, max, placeholder, onChange }: { name: string; value: string; max: number; placeholder: string; onChange: (v: string) => void }) => (
+    <label className="cother">
+      <input id={name} name={name} type="text" data-testid={name} value={value} maxLength={max} placeholder={placeholder} aria-label={placeholder} onChange={(e) => onChange(e.target.value)} />
+      <span className="cotherLimit">{pc.limit(max)}</span>
+    </label>
+  )
 
   const [listening, setListening] = useState(false)
   const [interim, setInterim] = useState('')
@@ -223,9 +239,13 @@ export default function Composer({ story, onStoryChange, onSubmit, copy, lang, c
         if (ready) onSubmit()
       }}
     >
-      <Chips name="relationship" label={copy.relationshipLabel} codes={RELATIONSHIP_CODES} labels={copy.relationships} value={context.relationship} onPick={(c) => setCtx({ relationship: c })} />
+      <Chips name="relationship" label={copy.relationshipLabel} codes={[...RELATIONSHIP_CODES, 'other'] as const} labels={{ ...copy.relationships, other: pc.other }} value={context.relationship} onPick={(c) => setCtx({ relationship: c })} />
+      {context.relationship === 'other' && <OtherText name="relationship_other" value={context.relationshipOther ?? ''} max={RELATIONSHIP_OTHER_MAX} placeholder={pc.relationshipOtherPlaceholder} onChange={(v) => setCtx({ relationshipOther: v })} />}
       <Chips name="direction" label={memorial ? copy.memorial.directionLabel : copy.directionLabel} codes={DIRECTION_CODES} labels={memorial ? copy.memorial.directions : copy.directions} value={context.direction} onPick={(c) => setCtx({ direction: c })} />
-      <Chips name="occasion" label={copy.occasionLabel} codes={OCCASION_CODES} labels={copy.occasions} value={context.occasion} onPick={(c) => setCtx({ occasion: c })} />
+      <Chips name="purpose" label={pc.purposeLabel} codes={PURPOSE_CODES} labels={pc.purposes} value={purpose} onPick={(c) => setCtx({ purpose: c, occasion: '' })} />
+      {purpose === 'other' && <OtherText name="purpose_other" value={context.purposeOther ?? ''} max={PURPOSE_OTHER_MAX} placeholder={pc.purposeOtherPlaceholder} onChange={(v) => setCtx({ purposeOther: v })} />}
+      <Chips name="state" label={pc.stateLabel} codes={STATE_CODES} labels={pc.states} value={context.state ?? ''} optional onPick={(c) => setCtx({ state: c })} />
+      {context.state === 'other' && <OtherText name="state_other" value={context.stateOther ?? ''} max={STATE_OTHER_MAX} placeholder={pc.stateOtherPlaceholder} onChange={(v) => setCtx({ stateOther: v })} />}
 
       {!memorial && (
         <details className="readerField" data-testid="reader-field" open={context.reader ? true : undefined}>
@@ -240,18 +260,22 @@ export default function Composer({ story, onStoryChange, onSubmit, copy, lang, c
         </details>
       )}
 
-      <label className="clab" htmlFor="occasion-detail">
-        {copy.occasionDetailLabel}
-      </label>
-      <input
-        id="occasion-detail"
-        name="occasion_detail"
-        type="text"
-        value={context.occasionDetail}
-        maxLength={OCCASION_DETAIL_MAX}
-        onChange={(e) => setCtx({ occasionDetail: e.target.value })}
-        placeholder={copy.occasionDetailPlaceholder}
-      />
+      {(purpose === 'celebrate' || purpose === 'other') && (
+        <>
+          <label className="clab" htmlFor="occasion-detail">
+            {copy.occasionDetailLabel}
+          </label>
+          <input
+            id="occasion-detail"
+            name="occasion_detail"
+            type="text"
+            value={context.occasionDetail}
+            maxLength={OCCASION_DETAIL_MAX}
+            onChange={(e) => setCtx({ occasionDetail: e.target.value })}
+            placeholder={copy.occasionDetailPlaceholder}
+          />
+        </>
+      )}
 
       {/* The box captures the scene or story the sender remembers most. The random question is only a HINT, small, under the headline. */}
       <label className="qHeadline" htmlFor="moment" data-testid="story-headline">

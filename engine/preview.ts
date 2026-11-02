@@ -46,6 +46,9 @@ export interface PreviewStart {
   occasion: string | null
   occasion_detail: string | null
   memorial: boolean
+  /** v9.6: the tone line of the purpose, and whether the gift is a quiet one (apology, encouragement, remembrance). */
+  tone?: string
+  quiet?: boolean
   /** Every character shown to the sender for this story (both forms): none of them may appear in the film's lines. */
   shown: string[]
   /** A draft this browser already has for this story. */
@@ -96,6 +99,8 @@ export async function startPreview(deps: PreviewDeps, input: PreviewStart, allow
     occasion: input.occasion,
     occasion_detail: input.occasion_detail,
     memorial: input.memorial,
+    ...(input.tone ? { tone: input.tone } : {}),
+    ...(input.quiet ? { quiet: true } : {}),
     glyph: NOT_CHOSEN,
     forms,
     who: NOT_CHOSEN,

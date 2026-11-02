@@ -83,7 +83,7 @@ const promotedResult = clone(GOLDEN)
 promotedResult.primary_kanji = '守'
 check('shown event: when slot 2 was promoted, the slot shown as main is "second"', (shownEvent(promotedResult, S1, 'customer', NOW) as { main_slot: string }).main_slot === 'second')
 check('shown event: an insufficient result has no main slot and no freestyle', (() => { const r = { ...clone(GOLDEN), status: 'insufficient' as const, candidates: [], primary_kanji: null, freestyle_kanji: null }; const e = shownEvent(r, S1, 'customer', NOW) as { main_slot: unknown; has_freestyle: boolean; status: string }; return e.status === 'insufficient' && e.main_slot === null && e.has_freestyle === false })())
-const KEYS_OK = new Set(['ts', 'session', 'source', 'event', 'language', 'relationship', 'occasion', 'status', 'main_slot', 'has_freestyle', 'choice'])
+const KEYS_OK = new Set(['ts', 'session', 'source', 'event', 'language', 'relationship', 'occasion', 'purpose', 'state', 'status', 'main_slot', 'has_freestyle', 'choice'])
 check('privacy: an event has ONLY whitelisted keys — no story, gaze, kanji, name, email, order_ref', Object.keys(shown).every((k) => KEYS_OK.has(k)) && !JSON.stringify(shown).includes('父') && !JSON.stringify(shown).includes('証'))
 check('client events: only "chosen" (with a valid choice) and "explain_opened" are accepted; extra fields are dropped; bad session / unknown event / bad choice are refused', (() => {
   const ok = parseClientEvent({ session: S1, event: 'chosen', choice: 'freestyle', source: 'harness', story: 'SECRET STORY', name: '山田', order_ref: 'IC-1' }, NOW)

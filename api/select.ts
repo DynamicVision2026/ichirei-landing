@@ -39,7 +39,12 @@ export async function POST(req: Request): Promise<Response> {
     return jsonResponse(400, { error: 'Body is not valid JSON' })
   }
 
-  const { story, follow_ups, session, source, condition, language, relationship, direction, occasion, occasion_detail, inscription_script, prompt_question, reader, exclude, retry } = (body ?? {}) as {
+  const { story, follow_ups, session, source, condition, language, relationship, direction, occasion, occasion_detail, inscription_script, prompt_question, reader, exclude, retry, purpose, purpose_other, state, state_other, relationship_other } = (body ?? {}) as {
+    purpose?: unknown
+    purpose_other?: unknown
+    state?: unknown
+    state_other?: unknown
+    relationship_other?: unknown
     exclude?: unknown
     retry?: unknown
     prompt_question?: unknown
@@ -75,7 +80,7 @@ export async function POST(req: Request): Promise<Response> {
   // defaults to 'ja', the rest reach the prompt as "unspecified". A value that IS
   // sent must be one of the codes in engine/contract.ts (occasion_detail is free text,
   // length-capped).
-  const parsed = parseContext({ language, relationship, direction, occasion, occasion_detail, inscription_script, reader })
+  const parsed = parseContext({ language, relationship, direction, occasion, occasion_detail, inscription_script, reader, purpose, purpose_other, state, state_other, relationship_other })
   if (!parsed.ok) return jsonResponse(400, { error: parsed.error })
   // The story-opener question: `prompt_question` is { id, text }. Only a KNOWN id counts and the wording is the server's own (text from the
   // request is never put in a prompt); it does not count toward the story limit and an unknown one is simply ignored.

@@ -7,6 +7,7 @@
 // Env: ICHIREI_REPLACE=off disables it; ICHIREI_REPLACE_MODEL, ICHIREI_REPLACE_EFFORT (default medium), ICHIREI_REPLACE_MAX_TOKENS (default 9000: up to three candidates),
 // ICHIREI_REPLACE_PROMPT_PATH.
 
+import { purposeFrame, toneLine } from './purpose.ts'
 import { thinkingTokensOf, watchThinkingTokens } from './usage.ts'
 import Anthropic from '@anthropic-ai/sdk'
 import { readFileSync } from 'node:fs'
@@ -136,7 +137,7 @@ export function fillFreePrompt(result: EngineResult, story: string, context: Eng
     FIELDS: f.fields,
     EXTRA: f.extra,
   }
-  return loadFreePrompt().replace(/\{\{ ([A-Z_]+) \}\}/g, (m, k: string) => v[k] ?? m)
+  return `${purposeFrame(context)}\n\n${loadFreePrompt().replace(/\{\{ ([A-Z_]+) \}\}/g, (m, k: string) => v[k] ?? m)}`
 }
 
 const REQUIRED = ['kanji', 'reading', 'one_line_gaze', 'story_anchor'] as const
@@ -375,7 +376,7 @@ export async function completeMains(
     if (rescue.length > 0) {
       const t1 = Date.now()
       const items = rescue.map((c) => ({ kanji: c.kanji, gaze: c.one_line_gaze, why: `the review found a claim the story does not state (${(c.eliminated_reason ?? '').replace(/^review: truth:?\s*/, '').slice(0, 160)}): say only what the story states` }))
-      const fixes = await rewriteLines(items, story, context.language, { apiKey: opts.apiKey, signal: opts.signal, client: opts.client, log, timeoutMs: freeRefillTimeoutMs(), model: process.env.ICHIREI_GAZE_MODEL ?? opts.freeModel ?? opts.reviewModel ?? opts.model, onUsage: opts.onUsage ? (u) => opts.onUsage!('review', u) : undefined })
+      const fixes = await rewriteLines(items, story, context.language, { tone: toneLine(context), apiKey: opts.apiKey, signal: opts.signal, client: opts.client, log, timeoutMs: freeRefillTimeoutMs(), model: process.env.ICHIREI_GAZE_MODEL ?? opts.freeModel ?? opts.reviewModel ?? opts.model, onUsage: opts.onUsage ? (u) => opts.onUsage!('review', u) : undefined })
       const rewritten = refereed.candidates.map((c) => (fixes.has(c.kanji) && newKanji.has(c.kanji) ? { ...c, one_line_gaze: fixes.get(c.kanji)! } : c))
       let second: EngineResult | null = null
       if (fixes.size > 0) {

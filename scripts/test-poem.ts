@@ -9,7 +9,7 @@
 import http from 'node:http'
 import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
-import { CI_PATTERNS, blockedCharacters, checkContainsCharacter, checkCraft, checkForm, checkPalette, moraCount } from '../engine/poem-check.ts'
+import { CI_PATTERNS, blockedCharacters, checkCharacterOnce, checkContainsCharacter, checkCraft, checkForcedLabel, checkForm, checkPalette, meaningWords, moraCount } from '../engine/poem-check.ts'
 import { buyerAids, generatePoem, loadPoemPrompt, loadPoemReviewPrompt, poemFamilies, reasonCode, type PoemInput } from '../engine/poem.ts'
 import { createPoemHandler } from '../api/poem.ts'
 import { createOrderHandler } from '../api/order.ts'
@@ -48,8 +48,8 @@ const ci = (pattern: string, lines: string[]) => ({ type: 'ci' as const, pattern
 check('(1) ci: three patterns only, line lengths checked — 憶江南 3-5-7-7-5, 如夢令 6-6-5-6-2-2-6, 長相思 3-3-7-5 ×2', Object.keys(CI_PATTERNS).join() === '憶江南,如夢令,長相思' && checkForm(ci('憶江南', C20.poems.ci.lines), palette).length === 0 && checkForm(ci('如夢令', C04.poems.ci.lines), palette).length === 0 && checkForm(ci('長相思', ['一二三', '一二三', '一二三四五六七', '一二三四五', '一二三', '一二三', '一二三四五六七', '一二三四五'])).length === 0)
 check('(1) ci: an unknown pattern, the wrong lengths for the chosen pattern, and a missing pattern are form errors', checkForm(ci('水調歌頭', C20.poems.ci.lines)).some((p) => p.includes('pattern')) && checkForm(ci('如夢令', C20.poems.ci.lines)).some((p) => p.includes('如夢令 needs line lengths 6-6-5-6-2-2-6')) && checkForm({ type: 'ci', lines: C20.poems.ci.lines }).some((p) => p.includes('pattern')))
 const en = (lines: string[]) => ({ type: 'en' as const, lines })
-check('(1) en: 4–6 short lines — valid', checkForm(en(C20.poems.en.lines)).length === 0 && checkForm(en(['a', 'b', 'c', 'd', 'e', 'f'])).length === 0)
-check('(1) en: 3 lines, 7 lines, or a line of more than 12 words are form errors', checkForm(en(['a', 'b', 'c'])).some((p) => p.includes('4–6')) && checkForm(en(['a', 'b', 'c', 'd', 'e', 'f', 'g'])).some((p) => p.includes('4–6')) && checkForm(en(['one two three four five six seven eight nine ten eleven twelve thirteen fourteen fifteen sixteen seventeen', 'b', 'c', 'd'])).some((p) => p.includes('not short')) && checkForm(en(['one two three four five six seven eight nine ten eleven twelve thirteen', 'b', 'c', 'd'])).length === 0)
+check('(1) en: 4–8 short lines — valid', checkForm(en(C20.poems.en.lines)).length === 0 && checkForm(en(['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h'])).length === 0)
+check('(1) en: 3 lines, 9 lines, or a line of more than 12 words are form errors', checkForm(en(['a', 'b', 'c'])).some((p) => p.includes('4–8')) && checkForm(en(['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i'])).some((p) => p.includes('4–8')) && checkForm(en(['one two three four five six seven eight nine ten eleven twelve thirteen fourteen fifteen sixteen seventeen', 'b', 'c', 'd'])).some((p) => p.includes('not short')) && checkForm(en(['one two three four five six seven eight nine ten eleven twelve thirteen', 'b', 'c', 'd'])).length === 0)
 check('(1) an empty line is a form error for every type', POEM_TYPES.every((t) => checkForm({ type: t, lines: ['', 'x', 'y', 'z'], reading_kana: ['a', 'b', 'c', 'd'] }).some((p) => p.includes('empty'))))
 check('(1) the chosen character must appear (its other form counts); if missing it fails like a form error', checkContainsCharacter(en(C20.poems.en.lines), ['備']) === null && checkContainsCharacter(en(C20.poems.en.lines), ['温', '溫']) !== null && checkContainsCharacter(tang(['晨起折庭花', '盒中春色輕', '溫載備朝飯', '不言我始知']), ['温', '溫']) === null)
 
@@ -186,6 +186,47 @@ function count(k: 'poem' | 'review') { return seen.filter((s) => s.kind === k).l
     check(`(4) spec v9.4: the ${t} prompt asks the poem to carry the TURNING POINT through one concrete image of the story and forbids generic scenery`, prompt.includes('carry the TURNING POINT') && prompt.includes('ONE concrete image') && prompt.includes('NO generic scenery') && prompt.includes('Remembrance stories stay quiet'))
   }
   check('(4) the review prompt carries the story_image rule', loadPoemReviewPrompt().includes('`story_image`') && loadPoemReviewPrompt().includes('does not come from THIS story'))
+  // ---- v9.6 addendum: the poem condenses the story and carries the character exactly once, naturally ------------------------------------------------------------------
+  for (const [t, c] of [['tanka', C20], ['haiku', C20], ['tang', C20], ['tanka', C04], ['haiku', C04], ['tang', C04], ['ci', C20]] as const) {
+    const p = c.poems[t]
+    const d = { type: t, lines: p.lines, reading_kana: p.reading_kana, pattern: p.pattern } as any
+    check(`(5) v9.6: the ${t} fixture (${c.name}) contains the character exactly once, and no label line`, checkCharacterOnce(d, [c.kanji]) === null && checkContainsCharacter(d, [c.kanji]) === null && checkForcedLabel(d, [c.kanji]) === null)
+  }
+  const twice = (t: PoemType, c: typeof C20): any => { const p = c.poems[t]; return { ...p, lines: p.lines.map((l: string, i: number) => (i === p.lines.length - 1 ? l + c.kanji : l)) } }
+  {
+    let allTwice = true
+    for (const t of ['tanka', 'haiku', 'tang'] as const) {
+      const r = await gen(C20, t, [twice(t, C20), C20.poems[t]])
+      if (!(r.ok && count('poem') === 2 && seen[1].prompt.includes('appears 2 times') && seen[1].prompt.includes('exactly once'))) allTwice = false
+    }
+    check('(5) the character twice in a tanka, a haiku or a 漢詩 fails the code check ("exactly once"), and the model is asked to rewrite', allTwice)
+  }
+  check('(5) …a poem with the character twice on both tries is an error for that type (poem_failed), never shown', !(await gen(C20, 'tanka', [twice('tanka', C20)])).ok)
+  const label = { ...C20.poems.tanka, lines: [C20.kanji + '見ゆ', ...C20.poems.tanka.lines.slice(1)], reading_kana: ['みゆ', ...C20.poems.tanka.reading_kana.slice(1)] }
+  check('(5) a bare label line that only announces the character (「備見ゆ」) is refused by the code check', checkForcedLabel({ type: 'tanka', lines: label.lines }, [C20.kanji]) !== null && checkForcedLabel({ type: 'haiku', lines: ['父察す', 'a', 'b'] }, ['察']) !== null && checkForcedLabel({ type: 'tanka', lines: C20.poems.tanka.lines }, [C20.kanji]) === null)
+  const noCharPoem = { ...C20.poems.tanka, lines: C20.poems.tanka.lines.map((l: string) => l.split(C20.kanji).join('')) }
+  const rMissing = await gen(C20, 'tanka', [noCharPoem, C20.poems.tanka])
+  check('(5) a fake poem WITHOUT the character is rewritten (the second try, with the failed check fed back, passes)', checkContainsCharacter({ type: 'tanka', lines: noCharPoem.lines }, [C20.kanji]) !== null && rMissing.ok && count('poem') === 2 && seen[1].prompt.includes('does not appear in the poem'))
+  const rImg = await gen(C20, 'tanka', [C20.poems.tanka], [{ pass: false, rule: 'story_image', reason: 'the moon on the sea is not in the story' }, { pass: true, rule: null, reason: 'ok' }])
+  check('(5) a fake poem with an image that is NOT in the story is rewritten once (the reader\'s note is fed back: no scenery, object or feeling the story does not give)', rImg.ok && count('poem') === 2 && count('review') === 2 && seen[2].prompt.includes('IMAGERY DOES NOT COME FROM THIS STORY') && seen[2].prompt.includes('the moon on the sea'))
+  const rLab = await gen(C20, 'tanka', [C20.poems.tanka], [{ pass: false, rule: 'character', reason: 'the character is a forced label' }, { pass: true, rule: null, reason: 'ok' }])
+  check('(5) the review rule `character` (missing, a label, or forced): ONE rewrite, then the better poem is kept — never lost to a quality rule', rLab.ok && count('poem') === 2 && seen[2].prompt.includes('NOT USED NATURALLY'))
+  const rKeep = await gen(C20, 'tanka', [C20.poems.tanka], [{ pass: false, rule: 'character', reason: 'still a label' }])
+  check('(5) …rejected again after the rewrite: the poem in hand is kept (not an error)', rKeep.ok && count('poem') === 2)
+  const rTone = await gen(C20, 'tanka', [C20.poems.tanka], [{ pass: false, rule: 'tone', reason: 'a celebration word in an apology' }, { pass: true, rule: null, reason: 'ok' }])
+  check('(5) the review rule `tone` (the purpose\'s tone rules apply to the poem) is a veto: regenerate with the reason', rTone.ok && count('poem') === 2 && seen[2].prompt.includes('review (tone)'))
+  const quietIn = { ...input(C04, 'tang'), quiet: true, occasion: null }
+  replies = [{ ...C04.poems.tang, lines: ['舊箋幾十通', '皆是母手跡', '綴我名而祝', '燈前讀不已'] }]
+  reviewReplies = []
+  const rQuiet = await quiet(() => generatePoem(quietIn as PoemInput, palette))
+  check('(5) a quiet gift (apology / encouragement / the state "lost") keeps celebration characters (祝) out of the poem even with no occasion code', !rQuiet.ok && logs.some((l) => l.includes('blocked in remembrance')))
+  check('(5) the English meaning word counts as the character in an English poem (信 → "trust"): present passes, absent fails; the glyph still counts', checkContainsCharacter(en(['She gave me the keys,', 'and said nothing.', 'That was trust.', 'I knew it then.']), ['信'], meaningWords('trust')) === null && checkContainsCharacter(en(['She gave me the keys,', 'and said nothing.', 'That was all.', 'I knew it then.']), ['信'], meaningWords('trust')) !== null && checkContainsCharacter(en(['the quiet word 待 —', 'b', 'c', 'd']), ['待'], meaningWords('to wait')) === null && meaningWords('to be ready').includes('ready'))
+  for (const t of POEM_TYPES) {
+    const pr = loadPoemPrompt(t)
+    check(`(5) the ${t} prompt: the character exactly once and naturally (no label line), the poem condenses the story around the RECEIVER, only the story's images, the purpose tone applies`, (t === 'en' ? pr.includes('MEANING WORD') : pr.includes('EXACTLY ONCE')) && pr.includes('THE POEM CONDENSES THE STORY') && pr.includes('RECEIVER') && pr.includes("ONLY THE STORY'S IMAGES") && pr.includes('PURPOSE TONE'))
+  }
+  check('(5) per format: tanka — one image from the turning point, the receiver\'s act and the feeling, the character inside a natural word (潤して / 察して / 待ちて); haiku — one image only, 季語 only when the season is clear; 漢詩 — the arc, the character best in line 3 or 4; 宋詞 — the arc; English — 4–8 lines, the turning point', (() => { const k = (t: PoemType) => loadPoemPrompt(t); return k('tanka').includes('潤して') && k('tanka').includes('the receiver\'s act') && k('haiku').includes('ONE image only') && k('haiku').includes('季語') && k('tang').includes('line 3 or 4') && k('tang').includes('ARC') && k('ci').includes('ARC') && k('en').includes('TURNING POINT') && k('en').includes('4 to 8') })())
+  check('(5) the poem review prompt has the `character` and `tone` rules and the stricter story_image (nothing the story does not give)', loadPoemReviewPrompt().includes('`character`') && loadPoemReviewPrompt().includes('`tone`') && loadPoemReviewPrompt().includes('nothing in the poem may come from outside the story') && /"story_image" \| "character" \| "tone"/.test(loadPoemReviewPrompt()))
   const rv4 = await gen(C20, 'en', [C20.poems.en], ['not json at all'])
   check('(4) an unusable review lets the poem through (the code checks still ran)', rv4.ok)
   const dec = await gen(C20, 'en', [{ declined: true }])
@@ -252,7 +293,7 @@ function count(k: 'poem' | 'review') { return seen.filter((s) => s.kind === k).l
   const enVeto = await gen(C20, 'en', [C20.poems.en], [{ pass: false, rule: 'palette', reason: 'uses a parting word' }])
   check('(4b) English poem: a review veto is reported as `review:palette` with its reason in the problems', !enVeto.ok && enVeto.reasons?.join() === 'review:palette' && (enVeto.problems ?? []).some((p) => p.includes('uses a parting word')))
   check('(4b) the review prompt says the chosen character in the poem is intended (a Chinese character inside an English poem is not a taboo)', loadPoemReviewPrompt().includes('was already judged') && loadPoemReviewPrompt().includes('inside an English poem'))
-  check('(4b) the English prompt tells the model to copy the character itself, gives the word limit and the shape', (() => { const t = loadPoemPrompt('en'); return t.includes('AS THE CHARACTER ITSELF') && t.includes('TWELVE words') && t.includes('never translate it away') })())
+  check('(4b) the English prompt asks for the character\'s MEANING WORD once (v9.6), gives the word limit and the four-to-eight-line shape', (() => { const t = loadPoemPrompt('en'); return t.includes('MEANING WORD') && t.includes('ONCE') && t.includes('TWELVE words') && t.includes('4 to 8 strings') })())
   check('(4b) failure reasons are short codes: call / parse / form / character_missing / rhyme / palette / review:<rule> / gendaigo', ['call: boom', 'the reply was not a JSON object', 'the reply has no lines array', 'a tanka has 5 lines (got 4)', 'the chosen character (備) does not appear in the poem', 'lines 2 and 4 must rhyme: …', '死: hard block (never used)', '祝: blocked in remembrance (x)', 'review (relationship): x', 'gendaigo is missing: …'].map(reasonCode).join() === 'call,parse,parse,form,character_missing,rhyme,palette,palette,review:relationship,gendaigo')
 }
 

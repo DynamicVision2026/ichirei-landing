@@ -134,7 +134,7 @@ const run = (cmd: string, args: string[]) => spawn(cmd, args, { stdio: ['pipe', 
 export async function makeFilmVideo(a: Artwork, opts: { fps?: number; ffmpeg?: string; seconds?: number } = {}): Promise<FilmVideo> {
   const t0 = Date.now()
   const fps = opts.fps ?? VIDEO_FPS
-  const c = a.memorial ? QUIET : INK
+  const c = a.quiet ? QUIET : INK
   const f = fontsFor(a.language)
   const body = fontObject(f.body)
   const hero = fontObject(f.character)

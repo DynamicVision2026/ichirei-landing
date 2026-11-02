@@ -22,17 +22,24 @@ const INSUFFICIENT = {
   candidates: [], primary_kanji: null,
 }
 
-// v5: relationship, direction and occasion are required before the engine can be called.
+// v9.6: relationship, direction and PURPOSE (why the gift is given) are required before the engine can be called; the state and the 「その他」 texts are optional.
+// (A legacy `occasion` name is still accepted and clicks the purpose it stands for.)
+const OCC_TO_PURPOSE = { birthday_milestone: 'celebrate', wedding: 'celebrate', new_baby: 'celebrate', school_career: 'celebrate', retirement_farewell: 'farewell', parent_day: 'thanks', seasonal_thanks: 'thanks', memorial: 'memorial' }
 const pickContext = async (page, ctx = {}) => {
-  const c = { relationship: 'parent_father', direction: 'up', occasion: 'birthday_milestone', ...ctx }
+  const c = { relationship: 'parent_father', direction: 'up', ...ctx }
+  c.purpose = c.purpose ?? OCC_TO_PURPOSE[c.occasion ?? 'birthday_milestone']
   if ((await page.locator('select[name=relationship]').count()) === 0) {
     // the customer site: chips
-    for (const k of ['relationship', 'direction', 'occasion']) await page.click(`[data-chip="${k}:${c[k]}"]`)
+    for (const k of ['relationship', 'direction', 'purpose']) await page.click(`[data-chip="${k}:${c[k]}"]`)
+    if (c.state) await page.click(`[data-chip="state:${c.state}"]`)
+    for (const k of ['relationship_other', 'purpose_other', 'state_other']) if (c[k] !== undefined) await page.fill(`input[name=${k}]`, c[k])
     return
   }
   await page.selectOption('select[name=relationship]', c.relationship)
   await page.selectOption('select[name=direction]', c.direction)
-  await page.selectOption('select[name=occasion]', c.occasion)
+  await page.selectOption('select[name=purpose]', c.purpose)
+  if (c.state) await page.selectOption('select[name=state]', c.state)
+  for (const k of ['relationship_other', 'purpose_other', 'state_other']) if (c[k] !== undefined) await page.fill(`input[name=${k}]`, c[k])
 }
 const FINALIZE = { ja: 'この一字を、贈る', 'zh-Hans': '就用这一个字', 'zh-Hant': '就用這一個字', en: 'Give this character' }
 // the customer site's composer button (the reference's words)
@@ -395,36 +402,37 @@ const mockPage = async (browser, { onExplain, result, order, track } = {}) => {
   const { page, errors, calls } = await mockPage(browser)
   await page.goto('http://localhost:5173/demo', { waitUntil: 'networkidle' })
   const submit = page.locator(`button:has-text("${SUBMIT.ja}")`)
-  check('selectors: language pills (ja / zh-Hans / zh-Hant / en), 3 selects and the occasion_detail field are present',
+  check('selectors: language pills (ja / zh-Hans / zh-Hant / en), the relationship / direction / purpose / state selects; the milestone field appears only for celebrate (and other)',
     (await page.locator('[data-language]').count()) === 4 &&
-    (await page.locator('select[name=relationship] option').count()) === 14 &&
+    (await page.locator('select[name=relationship] option').count()) === 16 &&
     (await page.locator('select[name=direction] option').count()) === 4 &&
-    (await page.locator('select[name=occasion] option').count()) === 9 &&
-    (await page.locator('input[name=occasion_detail]').count()) === 1)
+    (await page.locator('select[name=purpose] option').count()) === 10 &&
+    (await page.locator('select[name=state] option').count()) === 7 &&
+    (await page.locator('input[name=occasion_detail]').count()) === 0)
   check('selectors: ja is the default language; no inscription-script toggle for ja', (await page.locator('[data-language=ja][aria-pressed=true]').count()) === 1 && (await page.locator('[data-inscription-script]').count()) === 0)
   await page.locator('textarea').first().fill(STORY)
-  check('submit stays disabled until relationship, direction and occasion are chosen', await submit.isDisabled())
-  check('a hint says what is missing', await page.locator('text=関係・向き・場面を選ぶと').isVisible())
+  check('submit stays disabled until relationship, direction and the reason for giving are chosen', await submit.isDisabled())
+  check('a hint says what is missing', await page.locator('text=関係・向き・贈る理由を選ぶと').isVisible())
   const before = await chromeText(page)
-  check('copy: the opening ask is occasion-neutral (no 六十年 / 還暦 anywhere in the UI chrome)', before.includes('その人のことを、全部書かなくていい') && !/還暦|六十|60/.test(before), before.slice(0, 200))
-  await pickContext(page, { relationship: 'mentor', direction: 'up', occasion: 'retirement_farewell' })
+  check('copy: the opening ask is occasion-neutral (no 六十年 / 還暦 anywhere in the UI chrome)', before.includes('その人のことを、全部書かなくていい') && !/還暦|六十|60/.test(before.replace('お祝い（誕生日・還暦・結婚・出産・入学など）', '')), before.slice(0, 200))
+  await pickContext(page, { relationship: 'mentor', direction: 'up', purpose: 'celebrate' })
   await page.fill('input[name=occasion_detail]', '定年退職')
   check('submit enables once the three are chosen', await submit.isEnabled())
   await page.click(`text=${SUBMIT.ja}`)
   await page.waitForSelector('article', { timeout: 8000 })
   const body = calls.select[0]
   check('payload: story, condition and all five context fields go to /api/select',
-    body.story === STORY && body.condition === 'A' && body.language === 'ja' && body.relationship === 'mentor' && body.direction === 'up' && body.occasion === 'retirement_farewell' && body.occasion_detail === '定年退職', JSON.stringify(body))
+    body.story === STORY && body.condition === 'A' && body.language === 'ja' && body.relationship === 'mentor' && body.direction === 'up' && body.purpose === 'celebrate' && !('occasion' in body) && !('state' in body) && body.occasion_detail === '定年退職', JSON.stringify(body))
   check('payload: no inscription_script for ja', !('inscription_script' in body))
   await page.waitForSelector('text=この一字を、贈る', { timeout: 15000 })
   const after = await chromeText(page)
-  check('copy: the finalize button is neutral ("この一字を、贈る"), nothing 還暦-specific in the UI chrome', !/還暦|六十|60/.test(after) && !(await page.locator('text=還暦を祝う').count()))
+  check('copy: the finalize button is neutral ("この一字を、贈る"), nothing 還暦-specific in the UI chrome', !/還暦|六十|60/.test(after.replace('お祝い（誕生日・還暦・結婚・出産・入学など）', '')) && !(await page.locator('text=還暦を祝う').count()))
   await page.screenshot({ path: `${SHOTS}/e2e-v5-ja-reveal.png` })
   // golden fixture button loads story + context
   await page.click('text=もう一度試す')
   await page.click('text=golden fixture')
   check('golden fixture button also sets the golden context (ja / 父 / 目上 / 母の日・父の日 / 還暦)',
-    (await page.inputValue('select[name=relationship]')) === 'parent_father' && (await page.inputValue('select[name=direction]')) === 'up' && (await page.inputValue('select[name=occasion]')) === 'parent_day' && (await page.inputValue('input[name=occasion_detail]')) === '還暦')
+    (await page.inputValue('select[name=relationship]')) === 'parent_father' && (await page.inputValue('select[name=direction]')) === 'up' && (await page.inputValue('select[name=purpose]')) === 'thanks')
   check('no page errors (run 6)', errors.length === 0)
   if (errors.length) console.log('page errors:', errors)
   await page.close()
@@ -450,8 +458,8 @@ const mockPage = async (browser, { onExplain, result, order, track } = {}) => {
   // zh-Hans
   await page.click('[data-language=zh-Hans]')
   const hansChrome = await chromeText(page)
-  check('zh-Hans: the whole UI switches (opening ask, submit, selectors) and is simplified', hansChrome.includes('不必写下那个人的全部') && hansChrome.includes(SUBMIT['zh-Hans']) && hansChrome.includes('送礼的场合') && !JA_ONLY.test(hansChrome.replace(/日本語/g, '')), hansChrome.slice(0, 300))
-  check('zh-Hans: the relationship / direction / occasion labels are in Chinese', (await page.locator('select[name=relationship] option[value=parent_father]').innerText()) === '父亲' && (await page.locator('select[name=occasion] option[value=wedding]').innerText()) === '婚礼与结婚纪念')
+  check('zh-Hans: the whole UI switches (opening ask, submit, selectors) and is simplified', hansChrome.includes('不必写下那个人的全部') && hansChrome.includes(SUBMIT['zh-Hans']) && hansChrome.includes('送礼的对象与理由') && !JA_ONLY.test(hansChrome.replace(/日本語/g, '')), hansChrome.slice(0, 300))
+  check('zh-Hans: the relationship / direction / purpose labels are in Chinese', (await page.locator('select[name=relationship] option[value=parent_father]').innerText()) === '父亲' && (await page.locator('select[name=purpose] option[value=thanks]').innerText()) === '谢谢')
   check('zh-Hans: the inscription-script toggle appears, traditional by default', (await page.locator('[data-inscription-script=traditional][aria-pressed=true]').count()) === 1)
   await page.locator('textarea').first().fill('他总是把玄关的灯留着，不管我多晚回家。')
   await pickContext(page, { relationship: 'parent_father', direction: 'up', occasion: 'seasonal_thanks' })
@@ -459,7 +467,7 @@ const mockPage = async (browser, { onExplain, result, order, track } = {}) => {
   await page.waitForSelector(`button:has-text("${FINALIZE['zh-Hans']}")`, { timeout: 15000 }) // all cards revealed
   const b1 = calls.select[0]
   check('zh-Hans payload: language zh-Hans, inscription_script traditional (default), context, no occasion_detail when blank',
-    b1.language === 'zh-Hans' && b1.inscription_script === 'traditional' && b1.relationship === 'parent_father' && b1.occasion === 'seasonal_thanks' && !('occasion_detail' in b1), JSON.stringify(b1))
+    b1.language === 'zh-Hans' && b1.inscription_script === 'traditional' && b1.relationship === 'parent_father' && b1.purpose === 'thanks' && !('occasion_detail' in b1), JSON.stringify(b1))
   const cardWith = (glyph) => page.locator('article').filter({ has: page.locator(`[data-glyph]:text-is("${glyph}")`) })
   const first = cardWith('燈')
   check('zh-Hans + traditional inscription: the carved glyph is 燈, paired with 灯 and the pinyin', (await first.count()) === 1 && await first.locator('text=灯 ・ dēng').isVisible())
@@ -472,11 +480,11 @@ const mockPage = async (browser, { onExplain, result, order, track } = {}) => {
   await page.waitForSelector('text=解读文字', { timeout: 5000 })
   const ex = calls.explain[0]
   check('explain payload: language, script, context and both forms of the character reach /api/explain',
-    ex.language === 'zh-Hans' && ex.inscription_script === 'traditional' && ex.relationship === 'parent_father' && ex.direction === 'up' && ex.occasion === 'seasonal_thanks' && ex.candidate.kanji === '灯' && ex.candidate.inscription_form === '燈' && ex.story.includes('玄关的灯'), JSON.stringify(ex))
+    ex.language === 'zh-Hans' && ex.inscription_script === 'traditional' && ex.relationship === 'parent_father' && ex.direction === 'up' && ex.purpose === 'thanks' && ex.candidate.kanji === '灯' && ex.candidate.inscription_form === '燈' && ex.story.includes('玄关的灯'), JSON.stringify(ex))
   await page.click('header >> text="A"')
   // try again, simplified inscription
   await page.click('button:has-text("再试一次")')
-  check('retry keeps the story AND the whole context', (await page.locator('textarea').first().inputValue()).includes('玄关的灯') && (await page.inputValue('select[name=occasion]')) === 'seasonal_thanks')
+  check('retry keeps the story AND the whole context', (await page.locator('textarea').first().inputValue()).includes('玄关的灯') && (await page.inputValue('select[name=purpose]')) === 'thanks')
   await page.click('[data-inscription-script=simplified]')
   await page.click(`text=${SUBMIT['zh-Hans']}`)
   await page.waitForSelector(`button:has-text("${FINALIZE['zh-Hans']}")`, { timeout: 15000 })
@@ -488,7 +496,7 @@ const mockPage = async (browser, { onExplain, result, order, track } = {}) => {
   await page.click('button:has-text("再试一次")')
   await page.click('[data-language=zh-Hant]')
   const hantChrome = await chromeText(page)
-  check('zh-Hant: the UI is traditional (不必寫下那個人的全部, 送禮的場合) and not simplified', hantChrome.includes('不必寫下那個人的全部') && hantChrome.includes('送禮的場合') && !hantChrome.includes('不必写下'))
+  check('zh-Hant: the UI is traditional (不必寫下那個人的全部, 送禮的對象與理由) and not simplified', hantChrome.includes('不必寫下那個人的全部') && hantChrome.includes('送禮的對象與理由') && !hantChrome.includes('不必写下'))
   await page.click(`text=${SUBMIT['zh-Hant']}`)
   await page.waitForSelector(`button:has-text("${FINALIZE['zh-Hant']}")`, { timeout: 15000 })
   check('zh-Hant payload: language zh-Hant', calls.select[2].language === 'zh-Hant', JSON.stringify(calls.select[2]))
@@ -735,10 +743,10 @@ const mockPage = async (browser, { onExplain, result, order, track } = {}) => {
     await ign.page.close()
   }
   // a memorial gift gets the remembering-voice set
-  await page.click('[data-chip="occasion:memorial"]')
+  await page.click('[data-chip="purpose:memorial"]')
   await page.waitForFunction(() => document.querySelector('#write [data-testid=story-question]')?.getAttribute('data-question-id')?.startsWith('memorial-'))
   check('opener: the occasion "memorial" switches to the memorial set (no mention of death or loss)', !/死|亡|逝|失|悲/.test(await qEl.innerText()))
-  await page.click('[data-chip="occasion:birthday_milestone"]')
+  await page.click('[data-chip="purpose:celebrate"]')
   await page.waitForFunction(() => document.querySelector('#write [data-testid=story-question]')?.getAttribute('data-question-id')?.startsWith('up-'))
   const shownId = await qEl.getAttribute('data-question-id')
   // the 10-character minimum
@@ -831,7 +839,7 @@ const mockPage = async (browser, { onExplain, result, order, track } = {}) => {
     await long.page.click(`#write >> text=${GO.ja}`)
     await long.page.waitForSelector('article[data-slot=freestyle]', { timeout: 15000 })
     const slots = await long.page.locator('article[data-slot]').evaluateAll((els) => els.map((e) => e.getAttribute('data-slot')))
-    check('long remembrance: the whole 4105-character story is sent (occasion memorial, father, up) and THREE cards come back: main, second, freestyle', long.calls.select.length === 1 && [...long.calls.select[0].story].length === 4105 && long.calls.select[0].occasion === 'memorial' && slots.join() === 'main,second,freestyle', JSON.stringify([long.calls.select.length, slots]))
+    check('long remembrance: the whole 4105-character story is sent (occasion memorial, father, up) and THREE cards come back: main, second, freestyle', long.calls.select.length === 1 && [...long.calls.select[0].story].length === 4105 && long.calls.select[0].purpose === 'memorial' && slots.join() === 'main,second,freestyle', JSON.stringify([long.calls.select.length, slots]))
     check('no page errors (run 8c-3, long remembrance)', long.errors.length === 0, JSON.stringify(long.errors))
     await long.page.close()
   }
@@ -846,7 +854,7 @@ const mockPage = async (browser, { onExplain, result, order, track } = {}) => {
     await c.page.goto(`http://localhost:5173/?lang=${lang}`, { waitUntil: 'networkidle' })
     const h3 = () => c.page.locator('#how ol.steps li:nth-child(2) h3').innerText()
     const p2 = () => c.page.locator('#how ol.steps li:nth-child(2) p').innerText()
-    const mm = () => c.page.locator('p.from').first().innerText()
+    const mm = async () => ((await c.page.locator('p.from').first().textContent()) ?? '').trim()
     check(`copy (${lang}): before an occasion is picked the steps and the examples are unchanged — 「${st2Other}」 and the three-card note`, (await h3()) === st2Other && (await mm()) === noteOther, `${await h3()} | ${await mm()}`)
     await pickContext(c.page, { occasion: 'memorial' })
     check(`copy (${lang}): with 偲ぶ picked the second step reads 「${st2}」 and says two main characters only, and the examples note says two (no free pick)`, (await h3()) === st2 && (await p2()) === st2p && (await mm()) === note, `${await h3()} | ${await p2()} | ${await mm()}`)
@@ -1664,7 +1672,7 @@ const SECTION_ORDER = ['.hero', '.strip', '.philo', '#shape', '#angles', '#write
   check('landing ja: honesty — no native-speaker claim, no AI, no payment methods, no review counts or ratings', !/ネイティブ|\bAI\b|人工知能|VISA|Visa|PayPal|クレジット|★|⭐/.test(t) && t.includes('本物のレビューが、ここに並びます'))
   check('landing ja: the trust strip has three items (no "checked by native speakers")', (await page.locator('.strip li').count()) === 3)
   check('landing ja: no test controls (no A/B/C, no log export, no golden fixture, no harness label)', !/condition|ログ書き出し|golden fixture|VALIDATION HARNESS|raw contract/.test(t))
-  check('landing ja: the composer is the real flow — chips for relationship, direction and occasion, the textarea, the "0 / 5000字" counter, the soft hint', (await page.locator('[data-chip^="relationship:"]').count()) === 13 && (await page.locator('[data-chip^="direction:"]').count()) === 3 && (await page.locator('[data-chip^="occasion:"]').count()) === 8 && (await page.locator('#moment').count()) === 1 && (await page.locator('[data-testid=story-counter]').innerText()) === '0 / 5000字' && (await page.locator('[data-testid=story-hint]').innerText()) === '短くても長くても。ひとつの場面なら50字ほどから、物語なら5000字まで。')
+  check('landing ja: the composer is the real flow — chips for relationship, direction and the reason for giving (+ the optional state), the textarea, the "0 / 5000字" counter, the soft hint', (await page.locator('[data-chip^="relationship:"]').count()) === 15 && (await page.locator('[data-chip^="direction:"]').count()) === 3 && (await page.locator('[data-chip^="purpose:"]').count()) === 9 && (await page.locator('[data-chip^="state:"]').count()) === 6 && (await page.locator('#moment').count()) === 1 && (await page.locator('[data-testid=story-counter]').innerText()) === '0 / 5000字' && (await page.locator('[data-testid=story-hint]').innerText()) === '短くても長くても。ひとつの場面なら50字ほどから、物語なら5000字まで。')
   check('landing ja: no language pills inside the flow (the nav switch is the one control) and no inscription-script toggle', (await page.locator('#write [data-language]').count()) === 0 && (await page.locator('[data-inscription-script]').count()) === 0)
   check('landing ja: the nav switch shows exactly EN, 日本語, 繁中', (await page.locator('.lang button').allInnerTexts()).join('|') === 'EN|日本語|繁中')
   await page.locator('#gifts').scrollIntoViewIfNeeded()
@@ -1765,7 +1773,7 @@ const SECTION_ORDER = ['.hero', '.strip', '.philo', '#shape', '#angles', '#write
     await page.click(`#write button[type=submit]`)
     await page.waitForSelector('[data-testid=finalize]', { timeout: 15000 })
     const sent = calls.select.at(-1)
-    check(`${l}: the composer posts to /api/select with language ${l}, the story and the context${l === 'zh-Hant' ? ' (traditional inscription)' : ''}`, sent.language === l && sent.story === story && sent.relationship === 'parent_mother' && sent.direction === 'up' && sent.occasion === 'birthday_milestone' && (l === 'zh-Hant' ? sent.inscription_script === 'traditional' : !('inscription_script' in sent)), JSON.stringify(sent))
+    check(`${l}: the composer posts to /api/select with language ${l}, the story and the context${l === 'zh-Hant' ? ' (traditional inscription)' : ''}`, sent.language === l && sent.story === story && sent.relationship === 'parent_mother' && sent.direction === 'up' && sent.purpose === 'celebrate' && (l === 'zh-Hant' ? sent.inscription_script === 'traditional' : !('inscription_script' in sent)), JSON.stringify(sent))
     await page.click(`#write >> text=${{ en: 'Try again', ja: 'もう一度試す', 'zh-Hant': '再試一次' }[l]}`)
     await page.locator('#moment').waitFor()
   }
@@ -1973,14 +1981,14 @@ const SECTION_ORDER = ['.hero', '.strip', '.philo', '#shape', '#angles', '#write
 
   // -- the customer flow
   check('en customer page: the flow is English, no language pills inside it, no test controls', (await page.locator('#write').innerText()).includes('The moment with them you remember most.') && (await page.locator('#write [data-language]').count()) === 0 && (await page.locator('text=VALIDATION HARNESS').count()) === 0)
-  check('en: the chips are English (relationship, direction, occasion)', (await page.locator('[data-chip="relationship:parent_mother"]').innerText()) === 'Mother' && (await page.locator('[data-chip="occasion:wedding"]').innerText()) === 'Wedding or anniversary')
+  check('en: the chips are English (relationship, direction, occasion)', (await page.locator('[data-chip="relationship:parent_mother"]').innerText()) === 'Mother' && (await page.locator('[data-chip="purpose:celebrate"]').innerText()) === 'Celebrate (birthday, 60th, wedding, birth, school…)')
   await page.locator('#moment').fill('My mum left the porch light on every night until I got home.')
   await pickContext(page, { relationship: 'parent_mother', direction: 'up', occasion: 'birthday_milestone' })
   await page.fill('input[name=occasion_detail]', '70th birthday')
   await page.click(`#write >> text=${GO.en}`)
   await page.waitForSelector(`button:has-text("${FINALIZE.en}")`, { timeout: 15000 })
   const sel = calls.select[0]
-  check('en payload: language en, the context and occasion_detail, and NO inscription_script', sel.language === 'en' && sel.relationship === 'parent_mother' && sel.direction === 'up' && sel.occasion === 'birthday_milestone' && sel.occasion_detail === '70th birthday' && !('inscription_script' in sel), JSON.stringify(sel))
+  check('en payload: language en, the context and occasion_detail, and NO inscription_script', sel.language === 'en' && sel.relationship === 'parent_mother' && sel.direction === 'up' && sel.purpose === 'celebrate' && sel.occasion_detail === '70th birthday' && !('inscription_script' in sel), JSON.stringify(sel))
   const lamp = page.locator('article').filter({ has: page.locator('[data-glyph]:text-is("灯")') })
   check('en reveal: the carved glyph is the modern Japanese form 灯 (spec v9.1 step 9), shown with the romaji reading (from the palette), the pinyin and the one-phrase English meaning', (await lamp.count()) === 1 && await lamp.locator('text=akari · pinyin dēng — lamp').isVisible())
   check('en reveal: no old-form (kyūjitai) note — only the modern form is carved', (await lamp.locator('text=kyūjitai').count()) === 0)
@@ -2062,7 +2070,7 @@ const SECTION_ORDER = ['.hero', '.strip', '.philo', '#shape', '#angles', '#write
   await page.waitForSelector('text=She kept the porch light on', { timeout: 5000 })
   const ex = calls.explain[0]
   check('learning loop (/demo): the explanation reports "explain_opened" with source harness', calls.analytics.some((e) => e.event === 'explain_opened' && e.source === 'harness' && e.choice === 'main') && calls.select[0].source === 'harness')
-  check('en explain call: language en with the context, the romaji reading AND the English meaning, no inscription_script', ex.language === 'en' && ex.relationship === 'parent_mother' && ex.occasion === 'seasonal_thanks' && ex.candidate.kanji === '灯' && ex.candidate.inscription_form === '燈' && ex.candidate.reading === 'akari' && ex.candidate.meaning === 'lamp' && !('inscription_script' in ex), JSON.stringify(ex))
+  check('en explain call: language en with the context, the romaji reading AND the English meaning, no inscription_script', ex.language === 'en' && ex.relationship === 'parent_mother' && ex.purpose === 'thanks' && ex.candidate.kanji === '灯' && ex.candidate.inscription_form === '燈' && ex.candidate.reading === 'akari' && ex.candidate.meaning === 'lamp' && !('inscription_script' in ex), JSON.stringify(ex))
   check('no page errors (run 13, /demo)', errors.length === 0)
   await page.close()
 }
@@ -2074,27 +2082,28 @@ const SECTION_ORDER = ['.hero', '.strip', '.philo', '#shape', '#angles', '#write
   const memResult = (body) => {
     const r = clone(FIXTURE)
     r.language = body.language
-    r.occasion = body.occasion
+    r.occasion = body.purpose === 'memorial' ? 'memorial' : 'birthday_milestone'
+    r.purpose = body.purpose
     r.inscription_script = null
     // the sender chose a gift occasion but the story says the person has died: the model suggests remembrance
-    if (body.occasion !== 'memorial') r.suggest_memorial = true
+    if (body.purpose !== 'memorial') r.suggest_memorial = true
     return r
   }
   const orderOk = () => ({ json: { order_ref: 'IC-20261026-MEMREF22', checkout_url: 'http://localhost:5173/__checkout?cart=mem', glyph: '守', certificate_text: 'x', certificate: { memorial: true } } })
   const { page, errors, calls } = await mockPage(browser, { result: memResult, order: orderOk })
   await page.goto('http://localhost:5173/?lang=ja', { waitUntil: 'networkidle' })
-  const chips = await page.locator('[data-chip^="occasion:"]').evaluateAll((els) => els.map((e) => e.dataset.chip))
-  check('memorial: "偲ぶ" is the last occasion chip, after the existing seven (nothing is set silently: no chip is pressed at the start)', chips.length === 8 && chips[7] === 'occasion:memorial' && (await page.locator('[data-chip="occasion:memorial"]').innerText()) === '偲ぶ' && (await page.locator('[data-chip^="occasion:"][aria-pressed=true]').count()) === 0)
+  const chips = await page.locator('[data-chip^="purpose:"]').evaluateAll((els) => els.map((e) => e.dataset.chip))
+  check('memorial: "偲ぶ" is the 8th purpose chip, before 「その他」 (nothing is set silently: no chip is pressed at the start)', chips.length === 9 && chips[7] === 'purpose:memorial' && chips[8] === 'purpose:other' && (await page.locator('[data-chip="purpose:memorial"]').innerText()) === '偲ぶ' && (await page.locator('[data-chip^="purpose:"][aria-pressed=true]').count()) === 0)
   await page.locator('#moment').fill('父は、私が帰省するたびに玄関の灯りをつけて待っていた。去年の冬に亡くなったけれど、今も思い出す。')
   await pickContext(page, { relationship: 'parent_father', direction: 'up', occasion: 'birthday_milestone' })
-  await page.click('[data-chip="occasion:memorial"]')
+  await page.click('[data-chip="purpose:memorial"]')
   check('memorial: choosing it changes the direction wording to one that never speaks of giving (その人は、あなたより / 目上の方 …)', (await page.locator('#cg-direction').innerText()) === 'その人は、あなたより' && !(await page.locator('[data-chip^="direction:"]').allInnerTexts()).some((t) => /へ|贈/.test(t)))
-  await page.click('[data-chip="occasion:birthday_milestone"]')
+  await page.click('[data-chip="purpose:celebrate"]')
   check('memorial: the direction label returns to the gift wording for the other occasions', (await page.locator('#cg-direction').innerText()) === '贈る向き')
   // -- the suggestion: the engine says the story is about someone who has died; the page asks (and shows no cards yet)
   await page.click(`#write >> text=${GO.ja}`)
   await page.waitForSelector('[data-testid=memorial-suggest]', { timeout: 15000 })
-  check('suggestion: the page asks the sender before showing anything — no cards, no silent switch of the occasion', (await page.locator('#write article[data-slot]').count()) === 0 && (await page.locator('[data-testid=memorial-suggest]').innerText()).includes('亡くなった方のお話のようです。') && calls.select.length === 1 && calls.select[0].occasion === 'birthday_milestone')
+  check('suggestion: the page asks the sender before showing anything — no cards, no silent switch of the occasion', (await page.locator('#write article[data-slot]').count()) === 0 && (await page.locator('[data-testid=memorial-suggest]').innerText()).includes('亡くなった方のお話のようです。') && calls.select.length === 1 && calls.select[0].purpose === 'celebrate')
   // "No, continue as it is" → the cards, as for any gift (cinnabar main)
   await page.click('[data-testid=memorial-no]')
   await page.waitForSelector('[data-testid=finalize]', { timeout: 15000 })
@@ -2102,12 +2111,12 @@ const SECTION_ORDER = ['.hero', '.strip', '.philo', '#shape', '#angles', '#write
   await page.click('#write >> text=もう一度試す')
   await page.locator('#moment').waitFor()
   // -- accept: run again as memorial (the same story, the same answers)
-  check('after "try again" the story is kept and no chip is pressed for the occasion except the sender\'s own (birthday_milestone)', (await page.locator('[data-chip="occasion:birthday_milestone"][aria-pressed=true]').count()) === 1)
+  check('after "try again" the story is kept and no chip is pressed for the occasion except the sender\'s own (birthday_milestone)', (await page.locator('[data-chip="purpose:celebrate"][aria-pressed=true]').count()) === 1)
   await page.click(`#write >> text=${GO.ja}`)
   await page.waitForSelector('[data-testid=memorial-suggest]', { timeout: 15000 })
   await page.click('[data-testid=memorial-yes]')
   await page.waitForSelector('[data-testid=finalize]', { timeout: 15000 })
-  check('suggestion accepted: the engine runs again with occasion memorial (same story), then the cards appear', calls.select.length === 3 && calls.select[2].occasion === 'memorial' && calls.select[2].story === calls.select[1].story && (await page.locator('#write article[data-slot]').count()) === 3)
+  check('suggestion accepted: the engine runs again with occasion memorial (same story), then the cards appear', calls.select.length === 3 && calls.select[2].purpose === 'memorial' && calls.select[2].story === calls.select[1].story && (await page.locator('#write article[data-slot]').count()) === 3)
   const colours = await page.evaluate(() => ({ main: getComputedStyle(document.querySelector('article[data-slot=main] [data-glyph]')).color, label: getComputedStyle(document.querySelector('article[data-slot=main] [data-slot-label]')).backgroundColor, border: getComputedStyle(document.querySelector('article[data-slot=main]')).borderTopColor, marked: document.querySelector('article[data-slot=main]').dataset.memorial }))
   check('memorial result: the main character, its label and its top rule are ink, never cinnabar; the card is marked data-memorial', colours.main === INK && colours.label === INK && colours.border === INK && colours.marked === 'yes', JSON.stringify(colours))
   check('memorial result: the finalize button says 「この一字を、残す」 (nothing is given)', (await page.locator('[data-testid=finalize]').innerText()) === 'この一字を、残す')
@@ -2136,9 +2145,9 @@ const SECTION_ORDER = ['.hero', '.strip', '.philo', '#shape', '#angles', '#write
   // English: the chip label
   const en = await mockPage(browser, { result: memResult })
   await en.page.goto('http://localhost:5173/?lang=en', { waitUntil: 'networkidle' })
-  check('memorial (en): the last occasion chip is "In memory"; zh-Hant: 追思', (await en.page.locator('[data-chip="occasion:memorial"]').innerText()) === 'In memory')
+  check('memorial (en): the last occasion chip is "In memory"; zh-Hant: 追思', (await en.page.locator('[data-chip="purpose:memorial"]').innerText()) === 'In memory')
   await en.page.goto('http://localhost:5173/?lang=zh-Hant', { waitUntil: 'networkidle' })
-  check('memorial (zh-Hant): 追思', (await en.page.locator('[data-chip="occasion:memorial"]').innerText()) === '追思')
+  check('memorial (zh-Hant): 追思', (await en.page.locator('[data-chip="purpose:memorial"]').innerText()) === '追思')
   await en.page.close()
 }
 
@@ -2207,6 +2216,116 @@ const SECTION_ORDER = ['.hero', '.strip', '.philo', '#shape', '#angles', '#write
   await m2.page.goto('http://localhost:5173/track', { waitUntil: 'networkidle' })
   check('track: without ?order= the number field is empty', (await m2.page.inputValue('input[name=order]')) === '')
   await m2.page.close()
+}
+
+// ---------- Run 15 (v9.6): purpose chips, state chips, 「その他」 free texts — the form in ja / zh-Hant / en, and the gift page's opening words per purpose ----------
+{
+  const FORM = {
+    ja: { lang: 'ja', purposeLabel: '贈る理由', stateLabel: '今のふたりは（任意）', other: 'その他', relOtherPh: '例：幼なじみ、元同僚', purposes: ['お祝い（誕生日・還暦・結婚・出産・入学など）', 'ありがとう', 'ごめんね・仲直り', '応援・お見舞い', '門出・送別（退職・引っ越し・卒業）', 'ご無沙汰・再会', '想いを伝える（ずっと言えなかったこと）', '偲ぶ', 'その他'], states: ['いつも近く', '離れて暮らす', 'しばらく会っていない', 'すれ違ったまま', 'もう会えない', 'その他'], caregiver: 'お世話になった人（医療・介護・支えてくれた人）' },
+    'zh-Hant': { lang: 'zh-Hant', purposeLabel: '送禮的理由', stateLabel: '現在的兩人（選填）', other: '其他', relOtherPh: '例如：青梅竹馬、前同事', purposes: ['祝福（生日・六十大壽・結婚・出生・入學等）', '謝謝', '道歉・和好', '加油・探望', '送別・新旅程（退休・搬家・畢業）', '久違・重逢', '傳達心意（一直沒說出口的話）', '追思', '其他'], states: ['常在身邊', '分隔兩地', '很久沒見', '還有心結', '已無法相見', '其他'], caregiver: '照顧過我的人（醫療・照護・支持我的人）' },
+    en: { lang: 'en', purposeLabel: "Why you're giving", stateLabel: 'Where the two of you stand now (optional)', other: 'Other', relOtherPh: 'e.g. childhood friend, former colleague', purposes: ['Celebrate (birthday, 60th, wedding, birth, school…)', 'Thank you', 'Sorry / making up', 'Encourage / get well', 'Farewell / new start (retiring, moving, graduating)', 'Keep in touch / meeting again', 'Say it at last (what was never said)', 'In memory', 'Other'], states: ['Close', 'Living apart', "Haven't met in a while", 'Something unresolved', 'No longer here', 'Other'], caregiver: 'Someone who cared for me (medical, care, support)' },
+  }
+  for (const [lang, f] of Object.entries(FORM)) {
+    const { page, errors, calls } = await mockPage(browser)
+    await page.goto(`http://localhost:5173/?lang=${lang}`, { waitUntil: 'networkidle' })
+    const labels = async (group) => page.locator(`[data-chip^="${group}:"]`).evaluateAll((els) => els.map((e) => e.innerText.trim()))
+    check(`form (${lang}): the purpose chips are the nine of the ticket, in order, with the right words`, (await labels('purpose')).join('|') === f.purposes.join('|'), (await labels('purpose')).join('|'))
+    check(`form (${lang}): the state chips are the six, in order, with the right words`, (await labels('state')).join('|') === f.states.join('|'), (await labels('state')).join('|'))
+    check(`form (${lang}): the group labels read 「${f.purposeLabel}」 and 「${f.stateLabel}」; the relationship chips include the caregiver chip and end with 「${f.other}」`, (await page.locator('#write').innerText()).includes(f.purposeLabel) && (await page.locator('#write').innerText()).includes(f.stateLabel) && (await labels('relationship')).includes(f.caregiver) && (await labels('relationship')).at(-1) === f.other)
+    check(`form (${lang}): no 「その他」 text field is shown until 「${f.other}」 is picked`, (await page.locator('input[name=relationship_other], input[name=purpose_other], input[name=state_other]').count()) === 0)
+    // 「その他」 shows its field with the limit and the placeholder
+    await page.click('[data-chip="relationship:other"]')
+    const ro = page.locator('input[name=relationship_other]')
+    check(`form (${lang}): relationship 「${f.other}」 shows a text field, max 20, with the example placeholder`, (await ro.count()) === 1 && (await ro.getAttribute('maxlength')) === '20' && (await ro.getAttribute('placeholder')) === f.relOtherPh)
+    await page.click('[data-chip="purpose:other"]')
+    const po = page.locator('input[name=purpose_other]')
+    check(`form (${lang}): purpose 「${f.other}」 shows a text field, max 30`, (await po.count()) === 1 && (await po.getAttribute('maxlength')) === '30')
+    await page.click('[data-chip="state:other"]')
+    const so = page.locator('input[name=state_other]')
+    check(`form (${lang}): state 「${f.other}」 shows a text field, max 20`, (await so.count()) === 1 && (await so.getAttribute('maxlength')) === '20')
+    await po.fill('あ'.repeat(40))
+    await ro.fill('い'.repeat(40))
+    check(`form (${lang}): the text fields stop at their limits (30 / 20)`, [...(await po.inputValue())].length === 30 && [...(await ro.inputValue())].length === 20)
+    // the milestone field is for celebrate and other
+    check(`form (${lang}): the milestone field is shown for 「${f.other}」 (and celebrate), not for the other purposes`, (await page.locator('input[name=occasion_detail]').count()) === 1)
+    await page.click('[data-chip="purpose:thanks"]')
+    check(`form (${lang}): … and gone again for thanks`, (await page.locator('input[name=occasion_detail]').count()) === 0 && (await page.locator('input[name=purpose_other]').count()) === 0)
+    await page.click('[data-chip="purpose:celebrate"]')
+    check(`form (${lang}): … and shown for celebrate`, (await page.locator('input[name=occasion_detail]').count()) === 1)
+    await page.click('[data-chip="purpose:thanks"]')
+    await page.click('[data-chip="purpose:thanks"]') // (a purpose cannot be un-picked: it stays pressed)
+    check(`form (${lang}): a purpose is required — the submit button is off until the relationship, direction AND purpose are picked; the state is optional`, await (async () => {
+      await page.reload({ waitUntil: 'networkidle' })
+      await page.locator('#write [data-testid=story-input]').fill('父は、駅の改札でいつも黙って手を振った。そのうしろ姿を、私はずっと覚えている。')
+      const btn = page.locator('#write button[type=submit]')
+      await page.click('[data-chip="relationship:parent_father"]')
+      await page.click('[data-chip="direction:up"]')
+      const offWithoutPurpose = await btn.isDisabled()
+      await page.click('[data-chip="purpose:thanks"]')
+      return offWithoutPurpose && (await btn.isEnabled()) && (await page.locator('[data-chip^="state:"][aria-pressed=true]').count()) === 0
+    })())
+    // the state is a toggle (blank = the engine reads it from the story), and goes to the engine only when picked
+    await page.click('[data-chip="state:strained"]')
+    check(`form (${lang}): a state chip can be picked and picked again to clear it`, (await page.locator('[data-chip="state:strained"][aria-pressed=true]').count()) === 1 && (await (async () => { await page.click('[data-chip="state:strained"]'); return (await page.locator('[data-chip^="state:"][aria-pressed=true]').count()) === 0 })()))
+    await page.click('[data-chip="state:lost"]')
+    await page.click('#write button[type=submit]')
+    await page.waitForSelector('[data-testid=finalize], article', { timeout: 15000 })
+    const sent = calls.select.at(-1)
+    check(`form (${lang}): the request carries relationship, direction, purpose and state as codes (and no old occasion)`, sent.relationship === 'parent_father' && sent.direction === 'up' && sent.purpose === 'thanks' && sent.state === 'lost' && !('occasion' in sent) && !('purpose_other' in sent) && !('state_other' in sent), JSON.stringify(sent))
+    check(`form (${lang}): no page errors`, errors.length === 0, errors.join('; '))
+    await page.close()
+  }
+  // the 「その他」 texts travel, trimmed, with the codes
+  {
+    const { page, calls } = await mockPage(browser)
+    await page.goto('http://localhost:5173/?lang=ja', { waitUntil: 'networkidle' })
+    await page.locator('#write [data-testid=story-input]').fill('幼なじみは、毎年私の誕生日に手紙をくれた。字が少し右上がりだった。')
+    await page.click('[data-chip="relationship:other"]')
+    await page.fill('input[name=relationship_other]', '  幼なじみ ')
+    await page.click('[data-chip="direction:across"]')
+    await page.click('[data-chip="purpose:other"]')
+    await page.fill('input[name=purpose_other]', '幼なじみの誕生日')
+    await page.click('#write button[type=submit]')
+    await page.waitForSelector('article', { timeout: 15000 })
+    const b = calls.select.at(-1)
+    check('form: 「その他」 texts go to the engine trimmed, beside their codes (relationship other, purpose other)', b.relationship === 'other' && b.relationship_other === '幼なじみ' && b.purpose === 'other' && b.purpose_other === '幼なじみの誕生日' && !('state' in b), JSON.stringify(b))
+    await page.close()
+  }
+
+  // the gift page: 「おめでとう」 only for celebrate; apology / encourage / remembrance are quiet (ink class) and carry no celebration word
+  {
+    const TOKEN = 'RG-testtesttesttesttest'
+    const year = new Date().getFullYear()
+    const view = (over) => ({ locked: false, id: TOKEN, token: TOKEN, language: 'ja', glyph: '備', reading: 'そな-える', romanization: 'sonaeru', meaning_en: 'to be ready', who: 'いつも、頼まれる前に備えている人。', memorial: false, film: { status: 'fallback', lines: ['「ちょうど今詰めてたところ」', 'いつも、頼まれる前に備えている人。'], pictures: ['/film/washi-1.webp', '/film/washi-2.webp'] }, certificate_line: 'この字は、あなたの目に映る、その人です。', poem: { type: 'tanka', lines: ['朝ごとに', '蓋の花添え', '備えたる', '母の背中を', '今も思へる'], reading: 'あさごとに' }, from: '山田 太郎', to: '山田 一郎', message: 'いつも、ありがとう。', egift: null, certificate_no: 12, order_date: `${year}-11-07`, opens_on: null, replied: false, package: 'simple', ...over })
+    const lineOf = async (v) => {
+      const ctx = await browser.newContext({ locale: 'ja-JP', viewport: { width: 375, height: 844 } })
+      const page = await ctx.newPage()
+      await page.route(`**/api/gift/${TOKEN}**`, async (r) => {
+        const u = new URL(r.request().url())
+        if (u.pathname === `/api/gift/${TOKEN}/render`) return r.fulfill({ json: { state: 'ready', view: v } })
+        if (u.pathname === `/api/gift/${TOKEN}`) return r.fulfill({ json: v })
+        return r.continue()
+      })
+      await page.goto(`http://localhost:5173/g/${TOKEN}`, { waitUntil: 'networkidle' })
+      await page.locator('[data-testid=gift-envelope]').waitFor()
+      const line = await page.locator('[data-testid=gift-env-line]').innerText()
+      const quiet = (await page.locator('.gf-page.gf-memorial').count()) === 1
+      await ctx.close()
+      return { line, quiet }
+    }
+    const cel = await lineOf(view({ purpose: 'celebrate' }))
+    check('gift page: celebrate opens with 「おめでとう」 and is not quiet', cel.line.startsWith('おめでとう') && !cel.quiet, JSON.stringify(cel))
+    const th = await lineOf(view({ purpose: 'thanks' }))
+    check('gift page: thanks opens with 「ありがとうを込めて」 — not 「おめでとう」', th.line.startsWith('ありがとう') && !/おめでとう/.test(th.line) && !th.quiet, JSON.stringify(th))
+    for (const purpose of ['apology', 'encourage']) {
+      const r = await lineOf(view({ purpose }))
+      check(`gift page: ${purpose} has no 「おめでとう」 / 祝 and uses the quiet (ink, no red) look`, !/おめでとう|祝/.test(r.line) && r.quiet, JSON.stringify(r))
+    }
+    const mem = await lineOf(view({ purpose: 'memorial', memorial: true }))
+    check('gift page: memorial has no 「おめでとう」 / 祝 and the quiet look', !/おめでとう|祝/.test(mem.line) && mem.quiet, JSON.stringify(mem))
+    const old = await lineOf(view({}))
+    check('gift page: an old gift (no purpose) shows exactly the line it always did', old.line === 'あなただけに届いた、一字の贈りもの' && !old.quiet, JSON.stringify(old))
+  }
 }
 
 await browser.close()

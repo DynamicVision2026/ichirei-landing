@@ -129,7 +129,7 @@ const gift = { relationship: 'parent_mother', direction: 'up', occasion: 'parent
 {
   const st = mem()
   const d = draftOf('母は、いつも先に起きていた。', gift, 'up-habit', T0)
-  check('(4) a draft saves the story, the chips and the question — and nothing else (no names, no results)', saveDraft(d, st) && Object.keys(JSON.parse(st.m.get(DRAFT_KEY)!)).sort().join() === 'direction,occasion,occasionDetail,questionId,reader,relationship,savedAt,story,v')
+  check('(4) a draft saves the story, the chips and the question — and nothing else (no names, no results)', saveDraft(d, st) && Object.keys(JSON.parse(st.m.get(DRAFT_KEY)!)).sort().join() === 'direction,occasion,occasionDetail,purpose,purposeOther,questionId,reader,relationship,relationshipOther,savedAt,state,stateOther,story,v')
   const back = loadDraft(T0 + 3_600_000, st)
   check('(4) …and comes back whole on the next visit', back?.story === '母は、いつも先に起きていた。' && back.relationship === 'parent_mother' && back.direction === 'up' && back.occasion === 'parent_day' && back.occasionDetail === '還暦' && back.questionId === 'up-habit')
   check('(4) a draft is still there on day 30 and gone after it (30-day expiry); the expired draft is deleted on the spot', loadDraft(T0 + DRAFT_TTL_MS, st) !== null && loadDraft(T0 + DRAFT_TTL_MS + 1, st) === null && !st.m.has(DRAFT_KEY))

@@ -3,6 +3,8 @@
 // result is saved on the animation record (what the page reads) and on the order record (production.film). If it is not ready when someone opens
 // /a/<id> the page waits quietly; if it is still missing after a while (a restart, a throttled instance) the view asks for it once more here.
 
+import { toneLine } from './purpose.ts'
+import { isQuietPurpose } from '../src/order/purpose.ts'
 import type { AnimationRecord } from './animation.ts'
 import { isAnimationRecord } from './animation.ts'
 import { mergeStory } from './contract.ts'
@@ -23,6 +25,8 @@ export function filmInputFromRecord(record: OrderRecord): FilmInput {
     occasion: result.occasion ?? null,
     occasion_detail: result.occasion_detail ?? null,
     memorial: p.certificate.memorial === true,
+    tone: toneLine({ purpose: (result.purpose as never) ?? null, state: (result.state as never) ?? null }),
+    quiet: p.certificate.memorial === true || isQuietPurpose(result.purpose),
     glyph: p.glyph_to_carve,
     forms: [p.kanji, p.glyph_to_carve, cand?.inscription_form ?? ''].filter(Boolean),
     who: p.gaze_line,

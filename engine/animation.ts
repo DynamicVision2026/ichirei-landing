@@ -39,6 +39,8 @@ export interface AnimationRecord {
   /** "Who they are": the card's one line (shown near the end of the film). */
   who: string
   memorial: boolean
+  /** v9.6: why the gift is given (see Certificate.purpose); absent on older records. */
+  purpose?: string | null
   /** The film script (engine/film.ts): four lines and four picture descriptions, or the fallback; null while it is being written. */
   film: FilmRecord | null
   /** The receiver's page of this order (engine/gift.ts): the sender's page offers it for sharing. Never sent to the receiver. */
@@ -64,6 +66,7 @@ export function buildAnimationRecord(record: OrderRecord, id: string, now: Date 
     moment: p.story_anchor,
     who: p.gaze_line,
     memorial: p.certificate.memorial === true,
+    ...(p.certificate.purpose ? { purpose: p.certificate.purpose } : {}),
     film: null,
   }
 }
@@ -77,6 +80,8 @@ export interface AnimationView {
   meaning_en: string | null
   who: string
   memorial: boolean
+  /** v9.6: why the gift is given: decides the opening words of the gift page and whether red is used. */
+  purpose?: string | null
   /**
    * null = the film script is still being written (the page shows a quiet waiting screen and asks again).
    * `pictures` null = the script is there but the four pictures are not drawn yet: the page asks POST /api/film/<id>/render, which stays open until they are.
@@ -106,7 +111,7 @@ export function animationView(r: AnimationRecord, art: ArtRecord | null = null):
       film = { status: 'ready', lines: f.lines, pictures: f.lines.map((_, i) => (art.slots[i] === 'ai' ? pictureUrl(r.id, i + 1, art.made_at) : washiPictureUrl(i))), ...(art.slots.includes('pending') || art.slots.includes('unchecked') ? { incomplete: true } : {}) }
     } else film = { status: 'ready', lines: f.lines, pictures: null, ...(art?.status === 'deferred' ? { deferred: true } : {}) }
   }
-  return { id: r.id, language: r.language, glyph: r.glyph, reading: r.reading, romanization: r.romanization, meaning_en: r.meaning_en, who: r.who, memorial: r.memorial, film }
+  return { id: r.id, language: r.language, glyph: r.glyph, reading: r.reading, romanization: r.romanization, meaning_en: r.meaning_en, who: r.who, memorial: r.memorial, ...(r.purpose ? { purpose: r.purpose } : {}), film }
 }
 
 export function isAnimationRecord(x: unknown): x is AnimationRecord {

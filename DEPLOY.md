@@ -572,3 +572,7 @@ The site is public (`--allow-unauthenticated`) and every `/demo` run spends Anth
 docker build -t ichirei:local .
 node scripts/test-container.mjs        # runs the image against a fake model upstream, no key needed
 ```
+
+## Purpose and state (v9.6)
+
+The form sends `purpose` (celebrate / thanks / apology / encourage / farewell / reconnect / confess / memorial / other), an optional `state` and the 「その他」 texts (`relationship_other` ≤ 20, `purpose_other` ≤ 30, `state_other` ≤ 20 characters) to `/api/select`; there is nothing to configure. An older client that sends only an `occasion` keeps working. The logs show `purpose`, `state` and `other_text_mapped` (codes only, never the text) on the `[ichirei-cards]` line. Reference: `docs/ICHIREI_Relationship_Emotion_Map.md`. Check a deploy with `/api/health` (`commit`, `deployedAt`) and `/api/select?debug=1`; to read the real model's lines against the 16 internal stories run `ANTHROPIC_API_KEY=… node --experimental-strip-types scripts/run-story-accuracy.mjs --set purpose`.

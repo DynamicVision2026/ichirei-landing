@@ -18,7 +18,7 @@ THE STORY
 THE POEM ({{ TYPE }})
 {{ POEM }}
 
-The chosen character ({{ KANJI }}) was already judged when it was offered: its presence in the poem, in any form, is intended and is never a reason to fail — including a single Chinese character set inside an English poem. A word that merely TRANSLATES or glosses it is not a taboo either.
+The chosen character ({{ KANJI }}) was already judged when it was offered: its presence in the poem, in any form, is intended and is never a reason to fail on safety grounds (rule 12 below judges only HOW it is used) — including a single Chinese character set inside an English poem. A word that merely TRANSLATES or glosses it is not a taboo either.
 
 FAIL only if one of these clearly holds, and name it in `rule`:
 1. `palette` — The poem uses a death, illness, parting, severing or ending word, or a word that is a level-1/level-3 taboo for this occasion.
@@ -32,10 +32,12 @@ FAIL only if one of these clearly holds, and name it in `rule`:
 9. `insult` — It teases or mocks the receiver's body, appearance, intelligence, illness or anything cruel, or shames them for debt or poverty. Money as a topic (paying, saving, lending) is not an insult.
 10. `attribution` — It quotes or closely imitates a famous poem, or is presented as written by a named poet.
 
-There is also ONE quality rule, which fails a poem just as firmly:
-11. `story_image` — The poem's imagery does not come from THIS story: its pictures are generic scenery that would fit any other story (a boat light, a sea at dusk, a flower, the moon, rain, a path) and none of its concrete images is a detail the story itself gives — an object, a place or an act of the story, ideally the one at its turning point (the moment the sender saw who this person really was). A poem that uses one such story detail passes, even if the rest is plain. When you fail it, say in `reason` which detail of the story the poem should carry.
+There are also THREE quality rules, which fail a poem just as firmly:
+11. `story_image` — The poem's imagery does not come from THIS story: its pictures are generic scenery that would fit any other story (a boat light, a sea at dusk, a flower, the moon, rain, a path), or it contains a scenery, an object or a feeling the story does not give. At least one concrete image must be a detail the story itself gives — an object, a place or an act of the story, ideally the one at its turning point (the moment the sender saw who this person really was) — and nothing in the poem may come from outside the story. When you fail it, say in `reason` which detail of the story the poem should carry, or which image is not in the story.
+12. `character` — The chosen character ({{ KANJI }}) is not used naturally: it is missing, or it appears only as a bare label line that announces it (like 「父察す」 or 「誠見ゆ」), or it is forced into a word that does not belong. It must live inside a real word of a line that tells the story's image. (An English poem carries it as its plain meaning word.)
+13. `tone` — The poem breaks the tone rules of this gift's purpose (the TONE OF THIS GIFT line above, if any): celebration words or red-letter joy in an apology, an encouragement or a remembrance; a verdict on the receiver's illness, pain or death in an encouragement; the sender's guilt displayed in an apology; blame for the gap in a reconnection.
 
 Everything else is at most a concern. A poem with only concerns is a PASS.
 
 OUTPUT. Reply with exactly one JSON object and nothing else:
-{ "pass": true | false, "rule": null | "palette" | "occasion" | "memorial" | "dignity" | "register" | "illness" | "relationship" | "goodwill" | "insult" | "attribution" | "story_image", "reason": "<≤ 20 words, English>" }
+{ "pass": true | false, "rule": null | "palette" | "occasion" | "memorial" | "dignity" | "register" | "illness" | "relationship" | "goodwill" | "insult" | "attribution" | "story_image" | "character" | "tone", "reason": "<≤ 20 words, English>" }

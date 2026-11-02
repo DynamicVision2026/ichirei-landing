@@ -132,7 +132,7 @@ export async function changeCharacter(d: ChangeDeps, rec: OrderRecord, kanji: st
     story_anchor: cand.story_anchor,
     unique_truth: cand.unique_truth ?? '',
     suitability_flag: cand.suitability_flag ?? null,
-    certificate: buildCertificate(cand, glyph, p.language, palette, isMemorial(rec.engine_result.occasion ?? null)),
+    certificate: buildCertificate(cand, glyph, p.language, palette, isMemorial(rec.engine_result.occasion ?? null), rec.engine_result.purpose ?? null),
   }
   applyPoem(rec, gift, poem)
   const cert = rec.production.certificate

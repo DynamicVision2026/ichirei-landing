@@ -14,7 +14,7 @@ import { questionSetOf, questionTextOf } from './questions'
 import { OPENER } from '../reveal/opener-copy'
 import { exportEvents, log, setCondition as logSetCondition, setStory as logSetStory } from './logging'
 import { setMemorialSelected } from '../reveal/occasion-store'
-import { COPY, DEFAULT_GIFT_CONTEXT, FOLLOW_UP_COUNTER_FROM, FOLLOW_UP_MAX, clipStory, contextToPayload, storyLength, type Copy, type GiftContext } from './i18n'
+import { COPY, DEFAULT_GIFT_CONTEXT, FOLLOW_UP_COUNTER_FROM, FOLLOW_UP_MAX, clipStory, contextToPayload, occasionOf, purposeOf, storyLength, type Copy, type GiftContext } from './i18n'
 import { getLanguage, setLanguage } from '../lang-store'
 import { useLanguage } from '../useLanguage'
 
@@ -121,7 +121,8 @@ const GOLDEN_CONTEXT: GiftContext = {
   language: 'ja',
   relationship: 'parent_father',
   direction: 'up',
-  occasion: 'parent_day',
+  occasion: '',
+  purpose: 'thanks', // (the golden fixture's occasion was parent_day: 母の日・父の日 is 「ありがとう」 now)
   occasionDetail: '還暦',
 }
 const GOLDEN_FIXTURE =
@@ -214,11 +215,12 @@ export default function DemoApp({ mode = 'harness', aside }: { mode?: Mode; asid
     setContextState(next)
   }
   // The landing page's steps and examples say "two cards" while 偲ぶ is picked (a remembrance result is main + second, no free pick).
+  const memorialNow = occasionOf(context) === 'memorial'
   useEffect(() => {
     if (!customer) return
-    setMemorialSelected(context.occasion === 'memorial')
+    setMemorialSelected(memorialNow)
     return () => setMemorialSelected(false)
-  }, [customer, context.occasion])
+  }, [customer, memorialNow])
   const copy = COPY[context.language]
   const [chosen, setChosen] = useState<Candidate | null>(null)
 
@@ -268,7 +270,7 @@ export default function DemoApp({ mode = 'harness', aside }: { mode?: Mode; asid
       else saveDraft(draftOf(story, context, questionId))
     }, 400)
     return () => window.clearTimeout(id)
-  }, [customer, draftOffer, story, context.relationship, context.direction, context.occasion, context.occasionDetail, context.reader, questionId]) // eslint-disable-line react-hooks/exhaustive-deps
+  }, [customer, draftOffer, story, context.relationship, context.direction, context.occasion, context.purpose, context.purposeOther, context.state, context.stateOther, context.relationshipOther, context.occasionDetail, context.reader, questionId]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const changeCondition = (c: Condition) => {
     if (c === condition) return
@@ -350,7 +352,9 @@ export default function DemoApp({ mode = 'harness', aside }: { mode?: Mode; asid
         language: ctx.language,
         relationship: ctx.relationship,
         direction: ctx.direction,
-        occasion: ctx.occasion,
+        occasion: occasionOf(ctx),
+        purpose: purposeOf(ctx),
+        state: ctx.state ?? '',
         has_occasion_detail: ctx.occasionDetail.trim() !== '',
         follow_ups_used: followUpsUsed.current,
       })
@@ -369,7 +373,7 @@ export default function DemoApp({ mode = 'harness', aside }: { mode?: Mode; asid
         } else {
           setPhase('thin')
         }
-      } else if (engineResult.suggest_memorial === true && ctx.occasion !== 'memorial' && !memorialDeclined.current) {
+      } else if (engineResult.suggest_memorial === true && occasionOf(ctx) !== 'memorial' && !memorialDeclined.current) {
         // The story clearly says the person has died: ask the sender (never switch the occasion silently).
         log('memorial_suggested', {})
         setPhase('suggest')
@@ -419,7 +423,7 @@ export default function DemoApp({ mode = 'harness', aside }: { mode?: Mode; asid
   // The sender's answer to "this sounds like someone who has passed away": look again as memorial, or keep what was found.
   const acceptMemorial = () => {
     log('memorial_accepted', {})
-    const next = { ...context, occasion: 'memorial' as const }
+    const next = { ...context, purpose: 'memorial' as const, occasion: '' as const }
     setContext(next)
     setResult(null)
     followUpsUsed.current = 0
@@ -467,7 +471,7 @@ export default function DemoApp({ mode = 'harness', aside }: { mode?: Mode; asid
             data-testid="draft-continue"
             onClick={() => {
               setStory(draftOffer.story)
-              setContextState((c) => ({ ...c, relationship: draftOffer.relationship, direction: draftOffer.direction, occasion: draftOffer.occasion, occasionDetail: draftOffer.occasionDetail, reader: draftOffer.reader as GiftContext['reader'] }))
+              setContextState((c) => ({ ...c, relationship: draftOffer.relationship, direction: draftOffer.direction, occasion: draftOffer.occasion, purpose: (draftOffer.purpose ?? '') as GiftContext['purpose'], purposeOther: draftOffer.purposeOther ?? '', state: (draftOffer.state ?? '') as GiftContext['state'], stateOther: draftOffer.stateOther ?? '', relationshipOther: draftOffer.relationshipOther ?? '', occasionDetail: draftOffer.occasionDetail, reader: draftOffer.reader as GiftContext['reader'] }))
               setQuestionId(draftOffer.questionId)
               trackFlow('draft_restored', { language: context.language })
               setDraftOffer(null)

@@ -15,12 +15,18 @@ export interface Draft {
   direction: GiftContext['direction']
   occasion: GiftContext['occasion']
   occasionDetail: string
+  /** v9.6: why the gift is given, where the two stand, and the 「その他」 texts. An older draft has only an occasion; it is read as the purpose it stands for. */
+  purpose?: string
+  purposeOther?: string
+  state?: string
+  stateOther?: string
+  relationshipOther?: string
   /** Part B: where the receiver will read it ('' = same as the sender). */
   reader: string
   questionId: string | null
 }
 
-export const draftOf = (story: string, ctx: Pick<GiftContext, 'relationship' | 'direction' | 'occasion' | 'occasionDetail' | 'reader'>, questionId: string | null, now: number = Date.now()): Draft => ({
+export const draftOf = (story: string, ctx: Pick<GiftContext, 'relationship' | 'direction' | 'occasion' | 'occasionDetail' | 'reader' | 'purpose' | 'purposeOther' | 'state' | 'stateOther' | 'relationshipOther'>, questionId: string | null, now: number = Date.now()): Draft => ({
   v: 1,
   savedAt: now,
   story,
@@ -28,6 +34,11 @@ export const draftOf = (story: string, ctx: Pick<GiftContext, 'relationship' | '
   direction: ctx.direction,
   occasion: ctx.occasion,
   occasionDetail: ctx.occasionDetail,
+  purpose: ctx.purpose ?? '',
+  purposeOther: ctx.purposeOther ?? '',
+  state: ctx.state ?? '',
+  stateOther: ctx.stateOther ?? '',
+  relationshipOther: ctx.relationshipOther ?? '',
   reader: ctx.reader ?? '',
   questionId,
 })
@@ -67,6 +78,11 @@ export function loadDraft(now: number = Date.now(), storage: Pick<Storage, 'getI
       direction: (d.direction ?? '') as Draft['direction'],
       occasion: (d.occasion ?? '') as Draft['occasion'],
       occasionDetail: typeof d.occasionDetail === 'string' ? d.occasionDetail : '',
+      purpose: typeof d.purpose === 'string' ? d.purpose : '',
+      purposeOther: typeof d.purposeOther === 'string' ? d.purposeOther : '',
+      state: typeof d.state === 'string' ? d.state : '',
+      stateOther: typeof d.stateOther === 'string' ? d.stateOther : '',
+      relationshipOther: typeof d.relationshipOther === 'string' ? d.relationshipOther : '',
       reader: typeof d.reader === 'string' ? d.reader : '',
       questionId: typeof d.questionId === 'string' ? d.questionId : null,
     }

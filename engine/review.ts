@@ -12,6 +12,7 @@
 // Env: ICHIREI_REVIEW=off disables the call; ICHIREI_REVIEW_MODEL, ICHIREI_REVIEW_EFFORT (default
 // low), ICHIREI_REVIEW_MAX_TOKENS (default 4000; the reasoning counts against it), ICHIREI_REVIEW_TIMEOUT_MS (default 60000), ICHIREI_REVIEW_PROMPT_PATH.
 
+import { purposeFrame } from './purpose.ts'
 import Anthropic from '@anthropic-ai/sdk'
 import { readFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
@@ -117,7 +118,7 @@ export function fillReviewPrompt(template: string, story: string, context: Engin
     [REVIEW_SLOTS.candidates, JSON.stringify(items, null, 2)],
   ])
   const pattern = new RegExp([...values.keys()].map((s) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')).join('|'), 'g')
-  return template.replace(pattern, (slot) => values.get(slot) as string)
+  return `${purposeFrame(context)}\n\n${template.replace(pattern, (slot) => values.get(slot) as string)}`
 }
 
 export type Verdict = ReviewVerdict

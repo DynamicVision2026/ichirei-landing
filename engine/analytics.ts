@@ -6,6 +6,7 @@
 // Plumbing only: nothing here judges a character. Failures are logged and swallowed — analytics must never
 // cost a customer their result.
 
+import { PURPOSES, STATES } from '../src/order/purpose.ts'
 import { LANGUAGES, OCCASIONS, RELATIONSHIPS, type EngineResult, type Language, type Occasion, type Relationship } from './contract.ts'
 import { createOrderStore, type OrderStore } from './order-store.ts'
 import { QUESTION_SETS, findQuestion, type QuestionSet } from './story-questions.ts'
@@ -29,7 +30,7 @@ export type PictureState = (typeof PICTURE_STATES)[number]
 export const CLIENT_EVENTS = ['chosen', 'explain_opened', ...FLOW_EVENTS, ...PREVIEW_EVENTS] as const
 
 export type AnalyticsEvent =
-  | { ts: string; session: string; source: Source; event: 'shown'; language: Language; relationship: Relationship | null; occasion: Occasion | null; status: 'sufficient' | 'insufficient'; main_slot: 'main' | 'second' | null; has_freestyle: boolean }
+  | { ts: string; session: string; source: Source; event: 'shown'; language: Language; relationship: Relationship | null; occasion: Occasion | null; purpose?: string | null; state?: string | null; status: 'sufficient' | 'insufficient'; main_slot: 'main' | 'second' | null; has_freestyle: boolean }
   | { ts: string; session: string; source: Source; event: FlowEvent; language: Language | null; set: QuestionSet | null; qid: string | null }
   | { ts: string; session: string; source: Source; event: PreviewEvent; language: Language | null; n: 1 | 2 | null; state: PictureState | null; secs: number | null }
   | { ts: string; session: string; source: Source; event: 'chosen'; choice: Choice }
@@ -81,6 +82,9 @@ export function shownEvent(result: EngineResult, session: string, source: Source
     language: (LANGUAGES as readonly string[]).includes(result.language) ? result.language : 'ja',
     relationship: (RELATIONSHIPS as readonly string[]).includes(result.relationship as string) ? result.relationship : null,
     occasion: (OCCASIONS as readonly string[]).includes(result.occasion as string) ? result.occasion : null,
+    // v9.6: codes only — never the 「その他」 texts
+    purpose: (PURPOSES as readonly string[]).includes(result.purpose as string) ? (result.purpose as string) : null,
+    state: (STATES as readonly string[]).includes(result.state as string) ? (result.state as string) : null,
     status: result.status,
     main_slot: result.status === 'sufficient' && primary ? (primary.slot === 'second' ? 'second' : 'main') : null,
     has_freestyle: result.status === 'sufficient' && Boolean(result.freestyle_kanji),

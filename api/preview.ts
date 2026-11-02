@@ -11,6 +11,8 @@
 // A draft id is a private, unguessable link (100 bits), held by the browser that made it. No download exists before payment: there is no scroll and no PDF
 // for a draft (those routes only know orders). Web-standard handlers; mounted by server/app.ts.
 
+import { toneLine } from '../engine/purpose.ts'
+import { noCelebration } from '../src/order/purpose.ts'
 import { cleanSession } from '../engine/analytics.ts'
 import { FOLLOW_UP_MAX, STORY_MAX, countChars, mergeStory, parseContext, parseExclude, parseFollowUps } from '../engine/contract.ts'
 import { ANIMATION_ID_PATTERN } from '../engine/animation.ts'
@@ -80,6 +82,8 @@ export function createPreviewHandlers(deps: () => PreviewApiDeps) {
           occasion: ctx.context.occasion,
           occasion_detail: ctx.context.occasion_detail || null,
           memorial: ctx.context.occasion === 'memorial',
+          tone: toneLine(ctx.context),
+          quiet: noCelebration(ctx.context as never),
           shown: shown.exclude,
           draft_id: draftId,
         },

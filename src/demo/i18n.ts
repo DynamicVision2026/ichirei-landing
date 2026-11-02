@@ -9,6 +9,7 @@
 // engine/contract.ts (src/ and engine/ compile separately); scripts/test-copy.ts keeps them in sync.
 
 import { cleanReading } from '../order/reading.ts'
+import { effectivePurpose, effectiveState, mapOtherRelationship, occasionFromPurpose, purposeFromOccasion, PURPOSES, STATES, type Purpose, type State } from '../order/purpose.ts'
 import { SIZE_COPY } from './sizes-copy.ts'
 
 export type UiLanguage = 'ja' | 'zh-Hans' | 'zh-Hant' | 'en'
@@ -25,7 +26,7 @@ export const UI_LANGUAGES: readonly UiLanguage[] = ['ja', 'zh-Hans', 'zh-Hant', 
 export const isChineseUi = (l: UiLanguage | undefined): boolean => l === 'zh-Hans' || l === 'zh-Hant'
 export const RELATIONSHIP_CODES = [
   'parent_mother', 'parent_father', 'child', 'grandparent', 'spouse', 'romance', 'sibling',
-  'friend', 'work', 'pet', 'in_law', 'mentor', 'community',
+  'friend', 'work', 'pet', 'in_law', 'mentor', 'community', 'caregiver',
 ] as const
 export const DIRECTION_CODES = ['up', 'down', 'across'] as const
 export const OCCASION_CODES = [
@@ -33,6 +34,13 @@ export const OCCASION_CODES = [
   'parent_day', 'seasonal_thanks', 'memorial',
 ] as const
 export type RelationshipCode = (typeof RELATIONSHIP_CODES)[number]
+/** v9.6: why the gift is given, and where the two stand now (optional). Each has an 「その他」 with a short free text. */
+export const PURPOSE_CODES = PURPOSES
+export const STATE_CODES = STATES
+export type PurposeCode = Purpose
+export type StateCode = State
+/** The relationship chip can also be 「その他」 (with a short text); the server maps the text to the nearest code. */
+export type RelationshipChoice = RelationshipCode | 'other'
 export type DirectionCode = (typeof DIRECTION_CODES)[number]
 export type OccasionCode = (typeof OCCASION_CODES)[number]
 
@@ -64,10 +72,19 @@ export function appendSpoken(current: string, spoken: string, max = STORY_MAX): 
 /** The gift's context as the sender fills it in. '' = not chosen yet. */
 export interface GiftContext {
   language: UiLanguage
-  relationship: RelationshipCode | ''
+  relationship: RelationshipChoice | ''
   direction: DirectionCode | ''
+  /** Legacy: the old occasion chips are gone; a saved draft or an older caller may still carry one. `occasionOf(ctx)` is what the rules use. */
   occasion: OccasionCode | ''
+  /** The optional milestone (「どんな節目？」), shown for the purposes celebrate and other. */
   occasionDetail: string
+  /** v9.6: why you are giving (required). */
+  purpose?: PurposeCode | ''
+  purposeOther?: string
+  /** v9.6: where the two stand now (optional). */
+  state?: StateCode | ''
+  stateOther?: string
+  relationshipOther?: string
   inscriptionScript: InscriptionScript
   /** Where the receiver will READ the gift when that differs from the sender (Part B): '' = the same. Never asked for remembrance. */
   reader?: ReaderChoice
@@ -232,7 +249,7 @@ export interface Copy {
 const ja: Copy = {
   languageName: '日本語',
   languageLabel: '言語',
-  contextHeading: '贈る場面',
+  contextHeading: '贈る相手と理由',
   relationshipLabel: 'その人は、あなたにとって',
   directionLabel: '贈る向き',
   occasionLabel: '場面',
@@ -241,7 +258,7 @@ const ja: Copy = {
   inscriptionScriptLabel: '刻印の字体',
   inscriptionScripts: { traditional: '繁体字', simplified: '簡体字' },
   choose: '選んでください',
-  contextMissing: '関係・向き・場面を選ぶと、探しにいけます。',
+  contextMissing: '関係・向き・贈る理由を選ぶと、探しにいけます。',
   relationships: {
     parent_mother: '母',
     parent_father: '父',
@@ -256,6 +273,7 @@ const ja: Copy = {
     in_law: '義理の家族',
     mentor: '恩師・師匠',
     community: '地域・コミュニティの人',
+    caregiver: 'お世話になった人（医療・介護・支えてくれた人）',
   },
   directions: {
     up: '目上の方へ（親・恩師・上司など）',
@@ -380,7 +398,7 @@ const ja: Copy = {
 const zhHans: Copy = {
   languageName: '简体中文',
   languageLabel: '语言',
-  contextHeading: '送礼的场合',
+  contextHeading: '送礼的对象与理由',
   relationshipLabel: '对方是你的',
   directionLabel: '送礼的方向',
   occasionLabel: '场合',
@@ -389,7 +407,7 @@ const zhHans: Copy = {
   inscriptionScriptLabel: '刻字字体',
   inscriptionScripts: { traditional: '繁體字', simplified: '简体字' },
   choose: '请选择',
-  contextMissing: '选好关系、方向和场合，就可以开始寻找。',
+  contextMissing: '选好关系、方向和送礼的理由，就可以开始寻找。',
   relationships: {
     parent_mother: '母亲',
     parent_father: '父亲',
@@ -404,6 +422,7 @@ const zhHans: Copy = {
     in_law: '姻亲（公婆／岳父母等）',
     mentor: '恩师／导师',
     community: '社区／团体中的人',
+    caregiver: '照顾过我的人（医疗・照护・支持我的人）',
   },
   directions: {
     up: '送给长辈或上位者（父母、师长、上司）',
@@ -531,7 +550,7 @@ const zhHans: Copy = {
 const zhHant: Copy = {
   languageName: '繁體中文',
   languageLabel: '語言',
-  contextHeading: '送禮的場合',
+  contextHeading: '送禮的對象與理由',
   relationshipLabel: '對方是你的',
   directionLabel: '送禮的方向',
   occasionLabel: '場合',
@@ -540,7 +559,7 @@ const zhHant: Copy = {
   inscriptionScriptLabel: '刻字字體',
   inscriptionScripts: { traditional: '繁體字', simplified: '簡體字' },
   choose: '請選擇',
-  contextMissing: '選好關係、方向和場合，就可以開始尋找。',
+  contextMissing: '選好關係、方向和送禮的理由，就可以開始尋找。',
   relationships: {
     parent_mother: '母親',
     parent_father: '父親',
@@ -555,6 +574,7 @@ const zhHant: Copy = {
     in_law: '姻親（公婆／岳父母等）',
     mentor: '恩師／導師',
     community: '社區／團體中的人',
+    caregiver: '照顧過我的人（醫療・照護・支持我的人）',
   },
   directions: {
     up: '送給長輩或上位者（父母、師長、上司）',
@@ -694,7 +714,7 @@ const en: Copy = {
   inscriptionScriptLabel: 'Carved form',
   inscriptionScripts: { traditional: 'Traditional', simplified: 'Simplified' },
   choose: 'Please choose',
-  contextMissing: 'Choose the relationship, direction and occasion to begin.',
+  contextMissing: "Choose the relationship, direction and why you're giving to begin.",
   relationships: {
     parent_mother: 'Mother',
     parent_father: 'Father',
@@ -709,6 +729,7 @@ const en: Copy = {
     in_law: 'In-law',
     mentor: 'Teacher or mentor',
     community: 'Neighbour or community member',
+    caregiver: 'Someone who cared for me (medical, care, support)',
   },
   directions: {
     up: 'To someone older or senior (parent, mentor, boss)',
@@ -858,16 +879,39 @@ export function carvedGlyph(
 /** What the API call body should carry for this context (empty selections are simply omitted). */
 export function contextToPayload(ctx: GiftContext): Record<string, string> {
   const out: Record<string, string> = { language: ctx.language }
+  const flat = (t: string | undefined) => (t ?? '').replace(/\s+/g, ' ').trim()
   if (ctx.relationship) out.relationship = ctx.relationship
+  if (ctx.relationship === 'other' && flat(ctx.relationshipOther)) out.relationship_other = flat(ctx.relationshipOther)
   if (ctx.direction) out.direction = ctx.direction
-  if (ctx.occasion) out.occasion = ctx.occasion
+  if (ctx.purpose) {
+    out.purpose = ctx.purpose
+    if (ctx.purpose === 'other' && flat(ctx.purposeOther)) out.purpose_other = flat(ctx.purposeOther)
+  } else if (ctx.occasion) out.occasion = ctx.occasion // an older draft: the server maps it to the purpose
+  if (ctx.state) {
+    out.state = ctx.state
+    if (ctx.state === 'other' && flat(ctx.stateOther)) out.state_other = flat(ctx.stateOther)
+  }
   const detail = ctx.occasionDetail.replace(/\s+/g, ' ').trim()
   if (detail) out.occasion_detail = detail
   if (isChineseUi(ctx.language)) out.inscription_script = ctx.inscriptionScript
   // Remembrance never asks where the receiver will read it (nothing is given).
-  if (ctx.reader && ctx.occasion !== 'memorial') out.reader = ctx.reader
+  if (ctx.reader && occasionOf(ctx) !== 'memorial') out.reader = ctx.reader
   return out
 }
 
-export const contextComplete = (ctx: GiftContext): boolean =>
-  ctx.relationship !== '' && ctx.direction !== '' && ctx.occasion !== ''
+/**
+ * The old occasion code the rules still key on (remembrance, the question sets, the draft), derived from the purpose exactly as the server derives it
+ * (src/order/purpose.ts is shared): the state "lost" turns remembrance on under any purpose; a context that only has an old occasion keeps it.
+ */
+export function occasionOf(ctx: Pick<GiftContext, 'relationship' | 'occasion' | 'occasionDetail' | 'purpose' | 'purposeOther' | 'state' | 'stateOther' | 'relationshipOther'>): OccasionCode | '' {
+  const facts = { purpose: (ctx.purpose || null) as Purpose | null, purpose_other: ctx.purposeOther ?? null, state: (ctx.state || null) as State | null, state_other: ctx.stateOther ?? null }
+  if (effectiveState(facts) === 'lost') return 'memorial'
+  if (!ctx.purpose) return ctx.occasion
+  const rel = ctx.relationship === 'other' ? mapOtherRelationship(ctx.relationshipOther) : ctx.relationship || null
+  return (occasionFromPurpose(effectivePurpose(facts), rel, ctx.occasionDetail.trim() || null) ?? '') as OccasionCode | ''
+}
+
+/** The purpose chip of a context (an old occasion maps to the purpose it stands for). */
+export const purposeOf = (ctx: Pick<GiftContext, 'purpose' | 'occasion'>): PurposeCode | '' => ctx.purpose || purposeFromOccasion(ctx.occasion) || ''
+
+export const contextComplete = (ctx: GiftContext): boolean => ctx.relationship !== '' && ctx.direction !== '' && purposeOf(ctx) !== ''

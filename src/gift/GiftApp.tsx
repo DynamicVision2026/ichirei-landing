@@ -1,3 +1,4 @@
+import { isQuietPurpose } from '../order/purpose.ts'
 import { cleanReading } from '../order/reading.ts'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { COPY as FILM_COPY, pageLang, type PageLang } from '../animation/copy.ts'
@@ -119,7 +120,9 @@ export default function GiftApp() {
   }, [reduced])
 
   const memorial = load.state === 'ready' || load.state === 'locked' ? load.view.memorial : false
-  const shell = `gf-page gf-step-${step}${memorial ? ' gf-memorial' : ''}`
+  // v9.6: an apology and an encouragement are as quiet as a remembrance — no red, no celebration words (the page keeps its words about a letter, not a gift)
+  const quiet = memorial || ((load.state === 'ready' || load.state === 'locked') && isQuietPurpose(load.view.purpose))
+  const shell = `gf-page gf-step-${step}${quiet ? ' gf-memorial' : ''}`
 
   if (load.state === 'loading' || load.state === 'error')
     return (
@@ -134,7 +137,7 @@ export default function GiftApp() {
     const v = load.view
     return (
       <main className={shell} lang={lang} data-testid="gift-page" data-step="envelope" data-locked="yes">
-        <Envelope copy={copy} lang={lang} to={v.to} from={v.from} memorial={v.memorial} date={v.opens_on} reduced={reduced} state="closed" locked={{ opens_on: v.opens_on, days_left: v.days_left }} />
+        <Envelope copy={copy} lang={lang} to={v.to} from={v.from} memorial={v.memorial} purpose={v.purpose ?? null} date={v.opens_on} reduced={reduced} state="closed" locked={{ opens_on: v.opens_on, days_left: v.days_left }} />
       </main>
     )
   }
@@ -149,7 +152,7 @@ export default function GiftApp() {
 
   if (step === 'envelope' || step === 'opening')
     return stage(
-      <Envelope copy={copy} lang={lang} to={view.to} from={view.from} memorial={view.memorial} date={view.opens_on ?? view.order_date} reduced={reduced} state={step === 'opening' ? 'opening' : 'closed'} onOpen={openEnvelope} />,
+      <Envelope copy={copy} lang={lang} to={view.to} from={view.from} memorial={view.memorial} purpose={view.purpose ?? null} date={view.opens_on ?? view.order_date} reduced={reduced} state={step === 'opening' ? 'opening' : 'closed'} onOpen={openEnvelope} />,
     )
 
   if (step === 'letter')
@@ -244,12 +247,14 @@ function readingLine(view: GiftView): string {
   return cleanReading(view.reading)
 }
 
-function Envelope({ copy, lang, to, from, memorial, date, reduced, state, locked, onOpen }: {
+function Envelope({ copy, lang, to, from, memorial, purpose, date, reduced, state, locked, onOpen }: {
   copy: GiftCopy
   lang: PageLang
   to: string
   from: string
   memorial: boolean
+  /** v9.6: why it is given — 「おめでとう」 opens only a celebration; an apology and an encouragement open like a letter. */
+  purpose: string | null
   /** Which season's liner: the opening date, or the day it was ordered. */
   date: string
   reduced: boolean
@@ -257,13 +262,14 @@ function Envelope({ copy, lang, to, from, memorial, date, reduced, state, locked
   locked?: { opens_on: string; days_left: number }
   onOpen?: () => void
 }) {
+  const letterLike = purpose === 'apology' || purpose === 'encourage'
   const liner = useMemo(() => linerFor(date, memorial), [date, memorial])
   const thisYear = new Date().getFullYear()
   const ref = useRef<HTMLDivElement>(null)
   return (
     <section className="gf-env-screen" data-testid="gift-envelope-screen">
-      <p className="gf-label" data-testid="gift-env-label">{memorial ? copy.envLabelMemorial : copy.envLabel}</p>
-      <p className="gf-env-line" data-testid="gift-env-line">{memorial ? copy.envLineMemorial : copy.envLine}</p>
+      <p className="gf-label" data-testid="gift-env-label">{memorial || letterLike ? copy.envLabelMemorial : copy.envLabel}</p>
+      <p className="gf-env-line" data-testid="gift-env-line">{memorial || letterLike ? copy.envLineMemorial : purpose === 'celebrate' ? copy.envLineCelebrate : purpose === 'thanks' ? copy.envLineThanks : copy.envLine}</p>
       <div
         ref={ref}
         className={`gf-env gf-env-${state}`}

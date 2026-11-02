@@ -56,6 +56,9 @@ export interface EngineResult {
   relationship?: string | null
   direction?: 'up' | 'down' | 'across' | null
   occasion?: string | null
+  /** v9.6: the gift's purpose and state as the engine used them. */
+  purpose?: string | null
+  state?: string | null
   occasion_detail?: string | null
   status: 'sufficient' | 'insufficient'
   follow_up_question: string | null

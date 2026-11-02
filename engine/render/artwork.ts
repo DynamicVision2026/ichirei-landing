@@ -3,6 +3,7 @@
 // are" line, the poem, the certificate line, 「○○より」 / 「＿＿さんへ」, the short message, and the receiver page's address for the QR code.
 
 import { cleanReading } from '../../src/order/reading.ts'
+import { isQuietPurpose } from '../../src/order/purpose.ts'
 import sharp from 'sharp'
 import type { AnimationRecord } from '../animation.ts'
 import { filmUsable } from '../animation.ts'
@@ -23,6 +24,8 @@ export interface Artwork {
   /** The poem's format code (tanka, haiku, tang, ci, en): 短歌 and 俳句 are set vertically (縦書き) on the card, the others stay horizontal. */
   poemType?: string
   memorial: boolean
+  /** v9.6: no red, no celebration colour — remembrance, an apology and an encouragement. The main character is ink. */
+  quiet: boolean
   /** Names printed on the card. Empty strings mean the line stays blank, for handwriting (the sender hands it over). */
   from: string
   to: string
@@ -62,6 +65,7 @@ export async function loadArtwork(store: OrderStore, gift: GiftRecord, anim: Ani
     poem: gift.poem?.lines ?? [],
     poemType: gift.poem?.type ?? '',
     memorial: gift.memorial,
+    quiet: gift.memorial || isQuietPurpose(gift.purpose),
     from: blank ? '' : gift.from,
     to: blank ? '' : gift.to,
     message: blank ? '' : gift.message,
