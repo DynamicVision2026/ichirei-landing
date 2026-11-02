@@ -3,7 +3,7 @@
 // These are mechanical checks that catch the clear failures; the lines themselves are printed for a human to read.
 
 import type { EngineResult } from '../engine/contract.ts'
-import { gazeProblem, inventedFacts } from '../engine/gaze.ts'
+import { gazeProblem, inventedFacts, subjectProblem } from '../engine/gaze.ts'
 import { loadPalette } from '../engine/palette.ts'
 import { effectivePurpose, effectiveState, freePickMode, type PurposeFacts } from '../engine/purpose.ts'
 
@@ -51,6 +51,11 @@ export function fourChecks(result: EngineResult, c: PurposeCase | (PurposeFacts 
     if (FIRST_PERSON_SUBJECT.test(x.one_line_gaze.trim())) {
       receiver = false
       notes.push(`${x.kanji}: the line starts with the sender as its subject`)
+    }
+    const sp = subjectProblem(x, language, c.story)
+    if (sp) {
+      receiver = false
+      notes.push(`${x.kanji}: subject — ${sp.why}`)
     }
     const p = gazeProblem(x.one_line_gaze, language)
     if (p) {

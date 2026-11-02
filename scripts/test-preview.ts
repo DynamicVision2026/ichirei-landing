@@ -299,6 +299,74 @@ const rig = () => {
   check('(7) the page says "pictures after the order" only when ALL FOUR slots failed (state failed) — one picture is enough to show the card with its washi tiles; while drawing, a washi tile already shows', none.state === 'failed' && one.state === 'done' && mid.state === 'drawing' && mid.slots.join() === 'ai,pending,washi,pending')
 }
 
+// ---- 8. v9.6 follow-up: WHY the card shows no pictures — the picture outcome in `?debug=1` ------------------------------------------------------------------------------------
+{
+  const FALLBACK: FilmRecord = { status: 'fallback', lines: [], pictures: [], made_at: NOW.toISOString(), reason: 'pic_blocked' }
+  const mkRig = (over: { film?: () => FilmRecord; image?: ImageClient; env?: Record<string, string>; daily?: SlidingWindowLimiter } = {}) => {
+    const store = new MemoryOrderStore()
+    const image: ImageClient = over.image ?? { async generate() { return { bytes: PNG, model: 'fake-image' } } }
+    const H = createPreviewHandlers(() => ({ store, now: () => NOW, film: async () => clone((over.film ?? (() => FILM))()), image, vision: vision as never, env: { ICHIREI_FILM_DAILY_MAX: '1000', ICHIREI_FILM_RENDER_MS: '20000', ICHIREI_FILM_QUOTA_WAITS_MS: '0', ICHIREI_FILM_CHECK_WAITS_MS: '0', ICHIREI_FILM_BG_RETRY_MS: '0', ...(over.env ?? {}) } as never, log: () => {}, daily: over.daily ?? new SlidingWindowLimiter(100, 86_400_000) }))
+    const start = async (extra: Record<string, unknown> = {}, q = '?debug=1') => {
+      const r = await H.start(new Request(`http://x/api/preview${q}`, { method: 'POST', headers: { 'x-forwarded-for': '203.0.113.5' }, body: JSON.stringify({ story: FIX.story + (extra.story ?? ''), language: 'ja', ...FIX.context, shown: ['備'], ...extra }) }))
+      return (await r.json()) as Record<string, any>
+    }
+    const render = async (id: string, q = '?debug=1') => (await (await H.render(id, new Request(`http://x/api/preview/${id}/render${q}`, { method: 'POST' }))).json()) as Record<string, any>
+    const view = async (id: string, q = '?debug=1') => (await (await H.view(id, new Request(`http://x/api/preview/${id}${q}`))).json()) as Record<string, any>
+    return { store, H, start, render, view }
+  }
+  // ok
+  {
+    const r = mkRig()
+    const a = await r.start()
+    const done = await r.render(a.id)
+    const v = await r.view(a.id)
+    check('(8) outcome `ok`: the pictures were drawn → debug.outcome ok with the numbers (pictures 4, washi 0); the start says drawing, the view agrees', a.debug?.outcome === 'drawing' && done.debug?.outcome === 'ok' && done.debug.pictures === 4 && done.debug.washi === 0 && v.debug?.outcome === 'ok', JSON.stringify([a.debug, done.debug]))
+    const plain = await r.render(a.id, '')
+    check('(8) without ?debug=1 the response is unchanged: no `debug` key on the start, the view or the render', !('debug' in plain) && !('debug' in (await r.view(a.id, ''))) && !('debug' in (await r.start({}, ''))))
+  }
+  // limit: the person's daily limit
+  {
+    const r = mkRig({ daily: new SlidingWindowLimiter(1, 86_400_000) })
+    await r.start({ story: ' 一' })
+    const lim = await r.start({ story: ' 二' })
+    check('(8) outcome `limit` (person_daily): the second new set of one person in a day → state limited, debug {outcome limit, limit person_daily, max} — the page\'s 「物語の絵は、ご注文後にお届けします」 is the right message', lim.state === 'limited' && lim.debug?.outcome === 'limit' && lim.debug.limit === 'person_daily' && typeof lim.debug.max === 'number', JSON.stringify(lim))
+  }
+  // limit: the day's film limit (all sets)
+  {
+    const r = mkRig({ env: { ICHIREI_FILM_DAILY_MAX: '1' } })
+    const a1 = await r.start({ story: ' 甲' })
+    await r.render(a1.id)
+    const a2 = await r.start({ story: ' 乙' })
+    const out = await r.render(a2.id)
+    check('(8) outcome `limit` (film_daily): the day\'s film limit (ICHIREI_FILM_DAILY_MAX) reached → render state failed/deferred and debug {outcome limit, limit film_daily}', out.debug?.outcome === 'limit' && out.debug.limit === 'film_daily' && out.debug.art_status === 'deferred', JSON.stringify(out.debug))
+  }
+  // all_failed: the script fell back (the film script could not be made or failed its checks twice)
+  {
+    const r = mkRig({ film: () => FALLBACK })
+    const a = await r.start()
+    const out = await r.render(a.id)
+    check('(8) outcome `all_failed` / cause script_fallback: the film script was only the fallback → the reason code (pic_blocked) is in the output, so the cause is known without reading the logs', a.debug?.script_status === 'fallback' && out.state === 'failed' && out.debug?.outcome === 'all_failed' && out.debug.cause === 'script_fallback' && out.debug.script_reason === 'pic_blocked', JSON.stringify([a.debug, out.debug]))
+  }
+  // all_failed: the image model failed for every picture
+  {
+    const { ImageError } = await import('../engine/film-art.ts')
+    const bad: ImageClient = { async generate() { throw new ImageError('image_error', 'boom') } } as never
+    const r = mkRig({ image: bad })
+    const a = await r.start()
+    const out = await r.render(a.id)
+    check('(8) outcome `all_failed` / cause images_failed: every picture failed → reasons per slot (codes only) in debug, no picture, state failed', out.state !== 'done' && out.debug?.outcome === 'all_failed' && out.debug.cause === 'images_failed' && Array.isArray(out.debug.reasons) && out.debug.reasons.length === 4 && out.debug.pictures === 0, JSON.stringify(out.debug))
+  }
+  // the preview takes the purpose's tone: the page forwards purpose + state; an apology is a quiet film
+  {
+    const inputs: FilmInput[] = []
+    const store = new MemoryOrderStore()
+    const H = createPreviewHandlers(() => ({ store, now: () => NOW, film: async (i) => { inputs.push(i); return clone(FILM) }, log: () => {} }))
+    await H.start(new Request('http://x/api/preview', { method: 'POST', headers: { 'x-forwarded-for': '203.0.113.7' }, body: JSON.stringify({ story: FIX.story, language: 'ja', relationship: 'sibling', direction: 'across', purpose: 'apology', state: 'strained', shown: ['備'] }) }))
+    check('(8) a preview of an apology is a quiet film with the purpose\'s tone line (the page now sends purpose and state with the draft request)', inputs[0]?.quiet === true && /apology/.test(inputs[0]?.tone ?? '') && /unresolved/.test(inputs[0]?.tone ?? ''), JSON.stringify([inputs[0]?.quiet, inputs[0]?.tone]))
+  }
+  check('(8) the film prompt tells the writer: no knife, blade, weapon, fight or quarrel in a picture (the check refuses them), and no celebration image in a quiet gift (an apology, an encouragement)', (() => { const t = readFileSync(join(process.cwd(), 'engine/film-prompt.md'), 'utf8'); return t.includes('NO knife, blade, weapon, fight or quarrel') && t.includes('a quiet gift (an apology, an encouragement') })())
+}
+
 upstream.close()
 if (failures) {
   console.error(`\n${failures} preview check(s) FAILED`)

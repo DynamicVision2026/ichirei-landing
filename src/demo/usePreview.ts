@@ -62,6 +62,9 @@ export function usePreview(args: { result: EngineResult; story: string; followUp
             ...(result.direction ? { direction: result.direction } : {}),
             ...(result.occasion ? { occasion: result.occasion } : {}),
             ...(result.occasion_detail ? { occasion_detail: result.occasion_detail } : {}),
+            // v9.6: why the gift is given and where the two stand — the film and its pictures take the purpose's tone (quiet for an apology, an encouragement, a remembrance)
+            ...(result.purpose ? { purpose: result.purpose } : {}),
+            ...(result.state ? { state: result.state } : {}),
             shown,
             ...(known ? { draft_id: known } : {}),
             session: sessionId,

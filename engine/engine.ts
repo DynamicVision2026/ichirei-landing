@@ -13,7 +13,7 @@
 // Editing a prompt file changes the engine's behavior with no change to this code.
 
 import { purposeFrame, toneLine, effectivePurpose, effectiveState, mapOtherPurpose, mapOtherRelationship, mapOtherState, type Purpose } from './purpose.ts'
-import { cardsMode, runCards, INVENTED_FACT_REASON, type CardsReport } from './cards.ts'
+import { cardsMode, runCards, INVENTED_FACT_REASON, SUBJECT_REASON, type CardsReport } from './cards.ts'
 import { withDisplayReadings } from './reading-display.ts'
 import { thinkingTokensOf, watchThinkingTokens } from './usage.ts'
 import Anthropic from '@anthropic-ai/sdk'
@@ -29,7 +29,7 @@ import { fileURLToPath } from 'node:url'
 import { applyPalette, applyReviewVerdicts, loadPalette } from './palette.ts'
 import { runReview } from './review.ts'
 import { completeMains, type RefillReport } from './replace.ts'
-import { applyGazes, failingGazes, fixGazes, inventedFacts } from './gaze.ts'
+import { applyGazes, failingGazes, fixGazes, inventedFacts, subjectProblem } from './gaze.ts'
 import {
   DECLINE_MESSAGE,
   DEFAULT_CONTEXT,
@@ -293,14 +293,24 @@ export function selectCallInfo(message: Pick<Anthropic.Message, 'usage' | 'stop_
   return { output_tokens: message.usage?.output_tokens ?? null, thinking_tokens: thinkingTokensOf(message), stop_reason: message.stop_reason ?? null }
 }
 
-/** The last guard on a line: a card whose line still states a fact about the sender or a relative that the story does not give (after the one rewrite) is set aside — never shown. */
+/**
+ * The last guard on a line: a card whose line still states a fact about the sender or a relative that the story does not give (after the one rewrite), or that stands on an act of the
+ * narrator (`subject`), is set aside — never shown.
+ */
 function dropInvented(result: EngineResult, story: string, language: Language): EngineResult {
   if (result.status !== 'sufficient') return result
   let changed = false
   const candidates = result.candidates.map((c) => {
-    if (c.eliminated || !c.one_line_gaze || inventedFacts(c.one_line_gaze, story, language).length === 0) return c
-    changed = true
-    return { ...c, eliminated: true, eliminated_reason: INVENTED_FACT_REASON, flags: [...new Set([...c.flags, 'invented_fact'])] }
+    if (c.eliminated || !c.one_line_gaze) return c
+    if (inventedFacts(c.one_line_gaze, story, language).length > 0) {
+      changed = true
+      return { ...c, eliminated: true, eliminated_reason: INVENTED_FACT_REASON, flags: [...new Set([...c.flags, 'invented_fact'])] }
+    }
+    if (subjectProblem(c, language, story)) {
+      changed = true
+      return { ...c, eliminated: true, eliminated_reason: SUBJECT_REASON, flags: [...new Set([...c.flags, 'subject'])] }
+    }
+    return c
   })
   return changed ? { ...result, candidates } : result
 }
@@ -322,7 +332,7 @@ function logCards(story: string, context: EngineContext, before: EngineResult, a
   try {
     const live = (r: EngineResult, slot: string) => r.candidates.filter((c) => !c.eliminated && c.slot === slot).length
     const removed = after.candidates.filter((c) => c.eliminated).map((c) => ({ slot: c.slot, reason: (c.eliminated_reason ?? 'unknown').slice(0, 80) }))
-    const payload = { cards_mode: parallel ? 'parallel' : 'single', purpose: purposeCodeOf(context), state: effectiveState(context), ...(otherTextMapped(context) ? { other_text_mapped: otherTextMapped(context) } : {}), ...(parallel ? { second_source: parallel.second_source } : {}), story_chars: [...story].length, language: context.language, occasion: context.occasion, status: after.status, live: { main: live(after, 'main'), second: live(after, 'second'), freestyle: live(after, 'freestyle') }, before_final: before.candidates.filter((c) => !c.eliminated).length, freestyle: context.occasion === 'memorial' ? 'not_offered' : undefined, ms, select: select ?? undefined, ...(parallel ? { parallel: { first_card_ms: parallel.first_card_ms, all_cards_ms: parallel.all_cards_ms, calls: parallel.calls, reviews: parallel.reviews, collisions: parallel.collisions, runner_up_used: parallel.runner_up_used, free_dropped: parallel.free_dropped, second_source: parallel.second_source } } : {}), calls: parallel ? { select: parallel.calls.reduce((n, c) => n + c.attempts, 0), review: parallel.reviews.length, refill: refill ? 1 : 0, gaze: ms.gaze_failing > 0 ? 1 : 0 } : { select: ms.select_attempts, review: ms.review > 0 ? 1 : 0, refill: refill ? 1 : 0, gaze: ms.gaze_failing > 0 ? 1 : 0 }, removed, refill: refill ? { asked: refill.asked, filled: refill.filled.map((f) => f.slot), rejected: refill.rejected, rescued: refill.rescued.map((f) => f.slot), ms: refill.ms } : null }
+    const payload = { cards_mode: parallel ? 'parallel' : 'single', purpose: purposeCodeOf(context), state: effectiveState(context), ...(otherTextMapped(context) ? { other_text_mapped: otherTextMapped(context) } : {}), ...(parallel ? { second_source: parallel.second_source } : {}), story_chars: [...story].length, language: context.language, occasion: context.occasion, status: after.status, live: { main: live(after, 'main'), second: live(after, 'second'), freestyle: live(after, 'freestyle') }, before_final: before.candidates.filter((c) => !c.eliminated).length, freestyle: context.occasion === 'memorial' ? 'not_offered' : undefined, ms, select: select ?? undefined, ...(parallel ? { parallel: { first_card_ms: parallel.first_card_ms, all_cards_ms: parallel.all_cards_ms, calls: parallel.calls, reviews: parallel.reviews, collisions: parallel.collisions, runner_up_used: parallel.runner_up_used, free_dropped: parallel.free_dropped, second_source: parallel.second_source, subject_removed: parallel.subject_removed, subject_rewritten: parallel.subject_rewritten } } : {}), calls: parallel ? { select: parallel.calls.reduce((n, c) => n + c.attempts, 0), review: parallel.reviews.length, refill: refill ? 1 : 0, gaze: ms.gaze_failing > 0 ? 1 : 0 } : { select: ms.select_attempts, review: ms.review > 0 ? 1 : 0, refill: refill ? 1 : 0, gaze: ms.gaze_failing > 0 ? 1 : 0 }, removed, refill: refill ? { asked: refill.asked, filled: refill.filled.map((f) => f.slot), rejected: refill.rejected, rescued: refill.rescued.map((f) => f.slot), ms: refill.ms } : null }
     console.log(`[ichirei-cards] ${JSON.stringify(payload)}`)
     onDebug?.(debugOf(payload))
   } catch {
@@ -769,7 +779,7 @@ async function runCardsPipeline(a: PipelineArgs): Promise<PipelineOut> {
   const mainCall = out.report.calls.find((c) => c.slot === 'main')
   const timing = (t: { review_ms: number; replace_ms: number; status: string }) =>
     logTiming({ attempts: mainCall?.attempts ?? 1, max_tokens_used: 0, select_ms: selectMs, ...t, total_ms: Date.now() - tStart, stop_reason: mainCall?.stop_reason ?? null, output_tokens: mainCall?.output_tokens ?? null, lexicon: view !== null })
-  const earlyDebug = (status: string) => opts.onDebug?.(debugOf({ cards_mode: 'parallel', status, ms: { total: Date.now() - tStart, select: selectMs }, parallel: { first_card_ms: out.report.first_card_ms, all_cards_ms: out.report.all_cards_ms, calls: out.report.calls, reviews: out.report.reviews, collisions: out.report.collisions, runner_up_used: out.report.runner_up_used, free_dropped: out.report.free_dropped, second_source: out.report.second_source } }))
+  const earlyDebug = (status: string) => opts.onDebug?.(debugOf({ cards_mode: 'parallel', status, ms: { total: Date.now() - tStart, select: selectMs }, parallel: { first_card_ms: out.report.first_card_ms, all_cards_ms: out.report.all_cards_ms, calls: out.report.calls, reviews: out.report.reviews, collisions: out.report.collisions, runner_up_used: out.report.runner_up_used, free_dropped: out.report.free_dropped, second_source: out.report.second_source, subject_removed: out.report.subject_removed, subject_rewritten: out.report.subject_rewritten } }))
   // Goodwill check (selection or review): a polite decline, no cards.
   if (out.early?.kind === 'declined') {
     earlyDebug('declined')

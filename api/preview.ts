@@ -18,10 +18,17 @@ import { FOLLOW_UP_MAX, STORY_MAX, countChars, mergeStory, parseContext, parseEx
 import { ANIMATION_ID_PATTERN } from '../engine/animation.ts'
 import { createOrderStore, type OrderStore } from '../engine/order-store.ts'
 import { SlidingWindowLimiter, clientIp } from '../engine/rate-limit.ts'
-import { previewView, renderPreview, startPreview, type PreviewDeps } from '../engine/preview.ts'
+import { previewOutcome, previewView, renderPreview, startPreview, type PreviewDeps } from '../engine/preview.ts'
 
 const MAX_BODY_BYTES = 60_000
 const DAY_MS = 86_400_000
+/** `?debug=1`: this request's picture outcome rides along (codes and numbers, no story text). Without it nothing changes. */
+const wantsDebug = (req?: Request): boolean => { try { return !!req && new URL(req.url, 'http://localhost').searchParams.get('debug') === '1' } catch { return false } }
+/** A refused start is logged as a code (status + the error code or message, never the story): the page shows the same 「ご注文後にお届けします」 for a refusal as for a limit, so the log says which it was. */
+const rejected = (status: number, body: Record<string, unknown>): Response => {
+  console.log(`[ichirei-preview] ${JSON.stringify({ event: 'preview_rejected', status, error: String(body.code ?? body.error ?? '').slice(0, 80) })}`)
+  return json(status, body)
+}
 const hdr = (extra: Record<string, string> = {}) => ({ 'x-robots-tag': 'noindex, nofollow', 'cache-control': 'no-store', ...extra })
 const json = (status: number, body: unknown, extra: Record<string, string> = {}) => new Response(JSON.stringify(body), { status, headers: hdr({ 'content-type': 'application/json; charset=utf-8', ...extra }) })
 
@@ -50,24 +57,24 @@ export function createPreviewHandlers(deps: () => PreviewApiDeps) {
   return {
     async start(req: Request): Promise<Response> {
       const d = deps()
-      if (!need(d)) return json(503, { error: 'unavailable', code: 'store_not_configured' })
+      if (!need(d)) return rejected(503, { error: 'unavailable', code: 'store_not_configured' })
       const text = await req.text()
-      if (text.length > MAX_BODY_BYTES) return json(413, { error: 'Request body too large' })
+      if (text.length > MAX_BODY_BYTES) return rejected(413, { error: 'Request body too large' })
       let body: Record<string, unknown>
       try {
         body = JSON.parse(text) as Record<string, unknown>
       } catch {
-        return json(400, { error: 'Body is not valid JSON' })
+        return rejected(400, { error: 'Body is not valid JSON' })
       }
       const story = body.story
-      if (typeof story !== 'string' || !story.trim()) return json(400, { error: 'Missing "story"' })
-      if (countChars(story) > STORY_MAX) return json(400, { error: 'story_too_long', code: 'story_too_long', max: STORY_MAX })
+      if (typeof story !== 'string' || !story.trim()) return rejected(400, { error: 'Missing "story"' })
+      if (countChars(story) > STORY_MAX) return rejected(400, { error: 'story_too_long', code: 'story_too_long', max: STORY_MAX })
       const fu = parseFollowUps(body.follow_ups)
-      if (!fu.ok) return json(400, { error: fu.error, code: fu.code, max: FOLLOW_UP_MAX })
+      if (!fu.ok) return rejected(400, { error: fu.error, code: fu.code, max: FOLLOW_UP_MAX })
       const ctx = parseContext(body)
-      if (!ctx.ok) return json(400, { error: ctx.error })
+      if (!ctx.ok) return rejected(400, { error: ctx.error })
       const shown = parseExclude(body.shown, 1)
-      if (!shown.ok) return json(400, { error: shown.error, code: shown.code })
+      if (!shown.ok) return rejected(400, { error: shown.error, code: shown.code })
       const draftId = typeof body.draft_id === 'string' && ANIMATION_ID_PATTERN.test(body.draft_id) ? body.draft_id : null
       const env = d.env ?? process.env
       const daily = d.daily ?? dailyFor(env)
@@ -90,20 +97,23 @@ export function createPreviewHandlers(deps: () => PreviewApiDeps) {
         () => daily.hit(ip),
       )
       void cleanSession(body.session)
+      if (wantsDebug(req)) return json(200, { ...out, debug: out.state === 'limited' ? { outcome: 'limit', limit: 'person_daily', max: previewDailyMax(env) } : { outcome: 'drawing', script_status: out.script, reused: out.reused } })
       return json(200, out)
     },
 
-    async view(id: string): Promise<Response> {
+    async view(id: string, req?: Request): Promise<Response> {
       const d = deps()
       if (!need(d)) return json(503, { error: 'unavailable' })
       const v = await previewView({ ...d, store: d.store }, id)
+      if (v && wantsDebug(req)) return json(200, { ...v, debug: await previewOutcome({ ...d, store: d.store }, id) })
       return v ? json(200, v) : json(404, { error: 'not_found' })
     },
 
-    async render(id: string): Promise<Response> {
+    async render(id: string, req?: Request): Promise<Response> {
       const d = deps()
       if (!need(d)) return json(503, { error: 'unavailable' })
       const v = await renderPreview({ ...d, store: d.store }, id)
+      if (v && wantsDebug(req)) return json(200, { ...v, debug: await previewOutcome({ ...d, store: d.store }, id) })
       return v ? json(200, v) : json(404, { error: 'not_found' })
     },
   }

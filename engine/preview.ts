@@ -88,7 +88,10 @@ export async function startPreview(deps: PreviewDeps, input: PreviewStart, allow
       return { state: 'ok', id: old.id, reused: true, script: old.film?.status === 'ready' ? 'ready' : 'fallback' }
     }
   }
-  if (!allowNew()) return { state: 'limited' }
+  if (!allowNew()) {
+    ;(deps.log ?? console.log)(`[ichirei-preview] ${JSON.stringify({ event: 'preview_start', outcome: 'limit', limit: 'person_daily' })}`)
+    return { state: 'limited' }
+  }
   const now = deps.now?.() ?? new Date()
   const forms = [...new Set(input.shown.filter(Boolean))]
   const filmInput: FilmInput = {
@@ -127,6 +130,7 @@ export async function startPreview(deps: PreviewDeps, input: PreviewStart, allow
     draft: { story_hash: hash, memorial: input.memorial, created_at: now.toISOString(), picked_at: pickedAt },
   }
   await deps.store.put(id, record)
+  ;(deps.log ?? console.log)(`[ichirei-preview] ${JSON.stringify({ event: 'preview_start', script: film.status, script_reason: film.reason ?? null })}`)
   return { state: 'ok', id, reused: false, script: film.status === 'ready' ? 'ready' : 'fallback' }
 }
 
@@ -162,6 +166,52 @@ export function viewOf(rec: AnimationRecord, art: ArtRecord | null): PreviewView
   return { id: rec.id, state, lines: film.lines, pictures, slots }
 }
 
+/**
+ * Why the card shows pictures or does not (`?debug=1` on the preview routes; codes and numbers only, no story text):
+ *   ok          at least one picture was drawn and passed its check (`pictures`, `washi`)
+ *   drawing     still at work
+ *   limit       no pictures because of a daily limit: `person_daily` (this person's new sets today, ICHIREI_PREVIEW_DAILY_MAX) or `film_daily` (all sets today, ICHIREI_FILM_DAILY_MAX).
+ *               The page's 「物語の絵は、ご注文後にお届けします」 is the right message here.
+ *   all_failed  nothing was drawn although nothing was limited: `cause` says where it stopped — `script_fallback` (the film script could not be made or failed its checks twice:
+ *               `script_reason`), `images_failed` (every slot failed: `reasons` are the codes per picture — image_error, quota, timeout, face, text, …) or `no_render` (the render never ran)
+ */
+export interface PictureOutcome {
+  outcome: 'ok' | 'drawing' | 'limit' | 'all_failed'
+  limit?: 'person_daily' | 'film_daily'
+  cause?: 'script_fallback' | 'images_failed' | 'no_render'
+  script_status?: string
+  script_reason?: string | null
+  art_status?: string | null
+  slots?: string[]
+  reasons?: string[]
+  pictures?: number
+  washi?: number
+  calls?: number
+  model?: string | null
+}
+
+export function outcomeOf(rec: AnimationRecord, art: ArtRecord | null): PictureOutcome {
+  const film = rec.film
+  const base = { script_status: film?.status ?? 'none', script_reason: film?.reason ?? null, art_status: art?.status ?? null }
+  if (!film || film.status !== 'ready' || film.lines.length !== 4) return { outcome: 'all_failed', cause: 'script_fallback', ...base }
+  if (art?.status === 'deferred') return { outcome: 'limit', limit: 'film_daily', ...base }
+  const slots = art?.slots ?? []
+  const pictures = slots.filter((x) => x === 'ai').length
+  const info = { ...base, slots: [...slots], reasons: [...(art?.reasons ?? [])], pictures, washi: slots.filter((x) => x === 'washi').length, calls: art?.calls ?? 0, model: art?.model ?? null }
+  if (pictures > 0) return { outcome: 'ok', ...info }
+  if (!art || art.status === 'rendering') return { outcome: 'drawing', ...info }
+  if (art.status === 'done' || art.status === 'incomplete') return { outcome: 'all_failed', cause: 'images_failed', ...info }
+  return { outcome: 'all_failed', cause: 'no_render', ...info }
+}
+
+/** The outcome of a draft as it stands now (null = not a draft). */
+export async function previewOutcome(deps: PreviewDeps, id: string): Promise<PictureOutcome | null> {
+  const rec = await read(deps.store, id)
+  if (!isDraft(rec)) return null
+  const art = await readArt(deps.store, id).catch(() => null)
+  return outcomeOf(rec, art)
+}
+
 export async function previewView(deps: PreviewDeps, id: string): Promise<PreviewView | null> {
   const rec = await read(deps.store, id)
   if (!isDraft(rec)) return null
@@ -194,6 +244,7 @@ export async function renderPreview(deps: PreviewDeps, id: string): Promise<Prev
     status: final?.status ?? 'rendering',
     pictures: final ? final.slots.filter((s) => s === 'ai').length : null,
     washi: final ? final.slots.filter((s) => s === 'washi').length : null,
+    outcome: outcomeOf(rec, final),
   })}`)
   return viewOf(rec, final)
 }

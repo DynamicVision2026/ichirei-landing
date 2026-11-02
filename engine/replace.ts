@@ -15,7 +15,7 @@ import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { anchorPresent, applyPalette, applyReviewVerdicts, type Palette } from './palette.ts'
 import { runReview } from './review.ts'
-import { rewriteLines } from './gaze.ts'
+import { rewriteLines, subjectProblem } from './gaze.ts'
 import { callSignal, replaceTimeoutMs } from './limits.ts'
 import type { Candidate, EngineContext, EngineResult, RefereeAction } from './contract.ts'
 
@@ -338,6 +338,8 @@ export async function completeMains(
     if (seen.has(cand.kanji) || (cand.inscription_form && seen.has(cand.inscription_form))) { reject(slot, cand.kanji, 'already offered or refused'); continue }
     if (usable.some((u) => u.kanji === cand.kanji)) { reject(slot, cand.kanji, 'the same character twice in the refill'); continue }
     if (!anchorPresent(cand, story)) { reject(slot, cand.kanji, 'story_anchor is not a verbatim fragment of the story'); continue }
+    // `subject`: a replacement that stands on an act of the narrator is refused before the referee and the review spend a call
+    if (subjectProblem(cand, context.language, story)) { reject(slot, cand.kanji, 'subject: the quoted act is the narrator\'s own, not the receiver\'s'); continue }
     // Readability: a candidate that will be the MAIN must pass the same test as any main — checked before the referee and the review spend a call.
     if (slot === 'main' && opts.mainOk && !opts.mainOk(cand)) { reject(slot, cand.kanji, 'readability: the main character must be a 常用漢字 for a Japanese buyer'); continue }
     usable.push(cand)

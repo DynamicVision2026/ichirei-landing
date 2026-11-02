@@ -53,7 +53,8 @@ RULES
    - NO FACES. A person appears ONLY as hands, or seen from behind, or from far away as a small silhouette — never close enough to show a face. Never show a face, not even in profile. Never write smile, eyes, expression, profile, looking at, facing or any feature of a face.
    - NO TEXT of any kind in the picture: no letters, signs, writing, screens with words, logos or brands. (A letter or a card may appear as a folded paper, never as writing.)
    - No names, no real place names, no schools or companies; no digits; no Japanese or Chinese characters.
-   - NO illness, hospital, injury, blood, funeral or decline image, even if the story mentions it — paint the moment around it. For a remembrance film, no celebration image either (no party, cake, candles, festival, wedding).
+   - NO illness, hospital, injury, blood, funeral or decline image, even if the story mentions it — paint the moment around it. For a remembrance film, and for a quiet gift (an apology, an encouragement — the tone line above says so), no celebration image either (no party, cake, candles, festival, wedding).
+   - NO knife, blade, weapon, fight or quarrel in a picture, in word or in image (a work tool is a plane, a chisel, sandpaper, a ruler; a quarrel is told by its quiet aftermath: a table laid for one more, a door left unlatched, two cups).
    - Four different moments, following the arc above. Do not name or hint at the chosen character.
 {{ FEEDBACK }}
 

@@ -162,8 +162,8 @@ export function createApp(config: ServerConfig): Hono {
   // The free card preview (before payment): the draft is made the moment a character is picked; its pictures are drawn once per story.
   const previewLimit = envRunLimiter('ICHIREI_PREVIEW_LIMIT', { max: 30, minutes: 60 })
   app.post('/api/preview', requireApiKey, limited(previewLimit), (c) => previewHandlers.start(c.req.raw))
-  app.post('/api/preview/:id/render', requireApiKey, limited(filmRenderLimit), (c) => previewHandlers.render(c.req.param('id')))
-  app.get('/api/preview/:id', limited(animationLimit), (c) => previewHandlers.view(c.req.param('id')))
+  app.post('/api/preview/:id/render', requireApiKey, limited(filmRenderLimit), (c) => previewHandlers.render(c.req.param('id'), c.req.raw))
+  app.get('/api/preview/:id', limited(animationLimit), (c) => previewHandlers.view(c.req.param('id'), c.req.raw))
   app.get('/api/film/:id/picture/:file', limited(animationLimit), (c) => animationHandlers.picture(c.req.param('id'), c.req.param('file').replace(/\.webp$/, '')))
   // The receiver's gift page (/g/<token>): its own view, pictures, render and QR; and the e-gift address (typed once, never returned by any call).
   app.get('/api/gift/:token', limited(animationLimit), (c) => giftHandlers.view(c.req.param('token'), c.req.query('preview')))

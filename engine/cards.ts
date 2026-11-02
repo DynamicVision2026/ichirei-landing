@@ -20,7 +20,7 @@ import { applyPalette, applyReviewVerdicts, type Palette } from './palette.ts'
 import { runReview } from './review.ts'
 import { FREE_FIELDS, FREE_REVIEW_TIMEOUT_MS_DEFAULT } from './replace.ts'
 import { SAME_CHARACTER_REASON, finalizeResult } from './slots.ts'
-import { failingGazes, fixGazes, inventedFacts } from './gaze.ts'
+import { failingGazes, fixGazes, inventedFacts, rewriteLines, subjectProblem } from './gaze.ts'
 import { withDisplayReading } from './reading-display.ts'
 import { ModelTimeoutError, callSignal, callTimeoutMs, runBudgetMs, timedOut } from './limits.ts'
 import { thinkingTokensOf, watchThinkingTokens } from './usage.ts'
@@ -132,6 +132,9 @@ export interface CardReviewInfo {
 export interface CardsReport {
   calls: CardCallInfo[]
   reviews: CardReviewInfo[]
+  /** cards set aside by the `subject` code check (the narrator is the acting subject): which slot, and whether the quoted act or only the line was at fault */
+  subject_removed: { slot: CardSlot; where: 'anchor' | 'line' }[]
+  subject_rewritten: number
   collisions: { slot: CardSlot; resolved: 'runner_up' | 'none'; why?: 'character' | 'anchor' }[]
   runner_up_used: CardSlot[]
   /** from the start of the request */
@@ -339,6 +342,8 @@ export function readCardReply(text: string, slot: CardSlot): ReplyRead {
 }
 
 export const SAME_ANCHOR_REASON = 'slots: same story detail as the main card'
+/** A card that stands on something the NARRATOR did (the quoted act's subject is the narrator): set aside before the review; the runner-up, one line rewrite, then the refill. */
+export const SUBJECT_REASON = 'subject: the quoted act is the narrator\'s own, not the receiver\'s'
 export const INVENTED_FACT_REASON = 'review: truth: states a fact about the sender or a relative that the story does not give'
 
 const plain = (s: string): string => s.replace(/\s+/g, '').replace(/[「」『』“”"'、，,。.！!？?…・]/g, '')
@@ -372,7 +377,7 @@ export async function runCards(a: CardsArgs): Promise<CardsOut> {
   const freeStop = new AbortController()
   const freeSignal = AbortSignal.any([signal, freeStop.signal, AbortSignal.timeout(freeLaneMs())])
 
-  const report: CardsReport = { calls: [], reviews: [], collisions: [], runner_up_used: [], first_card_ms: null, all_cards_ms: 0, main_call_ms: 0, gaze_ms: 0, gaze_failing: 0, free_dropped: null, second_source: null }
+  const report: CardsReport = { calls: [], reviews: [], subject_removed: [], subject_rewritten: 0, collisions: [], runner_up_used: [], first_card_ms: null, all_cards_ms: 0, main_call_ms: 0, gaze_ms: 0, gaze_failing: 0, free_dropped: null, second_source: null }
   const verdicts: ReviewVerdict[] = []
   let anyReviewRan = false
   let skipped: string | null = null
@@ -598,6 +603,7 @@ export async function runCards(a: CardsArgs): Promise<CardsOut> {
     const tried: Candidate[] = []
     let chosen: Candidate | null = null
     let source: LaneOut['source']
+    const lineOnly: { card: Candidate; from: NonNullable<LaneOut['source']> }[] = [] // cards whose only fault is a line with the narrator as its subject: the one line rewrite
     try {
       const out = await call
       if (slot === 'main') {
@@ -623,6 +629,15 @@ export async function runCards(a: CardsArgs): Promise<CardsOut> {
           const ref = refereeOne(stampBase, cand)
           if (!ref.ok) {
             tried.push(ref.card)
+            continue
+          }
+          // `subject`: the card stands on an act of the narrator (the anchor's acting subject is 俺・私・僕…), or its line has the narrator as its subject. A code check, BEFORE the review.
+          // The order is: this call's runner-up (the loop goes on), then one line rewrite (below, lines only), then the refill (the engine, for an empty slot).
+          const sub = subjectProblem(ref.card, context.language, story)
+          if (sub) {
+            tried.push(eliminate(ref.card, SUBJECT_REASON, 'subject'))
+            report.subject_removed.push({ slot, where: sub.where })
+            if (sub.where === 'line') lineOnly.push({ card: ref.card, from })
             continue
           }
           // a higher card is already putting this character forward: take our runner-up (no review spent on it)
@@ -685,6 +700,17 @@ export async function runCards(a: CardsArgs): Promise<CardsOut> {
           log(`[ichirei-engine] second_from_main_runner_up ${JSON.stringify({ second_call: report.calls.find((c) => c.slot === 'second')?.parse ?? null, spare: spare.length })}`)
           await attempt(spare, 'main_runner_up')
           if (chosen) report.runner_up_used.push('second')
+        }
+      }
+      // The one line rewrite, only for a card whose ONLY fault is a line about the narrator, and only when no runner-up stood: the small model rewrites the line, then the card goes
+      // through the same checks again. (A card whose quoted act is the narrator's own cannot be saved by a new line: it goes to the refill.)
+      if (!chosen && !early && !sig.aborted && lineOnly.length > 0) {
+        const first = lineOnly[0]
+        const fixes = await rewriteLines([{ kanji: first.card.kanji, gaze: first.card.one_line_gaze, why: 'its subject is the narrator (the sender): rewrite it so the subject is the person who receives the gift, built only from what that person does in the story' }], story, context.language, { tone: toneLine(context), apiKey: opts.apiKey, signal: sig, client, log })
+        const line = fixes.get(first.card.kanji)
+        if (line) {
+          report.subject_rewritten++
+          await attempt([{ ...first.card, one_line_gaze: line, eliminated: false, eliminated_reason: null } as Candidate], first.from)
         }
       }
     } catch (err) {
