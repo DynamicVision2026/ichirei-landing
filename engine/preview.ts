@@ -51,6 +51,8 @@ export interface PreviewStart {
   quiet?: boolean
   /** Every character shown to the sender for this story (both forms): none of them may appear in the film's lines. */
   shown: string[]
+  /** The character the sender picked (both forms): the only one a caption may not show and the only one replaced by kana. Absent: every shown character counts. */
+  picked?: string[]
   /** A draft this browser already has for this story. */
   draft_id?: string | null
 }
@@ -106,6 +108,7 @@ export async function startPreview(deps: PreviewDeps, input: PreviewStart, allow
     ...(input.quiet ? { quiet: true } : {}),
     glyph: NOT_CHOSEN,
     forms,
+    ...(input.picked?.length ? { chosen: input.picked.filter((x) => forms.includes(x)) } : {}),
     who: NOT_CHOSEN,
     moment: '',
     names: [],

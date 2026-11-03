@@ -443,6 +443,18 @@ const rig = () => {
   check('(10) a picture that fails again after its one rewrite becomes washi (two draws, one rewrite — not three draws), logged with its reason; the others are drawn once', out2.slots.join() === 'washi,ai,ai,ai' && drawn2 === 5 && ev2[0].outcome === 'washi' && ev2[0].reason === 'face' && out2.debug.slot_outcomes?.join() === 'washi,drawn,drawn,drawn', JSON.stringify([out2.slots, drawn2, ev2[0]]))
 }
 
+// ---- 11. the pick: only the gift character is ever replaced in a caption --------------------------------------------------------------------------------------------------------------
+{
+  const seenInputs: { forms: string[]; chosen?: string[] }[] = []
+  const store = new MemoryOrderStore()
+  const H = createPreviewHandlers(() => ({ store, now: () => NOW, film: async (i: { forms: string[]; chosen?: string[] }) => { seenInputs.push({ forms: i.forms, chosen: i.chosen }); return clone(FILM) }, image: { async generate() { return { bytes: PNG, model: 'fake-image' } } } as ImageClient, vision: vision as never, env: { ICHIREI_FILM_DAILY_MAX: '1000' } as never, log: () => {}, daily: new SlidingWindowLimiter(100, 86_400_000) }))
+  const post = (body: Record<string, unknown>) => H.start(new Request('http://x/api/preview', { method: 'POST', headers: { 'x-forwarded-for': '203.0.113.77' }, body: JSON.stringify({ story: FIX.story + String(Math.random()), language: 'ja', ...FIX.context, ...body }) }))
+  await post({ shown: ['証', '守', '猫'], picked: ['証'] })
+  await post({ shown: ['証', '守'] })
+  await post({ shown: ['証', '守'], picked: ['x', '猫', '証', '証'] })
+  check('(11) the request\'s pick reaches the film as `chosen` (every shown character stays in `forms` for the prompt); without a pick there is no `chosen` (every shown character counts); junk and repeats in `picked` are dropped', seenInputs[0].chosen?.join() === '証' && seenInputs[0].forms.join() === '証,守,猫' && seenInputs[1].chosen === undefined && seenInputs[2].chosen?.join() === '証', JSON.stringify(seenInputs))
+}
+
 upstream.close()
 if (failures) {
   console.error(`\n${failures} preview check(s) FAILED`)

@@ -31,8 +31,8 @@ const starting = new Map<string, Promise<{ state: 'ok'; id: string } | { state: 
 
 type View = { state: 'drawing' | 'done' | 'failed' | 'deferred'; lines: string[]; pictures: (string | null)[]; slots?: PreviewSlot[] }
 
-export function usePreview(args: { result: EngineResult; story: string; followUps: string[]; shown: string[]; draftRef: DraftRef }): PreviewState {
-  const { result, story, followUps, shown, draftRef } = args
+export function usePreview(args: { result: EngineResult; story: string; followUps: string[]; shown: string[]; /** the character the sender picked (both forms): the only one a caption may not show */ picked?: string[]; draftRef: DraftRef }): PreviewState {
+  const { result, story, followUps, shown, picked, draftRef } = args
   const [state, setState] = useState<PreviewState>({ phase: 'script', lines: [], pictures: EMPTY, slots: PENDING, draftId: draftRef.current?.id ?? null })
   const memorial = result.occasion === 'memorial'
   const key = JSON.stringify([result.language, memorial, story.trim(), followUps])
@@ -66,6 +66,7 @@ export function usePreview(args: { result: EngineResult; story: string; followUp
             ...(result.purpose ? { purpose: result.purpose } : {}),
             ...(result.state ? { state: result.state } : {}),
             shown,
+            ...(picked?.length ? { picked } : {}),
             ...(known ? { draft_id: known } : {}),
             session: sessionId,
           }),

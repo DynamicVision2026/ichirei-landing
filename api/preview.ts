@@ -75,6 +75,8 @@ export function createPreviewHandlers(deps: () => PreviewApiDeps) {
       if (!ctx.ok) return rejected(400, { error: ctx.error })
       const shown = parseExclude(body.shown, 1)
       if (!shown.ok) return rejected(400, { error: shown.error, code: shown.code })
+      // the pick (optional): up to two single characters, each also among the shown ones
+      const picked = Array.isArray(body.picked) ? [...new Set((body.picked as unknown[]).filter((x): x is string => typeof x === 'string' && [...x].length === 1 && /\p{Script=Han}/u.test(x)))].slice(0, 2) : []
       const draftId = typeof body.draft_id === 'string' && ANIMATION_ID_PATTERN.test(body.draft_id) ? body.draft_id : null
       const env = d.env ?? process.env
       const daily = d.daily ?? dailyFor(env)
@@ -92,6 +94,7 @@ export function createPreviewHandlers(deps: () => PreviewApiDeps) {
           tone: toneLine(ctx.context),
           quiet: noCelebration(ctx.context as never),
           shown: shown.exclude,
+          ...(picked.length ? { picked } : {}),
           draft_id: draftId,
         },
         () => daily.hit(ip),

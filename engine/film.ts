@@ -16,6 +16,7 @@ import { callSignal, timedOut } from './limits.ts'
 import { DEFAULT_REVIEW_MODEL } from './engine.ts'
 import type { Language } from './contract.ts'
 import { loadPalette, type Palette } from './palette.ts'
+import { kanaFixWords, loadTokenizer } from './kana.ts'
 import { EN_FORBIDDEN } from './poem-check.ts'
 
 export const FILM_TIMEOUT_MS = 30_000
@@ -65,6 +66,8 @@ export interface FilmInput {
   /** The carved form shown at the end, and the other forms of the same character (none of them may appear in the lines). */
   glyph: string
   forms: string[]
+  /** The forms of the gift character ONLY, when the film is made for a known pick (the preview's draft). Without it every form in `forms` counts as the gift character. */
+  chosen?: string[]
   /** "Who they are": the card's one line. */
   who: string
   /** "Your moment": the sender's own words as the card quotes them (the fallback script's first line). */
@@ -180,39 +183,12 @@ export interface FilmProblem {
   scene?: number
 }
 
-// ---- the offered character in a line: replaced by its kana, in code ------------------------------------------------------------------------------------------
-// A line may not show the characters on offer before the reveal. When one is there (the story's own words — 「待ってた」 — often carry it), the character is replaced by its kana reading, in its
-// inflected form (待ってた → まってた); in a compound the other kanji stay (期待 → 期たい). The reading comes from the palette row (an on reading inside a compound, the kun stem on its own). This
-// is allowed to differ from the story's wording, and the quotation check accepts the story's words with the same replacement. Japanese only; null = cannot be done (no row, no reading, not Japanese).
-const IDEOGRAPH = /[\u3400-\u4dbf\u4e00-\u9fff\uf900-\ufaff]/u
-const toHiragana = (t: string): string => t.replace(/[\u30a1-\u30f6]/g, (c) => String.fromCharCode(c.charCodeAt(0) - 0x60))
-function kanaOfForm(form: string, compound: boolean, palette: Palette): string | null {
-  const row = palette.lookup('ja', form)
-  if (!row) return null
-  const on = row.readings.filter((r) => /^[\u30a0-\u30ff]+$/u.test(r))
-  const kun = row.readings.filter((r) => /^[\u3040-\u309f.\-・]+$/u.test(r))
-  const pick = compound ? (on[0] ?? kun[0]) : (kun[0] ?? on[0])
-  if (!pick) return null
-  const kana = toHiragana(pick.split('-')[0].replace(/[.・]/g, ''))
-  return kana || null
-}
-export function kanaFixText(text: string, forms: string[], palette: Palette, language: Language): string | null {
-  if (language !== 'ja') return null
-  const single = new Set(forms.filter((f) => [...f].length === 1))
-  const chars = [...text]
-  if (!chars.some((c) => single.has(c))) return text
-  const out: string[] = []
-  for (let k = 0; k < chars.length; k++) {
-    if (!single.has(chars[k])) {
-      out.push(chars[k])
-      continue
-    }
-    const compound = (k > 0 && IDEOGRAPH.test(chars[k - 1])) || (k + 1 < chars.length && IDEOGRAPH.test(chars[k + 1]))
-    const kana = kanaOfForm(chars[k], compound, palette)
-    if (!kana) return null
-    out.push(kana)
-  }
-  return out.join('')
+// ---- the gift character in a line: its WORD replaced by hiragana, in code (engine/kana.ts) ----------------------------------------------------------------------------------------
+/** The forms of the GIFT character: the only ones a caption may not show, and the only ones ever replaced. (The draft film of the preview knows the pick; without it every shown character counts.) */
+export const giftForms = (input: Pick<FilmInput, 'forms' | 'glyph' | 'chosen'>): string[] => [...new Set((input.chosen?.length ? input.chosen : input.forms.concat(input.glyph)).filter(Boolean))]
+/** The caption with the word that holds the gift character in hiragana (期待 → きたい, 野良猫 → のらねこ); null = no reliable reading (Japanese only; the analyser must be loaded). */
+export function kanaFixText(text: string, gift: string[], language: Language): string | null {
+  return language === 'ja' ? kanaFixWords(text, gift) : gift.some((f) => text.includes(f)) ? null : text
 }
 
 /** Words that do not suit this gift (a few explicit ones per language; the palette checks the offered characters, never the words of a scene line). */
@@ -238,10 +214,10 @@ export function checkFilmScript(raw: unknown, input: FilmInput, palette: Palette
   out.push(...checkPictures(pictures, input))
   const lim = lineLimits(input.language)
   const lang = input.language === 'ja' ? 'ja' : input.language === 'en' ? 'en' : 'zh'
-  const forms = [...new Set(input.forms.concat(input.glyph).filter(Boolean))]
   const story = input.story.normalize('NFC')
-  // the story with the offered characters in kana: a quotation that differs from the story ONLY by that replacement is accepted (the character fix is made in code)
-  const storyKana = (kanaFixText(story, forms, palette, input.language) ?? story).normalize('NFC')
+  const gift = giftForms(input)
+  // the story with the gift character's word in kana: a quotation that differs from the story ONLY by that replacement is accepted (the character fix is made in code)
+  const storyKana = (kanaFixText(story, gift, input.language) ?? story).normalize('NFC')
   const occasionWords = occasionWordsFor(input, lang)
   lines.forEach((l, i) => {
     const at = (code: string, detail: string, extra: Partial<FilmProblem> = {}) => out.push({ code, scene: i, detail, ...extra })
@@ -254,8 +230,8 @@ export function checkFilmScript(raw: unknown, input: FilmInput, palette: Palette
         if (q && !story.includes(q) && !storyKana.includes(q)) at('quote', `Line ${i + 1}: the quotation “${q}” is not word for word in the story. Copy quotations exactly from the story, or do not quote.`)
       }
     }
-    const shown = forms.filter((f) => l.includes(f))
-    if (shown.length > 0) at('character', `Line ${i + 1}: the character${shown.length > 1 ? 's' : ''} ${shown.join(' / ')} must not appear in the lines (the lines may not contain ANY of: ${forms.join(' ')}); say it with other words or in kana (for example 「待っていた」 → 「ずっとそこにいた」).`, { rule: 'character', terms: shown })
+    const shown = gift.filter((f) => l.includes(f))
+    if (shown.length > 0) at('character', `Line ${i + 1}: the character${shown.length > 1 ? 's' : ''} ${shown.join(' / ')} must not appear in the lines (the lines may not contain ANY of: ${gift.join(' ')}); say it with other words or in kana (for example 「待っていた」 → 「ずっとそこにいた」).`, { rule: 'character', terms: shown })
     if (/[0-9０-９]/.test(l)) at('digits', `Line ${i + 1}: no digits; write time in words or leave it out.`)
     const named = input.names.map((x) => x.trim()).filter((x) => [...x].length >= 2 && l.includes(x))
     if (named.length > 0) at('names', `Line ${i + 1}: a personal name from the order is in the line; use relation words instead.`)
@@ -450,6 +426,8 @@ const isUnsafe = (ps: FilmProblem[]): boolean => ps.some((p) => p.rule && SAFE_R
 const MIN_REAL_SCENES = 2
 
 export async function makeFilm(input: FilmInput, opts: FilmOptions = {}): Promise<FilmRecord> {
+  // (the gift character in a caption is replaced by its word in kana: the analyser is loaded once, here, because the checks are synchronous)
+  if (input.language === 'ja') await loadTokenizer()
   const log = opts.log ?? ((l: string) => console.log(l))
   const now = opts.now?.() ?? new Date()
   const t0 = Date.now()
@@ -525,7 +503,7 @@ export async function makeFilm(input: FilmInput, opts: FilmOptions = {}): Promis
       let kana = false
       const ps = problemsAt(i, line, picture)
       if (ps.some((p) => p.code === 'character')) {
-        const k = kanaFixText(line, forms, palette, input.language)
+        const k = kanaFixText(line, giftForms(input), input.language)
         if (k !== null && k !== line) {
           line = k
           kana = true

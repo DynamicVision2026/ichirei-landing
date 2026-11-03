@@ -8,6 +8,7 @@ import http from 'node:http'
 import { existsSync, readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { SAMPLE_IDS, SAMPLE_RECORDS } from '../engine/animation.ts'
+import { kanaFixWords, loadTokenizer } from '../engine/kana.ts'
 import { PICTURE_WORDS, kanaFixText, trimPicture, buildFilmPrompt, checkFilmScript, checkPictures, fallbackFilm, lineLimits, lineSize, loadFilmPrompt, makeFilm, pictureWords, type FilmInput } from '../engine/film.ts'
 import { loadPalette } from '../engine/palette.ts'
 import { animationView, type AnimationRecord } from '../engine/animation.ts'
@@ -327,10 +328,15 @@ const animationViewFor = (film: Awaited<ReturnType<typeof makeFilm>>) => animati
   const qin = (over: Partial<FilmInput> = {}): FilmInput => hin({ story: QSTORY, ...over })
   const QLINE = '「ずっと待ってたよ」と、\n母は玄関で言った。'
   const QSCRIPT = { ...SAFE, lines: [SAFE.lines[0], SAFE.lines[1], QLINE, SAFE.lines[3]] }
+  await loadTokenizer() // (the analyser with readings; makeFilm loads it itself, the pure checks need it loaded)
   const qp = checkFilmScript(QSCRIPT, qin(), palette)
   check('(8) the exact case: a line that quotes the story word for word AND holds the offered character fails ONE rule, `character` (the quotation itself is fine)', qp.length > 0 && qp.every((p) => p.scene === 2 && p.code === 'character'), JSON.stringify(qp.map((p) => [p.scene, p.code])))
-  const fkana = kanaFixText(QLINE, ['待', '守', '直'], palette, 'ja')
-  check('(8) kanaFixText: 待ってた → まってた (the kun stem, the rest as written); in a compound the other kanji stay and the on reading is used (期待 → 期たい); a line without the character is untouched; not Japanese → null; a character with no palette row → null', fkana === '「ずっとまってたよ」と、\n母は玄関で言った。' && kanaFixText('期待に応えて', ['待'], palette, 'ja') === '期たいに応えて' && kanaFixText('母は玄関にいた。', ['待'], palette, 'ja') === '母は玄関にいた。' && kanaFixText('等待', ['待'], palette, 'zh-Hant') === null && kanaFixText('㐀の人', ['㐀'], palette, 'ja') === null, String(fkana))
+  const fkana = kanaFixText(QLINE, ['待'], 'ja')
+  const t = (text: string, gift: string[]) => kanaFixText(text, gift, 'ja')
+  check('(8) THE FOUR CASES — 野良猫 with gift 待 stays unchanged; 待ってた → まってた; 期待 → きたい; 野良猫 with gift 猫 → のらねこ', t('野良猫がそこにいた。', ['待']) === '野良猫がそこにいた。' && t('ずっと待ってたよ', ['待']) === 'ずっとまってたよ' && t('期待していた。', ['待']) === 'きたいしていた。' && t('野良猫がそこにいた。', ['猫']) === 'のらねこがそこにいた。', JSON.stringify([t('野良猫がそこにいた。', ['待']), t('ずっと待ってたよ', ['待']), t('期待していた。', ['待']), t('野良猫がそこにいた。', ['猫'])]))
+  check('(8) ONLY the gift character is ever replaced: with 待 and 猫 in one line and gift 待, the 猫 stays as written (and the character rule is not triggered by it); the live 「野良びょう」 cannot happen — a single character is never converted by its standalone reading', t('野良猫を待ってた。', ['待']) === '野良猫をまってた。' && t('野良猫を待ってた。', ['猫']) === 'のらねこを待ってた。' && !(t('野良猫を待ってた。', ['待']) ?? '').includes('びょう') && !(t('野良猫を待ってた。', ['猫']) ?? '').includes('びょう'))
+  check('(8) the whole WORD is replaced, not the character: 彼は昨日、期待を裏切った → きたい only; a verb keeps its inflection (待たされた → またされた); a line without the gift character is untouched; not Japanese → null when it holds it; no analyser or an unreadable token → null (the caption is then left empty)', t('彼は昨日、期待を裏切った。', ['待']) === '彼は昨日、きたいを裏切った。' && t('一時間も待たされた。', ['待']) === '一時間もまたされた。' && t('母は玄関にいた。', ['待']) === '母は玄関にいた。' && kanaFixText('等待', ['待'], 'zh-Hant') === null && kanaFixText('等你', ['待'], 'zh-Hant') === '等你' && kanaFixWords('期待', ['待'], null) === null && kanaFixWords('期待', ['待'], { tokenize: () => [{ surface_form: '期待', pos: '名詞', word_type: 'UNKNOWN' }] }) === null && kanaFixWords('期待', ['待'], { tokenize: () => [{ surface_form: '期待', pos: '名詞', reading: '*', word_type: 'KNOWN' }] }) === null && kanaFixWords('期待', ['待'], { tokenize: () => [{ surface_form: '期', pos: '名詞', reading: 'キ', word_type: 'KNOWN' }] }) === null)
+  check('(8) the character check looks at the GIFT character only: a line with another card\'s character (猫) passes when the gift is 待; with the gift 猫 it fails `character`', checkFilmScript({ ...SAFE, lines: [SAFE.lines[0], SAFE.lines[1], '野良猫が玄関にいて、\n母は笑っていた。', SAFE.lines[3]] }, hin({ story: QSTORY, glyph: '待', forms: ['待', '猫'], chosen: ['待'] }), palette).filter((p) => p.code === 'character').length === 0 && checkFilmScript({ ...SAFE, lines: [SAFE.lines[0], SAFE.lines[1], '野良猫が玄関にいて、\n母は笑っていた。', SAFE.lines[3]] }, hin({ story: QSTORY, glyph: '猫', forms: ['待', '猫'], chosen: ['猫'] }), palette).some((p) => p.code === 'character'))
   const fixedScript = { ...QSCRIPT, lines: QSCRIPT.lines.map((l, i) => (i === 2 ? fkana! : l)) }
   check('(8) the quote check ACCEPTS the kana form of a story quotation (まってたよ) and the script then has no problem at all; a quotation that differs in any other way is still refused', checkFilmScript(fixedScript, qin(), palette).length === 0 && checkFilmScript({ ...fixedScript, lines: fixedScript.lines.map((l, i) => (i === 2 ? '「ずっとまっていたよ」と、\n母は玄関で言った。' : l)) }, qin(), palette).some((p) => p.code === 'quote'))
   const q1 = await run([QSCRIPT], qin(), 'ok', {})
