@@ -585,6 +585,8 @@ The form sends `purpose` (celebrate / thanks / apology / encourage / farewell / 
 
 ## Post-deploy self-test (v9.8)
 
+> **Switched off in the deploy (2026-11-03).** `cloudbuild.yaml` no longer has the `selftest-secret` and `selftest` steps and no longer mounts `ICHIREI_SELFTEST_TOKEN`; the build only builds, pushes and deploys. The code (`engine/selftest.ts`, `api/selftest.ts`, the routes) is unchanged and unused: without the token the route answers 503 and `/api/health` shows `selftest.configured: false`. To use it again, restore the two steps and the mount from the git history (commit `717bbc7`), or call the route by hand with a token mounted some other way. The notes below describe how it works when it is on.
+
 After every deploy, Cloud Build runs the 16 internal purpose stories (`engine/selftest/stories.json`; never shown publicly) through the REAL pipeline — parallel cards with their reviews and checks, the reading, the poem in the default format, and the film script with every safety check; **no picture is drawn** — and records the result.
 
 - **Token.** The step `selftest-secret` creates the Secret Manager secret `ichirei-selftest-token` once (random; never printed, never in the repo), lets the Cloud Run service account and the build account read it, and the deploy mounts it as `ICHIREI_SELFTEST_TOKEN`. If any of that fails (for example the build account may not create secrets), the deploy is exactly what it was and the self-test is off — grant the build account `roles/secretmanager.admin` once, or create the secret by hand and grant `roles/secretmanager.secretAccessor` to the service account and to the build account. `/api/health` shows `selftest.configured`.

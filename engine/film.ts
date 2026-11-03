@@ -111,6 +111,29 @@ const CJK = /[\u3040-\u30ff\u3400-\u9fff\uf900-\ufaff]/u
 
 export const pictureWords = (d: string): number => d.split(/\s+/).filter((w) => /[\p{L}\p{N}]/u.test(w)).length
 
+/**
+ * A picture description that is too long and has nothing else wrong is shortened IN CODE (never a washi for length alone): cut to the limit at a sentence end, else at a phrase break (; — , and), else at the
+ * word limit, and finished with a full stop. Returns null when it cannot be made to fit (too short to begin with, or fewer than the minimum words would be left).
+ */
+export function trimPicture(d: string): string | null {
+  const words = d.trim().split(/\s+/)
+  if (words.length <= PICTURE_WORDS.max) return null
+  const cutAt = (limit: number, pattern: RegExp): string | null => {
+    let best: string | null = null
+    let count = 0
+    for (let k = 0; k < words.length && k < limit; k++) {
+      count = k + 1
+      if (pattern.test(words[k]) && count >= PICTURE_WORDS.min) best = words.slice(0, count).join(' ')
+    }
+    return best
+  }
+  const tidy = (t: string): string => t.replace(/[\s,;:—–-]+$/u, '').replace(/\b(and|with|of|in|on|at|by|to|from|beside|near|a|an|the|her|his|their)$/iu, '').replace(/[\s,;:—–-]+$/u, '').replace(/[.!?]+$/u, '') + '.'
+  const cut = cutAt(PICTURE_WORDS.max, /[.!?]["')\]]?$/) ?? cutAt(PICTURE_WORDS.max, /[;:—–,]$/) ?? words.slice(0, PICTURE_WORDS.max).join(' ')
+  const out = tidy(cut)
+  const n = pictureWords(out)
+  return n >= PICTURE_WORDS.min && n <= PICTURE_WORDS.max ? out : null
+}
+
 /** The checks the ticket asks of each description (15–40 words, no digits, no level 1 words, not the chosen character) and the rules the prompt gives (no face, no text, no illness, no celebration in a remembrance film). */
 export function checkPictures(pictures: string[], input: Pick<FilmInput, 'glyph' | 'forms' | 'names' | 'memorial' | 'occasion'> & Partial<Pick<FilmInput, 'language' | 'story' | 'quiet'>>): FilmProblem[] {
   const out: FilmProblem[] = []
@@ -450,10 +473,29 @@ export async function makeFilm(input: FilmInput, opts: FilmOptions = {}): Promis
     await Promise.all(
       failing.map(async (i) => {
         const was = by.get(i)!
+        // a scene whose ONLY fault is a picture description that is too long is shortened in code: no model call, no washi
+        if (was.length > 0 && was.every((p) => p.code === 'pic_length')) {
+          const cut = trimPicture(pictures[i])
+          if (cut && (scenesOf(checkFilmScript({ turning_point: 'x', lines, pictures: pictures.map((x, k) => (k === i ? cut : x)) }, input, palette)).get(i) ?? []).length === 0) {
+            pictures[i] = cut
+            reports[i] = { state: 'rewritten', rules: reports[i].rules }
+            logLine(log, 'film_scene', { attempt, scene: i + 1, state: 'rewritten', was: reports[i].rules, trimmed: true })
+            return
+          }
+        }
         const now2 = await rewriteScene(i, lines.map((l, k) => ({ line: l, picture: pictures[k] })), was, callSignal(opts.signal, timeoutMs))
         if (now2) {
           const test = { turning_point: 'x', lines: lines.map((l, k) => (k === i ? now2.line : l)), pictures: pictures.map((x, k) => (k === i ? now2.picture : x)) }
-          const again = scenesOf(checkFilmScript(test, input, palette)).get(i) ?? []
+          let again = scenesOf(checkFilmScript(test, input, palette)).get(i) ?? []
+          // the rewrite fixed what was wrong but came back too long (and nothing else is wrong): cut it to the limit in code and draw it
+          if (again.length > 0 && again.every((p) => p.code === 'pic_length')) {
+            const cut = trimPicture(now2.picture)
+            if (cut) {
+              now2.picture = cut
+              test.pictures = pictures.map((x, k) => (k === i ? cut : x))
+              again = scenesOf(checkFilmScript(test, input, palette)).get(i) ?? []
+            }
+          }
           if (again.length === 0) {
             lines[i] = now2.line
             pictures[i] = now2.picture

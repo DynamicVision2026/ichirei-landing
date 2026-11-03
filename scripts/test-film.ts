@@ -8,7 +8,7 @@ import http from 'node:http'
 import { existsSync, readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { SAMPLE_IDS, SAMPLE_RECORDS } from '../engine/animation.ts'
-import { PICTURE_WORDS, buildFilmPrompt, checkFilmScript, checkPictures, fallbackFilm, lineLimits, lineSize, loadFilmPrompt, makeFilm, pictureWords, type FilmInput } from '../engine/film.ts'
+import { PICTURE_WORDS, trimPicture, buildFilmPrompt, checkFilmScript, checkPictures, fallbackFilm, lineLimits, lineSize, loadFilmPrompt, makeFilm, pictureWords, type FilmInput } from '../engine/film.ts'
 import { loadPalette } from '../engine/palette.ts'
 import { animationView, type AnimationRecord } from '../engine/animation.ts'
 import { outcomeOf } from '../engine/preview.ts'
@@ -306,6 +306,19 @@ const animationViewFor = (film: Awaited<ReturnType<typeof makeFilm>>) => animati
   const scene3Prompt = scenePrompts.find((x) => /SCENE 3 FAILED/.test(x.prompt))?.prompt ?? ''
   check('(7) the character rule is fixed INSIDE the scene rewrite: the prompt names 待 and gives the example 待っていた → ずっとそこにいた', scene3Prompt.includes('character') && scene3Prompt.includes('待っていた') && scene3Prompt.includes('ずっとそこにいた'))
   check('(7) none of the real scenes shows or names injury or medical detail', ![...f1.pictures, ...f1.lines].some((x) => HARM.test(x)) && !/事故|切断|病院|義足|手術|松葉杖/.test(f1.lines.join('')))
+
+  // the live 春子 case: scene 2 fails picture_unsafe:crutches, the rewrite fixes that but comes back TOO LONG (r:pic_length) → shortened in code and drawn, never washi
+  const LONGPIC = `${GOODPIC}, and beside it a small table with a teacup, a folded newspaper, a pair of reading glasses and a wool hat, while the curtains move a little in the breeze and the street outside stays quiet and bright until evening comes`
+  check('(7b) the long picture is really over the limit (more than 40 words)', pictureWords(LONGPIC) > PICTURE_WORDS.max, String(pictureWords(LONGPIC)))
+  const f4b = await run([LIVE], hin(), 'ok', { 2: { line: SAFE.lines[1], picture: LONGPIC }, 3: fixes[3] })
+  const p2 = f4b.pictures[1]
+  check('(7b) crutches, then r:pic_length: the picture is cut in code to the limit at a phrase boundary (15–40 words, ends with a full stop, starts as the rewrite did) and the scene is `rewritten` — FOUR real scenes, no washi, nothing empty', f4b.status === 'ready' && f4b.scenes?.every((x) => x.state !== 'washi') === true && f4b.scenes?.[1].state === 'rewritten' && f4b.pictures.every((x) => x.trim().length > 0) && pictureWords(p2) >= PICTURE_WORDS.min && pictureWords(p2) <= PICTURE_WORDS.max && p2.endsWith('.') && LONGPIC.startsWith(p2.slice(0, -1)) && checkFilmScript({ turning_point: 'x', lines: f4b.lines, pictures: f4b.pictures }, hin(), palette).length === 0, JSON.stringify([f4b.status, f4b.scenes?.map((x) => x.state), pictureWords(p2), p2]))
+  check('(7b) …and the log says the scene was rewritten with the crutch gone', logs.some((l) => l.includes('"event":"film_scene"') && l.includes('"state":"rewritten"')))
+  check('(7b) trimPicture: a description within the limit is left alone (null); one that is too long ends at a sentence end when there is one, else a phrase break, else the word limit; a too-short one cannot be fixed', trimPicture(GOODPIC) === null && trimPicture(`${GOODPIC}. ${LONGPIC}.`)?.endsWith('.') === true && pictureWords(trimPicture(`${GOODPIC}. ${LONGPIC}.`) ?? '') <= PICTURE_WORDS.max && pictureWords(trimPicture(LONGPIC.replace(/,/g, '')) ?? '') >= PICTURE_WORDS.min && pictureWords(trimPicture(LONGPIC.replace(/,/g, '')) ?? '') <= PICTURE_WORDS.max && trimPicture('one two three') === null)
+  // a scene whose ONLY fault is length is shortened without any model call
+  const onlyLong = { ...SAFE, pictures: [SAFE.pictures[0], `${SAFE.pictures[1]}, ${LONGPIC.slice(GOODPIC.length + 2)}`, SAFE.pictures[2], SAFE.pictures[3]] }
+  const f5b = await run([onlyLong], hin(), 'ok', {})
+  check('(7b) a scene whose only fault is a too-long picture is shortened in code with NO rewrite call: ready, four real scenes', f5b.status === 'ready' && f5b.scenes?.every((x) => x.state !== 'washi') === true && !seen.slice(-3).some((x) => x.prompt.includes('Film Scene Rewrite Prompt')) && pictureWords(f5b.pictures[1]) <= PICTURE_WORDS.max, JSON.stringify([f5b.status, f5b.scenes?.map((x) => x.state), pictureWords(f5b.pictures[1])]))
 
   // one UNFIXABLE scene: the rewrite is blocked too → three real pictures and one washi tile; the film is still ready
   const f2 = await run([LIVE], hin(), 'ok', { 2: { line: '父は松葉杖で廊下を歩いていた。', picture: CRUTCH }, 3: fixes[3] })

@@ -72,30 +72,6 @@ steps:
     name: gcr.io/cloud-builders/docker
     args: [push, '${_REGION}-docker.pkg.dev/$PROJECT_ID/${_REPO}/${_SERVICE}:latest']
 
-  # The post-deploy self-test needs a shared secret token (Secret Manager secret `ichirei-selftest-token`). If the secret EXISTS (the owner creates it and grants the Cloud Run service account
-  # access), the deploy mounts it as ICHIREI_SELFTEST_TOKEN. If it does not exist yet, this step tries to create it (random, never printed). Granting access is attempted too but its outcome does not
-  # decide anything: the deploy step below retries without the token if Cloud Run refuses the mount, so a missing grant can never break a deploy. Every failure here is non-fatal.
-  - id: selftest-secret
-    name: gcr.io/google.com/cloudsdktool/cloud-sdk:slim
-    entrypoint: bash
-    args:
-      - -c
-      - |
-        BASE="ANTHROPIC_API_KEY=ANTHROPIC_API_KEY:latest,SHOPIFY_STOREFRONT_TOKEN=SHOPIFY_STOREFRONT_TOKEN:latest"
-        echo "$$BASE" > /workspace/secrets.txt
-        SECRET=ichirei-selftest-token
-        if ! gcloud secrets describe "$$SECRET" >/dev/null 2>&1; then
-          head -c 32 /dev/urandom | od -An -tx1 | tr -d ' \n' | gcloud secrets create "$$SECRET" --replication-policy=automatic --data-file=- >/dev/null 2>&1 || { echo "selftest: the secret does not exist and could not be created; the self-test is off for this deploy"; exit 0; }
-        fi
-        SA=$$(gcloud run services describe ${_SERVICE} --region=${_REGION} --format='value(spec.template.spec.serviceAccountName)' 2>/dev/null)
-        if [ -z "$$SA" ]; then SA="$$(gcloud projects describe $PROJECT_ID --format='value(projectNumber)' 2>/dev/null)-compute@developer.gserviceaccount.com"; fi
-        gcloud secrets add-iam-policy-binding "$$SECRET" --member="serviceAccount:$$SA" --role=roles/secretmanager.secretAccessor >/dev/null 2>&1 || true
-        ME=$$(gcloud config get-value account 2>/dev/null)
-        [ -n "$$ME" ] && gcloud secrets add-iam-policy-binding "$$SECRET" --member="serviceAccount:$$ME" --role=roles/secretmanager.secretAccessor >/dev/null 2>&1 || true
-        echo "$$BASE,ICHIREI_SELFTEST_TOKEN=$$SECRET:latest" > /workspace/secrets.txt
-        echo "selftest: the token secret exists and will be mounted"
-        exit 0
-
   - id: deploy
     name: gcr.io/google.com/cloudsdktool/cloud-sdk:slim
     # bash only so that the deploy time can be stamped: `__DEPLOYED_AT__` in the env-vars argument below becomes the UTC time of this step (`$$` is Cloud Build's escape for a literal `$`).
@@ -103,25 +79,9 @@ steps:
     args:
       - -c
       - |
-        BASE="ANTHROPIC_API_KEY=ANTHROPIC_API_KEY:latest,SHOPIFY_STOREFRONT_TOKEN=SHOPIFY_STOREFRONT_TOKEN:latest"
-        S=$$(cat /workspace/secrets.txt 2>/dev/null)
-        [ -n "$$S" ] || S="$$BASE"
         D=$$(date -u +%Y-%m-%dT%H:%M:%SZ)
-        run_deploy() {
-          local args=("$${@:2}")
-          args=("$${args[@]/__DEPLOYED_AT__/$$D}")
-          args=("$${args[@]/__SECRETS__/$$1}")
-          gcloud "$${args[@]}"
-        }
-        if ! run_deploy "$$S" "$$@"; then
-          # Cloud Run refuses a secret it may not read: deploy again without the self-test token rather than lose the deploy
-          if [ "$$S" != "$$BASE" ]; then
-            echo "selftest: the deploy failed with the token mounted; deploying again without it"
-            run_deploy "$$BASE" "$$@"
-          else
-            exit 1
-          fi
-        fi
+        args=("$${@/__DEPLOYED_AT__/$$D}")
+        gcloud "$${args[@]}"
       - bash
       - run
       - deploy
@@ -137,25 +97,9 @@ steps:
       - --min-instances=0
       - --max-instances=3              # caps concurrent spend; raise when needed
       # Mount the Secret Manager secrets as env vars of the same name.
-      # (__SECRETS__ is replaced by the deploy script above: the two secrets, plus ICHIREI_SELFTEST_TOKEN when the self-test secret is ready — see the selftest-secret step)
-      - --set-secrets=__SECRETS__
+      - --set-secrets=ANTHROPIC_API_KEY=ANTHROPIC_API_KEY:latest,SHOPIFY_STOREFRONT_TOKEN=SHOPIFY_STOREFRONT_TOKEN:latest
       # Non-secret settings: the purchase settings and the engine speed settings. --update-env-vars leaves any other variable alone.
       - --update-env-vars=ICHIREI_EFFORT=${_EFFORT},ICHIREI_MAX_TOKENS=${_MAX_TOKENS},ICHIREI_MAX_TOKENS_RETRY=${_MAX_TOKENS_RETRY},ICHIREI_REVIEW_MODEL=${_REVIEW_MODEL},ICHIREI_REVIEW_EFFORT=${_REVIEW_EFFORT},ICHIREI_CALL_TIMEOUT_MS=${_CALL_TIMEOUT_MS},ICHIREI_REVIEW_TIMEOUT_MS=${_REVIEW_TIMEOUT_MS},ICHIREI_LEXICON_MODE=${_LEXICON_MODE},ICHIREI_SIMPLE_MAX_STROKES=${_SIMPLE_MAX_STROKES},ICHIREI_ANIMATION_SAMPLES=${_ANIMATION_SAMPLES},ICHIREI_FILM_IMAGE_MODEL=${_FILM_IMAGE_MODEL},ICHIREI_FILM_IMAGE_LOCATION=${_FILM_IMAGE_LOCATION},ICHIREI_FILM_DAILY_MAX=${_FILM_DAILY_MAX},SHOPIFY_VARIANT_SIMPLE=${_SHOPIFY_VARIANT_SIMPLE},SHOPIFY_VARIANT_STANDARD=${_SHOPIFY_VARIANT_STANDARD},SHOPIFY_VARIANT_EGIFT=${_SHOPIFY_VARIANT_EGIFT},SHOPIFY_STOREFRONT_TOKEN_PUBLIC=${_SHOPIFY_STOREFRONT_TOKEN},SHOPIFY_ADMIN_CLIENT_ID=${_SHOPIFY_ADMIN_CLIENT_ID},ORDER_BUCKET=${_ORDER_BUCKET},ICHIREI_WOOD_SIZES=${_WOOD_SIZES},ICHIREI_SELFTEST_MONTHLY_USD=${_SELFTEST_MONTHLY_USD},ICHIREI_COMMIT=${SHORT_SHA},ICHIREI_DEPLOYED_AT=__DEPLOYED_AT__
-
-  # The post-deploy self-test (v9.8): the 16 internal stories through the real pipeline (no pictures), results recorded at GET /api/selftest/latest. It waits for the run (up to ~5 min) and NEVER fails
-  # the build: a failing story, a refusal, a cap or a missing token only show in the log line and in the recorded results.
-  - id: selftest
-    name: gcr.io/google.com/cloudsdktool/cloud-sdk:slim
-    entrypoint: bash
-    args:
-      - -c
-      - |
-        URL=$$(gcloud run services describe ${_SERVICE} --region=${_REGION} --format='value(status.url)' 2>/dev/null)
-        TOKEN=$$(gcloud secrets versions access latest --secret=ichirei-selftest-token 2>/dev/null)
-        if [ -z "$$URL" ] || [ -z "$$TOKEN" ]; then echo "selftest: skipped (no service URL or no readable token)"; exit 0; fi
-        CODE=$$(curl -sS --max-time 320 -X POST -H "x-selftest-token: $$TOKEN" -o /dev/null -w '%{http_code}' "$$URL/api/selftest/run" 2>/dev/null)
-        echo "selftest: the route answered HTTP $$CODE — results at $$URL/api/selftest/latest"
-        exit 0
 
 images:
   - ${_REGION}-docker.pkg.dev/$PROJECT_ID/${_REPO}/${_SERVICE}:$BUILD_ID
