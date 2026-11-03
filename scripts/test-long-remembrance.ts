@@ -39,6 +39,7 @@ let gazeFail = false
 let refillHang = false
 const lastBody: Record<string, any> = {}
 let vetoed = new Set<string>()
+let vetoRule = 'dignity'
 let lineVeto: { text: string; kanji: string } | null = null
 let selectHook: ((prompt: string) => unknown) | null = null
 const upstream = http.createServer(async (req, res) => {
@@ -54,7 +55,7 @@ const upstream = http.createServer(async (req, res) => {
   if (kind === 'review') {
     const items = [...prompt.matchAll(/"slot": "(main|second|freestyle)",\s*"kanji": "([^"]+)"/g)].map((m) => {
       const lineBad = lineVeto !== null && m[2] === lineVeto.kanji && prompt.includes(lineVeto.text) // the review rejects a LINE that says more than the story does
-      return { slot: m[1], kanji: m[2], pass: !vetoed.has(m[2]) && !lineBad, rule: vetoed.has(m[2]) ? 'dignity' : lineBad ? 'truth' : null, reason: lineBad ? 'says more than the story: earlier than anyone' : 'ok' }
+      return { slot: m[1], kanji: m[2], pass: !vetoed.has(m[2]) && !lineBad, rule: vetoed.has(m[2]) ? vetoRule : lineBad ? 'truth' : null, reason: lineBad ? 'says more than the story: earlier than anyone' : 'ok' }
     })
     reply = { verdicts: items }
   } else reply = kind === 'gaze' ? gazeReply : kind === 'replace' ? refillReply : kind === 'select' && selectHook ? selectHook(prompt) : modelReply
@@ -250,13 +251,15 @@ try {
   gazeReply = { gazes: [{ kanji: '朝', one_line_gaze: '誰よりも早く、私の前に起きる人。' }] }
   const k3 = await run(BIRTHDAY, SHORT)
   check('(14) the rewrite still says the exaggerated thing: the second review rejects it too — dropped, two cards, no error', k3.status === 'sufficient' && live(k3).length === 2 && refillCalls === 1)
-  // the CHARACTER itself fails (insult / dignity, not truth): no rewrite is tried
+  // the CHARACTER itself fails (a rule about the character such as `register`, not a line rule): no rewrite is tried. (insult / dignity / truth / subject are LINE rules since v9.7: a rewrite is tried once.)
   lineVeto = null
   vetoed = new Set(['朝'])
+  vetoRule = 'register'
   gazeReply = { gazes: [{ kanji: '朝', one_line_gaze: 'いつも、私より先に起きている人。' }] }
   const k4 = await run(BIRTHDAY, SHORT)
   vetoed = new Set()
-  check('(14) a refilled free pick rejected for the CHARACTER itself (a safety rule, not truth) is dropped with no rewrite call', live(k4).length === 2 && gazeCalls === 0 && refillCalls === 1)
+  vetoRule = 'dignity'
+  check('(14) a refilled free pick rejected for the CHARACTER itself (a rule about the character, not a line rule) is dropped with no rewrite call', live(k4).length === 2 && gazeCalls === 0 && refillCalls === 1)
   lineVeto = null
   gazeReply = 'not json at all'
   // ---- THE FREE PICK MUST NOT BE A NEGATIVE TRAIT, AND LOOKS FROM A DIFFERENT ANGLE; THE SELECTION CALL IS MEASURED (2026-11-01) ------------------------------------------------------------

@@ -576,3 +576,9 @@ node scripts/test-container.mjs        # runs the image against a fake model ups
 ## Purpose and state (v9.6)
 
 The form sends `purpose` (celebrate / thanks / apology / encourage / farewell / reconnect / confess / memorial / other), an optional `state` and the 「その他」 texts (`relationship_other` ≤ 20, `purpose_other` ≤ 30, `state_other` ≤ 20 characters) to `/api/select`; there is nothing to configure. An older client that sends only an `occasion` keeps working. The logs show `purpose`, `state` and `other_text_mapped` (codes only, never the text) on the `[ichirei-cards]` line. Reference: `docs/ICHIREI_Relationship_Emotion_Map.md`. Check a deploy with `/api/health` (`commit`, `deployedAt`) and `/api/select?debug=1`; to read the real model's lines against the 16 internal stories run `ANTHROPIC_API_KEY=… node --experimental-strip-types scripts/run-story-accuracy.mjs --set purpose`.
+
+## Film blocks, line rescue, free-pick safety net, feeling labels (v9.7)
+
+- **Film script blocked:** the logs now say which rule and listed term blocked it (`[ichirei-film] film_blocked`, codes such as `illness:事故`, `palette:切:hard_block`, `picture_unsafe:hospital`; never story text) and `/api/preview/<id>?debug=1` shows `script_blocked_by`. A block gets one safe-scenes rewrite before the film falls back to washi (`film_safe_rewrite`).
+- **Line rescue:** a card the review rejects under `insult`, `dignity`, `truth` or `subject` gets its line rewritten once (small model, `ICHIREI_GAZE_MODEL`) and is checked again; `parallel.line_rescue` in `[ichirei-cards]` and `?debug=1`.
+- **Free-pick safety net:** when the first pair of free-pick calls leaves no free card, a second hedged pair is asked once (`parallel.free_retry`). `ICHIREI_FREE_RETRY=off` switches it off; `ICHIREI_FREE_RETRY_GRACE_MS` (default 12000) is the extra wait for it.

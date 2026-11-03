@@ -130,7 +130,7 @@ export async function startPreview(deps: PreviewDeps, input: PreviewStart, allow
     draft: { story_hash: hash, memorial: input.memorial, created_at: now.toISOString(), picked_at: pickedAt },
   }
   await deps.store.put(id, record)
-  ;(deps.log ?? console.log)(`[ichirei-preview] ${JSON.stringify({ event: 'preview_start', script: film.status, script_reason: film.reason ?? null })}`)
+  ;(deps.log ?? console.log)(`[ichirei-preview] ${JSON.stringify({ event: 'preview_start', script: film.status, script_reason: film.reason ?? null, ...(film.blocked_by?.length ? { blocked_by: film.blocked_by } : {}), ...(film.safe_rewrite ? { safe_rewrite: true } : {}) })}`)
   return { state: 'ok', id, reused: false, script: film.status === 'ready' ? 'ready' : 'fallback' }
 }
 
@@ -181,6 +181,8 @@ export interface PictureOutcome {
   cause?: 'script_fallback' | 'images_failed' | 'no_render'
   script_status?: string
   script_reason?: string | null
+  /** script_fallback after a block: the rules and listed terms that blocked it (codes, never story text) */
+  script_blocked_by?: string[]
   art_status?: string | null
   slots?: string[]
   reasons?: string[]
@@ -192,7 +194,7 @@ export interface PictureOutcome {
 
 export function outcomeOf(rec: AnimationRecord, art: ArtRecord | null): PictureOutcome {
   const film = rec.film
-  const base = { script_status: film?.status ?? 'none', script_reason: film?.reason ?? null, art_status: art?.status ?? null }
+  const base = { script_status: film?.status ?? 'none', script_reason: film?.reason ?? null, ...(film?.blocked_by?.length ? { script_blocked_by: film.blocked_by } : {}), art_status: art?.status ?? null }
   if (!film || film.status !== 'ready' || film.lines.length !== 4) return { outcome: 'all_failed', cause: 'script_fallback', ...base }
   if (art?.status === 'deferred') return { outcome: 'limit', limit: 'film_daily', ...base }
   const slots = art?.slots ?? []

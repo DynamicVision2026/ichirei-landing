@@ -43,6 +43,10 @@ export const FREE_GRACE_MS_DEFAULT = 5_000
 const freeCallMs = () => num(process.env.ICHIREI_FREE_CALL_TIMEOUT_MS, FREE_CALL_MS_DEFAULT)
 const freeLaneMs = () => num(process.env.ICHIREI_FREE_LANE_MS, FREE_LANE_MS_DEFAULT)
 const freeGraceMs = () => num(process.env.ICHIREI_FREE_GRACE_MS, FREE_GRACE_MS_DEFAULT)
+/** The free pick's safety net (a second hedged pair of calls when the first pair left no free card) and the extra wait it is given after the other two cards are settled. */
+export const FREE_RETRY_GRACE_MS_DEFAULT = 12_000
+const freeRetryGraceMs = () => num(process.env.ICHIREI_FREE_RETRY_GRACE_MS, FREE_RETRY_GRACE_MS_DEFAULT)
+const freeRetryOn = (): boolean => !/^(off|0|false|no)$/i.test((process.env.ICHIREI_FREE_RETRY ?? '').trim())
 const RESERVE_MS = 30_000 // time kept for the checks after a retried call
 const MIN_RETRY_MS = 30_000
 
@@ -81,7 +85,7 @@ export function cardPrompt(basePrompt: string, slot: 'main' | 'second', lexicon 
 }
 
 /** The compact free-pick prompt for the parallel call: the context, the story, the characters not to use; ranked top two. */
-export function freeCardPrompt(story: string, context: EngineContext, avoid: string[]): string {
+export function freeCardPrompt(story: string, context: EngineContext, avoid: (string | { kanji: string; reason: string })[], retry = false): string {
   const f = FREE_FIELDS[context.language === 'ja' ? 'ja' : context.language === 'en' ? 'en' : 'zh']
   const v: Record<string, string> = {
     LANGUAGE: context.language,
@@ -90,11 +94,12 @@ export function freeCardPrompt(story: string, context: EngineContext, avoid: str
     OCCASION: context.occasion ?? 'unspecified',
     OCCASION_DETAIL: context.occasion_detail ?? 'unspecified',
     STORY: story,
-    AVOID: JSON.stringify(avoid.map((k) => ({ kanji: k, reason: 'already shown for this story' })), null, 2),
+    AVOID: JSON.stringify(avoid.map((k) => (typeof k === 'string' ? { kanji: k, reason: 'already shown for this story' } : k)), null, 2),
     FIELDS: f.fields,
     EXTRA: f.extra,
   }
-  return `${purposeFrame(context)}\n\n${readEngineFile('card-free-prompt.md', process.env.ICHIREI_CARD_FREE_PROMPT_PATH).replace(/\{\{ ([A-Z_]+) \}\}/g, (m, k: string) => v[k] ?? m)}`
+  const body = `${purposeFrame(context)}\n\n${readEngineFile('card-free-prompt.md', process.env.ICHIREI_CARD_FREE_PROMPT_PATH).replace(/\{\{ ([A-Z_]+) \}\}/g, (m, k: string) => v[k] ?? m)}`
+  return retry ? `${body}\n\nSECOND ASK: your first answer could not be used (nothing readable, or every card in it was set aside — see the characters to avoid above). Give two usable candidates now, from a different detail of the story, with a line that says only what the story states and nothing about the person's body or looks.` : body
 }
 
 // ---- types -------------------------------------------------------------------------------------------------------------------------------------------------------------------------
@@ -115,6 +120,8 @@ export interface CardCallInfo {
   offered: number
   /** the free pick is asked twice at the same moment (a hedge against one slow call): which of the two calls this is, and whether its answer was the one used */
   hedge?: 1 | 2
+  /** the free pick's safety net: 2 = the second pair of calls */
+  round?: 1 | 2
   won?: boolean
   /** the top-level keys of the answer and its length in characters — never any text */
   keys: string[]
@@ -135,6 +142,10 @@ export interface CardsReport {
   /** cards set aside by the `subject` code check (the narrator is the acting subject): which slot, and whether the quoted act or only the line was at fault */
   subject_removed: { slot: CardSlot; where: 'anchor' | 'line' }[]
   subject_rewritten: number
+  /** a card the review rejected under a LINE rule (insult, dignity, truth, subject) got its line rewritten once with the reviewer's note and was checked again: which slot, which rule, whether a new line came back, whether the card then stood */
+  line_rescue: { slot: CardSlot; rule: string; rewritten: boolean; saved: boolean }[]
+  /** the free pick's safety net: when the first pair of calls (or the first pair's cards) left no free card, a second hedged pair is asked once */
+  free_retry: { asked: boolean; why: 'no_candidates' | 'all_set_aside' | null; won: boolean | null }
   collisions: { slot: CardSlot; resolved: 'runner_up' | 'none'; why?: 'character' | 'anchor' }[]
   runner_up_used: CardSlot[]
   /** from the start of the request */
@@ -342,6 +353,13 @@ export function readCardReply(text: string, slot: CardSlot): ReplyRead {
 }
 
 export const SAME_ANCHOR_REASON = 'slots: same story detail as the main card'
+/** The review rules that fault the LINE, not the character: a rewrite of the line can answer them. */
+const LINE_RULES = ['insult', 'dignity', 'truth', 'subject']
+export const lineRuleOf = (reason: string | null | undefined): string | null => {
+  const m = /^review:\s*([a-z_]+):/i.exec(reason ?? '')
+  return m && LINE_RULES.includes(m[1].toLowerCase()) ? m[1].toLowerCase() : null
+}
+
 /** A card that stands on something the NARRATOR did (the quoted act's subject is the narrator): set aside before the review; the runner-up, one line rewrite, then the refill. */
 export const SUBJECT_REASON = 'subject: the quoted act is the narrator\'s own, not the receiver\'s'
 export const INVENTED_FACT_REASON = 'review: truth: states a fact about the sender or a relative that the story does not give'
@@ -377,7 +395,7 @@ export async function runCards(a: CardsArgs): Promise<CardsOut> {
   const freeStop = new AbortController()
   const freeSignal = AbortSignal.any([signal, freeStop.signal, AbortSignal.timeout(freeLaneMs())])
 
-  const report: CardsReport = { calls: [], reviews: [], subject_removed: [], subject_rewritten: 0, collisions: [], runner_up_used: [], first_card_ms: null, all_cards_ms: 0, main_call_ms: 0, gaze_ms: 0, gaze_failing: 0, free_dropped: null, second_source: null }
+  const report: CardsReport = { calls: [], reviews: [], subject_removed: [], subject_rewritten: 0, line_rescue: [], free_retry: { asked: false, why: null, won: null }, collisions: [], runner_up_used: [], first_card_ms: null, all_cards_ms: 0, main_call_ms: 0, gaze_ms: 0, gaze_failing: 0, free_dropped: null, second_source: null }
   const verdicts: ReviewVerdict[] = []
   let anyReviewRan = false
   let skipped: string | null = null
@@ -385,6 +403,7 @@ export async function runCards(a: CardsArgs): Promise<CardsOut> {
   let mainRaw: EngineResult | null = null
   let mainExtracted: EngineResult | null = null
   let freeClosed = false
+  let freeRetrying = false // the free pick's second pair of calls is under way (the join waits a little longer for it)
 
   // progress for the page: only ever forward (reading → choosing → checking)
   const order = ['reading', 'choosing', 'checking'] as const
@@ -401,15 +420,15 @@ export async function runCards(a: CardsArgs): Promise<CardsOut> {
   // ---- the calls: all started now ---------------------------------------------------------------------------------------------------------------------------------------------
   const room = () => runBudgetMs() - at() - RESERVE_MS
 
-  const modelCall = async (slot: CardSlot, content: string | Anthropic.TextBlockParam[], model: string, effort: string, maxTokens: number, ceilingMs: number, retryable: boolean, sig: AbortSignal, extra: { noThinking?: boolean; hedge?: 1 | 2 } = {}): Promise<CallOut> => {
-    const info: CardCallInfo = { slot, model, effort, ms: 0, attempts: 0, output_tokens: null, thinking_tokens: null, stop_reason: null, parse: 'failed', offered: 0, keys: [], reply_chars: 0, ...(extra.hedge ? { hedge: extra.hedge } : {}) }
+  const modelCall = async (slot: CardSlot, content: string | Anthropic.TextBlockParam[], model: string, effort: string, maxTokens: number, ceilingMs: number, retryable: boolean, sig: AbortSignal, extra: { noThinking?: boolean; hedge?: 1 | 2; round?: 1 | 2 } = {}): Promise<CallOut> => {
+    const info: CardCallInfo = { slot, model, effort, ms: 0, attempts: 0, output_tokens: null, thinking_tokens: null, stop_reason: null, parse: 'failed', offered: 0, keys: [], reply_chars: 0, ...(extra.hedge ? { hedge: extra.hedge } : {}), ...(extra.round === 2 ? { round: 2 as const } : {}) }
     report.calls.push(info)
     const t0 = Date.now()
     let limit = ceilingMs
     let tokens = maxTokens
     // One line per call, codes only: what the answer was (parse, keys, length), what was offered (character and the fields it lacks), and how the call ended. Never any story text.
     const logCall = (more: Record<string, unknown> = {}, offered: ReplyRead['offered'] = []) =>
-      log(`[ichirei-card-call] ${JSON.stringify({ slot, ...(extra.hedge ? { hedge: extra.hedge } : {}), model, effort, ms: info.ms, attempts: info.attempts, stop_reason: info.stop_reason, output_tokens: info.output_tokens, thinking_tokens: info.thinking_tokens, parse: info.parse, keys: info.keys, reply_chars: info.reply_chars, offered, ...more })}`)
+      log(`[ichirei-card-call] ${JSON.stringify({ slot, ...(extra.hedge ? { hedge: extra.hedge } : {}), ...(extra.round === 2 ? { round: 2 } : {}), model, effort, ms: info.ms, attempts: info.attempts, stop_reason: info.stop_reason, output_tokens: info.output_tokens, thinking_tokens: info.thinking_tokens, parse: info.parse, keys: info.keys, reply_chars: info.reply_chars, offered, ...more })}`)
     try {
       for (;;) {
         info.attempts++
@@ -502,24 +521,24 @@ export async function runCards(a: CardsArgs): Promise<CardsOut> {
   const callSecond = modelCall('second', contentOf(cardPrompt(a.prompt, 'second', !!a.lexicon)), models.select, CARD_EFFORT(), CARD_MAX_TOKENS(), callTimeoutMs(), true, signal)
   // The free pick is asked TWICE at the same moment (the same prompt, the small model, low effort, no extended thinking, 1,500 tokens, the same ceiling): the first answer that is
   // readable and offers a card wins and the other call is cancelled. If both fail or time out, the sender sees two cards, as before.
-  const hedgedFree = (): Promise<CallOut> => {
-    const content = freeCardPrompt(story, context, [...(opts.exclude ?? [])])
+  const hedgedFree = (round: 1 | 2 = 1, avoid: { kanji: string; reason: string }[] = []): Promise<CallOut> => {
+    const content = freeCardPrompt(story, context, [...(opts.exclude ?? []), ...avoid], round === 2)
     const stops = [new AbortController(), new AbortController()]
     return new Promise<CallOut>((resolve) => {
       const results: (CallOut | null)[] = [null, null]
       let decided = false
-      const infoOf = (h: 1 | 2) => report.calls.find((c) => c.slot === 'freestyle' && c.hedge === h)
+      const infoOf = (h: 1 | 2) => report.calls.find((c) => c.slot === 'freestyle' && c.hedge === h && (c.round ?? 1) === round)
       const done = (winner: 1 | 2 | null, out: CallOut) => {
         decided = true
         const w = infoOf(1)
         const v = infoOf(2)
         if (w) w.won = winner === 1
         if (v) v.won = winner === 2
-        log(`[ichirei-card-call] ${JSON.stringify({ slot: 'freestyle', hedged: 2, hedge_winner: winner })}`)
+        log(`[ichirei-card-call] ${JSON.stringify({ slot: 'freestyle', hedged: 2, ...(round === 2 ? { round } : {}), hedge_winner: winner })}`)
         resolve(out)
       }
       ;([1, 2] as const).forEach((h, i) => {
-        void modelCall('freestyle', content, models.free, 'low', 1500, freeCallMs(), false, AbortSignal.any([freeSignal, stops[i].signal]), { noThinking: true, hedge: h }).then((out) => {
+        void modelCall('freestyle', content, models.free, 'low', 1500, freeCallMs(), false, AbortSignal.any([freeSignal, stops[i].signal]), { noThinking: true, hedge: h, round }).then((out) => {
           results[i] = out
           if (decided) return
           if (out.cands.length > 0) {
@@ -603,6 +622,7 @@ export async function runCards(a: CardsArgs): Promise<CardsOut> {
     const tried: Candidate[] = []
     let chosen: Candidate | null = null
     let source: LaneOut['source']
+    const rescued = new Set<string>() // characters whose line got its one rewrite after a review rejection
     const lineOnly: { card: Candidate; from: NonNullable<LaneOut['source']> }[] = [] // cards whose only fault is a line with the narrator as its subject: the one line rewrite
     try {
       const out = await call
@@ -657,6 +677,24 @@ export async function runCards(a: CardsArgs): Promise<CardsOut> {
           if (!rv.ok) {
             tried.push(rv.card)
             if (picked[slot] === ref.card) delete picked[slot]
+            // A good character is not dropped for its line: when the review rejected the card under a LINE rule (insult, dignity, truth, subject) the line is rewritten ONCE with the reviewer's
+            // own note, and the card goes through every check again (the referee, the `subject` guard, the review). Every slot. If the character was the problem, the second review says so.
+            const rule = lineRuleOf(rv.card.eliminated_reason)
+            if (rule && !rescued.has(ref.card.kanji) && !early && !sig.aborted) {
+              rescued.add(ref.card.kanji)
+              const note = (rv.card.eliminated_reason ?? '').replace(/^review:\s*[a-z_]+:\s*/i, '').slice(0, 200)
+              const fixes = await rewriteLines([{ kanji: ref.card.kanji, gaze: ref.card.one_line_gaze, why: `the reviewer rejected the line under the rule \`${rule}\`${note ? `: ${note}` : ''}. Reword ONLY the line so it says only what the story states and nothing about the person's body, looks or character that could hurt; the character and the story detail stay` }], story, context.language, { tone: toneLine(context), apiKey: opts.apiKey, signal: sig, client, log, timeoutMs: slot === 'freestyle' ? freeCallMs() : undefined })
+              const line = fixes.get(ref.card.kanji)
+              const entry = { slot, rule, rewritten: !!line, saved: false }
+              report.line_rescue.push(entry)
+              if (line) {
+                await attempt([{ ...ref.card, one_line_gaze: line, eliminated: false, eliminated_reason: null } as Candidate], from)
+                if (chosen) {
+                  entry.saved = true
+                  break
+                }
+              }
+            }
             continue
           }
           // the final check against what the higher cards ended up with
@@ -691,6 +729,19 @@ export async function runCards(a: CardsArgs): Promise<CardsOut> {
         }
       }
       await attempt(out.cands, 'second_call')
+      // The free pick's SAFETY NET: when the first pair of calls left no free card (both failed or came back empty, or every card they offered was set aside — by the referee, a collision with a
+      // higher card, the review, or the `subject` guard), the pair is asked ONCE more at the same moment, told which characters were set aside and why (codes), within the free lane's own time.
+      // The first two cards never wait for it; the join gives it a short extra wait (ICHIREI_FREE_RETRY_GRACE_MS). ICHIREI_FREE_RETRY=off switches it off.
+      if (slot === 'freestyle' && !chosen && !early && !sig.aborted && freeRetryOn()) {
+        const why: 'no_candidates' | 'all_set_aside' = out.cands.length === 0 ? 'no_candidates' : 'all_set_aside'
+        const avoid = tried.filter((t) => t.eliminated).map((t) => ({ kanji: t.kanji, reason: `set aside (${String(t.eliminated_reason ?? 'refused').split(':').slice(0, 2).join(':').trim().slice(0, 40)}): choose another character from a different detail of the story` }))
+        report.free_retry = { asked: true, why, won: null }
+        freeRetrying = true
+        log(`[ichirei-engine] free_retry ${JSON.stringify({ why, avoided: avoid.length })}`)
+        const out2 = await hedgedFree(2, avoid)
+        await attempt(out2.cands, 'second_call')
+        report.free_retry.won = !!chosen
+      }
       // The second card: when its own call could not deliver (a failed or unreadable answer, nothing offered, or everything it offered was set aside), the MAIN call's runner-up
       // becomes the second card, after its own referee and review — no refill. It is reviewed in parallel with the main card's own review. The refill is for when this fails too.
       if (slot === 'second' && !chosen && !early && !sig.aborted) {
@@ -770,6 +821,10 @@ export async function runCards(a: CardsArgs): Promise<CardsOut> {
   if (laneFree) {
     const grace = new Promise<null>((r) => setTimeout(() => r(null), freeGraceMs()).unref?.())
     lf = await Promise.race([laneFree, grace])
+    if (!lf && freeRetrying) {
+      const more = new Promise<null>((r) => setTimeout(() => r(null), freeRetryGraceMs()).unref?.())
+      lf = await Promise.race([laneFree, more])
+    }
     if (!lf) {
       freeClosed = true
       freeStop.abort()

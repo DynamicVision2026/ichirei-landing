@@ -2328,6 +2328,37 @@ const SECTION_ORDER = ['.hero', '.strip', '.philo', '#shape', '#angles', '#write
   }
 }
 
+// ---------- Run 16 (v9.7): the 気持ち line never shows a raw English code on a Japanese or Chinese page ----------
+{
+  const REG = ['apologetic', 'humble', 'zzz-unmapped']
+  const regResult = (body) => {
+    const r = clone(FIXTURE)
+    r.language = body.language
+    r.fingerprint = { ...(r.fingerprint ?? {}), emotional_register: REG }
+    return r
+  }
+  const LABEL = { ja: '気持ち', 'zh-Hant': '心情', 'zh-Hans': '心情' }
+  for (const lang of ['ja', 'zh-Hant', 'zh-Hans', 'en']) {
+    const { page, errors } = await mockPage(browser, { result: regResult })
+    await page.goto(`http://localhost:5173/?lang=${lang}`, { waitUntil: 'networkidle' })
+    await pickContext(page, { relationship: 'sibling', direction: 'across', purpose: 'apology' })
+    await page.locator('#write [data-testid=story-input]').fill('兄とは長く話していなかった。春に、私から先に手紙を書いた。返事は短かったが、最後に私の好きな店の名前があった。')
+    await page.click('#write button[type=submit]')
+    await page.waitForSelector('[data-match-feeling]', { timeout: 15000 })
+    const texts = await page.locator('[data-match-feeling] dd').allInnerTexts()
+    const label = (await page.locator('[data-match-feeling] dt').first().innerText()).trim()
+    const joined = texts.join(' ')
+    if (lang === 'en') {
+      check('feeling line (en): the known words are shown as English labels, the unmapped word is dropped', texts.length > 0 && /Apologetic/.test(joined) && /Humble/.test(joined) && !/zzz/i.test(joined), joined)
+    } else {
+      check(`feeling line (${lang}): label 「${LABEL[lang]}」 and the line has NO ASCII word — the raw code "humble" is shown as its translation, the unmapped word is dropped`, label === LABEL[lang] && texts.length > 0 && texts.every((t) => !/[A-Za-z]{2,}/.test(t)) && !/zzz/i.test(joined), `${label} | ${joined}`)
+    }
+    if (lang === 'ja') check('feeling line (ja): reads 詫びる気持ち・謙虚さ', texts.every((t) => t.trim() === '詫びる気持ち・謙虚さ'), joined)
+    check(`feeling line (${lang}): no page errors`, errors.length === 0, errors.join('; '))
+    await page.close()
+  }
+}
+
 await browser.close()
 console.log(failures === 0 ? '\nALL E2E CHECKS PASSED' : `\n${failures} CHECKS FAILED`)
 process.exit(failures === 0 ? 0 : 1)

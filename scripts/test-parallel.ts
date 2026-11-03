@@ -379,7 +379,9 @@ try {
   process.env.ICHIREI_FREE_CALL_TIMEOUT_MS = '250'
   delay = { main: 60, second: 60, free: 40, review: 20, refill: 20 }
   hedgeScript = ['hang', 'hang']
+  process.env.ICHIREI_FREE_RETRY = 'off' // (the safety net — a second pair — is tested in test-rescue.ts; this section is about the first pair\'s ceiling)
   const h5 = await run()
+  delete process.env.ICHIREI_FREE_RETRY
   const t5 = cardsLine().ms.total
   const HC5 = cardsLine().parallel.calls.filter((c: any) => c.slot === 'freestyle')
   check('(H5) both free-pick calls time out: two cards, no refill, and the request ends at the call ceiling (250 ms) — not later; both calls are logged as timeouts', sum(h5) === 'main:誠,second:灯' && counts.refill === 0 && t5 >= 240 && t5 < 400 && HC5.length === 2 && HC5.every((c: any) => c.parse === 'failed' && c.error === 'timeout' && c.won === false), JSON.stringify({ t5, HC5: HC5.map((c: any) => [c.hedge, c.won, c.error]) }))

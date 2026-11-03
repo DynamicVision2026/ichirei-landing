@@ -29,6 +29,7 @@ import { fileURLToPath } from 'node:url'
 import { applyPalette, applyReviewVerdicts, loadPalette } from './palette.ts'
 import { runReview } from './review.ts'
 import { completeMains, type RefillReport } from './replace.ts'
+import { canonicalRegisters } from '../src/order/register.ts'
 import { applyGazes, failingGazes, fixGazes, inventedFacts, subjectProblem } from './gaze.ts'
 import {
   DECLINE_MESSAGE,
@@ -186,7 +187,7 @@ export function normalizeModelOutput(raw: EngineResult): EngineResult {
       unsaid_truth: fp.unsaid_truth ?? null,
       dominant_truth_type: fp.dominant_truth_type ?? null,
       dignity_direction: fp.dignity_direction ?? null,
-      emotional_register: sufficient ? register : null,
+      emotional_register: sufficient ? canonicalRegisters(register) : null, // known codes only (src/order/register.ts): a word nothing maps to is dropped, never shown
     },
     follow_up_question: r.follow_up_question ?? null,
     candidates: (Array.isArray(r.candidates) ? r.candidates : []).map((c) => ({
@@ -332,7 +333,7 @@ function logCards(story: string, context: EngineContext, before: EngineResult, a
   try {
     const live = (r: EngineResult, slot: string) => r.candidates.filter((c) => !c.eliminated && c.slot === slot).length
     const removed = after.candidates.filter((c) => c.eliminated).map((c) => ({ slot: c.slot, reason: (c.eliminated_reason ?? 'unknown').slice(0, 80) }))
-    const payload = { cards_mode: parallel ? 'parallel' : 'single', purpose: purposeCodeOf(context), state: effectiveState(context), ...(otherTextMapped(context) ? { other_text_mapped: otherTextMapped(context) } : {}), ...(parallel ? { second_source: parallel.second_source } : {}), story_chars: [...story].length, language: context.language, occasion: context.occasion, status: after.status, live: { main: live(after, 'main'), second: live(after, 'second'), freestyle: live(after, 'freestyle') }, before_final: before.candidates.filter((c) => !c.eliminated).length, freestyle: context.occasion === 'memorial' ? 'not_offered' : undefined, ms, select: select ?? undefined, ...(parallel ? { parallel: { first_card_ms: parallel.first_card_ms, all_cards_ms: parallel.all_cards_ms, calls: parallel.calls, reviews: parallel.reviews, collisions: parallel.collisions, runner_up_used: parallel.runner_up_used, free_dropped: parallel.free_dropped, second_source: parallel.second_source, subject_removed: parallel.subject_removed, subject_rewritten: parallel.subject_rewritten } } : {}), calls: parallel ? { select: parallel.calls.reduce((n, c) => n + c.attempts, 0), review: parallel.reviews.length, refill: refill ? 1 : 0, gaze: ms.gaze_failing > 0 ? 1 : 0 } : { select: ms.select_attempts, review: ms.review > 0 ? 1 : 0, refill: refill ? 1 : 0, gaze: ms.gaze_failing > 0 ? 1 : 0 }, removed, refill: refill ? { asked: refill.asked, filled: refill.filled.map((f) => f.slot), rejected: refill.rejected, rescued: refill.rescued.map((f) => f.slot), ms: refill.ms } : null }
+    const payload = { cards_mode: parallel ? 'parallel' : 'single', purpose: purposeCodeOf(context), state: effectiveState(context), ...(otherTextMapped(context) ? { other_text_mapped: otherTextMapped(context) } : {}), ...(parallel ? { second_source: parallel.second_source } : {}), story_chars: [...story].length, language: context.language, occasion: context.occasion, status: after.status, live: { main: live(after, 'main'), second: live(after, 'second'), freestyle: live(after, 'freestyle') }, before_final: before.candidates.filter((c) => !c.eliminated).length, freestyle: context.occasion === 'memorial' ? 'not_offered' : undefined, ms, select: select ?? undefined, ...(parallel ? { parallel: { first_card_ms: parallel.first_card_ms, all_cards_ms: parallel.all_cards_ms, calls: parallel.calls, reviews: parallel.reviews, collisions: parallel.collisions, runner_up_used: parallel.runner_up_used, free_dropped: parallel.free_dropped, second_source: parallel.second_source, subject_removed: parallel.subject_removed, subject_rewritten: parallel.subject_rewritten, line_rescue: parallel.line_rescue, free_retry: parallel.free_retry } } : {}), calls: parallel ? { select: parallel.calls.reduce((n, c) => n + c.attempts, 0), review: parallel.reviews.length, refill: refill ? 1 : 0, gaze: ms.gaze_failing > 0 ? 1 : 0 } : { select: ms.select_attempts, review: ms.review > 0 ? 1 : 0, refill: refill ? 1 : 0, gaze: ms.gaze_failing > 0 ? 1 : 0 }, removed, refill: refill ? { asked: refill.asked, filled: refill.filled.map((f) => f.slot), rejected: refill.rejected, rescued: refill.rescued.map((f) => f.slot), ms: refill.ms } : null }
     console.log(`[ichirei-cards] ${JSON.stringify(payload)}`)
     onDebug?.(debugOf(payload))
   } catch {
@@ -779,7 +780,7 @@ async function runCardsPipeline(a: PipelineArgs): Promise<PipelineOut> {
   const mainCall = out.report.calls.find((c) => c.slot === 'main')
   const timing = (t: { review_ms: number; replace_ms: number; status: string }) =>
     logTiming({ attempts: mainCall?.attempts ?? 1, max_tokens_used: 0, select_ms: selectMs, ...t, total_ms: Date.now() - tStart, stop_reason: mainCall?.stop_reason ?? null, output_tokens: mainCall?.output_tokens ?? null, lexicon: view !== null })
-  const earlyDebug = (status: string) => opts.onDebug?.(debugOf({ cards_mode: 'parallel', status, ms: { total: Date.now() - tStart, select: selectMs }, parallel: { first_card_ms: out.report.first_card_ms, all_cards_ms: out.report.all_cards_ms, calls: out.report.calls, reviews: out.report.reviews, collisions: out.report.collisions, runner_up_used: out.report.runner_up_used, free_dropped: out.report.free_dropped, second_source: out.report.second_source, subject_removed: out.report.subject_removed, subject_rewritten: out.report.subject_rewritten } }))
+  const earlyDebug = (status: string) => opts.onDebug?.(debugOf({ cards_mode: 'parallel', status, ms: { total: Date.now() - tStart, select: selectMs }, parallel: { first_card_ms: out.report.first_card_ms, all_cards_ms: out.report.all_cards_ms, calls: out.report.calls, reviews: out.report.reviews, collisions: out.report.collisions, runner_up_used: out.report.runner_up_used, free_dropped: out.report.free_dropped, second_source: out.report.second_source, subject_removed: out.report.subject_removed, subject_rewritten: out.report.subject_rewritten, line_rescue: out.report.line_rescue, free_retry: out.report.free_retry } }))
   // Goodwill check (selection or review): a polite decline, no cards.
   if (out.early?.kind === 'declined') {
     earlyDebug('declined')

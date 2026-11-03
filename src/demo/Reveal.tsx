@@ -1,3 +1,4 @@
+import { feelingLine } from '../order/register.ts'
 import { cleanReading } from '../order/reading.ts'
 import { quoteScene } from '../order/quote.ts'
 import { useEffect, useMemo, useRef, useState } from 'react'
@@ -220,11 +221,9 @@ export default function Reveal({ result, story, followUps = [], condition, copy,
     }
   }
 
-  // The feeling line: the emotional register of the story, in the page language (the engine writes English words; unknown ones show as written).
-  const feelingText = (result.fingerprint?.emotional_register ?? [])
-    .map((w) => copy.match.registers[String(w).toLowerCase()] ?? String(w))
-    .filter(Boolean)
-    .join(language === 'en' ? ' · ' : '・')
+  // The feeling line: the emotional register of the story, in the page language. Every word the engine writes is mapped to a fixed label (src/order/register.ts); a word nothing maps to is
+  // left out — an English word is never shown on a Japanese or Chinese page.
+  const feelingText = feelingLine(result.fingerprint?.emotional_register ?? [], language)
   const allRevealed = revealedCount >= revealOrder.length
   const primaryBtn = diagnostics
     ? 'font-label rounded-full bg-seal px-10 py-4 text-sm tracking-[0.15em] text-white transition-all disabled:cursor-not-allowed disabled:opacity-40'

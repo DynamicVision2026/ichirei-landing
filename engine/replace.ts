@@ -373,11 +373,11 @@ export async function completeMains(
     judged = applyReviewVerdicts(refereed, palette, story, review, { deferInsufficient: true, canBeMain: opts.mainOk })
     // A good character is not dropped for its line (2026-11-01): when the review rejects a refilled card ONLY under `truth` (its line says something the story does not), the line is rewritten ONCE by the
     // small model and the card is reviewed again — within the same ceilings (the rewrite 10 s, the second review 8 s). Only if the character itself fails, or the second review still fails, is it dropped.
-    const truthOnly = (c: Candidate) => newKanji.has(c.kanji) && c.eliminated && !refereed.candidates.find((r) => r.kanji === c.kanji)?.eliminated && /^review: truth\b/.test(c.eliminated_reason ?? '')
+    const truthOnly = (c: Candidate) => newKanji.has(c.kanji) && c.eliminated && !refereed.candidates.find((r) => r.kanji === c.kanji)?.eliminated && /^review: (truth|insult|dignity|subject)\b/.test(c.eliminated_reason ?? '')
     const rescue = judged.candidates.filter(truthOnly)
     if (rescue.length > 0) {
       const t1 = Date.now()
-      const items = rescue.map((c) => ({ kanji: c.kanji, gaze: c.one_line_gaze, why: `the review found a claim the story does not state (${(c.eliminated_reason ?? '').replace(/^review: truth:?\s*/, '').slice(0, 160)}): say only what the story states` }))
+      const items = rescue.map((c) => ({ kanji: c.kanji, gaze: c.one_line_gaze, why: `the reviewer rejected the line under the rule \`${/^review: (\w+)/.exec(c.eliminated_reason ?? '')?.[1] ?? 'truth'}\` (${(c.eliminated_reason ?? '').replace(/^review:\s*\w+:?\s*/, '').slice(0, 160)}): say only what the story states, and nothing about the person's body, looks or character that could hurt` }))
       const fixes = await rewriteLines(items, story, context.language, { tone: toneLine(context), apiKey: opts.apiKey, signal: opts.signal, client: opts.client, log, timeoutMs: freeRefillTimeoutMs(), model: process.env.ICHIREI_GAZE_MODEL ?? opts.freeModel ?? opts.reviewModel ?? opts.model, onUsage: opts.onUsage ? (u) => opts.onUsage!('review', u) : undefined })
       const rewritten = refereed.candidates.map((c) => (fixes.has(c.kanji) && newKanji.has(c.kanji) ? { ...c, one_line_gaze: fixes.get(c.kanji)! } : c))
       let second: EngineResult | null = null
