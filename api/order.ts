@@ -25,7 +25,7 @@ import { POEM_ID_PATTERN, buildRecord, lineAttributes, newOrderRef, parseOrderRe
 import { createOrderStore, type OrderStore } from '../engine/order-store.ts'
 import type { Palette } from '../engine/palette.ts'
 import { ShopifyError, createCart, loadShopifyConfig, type ShopifyConfig } from '../engine/shopify.ts'
-import { MAX_POEMS, POEM_TYPES, poemTypeAllowed } from '../src/order/packages.ts'
+import { MAX_POEMS, POEM_TYPES, comingSoonSizes, poemTypeAllowed } from '../src/order/packages.ts'
 
 const MAX_BODY_BYTES = 300_000
 
@@ -101,6 +101,8 @@ export function createOrderHandler(deps: () => OrderDeps) {
     }
 
     const order = parsed.order
+    // E-gift-first launch: with ICHIREI_WOOD_SIZES=coming_soon the wooden sizes are shown as 「近日公開」 and cannot be ordered (whatever the page sent).
+    if (comingSoonSizes((d.env ?? process.env).ICHIREI_WOOD_SIZES).includes(order.package)) return json(400, { error: `The size "${order.package}" is coming soon.`, code: 'size_coming_soon', field: 'package' })
     // A size whose Shopify variant is not configured (① and ② until the owner creates them) cannot be ordered.
     if (!d.shopify.variants[order.package]) return json(400, { error: `The size "${order.package}" is not on sale yet.`, code: 'size_unavailable', field: 'package' })
     const resolved = await resolvePoems((body as { poems?: unknown } | null)?.poems, d.store, order)

@@ -1,4 +1,4 @@
-// The post-deploy self-test: the route refuses without the token, the daily cap (6) and the "already tested" rule work, one run at a time, the public output holds codes and characters only (no story text,
+// The post-deploy self-test: the route refuses without the token, the daily cap (2), the monthly ceiling and the "already tested" rule work, one run at a time, the public output holds codes and characters only (no story text,
 // no card line, no anchor, no poem), the spend is an estimate from the token counts. FAKE steps and a fake store: no key, no network.
 //   node --experimental-strip-types --disable-warning=ExperimentalWarning scripts/test-selftest.ts
 import { createSelftestHandlers, SELFTEST_DAILY_MAX, tokenOk } from '../api/selftest.ts'
@@ -33,12 +33,39 @@ const base = { engine: fakeEngine(), poem: fakePoem as never, film: fakeFilm as 
   const r = await runSelftest({ ...base, commit: 'abc1234' })
   check('(1) all 16 internal stories run (two per purpose, the 春子 apology and the camera remembrance among them) and each report has the id, purpose, state, the cards\' slots and characters, the checks and the total ms', r.stories.length === 16 && r.summary.stories === 16 && r.stories.every((s) => s.id && s.purpose && s.cards.length >= 2 && typeof s.ms === 'number' && 'poem' in s.checks && 'film' in s.checks) && r.stories.some((s) => s.id === 'apology-1' && s.state === 'strained') && r.stories.some((s) => s.id === 'memorial-1'))
   check('(1) remembrance has no free pick (two cards), the others have three — as the purpose rule says', r.stories.filter((s) => s.purpose === 'memorial').every((s) => s.cards.length === 2) && r.stories.filter((s) => s.purpose === 'thanks').every((s) => s.cards.length === 3))
-  check('(1) each story\'s checks: about the receiver, invented facts, tone, free pick, the reading, the poem (character inside once, story images), the film script (passed / blocked with rule codes) — and pass is their conjunction', r.stories.every((s) => typeof s.checks.receiver === 'boolean' && typeof s.checks.reading === 'boolean' && s.checks.poem.character_once !== undefined && ['pass', 'rewritten', 'kept', 'n/a'].includes(s.checks.poem.story_images) && ['passed', 'blocked', 'error'].includes(s.checks.film.outcome)), JSON.stringify(r.stories[0]))
+  check('(1) each story\'s checks: about the receiver, invented facts, tone, free pick, the reading, the poem (character inside once, story images), the film script (passed / blocked with rule codes) — and pass is their conjunction', r.stories.every((s) => typeof s.checks.receiver === 'boolean' && typeof s.checks.reading === 'boolean' && s.checks.poem.character_once !== undefined && ['pass', 'rewritten', 'kept', 'n/a'].includes(s.checks.poem.story_images) && ['passed', 'partial', 'blocked', 'error'].includes(s.checks.film.outcome)), JSON.stringify(r.stories[0]))
   check('(1) the reading check is part of it: 直 read as ただちに fails that story with the code reading:adverb_or_conjunction', (await runSelftest({ ...base, engine: fakeEngine((id) => (id === 'thanks-1' ? { reading: 'ただちに' } : {})) })).stories.find((s) => s.id === 'thanks-1')!.codes.includes('reading:adverb_or_conjunction'))
   const blocked = await runSelftest({ ...base, film: (async () => ({ status: 'fallback', lines: [], pictures: [], made_at: '', reason: 'character+illness', blocked_by: ['a1:illness:けが', 'a1:character:待'] })) as never })
   check('(1) a blocked film script is reported with its rule codes (a1:illness:…, a1:character:…, reason:…), and the story does not pass', blocked.stories.every((s) => s.checks.film.outcome === 'blocked' && s.checks.film.rules.includes('a1:illness:けが') && s.checks.film.rules.includes('reason:character+illness') && !s.pass))
+  // launch freeze (cost): the first story runs ALONE to warm the prompt cache; the other fifteen start only after it has finished, and then run together
+  {
+    const events: string[] = []
+    let live = 0
+    let peak = 0
+    const inner = fakeEngine()
+    const watched = (async (story: string, mode: 'A', o: never) => {
+      const id = stories.find((x) => x.story === story)?.id ?? '?'
+      events.push(`start:${id}`)
+      live++
+      peak = Math.max(peak, live)
+      await new Promise((r) => setTimeout(r, id === stories[0].id ? 60 : 10))
+      live--
+      events.push(`end:${id}`)
+      return (inner as never as (s: string, m: 'A', o: never) => Promise<unknown>)(story, mode, o)
+    }) as never
+    const w = await runSelftest({ ...base, engine: watched })
+    const firstEnd = events.indexOf(`end:${stories[0].id}`)
+    check('(1) cache warm-up: story 1 starts first and ALONE; the other 15 start only after it has finished (and then run together)', events[0] === `start:${stories[0].id}` && events.slice(0, firstEnd).every((e) => e.startsWith('start:') ? e === events[0] : true) && events.slice(firstEnd + 1).filter((e) => e.startsWith('start:')).length === 15 && peak >= 2 && w.stories.length === 16 && w.warm?.id === stories[0].id && w.stories[0].id === stories[0].id, JSON.stringify([events.slice(0, 4), peak, w.warm]))
+  }
   const slow = await runSelftest({ ...base, engine: (async (_s: string, _c: 'A', o: { signal?: AbortSignal }) => new Promise((_res, rej) => o.signal?.addEventListener('abort', () => rej(new Error('aborted'))))) as never, env: { ICHIREI_SELFTEST_DEADLINE_MS: '150' } as never })
   check('(1) a story that runs out of time is recorded as `timeout`, not lost, and the run still ends inside the deadline', slow.stories.length === 16 && slow.stories.every((s) => s.status === 'timeout') && slow.ms < 3000)
+  // launch freeze: a film with ONE washi scene (three real) passes the story; two washi scenes do not (a missing free pick never failed a story)
+  {
+    const withScenes = (states: string[]) => (async () => ({ status: 'ready', lines: ['a', 'b', 'c', 'd'], pictures: ['p', 'q', 'r', 's'], made_at: '', scenes: states.map((state) => ({ state, rules: state === 'washi' ? ['picture_unsafe:crutches'] : [] })) })) as never
+    const one = await runSelftest({ ...base, film: withScenes(['pass', 'pass', 'washi', 'rewritten']) })
+    const two = await runSelftest({ ...base, film: withScenes(['pass', 'washi', 'washi', 'rewritten']) })
+    check('(1) a film with one washi scene is `partial` and the story PASSES (its scene states are in the report); with two washi scenes the story does not pass', one.stories.every((s) => s.checks.film.outcome === 'partial' && s.checks.film.scenes?.join() === 'pass,pass,washi,rewritten') && one.stories.filter((s) => !s.codes.some((c) => c.startsWith('receiver:'))).every((s) => s.pass) && two.stories.every((s) => s.checks.film.outcome === 'partial' && !s.pass), JSON.stringify([one.stories.filter((s) => !s.pass).map((s) => [s.id, s.codes]), two.stories.filter((s) => s.pass).length]))
+  }
   const broken = await runSelftest({ ...base, poem: (async () => { throw new Error('boom') }) as never })
   check('(1) a failing step fails that story only (poem:error) — the run goes on', broken.stories.length === 16 && broken.stories.every((s) => s.checks.poem.state === 'fail' && s.codes.includes('poem:error') && s.checks.film.outcome === 'passed'))
 }
@@ -94,13 +121,34 @@ const base = { engine: fakeEngine(), poem: fakePoem as never, film: fakeFilm as 
   const latestBody = (await latest.json()) as SelftestReport
   check('(3) GET latest is public and read-only, cached 60 s, and serves the report (commit, time, spend, per-story checks) without any token', latest.status === 200 && latest.headers.get('cache-control') === 'public, max-age=60' && latestBody.spend_estimate_usd === 1.23 && latestBody.stories[0].checks.poem.character_once === true && !!latestBody.started_at)
   check('(3) before any run there is no latest (404)', (await createSelftestHandlers(() => ({ store: emptyStore, env: {} as never })).latest()).status === 404)
-  // the daily cap: 6 runs a day (a manual deploy has no commit, so nothing is skipped)
+  // the daily cap: 2 runs a day (a manual deploy has no commit, so nothing is skipped)
   const outs: number[] = []
-  for (let i = 0; i < 8; i++) outs.push((await post(h, TOKEN)).status)
-  check(`(3) the DAILY CAP: at most ${SELFTEST_DAILY_MAX} runs a day — the 7th and the 8th are 429 {state: capped}, and nothing runs for them`, SELFTEST_DAILY_MAX === 6 && outs.slice(0, 5).every((s) => s === 200) && outs.slice(5).every((s) => s === 429) && runs === 6, JSON.stringify([outs, runs]))
+  for (let i = 0; i < 5; i++) outs.push((await post(h, TOKEN)).status)
+  check(`(3) the DAILY CAP: at most ${SELFTEST_DAILY_MAX} runs a day — the 3rd and every later one is 429 {state: capped}, and nothing runs for them`, SELFTEST_DAILY_MAX === 2 && outs[0] === 200 && outs.slice(1).every((s) => s === 429) && runs === 2, JSON.stringify([outs, runs]))
   // the next day is a new count
   const tomorrow = createSelftestHandlers(() => ({ store, env: { ICHIREI_SELFTEST_TOKEN: TOKEN } as never, now: () => new Date('2026-11-04T03:00:00Z'), run: run as never }))
   check('(3) …the next day counts again', (await post(tomorrow, TOKEN)).status === 200)
+  // launch freeze (cost): the monthly ceiling ICHIREI_SELFTEST_MONTHLY_USD — the estimated spend so far plus what the last run cost must fit under it, else state `budget` and nothing runs
+  {
+    const storeB = new MemoryOrderStore()
+    let day = 3
+    const hb = () => createSelftestHandlers(() => ({ store: storeB, env: { ICHIREI_SELFTEST_TOKEN: TOKEN, ICHIREI_SELFTEST_MONTHLY_USD: '3' } as never, now: () => new Date(`2026-11-0${day}T03:00:00Z`), run: run as never }))
+    const r0 = runs
+    const o1 = await post(hb(), TOKEN)
+    day = 4
+    const o2 = await post(hb(), TOKEN)
+    day = 5
+    const o3 = await post(hb(), TOKEN)
+    const b3 = (await o3.json()) as { state: string; month_to_date_usd: number; ceiling_usd: number }
+    check('(3) the MONTHLY CEILING ($3 here): two runs of $1.23 fit; the third would not → 200 {state: budget, month_to_date_usd: 2.46, ceiling_usd: 3} and nothing runs', o1.status === 200 && o2.status === 200 && o3.status === 200 && b3.state === 'budget' && b3.month_to_date_usd === 2.46 && b3.ceiling_usd === 3 && runs === r0 + 2, JSON.stringify([b3, runs - r0]))
+    const lat = (await (await hb().latest()).json()) as SelftestReport
+    check('(3) …the latest report shows month_to_date_usd (2.46), and nothing but a number was added to it', lat.month_to_date_usd === 2.46 && lat.spend_estimate_usd === 1.23)
+    day = 6
+    const bigger = createSelftestHandlers(() => ({ store: storeB, env: { ICHIREI_SELFTEST_TOKEN: TOKEN, ICHIREI_SELFTEST_MONTHLY_USD: '20' } as never, now: () => new Date('2026-11-06T03:00:00Z'), run: run as never }))
+    check('(3) raising the ceiling lets it run again; the default ceiling is $20', (await post(bigger, TOKEN)).status === 200 && (await import('../api/selftest.ts')).SELFTEST_MONTHLY_USD === 20)
+    const nextMonth = createSelftestHandlers(() => ({ store: storeB, env: { ICHIREI_SELFTEST_TOKEN: TOKEN, ICHIREI_SELFTEST_MONTHLY_USD: '3' } as never, now: () => new Date('2026-12-01T03:00:00Z'), run: run as never }))
+    check('(3) a new month starts from zero', (await post(nextMonth, TOKEN)).status === 200 && ((await (await nextMonth.latest()).json()) as SelftestReport).month_to_date_usd === 1.23)
+  }
   // the same commit is not tested twice
   const storeC = new MemoryOrderStore()
   const hc = createSelftestHandlers(() => ({ store: storeC, env: { ICHIREI_SELFTEST_TOKEN: TOKEN, ICHIREI_COMMIT: 'abc1234' } as never, now: () => new Date('2026-11-03T03:00:00Z'), run: run as never }))

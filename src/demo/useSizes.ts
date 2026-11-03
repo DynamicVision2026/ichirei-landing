@@ -7,6 +7,8 @@ import { PACKAGES, PACKAGE_DISPLAY_ORDER, type PackageId } from '../order/packag
 
 const FALLBACK: PackageId[] = ['simple', 'standard']
 let cache: PackageId[] | null = null
+/** The sizes shown as 「近日公開」 (ICHIREI_WOOD_SIZES=coming_soon on the server): listed, but not orderable. */
+let soon: PackageId[] = []
 let inflight: Promise<PackageId[]> | null = null
 
 export const cleanSizes = (raw: unknown): PackageId[] => {
@@ -15,12 +17,18 @@ export const cleanSizes = (raw: unknown): PackageId[] => {
   return PACKAGE_DISPLAY_ORDER.filter((p) => known.includes(p))
 }
 
+export const cleanComingSoon = (raw: unknown): PackageId[] => {
+  const list = Array.isArray((raw as { coming_soon?: unknown } | null)?.coming_soon) ? ((raw as { coming_soon: unknown[] }).coming_soon as unknown[]) : []
+  return PACKAGE_DISPLAY_ORDER.filter((p) => list.includes(p))
+}
+
 export function loadSizes(): Promise<PackageId[]> {
   if (cache) return Promise.resolve(cache)
   inflight ??= fetch('/api/sizes')
     .then((r) => (r.ok ? r.json() : null))
     .then((j) => {
       const sizes = j ? cleanSizes(j) : FALLBACK
+      soon = j ? cleanComingSoon(j) : []
       cache = sizes
       return sizes
     })
@@ -41,4 +49,17 @@ export function useSizes(): PackageId[] | null {
     }
   }, [])
   return sizes
+}
+
+/** The sizes that are shown but cannot be ordered yet (empty unless the owner turned the e-gift-first switch on). Same single request as useSizes. */
+export function useComingSoon(): PackageId[] {
+  const [list, setList] = useState<PackageId[]>(soon)
+  useEffect(() => {
+    let alive = true
+    void loadSizes().then(() => alive && setList(soon))
+    return () => {
+      alive = false
+    }
+  }, [])
+  return list
 }

@@ -78,6 +78,8 @@ export interface ArtRecord {
   reasons?: string[]
   /** How often each slot's picture failed the safety check: the second failure makes the description be rewritten once; a failure after that makes the washi final. */
   check_fails?: number[]
+  /** Per slot, at the end of the render: `drawn` (first try), `drawn_on_retry` (it needed a second attempt), `washi` (final, with its reason in `reasons`), or `pending` / `unchecked` (not finished yet). Codes only. */
+  outcomes?: ('drawn' | 'drawn_on_retry' | 'washi' | 'pending' | 'unchecked')[]
   /** Per slot: 1 once its description was rewritten (the same moment from a different view) — the rewrite happens once. */
   rewrites?: number[]
   /** Per slot: the rewritten description (null = the film's own). */
@@ -585,6 +587,10 @@ async function renderLocked(deps: ArtDeps, input: RenderInput): Promise<ArtRecor
   const checkWaits = (env.ICHIREI_FILM_CHECK_WAITS_MS === undefined || env.ICHIREI_FILM_CHECK_WAITS_MS === '' ? '5000,15000,30000' : env.ICHIREI_FILM_CHECK_WAITS_MS).split(',').map(Number).filter((x) => Number.isFinite(x) && x >= 0)
   let modelUsed = ''
   let drawn = 0
+  /** How many times each slot was drawn (or tried) in THIS render: a slot that needed more than one is `drawn_on_retry`. */
+  const tries: number[] = Array(n).fill(0)
+  /** The reason of the last failed check of each slot in this render (kept for the per-slot log after the slot passed on its retry). */
+  const failedWhy: string[] = Array(n).fill('')
   const usage = { input_tokens: 0, output_tokens: 0 }
 
   /** One picture, with the quota waits: a 429 (after the fallback model was tried too) waits 8 s, 20 s, 40 s — while the render window has room. Only a picture that was drawn counts toward the order's cap. */
@@ -593,6 +599,7 @@ async function renderLocked(deps: ArtDeps, input: RenderInput): Promise<ArtRecor
     for (;;) {
       if (calls >= cap) return { error: 'limit' }
       const signal = callSignal(deps.signal, timeout)
+      if (w === 0) tries[slot]++
       try {
         const hint = attempt > 1 && reasons[slot] ? (RETRY_HINT[reasons[slot]] ?? '') : ''
         const r = await image.generate(buildImagePrompt(desc(slot), input.memorial, hint), signal)
@@ -662,8 +669,17 @@ async function renderLocked(deps: ArtDeps, input: RenderInput): Promise<ArtRecor
         } else {
           checkFails[g.slot]++
           reasons[g.slot] = v.reason
+          failedWhy[g.slot] = v.reason
           logLine(log, 'film_picture_fail', { slot: g.slot + 1, reason: v.reason, attempt, fails: checkFails[g.slot] })
-          if (checkFails[g.slot] < 2) slots[g.slot] = 'pending' // failed once: drawn again as it is
+          if (deps.progress) {
+            // The card preview (launch freeze): a picture that fails the check gets ONE more attempt, and not the same one again — the scene's description is rewritten with the failure reason
+            // (no face, no leg or body close-up, a figure from behind or far away …) and the picture is drawn from that. A failure after that makes the slot washi. If the rewrite cannot be
+            // had right now (an outage) the slot stays pending and the next try asks again.
+            if (rewrites[g.slot] < 1) {
+              await rewriteSlot(g.slot, v.reason)
+              slots[g.slot] = 'pending'
+            } else slots[g.slot] = 'washi'
+          } else if (checkFails[g.slot] < 2) slots[g.slot] = 'pending' // failed once: drawn again as it is
           else if (rewrites[g.slot] < 1) {
             // failed twice: the description is rewritten once and drawn again (if the rewrite cannot be had now, the slot waits for the next try)
             await rewriteSlot(g.slot, v.reason)
@@ -707,16 +723,21 @@ async function renderLocked(deps: ArtDeps, input: RenderInput): Promise<ArtRecor
     if (deps.progress) {
       // The card preview (before payment): each picture is stored the moment it is drawn and checked on its own while the next one is drawn,
       // and every picture that has passed is written into the lease — the page that waits shows each one as soon as it is there.
-      await mapLimit(list, concurrency, async (slot) => {
-        const r = await draw(slot, attempt)
+      const one = async (slot: number, att: number): Promise<void> => {
+        const r = await draw(slot, att)
         if (!('webp' in r)) {
           reasons[slot] = r.error
           return
         }
         await store.putObject(uncheckedPath(id, slot + 1), r.webp, 'image/webp')
         slots[slot] = 'unchecked'
-        await checkStored([{ slot, webp: r.webp }], attempt)
+        await checkStored([{ slot, webp: r.webp }], att)
         await progress()
+      }
+      await mapLimit(list, concurrency, async (slot) => {
+        await one(slot, attempt)
+        // a picture that failed its check is redrawn from its rewritten description RIGHT AWAY, inside its own task: the other pictures show as they arrive and nothing waits for this one
+        if (slots[slot] === 'pending' && afterRewrite.has(slot) && Date.now() < deadline - 15_000) await one(slot, 3)
       })
       return
     }
@@ -752,9 +773,12 @@ async function renderLocked(deps: ArtDeps, input: RenderInput): Promise<ArtRecor
 
   const incomplete = slots.includes('pending') || slots.includes('unchecked')
   const ms = Date.now() - started
+  // what became of each slot (launch freeze): drawn, drawn_on_retry (a second attempt after a failed check or error) or washi — with the reason; one log line per slot, codes only
+  const outcomes: NonNullable<ArtRecord['outcomes']> = slots.map((sl, i) => (sl === 'ai' ? (tries[i] > 1 || rewrites[i] > 0 || checkFails[i] > 0 ? 'drawn_on_retry' : 'drawn') : sl === 'washi' ? 'washi' : sl === 'unchecked' ? 'unchecked' : 'pending'))
+  outcomes.forEach((o, i) => logLine(log, 'film_slot', { slot: i + 1, outcome: o, reason: slots[i] === 'ai' ? (o === 'drawn_on_retry' ? failedWhy[i] || reasons[i] && reasons[i] !== 'ok' && reasons[i] || 'retried' : 'ok') : reasons[i] || null, tries: tries[i], rewritten: rewrites[i] > 0 }))
   const art: ArtRecord = {
     schema: 'film-art', id, status: incomplete ? 'incomplete' : 'done', started_at: new Date(started).toISOString(), made_at: now().toISOString(), slots, ready_ms: ((): (number | null)[] => { markReady(); return slots.map((sl, i) => (sl === 'ai' ? (readyMs[i] ?? (cur?.ready_ms?.[i] ?? null)) : null)) })(),
-    reasons: reasons.map((r, i) => (slots[i] === 'ai' ? 'ok' : r || 'ok')), check_fails: checkFails, rewrites, rewritten, calls, rev: input.rev, ms: (cur?.ms ?? 0) + ms, model: modelUsed || cur?.model,
+    reasons: reasons.map((r, i) => (slots[i] === 'ai' ? 'ok' : r || 'ok')), outcomes, check_fails: checkFails, rewrites, rewritten, calls, rev: input.rev, ms: (cur?.ms ?? 0) + ms, model: modelUsed || cur?.model,
     ...(incomplete ? { retry_after: new Date(now().getTime() + num(env.ICHIREI_FILM_RETRY_MS, 60_000)).toISOString() } : {}),
     ...(cur?.bg_scheduled ? { bg_scheduled: true } : {}),
     ...(cur?.paid_retry ? { paid_retry: true } : {}),

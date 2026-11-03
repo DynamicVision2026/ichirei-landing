@@ -7,8 +7,9 @@ import { sessionId } from './analytics'
 import { clearDraft } from './draft'
 import { EGIFT_JAPAN_ONLY, GIFT_MESSAGE_MAX, OPEN_DATE_MAX_DAYS, PACKAGE_DISPLAY_ORDER, PACKAGE_PRICE_JPY, RECOMMENDED_PACKAGE, SHIPS, SHIP_TO, WOODEN, formatYen, type ShipTo } from '../order/packages.ts'
 import { SIZE_COPY } from './sizes-copy.ts'
-import { useSizes } from './useSizes.ts'
+import { useComingSoon, useSizes } from './useSizes.ts'
 import { isMemorial } from '../order/memorial.ts'
+import { isQuietPurpose } from '../order/purpose.ts'
 import { certificateText } from '../order/certificate.ts'
 import { DEFAULT_STYLE, STYLES_BY_LANGUAGE, glyphFor, hasFormChoice } from '../order/inscription.ts'
 import { DEFAULT_SIMPLE_MAX_STROKES, carvedStrokes, simpleAvailable } from '../order/strokes.ts'
@@ -65,6 +66,8 @@ export default function OrderForm({ result, story, followUps = [], promptQuestio
   const o = copy.order
   // Remembrance: ink instead of cinnabar on the slip, and the receiver field is the person being remembered.
   const memorial = isMemorial(result.occasion)
+  // Launch freeze: apology, encouragement and remembrance are ink — no red on the slip or the card preview (the wording of a remembrance stays its own).
+  const quiet = memorial || isQuietPurpose(result.purpose)
   const distinct = hasFormChoice(language, candidate) // (ja and en carve the modern form only: no choice to show)
 
   const [sender, setSender] = useState('')
@@ -73,6 +76,7 @@ export default function OrderForm({ result, story, followUps = [], promptQuestio
   const [style, setStyle] = useState<InscriptionStyle>(DEFAULT_STYLE[language])
   const [pkg, setPkg] = useState<PackageId | ''>('')
   const sizes = useSizes() // the sizes on sale right now (Part C): a size without a Shopify variant is not shown
+  const soon = useComingSoon() // e-gift-first launch: listed with 「近日公開」, not selectable
   const sc = SIZE_COPY[language]
   const [shipTo, setShipTo] = useState<ShipTo>('me')
   const [giftMessage, setGiftMessage] = useState('')
@@ -190,7 +194,7 @@ export default function OrderForm({ result, story, followUps = [], promptQuestio
       <span className="eyebrow">{o.heading}</span>
 
       {/* The chosen character on its slip, with the certificate line */}
-      <div className={`slip${memorial ? ' memorial' : ''}`} data-memorial={memorial ? 'yes' : undefined}>
+      <div className={`slip${memorial ? ' memorial' : ''}${quiet ? ' quietInk' : ''}`} data-memorial={memorial ? 'yes' : undefined} data-quiet={quiet ? 'yes' : undefined}>
         <p className="clab">{o.chosenLabel}</p>
         <span data-order-glyph className="k slipGlyph notranslate">
           {glyph}
@@ -225,7 +229,7 @@ export default function OrderForm({ result, story, followUps = [], promptQuestio
         </fieldset>
 
         {/* The free card preview: the character, who they are, the poem and the four scenes of the story (drawn once per story) */}
-        <CardPreview copy={pc} glyph={glyph} reading={copy.glyphReading(candidate, glyph)} who={candidate.one_line_gaze} poem={poemShown} certificateLine={cert} memorial={memorial} language={language} preview={preview} />
+        <CardPreview copy={pc} glyph={glyph} reading={copy.glyphReading(candidate, glyph)} who={candidate.one_line_gaze} poem={poemShown} certificateLine={cert} memorial={memorial} quiet={quiet} language={language} preview={preview} />
 
         <div className="orderGrid">
           <div>
@@ -275,11 +279,11 @@ export default function OrderForm({ result, story, followUps = [], promptQuestio
             {PACKAGE_DISPLAY_ORDER.filter((id) => (sizes ?? []).includes(id)).map((id) => {
               const approx = approxLine(PACKAGE_PRICE_JPY[id], currency, rates, pageLang)
               return (
-                <label key={id} className={`opt pkg${pkg === id ? ' on' : ''}${id === 'simple' && !simpleOk ? ' off' : ''}`} data-simple-unavailable={id === 'simple' && !simpleOk ? 'yes' : undefined} data-size={id}>
-                  <input type="radio" name="package" value={id} checked={pkg === id} disabled={id === 'simple' && !simpleOk} onChange={() => setPkg(id)} />
+                <label key={id} className={`opt pkg${pkg === id ? ' on' : ''}${(id === 'simple' && !simpleOk) || soon.includes(id) ? ' off' : ''}`} data-simple-unavailable={id === 'simple' && !simpleOk ? 'yes' : undefined} data-coming-soon={soon.includes(id) ? 'yes' : undefined} data-size={id}>
+                  <input type="radio" name="package" value={id} checked={pkg === id} disabled={(id === 'simple' && !simpleOk) || soon.includes(id)} onChange={() => setPkg(id)} />
                   <span className="pkgName">
                     {o.packages[id]}
-                    {id === RECOMMENDED_PACKAGE && <span className="badge" data-badge="recommended">{sc.recommended}</span>}
+                    {soon.includes(id) ? <span className="badge quiet" data-badge="soon">{sc.comingSoon}</span> : id === RECOMMENDED_PACKAGE && <span className="badge" data-badge="recommended">{sc.recommended}</span>}
                     {id === 'egift' && !memorial && <span className="badge quiet" data-badge="now">{sc.sendNow}</span>}
                   </span>
                   <span className="pkgPrice" data-price={id}>

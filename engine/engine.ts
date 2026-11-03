@@ -30,7 +30,7 @@ import { applyPalette, applyReviewVerdicts, loadPalette } from './palette.ts'
 import { runReview } from './review.ts'
 import { completeMains, type RefillReport } from './replace.ts'
 import { canonicalRegisters } from '../src/order/register.ts'
-import { applyGazes, failingGazes, fixGazes, inventedFacts, subjectProblem } from './gaze.ts'
+import { applyGazes, failingGazes, fixGazes, inventedFacts, shapeGate, subjectProblem } from './gaze.ts'
 import {
   DECLINE_MESSAGE,
   DEFAULT_CONTEXT,
@@ -733,6 +733,12 @@ async function runPipeline(a: PipelineArgs): Promise<PipelineOut> {
   } catch {
     withGazes = completed
   }
+  // launch freeze: a line that STILL fails the shape check goes through the line rescue before the result is returned (never only in the self-test)
+  try {
+    withGazes = (await shapeGate(withGazes, story, context.language, { tone: toneLine(context), apiKey: opts.apiKey, signal: opts.signal, onUsage: opts.onUsage ? (u) => opts.onUsage!('review', u) : undefined })).result
+  } catch {
+    // (the gate never fails a result)
+  }
   const gazeMs = Date.now() - tGaze
   const final = withDisplayReadings(finalizeResult(dropInvented(withGazes, story, context.language)), palette)
   // Which cards leave the engine, and why a card is missing (reasons are the referee / review codes, no story text and no character): the log a missing card is traced from.
@@ -842,6 +848,12 @@ async function runCardsPipeline(a: PipelineArgs): Promise<PipelineOut> {
     if (applied.candidates.length === completed.candidates.length) withGazes = applied
   } catch {
     withGazes = completed
+  }
+  // launch freeze: a line that STILL fails the shape check goes through the line rescue before the result is returned (never only in the self-test)
+  try {
+    withGazes = (await shapeGate(withGazes, story, context.language, { tone: toneLine(context), apiKey: opts.apiKey, signal: opts.signal, onUsage: opts.onUsage ? (u) => opts.onUsage!('review', u) : undefined })).result
+  } catch {
+    // (the gate never fails a result)
   }
   const gazeMs = Date.now() - tGaze + out.report.gaze_ms
   const final = withDisplayReadings(finalizeResult(dropInvented(withGazes, story, context.language)), palette)

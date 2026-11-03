@@ -27,7 +27,7 @@ export interface OrderStore {
   getObject(path: string): Promise<Buffer | null>
 }
 
-const SAFE_OBJECT = /^(films\/(AN-[a-z2-9]{20}\/(art\.json|film\.(mp4|json)|[1-4](\.unchecked)?\.webp)|renders-\d{4}-\d{2}-\d{2}\.jsonl)|ops\/(orders-\d{4}-\d{2}-\d{2}|egift)\.jsonl|ops\/certno\/(\d{4,7}|last)\.json|og\/RG-[a-z2-9]{20}\.[0-9a-f]{8}\.png|selftest\/(latest|lock)\.json|selftest\/day-\d{4}-\d{2}-\d{2}\.json|selftest\/commit-[0-9a-zA-Z]{4,40}\.json)$/
+const SAFE_OBJECT = /^(films\/(AN-[a-z2-9]{20}\/(art\.json|film\.(mp4|json)|[1-4](\.unchecked)?\.webp)|renders-\d{4}-\d{2}-\d{2}\.jsonl)|ops\/(orders-\d{4}-\d{2}-\d{2}|egift)\.jsonl|ops\/certno\/(\d{4,7}|last)\.json|og\/RG-[a-z2-9]{20}\.[0-9a-f]{8}\.png|selftest\/(latest|lock)\.json|selftest\/day-\d{4}-\d{2}-\d{2}\.json|selftest\/month-\d{4}-\d{2}\.json|selftest\/commit-[0-9a-zA-Z]{4,40}\.json)$/
 export function assertObjectPath(path: string): void {
   if (!SAFE_OBJECT.test(path)) throw new Error(`Unsafe object path: ${path.slice(0, 40)}`)
 }

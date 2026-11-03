@@ -186,6 +186,8 @@ export interface PictureOutcome {
   script_blocked_by?: string[]
   /** per scene: pass | rewritten | washi, with the rule codes that failed it */
   script_scenes?: { state: string; rules: string[] }[]
+  /** launch freeze: per slot, drawn / drawn_on_retry / washi (the reason is in `reasons`) */
+  slot_outcomes?: string[]
   art_status?: string | null
   slots?: string[]
   reasons?: string[]
@@ -202,7 +204,7 @@ export function outcomeOf(rec: AnimationRecord, art: ArtRecord | null): PictureO
   if (art?.status === 'deferred') return { outcome: 'limit', limit: 'film_daily', ...base }
   const slots = art?.slots ?? []
   const pictures = slots.filter((x) => x === 'ai').length
-  const info = { ...base, slots: [...slots], reasons: [...(art?.reasons ?? [])], pictures, washi: slots.filter((x) => x === 'washi').length, calls: art?.calls ?? 0, model: art?.model ?? null }
+  const info = { ...base, slots: [...slots], reasons: [...(art?.reasons ?? [])], ...(art?.outcomes ? { slot_outcomes: [...art.outcomes] } : {}), pictures, washi: slots.filter((x) => x === 'washi').length, calls: art?.calls ?? 0, model: art?.model ?? null }
   if (pictures > 0) return { outcome: 'ok', ...info }
   if (!art || art.status === 'rendering') return { outcome: 'drawing', ...info }
   if (art.status === 'done' || art.status === 'incomplete') return { outcome: 'all_failed', cause: 'images_failed', ...info }

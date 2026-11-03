@@ -11,9 +11,9 @@ import { createOrderHandler, type OrderDeps } from '../api/order.ts'
 import { buildRecord, lineAttributes, parseOrderRequest } from '../engine/order.ts'
 import { MemoryOrderStore } from '../engine/order-store.ts'
 import { availableSizes, loadShopifyConfig } from '../engine/shopify.ts'
-import { EGIFT_JAPAN_ONLY, GIFT_MESSAGE_MAX, LEGACY_PACKAGES, OPEN_DATE_MAX_DAYS, PACKAGES, PACKAGE_DISPLAY_ORDER, PACKAGE_PRICE_JPY, PACKAGE_SKU, PRINTED_CARD, RECOMMENDED_PACKAGE, SHIPS, SHIP_TO, WOODEN } from '../src/order/packages.ts'
+import { EGIFT_JAPAN_ONLY, GIFT_MESSAGE_MAX, LEGACY_PACKAGES, OPEN_DATE_MAX_DAYS, PACKAGES, PACKAGE_DISPLAY_ORDER, PACKAGE_PRICE_JPY, PACKAGE_SKU, PRINTED_CARD, RECOMMENDED_PACKAGE, comingSoonSizes, SHIPS, SHIP_TO, WOODEN } from '../src/order/packages.ts'
 import { SIZE_COPY } from '../src/demo/sizes-copy.ts'
-import { cleanSizes } from '../src/demo/useSizes.ts'
+import { cleanComingSoon, cleanSizes } from '../src/demo/useSizes.ts'
 
 let failures = 0
 function check(name: string, cond: boolean, detail?: string) {
@@ -53,6 +53,26 @@ check('(2) the page reads the list tolerantly: unknown ids (and the old digital 
   check('(2) …and lets it through once its variant is configured (this one then stops at the fake Shopify, not at the size check)', ok.json.code !== 'size_unavailable')
   const gone = await call(ENV, base({ package: 'digital' }))
   check('(2) the old sizes are no longer orderable: "digital" and "card" are refused as an invalid package', gone.status === 400 && gone.json.field === 'package' && (await call(ENV, base({ package: 'card' }))).json.field === 'package')
+}
+
+// ---- 2b. launch freeze: the e-gift-first switch ICHIREI_WOOD_SIZES=coming_soon ---------------------------------------------------------------------------------
+{
+  const SOON = { ...ENV, ICHIREI_WOOD_SIZES: 'coming_soon' } as NodeJS.ProcessEnv
+  const sizesJson = async (env: NodeJS.ProcessEnv) => (await sizesResponse(env).json()) as { sizes: string[]; coming_soon?: string[] }
+  const off = await sizesJson(ENV)
+  const on = await sizesJson({ ...SOON, SHOPIFY_VARIANT_EGIFT: '3333' } as NodeJS.ProcessEnv)
+  const bare = await sizesJson({ ICHIREI_WOOD_SIZES: 'coming_soon' } as NodeJS.ProcessEnv)
+  check('(2b) OFF by default: no `coming_soon` in /api/sizes, 木札 and 版木 are on sale as before', off.sizes.join() === 'simple,standard' && off.coming_soon === undefined && comingSoonSizes(undefined).length === 0 && comingSoonSizes('').length === 0 && comingSoonSizes('on_sale').length === 0)
+  check('(2b) ICHIREI_WOOD_SIZES=coming_soon: /api/sizes still lists all three in order and names 木札 and 版木 as coming_soon (also with no Shopify variant for them)', on.sizes.join() === 'egift,simple,standard' && on.coming_soon?.join() === 'simple,standard' && bare.sizes.join() === 'simple,standard' && bare.coming_soon?.join() === 'simple,standard' && comingSoonSizes(' Coming_Soon ').join() === 'simple,standard')
+  const store = new MemoryOrderStore()
+  const mk = (env: NodeJS.ProcessEnv) => (): OrderDeps => ({ store, env, shopify: loadShopifyConfig({ ...env, SHOPIFY_VARIANT_EGIFT: '3333' } as NodeJS.ProcessEnv).config, shopifyMissing: [], now: () => NOW, fetchImpl: (async () => new Response('{}', { status: 500 })) as typeof fetch } as OrderDeps)
+  const call = async (env: NodeJS.ProcessEnv, body: unknown) => { const res = await createOrderHandler(mk(env))(new Request('http://x/api/order', { method: 'POST', body: JSON.stringify(body) })); return { status: res.status, json: (await res.json()) as { code?: string; field?: string } } }
+  const w1 = await call(SOON, base({ package: 'simple' }))
+  const w2 = await call(SOON, base({ package: 'standard' }))
+  const e1 = await call(SOON, base({ package: 'egift' }))
+  const w3 = await call(ENV, base({ package: 'standard' }))
+  check('(2b) /api/order refuses 木札 and 版木 while it is on (400 size_coming_soon on "package"), still accepts the e-gift past the size check, and the wooden sizes are untouched when it is off', w1.status === 400 && w1.json.code === 'size_coming_soon' && w1.json.field === 'package' && w2.json.code === 'size_coming_soon' && e1.json.code !== 'size_coming_soon' && e1.json.code !== 'size_unavailable' && w3.json.code !== 'size_coming_soon', JSON.stringify([w1, w2, e1.json, w3.json]))
+  check('(2b) the page reads `coming_soon` tolerantly and every language has the label (近日公開 / 即將推出 / 即将推出 / Coming soon)', cleanComingSoon({ coming_soon: ['standard', 'x', 'simple'] }).join() === 'simple,standard' && cleanComingSoon(null).length === 0 && cleanComingSoon({ coming_soon: 'simple' }).length === 0 && SIZE_COPY.ja.comingSoon === '近日公開' && SIZE_COPY['zh-Hant'].comingSoon === '即將推出' && SIZE_COPY['zh-Hans'].comingSoon === '即将推出' && SIZE_COPY.en.comingSoon === 'Coming soon')
 }
 
 // ---- 3. where it goes ---------------------------------------------------------------------------------------------------------------------------

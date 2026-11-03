@@ -12,6 +12,12 @@ export const LEGACY_PACKAGES = ['digital', 'card'] as const
 
 /** The order the page shows them in, left to right: eギフト (「今すぐ贈れる」), 木札 (おすすめ), 版木. */
 export const PACKAGE_DISPLAY_ORDER: readonly PackageId[] = ['egift', 'simple', 'standard']
+/**
+ * E-gift-first launch switch: ICHIREI_WOOD_SIZES=coming_soon puts 木札 and 版木 on the page as 「近日公開」 (disabled buttons; /api/order refuses them). Off by default — the owner turns it on.
+ * Reads the value it is given (the server passes its environment); anything else means the wooden sizes are on sale as usual.
+ */
+export const COMING_SOON_VALUE = 'coming_soon'
+export const comingSoonSizes = (value: string | null | undefined): PackageId[] => ((value ?? '').trim().toLowerCase() === COMING_SOON_VALUE ? ['simple', 'standard'] : [])
 /** The size recommended on the page. */
 export const RECOMMENDED_PACKAGE: PackageId = 'simple'
 

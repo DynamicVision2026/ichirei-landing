@@ -2151,6 +2151,95 @@ const SECTION_ORDER = ['.hero', '.strip', '.philo', '#shape', '#angles', '#write
   await en.page.close()
 }
 
+// ---------- Run 13c (launch freeze): apology, encouragement and remembrance are ink — never red — on the cards, the preview, the order slip, the gift page and the film ----------
+{
+  const INK = 'rgb(31, 42, 68)'
+  const SEAL = 'rgb(200, 64, 45)'
+  const purposeResult = (body) => { const r = clone(FIXTURE); r.language = body.language; r.occasion = null; r.purpose = body.purpose; r.inscription_script = null; return r }
+  for (const purpose of ['apology', 'encourage', 'thanks']) {
+    const quiet = purpose !== 'thanks'
+    const { page, errors } = await mockPage(browser, { result: purposeResult, order: () => ({ json: { order_ref: 'IC-20261026-QUIET222', checkout_url: 'http://localhost:5173/__checkout?cart=q', glyph: '証', certificate_text: 'x', certificate: { memorial: false } } }) })
+    await page.goto('http://localhost:5173/?lang=ja', { waitUntil: 'networkidle' })
+    await page.locator('#moment').fill('母は、私が何を言っても黙って台所に立っていた。あの日の言葉を、今でも悔やんでいる。')
+    await pickContext(page, { relationship: 'parent_mother', direction: 'up', occasion: 'birthday_milestone' })
+    await page.click(`[data-chip="purpose:${purpose === 'thanks' ? 'thanks' : purpose}"]`)
+    await page.click(`#write >> text=${GO.ja}`)
+    await page.waitForSelector('[data-testid=finalize]', { timeout: 15000 })
+    const main = await page.evaluate(() => ({ glyph: getComputedStyle(document.querySelector('article[data-slot=main] [data-glyph]')).color, label: getComputedStyle(document.querySelector('article[data-slot=main] [data-slot-label]')).backgroundColor, border: getComputedStyle(document.querySelector('article[data-slot=main]')).borderTopColor }))
+    check(`${purpose}: the main card's character, label and top rule are ${quiet ? 'ink, never cinnabar' : 'cinnabar (the celebration colour stays for a thank-you)'}`, quiet ? main.glyph === INK && main.label === INK && main.border === INK : main.glyph === SEAL, JSON.stringify(main))
+    await page.locator('article[data-slot=main]').locator('text=この一字を選ぶ').click()
+    await page.click('[data-testid=finalize]')
+    await page.locator('[data-testid=order-form]').waitFor()
+    const form = await page.evaluate(() => {
+      const sheet = document.querySelector('[data-testid=card-sheet] .cardGlyph')
+      return { slipGlyph: getComputedStyle(document.querySelector('[data-order-glyph]')).color, slipTop: getComputedStyle(document.querySelector('.slip')).borderTopColor, slipQuiet: document.querySelector('.slip').dataset.quiet ?? null, previewQuiet: document.querySelector('[data-testid=card-preview]').dataset.quiet ?? null, sheetGlyph: sheet ? getComputedStyle(sheet).color : null, memorial: document.querySelector('.slip').dataset.memorial ?? null }
+    })
+    check(`${purpose} order form: the slip glyph and rule${quiet ? ' and the card preview glyph are ink, marked data-quiet, and it is NOT worded as a remembrance' : ' and the card preview glyph are cinnabar (not quiet)'}`, quiet ? form.slipGlyph === INK && form.slipTop === INK && form.slipQuiet === 'yes' && form.previewQuiet === 'yes' && form.sheetGlyph !== SEAL && form.memorial === null : form.slipGlyph === SEAL && form.slipQuiet === null && form.sheetGlyph === SEAL, JSON.stringify(form))
+    check(`no page errors (run 13c, ${purpose})`, errors.length === 0, errors.join('; '))
+    await page.close()
+  }
+  // the receiver's page and the sender's film: an apology view is ink, a celebration view keeps the cinnabar character
+  const view = (over) => ({ id: 'AN-testtesttesttesttest', language: 'ja', glyph: '備', reading: 'そな.える', romanization: 'sonaeru', meaning_en: 'to be ready', who: 'いつも、頼まれる前に備えている人。', memorial: false, film: { status: 'fallback', lines: ['「ちょうど今詰めてたところ」', 'いつも、頼まれる前に備えている人。'], pictures: ['/film/washi-1.webp', '/film/washi-2.webp'] }, certificate_line: 'この字は、あなたの目に映る、その人です。', poem: null, ...over })
+  for (const [purpose, quiet] of [['apology', true], ['encourage', true], ['memorial', true], ['celebrate', false]]) {
+    const p = await browser.newPage({ locale: 'ja-JP', viewport: { width: 390, height: 800 }, reducedMotion: 'reduce' })
+    const errs = []
+    p.on('pageerror', (e) => errs.push(String(e)))
+    await p.route('**/api/animation/AN-testtesttesttesttest', (r) => r.fulfill({ json: view({ purpose }) }))
+    await p.goto('http://localhost:5173/a/AN-testtesttesttesttest', { waitUntil: 'networkidle' })
+    await p.waitForSelector('[data-testid=film-still]')
+    const still = await p.evaluate(() => ({ quiet: document.querySelector('[data-testid=film-still]').dataset.quiet, kanji: getComputedStyle(document.querySelector('.an-kanji-still')).color }))
+    check(`film (${purpose}): the character is ${quiet ? 'ink, never cinnabar (data-quiet=yes)' : 'cinnabar'}`, quiet ? still.quiet === 'yes' && still.kanji !== 'rgb(192, 57, 43)' && /^rgb\((\d+), (\d+), (\d+)\)$/.test(still.kanji) && Number(still.kanji.match(/\d+/g)[0]) < 60 : still.quiet === 'no' && still.kanji === 'rgb(192, 57, 43)', JSON.stringify(still))
+    check(`no page errors (run 13c, film ${purpose})`, errs.length === 0, errs.join('; '))
+    await p.close()
+  }
+  for (const [purpose, quiet] of [['apology', true], ['encourage', true], ['celebrate', false]]) {
+    const TOKEN = 'RG-testtesttesttesttest'
+    const p = await browser.newPage({ locale: 'ja-JP', viewport: { width: 375, height: 844 } })
+    const errs = []
+    p.on('pageerror', (e) => errs.push(String(e)))
+    await p.route(`**/api/gift/${TOKEN}**`, (r) => r.fulfill({ json: { ...view({ purpose }), locked: false, id: TOKEN, token: TOKEN, from: '山田 太郎', to: '山田 一郎', message: 'ごめんね。', egift: null, certificate_no: 12, order_date: '2026-11-07', opens_on: null, replied: false, package: 'simple' } }))
+    await p.goto(`http://localhost:5173/g/${TOKEN}`, { waitUntil: 'networkidle' })
+    await p.waitForSelector('[data-testid=gift-page]')
+    const g = await p.evaluate(() => { const el = document.querySelector('[data-testid=gift-page]'); return { quiet: el.dataset.quiet, cls: el.className, char: getComputedStyle(el).getPropertyValue('--char').trim().toLowerCase() } })
+    check(`gift page (${purpose}): ${quiet ? 'the page is in the ink style (gf-memorial, data-quiet=yes) and the character colour is not cinnabar' : 'the celebration colours stay (cinnabar character)'}`, quiet ? g.quiet === 'yes' && g.cls.includes('gf-memorial') && g.char !== '#c0392b' : g.quiet === 'no' && !g.cls.includes('gf-memorial') && g.char === 'var(--cinnabar)' || g.char === '#c0392b', JSON.stringify(g))
+    check(`no page errors (run 13c, gift ${purpose})`, errs.length === 0, errs.join('; '))
+    await p.close()
+  }
+}
+
+// ---------- Run 13d (launch freeze): the e-gift-first switch — 木札 and 版木 are shown as 「近日公開」 with disabled buttons; the e-gift is unchanged ----------
+{
+  const SOON = { en: 'Coming soon', 'zh-Hant': '即將推出', ja: '近日公開' }
+  for (const [lang, soonOn] of [['ja', true], ['zh-Hant', true], ['en', true], ['ja', false]]) {
+    const { page, errors } = await mockPage(browser, { result: (b) => ({ ...clone(FIXTURE), language: b.language, occasion: null, purpose: b.purpose }), order: () => ({ json: { order_ref: 'IC-20261026-SOON2222', checkout_url: 'http://localhost:5173/__checkout?cart=s', glyph: '証', certificate_text: 'x', certificate: { memorial: false } } }) })
+    await page.route('**/api/sizes', (r) => r.fulfill({ json: soonOn ? { sizes: ['egift', 'simple', 'standard'], coming_soon: ['simple', 'standard'] } : { sizes: ['egift', 'simple', 'standard'] } }))
+    await page.goto(`http://localhost:5173/?lang=${lang}`, { waitUntil: 'networkidle' })
+    await page.waitForSelector('#gifts article.gift')
+    const cards = await page.evaluate(() => [...document.querySelectorAll('#gifts article.gift')].map((a) => ({ id: a.dataset.size, soon: a.dataset.comingSoon ?? null, badge: a.querySelector('.badge')?.textContent ?? null, cta: a.querySelector('[data-testid^=gift-cta]')?.tagName ?? null, disabled: a.querySelector('[data-testid^=gift-cta]')?.disabled ?? null, label: a.querySelector('[data-testid^=gift-cta]')?.textContent ?? null })))
+    const byId = Object.fromEntries(cards.map((c) => [c.id, c]))
+    if (soonOn) {
+      check(`wood sizes switch on (${lang}): 木札 and 版木 are listed with 「${SOON[lang]}」 and a DISABLED button; the e-gift keeps its badge and its link`, cards.length === 3 && ['simple', 'standard'].every((id) => byId[id].soon === 'yes' && byId[id].badge === SOON[lang] && byId[id].cta === 'BUTTON' && byId[id].disabled === true && byId[id].label === SOON[lang]) && byId.egift.soon === null && byId.egift.cta === 'A' && byId.egift.badge !== SOON[lang], JSON.stringify(cards))
+    } else {
+      check('wood sizes switch OFF (default): no 「近日公開」 anywhere, every size has its normal link', cards.length === 3 && cards.every((c) => c.soon === null && c.cta === 'A' && c.badge !== SOON.ja), JSON.stringify(cards))
+    }
+    if (lang === 'ja') {
+      await page.locator('#moment').fill('母は、私が何を言っても黙って台所に立っていた。あの日の言葉を、今でも悔やんでいる。')
+      await pickContext(page, { relationship: 'parent_mother', direction: 'up', occasion: 'birthday_milestone' })
+      await page.click(`#write >> text=${GO.ja}`)
+      await page.waitForSelector('[data-testid=finalize]', { timeout: 15000 })
+      await page.locator('article[data-slot=main]').locator('text=この一字を選ぶ').click()
+      await page.click('[data-testid=finalize]')
+      await page.locator('[data-testid=order-form]').waitFor()
+      const radios = await page.evaluate(() => [...document.querySelectorAll('input[name=package]')].map((i) => ({ v: i.value, disabled: i.disabled, soon: i.closest('label').dataset.comingSoon ?? null, badge: i.closest('label').querySelector('.badge[data-badge=soon]')?.textContent ?? null })))
+      const rb = Object.fromEntries(radios.map((r) => [r.v, r]))
+      if (soonOn) check('wood sizes switch on: in the order form the 木札 and 版木 choices are disabled and say 「近日公開」; the e-gift can be chosen', radios.length === 3 && ['simple', 'standard'].every((v) => rb[v].disabled === true && rb[v].soon === 'yes' && rb[v].badge === '近日公開') && rb.egift.disabled === false && rb.egift.badge === null, JSON.stringify(radios))
+      else check('wood sizes switch OFF: the order form has no disabled size and no 「近日公開」', radios.length === 3 && radios.every((r) => r.soon === null && r.badge === null), JSON.stringify(radios))
+    }
+    check(`no page errors (run 13d, ${lang}${soonOn ? '' : ', off'})`, errors.length === 0, errors.join('; '))
+    await page.close()
+  }
+}
+
 // ---------- Run 14: /track — order status, four languages ----------
 {
   let reply = { json: { ordered_on: '2026-10-20', status: 'processing', sku: ['ICHIREI-STANDARD'], carrier: null, tracking_number: null, tracking_url: null, estimated_by: '2026-11-03' } }

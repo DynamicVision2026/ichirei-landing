@@ -111,7 +111,7 @@ try {
   check('(3) …the selection prompt tells the model: no free pick in remembrance', ['ja', 'zh', 'en'].every((f) => readFileSync(join(process.cwd(), 'engine', `prompt.${f}.md`), 'utf8').includes('NO FREESTYLE IN REMEMBRANCE')))
 
   // ---- the gaze step never costs a card ------------------------------------------------------------------------------------------------------------------------------------
-  check('(4) gaze rewrite unusable (rubbish): both cards stay, one rewrite call, original lines kept', live(r3).length === 2 && gazeCalls === 1 && gazeOf(r3, '誠') === BAD_GAZE_1 && gazeOf(r3, '灯') === BAD_GAZE_2)
+  check('(4) gaze rewrite unusable (rubbish): both cards stay; two rewrite calls (the lane\'s one, then the shape gate\'s rescue before the result is returned); the line that cannot be repaired is kept, the one that only ended on a verb gets 人', live(r3).length === 2 && gazeCalls === 2 && gazeOf(r3, '誠') === BAD_GAZE_1 && gazeOf(r3, '灯') === BAD_GAZE_2.replace(/。$/, '') + '人', `${gazeCalls} | ${gazeOf(r3, '灯')}`)
   gazeFail = true
   const r4 = await run()
   gazeFail = false

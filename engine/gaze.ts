@@ -121,6 +121,26 @@ export function insideQuote(story: string, fragment: string): boolean {
   return depth > 0
 }
 
+/**
+ * Launch freeze: a line that OPENS with the sender as its subject — 「私が約束を破っても、先に『大丈夫』と言ってくれる人」, 「私は…」, 「僕が…」, "When I …", 「我…」 — is about the sender's act first,
+ * even when the receiver's kindness follows (the receiver-acts exemption below is for the quoted act, not for how a line begins). Self-test apology-1 (`receiver:sender_subject`) found the
+ * line that slipped through: the exemption (くれる) let it pass. The self-test uses this very function, so the engine and the check can no longer disagree.
+ */
+const JA_LINE_OPENS_SENDER = new RegExp(`^[\\s「『]*${JA_FIRST}(?:は|が|も|だけは|こそ)`)
+const ZH_LINE_OPENS_SENDER = /^[\s「『“"]*(?:我|俺|咱)(?!的)/u
+const EN_LINE_OPENS_SENDER = /^[\s"“'‘]*(?:(?:[Aa]nd|[Bb]ut|[Ww]hen|[Ww]hile|[Ww]henever|[Aa]fter|[Bb]efore|[Ee]ven when|[Ee]ven though|[Aa]lthough|[Tt]hough|[Ii]f|[Oo]nce|[Aa]s|[Bb]ecause|[Ss]ince|[Uu]ntil)\s+)?(?:I|I'd|I'll|I've|I'm|I’d|I’ll|I’ve|I’m|we|We)(?:\s|$)/
+export function lineOpensWithSender(gaze: string, language: Language): boolean {
+  const t = (gaze ?? '').trim()
+  if (!t) return false
+  if (language === 'ja') {
+    // the sender as the subject of the FIRST clause (「約束を私が破っても、…」) is the same slip as opening with it
+    const first = withoutQuotes(t).split(/[、，。]/)[0] ?? ''
+    return JA_LINE_OPENS_SENDER.test(t) || JA_FIRST_SUBJ.test(first)
+  }
+  if (language === 'en') return EN_LINE_OPENS_SENDER.test(t)
+  return ZH_LINE_OPENS_SENDER.test(t)
+}
+
 /** true = the acting subject of this quoted act is the NARRATOR (the first person), and no one else acts in it. */
 export function narratorActs(text: string, language: Language): boolean {
   const t = bare(withoutQuotes(text))
@@ -176,7 +196,7 @@ export function subjectProblem(card: { story_anchor?: string | null; one_line_ga
   if (anchor && !(story && insideQuote(story, anchor)) && narratorActs(anchor, language)) {
     return { where: 'anchor', why: `the quoted act is the narrator's own${gaze && sharedActs(anchor, gaze) ? ' and the line describes those acts' : ''}: the card must stand on what the RECEIVER did` }
   }
-  if (gaze && narratorActs(strip(gaze), language) && /^[\s「『]*(?:俺|おれ|私|わたし|僕|ぼく|自分|我|I\b|I'|I’)/u.test(gaze)) {
+  if (gaze && (lineOpensWithSender(gaze, language) || (narratorActs(strip(gaze), language) && /^[\s「『]*(?:俺|おれ|私|わたし|僕|ぼく|自分|我|I\b|I'|I’)/u.test(gaze)))) {
     return { where: 'line', why: 'the line has the narrator as its subject: it must describe the receiver' }
   }
   return null
@@ -315,4 +335,63 @@ export async function rewriteLines(items: { kanji: string; gaze: string; why: st
 export function applyGazes(result: EngineResult, fixes: Map<string, string>): EngineResult {
   if (fixes.size === 0) return result
   return { ...result, candidates: result.candidates.map((c) => (fixes.has(c.kanji) ? { ...c, one_line_gaze: fixes.get(c.kanji)! } : c)) }
+}
+
+// ---- the shape gate (launch freeze): before the result leaves the engine ---------------------------------------------------------------------------------------
+// Self-test reconnect-1 returned a card whose line still failed the shape check (`receiver:shape`): the one rewrite after the review had not produced a passing line and "the original stays".
+// That is fine for a draft but not for a result. Now every result passes ONE more gate on the way out — the same shape check the self-test runs — and a line that still fails gets the line
+// rescue (a rewrite told what failed and that the earlier attempt did not fix it); a Japanese line that only ends on a plain verb/adjective gets the noun 人 (its relative clause then ends on
+// the person, which is what the shape asks). The character is never dropped for its line. ICHIREI_SHAPE_GATE=off switches the gate off.
+export const shapeGateEnabled = (env: NodeJS.ProcessEnv = process.env): boolean => !/^(off|0|false|no)$/i.test((env.ICHIREI_SHAPE_GATE ?? '').trim())
+
+/** A plain-form Japanese line that ends on a verb or adjective becomes a noun phrase with 人; null = not mechanically fixable (polite form, particle, or no clause). */
+export function nounPhraseJa(gaze: string): string | null {
+  const t = strip(gaze)
+  if (!t || !HIRAGANA_END.test(t.at(-1) ?? '')) return null
+  if (/(?:ます|ません|ました|です|でした|でしょう|ください|ね|よ|か|な|わ|ぞ|ぜ|の|を|に|へ|で|と|が|は|も|て|で|けど|から|ので)$/.test(t)) return null
+  const next = `${t}人`
+  return gazeIssues(next, 'ja').length === 0 ? next : null
+}
+
+export interface ShapeGateReport {
+  failing: number
+  /** lines replaced by the line rescue */
+  rescued: number
+  /** lines made a noun phrase by the mechanical repair */
+  mechanical: number
+  /** lines that still fail (kept: a line is never a reason to drop a character) */
+  left: number
+}
+
+export async function shapeGate(result: EngineResult, story: string, language: Language, opts: GazeFixOptions & { model?: string } = {}): Promise<{ result: EngineResult; report: ShapeGateReport }> {
+  const report: ShapeGateReport = { failing: 0, rescued: 0, mechanical: 0, left: 0 }
+  if (!shapeGateEnabled() || !gazeFixEnabled() || result.status !== 'sufficient') return { result, report } // (ICHIREI_GAZE_FIX=off switches every line rewrite off, the gate with it)
+  const bad = failingGazes(result.candidates, language, story)
+  report.failing = bad.length
+  if (bad.length === 0) return { result, report }
+  const log = opts.log ?? ((l: string) => console.log(l))
+  const fixes = new Map<string, string>()
+  if (gazeFixEnabled()) {
+    const items = bad.map((b) => ({ kanji: b.kanji, gaze: b.gaze, why: `${b.why}. An earlier rewrite did not fix it: write the line again as ONE noun phrase about the person that ENDS on the person (${language === 'ja' ? '〜人' : language === 'en' ? 'Someone who …' : '…的人'}), with the person as its subject and only details the story gives` }))
+    try {
+      for (const [k, v] of await rewriteLines(items, story, language, opts)) fixes.set(k, v)
+    } catch {
+      // (rewriteLines never throws; this keeps the gate from ever failing a result)
+    }
+  }
+  report.rescued = fixes.size
+  if (language === 'ja') {
+    for (const b of bad) {
+      if (fixes.has(b.kanji) || !/ends on a verb or an adjective/.test(b.why)) continue
+      const next = nounPhraseJa(b.gaze)
+      if (next && inventedFacts(next, story, language).length === 0) {
+        fixes.set(b.kanji, next)
+        report.mechanical++
+      }
+    }
+  }
+  const out = applyGazes(result, fixes)
+  report.left = failingGazes(out.candidates, language, story).length
+  log(`[ichirei-gaze] ${JSON.stringify({ event: 'shape_gate', ...report })}`)
+  return { result: out, report }
 }

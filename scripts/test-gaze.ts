@@ -1,7 +1,7 @@
 // The gaze line shape check and its one rewrite (spec v9.4). Run: node --experimental-strip-types --disable-warning=ExperimentalWarning scripts/test-gaze.ts
 import assert from 'node:assert/strict'
-import { applyGazes, failingGazes, fixGazes, gazeProblem } from '../engine/gaze.ts'
-import type { Candidate } from '../engine/contract.ts'
+import { applyGazes, failingGazes, fixGazes, gazeProblem, nounPhraseJa, shapeGate } from '../engine/gaze.ts'
+import type { Candidate, EngineResult } from '../engine/contract.ts'
 
 let n = 0
 const ok = (name: string, fn: () => void | Promise<void>) => Promise.resolve(fn()).then(() => console.log(`  ok  ${name}`), (e) => { console.error(`  FAIL ${name}`); throw e }).finally(() => { n++ })
@@ -57,6 +57,42 @@ const badJa = ['「そうか」という短い一言の中に、父の十年分�
     assert.equal(out.size, 0)
   })
   await ok('eliminated candidates are not rewritten', () => { assert.equal(failingGazes([cand('寡', badJa[0]!, { eliminated: true } as never)], 'ja').length, 0) })
+
+  // ---- launch freeze: the shape gate runs before the result is returned (self-test reconnect-1 `receiver:shape`) ------------------------------------------------------------------
+  const result = (...c: Candidate[]): EngineResult => ({ status: 'sufficient', candidates: c } as unknown as EngineResult)
+  const RC = '友だちの話。'
+  await ok('shape gate: a line that still fails is rescued by ONE more rewrite, and the result carries the new line', async () => {
+    const calls = { n: 0 }
+    const reply = JSON.stringify({ gazes: [{ kanji: '待', one_line_gaze: '連絡が途絶えても、ずっと待っていてくれた人。' }] })
+    const { result: r, report } = await shapeGate(result(cand('待', '連絡が途絶えても、ずっと待っていてくれる')), RC, 'ja', { client: fakeClient(reply, calls), log: quiet })
+    assert.equal(r.candidates[0]!.one_line_gaze, '連絡が途絶えても、ずっと待っていてくれた人。')
+    assert.deepEqual([report.failing, report.rescued, report.left, calls.n], [1, 1, 0, 1])
+  })
+  await ok('shape gate: when the rescue gives nothing usable, a plain-form Japanese line gets 人 (mechanical noun phrase); the card is never dropped', async () => {
+    const calls = { n: 0 }
+    const { result: r, report } = await shapeGate(result(cand('待', '連絡が途絶えても、ずっと待っていてくれる')), RC, 'ja', { client: fakeClient('{}', calls), log: quiet })
+    assert.equal(r.candidates[0]!.one_line_gaze, '連絡が途絶えても、ずっと待っていてくれる人')
+    assert.deepEqual([report.mechanical, report.left], [1, 0])
+    assert.equal(nounPhraseJa('お疲れさまです'), null)
+    assert.equal(nounPhraseJa('待っていてくれました'), null)
+    assert.equal(nounPhraseJa('先に笑ってくれた'), '先に笑ってくれた人')
+  })
+  await ok('shape gate: a line nothing can repair stays (counted as left), a good line costs no call, an off switch skips it, an insufficient result is untouched', async () => {
+    const calls = { n: 0 }
+    const stuck = '「そうか」という短い一言の中に、父の十年分の想いが詰まっていた。'
+    const a = await shapeGate(result(cand('寡', stuck)), story, 'ja', { client: fakeClient('{}', calls), log: quiet })
+    assert.deepEqual([a.result.candidates[0]!.one_line_gaze, a.report.left], [stuck, 1])
+    const c2 = { n: 0 }
+    const b = await shapeGate(result(cand('寡', goodJa[0]!)), story, 'ja', { client: fakeClient('{}', c2), log: quiet })
+    assert.deepEqual([b.report.failing, c2.n], [0, 0])
+    process.env.ICHIREI_SHAPE_GATE = 'off'
+    const c3 = { n: 0 }
+    const off = await shapeGate(result(cand('寡', stuck)), story, 'ja', { client: fakeClient('{}', c3), log: quiet })
+    delete process.env.ICHIREI_SHAPE_GATE
+    assert.deepEqual([off.report.failing, c3.n], [0, 0])
+    const ins = await shapeGate({ status: 'insufficient', candidates: [cand('寡', stuck)] } as unknown as EngineResult, story, 'ja', { client: fakeClient('{}', calls), log: quiet })
+    assert.equal(ins.report.failing, 0)
+  })
 
   console.log(`\n${n} gaze checks passed`)
 })().catch((e) => { console.error(e); process.exit(1) })

@@ -245,7 +245,7 @@ const rig = () => {
   }
   const store = new MemoryOrderStore()
   let drawn = 0
-  const image: ImageClient = { async generate() { drawn++; await new Promise((r) => setTimeout(r, 15)); return { bytes: PNG, model: 'fake-image' } } }
+  const image: ImageClient = { async generate() { drawn++; await new Promise((r) => setTimeout(r, 45)); return { bytes: PNG, model: 'fake-image' } } }
   const logs: string[] = []
   const env = { ICHIREI_FILM_DAILY_MAX: '1000', ICHIREI_FILM_RENDER_MS: '30000', ICHIREI_FILM_QUOTA_WAITS_MS: '0', ICHIREI_FILM_CHECK_WAITS_MS: '0', ICHIREI_FILM_BG_RETRY_MS: '0' } as never
   const H = createPreviewHandlers(() => ({ store, now: () => NOW, film: async () => clone(FILM), image, vision: visionFail as never, env, log: (l) => logs.push(l), pollMs: 10, daily: new SlidingWindowLimiter(5, 86_400_000) }))
@@ -257,8 +257,9 @@ const rig = () => {
   const view = await (await H.render(started.id)).json() as { state: string; pictures: (string | null)[]; slots: string[] }
   polling = false
   await watcher
+  seen.push(((await (await H.view(started.id)).json()) as { pictures: (string | null)[] }).pictures.filter(Boolean).length) // (the last look, after the render ended)
   check('(7) the slot that failed its check three times is the plain washi tile, and the other three pictures are shown: state "done" (not "failed"), slots washi / ai / ai / ai', view.state === 'done' && view.slots.join() === 'washi,ai,ai,ai' && view.pictures[0] === null && view.pictures.slice(1).every((u) => typeof u === 'string'))
-  check('(7) the pictures that are shown never go away while the others are still being drawn (the number shown never goes down)', seen.length > 2 && seen.every((n, i) => i === 0 || n >= seen[i - 1]) && seen.at(-1) === 3)
+  check('(7) the pictures that are shown never go away while the others are still being drawn (the number shown never goes down)', seen.length > 2 && seen.every((n, i) => i === 0 || n >= seen[i - 1]) && seen.at(-1) === 3, JSON.stringify(seen))
   const ev = logs.map((l) => (l.startsWith('[ichirei-preview] ') ? JSON.parse(l.slice('[ichirei-preview] '.length)) : null)).find((e) => e?.event === 'preview_render')
   check('(7) preview_render is logged with the seconds from the pick to each picture (null for the washi tile) — codes and numbers only', !!ev && ev.picture_secs_from_pick.length === 4 && ev.picture_secs_from_pick[0] === null && ev.picture_secs_from_pick.slice(1).every((x: unknown) => typeof x === 'number' && (x as number) >= 0) && ev.pictures === 3 && ev.washi === 1 && typeof ev.secs_from_pick_to_render === 'number')
   const art0 = await readArt(store, started.id)
@@ -381,6 +382,65 @@ const rig = () => {
   check('(9) the render draws THREE pictures — never one for the washi scene — and the card is done: slots ai, ai, washi, ai', drawn === 3 && out.state === 'done' && out.slots.join() === 'ai,ai,washi,ai' && out.pictures[2] === null && out.pictures.filter(Boolean).length === 3, JSON.stringify([drawn, out.slots, out.state]))
   check('(9) the debug shows the outcome ok with 3 pictures and 1 washi, and each scene\'s state with its rule codes (pass / rewritten / washi)', out.debug.outcome === 'ok' && out.debug.pictures === 3 && out.debug.washi === 1 && out.debug.script_scenes?.map((x: { state: string }) => x.state).join() === 'pass,pass,washi,rewritten' && out.debug.script_scenes[2].rules.includes('picture_unsafe:crutches'), JSON.stringify(out.debug))
   check('(9) after payment the scene the script blocked stays washi (the paid retry only gives the OTHER washi slots another go)', await (async () => { const { markWashiForRetry } = await import('../engine/film-art.ts'); return (await markWashiForRetry(store, a.id)) === false })())
+}
+
+// ---- 10. launch freeze: a picture that fails the check gets ONE more attempt in the preview — its description is rewritten with the failure reason and it is drawn again --------------
+{
+  const KITCHEN = 'standing at a quiet kitchen counter'
+  const rewritePrompts: string[] = []
+  const vision = {
+    messages: {
+      stream: (params: { messages: { content: string | { type: string; text?: string }[] }[] }) => ({
+        finalMessage: async () => {
+          const content = params.messages[0].content
+          if (typeof content === 'string') {
+            rewritePrompts.push(content)
+            return { content: [{ type: 'text', text: JSON.stringify({ picture: 'A pair of hands resting on a closed bento box on a wooden table, seen from far away in soft grey light' }) }], usage: { input_tokens: 1, output_tokens: 1 }, stop_reason: 'end_turn' }
+          }
+          const text = content.filter((b) => b.type === 'text').map((b) => b.text).join(' ')
+          const n = content.filter((b) => b.type === 'image').length
+          const bad = text.includes(KITCHEN) // the film's own description of picture 1 fails (a face); the rewritten one passes
+          return { content: [{ type: 'text', text: JSON.stringify({ pictures: Array.from({ length: n }, () => (bad ? { ok: false, reason: 'face' } : OKV)) }) }], usage: { input_tokens: 1, output_tokens: 1 }, stop_reason: 'end_turn' }
+        },
+      }),
+    },
+  }
+  const store = new MemoryOrderStore()
+  let drawn = 0
+  const image: ImageClient = { async generate() { drawn++; await new Promise((r) => setTimeout(r, 30)); return { bytes: PNG, model: 'fake-image' } } }
+  const logs: string[] = []
+  const env = { ICHIREI_FILM_DAILY_MAX: '1000', ICHIREI_FILM_RENDER_MS: '30000', ICHIREI_FILM_QUOTA_WAITS_MS: '0', ICHIREI_FILM_CHECK_WAITS_MS: '0', ICHIREI_FILM_BG_RETRY_MS: '0' } as never
+  const H = createPreviewHandlers(() => ({ store, now: () => NOW, film: async () => clone(FILM), image, vision: vision as never, env, log: (l) => logs.push(l), pollMs: 10, daily: new SlidingWindowLimiter(5, 86_400_000) }))
+  const started = (await (await H.start(new Request('http://x/api/preview?debug=1', { method: 'POST', body: JSON.stringify({ story: FIX.story, language: 'ja', ...FIX.context, shown: ['証'] }) }))).json()) as { id: string }
+  const seen: number[] = []
+  let polling = true
+  const watcher = (async () => { while (polling) { const v = (await (await H.view(started.id)).json()) as { pictures: (string | null)[] }; seen.push(v.pictures.filter(Boolean).length); await new Promise((r) => setTimeout(r, 5)) } })()
+  const out = (await (await H.render(started.id, new Request('http://x/r?debug=1', { method: 'POST' }))).json()) as { state: string; slots: string[]; pictures: (string | null)[]; debug: Record<string, any> }
+  polling = false
+  await watcher
+  seen.push(((await (await H.view(started.id)).json()) as { pictures: (string | null)[] }).pictures.filter(Boolean).length)
+  const first = FILM.pictures.findIndex((x) => x.includes(KITCHEN))
+  const ev = logs.filter((l) => l.startsWith('[ichirei-film] ')).map((l) => JSON.parse(l.slice('[ichirei-film] '.length))).filter((e) => e.event === 'film_slot')
+  check('(10) one failed drawing: the description is rewritten ONCE with the failure reason ("face") and the picture is drawn again — five draws in all (four + one), all four slots end as pictures, no washi', out.state === 'done' && out.slots.join() === 'ai,ai,ai,ai' && drawn === 5 && rewritePrompts.length === 1 && rewritePrompts[0].includes('face'), JSON.stringify([out.state, out.slots, drawn, rewritePrompts.length]))
+  check('(10) …that slot ends as `drawn_on_retry` (the other three `drawn`): in the art record, in the debug (slot_outcomes) and one `film_slot` log line per slot, codes only', first === 0 && out.debug.slot_outcomes?.join() === 'drawn_on_retry,drawn,drawn,drawn' && ev.length === 4 && ev[0].outcome === 'drawn_on_retry' && ev[0].reason === 'face' && ev.slice(1).every((e) => e.outcome === 'drawn' && e.reason === 'ok'), JSON.stringify([out.debug.slot_outcomes, ev]))
+  check('(10) the other pictures show as they arrive: the number shown never goes down, and three were already shown while the retry was still being drawn', seen.every((n, i) => i === 0 || n >= seen[i - 1]) && seen.includes(3) && seen.at(-1) === 4, JSON.stringify(seen))
+  // a picture that fails AFTER the rewrite is washi (final), with its reason; the others are unaffected
+  const store2 = new MemoryOrderStore()
+  const vision2 = { messages: { stream: (params: { messages: { content: string | { type: string; text?: string }[] }[] }) => ({ finalMessage: async () => {
+    const content = params.messages[0].content
+    if (typeof content === 'string') return { content: [{ type: 'text', text: JSON.stringify({ picture: `A woman ${KITCHEN} seen from far away, a closed bento box` }) }], usage: { input_tokens: 1, output_tokens: 1 }, stop_reason: 'end_turn' }
+    const text = content.filter((b) => b.type === 'text').map((b) => b.text).join(' ')
+    const n = content.filter((b) => b.type === 'image').length
+    return { content: [{ type: 'text', text: JSON.stringify({ pictures: Array.from({ length: n }, () => (text.includes(KITCHEN) ? { ok: false, reason: 'face' } : OKV)) }) }], usage: { input_tokens: 1, output_tokens: 1 }, stop_reason: 'end_turn' }
+  } }) } }
+  let drawn2 = 0
+  const image2: ImageClient = { async generate() { drawn2++; return { bytes: PNG, model: 'fake-image' } } }
+  const logs2: string[] = []
+  const H2 = createPreviewHandlers(() => ({ store: store2, now: () => NOW, film: async () => clone(FILM), image: image2, vision: vision2 as never, env, log: (l) => logs2.push(l), pollMs: 10, daily: new SlidingWindowLimiter(5, 86_400_000) }))
+  const st2 = (await (await H2.start(new Request('http://x/api/preview', { method: 'POST', body: JSON.stringify({ story: FIX.story, language: 'ja', ...FIX.context, shown: ['証'] }) }))).json()) as { id: string }
+  const out2 = (await (await H2.render(st2.id, new Request('http://x/r?debug=1', { method: 'POST' }))).json()) as { slots: string[]; debug: Record<string, any> }
+  const ev2 = logs2.filter((l) => l.startsWith('[ichirei-film] ')).map((l) => JSON.parse(l.slice('[ichirei-film] '.length))).filter((e) => e.event === 'film_slot')
+  check('(10) a picture that fails again after its one rewrite becomes washi (two draws, one rewrite — not three draws), logged with its reason; the others are drawn once', out2.slots.join() === 'washi,ai,ai,ai' && drawn2 === 5 && ev2[0].outcome === 'washi' && ev2[0].reason === 'face' && out2.debug.slot_outcomes?.join() === 'washi,drawn,drawn,drawn', JSON.stringify([out2.slots, drawn2, ev2[0]]))
 }
 
 upstream.close()

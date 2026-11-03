@@ -73,6 +73,13 @@ check('(1) the scroll is ONE PNG, 2400 px wide and tall enough for four pictures
 check('(1) the character is cinnabar (many red pixels) for an ordinary gift', (await redPixels(scroll.png)) > 5000)
 const memWork: Artwork = { ...work, memorial: true, quiet: true }
 check('(1) remembrance: ink black, NO red anywhere on the scroll', (await redPixels((await makeScroll(memWork)).png)) === 0)
+// launch freeze: an apology / an encouragement is as quiet as a remembrance — ink on the scroll and the card PDF, no red anywhere (the wording of a remembrance is NOT switched on)
+for (const purpose of ['apology', 'encourage']) {
+  const qWork = await loadArtwork(store, { ...a1.gift, purpose, memorial: false } as never, a1.anim, art, process.env)
+  check(`(1) ${purpose}: the artwork is quiet but not a remembrance, and neither the scroll nor the card PDF has a red pixel`, qWork.quiet === true && qWork.memorial === false && (await redPixels((await makeScroll(qWork)).png)) === 0)
+}
+const thanksWork = await loadArtwork(store, { ...a1.gift, purpose: 'thanks', memorial: false } as never, a1.anim, art, process.env)
+check('(1) thanks: not quiet — the cinnabar character stays', thanksWork.quiet === false && (await redPixels((await makeScroll(thanksWork)).png)) > 5000)
 const pdf = await scrollPdf(scroll)
 check('(1) the same scroll as a PDF: one page of the same size', pdf.subarray(0, 5).toString() === '%PDF-' && (pdf.toString('latin1').match(/\/Type \/Page\b/g) ?? []).length === 1 && /\/MediaBox \[0 0 2400 \d+\]/.test(pdf.toString('latin1')))
 check('(1) a slot without a real picture is never drawn: the scroll refuses to be made (and scrollReady is false)', await makeScroll({ ...work, pictures: [work.pictures[0], null, work.pictures[2], work.pictures[3]] }).then(() => false, () => true) && scrollReady(a1.anim, art) && !scrollReady(a1.anim, { ...art, slots: ['ai', 'washi', 'ai', 'ai'] }) && !scrollReady(a1.anim, null))

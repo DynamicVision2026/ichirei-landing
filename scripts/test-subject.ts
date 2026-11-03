@@ -22,6 +22,16 @@ check('(1) a line of its own with the narrator as the subject is `subject` (wher
 
 check('(1) the first person INSIDE quoted speech is the speaker\'s, not the narrator\'s: the anchor 「ここは俺が」 cut from あいつは「ここは俺が」と言って… (the receiver speaking) is fine, as is an anchor with a quotation inside it', subjectProblem({ story_anchor: 'ここは俺が', one_line_gaze: '「ここは俺が」で、私の財布はいつも出番なし。' }, 'ja', '大学の頃から、あいつは「ここは俺が」と言って、先に払ってしまう。') === null && subjectProblem({ story_anchor: '「ここは俺が」と言って、先に払ってしまう', one_line_gaze: '' }, 'ja', '') === null && subjectProblem({ story_anchor: 'ここは俺が', one_line_gaze: '' }, 'ja', '俺は毎晩、削った。ここは俺が') !== null)
 
+// ---- launch freeze: self-test apology-1 (`receiver:sender_subject`) — a line that OPENS with the sender, with the receiver's kindness after it ---------------------------------------------------
+{
+  const ANCHOR = '春子はいつも、私が約束を破っても、次の日には「大丈夫」と先に言ってくれる人だった'
+  const slips = ['私が約束を破っても、次の日には「大丈夫」と先に言ってくれる人。', '私は途中で遮ったのに、先に「大丈夫」と言ってくれた人。', '約束を私が破っても、いつも先に許してくれる人。', '僕が連絡を絶っても、待っていてくれた人。', '私も忙しいと言ったのに、笑って受け止めてくれた人。']
+  check('(launch freeze) apology-1: lines that open with 私が / 私は / 僕が — or put 私が in the first clause — are `subject` (where: line) EVEN THOUGH the receiver\'s kindness (くれる) follows; the old exemption let them through', slips.every((g) => subjectProblem({ story_anchor: ANCHOR, one_line_gaze: g }, 'ja')?.where === 'line'), JSON.stringify(slips.map((g) => subjectProblem({ story_anchor: ANCHOR, one_line_gaze: g }, 'ja')?.where)))
+  const fine = ['約束を破った私にも、次の日には「大丈夫」と先に言ってくれる人。', '何を言い忘れても、次の日には「大丈夫」と先に言ってくれる人。', '先に「大丈夫」と言ってくれる人。', '私の友だちの春子は、いつも先に笑ってくれる人。']
+  check('(launch freeze) …and the receiver-centred forms stand: the sender only as an object (私にも), a possessive (私の友だち), or not at all', fine.every((g) => subjectProblem({ story_anchor: ANCHOR, one_line_gaze: g }, 'ja') === null), JSON.stringify(fine.map((g) => subjectProblem({ story_anchor: ANCHOR, one_line_gaze: g }, 'ja')?.where)))
+  check('(launch freeze) zh and en lines that open with the sender are `subject` too; a line about the person is not', subjectProblem({ story_anchor: '', one_line_gaze: '我失約了，她還是先說「沒關係」的人。' }, 'zh-Hant')?.where === 'line' && subjectProblem({ story_anchor: '', one_line_gaze: 'When I broke my promise, she was the one who said it was fine.' }, 'en')?.where === 'line' && subjectProblem({ story_anchor: '', one_line_gaze: 'I broke my promise and she forgave me first.' }, 'en')?.where === 'line' && subjectProblem({ story_anchor: '', one_line_gaze: '她總是先說「沒關係」的人。' }, 'zh-Hant') === null && subjectProblem({ story_anchor: '', one_line_gaze: 'The one who always says it is fine first.' }, 'en') === null && subjectProblem({ story_anchor: '', one_line_gaze: '我的朋友總是先說「沒關係」。' }, 'zh-Hant') === null)
+}
+
 // ---- the engine, with a fake model --------------------------------------------------------------------------------------------------------------------------------------------------------
 const STORY = '妹の春子は、俺が作るものをいつも黙って見てくれた。俺はそれをひとつひとつ計測して、削って、加えていった。俺は毎晩、削った面を確かめて、整えていった。春子は夜遅くまで工房の灯りをつけて待っていた。完成した日、春子は何も言わず、ただ頷いた。喧嘩のあとも、春子は俺の分の夕飯を取っておいてくれた。'
 const A = { narrator1: NARRATOR, narrator2: '俺は毎晩、削った面を確かめて、整えていった', lamp: '春子は夜遅くまで工房の灯りをつけて待っていた', nod: '春子は何も言わず、ただ頷いた', supper: '春子は俺の分の夕飯を取っておいてくれた' }
@@ -104,6 +114,18 @@ try {
   replies = { ...replies, main: mainOk, second: sel(cand('second', '継', 'つぐ', 'けんかのあとも、夕飯を取っておいてくれた人。', A.supper, 'Private Symbol')), gaze: { gazes: [] }, refill: { none: true } }
   const d = await run()
   check('(5) a first-person anchor where the receiver acts on the narrator (「春子は俺の分の夕飯を取っておいてくれた」) is fine: it is reviewed and stands, nothing is rewritten or refilled', sum(d).includes('second:継') && reviewed('継') && !kinds.gaze && !kinds.refill && (cardsLine().parallel?.subject_removed ?? []).length === 0, sum(d))
+
+  // E. launch freeze: the apology-1 line (opens with 私が…, receiver acts after) is rewritten ONCE in the engine — never returned as it was
+  replies = { ...replies, main: sel(cand('main', '誠', 'まこと', GOOD, A.lamp, 'Turning Point')), second: sel(cand('second', '信', 'しんじる', '私が約束を破っても、次の日には「大丈夫」と先に言ってくれる人。', A.lamp, 'Private Symbol')), gaze: { gazes: [{ kanji: '信', one_line_gaze: '約束を破られても、次の日には「大丈夫」と先に言ってくれる人。' }] }, refill: { none: true } }
+  const e = await run()
+  const ku = live(e).find((x) => x.kanji === '信')
+  check('(launch freeze) the apology-1 slip: the line that opens with the sender is rewritten once before the result is returned, and the card stands with the receiver\'s line', !!ku && !/^私/.test(ku.one_line_gaze) && (kinds.gaze?.length ?? 0) === 1, JSON.stringify([sum(e), ku?.one_line_gaze, kinds.gaze?.length]))
+
+  // F. launch freeze: a line that still fails the SHAPE after its one rewrite is rescued before the result is returned (self-test reconnect-1 `receiver:shape`)
+  replies = { ...replies, main: sel(cand('main', '誠', 'まこと', 'いつも、遅くまで灯りをつけて待っていてくれる', A.lamp, 'Turning Point')), second: sel(cand('second', '信', 'しんじる', GOOD, A.nod, 'Private Symbol')), free: freeOk, gaze: { gazes: [{ kanji: '誠', one_line_gaze: 'いつも、遅くまで灯りをつけて待っていてくれる' }] }, refill: { none: true } }
+  const f = await run()
+  const mk = live(f).find((x) => x.kanji === '誠')
+  check('(launch freeze) a main line that fails the shape check after its rewrite is repaired by the shape gate (one more rescue call, then the noun phrase) — the returned result has no `shape` fault and keeps the character', !!mk && /人$/.test(mk.one_line_gaze) && (kinds.gaze?.length ?? 0) >= 2 && logs.some((l) => l.includes('shape_gate')), JSON.stringify([mk?.one_line_gaze, kinds.gaze?.length]))
 } finally {
   upstream.closeAllConnections?.()
   upstream.close()

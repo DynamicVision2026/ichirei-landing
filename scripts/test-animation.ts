@@ -215,8 +215,12 @@ const READY: FilmRecord = { status: 'ready', made_at: NOW.toISOString(), picture
     const t0 = Date.now()
     const a = await post(r)
     const quick = Date.now() - t0
-    await sleep(900)
-    const b = await post(r)
+    // (the draw takes 2 x 400 ms plus the checks: ask again until the set is finished — a fixed 900 ms was a coin-toss on a busy machine)
+    let b = await post(r)
+    for (let i = 0; i < 40 && b.state !== 'ready'; i++) {
+      await sleep(150)
+      b = await post(r)
+    }
     check('(3b) a render that takes longer than the request may stay open (here 150 ms of a 400 ms set) answers "pending" with no pictures yet; asking again joins it and returns the finished set (no second set)', a.state === 'pending' && a.view.film.pictures === null && quick < 380 && b.state === 'ready' && b.view.film.pictures.length === 4 && r.imageCalls() === 4, `${quick} ms`)
   }
   {

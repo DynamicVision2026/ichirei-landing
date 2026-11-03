@@ -1,6 +1,6 @@
 import { PACKAGE_DISPLAY_ORDER, RECOMMENDED_PACKAGE } from '../order/packages.ts'
 import { SIZE_COPY } from '../demo/sizes-copy.ts'
-import { useSizes } from '../demo/useSizes.ts'
+import { useComingSoon, useSizes } from '../demo/useSizes.ts'
 import { useEffect, useId, useRef, useState, type KeyboardEvent, type ReactNode } from 'react'
 import { ANGLES, TEXT, type RevealLang } from './copy.ts'
 import { rich } from './rich.tsx'
@@ -306,6 +306,7 @@ export function Gifts({
   // The four sizes of the one gift (Part C), in the order ③ 木札 (recommended), ④ 版木, ② カード, ① デジタル (last, "send it now"); a size whose Shopify
   // variant is missing is not listed (useSizes).
   const sizes = useSizes()
+  const soon = useComingSoon() // e-gift-first launch: 木札 / 版木 are listed with 「近日公開」 and a disabled button
   const sc = SIZE_COPY[lang]
   const cards = PACKAGE_DISPLAY_ORDER.filter((id) => (sizes ?? []).includes(id)).map((id) => ({
     id,
@@ -313,7 +314,8 @@ export function Gifts({
     img: id === 'simple' ? 'simple-hero' : id === 'standard' ? 'standard-hero' : 'egift-hero',
     items: id === 'simple' ? [t.sp1, t.sp2, t.sp3, t.sp4] : id === 'standard' ? [t.dp1, t.dp2, t.dp3, t.dp4] : [sc.includes[id], sc.ship[id]],
     cta: id === 'simple' ? t.buy1 : id === 'standard' ? t.buy2 : t.buy0,
-    badge: id === RECOMMENDED_PACKAGE ? sc.recommended : id === 'egift' ? sc.sendNow : null,
+    badge: soon.includes(id) ? sc.comingSoon : id === RECOMMENDED_PACKAGE ? sc.recommended : id === 'egift' ? sc.sendNow : null,
+    soon: soon.includes(id),
   }))
   return (
     <section className="tintBand" id="gifts">
@@ -328,12 +330,12 @@ export function Gifts({
         {cards.map((c) => {
           const approx = approxLine(PACKAGE_PRICE_JPY[c.id], currency, rates, lang)
           return (
-            <article className="gift" key={c.id} data-size={c.id}>
+            <article className="gift" key={c.id} data-size={c.id} data-coming-soon={c.soon ? 'yes' : undefined}>
               <Picture name={c.img} width={1600} height={1000} alt={GIFT_ALT[c.id]} sizes="(max-width: 860px) 100vw, 380px" />
               <div className="body">
                 {/* badge line (reserved even when there is no badge), then the name, then the price: the same stack in all three cards at every width */}
                 <div className="row">
-                  <span className="badgeSlot">{c.badge && <span className="badge" data-badge={c.id === 'egift' ? 'now' : 'recommended'}>{c.badge}</span>}</span>
+                  <span className="badgeSlot">{c.badge && <span className="badge" data-badge={c.soon ? 'soon' : c.id === 'egift' ? 'now' : 'recommended'}>{c.badge}</span>}</span>
                   <h3>{c.title}</h3>
                   <span className="price" data-price={c.id}>
                     {formatYen(PACKAGE_PRICE_JPY[c.id])}
@@ -345,9 +347,15 @@ export function Gifts({
                     <li key={x}>{x}</li>
                   ))}
                 </ul>
-                <a className="btn primary" href="#write">
-                  {c.cta}
-                </a>
+                {c.soon ? (
+                  <button type="button" className="btn primary" disabled aria-disabled="true" data-testid={`gift-cta-${c.id}`}>
+                    {sc.comingSoon}
+                  </button>
+                ) : (
+                  <a className="btn primary" href="#write" data-testid={`gift-cta-${c.id}`}>
+                    {c.cta}
+                  </a>
+                )}
               </div>
             </article>
           )

@@ -1,3 +1,4 @@
+import { inkOnly } from '../order/memorial.ts'
 import { cleanReading } from '../order/reading.ts'
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { COPY, pageLang, type PageCopy } from './copy.ts'
@@ -101,7 +102,7 @@ export default function AnimationApp() {
   // below the film: where the order stands and the 「贈る」 buttons
   const panel = load.state === 'ready' && load.view.film?.pictures ? <SenderPanel view={load.view} lang={lang} /> : null
   return (
-    <main className={`an-page${load.state === 'ready' && load.view.memorial ? ' an-memorial' : ''}${panel ? ' an-with-panel' : ''}`} data-testid="animation-page" lang={lang}>
+    <main className={`an-page${load.state === 'ready' && inkOnly(load.view) ? ' an-memorial' : ''}${panel ? ' an-with-panel' : ''}`} data-testid="animation-page" lang={lang}>
       {load.state === 'loading' && <p className="an-note">{copy.loading}</p>}
       {load.state === 'error' && (
         <p className="an-note" role="alert" data-testid="animation-error">
@@ -354,7 +355,7 @@ export function Film({ view, film, copy, giftMode = false, onEnd }: { view: Anim
     <>
       <div className={`an-wrap${still ? ' an-wrap-still' : ''}`} ref={wrap}>
         {still ? (
-          <div className={`an-still-page${view.memorial ? ' an-memorial' : ''}`} style={{ ['--u' as string]: '3.6px' }} data-testid="film-still">
+          <div className={`an-still-page${inkOnly(view) ? ' an-memorial' : ''}`} data-quiet={inkOnly(view) ? 'yes' : 'no'} style={{ ['--u' as string]: '3.6px' }} data-testid="film-still">
             {film.lines.map((line, i) => (
               <section className="an-still-scene" key={i}>
                 <div className="an-art"><img src={film.pictures[i]} alt="" decoding="async" /></div>
@@ -371,7 +372,7 @@ export function Film({ view, film, copy, giftMode = false, onEnd }: { view: Anim
         ) : (
           <div
             ref={frame}
-            className={`an-film${view.memorial ? ' an-memorial' : ''}`}
+            className={`an-film${inkOnly(view) ? ' an-memorial' : ''}`}
             style={{ ['--u' as string]: `${u}px`, width: `${u * 100}px`, height: `${u * 177.78}px` }}
             role="img"
             aria-label={copy.alt}
@@ -381,6 +382,7 @@ export function Film({ view, film, copy, giftMode = false, onEnd }: { view: Anim
             data-pictures={film.pictures.join(',')}
             data-status={film.status}
             data-memorial={view.memorial ? 'yes' : 'no'}
+            data-quiet={inkOnly(view) ? 'yes' : 'no'}
             data-ready={ready ? 'yes' : 'no'}
             data-ended={ended ? 'yes' : 'no'}
             onClick={() => (playing ? pause() : play())}

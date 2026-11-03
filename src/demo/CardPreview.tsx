@@ -14,21 +14,23 @@ type Props = {
   poem: { lines: string[]; reading: string; type?: string } | null
   certificateLine: string
   memorial: boolean
+  /** Ink instead of cinnabar (remembrance, apology, encouragement). */
+  quiet?: boolean
   language: string
   preview: PreviewState
 }
 
-export default function CardPreview({ copy: c, glyph, reading, who, poem, certificateLine, memorial, language, preview }: Props) {
+export default function CardPreview({ copy: c, glyph, reading, who, poem, certificateLine, memorial, quiet = memorial, language, preview }: Props) {
   useEffect(() => {
     trackPreview('card_preview_shown', { language })
   }, [language])
   const waiting = preview.phase === 'script' || preview.phase === 'drawing'
   const noPictures = preview.phase === 'limited' || preview.phase === 'failed'
   return (
-    <section className="cardPreview" data-testid="card-preview" data-state={preview.phase} data-memorial={memorial ? 'yes' : undefined} aria-label={c.heading}>
+    <section className="cardPreview" data-testid="card-preview" data-state={preview.phase} data-memorial={memorial ? 'yes' : undefined} data-quiet={quiet ? 'yes' : undefined} aria-label={c.heading}>
       <span className="eyebrow">{c.heading}</span>
       <p className="sent">{c.lead}</p>
-      <div className={`cardSheet${memorial ? ' memorial' : ''}`} data-testid="card-sheet">
+      <div className={`cardSheet${memorial ? ' memorial' : ''}${quiet ? ' quietInk' : ''}`} data-testid="card-sheet">
         <span className="sampleMark" data-testid="sample-mark">{c.sample}</span>
         {!noPictures && (
           <div className="cardPics" data-testid="card-pictures">

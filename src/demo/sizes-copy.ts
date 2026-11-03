@@ -14,6 +14,8 @@ export interface SizeCopy {
   ship: Record<PackageId, string>
   recommended: string
   sendNow: string
+  /** Shown on the wooden sizes while ICHIREI_WOOD_SIZES=coming_soon (their buttons are disabled). */
+  comingSoon: string
   shipTo: { label: string } & Record<ShipTo, { label: string; note: string }>
   /** Remembrance: nothing is "given" — the same three ways, without gift wording. */
   shipToMemorial: { label: string } & Record<ShipTo, { label: string; note: string }>
@@ -53,6 +55,7 @@ const ja: SizeCopy = {
   ship: { egift: '送料なし（リンクでお届け）', simple: '日本国内送料無料・海外は EMS ¥6,000', standard: '日本国内送料無料・海外は EMS ¥6,000' },
   recommended: 'おすすめ',
   sendNow: '今すぐ贈れる',
+  comingSoon: '近日公開',
   shipTo: {
     label: 'どこへ届けますか',
     me: { label: '自分に届ける', note: 'あなたが手渡しします。カードの「＿＿さんへ」「＿＿より」は空白のまま、手書きできます。' },
@@ -95,6 +98,7 @@ const en: SizeCopy = {
   ship: { egift: 'No shipping (sent as a link)', simple: 'Free in Japan · overseas EMS ¥6,000', standard: 'Free in Japan · overseas EMS ¥6,000' },
   recommended: 'Recommended',
   sendNow: 'Send it now',
+  comingSoon: 'Coming soon',
   shipTo: {
     label: 'Where should it go?',
     me: { label: 'Send to me', note: 'You hand it over. The card’s “To ___” and “From ___” lines stay blank, for you to fill in with a pen.' },
@@ -137,6 +141,7 @@ const zhHant: SizeCopy = {
   ship: { egift: '免運費（以連結送出）', simple: '日本國內免運費・海外 EMS ¥6,000', standard: '日本國內免運費・海外 EMS ¥6,000' },
   recommended: '推薦',
   sendNow: '馬上就能送',
+  comingSoon: '即將推出',
   shipTo: {
     label: '要寄到哪裡？',
     me: { label: '寄給我自己', note: '由你交給對方。卡片上的「＿＿收」「＿＿贈」會留白，可以親筆寫。' },
@@ -179,6 +184,7 @@ const zhHans: SizeCopy = {
   ship: { egift: '免运费（以链接送出）', simple: '日本国内免运费・海外 EMS ¥6,000', standard: '日本国内免运费・海外 EMS ¥6,000' },
   recommended: '推荐',
   sendNow: '马上就能送',
+  comingSoon: '即将推出',
   shipTo: {
     label: '要寄到哪里？',
     me: { label: '寄给我自己', note: '由你交给对方。卡片上的“＿＿收”“＿＿赠”会留白，可以亲笔写。' },

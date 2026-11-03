@@ -1,3 +1,4 @@
+import { inkOnly } from '../order/memorial.ts'
 import { isQuietPurpose } from '../order/purpose.ts'
 import { cleanReading } from '../order/reading.ts'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
@@ -144,7 +145,7 @@ export default function GiftApp() {
 
   const view = load.view
   const stage = (body: React.ReactNode, extra = '') => (
-    <main className={`${shell}${extra}`} lang={lang} data-testid="gift-page" data-step={step} data-memorial={memorial ? 'yes' : 'no'}>
+    <main className={`${shell}${extra}`} lang={lang} data-testid="gift-page" data-step={step} data-memorial={memorial ? 'yes' : 'no'} data-quiet={quiet ? 'yes' : 'no'}>
       {preview && <p className="gf-preview" data-testid="gift-preview-note">{copy.previewNote}</p>}
       {body}
     </main>
@@ -169,7 +170,7 @@ export default function GiftApp() {
   if (step === 'film') {
     const pictures = view.film?.pictures
     return (
-      <main className={`an-page${view.memorial ? ' an-memorial' : ''}`} lang={lang} data-testid="gift-page" data-step="film">
+      <main className={`an-page${inkOnly(view) ? ' an-memorial' : ''}`} lang={lang} data-testid="gift-page" data-step="film" data-quiet={inkOnly(view) ? 'yes' : 'no'}>
         {!pictures && !view.film?.deferred && (
           <p className="an-note an-preparing" role="status" data-testid="animation-preparing">{copy.preparing}<span className="an-dots" aria-hidden="true" /></p>
         )}
