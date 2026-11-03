@@ -1,3 +1,4 @@
+import { isNonQualityReading } from '../src/order/reading.ts'
 // Kana → Hepburn romaji, for the palette's Japanese readings (plumbing only: no judgement).
 //
 // The palette stores on-yomi in katakana (トウ), kun-yomi in hiragana (ひ, あか-り — the hyphen marks the
@@ -95,7 +96,10 @@ export interface ChosenReading {
  * Plumbing only: no reading is chosen by code on its merits.
  */
 export function chooseReading(readings: readonly string[], modelPick: string | null | undefined): ChosenReading | null {
-  const entries = readings.map((r) => ({ kana: hiraganaOf(r), romaji: kanaToRomaji(r), kun: !/[ァ-ヶ]/.test(r) })).filter((e) => e.romaji)
+  const all = readings.map((r) => ({ kana: hiraganaOf(r), romaji: kanaToRomaji(r), kun: !/[ァ-ヶ]/.test(r) })).filter((e) => e.romaji)
+  // an adverb or a conjunction (直: ただちに) is not a reading that names the character as a quality: it is not offered unless nothing else is left
+  const quality = all.filter((e) => !isNonQualityReading(e.kana))
+  const entries = quality.length > 0 ? quality : all
   if (entries.length === 0) return null
   const options = [...new Set(entries.map((e) => e.romaji))]
   const pick = typeof modelPick === 'string' ? modelPick.trim() : ''

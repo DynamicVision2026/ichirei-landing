@@ -184,6 +184,8 @@ export interface GenerateOptions {
   client?: Pick<Anthropic, 'messages'>
   log?: (line: string) => void
   onUsage?: (stage: 'poem' | 'review', usage: { model: string; input_tokens: number; output_tokens: number }) => void
+  /** The quality notes of the story-image rule, as codes: the poem was rewritten once for it, or kept after the rewrite (the post-deploy self-test reads them). */
+  onNote?: (code: 'story_image_rewritten' | 'story_image_kept' | 'character_rewritten') => void
 }
 
 export async function generatePoem(input: PoemInput, palette: Palette, opts: GenerateOptions = {}): Promise<PoemResult> {
@@ -272,9 +274,11 @@ export async function generatePoem(input: PoemInput, palette: Palette, opts: Gen
       if (imageNote && problems.length === 0) {
         if (attempt === 2) {
           log(`[ichirei-poem] ${JSON.stringify({ type: input.type, event: 'story_image_kept', language: input.language })}`)
+          opts.onNote?.('story_image_kept')
         } else {
           spare = build(raw, draft)
           spareSoft = []
+          opts.onNote?.(imageNote.startsWith('review (character)') ? 'character_rewritten' : 'story_image_rewritten')
           feedback = imageNote.startsWith('review (character)')
             ? `\nA SECOND READER FOUND THAT THE CHOSEN CHARACTER IS NOT USED NATURALLY (it is missing, or it is only a label that announces it) — write a new poem that keeps the story's image and puts the character, once, inside a real word of that image:\n- ${imageNote}\n`
             : `\nA SECOND READER FOUND THAT YOUR POEM'S IMAGERY DOES NOT COME FROM THIS STORY — write a new poem (read the whole story again; carry its turning point through one concrete image the story itself gives; no scenery, object or feeling the story does not give):\n- ${imageNote}\n`

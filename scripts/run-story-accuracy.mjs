@@ -3,7 +3,7 @@
 // with the seconds each step took, plus the same for the short father story (regression: no slower). Needs ANTHROPIC_API_KEY. The referee checks run on every result.
 //
 //   ANTHROPIC_API_KEY=… node --experimental-strip-types --disable-warning=ExperimentalWarning scripts/run-story-accuracy.mjs
-//   … --set purpose [--only apology-1]   (v9.6: the 16 internal stories, two per purpose, scripts/fixtures-purpose — prints four checks per story: about the receiver · no invented facts · tone fits
+//   … --set purpose [--only apology-1]   (v9.6: the 16 internal stories, two per purpose, engine/selftest — prints four checks per story: about the receiver · no invented facts · tone fits
 //        the purpose · free pick follows the purpose rule — and the cards' lines for you to read. Mechanical checks catch the clear failures; the lines are for a human to judge.)
 //   … --arc off      (the film script without the arc reader: the "before" timing)   … --story frost   (only the short story)   … --no-poem
 import { readFileSync } from 'node:fs'
@@ -21,7 +21,7 @@ if (opt('arc', '') === 'off') process.env.ICHIREI_FILM_ARC = 'off'
 if (!process.env.ANTHROPIC_API_KEY) { console.error('ANTHROPIC_API_KEY is not set: this script calls the real model (it never mocks one).'); process.exit(3) }
 if (opt('set', '') === 'purpose') {
   const { fourChecks } = await import('./purpose-checks.ts')
-  const stories = JSON.parse(readFileSync(join(import.meta.dirname, 'fixtures-purpose', 'stories.json'), 'utf8')).stories.filter((c) => opt('only', '') === '' || c.id === opt('only', ''))
+  const stories = JSON.parse(readFileSync(join(import.meta.dirname, '..', 'engine', 'selftest', 'stories.json'), 'utf8')).stories.filter((c) => opt('only', '') === '' || c.id === opt('only', ''))
   let bad = 0
   for (const c of stories) {
     const t0 = Date.now()

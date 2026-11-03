@@ -12,6 +12,7 @@ import { PICTURE_WORDS, buildFilmPrompt, checkFilmScript, checkPictures, fallbac
 import { loadPalette } from '../engine/palette.ts'
 import { animationView, type AnimationRecord } from '../engine/animation.ts'
 import { outcomeOf } from '../engine/preview.ts'
+import { findIllness } from '../engine/unsafe-words.ts'
 
 delete process.env.ICHIREI_FILM
 let failures = 0
@@ -277,21 +278,59 @@ const animationViewFor = (film: Awaited<ReturnType<typeof makeFilm>>) => animati
   const pr = shaped(BLOCKED)
   check('(7) the block is named by RULE and LISTED TERM, as codes: the accident word in the lines (illness:事故), the blocked characters (palette:…:hard_block), the unsafe picture word (picture_unsafe:hospital)', pr.some((p) => p.rule === 'illness' && p.terms?.includes('事故')) && pr.some((p) => p.rule === 'palette' && p.terms?.some((t) => /:hard_block$/.test(t))) && pr.some((p) => p.rule === 'picture_unsafe' && p.terms?.includes('hospital')), JSON.stringify(pr.map((p) => [p.code, p.rule, p.terms])))
   check('(7) the safe script passes every check on its own', shaped(SAFE).length === 0, JSON.stringify(shaped(SAFE).map((p) => p.detail)))
-  check('(7) picture words: a prosthesis, an ambulance, an accident, an operating room, a stump, crutches, a medical procedure are refused as picture_unsafe', ['a prosthetic leg by the bed', 'an ambulance at the roadside', 'a car accident on a wet road', 'an operating room under a bright lamp', 'a stump wrapped in a cloth', 'a pair of crutches against the wall', 'a medical procedure room with a drip'].every((d) => checkPictures([d + ' in soft morning light with a quiet chair and a window beside it'], hin()).some((p) => p.rule === 'picture_unsafe')))
+  check('(7) picture words: a prosthesis, an ambulance, an accident, an operating room, a stump, crutches, a medical procedure are refused as picture_unsafe', ['a prosthetic leg by the bed', 'an ambulance at the roadside', 'a car accident on a wet road', 'an operating room under a bright lamp', 'a stump of a leg wrapped in a cloth', 'a pair of crutches against the wall', 'a medical procedure room with an IV drip'].every((d) => checkPictures([d + ' in soft morning light with a quiet chair and a window beside it'], hin()).some((p) => p.rule === 'picture_unsafe')))
 
   const r1 = await run([BLOCKED, SAFE], hin())
   check('(7) a BLOCKED first script is not the end of the film: the next try is the SAFE-SCENES rewrite (asked once, with the failed checks and the instruction: places, objects, hands, figures from behind; no injury, medical procedure, prosthesis close-up or accident) → status ready, marked safe_rewrite', r1.status === 'ready' && r1.safe_rewrite === true && seen.length === 2 && seen[1].prompt.includes('SAFE, STORY-TRUE SCENES') && seen[1].prompt.includes('no prosthesis or close-up of a body part') && seen[1].prompt.includes('YOUR PREVIOUS SCRIPT FAILED THESE CHECKS') && !seen[0].prompt.includes('SAFE, STORY-TRUE SCENES'), `${r1.status} ${seen.length}`)
   check('(7) the result has four pictures and NONE shows or names injury or medical detail (nothing of hospital / surgery / amputation / prosthesis / accident / blood in the lines or the pictures)', r1.pictures.length === 4 && r1.lines.length === 4 && ![...r1.pictures, ...r1.lines].some((x) => HARM.test(x)) && !/事故|切断|病院|義足|手術/.test(r1.lines.join('')))
   check('(7) the log names the rule and term as CODES (film_blocked by: illness:…, picture_unsafe:…) and the safe rewrite (film_safe_rewrite) — never a phrase of the story', logs.some((l) => l.includes('"event":"film_blocked"') && l.includes('illness:') && l.includes('picture_unsafe:hospital')) && logs.some((l) => l.includes('"event":"film_safe_rewrite"')) && logs.some((l) => l.includes('"safe_rewrite":true')) && !logs.some((l) => HARD.split(/[。、\n]/).filter((p) => p.length >= 6).some((p) => l.includes(p))), logs.join(' | ').slice(0, 400))
   const r2 = await run([BLOCKED, BLOCKED], hin())
-  check('(7) the rewrite is blocked too → the fallback (plain washi tiles), after exactly TWO calls (one rewrite, never a loop); film_fallback carries blocked_by with the rule/term codes and the reason code', r2.status === 'fallback' && seen.length === 2 && /illness|blocked/.test(r2.reason ?? '') && (r2.blocked_by?.length ?? 0) > 0 && r2.blocked_by!.some((c) => c.startsWith('illness:')) && logs.some((l) => l.includes('"event":"film_fallback"') && l.includes('blocked_by')), JSON.stringify([r2.reason, r2.blocked_by]))
+  check('(7) the rewrite is blocked too → the fallback (plain washi tiles), after exactly TWO calls (one rewrite, never a loop); film_fallback carries blocked_by with the rule/term codes and the reason code', r2.status === 'fallback' && seen.length === 2 && /illness|blocked/.test(r2.reason ?? '') && (r2.blocked_by?.length ?? 0) > 0 && r2.blocked_by!.some((c) => /^a[12]:illness:/.test(c)) && r2.blocked_by!.some((c) => c.startsWith('a1:')) && r2.blocked_by!.some((c) => c.startsWith('a2:')) && logs.some((l) => l.includes('"event":"film_fallback"') && l.includes('blocked_by')), JSON.stringify([r2.reason, r2.blocked_by]))
   const LONG = { ...SAFE, lines: [SAFE.lines[0], SAFE.lines[1], SAFE.lines[2], 'あ'] }
   const r3 = await run([LONG, BLOCKED, SAFE], hin())
   check('(7) a first try spent on something else (a line too short) and a SECOND try that is blocked → the safe rewrite still gets its one turn (a third call), and succeeds', r3.status === 'ready' && r3.safe_rewrite === true && seen.length === 3 && seen[2].prompt.includes('SAFE, STORY-TRUE SCENES'), `${r3.status} ${seen.length}`)
   const r4 = await run([withLine(1, '「もう要らない」と断った日も、\n母は静かに台所へ戻った。'), withLine(1, '「もう要らない」と断った日も、\n母は静かに台所へ戻った。')])
-  check('(7) a script that fails for a plain reason (a quotation not in the story) is NOT given the safe-scenes text — the instruction is for blocks only; two tries, then the fallback as before', r4.status === 'fallback' && seen.length === 2 && !seen[1].prompt.includes('SAFE, STORY-TRUE SCENES') && !r4.blocked_by)
+  check('(7) a script that fails for a plain reason (a quotation not in the story) is NOT given the safe-scenes text — the instruction is for blocks only; two tries, then the fallback as before', r4.status === 'fallback' && seen.length === 2 && !seen[1].prompt.includes('SAFE, STORY-TRUE SCENES') && (r4.blocked_by ?? []).every((c) => /quote/.test(c)))
   const view = outcomeOf({ schema: 'animation', id: 'AN-x', order_ref: 'DRAFT', created_at: '', language: 'ja', glyph: '', reading: '', romanization: '', meaning_en: null, moment: '', who: '', memorial: false, film: r2 } as never, null)
   check('(7) the preview debug shows WHICH rules blocked the script (script_blocked_by), not just "blocked"', view.outcome === 'all_failed' && view.cause === 'script_fallback' && (view.script_blocked_by?.length ?? 0) > 0, JSON.stringify(view))
+}
+
+// ---- (8) v9.8: word matching is by WORD, not by raw substring; every failed rule goes into the one rewrite --------------------------------------------------------
+{
+  const ill = (t: string, l: 'ja' | 'zh' | 'en' = 'ja') => findIllness(t, l)
+  check('(8) 「かけがえのない人」 passes (けが sits inside かけがえ — the live false match); 「けがをした」 and 「ケガをした」 are caught', ill('かけがえのない人だった。') === null && ill('けがをした。') === 'けが' && ill('ケガをした。') === 'ケガ' && ill('怪我で入院した。') !== null)
+  check('(8) the same trap in other words: 見つけがち, 出かけがてら, 見つけがない pass; がんばる, 頑張って, ガンバレ, ガンジー pass; 「がんを患った」, 「がんの治療」, 「ガンと言われた」 are caught', ['見つけがちな人。', '出かけがてらの買い物。', 'がんばる母。', 'いつもがんばって笑う人。', 'ガンバレと言う人。', 'ガンジーの本。'].every((t) => ill(t) === null) && ['がんを患った。', 'がんの治療。', 'ガンと言われた。'].every((t) => ill(t) !== null))
+  check('(8) harmless compounds of a listed kanji pass (必死に働く母, 決死の覚悟, 死角, 病みつき); the words themselves are caught (死んだ, 病気, 亡くなった, 事故, 入院)', ['必死に働く母。', '決死の覚悟の人。', '死角を見ていた人。', '病みつきになる味。'].every((t) => ill(t) === null) && ['父は死んだ。', '病気になった。', '亡くなった母。', '事故があった。', '入院した日。'].every((t) => ill(t) !== null))
+  check('(8) zh: 死黨, 飛逝 and 流逝 pass; 他死了, 住院, 事故 are caught', ['他是我的死黨。', '歲月飛逝。', '時間流逝得很快。'].every((t) => ill(t, 'zh') === null) && ['他死了。', '她住院了。', '那場事故。'].every((t) => ill(t, 'zh') !== null))
+  check('(8) en: "brush stroke", "airport terminal", "passing by", "crashing waves", "dead leaves", "the stump" pass; "had a stroke", "she died", "a car accident", "the hospital" are caught', ['She painted each brush stroke slowly.', 'He waited at the airport terminal.', 'A car passing by in the rain.', 'Waves crashing on the rocks.', 'Dead leaves on the path.'].every((t) => ill(t, 'en') === null) && ['After he had a stroke.', 'She died last spring.', 'A car accident on the road.', 'In the hospital.'].every((t) => ill(t, 'en') !== null))
+  const pic = (d: string) => checkPictures([d + ' in soft morning light with a quiet chair and a window beside it'], input()).some((p) => p.rule === 'picture_unsafe')
+  check('(8) pictures: an old tree stump, brush strokes, crashing waves, a drip of water from the eaves, stitching a cloth, limbs of an old tree pass; an ambulance, a prosthetic leg, a car crash, an IV drip, surgical stitches on a wound, a stump of a leg are caught', ['an old tree stump by the path', 'ink brush strokes across the paper', 'crashing waves below the rocks', 'a drip of water from the eaves', 'hands stitching a cloth on a table', 'the limbs of an old tree'].every((d) => !pic(d)) && ['an ambulance at the roadside', 'a prosthetic leg by the bed', 'a car crash on a wet road', 'an IV drip beside a bed', 'surgical stitches on a wound', 'a stump of a leg'].every((d) => pic(d)))
+  // every term of the lists is caught as itself and not as a fragment inside a longer kana word
+  check('(8) AUDIT: each kana-only term needs its own word boundary (けが, がん, ケガ, ガン, リハビリ): inside a longer run of the same script it is not a match', findIllness('かけがえ', 'ja') === null && findIllness('ほがんばる', 'ja') === null && findIllness('ガンガン', 'ja') === null && findIllness('リハビリ中', 'ja') === 'リハビリ')
+
+  // the exact live combination: one script fails `character` AND `illness` together; the single safe rewrite must fix BOTH
+  const HARU = '妹の春子は、俺が作るものをいつも黙って見てくれた。春子は夜遅くまで工房の灯りをつけて待っていた。喧嘩のあとも、春子は俺の分の夕飯を取っておいてくれた。事故のあと、病院に通った日々も、春子は何も言わなかった。'
+  const pin = (over: Partial<FilmInput> = {}): FilmInput => input({ story: HARU, relationship: 'sibling', occasion: null, quiet: true, glyph: '待', forms: ['待', '守', '直'], names: [], ...over })
+  const OKP = [
+    'A lit lamp on a workbench in a quiet workshop at night, tools laid out neatly beside it, seen from across the room',
+    'Two cups on a kitchen table beside a covered plate of rice, evening light falling across the wood, nobody in sight',
+    'A person seen from behind standing at a workshop door, a small paper bag held in one hand, the lamp still lit',
+    'A closed notebook and a pencil on a bench, a window with soft grey light, an empty stool pulled up close to the bench',
+  ]
+  const BOTH = { turning_point: '春子が灯りをつけて待っていたこと', lines: ['春子は夜遅くまで、工房の灯りを\nつけて待っていてくれた。', '喧嘩のあとも、春子は俺の分の\n夕飯を取っておいてくれた。', '事故のあと病院に通った日々も、\n春子は何も言わなかった。', '何も言わず、春子はただ\n守るように隣にいた。'], pictures: OKP }
+  const FIXED = { ...BOTH, lines: ['春子は夜遅くまで、工房の灯りを\nつけたままにしてくれた。', '喧嘩のあとも、春子は俺の分の\n夕飯を取っておいてくれた。', '大変だった日々のあいだも、\n春子は何も言わなかった。', '何も言わず、春子はただ\n隣に座っていてくれた。'] }
+  const hp = checkFilmScript(BOTH, pin(), palette)
+  check('(8) the exact combination: this script fails `character` (待 / 守 in the lines) AND `illness` (事故 / 病院) together, and both are named by rule and term', hp.some((p) => p.rule === 'character' && p.terms?.includes('待')) && hp.some((p) => p.rule === 'illness'), JSON.stringify(hp.map((p) => [p.code, p.rule, p.terms])))
+  check('(8) …the fixed script passes every check', checkFilmScript(FIXED, pin(), palette).length === 0, JSON.stringify(checkFilmScript(FIXED, pin(), palette).map((p) => p.detail)))
+  const h1 = await run([BOTH, FIXED], pin())
+  check('(8) the one safe rewrite is given EVERY failed rule at once: the header names both (character, illness), both details are in it, the full list of characters not to use is spelled out, the safe-scenes text is added — and the 春子 story ends with FOUR pictures', h1.status === 'ready' && h1.pictures.length === 4 && h1.safe_rewrite === true && seen.length === 2 && /FAILED THESE CHECKS \([^)]*character[^)]*\)/.test(seen[1].prompt) && /FAILED THESE CHECKS \([^)]*illness[^)]*\)/.test(seen[1].prompt) && seen[1].prompt.includes('待 守 直') && seen[1].prompt.includes('SAFE, STORY-TRUE SCENES') && seen[1].prompt.includes('all at once'), `${h1.status} ${seen.length}`)
+  const ONLYCHAR = { ...FIXED, lines: ['春子は夜遅くまで、工房の灯りを\nつけて待っていてくれた。', ...FIXED.lines.slice(1)] }
+  const h2 = await run([ONLYCHAR, ONLYCHAR, FIXED], pin())
+  check('(8) a script whose only fault left after the rewrite is the offered characters in the lines gets ONE more narrow try (a third call) — not more', h2.status === 'ready' && seen.length === 3, `${h2.status} ${seen.length}`)
+  const h3 = await run([ONLYCHAR, ONLYCHAR, ONLYCHAR], pin())
+  check('(8) …and never a fourth: three failures → the fallback, whose blocked_by lists every attempt (a1:, a2:, a3: character:…)', h3.status === 'fallback' && seen.length === 3 && ['a1:', 'a2:', 'a3:'].every((pre) => h3.blocked_by?.some((c) => c.startsWith(pre) && c.includes('character:'))), JSON.stringify(h3.blocked_by))
+  const h4 = await run([BOTH, BOTH], pin())
+  check('(8) script_blocked_by shows each attempt\'s rules: attempt 1 and attempt 2 both listed, with the rule and the term (a1:illness:…, a1:character:待 …)', h4.status === 'fallback' && (h4.blocked_by ?? []).some((c) => /^a1:illness:/.test(c)) && (h4.blocked_by ?? []).some((c) => /^a2:illness:/.test(c)) && (h4.blocked_by ?? []).some((c) => /^a1:character:/.test(c)), JSON.stringify(h4.blocked_by))
 }
 
 upstream.closeAllConnections?.()

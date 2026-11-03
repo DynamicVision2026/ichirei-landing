@@ -15,6 +15,7 @@ import { POST as poemPost } from '../api/poem.ts'
 import { POST as trackPost } from '../api/track.ts'
 import { handlers as animationHandlers } from '../api/animation.ts'
 import { handlers as previewHandlers } from '../api/preview.ts'
+import { handlers as selftestHandlers } from '../api/selftest.ts'
 import { readFile } from 'node:fs/promises'
 import { handlers as giftHandlers } from '../api/gift.ts'
 import { handlers as opsHandlers } from '../api/ops.ts'
@@ -114,6 +115,7 @@ export function createApp(config: ServerConfig): Hono {
       lexiconMode: lexiconModeFromEnv(),
       cardsMode: cardsMode(), // parallel | single (ICHIREI_CARDS=single is the rollback)
       // Which build is live: the short commit SHA (Cloud Build's SHORT_SHA, passed at deploy) and when it was deployed. null when the deploy did not set them (a local run).
+      selftest: { configured: Boolean(process.env.ICHIREI_SELFTEST_TOKEN?.trim()) },
       commit: process.env.ICHIREI_COMMIT?.trim() || null,
       deployedAt: process.env.ICHIREI_DEPLOYED_AT?.trim() || null,
       filmPictures: { model: process.env.ICHIREI_FILM_IMAGE_MODEL || 'gemini-3.1-flash-image|gemini-2.5-flash-image', location: process.env.ICHIREI_FILM_IMAGE_LOCATION || 'global', dailyMax: process.env.ICHIREI_FILM_DAILY_MAX || '200' },
@@ -159,6 +161,10 @@ export function createApp(config: ServerConfig): Hono {
   // then served from the private bucket through the server.
   const filmRenderLimit = envRunLimiter('ICHIREI_FILM_RENDER_LIMIT', { max: 30, minutes: 10 })
   app.post('/api/film/:id/render', requireApiKey, limited(filmRenderLimit), (c) => animationHandlers.render(c.req.param('id')))
+  // The post-deploy self-test (v9.8): the internal purpose stories through the real pipeline (no pictures). The run needs the secret token (header x-selftest-token), is capped at 6 a day and skipped for a commit
+  // already tested; the latest report is public, read-only and cached 60 s — codes and characters only, never a line of any story.
+  app.post('/api/selftest/run', requireApiKey, (c) => selftestHandlers.run(c.req.raw))
+  app.get('/api/selftest/latest', () => selftestHandlers.latest())
   // The free card preview (before payment): the draft is made the moment a character is picked; its pictures are drawn once per story.
   const previewLimit = envRunLimiter('ICHIREI_PREVIEW_LIMIT', { max: 30, minutes: 60 })
   app.post('/api/preview', requireApiKey, limited(previewLimit), (c) => previewHandlers.start(c.req.raw))

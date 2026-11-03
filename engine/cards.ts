@@ -20,7 +20,7 @@ import { applyPalette, applyReviewVerdicts, type Palette } from './palette.ts'
 import { runReview } from './review.ts'
 import { FREE_FIELDS, FREE_REVIEW_TIMEOUT_MS_DEFAULT } from './replace.ts'
 import { SAME_CHARACTER_REASON, finalizeResult } from './slots.ts'
-import { failingGazes, fixGazes, inventedFacts, rewriteLines, subjectProblem } from './gaze.ts'
+import { appearanceProblem, failingGazes, fixGazes, inventedFacts, rewriteLines, subjectProblem } from './gaze.ts'
 import { withDisplayReading } from './reading-display.ts'
 import { ModelTimeoutError, callSignal, callTimeoutMs, runBudgetMs, timedOut } from './limits.ts'
 import { thinkingTokensOf, watchThinkingTokens } from './usage.ts'
@@ -142,6 +142,8 @@ export interface CardsReport {
   /** cards set aside by the `subject` code check (the narrator is the acting subject): which slot, and whether the quoted act or only the line was at fault */
   subject_removed: { slot: CardSlot; where: 'anchor' | 'line' }[]
   subject_rewritten: number
+  /** lines that remarked on the person's body or looks (「細い目で…」) and went to the one line rewrite BEFORE the review: which slot, and whether a new line came back */
+  looks_rewritten: { slot: CardSlot; rewritten: boolean }[]
   /** a card the review rejected under a LINE rule (insult, dignity, truth, subject) got its line rewritten once with the reviewer's note and was checked again: which slot, which rule, whether a new line came back, whether the card then stood */
   line_rescue: { slot: CardSlot; rule: string; rewritten: boolean; saved: boolean }[]
   /** the free pick's safety net: when the first pair of calls (or the first pair's cards) left no free card, a second hedged pair is asked once */
@@ -395,7 +397,7 @@ export async function runCards(a: CardsArgs): Promise<CardsOut> {
   const freeStop = new AbortController()
   const freeSignal = AbortSignal.any([signal, freeStop.signal, AbortSignal.timeout(freeLaneMs())])
 
-  const report: CardsReport = { calls: [], reviews: [], subject_removed: [], subject_rewritten: 0, line_rescue: [], free_retry: { asked: false, why: null, won: null }, collisions: [], runner_up_used: [], first_card_ms: null, all_cards_ms: 0, main_call_ms: 0, gaze_ms: 0, gaze_failing: 0, free_dropped: null, second_source: null }
+  const report: CardsReport = { calls: [], reviews: [], subject_removed: [], subject_rewritten: 0, looks_rewritten: [], line_rescue: [], free_retry: { asked: false, why: null, won: null }, collisions: [], runner_up_used: [], first_card_ms: null, all_cards_ms: 0, main_call_ms: 0, gaze_ms: 0, gaze_failing: 0, free_dropped: null, second_source: null }
   const verdicts: ReviewVerdict[] = []
   let anyReviewRan = false
   let skipped: string | null = null
@@ -623,6 +625,7 @@ export async function runCards(a: CardsArgs): Promise<CardsOut> {
     let chosen: Candidate | null = null
     let source: LaneOut['source']
     const rescued = new Set<string>() // characters whose line got its one rewrite after a review rejection
+    const looksFixed = new Set<string>() // characters whose line got its one rewrite for a remark on the body or looks
     const lineOnly: { card: Candidate; from: NonNullable<LaneOut['source']> }[] = [] // cards whose only fault is a line with the narrator as its subject: the one line rewrite
     try {
       const out = await call
@@ -671,6 +674,20 @@ export async function runCards(a: CardsArgs): Promise<CardsOut> {
             tried.push(eliminate(ref.card, SAME_ANCHOR_REASON, 'same_anchor'))
             report.collisions.push({ slot, resolved: n < list.length ? 'runner_up' : 'none', why: 'anchor' })
             continue
+          }
+          // A line that remarks on the person's body or looks (「いつも細い目でどこかを追っている人」) is never shown and never sent to the review as it is: it goes to the one line rewrite first.
+          const looks = appearanceProblem(ref.card.one_line_gaze, context.language)
+          if (looks && !looksFixed.has(ref.card.kanji) && !early && !sig.aborted) {
+            looksFixed.add(ref.card.kanji)
+            const fixes = await rewriteLines([{ kanji: ref.card.kanji, gaze: ref.card.one_line_gaze, why: looks }], story, context.language, { tone: toneLine(context), apiKey: opts.apiKey, signal: sig, client, log, timeoutMs: slot === 'freestyle' ? freeCallMs() : undefined })
+            const line = fixes.get(ref.card.kanji)
+            report.looks_rewritten.push({ slot, rewritten: !!line })
+            if (line) {
+              await attempt([{ ...ref.card, one_line_gaze: line, eliminated: false, eliminated_reason: null } as Candidate], from)
+              if (chosen) break
+              continue
+            }
+            // (no usable rewrite: the card goes on with its line; the shape check after the review asks once more)
           }
           picked[slot] = ref.card
           const rv = await reviewOne(stampBase, ref.mini, slot)

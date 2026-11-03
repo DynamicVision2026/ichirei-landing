@@ -7,6 +7,7 @@
 // Env: ICHIREI_FILM_MODEL (default claude-haiku-5-5), ICHIREI_FILM_TIMEOUT_MS (30000 per call), ICHIREI_FILM=off (always the fallback).
 // Logs (no story text — codes and counts only): [ichirei-film] film_generated | film_retry | film_fallback.
 
+import { PICTURE_UNSAFE_RE, findIllnessAll } from './unsafe-words.ts'
 import Anthropic from '@anthropic-ai/sdk'
 import { readFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
@@ -79,11 +80,7 @@ export const lineSize = (line: string, language: Language): number =>
   language === 'en' ? line.split(/\s+/).filter((w) => /[\p{L}\p{N}]/u.test(w)).length : [...line.replace(/[\s\n]/g, '')].length
 
 /** Illness, hospital, decline and death words (the engine's level 1 / level 4 rules, for a text the receiver will see). Characters of the palette's hard blocks are checked besides. */
-const ILLNESS: Record<'ja' | 'zh' | 'en', RegExp> = {
-  ja: /(死|亡|逝|葬|病|癌|がん|ガン|入院|退院|手術|認知症|介護|寝たきり|余命|危篤|闘病|老い|衰え|高齢|遺影|看取|事故|怪我|ケガ|けが|負傷|切断|義足|義手|義肢|骨折|救急|搬送|リハビリ)/u,
-  zh: /(死|亡|逝|葬|病|癌|醫院|医院|住院|手術|手术|失智|癡呆|痴呆|臨終|临终|去世|過世|过世|衰老|老去|高齡|高龄|看護|护理|護理|事故|受傷|受伤|截肢|義肢|义肢|骨折|急救|救護車|救护车|復健|复健)/u,
-  en: /\b(die[sd]?|dying|death|dead|deceased|funeral|grave|hospital|hospice|ill|illness|sick|sickness|cancer|dementia|stroke|surgery|chemo\w*|terminal|nursing home|passed away|passing|late (mother|father|mum|mom|dad)|old age|elderly|aging|ageing|decline|frail|frailty|accident|injur\w+|amputat\w+|prosthe\w+|crash\w*|ambulance|rehab\w*)\b/i,
-}
+// (the matching itself — whole words, not raw substrings — is in engine/unsafe-words.ts)
 
 const QUOTES: RegExp[] = [/「([^」]*)」/g, /『([^』]*)』/g, /“([^”]*)”/g, /"([^"]*)"/g]
 
@@ -93,7 +90,7 @@ export const PICTURE_WORDS = { min: 15, max: 40 }
 
 /** Words that ask the painter for a face, for writing, or for what a picture must never show. */
 const PICTURE_FACE_TEXT = /\b(faces?|facial|smil\w+|eyes?|eyebrows?|expressions?|profile|lips|(?<!river |harbou?r |bay |inlet |cove |cave |tunnel )mouth(?! of)|text|words?|captions?|subtitles?|signboards?|signs?|logos?|brands?|labels?|letters? of|handwriting|calligraphy|writing on|poster|banner|screens? (with|showing|displaying))\b/i
-const PICTURE_UNSAFE = /\b(blood|bloody|injur\w+|accident\w*|crash\w*|collision|ambulance|amputat\w+|prosthe\w+|artificial (?:leg|limb|arm|hand)|stumps?|limbs?|crutch\w*|operating (?:room|table|theatre|theater)|surgeon|surgical|medical|medic\w*|stitch\w*|syringe|drip|scalpel|wounds?|bandages?|funeral|coffin|casket|cremation|corpse|naked|nude|weapons?|knife|gun|violen\w+|fight\w*|hospital|hospice|clinic|sickbed|wheelchair|stretcher|ill|illness|sick|cancer|dementia|dying|death|dead|grave|tombstone|passed away|passing away|nursing home|old age|elderly|aging|ageing|decline|frail|surgery|stroke|chemo\w*|terminal)\b/i
+const PICTURE_UNSAFE = PICTURE_UNSAFE_RE
 const PICTURE_CELEBRATION = /\b(celebrat\w+|festiv\w+|party|birthday|wedding|bride|groom|cake|candles?|confetti|toast\w*|cheers|balloons?|fireworks|festival|lanterns?|congratulat\w+)\b/i
 // traditional dress, a setting from another country's world, and religious symbols: not allowed in a picture unless the STORY itself mentions them
 const PICTURE_TRADITIONAL = /\b(kimono\w*|yukata|hanbok|qipao|cheongsam|haori|hakama|obi|geta|zori|samurai|geisha|traditional (dress|clothes|clothing|costume|attire|garments?)|ceremonial (dress|robes?))\b/i
@@ -171,14 +168,14 @@ export function checkFilmScript(raw: unknown, input: FilmInput, palette: Palette
   const text = lines.join('\n')
   const forms = [...new Set(input.forms.concat(input.glyph).filter(Boolean))]
   const shown = forms.filter((f) => text.includes(f))
-  if (shown.length > 0) out.push({ code: 'character', detail: `The character ${shown.join(' / ')} must not appear in the lines; the film shows it at the end.` })
+  if (shown.length > 0) out.push({ code: 'character', rule: 'character', terms: shown, detail: `The character${shown.length > 1 ? 's' : ''} ${shown.join(' / ')} must not appear in the lines (the lines may not contain ANY of: ${forms.join(' ')}); say it with other words or in kana.` })
   if (/[0-9０-９]/.test(text)) out.push({ code: 'digits', detail: 'No digits anywhere; write time in words or leave it out.' })
   const named = input.names.map((n) => n.trim()).filter((n) => [...n].length >= 2 && text.includes(n))
   if (named.length > 0) out.push({ code: 'names', detail: 'A personal name from the order is in the lines; use relation words instead.' })
   if (/\bAI\b/.test(text)) out.push({ code: 'names', detail: 'Never mention AI.' })
   const lang = input.language === 'ja' ? 'ja' : input.language === 'en' ? 'en' : 'zh'
-  const ill = text.match(ILLNESS[lang])
-  if (ill) out.push({ code: 'illness', detail: `The word “${ill[0]}” (illness, hospital, injury, accident, decline or death) must not appear; tell the moment around it.`, rule: 'illness', terms: [ill[0].toLowerCase()] })
+  const ill = findIllnessAll(text, lang)
+  if (ill.length > 0) out.push({ code: 'illness', detail: `The word${ill.length > 1 ? 's' : ''} “${ill.join('”, “')}” (illness, hospital, injury, accident, decline or death) must not appear; tell the moment around it.`, rule: 'illness', terms: ill.map((x) => x.toLowerCase()) })
   const draft: PoemDraft = { type: lang === 'en' ? 'en' : 'tang', lines }
   const blocked = checkPalette(draft, palette, (input.occasion ?? null) as never, lang === 'ja' ? ['ja'] : lang === 'zh' ? ['zh'] : [], [])
   if (blocked.length > 0) out.push({ code: 'blocked', detail: `Not allowed for this gift: ${blocked.slice(0, 4).join('; ')}. Choose other words.`, rule: 'palette', terms: blocked.slice(0, 4).map((b) => `${b.startsWith('"') ? (/^"([^"]+)"/.exec(b)?.[1] ?? '') : [...b][0]}:${/hard block/.test(b) ? 'hard_block' : /remembrance/.test(b) ? 'memorial_default' : 'occasion'}`) })
@@ -318,15 +315,16 @@ export async function reviewArc(a: { client: Pick<Anthropic, 'messages'>; signal
 /** The rules that make a script UNSAFE to show (not merely badly shaped): illness / injury / accident words in the lines, a blocked character, an unsafe picture. A block of these gets ONE safe-scenes rewrite. */
 const SAFE_RULES = new Set(['illness', 'palette', 'occasion_word', 'picture_unsafe'])
 
-/** The failed checks as codes for the logs (`illness:病院`, `palette:切:hard_block`, `picture_unsafe:injury`): rules and listed terms only, never a phrase of the story. */
-export function blockCodes(problems: FilmProblem[]): string[] {
+/** The failed checks as codes for the logs, prefixed with the attempt (`a1:illness:事故`, `a1:character:守`, `a2:palette:切:hard_block`, `a1:picture_unsafe:injury`): rules and listed terms only, never a phrase of the story. */
+export function blockCodes(problems: FilmProblem[], attempt = 0): string[] {
   const out: string[] = []
+  const pre = attempt > 0 ? `a${attempt}:` : ''
   for (const p of problems) {
-    if (!p.rule) continue
-    if (p.terms?.length) for (const t of p.terms) out.push(`${p.rule}:${t}`)
-    else out.push(p.rule)
+    const rule = p.rule ?? p.code
+    if (p.terms?.length) for (const t of p.terms) out.push(`${pre}${rule}:${t}`)
+    else out.push(`${pre}${rule}`)
   }
-  return [...new Set(out)].slice(0, 8)
+  return [...new Set(out)].slice(0, 10)
 }
 
 /** Added to the retry when the script was blocked for naming or showing something harmful: depict only safe, story-true scenes. */
@@ -338,10 +336,10 @@ export async function makeFilm(input: FilmInput, opts: FilmOptions = {}): Promis
   const log = opts.log ?? ((l: string) => console.log(l))
   const now = opts.now?.() ?? new Date()
   const t0 = Date.now()
-  let lastBlocked: string[] = [] // the rule/term codes of the last blocked attempt (never story text)
+  let blockedAll: string[] = [] // the rule/term codes of every failed attempt, prefixed with the attempt (never story text)
   const fallback = (reason: string): FilmRecord => {
-    logLine(log, 'film_fallback', { reason, ...(lastBlocked.length ? { blocked_by: lastBlocked } : {}), ms: Date.now() - t0 })
-    return { ...fallbackFilm(input, reason, now), ...(lastBlocked.length ? { blocked_by: lastBlocked } : {}) }
+    logLine(log, 'film_fallback', { reason, ...(blockedAll.length ? { blocked_by: blockedAll } : {}), ms: Date.now() - t0 })
+    return { ...fallbackFilm(input, reason, now), ...(blockedAll.length ? { blocked_by: blockedAll } : {}) }
   }
   if (process.env.ICHIREI_FILM?.trim().toLowerCase() === 'off') return fallback('disabled')
   let palette: Palette
@@ -401,12 +399,13 @@ export async function makeFilm(input: FilmInput, opts: FilmOptions = {}): Promis
           feedback = arcFeedback(verdict)
         } else {
           lastReason = [...new Set(problems.map((p) => p.code))].join('+')
-          feedback = `\nYOUR PREVIOUS SCRIPT FAILED THESE CHECKS — write a new one that fixes every one of them:\n${problems.map((p) => `- ${p.detail}`).join('\n')}\n`
-          const codes = blockCodes(problems)
-          if (codes.length > 0) {
-            lastBlocked = codes
-            logLine(log, 'film_blocked', { attempt, by: codes })
-          }
+          const failedRules = [...new Set(problems.map((p) => p.rule ?? p.code))]
+          feedback = `\nYOUR PREVIOUS SCRIPT FAILED THESE CHECKS (${failedRules.join(', ')}) — write a new one that fixes EVERY one of them, all at once:\n${problems.map((p) => `- ${p.detail}`).join('\n')}\n`
+          const codes = blockCodes(problems, attempt)
+          blockedAll = [...blockedAll, ...codes].slice(0, 20)
+          logLine(log, 'film_blocked', { attempt, by: codes })
+          // a script whose ONLY fault is the offered characters in its lines gets one more, narrow try: it is the cheapest fault to fix and the commonest in a preview
+          if (attempt === maxAttempts && maxAttempts < 3 && problems.every((p) => p.code === 'character')) maxAttempts = 3
           if (!safeTried && problems.some((p) => p.rule && SAFE_RULES.has(p.rule))) {
             safeTried = true
             safeAttempt = attempt + 1

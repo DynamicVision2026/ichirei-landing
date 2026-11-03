@@ -27,6 +27,21 @@ const EN_ABSTRACT_START = /^(the |a |an )?(silence|words?|feelings?|love|memor(y
 const strip = (s: string): string => s.trim().replace(/[。.！!？?」』”"’'\s]+$/u, '')
 
 /** Every way the line fails the shape check (empty = it is a sentence about the person). Short English sentences, also the feedback for the rewrite. */
+// A line that remarks on the person's body or looks (「いつも細い目でどこかを追っている人」, "a tall man with narrow eyes") is never shown: the card says what the person DOES. A code check, before the review;
+// the line goes to the one line rewrite. Only a body/appearance word WITH a descriptive word counts (「目を合わせてくれた人」 and 「大きな背中」 are fine).
+const JA_BODY = '(?:目(?![標的指当安印立処覚頭次前先上下分盛算論撃配録新玉])|眼|瞳|顔(?!色)|顔立ち|背丈|身長|体型|体つき|体格|髪型|髪|肌|鼻|口元|唇)'
+const JA_DESC = '(?:細|太|大き|小さ|丸|つぶら|鋭|切れ長|つり上が|垂れ|長|短|高|低|白|黒|青|茶|赤|濃|薄|美し|綺麗|きれい|可愛|かわい|整っ|端正|やさし|優し|ぽっちゃり|ふくよか)'
+const JA_APPEARANCE = new RegExp(`${JA_DESC}[いなくのだ]{0,2}${JA_BODY}|${JA_BODY}(?:が|は|も)[^、。]{0,3}${JA_DESC}|背(?:が|は)(?:高|低|小さ|大き)|体型|体つき|体格|見た目|外見|容姿|顔立ち|美人|イケメン|ブサイク|ぽっちゃり|ふくよか|太って|痩せて|やせて|太った|痩せた|やせた`, 'u')
+const ZH_APPEARANCE = /(?:(?:大|小|細|细|圓|圆|長|长|短|高|矮|瘦|胖|黑|白|美麗|美丽|漂亮|好看|瞇|眯)(?:的|得)?(?:眼睛|眼|臉|脸|頭髮|头发|髮|身材|個子|个子))|(?:(?:眼睛|臉|脸|頭髮|头发|身材|個子|个子|身高)(?:很|好|是|比較|比较)?(?:大|小|細|细|圓|圆|長|长|短|高|矮|瘦|胖|漂亮|好看))|外貌|長相|长相|容貌|身材|胖|瘦/u
+const EN_APPEARANCE = /\b(?:narrow|big|large|small|round|sharp|slanted|dark|bright|blue|brown|green|thin|tall|short|slim|plump|fat|long|curly|gray|grey|white|black|pretty|handsome|beautiful)\s+(?:eyes?|face|hair|build|figure)\b|\b(?:tall|slim|plump|handsome|beautiful|pretty)\b|\b(?:eyes|hair|face|build|figure) (?:are|is|was|were)\b/i
+
+/** null = the line says nothing about the person's body or looks; otherwise why not (a sentence for the rewrite). */
+export function appearanceProblem(gaze: string, language: Language): string | null {
+  const t = gaze.normalize('NFC')
+  const hit = language === 'ja' ? JA_APPEARANCE.test(t) : language === 'en' ? EN_APPEARANCE.test(t) : ZH_APPEARANCE.test(t)
+  return hit ? "it remarks on the person's body or looks (eyes, face, build, hair): say what the person DOES, never how they look" : null
+}
+
 export function gazeIssues(gaze: string, language: Language): string[] {
   const t = strip(gaze)
   if (!t) return ['it is empty']
@@ -43,6 +58,8 @@ export function gazeIssues(gaze: string, language: Language): string[] {
     if (ZH_ABSTRACT_SUBJECT.test(t) || ZH_ABSTRACT_END.test(t)) out.push('its subject is a word or a feeling, not the person')
     if (!t.includes('的')) out.push('it is not a noun phrase about the person (…的人 / …的父親)')
   }
+  const looks = appearanceProblem(t, language)
+  if (looks) out.push(looks)
   return out
 }
 

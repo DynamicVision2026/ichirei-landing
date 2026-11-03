@@ -154,7 +154,7 @@ const run = async (ctx: object, s: string): Promise<EngineResult> => {
 const live = (r: EngineResult) => r.candidates.filter((c) => !c.eliminated)
 const sum = (r: EngineResult) => ['main', 'second', 'freestyle'].map((sl) => live(r).find((c) => c.slot === sl)).filter(Boolean).map((c) => `${c!.slot}:${c!.kanji}`).join()
 const cardsLine = () => JSON.parse((logs.find((l) => l.startsWith('[ichirei-cards]')) ?? '[ichirei-cards] {}').slice('[ichirei-cards] '.length))
-const set = JSON.parse(read('scripts/fixtures-purpose/stories.json')).stories as PurposeCase[]
+const set = JSON.parse(read('engine/selftest/stories.json')).stories as PurposeCase[]
 
 try {
   check('(6a) the 16-story test set: two per purpose (celebrate, thanks, apology, encourage, farewell, reconnect, confess, memorial), the 春子 apology story and a camera remembrance story included, every story at least two sentences, none says the sender\'s gender', set.length === 16 && ['celebrate', 'thanks', 'apology', 'encourage', 'farewell', 'reconnect', 'confess', 'memorial'].every((p) => set.filter((s) => s.purpose === p).length === 2) && set.some((s) => s.id === 'apology-1' && s.story.includes('春子')) && set.some((s) => s.id === 'memorial-1' && s.story.includes('カメラ')) && set.every((s) => s.story.split('。').filter(Boolean).length >= 2 && !/娘の私|息子の私|女の私|男の私/.test(s.story)))

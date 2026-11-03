@@ -5,6 +5,7 @@ import http from 'node:http'
 import { runEngine } from '../engine/engine.ts'
 import type { EngineResult } from '../engine/contract.ts'
 import { lineRuleOf } from '../engine/cards.ts'
+import { appearanceProblem } from '../engine/gaze.ts'
 
 let failures = 0
 const check = (name: string, cond: boolean, detail = '') => { console.log(`${cond ? 'PASS' : 'FAIL'}  ${name}${!cond && detail ? `  -> ${detail.slice(0, 700)}` : ''}`); if (!cond) failures++ }
@@ -64,13 +65,13 @@ const live = (r: EngineResult) => r.candidates.filter((c) => !c.eliminated)
 const card = (r: EngineResult, slot: string) => live(r).find((c) => c.slot === slot)
 const sum = (r: EngineResult) => ['main', 'second', 'freestyle'].map((sl) => card(r, sl)).filter(Boolean).map((c) => `${c!.slot}:${c!.kanji}`).join()
 const cardsLine = () => JSON.parse((logs.find((l) => l.startsWith('[ichirei-cards]')) ?? '[ichirei-cards] {}').slice('[ichirei-cards] '.length))
-const FREE_CAT = { candidates: [cand('freestyle', '猫', 'ねこ', '細い目で、縁側の日だまりにいる猫と待っていた人。', A.cat, 'Play'), cand('freestyle', '水', 'みず', '毎朝、猫の水を替えてくれた人。', A.water, 'Play')] }
+const FREE_CAT = { candidates: [cand('freestyle', '猫', 'ねこ', '縁側でうたた寝ばかりの猫を、呆れて眺めていた人。', A.cat, 'Play'), cand('freestyle', '水', 'みず', '毎朝、猫の水を替えてくれた人。', A.water, 'Play')] }
 const REWORDED = '縁側の日だまりで、猫と一緒に私の帰りを待っていた人。'
 
 try {
   // ---- 1. the free pick 猫: rejected on `insult` for 「細い目」 (the reviewer says rewording would make it safe) → one rewrite → checked again → stands
   freeReplies = [FREE_CAT]
-  reviewer = (k, prompt) => (k === '猫' && prompt.includes('細い目で、縁側') ? { pass: false, rule: 'insult', reason: 'mentions the narrowness of her eyes; rewording would make it safe' } : { pass: true, rule: null, reason: 'ok' })
+  reviewer = (k, prompt) => (k === '猫' && prompt.includes('うたた寝ばかり') ? { pass: false, rule: 'insult', reason: 'mentions the narrowness of her eyes; rewording would make it safe' } : { pass: true, rule: null, reason: 'ok' })
   gazeReply = { gazes: [{ kanji: '猫', one_line_gaze: REWORDED }] }
   const a = await run()
   const cat = card(a, 'freestyle')
@@ -114,6 +115,17 @@ try {
   const h = await run()
   delete process.env.ICHIREI_FREE_RETRY
   check('(5) ICHIREI_FREE_RETRY=off switches the safety net off (rollback)', sum(h) === 'main:誠,second:灯' && cardsLine().parallel?.free_retry?.asked === false)
+  // ---- 6. a line that remarks on the body or looks goes to the line rewrite BEFORE the review
+  check('(6) the appearance check: 「いつも細い目でどこかを追っている人」, 「目が細い人」, 「丸い顔の母」, 「背が高い人」 are caught; 「目を合わせてくれた人」, 「大きな背中で待っていた人」, 「高い目標を持つ人」 are not; en and zh too', ['いつも細い目でどこかを追っている人。', '目が細い人。', '丸い顔の母。', '背が高い人。'].every((t) => appearanceProblem(t, 'ja') !== null) && ['目を合わせてくれた人。', '大きな背中で待っていた人。', '高い目標を持つ人。'].every((t) => appearanceProblem(t, 'ja') === null) && appearanceProblem('a tall man with narrow eyes', 'en') !== null && appearanceProblem('Someone who waits at the door', 'en') === null && appearanceProblem('眼睛小小的人', 'zh-Hant') !== null && appearanceProblem('總是等門的人', 'zh-Hant') === null)
+  reviewer = () => ({ pass: true, rule: null, reason: 'ok' })
+  freeReplies = [{ candidates: [cand('freestyle', '猫', 'ねこ', 'いつも細い目でどこかを追っている人。', A.cat, 'Play'), cand('freestyle', '水', 'みず', '毎朝、猫の水を替えてくれた人。', A.water, 'Play')] }]
+  gazeReply = { gazes: [{ kanji: '猫', one_line_gaze: '縁側の日だまりで、猫と一緒に私の帰りを待っていた人。' }] }
+  const n = await run()
+  const catCard = card(n, 'freestyle')
+  check('(6) the free pick 猫 whose line said 「いつも細い目でどこかを追っている人」: the line is rewritten ONCE before the review (the reviewer never sees 「細い目」), and the card stands with the new line', catCard?.kanji === '猫' && !appearanceProblem(catCard.one_line_gaze, 'ja') && (kinds.gaze?.length ?? 0) === 1 && !(kinds.review ?? []).some((p) => p.includes('いつも細い目でどこかを追っている人')) && cardsLine().parallel?.looks_rewritten?.some((x: { slot: string; rewritten: boolean }) => x.slot === 'freestyle' && x.rewritten), `${sum(n)} | ${catCard?.one_line_gaze} | gaze ${kinds.gaze?.length}`)
+  gazeReply = { gazes: [] }
+  const n2 = await run()
+  check('(6) when no usable rewrite comes back the card is not lost for it: it goes on (the shape check after the review asks once more), never an error', n2.status === 'sufficient' && live(n2).length >= 2)
   const m = await run({ relationship: 'grandparent', direction: 'up', purpose: 'memorial' })
   check('(5) remembrance has no free pick, so no safety net either', !kinds.free && cardsLine().parallel?.free_retry?.asked === false && !sum(m).includes('freestyle'), sum(m))
 } finally {

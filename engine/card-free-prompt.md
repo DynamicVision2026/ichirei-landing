@@ -26,6 +26,8 @@ The playful or raw truth of the relationship: a smile, a shared joke, a habit th
 8. A DIFFERENT ANGLE from the cards that stand: a habit, a place, an object, a playful detail. Not another word for the same feeling (if they carry warmth or care, not 温, 暖, 優, 愛).
 9. `one_line_gaze`: ONE short sentence that describes the PERSON (it completes 「その人は、」 / "They are"): built only from details stated in the story, never an invented object, place, time or habit.
 
+10. READING (Japanese): a single character is read as a QUALITY of the person (a noun, an adjective or a verb stem: 直 → なお / すなお / ちょく), never as an adverb or a conjunction (ただちに, および, すなわち).
+
 ANCHOR ELSEWHERE. The main card stands on the story's TURNING POINT: the sentence or moment where something changes, or the key moment the sender tells. Find that sentence yourself and take your `story_anchor` and your line from a DIFFERENT sentence or detail: a habit, an object, a saying, a place. If your quote comes from the same sentence as the turning point (or from the main card's own quote), it is set aside and your runner-up is used, so make candidate 2 anchor elsewhere too.
 
 THE OTHER CARDS (written at the same moment by other calls): the MAIN card carries the person's deepest truth, from the story's turning point; the SECOND card carries another side of the person. Both carry the big feelings (warmth, care, strength, gratitude). Look elsewhere: a habit, a place, an object or a saying from the story, played with a smile. Not another word for the same feeling.

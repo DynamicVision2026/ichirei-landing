@@ -10,12 +10,27 @@
 
 import type { Candidate, EngineResult } from './contract.ts'
 import type { Palette } from './palette.ts'
-import { cleanReading } from '../src/order/reading.ts'
+import { cleanReading, isNonQualityReading } from '../src/order/reading.ts'
 
 const hira = (s: string): string => s.replace(/[ァ-ヶ]/g, (c) => String.fromCharCode(c.charCodeAt(0) - 0x60)).trim()
 const preferOn = (): boolean => !/^(off|0|false|no)$/i.test((process.env.ICHIREI_READING_PREFER_ON ?? '').trim())
 
 export function displayReadingJa(modelReading: string, paletteReadings: readonly string[]): string {
+  const shown = displayReadingRaw(modelReading, paletteReadings)
+  if (!shown || !isNonQualityReading(shown)) return shown
+  // An adverb or a conjunction (直: ただちに) is not a reading that names the character as a quality: use the character's own quality reading — the first listed reading that is not one
+  // (a kun reading's stem first: なお-す → なお), else its on-reading (ちょく).
+  const entries = paletteReadings
+    .map((r) => r.trim())
+    .filter(Boolean)
+    .map((raw) => ({ raw, on: /^[ァ-ヶー]+$/.test(raw), marker: /[-.\u2010\uFF0D\uFF0E]/.test(raw), kana: hira(cleanReading(raw)), stem: hira(raw.split(/[-.\u2010\uFF0D\uFF0E]/)[0]) }))
+    .filter((e) => !isNonQualityReading(e.kana) && !isNonQualityReading(e.stem))
+  const kun = entries.find((e) => !e.on && e.marker && [...e.stem].length >= 2)
+  return kun ? kun.stem : (entries.find((e) => !e.on)?.kana ?? entries[0]?.kana ?? shown)
+}
+
+/** The reading as the model wrote it, cleaned of the dictionary markers and completed from the palette (see the header). */
+function displayReadingRaw(modelReading: string, paletteReadings: readonly string[]): string {
   const cleaned = hira(cleanReading(modelReading))
   if (!cleaned) return cleaned
   const entries = paletteReadings
@@ -31,6 +46,13 @@ export function displayReadingJa(modelReading: string, paletteReadings: readonly
   const on = entries.find((e) => e.on)
   if (on && preferOn() && (/っ$/.test(cleaned) || /[るうくぐすつぬぶむ]$/.test(cleaned))) return on.kana
   return cleaned
+}
+
+/** The reading check: null = fine; otherwise a code — `empty`, or `adverb_or_conjunction` (a function word is not a reading that names the character as a quality). */
+export function readingProblem(reading: string | null | undefined): 'empty' | 'adverb_or_conjunction' | null {
+  const r = hira(cleanReading(reading ?? ''))
+  if (!r) return 'empty'
+  return isNonQualityReading(r) ? 'adverb_or_conjunction' : null
 }
 
 /** Every live card's reading, displayed (Japanese gifts only; the palette is the source of the on-reading). */
