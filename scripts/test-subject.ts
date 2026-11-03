@@ -1,6 +1,9 @@
 // v9.6 follow-up: the `subject` code guard — a card whose quoted act (the story_anchor) is something the NARRATOR did is about the sender, not the receiver. The review had passed such a card
 // (second card 磨, line 「三週間かけて、削って、加えて…」, anchor 「俺はそれをひとつひとつ計測して、削って、加えていった」). Checked before the review; then the runner-up, one line rewrite, the refill.
 // A FAKE model: no key, no network.   node --experimental-strip-types --disable-warning=ExperimentalWarning scripts/test-subject.ts
+import { readFileSync } from 'node:fs'
+import { join } from 'node:path'
+import { loadPalette } from '../engine/palette.ts'
 import http from 'node:http'
 import { runEngine } from '../engine/engine.ts'
 import type { EngineResult } from '../engine/contract.ts'
@@ -126,6 +129,23 @@ try {
   const f = await run()
   const mk = live(f).find((x) => x.kanji === '誠')
   check('(launch freeze) a main line that fails the shape check after its rewrite is repaired by the shape gate (one more rescue call, then the noun phrase) — the returned result has no `shape` fault and keeps the character', !!mk && /人$/.test(mk.one_line_gaze) && (kinds.gaze?.length ?? 0) >= 2 && logs.some((l) => l.includes('shape_gate')), JSON.stringify([mk?.one_line_gaze, kinds.gaze?.length]))
+
+  // G. final touch (self-test encourage-1 `engine:no_main`): EVERY main candidate is set aside and the refill gives nothing → the live second card is the main; never "no main" for a sufficient story
+  replies = { ...replies, main: sel(cand('main', '誠', 'まこと', GOOD, A.narrator1, 'Turning Point'), cand('main', '整', 'ととのえる', '毎晩、整えている人。', A.narrator2, 'Hidden Cost')), second: sel(cand('second', '信', 'しんじる', GOOD, A.nod, 'Private Symbol')), free: freeOk, gaze: { gazes: [] }, refill: { none: true } }
+  const g = await run()
+  const gm = live(g).filter((x) => x.slot === 'main')
+  check('(final touch) every main candidate set aside + refill gives nothing → the result is still `sufficient`, the live second card (信) is the MAIN (primary_kanji 信), there is no second, and the free pick stays', g.status === 'sufficient' && gm.length === 1 && gm[0].kanji === '信' && g.primary_kanji === '信' && !live(g).some((x) => x.slot === 'second') && live(g).some((x) => x.slot === 'freestyle') && logs.some((l) => l.includes('main_from_second')), JSON.stringify([g.status, sum(g), g.primary_kanji]))
+  // …and when the refill DOES give a card, the result has a main and a second (the live second card leads, the refilled card is its partner) — no promotion log needed
+  replies = { ...replies, refill: { candidates: [cand('main', '守', 'まもる', 'いつも、夕飯を取っておいてくれた人。', A.supper, 'Private Symbol')] } }
+  const g2 = await run()
+  check('(final touch) …if the refill produces a card the result has a main AND a second (信, 守), still sufficient', g2.status === 'sufficient' && live(g2).some((x) => x.slot === 'main') && live(g2).some((x) => x.slot === 'second') && live(g2).length >= 2 && !!g2.primary_kanji, JSON.stringify([g2.status, sum(g2)]))
+
+  // H. final touch (self-test celebrate-2 焦, reconnect-1 辛): a free pick whose common meaning is a negative feeling or state is refused by the referee and the runner-up stands
+  replies = { ...replies, main: sel(cand('main', '誠', 'まこと', GOOD, A.lamp, 'Turning Point')), second: sel(cand('second', '信', 'しんじる', GOOD, A.supper, 'Private Symbol')), free: { candidates: [cand('freestyle', '焦', 'こげる', 'うなずくだけで、全部を受け止める人。', A.nod, 'Play'), cand('freestyle', '笑', 'わらう', 'うなずいて、にこっと笑ってくれる人。', A.nod, 'Play')] }, gaze: { gazes: [] }, refill: { none: true } }
+  const h = await run()
+  const hf = live(h).find((x) => x.slot === 'freestyle')
+  check('(final touch) the free pick 焦 (a negative feeling) is refused; its runner-up 笑 stands; 辛 and 苦 are refused the same way', hf?.kanji === '笑' && ['辛', '苦', '怒', '嫌', '怠', '寒'].every((k) => loadPalette().freestyleCategory('ja', [k]) === 'negative_feeling'), JSON.stringify([sum(h), hf?.kanji]))
+  check('(final touch) the free-pick prompt and the review prompt both say it: no negative feeling or state, even as a joke', ['card-free-prompt.md', 'refill-free-prompt.md'].every((f) => /negative feeling or state/.test(readFileSync(join(process.cwd(), 'engine', f), 'utf8'))) && /negative feeling or state/.test(readFileSync(join(process.cwd(), 'engine', 'review-prompt.md'), 'utf8')))
 } finally {
   upstream.closeAllConnections?.()
   upstream.close()

@@ -11,6 +11,7 @@
 // the existing refill, the free pick is simply not shown (two cards). Pure plumbing: this file chooses no character; it orders, checks and
 // joins what the calls wrote, with the same referee, review and gaze code as the single-call engine.
 
+import { usageOf } from './cache-usage.ts'
 import Anthropic from '@anthropic-ai/sdk'
 import { readFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
@@ -110,6 +111,10 @@ export interface CardCallInfo {
   ms: number
   attempts: number
   output_tokens: number | null
+  /** the prompt cache (launch freeze): the part of the prompt that was NOT cached, what was read from the cache, what was written to it — a read share near 0 on the second and later calls means the cache is not being hit */
+  input_tokens?: number
+  cache_read_tokens?: number
+  cache_write_tokens?: number
   thinking_tokens: number | null
   stop_reason: string | null
   /**
@@ -430,7 +435,7 @@ export async function runCards(a: CardsArgs): Promise<CardsOut> {
     let tokens = maxTokens
     // One line per call, codes only: what the answer was (parse, keys, length), what was offered (character and the fields it lacks), and how the call ended. Never any story text.
     const logCall = (more: Record<string, unknown> = {}, offered: ReplyRead['offered'] = []) =>
-      log(`[ichirei-card-call] ${JSON.stringify({ slot, ...(extra.hedge ? { hedge: extra.hedge } : {}), ...(extra.round === 2 ? { round: 2 } : {}), model, effort, ms: info.ms, attempts: info.attempts, stop_reason: info.stop_reason, output_tokens: info.output_tokens, thinking_tokens: info.thinking_tokens, parse: info.parse, keys: info.keys, reply_chars: info.reply_chars, offered, ...more })}`)
+      log(`[ichirei-card-call] ${JSON.stringify({ slot, ...(extra.hedge ? { hedge: extra.hedge } : {}), ...(extra.round === 2 ? { round: 2 } : {}), model, effort, ms: info.ms, attempts: info.attempts, stop_reason: info.stop_reason, output_tokens: info.output_tokens, input_tokens: info.input_tokens, cache_read_tokens: info.cache_read_tokens, cache_write_tokens: info.cache_write_tokens, thinking_tokens: info.thinking_tokens, parse: info.parse, keys: info.keys, reply_chars: info.reply_chars, offered, ...more })}`)
     try {
       for (;;) {
         info.attempts++
@@ -459,9 +464,12 @@ export async function runCards(a: CardsArgs): Promise<CardsOut> {
           if (timedOut(callSig)) throw new ModelTimeoutError(Math.round(Math.min(limit, callTimeoutMs()) / 1000))
           throw err
         }
-        opts.onUsage?.('select', { model, input_tokens: message.usage?.input_tokens ?? 0, output_tokens: message.usage?.output_tokens ?? 0 })
+        opts.onUsage?.('select', usageOf(model, message.usage))
         info.ms = Date.now() - t0
         info.output_tokens = message.usage?.output_tokens ?? null
+        info.input_tokens = message.usage?.input_tokens ?? 0
+        info.cache_read_tokens = message.usage?.cache_read_input_tokens ?? 0
+        info.cache_write_tokens = message.usage?.cache_creation_input_tokens ?? 0
         info.thinking_tokens = thinkingTokensOf(message, seen())
         info.stop_reason = message.stop_reason ?? null
         const text = message.content.filter((b): b is Anthropic.TextBlock => b.type === 'text').map((b) => b.text).join('')

@@ -4,7 +4,7 @@
 import { createSelftestHandlers, SELFTEST_DAILY_MAX, tokenOk } from '../api/selftest.ts'
 import type { EngineResult } from '../engine/contract.ts'
 import { MemoryOrderStore } from '../engine/order-store.ts'
-import { Spend, loadSelftestStories, publicReport, runSelftest, type SelftestReport } from '../engine/selftest.ts'
+import { Spend, loadSelftestStories, noMainCodes, publicReport, runSelftest, type SelftestReport } from '../engine/selftest.ts'
 import { freePickMode } from '../engine/purpose.ts'
 import { readFileSync } from 'node:fs'
 
@@ -37,6 +37,26 @@ const base = { engine: fakeEngine(), poem: fakePoem as never, film: fakeFilm as 
   check('(1) the reading check is part of it: 直 read as ただちに fails that story with the code reading:adverb_or_conjunction', (await runSelftest({ ...base, engine: fakeEngine((id) => (id === 'thanks-1' ? { reading: 'ただちに' } : {})) })).stories.find((s) => s.id === 'thanks-1')!.codes.includes('reading:adverb_or_conjunction'))
   const blocked = await runSelftest({ ...base, film: (async () => ({ status: 'fallback', lines: [], pictures: [], made_at: '', reason: 'character+illness', blocked_by: ['a1:illness:けが', 'a1:character:待'] })) as never })
   check('(1) a blocked film script is reported with its rule codes (a1:illness:…, a1:character:…, reason:…), and the story does not pass', blocked.stories.every((s) => s.checks.film.outcome === 'blocked' && s.checks.film.rules.includes('a1:illness:けが') && s.checks.film.rules.includes('reason:character+illness') && !s.pass))
+  // final touch: the check `free_tone` — a free pick that is a negative feeling or state (焦, 辛, 苦 …) fails that story with the code free:free_tone; an ordinary free pick (待) does not
+  {
+    const base2 = fakeEngine()
+    const withBad = (async (story: string, m: 'A', o: never) => {
+      const r = (await (base2 as never as (s: string, m: 'A', o: never) => Promise<EngineResult>)(story, m, o)) as EngineResult
+      const id = stories.find((x) => x.story === story)!.id
+      if (id !== 'celebrate-2' && id !== 'reconnect-1') return r
+      return { ...r, candidates: r.candidates.map((c) => (c.slot === 'freestyle' ? { ...c, kanji: id === 'celebrate-2' ? '焦' : '辛' } : c)), freestyle_kanji: id === 'celebrate-2' ? '焦' : '辛' } as EngineResult
+    }) as never
+    const ft = await runSelftest({ ...base, engine: withBad })
+    const bad = ft.stories.filter((x) => x.codes.includes('free:free_tone')).map((x) => x.id).sort().join()
+    check('(1) free_tone: a free pick of 焦 (celebrate-2) or 辛 (reconnect-1) fails THAT story with free:free_tone and checks.free_tone false; the other stories keep it true', bad === 'celebrate-2,reconnect-1' && ft.stories.every((x) => (x.checks.free_tone === false) === x.codes.includes('free:free_tone')) && ft.stories.filter((x) => !x.pass && !x.codes.some((c) => c.startsWith('receiver:'))).map((x) => x.id).sort().join() === 'celebrate-2,reconnect-1', bad)
+  }
+  // final touch: a result with no main says WHY, in codes (never text): the engine's closing reason and the rule codes of the main cards it set aside
+  {
+    const cands = [{ slot: 'main', eliminated: true, eliminated_reason: 'palette: hard_block' }, { slot: 'second', eliminated: true, eliminated_reason: 'review: tone: 祖母の病気に触れている' }, { slot: 'freestyle', eliminated: true, eliminated_reason: 'palette: x' }]
+    const sufficient = noMainCodes({ status: 'sufficient', candidates: cands } as never)
+    const question = noMainCodes({ status: 'insufficient', candidates: [], lexicon: { outcome: 'question' } } as never)
+    check('(1) no main: codes say why — engine:no_main + main_out:palette:hard_block + main_out:review:tone (no model note, no character); a lexicon question is engine:question', sufficient.join() === 'engine:no_main,main_out:palette:hard_block,main_out:review:tone' && question.join() === 'engine:question', JSON.stringify([sufficient, question]))
+  }
   // launch freeze (cost): the first story runs ALONE to warm the prompt cache; the other fifteen start only after it has finished, and then run together
   {
     const events: string[] = []
@@ -101,7 +121,7 @@ const base = { engine: fakeEngine(), poem: fakePoem as never, film: fakeFilm as 
   const store = new MemoryOrderStore()
   const run = async (d: { commit?: string | null }): Promise<SelftestReport> => {
     runs++
-    return { schema: 'selftest', commit: d.commit ?? null, started_at: '2026-11-03T00:00:00Z', finished_at: '2026-11-03T00:01:00Z', ms: 60000, spend_estimate_usd: 1.23, tokens: { input: 10, output: 5 }, models: ['claude-sonnet-5'], summary: { stories: 1, passed: 1, failed: 0, errors: 0 }, stories: [{ id: 'x-1', purpose: 'thanks', state: null, language: 'ja', status: 'ok', ms: 5, cards: [{ slot: 'main', kanji: '誠' }], checks: { receiver: true, facts: true, tone: true, free: true, reading: true, poem: { state: 'pass', type: 'tanka', character_once: true, story_images: 'pass' }, film: { outcome: 'passed', rules: [] } }, codes: [], pass: true }] }
+    return { schema: 'selftest', commit: d.commit ?? null, started_at: '2026-11-03T00:00:00Z', finished_at: '2026-11-03T00:01:00Z', ms: 60000, spend_estimate_usd: 1.23, tokens: { input: 10, output: 5, cache_read: 0, cache_write: 0 }, cached_input_share: null, models: ['claude-sonnet-5'], summary: { stories: 1, passed: 1, failed: 0, errors: 0 }, stories: [{ id: 'x-1', purpose: 'thanks', state: null, language: 'ja', status: 'ok', ms: 5, cards: [{ slot: 'main', kanji: '誠' }], checks: { receiver: true, facts: true, tone: true, free: true, free_tone: true, reading: true, poem: { state: 'pass', type: 'tanka', character_once: true, story_images: 'pass' }, film: { outcome: 'passed', rules: [] } }, codes: [], pass: true }] }
   }
   const mk = (env: Record<string, string | undefined>) => createSelftestHandlers(() => ({ store, env: env as never, now: () => new Date('2026-11-03T03:00:00Z'), run: run as never }))
   const post = (h: ReturnType<typeof mk>, token?: string) => h.run(new Request('http://x/api/selftest/run', { method: 'POST', headers: token ? { 'x-selftest-token': token } : {} }))

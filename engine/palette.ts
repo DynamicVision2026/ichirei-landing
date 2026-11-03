@@ -60,7 +60,7 @@ export const CLASSICAL_ECHO_REQUIRED_REASON = 'palette: classical_echo_required'
 export const noRowReason = (family: Family) => `palette: no_row_in_${family}`
 
 /** Why the freestyle slot refuses a character (categories of engine/freestyle-blocklist.csv). */
-export const FREESTYLE_CATEGORIES = ['body', 'appearance', 'weight', 'intelligence', 'status', 'sexual', 'illness', 'disability', 'cruelty'] as const
+export const FREESTYLE_CATEGORIES = ['body', 'appearance', 'weight', 'intelligence', 'status', 'sexual', 'illness', 'disability', 'cruelty', 'negative_feeling'] as const
 
 /**
  * The parsed palette. A row is found by its `kanji` OR its `inscription_form`, so one
@@ -447,6 +447,16 @@ function settlePrimary(
   if (second && eligible(second)) return { primary: second.kanji, promotedFrom: 'second' }
   if (second && !second.eliminated && anchorMissing(second)) refuse(second, 'second slot skipped as promotion target: no usable story anchor')
   return { primary: null, promotedFrom: null }
+}
+
+/**
+ * May this live candidate be the MAIN card? The same test settlePrimary applies to a promoted second card: a main slot, not eliminated, not without a heart anchor, a usable story anchor where
+ * its row demands one, and readable for the buyer (`canBeMain`). Used by the last-resort promotion of the second card (engine/slots.ts ensureMain).
+ */
+export function mainEligibility(result: Pick<EngineResult, 'language' | 'reader'>, palette: Palette, story: string, canBeMain: (c: Candidate) => boolean = () => true): (c: Candidate) => boolean {
+  const families = refereeFamilies(result.language, result.reader)
+  const anchorMissing = (c: Candidate): boolean => rowsFor(palette, families, c).some((f) => f.row?.status === 'context_required' && f.row.anchor_required) && !anchorPresent(c, story)
+  return (c) => isMainSlot(c) && !c.eliminated && !c.flags.includes('no_heart_anchor') && !anchorMissing(c) && canBeMain(c)
 }
 
 /** The question a sender gets when no main candidate is left: the model's own fallback question, else the per-language last resort. Never empty. */

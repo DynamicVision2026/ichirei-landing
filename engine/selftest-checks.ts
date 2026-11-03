@@ -23,6 +23,8 @@ export interface FourChecks {
   facts: boolean
   tone: boolean
   free: boolean
+  /** the free pick's character is not a negative feeling or state (焦, 辛, 苦, 怒 …) — launch freeze */
+  free_tone: boolean
   /** the same findings as short CODES (receiver:subject, facts:invented, tone:celebration_character …): safe to publish — no card text, no story text */
   codes: string[]
   notes: string[]
@@ -123,5 +125,15 @@ export function fourChecks(result: EngineResult, c: PurposeCase | (PurposeFacts 
       notes.push(`${free.kanji}: a joke in a gentle purpose`); codes.push('free:joke_in_gentle')
     }
   }
-  return { receiver, facts: facts_ok, tone, free: freeOk, codes: [...new Set(codes)], notes }
+  // 5. free_tone (launch freeze): the free pick is never a character whose common meaning is a negative feeling or state, even as a joke
+  let freeTone = true
+  if (free) {
+    const palette2 = loadPalette()
+    const hit = (['ja', 'zh'] as const).map((f) => palette2.freestyleCategory(f, [free.kanji, free.inscription_form])).find((cat) => cat === 'negative_feeling')
+    if (hit) {
+      freeTone = false
+      notes.push(`${free.kanji}: the free pick's character is a negative feeling or state`); codes.push('free:free_tone')
+    }
+  }
+  return { receiver, facts: facts_ok, tone, free: freeOk, free_tone: freeTone, codes: [...new Set(codes)], notes }
 }

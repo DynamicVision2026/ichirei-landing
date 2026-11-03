@@ -46,6 +46,29 @@ export function enforceSlots(result: EngineResult, log: (line: string) => void =
  * `insufficient` WITH a question — a result with zero cards and no question is impossible.
  */
 /**
+ * Launch freeze: a story judged sufficient never ends with no main card. When every main candidate was set aside (the referee, the review, the `subject` guard) and the refill gave nothing,
+ * the live SECOND card becomes the main when it is eligible as a main (its slot and the primary say so; there is then no second). Plumbing only: it picks nothing the earlier stages had not already passed.
+ * With no live second either, the result is left as it is (the sender is asked a question).
+ */
+export function ensureMain(result: EngineResult, log: (line: string) => void = (l) => console.log(l), eligible?: (c: Candidate) => boolean): EngineResult {
+  if (result.status !== 'sufficient') return result
+  const live = result.candidates.filter((c) => !c.eliminated)
+  if (live.some((c) => isMain(c) && c.kanji === result.primary_kanji)) return result
+  // (the second card must pass the same test as any promoted main: a usable anchor where its row demands one, and readable for the buyer — see palette.mainEligibility)
+  const second = live.find((c) => isMain(c) && (eligible ? eligible(c) : true))
+  if (!second) return result
+  log(`[ichirei-engine] main_from_second ${JSON.stringify({ slot: second.slot })}`)
+  const actions: RefereeAction[] = [...(result.referee?.actions ?? []), { kanji: second.kanji, action: 'second_promoted_to_main', detail: 'no main card survived: the second card is the main' }]
+  return {
+    ...result,
+    candidates: result.candidates.map((c) => (c === second ? { ...c, slot: 'main' } : c)),
+    primary_kanji: second.kanji,
+    runner_up_kanji: null,
+    ...(result.referee ? { referee: { ...result.referee, actions } } : {}),
+  }
+}
+
+/**
  * Spec v9.1 step 6: all cards are different characters. Of two live cards that carry the same character (either form), the lower-ranked
  * one — main, then second, then freestyle — is removed with a reason. Plumbing only.
  */

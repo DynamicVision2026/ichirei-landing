@@ -107,7 +107,7 @@ export function createSelftestHandlers(getDeps: () => SelftestApiDeps) {
         await writeJson(store, 'selftest/latest.json', report)
         if (commit) await writeJson(store, `selftest/commit-${commit}.json`, { commit, at: report.finished_at, passed: report.summary.passed, failed: report.summary.failed })
         await writeJson(store, 'selftest/lock.json', { started_at: startedAt, done: true })
-        console.log(`[ichirei-selftest] ${JSON.stringify({ commit, stories: report.summary.stories, passed: report.summary.passed, failed: report.summary.failed, errors: report.summary.errors, ms: report.ms, spend_estimate_usd: report.spend_estimate_usd, month_to_date_usd: after.usd })}`)
+        console.log(`[ichirei-selftest] ${JSON.stringify({ commit, stories: report.summary.stories, passed: report.summary.passed, failed: report.summary.failed, errors: report.summary.errors, ms: report.ms, spend_estimate_usd: report.spend_estimate_usd, cached_input_share: report.cached_input_share, tokens: report.tokens, month_to_date_usd: after.usd })}`)
         return json(200, { state: 'done', report })
       } catch (err) {
         await writeJson(store, 'selftest/lock.json', { started_at: startedAt, done: true }).catch(() => {})

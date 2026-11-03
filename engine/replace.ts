@@ -7,6 +7,7 @@
 // Env: ICHIREI_REPLACE=off disables it; ICHIREI_REPLACE_MODEL, ICHIREI_REPLACE_EFFORT (default medium), ICHIREI_REPLACE_MAX_TOKENS (default 9000: up to three candidates),
 // ICHIREI_REPLACE_PROMPT_PATH.
 
+import { usageOf } from './cache-usage.ts'
 import { purposeFrame, toneLine } from './purpose.ts'
 import { thinkingTokensOf, watchThinkingTokens } from './usage.ts'
 import Anthropic from '@anthropic-ai/sdk'
@@ -233,6 +234,8 @@ export interface RefillReport {
 }
 
 export interface ReplaceOptions {
+  /** Lexicon mode: the static lexicon block, sent FIRST with a cache breakpoint (the same block, byte for byte, as the selection calls — so the refill reads the cache instead of paying for the table again). */
+  cachedPrefix?: string
   apiKey?: string
   signal?: AbortSignal
   /** The model that writes the replacements. */
@@ -307,12 +310,12 @@ export async function completeMains(
     const callModel = freeOnly ? (process.env.ICHIREI_REFILL_FREE_MODEL ?? opts.freeModel ?? opts.reviewModel ?? opts.model) : opts.model
     const signal = callSignal(opts.signal, freeOnly ? freeRefillTimeoutMs() : replaceTimeoutMs())
     const stream = client.messages.stream(
-      { model: callModel, max_tokens: freeOnly ? 1500 : Number(process.env.ICHIREI_REPLACE_MAX_TOKENS ?? 9000), output_config: { effort }, messages: [{ role: 'user', content: prompt }] },
+      { model: callModel, max_tokens: freeOnly ? 1500 : Number(process.env.ICHIREI_REPLACE_MAX_TOKENS ?? 9000), output_config: { effort }, messages: [{ role: 'user', content: !freeOnly && opts.cachedPrefix ? [{ type: 'text' as const, text: opts.cachedPrefix, cache_control: { type: 'ephemeral' as const } }, { type: 'text' as const, text: prompt }] : prompt }] },
       { signal },
     )
     const thinking = watchThinkingTokens(stream)
     const message = await stream.finalMessage()
-    opts.onUsage?.('replace', { model: callModel, input_tokens: message.usage?.input_tokens ?? 0, output_tokens: message.usage?.output_tokens ?? 0 })
+    opts.onUsage?.('replace', usageOf(callModel, message.usage))
     const text = message.content.filter((b): b is Anthropic.TextBlock => b.type === 'text').map((b) => b.text).join('')
     const parsed = parseReplacementsDiag(text, slots)
     cands = parsed.cands

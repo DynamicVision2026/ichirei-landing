@@ -369,6 +369,7 @@ export interface RefereeAction {
     | 'freestyle_blocked_eliminated' // the freestyle kanji is on the freestyle blocklist (body, status, illness …)
     | 'freestyle_duplicate_eliminated' // the freestyle is the same character as a main slot
     | 'classical_echo_required_eliminated' // REQUIRE_CLASSICAL_ECHO is on and a main candidate has no reviewed classical line
+    | 'second_promoted_to_main' // no main card survived and the refill gave none: the live second card became the main
     | 'review_eliminated' // the separate review call failed this candidate (under a safety rule)
     | 'review_veto_ignored' // the review failed a main candidate without naming a safety rule: not a veto, the candidate stands
     | 'missing_row_eliminated' // en: a main candidate has no row in one of the two palettes (ja, zh)

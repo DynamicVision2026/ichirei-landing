@@ -12,6 +12,7 @@
 // Env: ICHIREI_REVIEW=off disables the call; ICHIREI_REVIEW_MODEL, ICHIREI_REVIEW_EFFORT (default
 // low), ICHIREI_REVIEW_MAX_TOKENS (default 4000; the reasoning counts against it), ICHIREI_REVIEW_TIMEOUT_MS (default 60000), ICHIREI_REVIEW_PROMPT_PATH.
 
+import { usageOf } from './cache-usage.ts'
 import { purposeFrame } from './purpose.ts'
 import Anthropic from '@anthropic-ai/sdk'
 import { readFileSync } from 'node:fs'
@@ -187,7 +188,7 @@ export async function runReview(result: EngineResult, palette: Palette, story: s
       { signal },
     )
     const message = await stream.finalMessage()
-    opts.onUsage?.({ model: opts.model, input_tokens: message.usage?.input_tokens ?? 0, output_tokens: message.usage?.output_tokens ?? 0 })
+    opts.onUsage?.(usageOf(opts.model, message.usage))
     if (message.stop_reason === 'refusal') throw new Error('reviewer refused the request')
     const text = message.content.filter((b): b is Anthropic.TextBlock => b.type === 'text').map((b) => b.text).join('')
     const verdicts = parseVerdicts(text, items)

@@ -19,6 +19,8 @@ import { toneLine } from './purpose.ts'
 import { readingProblem } from './reading-display.ts'
 import { fourChecks, type PurposeCase } from './selftest-checks.ts'
 import { noCelebration } from '../src/order/purpose.ts'
+import { cachedShare, usageOf, type Usage } from './cache-usage.ts'
+import { warmLexiconCache } from './cache-warm.ts'
 import { defaultPoemType } from '../src/order/packages.ts'
 
 export const SELFTEST_STORIES_FILE = 'selftest/stories.json'
@@ -61,6 +63,8 @@ export interface StoryReport {
     facts: boolean
     tone: boolean
     free: boolean
+    /** the free pick is not a negative feeling or state */
+    free_tone: boolean
     reading: boolean
     poem: PoemCheck
     film: FilmCheck
@@ -78,7 +82,10 @@ export interface SelftestReport {
   ms: number
   /** an ESTIMATE of the model spend of this run, in US dollars, from the token counts and the price table below (ICHIREI_SELFTEST_PRICES overrides it) */
   spend_estimate_usd: number
-  tokens: { input: number; output: number }
+  /** `input` is the UNCACHED part of the prompts; `cache_read` / `cache_write` are the cached part (read at a tenth of the price, written at 1.25 times) */
+  tokens: { input: number; output: number; cache_read: number; cache_write: number }
+  /** cache_read / (input + cache_read + cache_write): how much of everything sent to the model came from the prompt cache (null when nothing was sent) */
+  cached_input_share: number | null
   models: string[]
   /** the story run first and alone to warm the prompt cache (the other stories ran together afterwards) */
   warm?: { id: string; ms: number }
@@ -120,21 +127,33 @@ const familyOf = (model: string): string => (/haiku/i.test(model) ? 'haiku' : /o
 export class Spend {
   input = 0
   output = 0
+  /** prompt tokens read from the cache / written to it (the API reports them apart from `input_tokens`) */
+  cacheRead = 0
+  cacheWrite = 0
   readonly models = new Set<string>()
   private readonly prices: Record<string, [number, number]>
   private usd = 0
   constructor(env: NodeJS.ProcessEnv = process.env) {
     this.prices = priceTable(env)
   }
-  add(model: string, input: number, output: number): void {
+  /** `input` is the uncached part; a cache READ costs a tenth of the input price, a cache WRITE 1.25 times (the estimate used to leave both out, so it looked the same with or without the cache). */
+  add(model: string, input: number, output: number, cacheRead = 0, cacheWrite = 0): void {
     this.input += input
     this.output += output
+    this.cacheRead += cacheRead
+    this.cacheWrite += cacheWrite
     this.models.add(model)
     const [pi, po] = this.prices[familyOf(model)] ?? this.prices.sonnet
-    this.usd += (input * pi + output * po) / 1_000_000
+    this.usd += ((input + cacheRead * 0.1 + cacheWrite * 1.25) * pi + output * po) / 1_000_000
+  }
+  addUsage(u: Usage): void {
+    this.add(u.model, u.input_tokens, u.output_tokens, u.cache_read_input_tokens ?? 0, u.cache_creation_input_tokens ?? 0)
   }
   get estimate(): number {
     return Math.round(this.usd * 100) / 100
+  }
+  get cachedShare(): number | null {
+    return cachedShare(this.input, this.cacheRead, this.cacheWrite)
   }
 }
 
@@ -148,7 +167,7 @@ function countingClient(spend: Spend, apiKey?: string): Pick<Anthropic, 'message
         const fin = st.finalMessage.bind(st)
         st.finalMessage = async () => {
           const m = await fin()
-          spend.add(String(body.model), m.usage?.input_tokens ?? 0, m.usage?.output_tokens ?? 0)
+          spend.addUsage(usageOf(String(body.model), m.usage))
           return m
         }
         return st
@@ -171,13 +190,34 @@ export interface SelftestDeps {
   engine?: (story: string, condition: 'A', opts: RunEngineOptions) => Promise<EngineResult>
   poem?: (input: PoemInput, palette: Palette, opts: GenerateOptions) => ReturnType<typeof generatePoem>
   film?: (input: FilmInput, opts: FilmOptions) => ReturnType<typeof makeFilm>
+  /** Tests: stands in for the cache warm-up call. */
+  warm?: typeof warmLexiconCache
+}
+
+/** What a result with no main card says about itself, as short codes (never text): why the engine closed it, and the rule codes of the cards it set aside. */
+const reasonCode = (r: string | null | undefined): string =>
+  String(r ?? '')
+    .split(':')
+    .slice(0, 2)
+    .map((x) => x.trim().toLowerCase().replace(/[^a-z_ ]/g, '').replace(/\s+/g, '_').slice(0, 24))
+    .filter(Boolean)
+    .join(':')
+export function noMainCodes(result: EngineResult): string[] {
+  const why = result.declined ? 'engine:declined' : result.lexicon?.outcome === 'question' ? 'engine:question' : result.status !== 'sufficient' ? 'engine:insufficient' : 'engine:no_main'
+  const out = result.candidates
+    .filter((c) => c.eliminated && c.slot !== 'freestyle')
+    .map((c) => reasonCode(c.eliminated_reason))
+    .filter(Boolean)
+    .slice(0, 4)
+    .map((r) => `main_out:${r}`)
+  return [...new Set([why, ...out])]
 }
 
 async function runOne(c: PurposeCase, d: SelftestDeps, spend: Spend, palette: Palette, signal: AbortSignal): Promise<StoryReport> {
   const t0 = Date.now()
   const codes: string[] = []
   const base = { id: c.id, purpose: c.purpose, state: c.state ?? null, language: c.language }
-  const empty: StoryReport['checks'] = { receiver: false, facts: false, tone: false, free: false, reading: false, poem: { state: 'skipped', type: '', character_once: null, story_images: 'n/a' }, film: { outcome: 'error', rules: [] } }
+  const empty: StoryReport['checks'] = { receiver: false, facts: false, tone: false, free: false, free_tone: false, reading: false, poem: { state: 'skipped', type: '', character_once: null, story_images: 'n/a' }, film: { outcome: 'error', rules: [] } }
   const payload = { language: c.language, relationship: c.relationship, direction: c.direction, purpose: c.purpose, ...(c.state ? { state: c.state } : {}), ...(c.occasion_detail ? { occasion_detail: c.occasion_detail } : {}) }
   const parsed = parseContext(payload)
   if (!parsed.ok) return { ...base, status: 'error', error: 'bad_context', ms: 0, cards: [], checks: empty, codes: ['context'], pass: false }
@@ -190,7 +230,7 @@ async function runOne(c: PurposeCase, d: SelftestDeps, spend: Spend, palette: Pa
       context,
       apiKey: d.apiKey,
       signal,
-      onUsage: (_stage, u) => spend.add(u.model, u.input_tokens, u.output_tokens),
+      onUsage: (_stage, u) => spend.addUsage(u),
     })
   } catch (err) {
     const code = signal.aborted ? 'timeout' : String((err as { status?: unknown })?.status ?? (err as Error)?.name ?? 'error').slice(0, 40)
@@ -199,7 +239,7 @@ async function runOne(c: PurposeCase, d: SelftestDeps, spend: Spend, palette: Pa
   const live = result.candidates.filter((x) => !x.eliminated)
   const cards = ['main', 'second', 'freestyle'].flatMap((slot) => live.filter((x) => x.slot === slot).map((x) => ({ slot, kanji: x.kanji })))
   if (result.status !== 'sufficient' || !live.some((x) => x.slot === 'main')) {
-    return { ...base, status: 'ok', ms: Date.now() - t0, cards, checks: { ...empty, poem: { ...empty.poem, state: 'skipped' } }, codes: ['engine:no_main'], pass: false }
+    return { ...base, status: 'ok', ms: Date.now() - t0, cards, checks: { ...empty, poem: { ...empty.poem, state: 'skipped' } }, codes: noMainCodes(result), pass: false }
   }
   // 1. the four checks of the owner's reading
   const four = fourChecks(result, c)
@@ -237,7 +277,7 @@ async function runOne(c: PurposeCase, d: SelftestDeps, spend: Spend, palette: Pa
         type: poemType,
       },
       palette,
-      { apiKey: d.apiKey, signal, log: () => {}, onUsage: (_s, u) => spend.add(u.model, u.input_tokens, u.output_tokens), onNote: (n) => notes.push(n) },
+      { apiKey: d.apiKey, signal, log: () => {}, onUsage: (_s, u) => spend.addUsage(u), onNote: (n) => notes.push(n) },
     )
     if (pr.ok) {
       const once = poemType === 'en' ? null : checkCharacterOnce({ type: pr.poem.type, lines: pr.poem.lines }, [main.kanji, main.inscription_form ?? ''].filter(Boolean)) === null
@@ -287,11 +327,11 @@ async function runOne(c: PurposeCase, d: SelftestDeps, spend: Spend, palette: Pa
     film = { outcome: 'error', rules: [] }
     codes.push('film:error')
   }
-  const checks = { receiver: four.receiver, facts: four.facts, tone: four.tone, free: four.free, reading, poem, film }
+  const checks = { receiver: four.receiver, facts: four.facts, tone: four.tone, free: four.free, free_tone: four.free_tone, reading, poem, film }
   // (a film with ONE plain-washi scene and three real ones is the product working as designed — `partial` — and passes; two or more washi scenes, or a blocked film, do not.
   // A missing free pick was never a failure; repeated characters are not checked here.)
   const filmOk = film.outcome === 'passed' || (film.outcome === 'partial' && (film.scenes ?? []).filter((x) => x === 'washi').length <= 1)
-  const pass = four.receiver && four.facts && four.tone && four.free && reading && poem.state === 'pass' && filmOk
+  const pass = four.receiver && four.facts && four.tone && four.free && four.free_tone && reading && poem.state === 'pass' && filmOk
   return { ...base, status: 'ok', ms: Date.now() - t0, cards, checks, codes: [...new Set(codes)], pass }
 }
 
@@ -309,7 +349,12 @@ export async function runSelftest(d: SelftestDeps = {}): Promise<SelftestReport>
   const signal = d.signal ? AbortSignal.any([deadline, d.signal]) : deadline
   // Cache warm-up (launch freeze, cost): ONE story runs first and alone, so the model's prompt cache holds the shared prompts; the other fifteen then run together and READ from it.
   // (The first story's time is part of the run; the deadline covers both.)
-  const one = (c: PurposeCase): Promise<StoryReport> => runOne(c, d, spend, palette, signal).catch((): StoryReport => ({ id: c.id, purpose: c.purpose, state: c.state ?? null, language: c.language, status: 'error', error: 'unexpected', ms: 0, cards: [], checks: { receiver: false, facts: false, tone: false, free: false, reading: false, poem: { state: 'skipped', type: '', character_once: null, story_images: 'n/a' }, film: { outcome: 'error', rules: [] } }, codes: ['unexpected'], pass: false }))
+  const one = (c: PurposeCase): Promise<StoryReport> => runOne(c, d, spend, palette, signal).catch((): StoryReport => ({ id: c.id, purpose: c.purpose, state: c.state ?? null, language: c.language, status: 'error', error: 'unexpected', ms: 0, cards: [], checks: { receiver: false, facts: false, tone: false, free: false, free_tone: false, reading: false, poem: { state: 'skipped', type: '', character_once: null, story_images: 'n/a' }, film: { outcome: 'error', rules: [] } }, codes: ['unexpected'], pass: false }))
+  // (a tiny call first writes the cache once — see engine/cache-warm.ts — so even the first story READS it; skipped when the engine is replaced for a test or the lexicon is not on)
+  if (!d.engine) {
+    const w = await (d.warm ?? warmLexiconCache)({ apiKey: d.apiKey, signal, env })
+    if (w.usage) spend.addUsage(w.usage)
+  }
   const [first, ...rest] = stories
   const tWarm = Date.now()
   const warmed = first ? await one(first) : null
@@ -323,7 +368,8 @@ export async function runSelftest(d: SelftestDeps = {}): Promise<SelftestReport>
     finished_at: finished.toISOString(),
     ms: finished.getTime() - started.getTime(),
     spend_estimate_usd: spend.estimate,
-    tokens: { input: spend.input, output: spend.output },
+    tokens: { input: spend.input, output: spend.output, cache_read: spend.cacheRead, cache_write: spend.cacheWrite },
+    cached_input_share: spend.cachedShare,
     models: [...spend.models].sort(),
     ...(first ? { warm: { id: first.id, ms: warmMs } } : {}),
     summary: { stories: reports.length, passed: reports.filter((r) => r.pass).length, failed: reports.filter((r) => !r.pass).length, errors: reports.filter((r) => r.status !== 'ok').length },
@@ -341,7 +387,8 @@ export function publicReport(r: SelftestReport): SelftestReport {
     finished_at: code(r.finished_at),
     ms: Number(r.ms) || 0,
     spend_estimate_usd: Number(r.spend_estimate_usd) || 0,
-    tokens: { input: Number(r.tokens.input) || 0, output: Number(r.tokens.output) || 0 },
+    tokens: { input: Number(r.tokens.input) || 0, output: Number(r.tokens.output) || 0, cache_read: Number(r.tokens.cache_read) || 0, cache_write: Number(r.tokens.cache_write) || 0 },
+    cached_input_share: typeof r.cached_input_share === 'number' ? Math.round(r.cached_input_share * 1000) / 1000 : null,
     models: r.models.map(code),
     ...(r.warm ? { warm: { id: code(r.warm.id), ms: Number(r.warm.ms) || 0 } } : {}),
     ...(r.month_to_date_usd !== undefined ? { month_to_date_usd: Math.round((Number(r.month_to_date_usd) || 0) * 100) / 100 } : {}),
@@ -360,6 +407,7 @@ export function publicReport(r: SelftestReport): SelftestReport {
         facts: !!s.checks.facts,
         tone: !!s.checks.tone,
         free: !!s.checks.free,
+        free_tone: s.checks.free_tone !== false,
         reading: !!s.checks.reading,
         poem: { state: s.checks.poem.state, type: code(s.checks.poem.type), character_once: s.checks.poem.character_once, story_images: s.checks.poem.story_images, ...(s.checks.poem.code ? { code: code(s.checks.poem.code) } : {}) },
         film: { outcome: s.checks.film.outcome, rules: s.checks.film.rules.map(code), ...(s.checks.film.scenes ? { scenes: s.checks.film.scenes.map(code) } : {}), ...(s.checks.film.safe_rewrite ? { safe_rewrite: true } : {}) },

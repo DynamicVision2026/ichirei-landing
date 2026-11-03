@@ -3,6 +3,7 @@
 // (「『そうか』という短い一言の中に、父の十年分の想いが詰まっていた。」) is not a line about the person. The prompts ask for the right shape; this module checks it
 // and, when a line fails, asks ONE small model call to rewrite the failing lines once. A rewrite that fails the check too is dropped: the original stays.
 
+import { usageOf } from './cache-usage.ts'
 import Anthropic from '@anthropic-ai/sdk'
 import { readFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
@@ -268,7 +269,7 @@ export async function fixGazes(cands: Candidate[], story: string, language: Lang
     const model = process.env.ICHIREI_GAZE_MODEL ?? process.env.ICHIREI_REVIEW_MODEL ?? 'claude-haiku-5-5'
     const stream = client.messages.stream({ model, max_tokens: 1500, output_config: { effort: 'low' }, messages: [{ role: 'user', content: prompt }] }, { signal })
     const message = await stream.finalMessage()
-    opts.onUsage?.({ model, input_tokens: message.usage?.input_tokens ?? 0, output_tokens: message.usage?.output_tokens ?? 0 })
+    opts.onUsage?.(usageOf(model, message.usage))
     const raw = parseJson(message.content.filter((b): b is Anthropic.TextBlock => b.type === 'text').map((b) => b.text).join(''))
     const list = Array.isArray(raw?.gazes) ? (raw!.gazes as { kanji?: unknown; one_line_gaze?: unknown }[]) : []
     let improved = 0
@@ -317,7 +318,7 @@ export async function rewriteLines(items: { kanji: string; gaze: string; why: st
     const model = opts.model ?? process.env.ICHIREI_GAZE_MODEL ?? process.env.ICHIREI_REVIEW_MODEL ?? 'claude-haiku-5-5'
     const stream = client.messages.stream({ model, max_tokens: 1500, output_config: { effort: 'low' }, messages: [{ role: 'user', content: prompt }] }, { signal })
     const message = await stream.finalMessage()
-    opts.onUsage?.({ model, input_tokens: message.usage?.input_tokens ?? 0, output_tokens: message.usage?.output_tokens ?? 0 })
+    opts.onUsage?.(usageOf(model, message.usage))
     const raw = parseJson(message.content.filter((b): b is Anthropic.TextBlock => b.type === 'text').map((b) => b.text).join(''))
     const list = Array.isArray(raw?.gazes) ? (raw!.gazes as { kanji?: unknown; one_line_gaze?: unknown }[]) : []
     for (const b of items) {

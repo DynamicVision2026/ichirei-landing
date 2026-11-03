@@ -356,10 +356,15 @@ export interface LexiconPromptParts {
   dynamicBlock: string
 }
 
+/** The static lexicon block alone (the same bytes buildLexiconPrompt puts first in every selection call): what the prompt cache holds. */
+export function lexiconStaticBlock(lexicon: Lexicon): string {
+  return loadLexiconPrompt().staticTemplate.split(LEXICON_SLOTS.table).join(renderLexiconTable(lexicon))
+}
+
 export function buildLexiconPrompt(lexicon: Lexicon, set: EligibleSet, relationship: Relationship | null = null, language: string | null = null): LexiconPromptParts {
   const { staticTemplate, dynamicTemplate } = loadLexiconPrompt()
   return {
-    staticBlock: staticTemplate.split(LEXICON_SLOTS.table).join(renderLexiconTable(lexicon)),
+    staticBlock: staticTemplate.split(LEXICON_SLOTS.table).join(renderLexiconTable(lexicon)), // (= lexiconStaticBlock)
     dynamicBlock: dynamicTemplate.split(LEXICON_SLOTS.eligible).join(renderEligible(set, relationship, language)),
   }
 }

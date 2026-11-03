@@ -29,7 +29,7 @@ const MONEY_CHARS = [...'金銭財富貯稼奢払貸借倹宝寳貨賃債蓄儲�
   const blocked = blRows.filter((r) => r.length === 3).map((r) => r[1])
   const blockedMoney = MONEY_CHARS.filter((c) => blocked.includes(c))
   check('(1) the freestyle blocklist (ja and zh) holds NO money character: 金 銭 財 富 貯 稼 奢 払 貸 借 倹 宝 钱 錢 … are all absent', blockedMoney.length === 0, blockedMoney.join(''))
-  check('(1) …and the category "money_status" is gone: the blocklist categories are body, appearance, weight, intelligence, status (poverty, stinginess, low standing), sexual, illness, disability, cruelty', !FREESTYLE_CATEGORIES.includes('money_status' as never) && (FREESTYLE_CATEGORIES as readonly string[]).includes('status') && !read('engine/freestyle-blocklist.csv').includes('money'))
+  check('(1) …and the category "money_status" is gone: the blocklist categories are body, appearance, weight, intelligence, status (poverty, stinginess, low standing), sexual, illness, disability, cruelty, negative_feeling', !FREESTYLE_CATEGORIES.includes('money_status' as never) && (FREESTYLE_CATEGORIES as readonly string[]).includes('status') && !read('engine/freestyle-blocklist.csv').includes('money'))
   const viaPalette = (['ja', 'zh', 'en'] as const).flatMap((fam) => MONEY_CHARS.filter((c) => palette.freestyleCategory(fam === 'en' ? 'ja' : fam, [c, c])))
   check('(1) the palette refuses none of the money characters for the freestyle slot (ja, zh, and the English gift, which checks both)', viaPalette.length === 0, viaPalette.join(''))
   const [, ...memRows] = parseCsv(read('engine/memorial-block.csv'))

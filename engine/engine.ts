@@ -12,13 +12,14 @@
 //   5. hands it to the palette referee (engine/palette.ts) and returns the refereed result.
 // Editing a prompt file changes the engine's behavior with no change to this code.
 
+import { usageOf } from './cache-usage.ts'
 import { purposeFrame, toneLine, effectivePurpose, effectiveState, mapOtherPurpose, mapOtherRelationship, mapOtherState, type Purpose } from './purpose.ts'
 import { cardsMode, runCards, INVENTED_FACT_REASON, SUBJECT_REASON, type CardsReport } from './cards.ts'
 import { withDisplayReadings } from './reading-display.ts'
 import { thinkingTokensOf, watchThinkingTokens } from './usage.ts'
 import Anthropic from '@anthropic-ai/sdk'
 import { callSignal, callTimeoutMs, ModelTimeoutError, reviewTimeoutMs, runBudgetMs, shadowGraceMs, timedOut } from './limits.ts'
-import { finalizeResult } from './slots.ts'
+import { ensureMain, finalizeResult } from './slots.ts'
 import { logMainCharacter, logSafetyRemovals } from './main-count.ts'
 import { attachStrokes } from './strokes.ts'
 import { isJoyo } from './joyo.ts'
@@ -26,7 +27,7 @@ import { buildLexiconPrompt, eligibleFor, inEligible, inLexicon, lexiconEchoOf, 
 import { readFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { applyPalette, applyReviewVerdicts, loadPalette } from './palette.ts'
+import { applyPalette, applyReviewVerdicts, loadPalette, mainEligibility } from './palette.ts'
 import { runReview } from './review.ts'
 import { completeMains, type RefillReport } from './replace.ts'
 import { canonicalRegisters } from '../src/order/register.ts'
@@ -535,7 +536,7 @@ async function selectWithRetry(a: PipelineArgs, signal: AbortSignal | undefined,
       if (!quiet) opts.onStage?.('reading')
       continue
     }
-    onUsage?.('select', { model: MODEL, input_tokens: message.usage?.input_tokens ?? 0, output_tokens: message.usage?.output_tokens ?? 0 })
+    onUsage?.('select', usageOf(MODEL, message.usage))
     if (message.stop_reason === 'refusal') {
       throw new Error('Model refused the request')
     }
@@ -706,7 +707,8 @@ async function runPipeline(a: PipelineArgs): Promise<PipelineOut> {
   // A main slot that is EMPTY (never produced, or removed by the referee or the review) is replaced — never an extra card beside a filled one.
   const tReplace = Date.now()
   let refill: RefillReport | null = null
-  const completed = await completeMains(reviewed, palette, story, context, view ? `${view.parts.staticBlock}\n\n${prompt}\n\n${view.parts.dynamicBlock}` : prompt, {
+  const completed = await completeMains(reviewed, palette, story, context, view ? `${prompt}\n\n${view.parts.dynamicBlock}` : prompt, {
+    cachedPrefix: view?.parts.staticBlock,
     apiKey: opts.apiKey,
     signal: opts.signal,
     // the replacement is a selection (it must pass the person test): the selection model; only its review uses the review model
@@ -740,7 +742,7 @@ async function runPipeline(a: PipelineArgs): Promise<PipelineOut> {
     // (the gate never fails a result)
   }
   const gazeMs = Date.now() - tGaze
-  const final = withDisplayReadings(finalizeResult(dropInvented(withGazes, story, context.language)), palette)
+  const final = withDisplayReadings(finalizeResult(ensureMain(dropInvented(withGazes, story, context.language), undefined, mainEligibility(withGazes, palette, story, canBeMain))), palette)
   // Which cards leave the engine, and why a card is missing (reasons are the referee / review codes, no story text and no character): the log a missing card is traced from.
   const refillMs = tGaze - tReplace
   logCards(story, context, completed, final, refill, { total: Date.now() - tStart, select: selectMs, select_attempts: attempts, referee: refereeMs, review: reviewMs, refill: refillMs, gaze: gazeMs, gaze_failing: gazeFailing }, selectCallInfo(message), undefined, opts.onDebug)
@@ -825,7 +827,8 @@ async function runCardsPipeline(a: PipelineArgs): Promise<PipelineOut> {
   // An EMPTY main or second (both of the call's characters were set aside) is refilled — one call, as before (in lexicon mode from the lexicon's list). The free pick is never refilled: two cards.
   const tReplace = Date.now()
   let refill: RefillReport | null = null
-  const completed = await completeMains(reviewed, palette, story, context, view ? `${view.parts.staticBlock}\n\n${prompt}\n\n${view.parts.dynamicBlock}` : prompt, {
+  const completed = await completeMains(reviewed, palette, story, context, view ? `${prompt}\n\n${view.parts.dynamicBlock}` : prompt, {
+    cachedPrefix: view?.parts.staticBlock,
     apiKey: opts.apiKey,
     signal: opts.signal,
     model: process.env.ICHIREI_REPLACE_MODEL ?? MODEL,
@@ -856,7 +859,7 @@ async function runCardsPipeline(a: PipelineArgs): Promise<PipelineOut> {
     // (the gate never fails a result)
   }
   const gazeMs = Date.now() - tGaze + out.report.gaze_ms
-  const final = withDisplayReadings(finalizeResult(dropInvented(withGazes, story, context.language)), palette)
+  const final = withDisplayReadings(finalizeResult(ensureMain(dropInvented(withGazes, story, context.language), undefined, canBeMain)), palette)
   const refillMs = tGaze - tReplace
   out.report.all_cards_ms = Math.max(out.report.all_cards_ms, Date.now() - tStart)
   // where the second card came from: its own call, the main call's runner-up, or (only when both could not deliver) the refill

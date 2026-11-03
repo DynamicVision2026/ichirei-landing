@@ -6,6 +6,7 @@
 // Env: ICHIREI_POEM_MODEL (default: the selection model), ICHIREI_POEM_EFFORT (default low), ICHIREI_POEM_MAX_TOKENS (4000),
 // ICHIREI_POEM_TIMEOUT_MS (45000 — the whole generation, retry and review included), ICHIREI_REVIEW=off skips the safety review.
 
+import { usageOf } from './cache-usage.ts'
 import Anthropic from '@anthropic-ai/sdk'
 import { readFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
@@ -223,7 +224,7 @@ export async function generatePoem(input: PoemInput, palette: Palette, opts: Gen
   const callText = async (stage: 'poem' | 'review', mdl: string, prompt: string, maxTokens: number, eff: 'low' | 'medium' | 'high'): Promise<string> => {
     const stream = client.messages.stream({ model: mdl, max_tokens: maxTokens, output_config: { effort: eff }, messages: [{ role: 'user', content: prompt }] }, { signal })
     const message = await stream.finalMessage()
-    opts.onUsage?.(stage, { model: mdl, input_tokens: message.usage?.input_tokens ?? 0, output_tokens: message.usage?.output_tokens ?? 0 })
+    opts.onUsage?.(stage, usageOf(mdl, message.usage))
     if (message.stop_reason === 'refusal') throw new Error('Model refused the request')
     return message.content.filter((b): b is Anthropic.TextBlock => b.type === 'text').map((b) => b.text).join('')
   }
