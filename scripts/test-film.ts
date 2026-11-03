@@ -8,7 +8,7 @@ import http from 'node:http'
 import { existsSync, readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { SAMPLE_IDS, SAMPLE_RECORDS } from '../engine/animation.ts'
-import { PICTURE_WORDS, trimPicture, buildFilmPrompt, checkFilmScript, checkPictures, fallbackFilm, lineLimits, lineSize, loadFilmPrompt, makeFilm, pictureWords, type FilmInput } from '../engine/film.ts'
+import { PICTURE_WORDS, kanaFixText, trimPicture, buildFilmPrompt, checkFilmScript, checkPictures, fallbackFilm, lineLimits, lineSize, loadFilmPrompt, makeFilm, pictureWords, type FilmInput } from '../engine/film.ts'
 import { loadPalette } from '../engine/palette.ts'
 import { animationView, type AnimationRecord } from '../engine/animation.ts'
 import { outcomeOf } from '../engine/preview.ts'
@@ -299,12 +299,12 @@ const animationViewFor = (film: Awaited<ReturnType<typeof makeFilm>>) => animati
   }
   const f1 = await run([LIVE], hin(), 'ok', fixes)
   const scenePrompts = seen.filter((x) => x.prompt.includes('Film Scene Rewrite Prompt'))
-  check('(7) the exact combination ends with the film READY and at least three drawn scenes (here all four are real): the two failing scenes are rewritten ALONE, in parallel, the passing scenes are untouched', f1.status === 'ready' && f1.scenes?.filter((x) => x.state !== 'washi').length === 4 && f1.scenes?.[0].state === 'pass' && f1.scenes?.[1].state === 'rewritten' && f1.scenes?.[2].state === 'rewritten' && f1.scenes?.[3].state === 'pass' && f1.lines[0] === LIVE.lines[0] && f1.pictures[0] === LIVE.pictures[0] && seen.length === 3 && scenePrompts.length === 2, `${f1.status} ${JSON.stringify(f1.scenes)} calls ${seen.length}`)
+  check('(7) the exact combination ends with the film READY and all four scenes drawn: the crutch scene is rewritten ALONE by the model (one call), the scene whose line named 待 is fixed IN CODE (no call), the passing scenes are untouched', f1.status === 'ready' && f1.scenes?.filter((x) => x.state !== 'washi').length === 4 && f1.scenes?.[0].state === 'pass' && f1.scenes?.[1].state === 'rewritten' && f1.scenes?.[2].state === 'pass' && f1.scenes?.[2].line === 'kana_fixed' && f1.scenes?.[3].state === 'pass' && f1.lines[0] === LIVE.lines[0] && f1.pictures[0] === LIVE.pictures[0] && seen.length === 2 && scenePrompts.length === 1, `${f1.status} ${JSON.stringify(f1.scenes)} calls ${seen.length}`)
   check('(7) …scene 3 (crutch) shows its debug state: per scene pass / rewritten / washi with rule codes', f1.scenes?.[1].rules.some((c) => c.startsWith('picture_unsafe:crutch')) === true && f1.scenes?.[2].rules.some((c) => c.startsWith('character:待')) === true && f1.scenes?.[0].rules.length === 0)
   const crutchPrompt = scenePrompts.find((x) => /SCENE 2 FAILED/.test(x.prompt))?.prompt ?? ''
   check('(7) the scene rewrite is told WHICH object to drop (crutch) and to show places, objects, hands or a figure from behind instead, carries the safe-scenes text, the full forbidden-character list, and the other scenes for context', crutchPrompt.includes('DROP THESE FROM THE PICTURE: crutch') && /places?, objects?, hands?|a place, an object, hands/.test(crutchPrompt) && crutchPrompt.includes('SAFE, STORY-TRUE SCENES') && crutchPrompt.includes('待 守 直') && crutchPrompt.includes('(FAILED)'))
   const scene3Prompt = scenePrompts.find((x) => /SCENE 3 FAILED/.test(x.prompt))?.prompt ?? ''
-  check('(7) the character rule is fixed INSIDE the scene rewrite: the prompt names 待 and gives the example 待っていた → ずっとそこにいた', scene3Prompt.includes('character') && scene3Prompt.includes('待っていた') && scene3Prompt.includes('ずっとそこにいた'))
+  check('(7) the character rule is fixed IN CODE, without a model call: 待 in the line becomes its kana in the inflected form (待っていて → まっていて), the rest of the line is the story-true wording, and no rewrite prompt exists for scene 3', scene3Prompt === '' && f1.lines[2] === LIVE.lines[2].replace('待', 'ま') && !f1.lines[2].includes('待'), f1.lines[2])
   check('(7) none of the real scenes shows or names injury or medical detail', ![...f1.pictures, ...f1.lines].some((x) => HARM.test(x)) && !/事故|切断|病院|義足|手術|松葉杖/.test(f1.lines.join('')))
 
   // the live 春子 case: scene 2 fails picture_unsafe:crutches, the rewrite fixes that but comes back TOO LONG (r:pic_length) → shortened in code and drawn, never washi
@@ -320,13 +320,43 @@ const animationViewFor = (film: Awaited<ReturnType<typeof makeFilm>>) => animati
   const f5b = await run([onlyLong], hin(), 'ok', {})
   check('(7b) a scene whose only fault is a too-long picture is shortened in code with NO rewrite call: ready, four real scenes', f5b.status === 'ready' && f5b.scenes?.every((x) => x.state !== 'washi') === true && !seen.slice(-3).some((x) => x.prompt.includes('Film Scene Rewrite Prompt')) && pictureWords(f5b.pictures[1]) <= PICTURE_WORDS.max, JSON.stringify([f5b.status, f5b.scenes?.map((x) => x.state), pictureWords(f5b.pictures[1])]))
 
+  // ---- text problems never cost a picture (the live 春子 case, scene 3: character:待, then r:quote → washi) -----------------------------------------------------------------------------------------
+  // The story QUOTES the chosen character (「ずっと待ってたよ」); the line quotes it word for word, so the character rule fails — and any model rewrite would change the quotation. Now: the character is
+  // replaced by its kana IN CODE (待ってた → まってた), the quotation check accepts the story's words with the same replacement, no model call, and the scene's picture is drawn.
+  const QSTORY = '母は玄関で「ずっと待ってたよ」と言って、私の鞄を受け取った。父は「工場の仲間は大丈夫か」と真っ先に聞いた。春の夕方、台所には湯気が立っていた。弁当箱を洗って伏せてくれる人だった。'
+  const qin = (over: Partial<FilmInput> = {}): FilmInput => hin({ story: QSTORY, ...over })
+  const QLINE = '「ずっと待ってたよ」と、\n母は玄関で言った。'
+  const QSCRIPT = { ...SAFE, lines: [SAFE.lines[0], SAFE.lines[1], QLINE, SAFE.lines[3]] }
+  const qp = checkFilmScript(QSCRIPT, qin(), palette)
+  check('(8) the exact case: a line that quotes the story word for word AND holds the offered character fails ONE rule, `character` (the quotation itself is fine)', qp.length > 0 && qp.every((p) => p.scene === 2 && p.code === 'character'), JSON.stringify(qp.map((p) => [p.scene, p.code])))
+  const fkana = kanaFixText(QLINE, ['待', '守', '直'], palette, 'ja')
+  check('(8) kanaFixText: 待ってた → まってた (the kun stem, the rest as written); in a compound the other kanji stay and the on reading is used (期待 → 期たい); a line without the character is untouched; not Japanese → null; a character with no palette row → null', fkana === '「ずっとまってたよ」と、\n母は玄関で言った。' && kanaFixText('期待に応えて', ['待'], palette, 'ja') === '期たいに応えて' && kanaFixText('母は玄関にいた。', ['待'], palette, 'ja') === '母は玄関にいた。' && kanaFixText('等待', ['待'], palette, 'zh-Hant') === null && kanaFixText('㐀の人', ['㐀'], palette, 'ja') === null, String(fkana))
+  const fixedScript = { ...QSCRIPT, lines: QSCRIPT.lines.map((l, i) => (i === 2 ? fkana! : l)) }
+  check('(8) the quote check ACCEPTS the kana form of a story quotation (まってたよ) and the script then has no problem at all; a quotation that differs in any other way is still refused', checkFilmScript(fixedScript, qin(), palette).length === 0 && checkFilmScript({ ...fixedScript, lines: fixedScript.lines.map((l, i) => (i === 2 ? '「ずっとまっていたよ」と、\n母は玄関で言った。' : l)) }, qin(), palette).some((p) => p.code === 'quote'))
+  const q1 = await run([QSCRIPT], qin(), 'ok', {})
+  check('(8) THE LIVE CASE ends with FOUR drawn scenes: no scene is washi, all four pictures are there, scene 3 shows its line in kana (まってた), there was NO model call for it (the script call only), and the debug says line: kana_fixed beside the picture outcome pass', q1.status === 'ready' && q1.scenes?.every((x) => x.state !== 'washi') === true && q1.pictures.every((x) => x.trim().length > 0) && q1.lines[2] === fkana && q1.scenes?.[2].line === 'kana_fixed' && q1.scenes?.[2].state === 'pass' && q1.scenes?.[0].line === 'ok' && seen.length === 1, JSON.stringify([q1.status, q1.scenes, q1.lines[2], seen.length]))
+  const qv = outcomeOf({ schema: 'animation', id: 'AN-x', order_ref: 'DRAFT', created_at: '', language: 'ja', glyph: '', reading: '', romanization: '', meaning_en: null, moment: '', who: '', memorial: false, film: q1 } as never, null)
+  check('(8) the preview debug shows, per scene, the picture outcome and the line outcome: pass/ok, pass/ok, pass/kana_fixed, pass/ok', (qv.script_scenes ?? []).map((x) => `${x.state}/${x.line}`).join() === 'pass/ok,pass/ok,pass/kana_fixed,pass/ok', JSON.stringify(qv.script_scenes))
+  // a line that cannot be mended even by the one rewrite is shown EMPTY, and the picture is drawn: a line far too long, no usable rewrite
+  const TOOLONG = '母は玄関でずっと私の帰りを待って、湯気の立つ台所で夕飯を温め直して、私が着くまで一度も席を立たず、窓の外ばかり見ていた。'
+  const e1 = await run([{ ...SAFE, lines: [SAFE.lines[0], TOOLONG, SAFE.lines[2], SAFE.lines[3]] }], qin(), 'ok', {})
+  check('(8) anything else still failing after the one rewrite (here a line far over the length limit, the rewrite unusable) is shown with an EMPTY line — the picture is drawn, the scene is NOT washi: line: empty', e1.status === 'ready' && e1.scenes?.[1].state === 'pass' && e1.scenes?.[1].line === 'empty' && e1.lines[1] === '' && e1.pictures[1] === SAFE.pictures[1] && e1.scenes?.every((x) => x.state !== 'washi') === true, JSON.stringify([e1.status, e1.scenes, e1.lines[1]]))
+  // …and a usable rewrite of the line is taken (the picture stays as it was)
+  const e2 = await run([{ ...SAFE, lines: [SAFE.lines[0], TOOLONG, SAFE.lines[2], SAFE.lines[3]] }], qin(), 'ok', { 2: { line: SAFE.lines[1], picture: SAFE.pictures[1] } })
+  check('(8) …while a usable one-time rewrite of the line is taken (line: ok), the picture unchanged', e2.scenes?.[1].line === 'ok' && e2.lines[1] === SAFE.lines[1] && e2.scenes?.[1].state === 'pass' && e2.pictures[1] === SAFE.pictures[1])
+  // the PICTURE and the LINE are judged apart: an unsafe picture with an unfixable line → washi (picture) and an empty line; an unsafe LINE (illness word) with a safe picture → picture drawn, empty line
+  const e3 = await run([{ ...SAFE, lines: [SAFE.lines[0], '事故のあと、病院で父は黙っていた。', SAFE.lines[2], SAFE.lines[3]] }], qin(), 'ok', {})
+  check('(8) a line with an illness word that cannot be mended (no usable rewrite) never costs the picture: the picture is drawn, the line is empty', e3.scenes?.[1].state === 'pass' && e3.scenes?.[1].line === 'empty' && e3.lines[1] === '' && e3.pictures[1] === SAFE.pictures[1] && e3.status === 'ready', JSON.stringify([e3.scenes?.[1], e3.pictures[1]?.slice(0, 20)]))
+  const e4 = await run([{ ...SAFE, pictures: [SAFE.pictures[0], CRUTCH, SAFE.pictures[2], SAFE.pictures[3]] }], qin(), 'ok', {})
+  check('(8) only a picture that fails the PICTURE checks after its rewrite is washi (its good line stays)', e4.scenes?.[1].state === 'washi' && e4.pictures[1] === '' && e4.lines[1] === SAFE.lines[1] && e4.scenes?.[1].line === 'ok')
+
   // one UNFIXABLE scene: the rewrite is blocked too → three real pictures and one washi tile; the film is still ready
   const f2 = await run([LIVE], hin(), 'ok', { 2: { line: '父は松葉杖で廊下を歩いていた。', picture: CRUTCH }, 3: fixes[3] })
   check('(7) one unfixable scene leaves THREE pictures and ONE washi tile: scene 2 (the rewrite names 松葉杖 and shows the crutch again) is washi — its picture is empty — and the other three scenes are real; the film status is ready, never a whole-film fallback', f2.status === 'ready' && f2.scenes?.filter((x) => x.state === 'washi').length === 1 && f2.scenes?.[1].state === 'washi' && f2.pictures[1] === '' && f2.pictures.filter((x) => x).length === 3 && f2.lines[1] === LIVE.lines[1] && f2.lines.filter((x) => x).length === 4, JSON.stringify([f2.status, f2.scenes, f2.pictures.map((x) => !!x)]))
   check('(7) …and the log names the washi scene with its rule codes (film_scene state washi)', logs.some((l) => l.includes('"event":"film_scene"') && l.includes('"state":"washi"') && l.includes('picture_unsafe:crutch')))
   const f3 = await run([LIVE], hin(), 'ok', {})
-  check('(7) a scene whose rewrite comes back unusable is washi too (never retried again)', f3.status === 'ready' && f3.scenes?.filter((x) => x.state === 'washi').length === 2 && seen.filter((x) => x.prompt.includes('Film Scene Rewrite Prompt')).length === 2)
-  check('(7) a washi scene keeps its line when the LINE passes by itself (only the picture was the problem), and loses it when the line itself failed', f3.lines[1] === LIVE.lines[1] && f3.lines[2] === '')
+  check('(7) a scene whose PICTURE fails and whose rewrite comes back unusable is washi (never retried again); the scene with a character in its line is not asked at all', f3.status === 'ready' && f3.scenes?.filter((x) => x.state === 'washi').length === 1 && f3.scenes?.[1].state === 'washi' && seen.filter((x) => x.prompt.includes('Film Scene Rewrite Prompt')).length === 1)
+  check('(7) a washi scene keeps its line when the LINE passes by itself (only the picture was the problem); and the line with the offered character is shown in kana, never emptied for it', f3.lines[1] === LIVE.lines[1] && f3.scenes?.[1].line === 'ok' && f3.lines[2].includes('まって') && f3.scenes?.[2].line === 'kana_fixed')
 
   // fewer than two real scenes → a new full try (with every failed rule and the safe-scenes text), then the whole film falls back
   const ALLBAD = { ...SAFE, lines: SAFE.lines.map((_, i) => `事故のあと、病院で父は${i}日、\n黙っていた。`), pictures: [CRUTCH, CRUTCH.replace('wooden', 'metal'), CRUTCH.replace('quiet', 'long'), CRUTCH.replace('afternoon', 'evening')] }
@@ -335,9 +365,9 @@ const animationViewFor = (film: Awaited<ReturnType<typeof makeFilm>>) => animati
   const f5 = await run([ALLBAD, SAFE], hin(), 'ok', {})
   check('(7) …but the second full try may succeed: a clean script on the second try → ready (safe_rewrite)', f5.status === 'ready' && f5.safe_rewrite === true && f5.scenes?.every((x) => x.state === 'pass') === true)
   const r4 = await run([withScene(1, '「もう要らない」と断った夜も、\n父は静かに台所へ戻った。')], hin(), 'ok', { 2: { line: '「工場の仲間は大丈夫か」と、\n父は真っ先に聞いた。', picture: GOODPIC } })
-  check('(7) a plain fault in one scene (a quotation that is not in the story) is repaired in that scene alone; no safe-scenes text is given for a non-safety fault', r4.status === 'ready' && r4.scenes?.[1].state === 'rewritten' && !seen.some((x) => x.prompt.includes('Film Scene Rewrite Prompt') && x.prompt.includes('SAFE, STORY-TRUE SCENES')) && seen.length === 2)
+  check('(7) a plain fault in one scene (a quotation that is not in the story) is repaired in that scene alone; no safe-scenes text is given for a non-safety fault', r4.status === 'ready' && r4.scenes?.[1].state === 'pass' && r4.scenes?.[1].line === 'ok' && r4.lines[1] === '「工場の仲間は大丈夫か」と、\n父は真っ先に聞いた。' && !seen.some((x) => x.prompt.includes('Film Scene Rewrite Prompt') && x.prompt.includes('SAFE, STORY-TRUE SCENES')) && seen.length === 2)
   const view = outcomeOf({ schema: 'animation', id: 'AN-x', order_ref: 'DRAFT', created_at: '', language: 'ja', glyph: '', reading: '', romanization: '', meaning_en: null, moment: '', who: '', memorial: false, film: f2 } as never, null)
-  check('(7) the preview debug shows each scene (pass / rewritten / washi) with its rule codes', (view.script_scenes ?? []).map((x) => x.state).join() === 'pass,washi,rewritten,pass' && view.script_scenes![1].rules.some((c) => c.includes('picture_unsafe')), JSON.stringify(view.script_scenes))
+  check('(7) the preview debug shows each scene (pass / rewritten / washi) with its rule codes', (view.script_scenes ?? []).map((x) => `${x.state}/${x.line}`).join() === 'pass/ok,washi/ok,pass/kana_fixed,pass/ok' && view.script_scenes![1].rules.some((c) => c.includes('picture_unsafe')), JSON.stringify(view.script_scenes))
 }
 
 // ---- (8) word matching is by WORD, not by raw substring (v9.8) ------------------------------------------------------------------------------------------------------------------------

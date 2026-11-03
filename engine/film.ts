@@ -42,7 +42,10 @@ export interface FilmRecord {
 }
 
 export interface SceneReport {
+  /** the PICTURE's outcome: pass (as written), rewritten (changed once, by the model or in code) or washi (its description failed the picture checks even after its rewrite) */
   state: 'pass' | 'rewritten' | 'washi'
+  /** the LINE's outcome, apart from the picture: ok (as written), kana_fixed (the offered character was replaced by its kana, in code) or empty (still failing after its one rewrite: the picture is shown with no line) */
+  line: 'ok' | 'kana_fixed' | 'empty'
   /** the rule/term codes that failed this scene (`illness:けが`, `picture_unsafe:crutch`, `character:待`); never story text */
   rules: string[]
 }
@@ -177,6 +180,41 @@ export interface FilmProblem {
   scene?: number
 }
 
+// ---- the offered character in a line: replaced by its kana, in code ------------------------------------------------------------------------------------------
+// A line may not show the characters on offer before the reveal. When one is there (the story's own words — 「待ってた」 — often carry it), the character is replaced by its kana reading, in its
+// inflected form (待ってた → まってた); in a compound the other kanji stay (期待 → 期たい). The reading comes from the palette row (an on reading inside a compound, the kun stem on its own). This
+// is allowed to differ from the story's wording, and the quotation check accepts the story's words with the same replacement. Japanese only; null = cannot be done (no row, no reading, not Japanese).
+const IDEOGRAPH = /[\u3400-\u4dbf\u4e00-\u9fff\uf900-\ufaff]/u
+const toHiragana = (t: string): string => t.replace(/[\u30a1-\u30f6]/g, (c) => String.fromCharCode(c.charCodeAt(0) - 0x60))
+function kanaOfForm(form: string, compound: boolean, palette: Palette): string | null {
+  const row = palette.lookup('ja', form)
+  if (!row) return null
+  const on = row.readings.filter((r) => /^[\u30a0-\u30ff]+$/u.test(r))
+  const kun = row.readings.filter((r) => /^[\u3040-\u309f.\-・]+$/u.test(r))
+  const pick = compound ? (on[0] ?? kun[0]) : (kun[0] ?? on[0])
+  if (!pick) return null
+  const kana = toHiragana(pick.split('-')[0].replace(/[.・]/g, ''))
+  return kana || null
+}
+export function kanaFixText(text: string, forms: string[], palette: Palette, language: Language): string | null {
+  if (language !== 'ja') return null
+  const single = new Set(forms.filter((f) => [...f].length === 1))
+  const chars = [...text]
+  if (!chars.some((c) => single.has(c))) return text
+  const out: string[] = []
+  for (let k = 0; k < chars.length; k++) {
+    if (!single.has(chars[k])) {
+      out.push(chars[k])
+      continue
+    }
+    const compound = (k > 0 && IDEOGRAPH.test(chars[k - 1])) || (k + 1 < chars.length && IDEOGRAPH.test(chars[k + 1]))
+    const kana = kanaOfForm(chars[k], compound, palette)
+    if (!kana) return null
+    out.push(kana)
+  }
+  return out.join('')
+}
+
 /** Words that do not suit this gift (a few explicit ones per language; the palette checks the offered characters, never the words of a scene line). */
 function occasionWordsFor(input: Pick<FilmInput, 'occasion' | 'memorial' | 'quiet'>, lang: 'ja' | 'zh' | 'en'): RegExp {
   const parts: string[] = []
@@ -202,6 +240,8 @@ export function checkFilmScript(raw: unknown, input: FilmInput, palette: Palette
   const lang = input.language === 'ja' ? 'ja' : input.language === 'en' ? 'en' : 'zh'
   const forms = [...new Set(input.forms.concat(input.glyph).filter(Boolean))]
   const story = input.story.normalize('NFC')
+  // the story with the offered characters in kana: a quotation that differs from the story ONLY by that replacement is accepted (the character fix is made in code)
+  const storyKana = (kanaFixText(story, forms, palette, input.language) ?? story).normalize('NFC')
   const occasionWords = occasionWordsFor(input, lang)
   lines.forEach((l, i) => {
     const at = (code: string, detail: string, extra: Partial<FilmProblem> = {}) => out.push({ code, scene: i, detail, ...extra })
@@ -211,7 +251,7 @@ export function checkFilmScript(raw: unknown, input: FilmInput, palette: Palette
     for (const re of QUOTES) {
       for (const m of l.normalize('NFC').matchAll(re)) {
         const q = m[1].trim()
-        if (q && !story.includes(q)) at('quote', `Line ${i + 1}: the quotation “${q}” is not word for word in the story. Copy quotations exactly from the story, or do not quote.`)
+        if (q && !story.includes(q) && !storyKana.includes(q)) at('quote', `Line ${i + 1}: the quotation “${q}” is not word for word in the story. Copy quotations exactly from the story, or do not quote.`)
       }
     }
     const shown = forms.filter((f) => l.includes(f))
@@ -406,8 +446,6 @@ const scenesOf = (problems: FilmProblem[]): Map<number, FilmProblem[]> => {
   return m
 }
 const isUnsafe = (ps: FilmProblem[]): boolean => ps.some((p) => p.rule && SAFE_RULES.has(p.rule))
-/** A scene whose LINE passes on its own keeps its line when only its picture has to go. */
-const lineFailed = (ps: FilmProblem[]): boolean => ps.some((p) => !p.code.startsWith('pic_'))
 
 const MIN_REAL_SCENES = 2
 
@@ -463,53 +501,76 @@ export async function makeFilm(input: FilmInput, opts: FilmOptions = {}): Promis
     }
   }
 
-  /** Check every scene of a script by itself; rewrite each failed scene once (in parallel); a scene that still fails keeps its line if the line alone is fine and loses its picture (washi). */
+  /**
+   * Check every scene of a script by itself and repair what failed — the PICTURE and the LINE apart. A scene becomes washi only when its picture description fails the picture checks (unsafe content)
+   * even after its one rewrite; a line that fails (the offered character, a quotation, length, a word) never costs the picture:
+   *   - the offered character in a line is replaced by its kana IN CODE (no model call; the quotation check accepts it);
+   *   - a picture that is only too long is cut in code;
+   *   - what still fails gets ONE model rewrite of that scene (and the same code fixes are applied to its answer);
+   *   - a line that still fails after that is shown EMPTY, the picture is drawn.
+   */
   const repair = async (raw: Record<string, unknown>, problems: FilmProblem[], attempt: number): Promise<{ lines: string[]; pictures: string[]; scenes: SceneReport[]; real: number }> => {
     const lines = (raw.lines as string[]).map((l) => l.trim())
     const pictures = (raw.pictures as string[]).map((x) => x.trim())
     const by = scenesOf(problems)
-    const reports: SceneReport[] = [0, 1, 2, 3].map((i) => ({ state: 'pass', rules: by.has(i) ? blockCodes(by.get(i)!).slice(0, 6) : [] }))
+    const reports: SceneReport[] = [0, 1, 2, 3].map((i) => ({ state: 'pass', line: 'ok', rules: by.has(i) ? blockCodes(by.get(i)!).slice(0, 6) : [] }))
     const failing = [...by.keys()].sort()
+    const isPic = (p: FilmProblem): boolean => p.code.startsWith('pic_')
+    /** the problems of scene i when it has this line and this picture (the other scenes as they are) */
+    const problemsAt = (i: number, line: string, picture: string): FilmProblem[] =>
+      scenesOf(checkFilmScript({ turning_point: 'x', lines: lines.map((l, k) => (k === i ? line : l)), pictures: pictures.map((x, k) => (k === i ? picture : x)) }, input, palette)).get(i) ?? []
+    /** the fixes made in code: the offered character as kana in the line, a too-long picture cut to the limit */
+    const inCode = (i: number, s: Scene): { scene: Scene; kana: boolean } => {
+      let { line, picture } = s
+      let kana = false
+      const ps = problemsAt(i, line, picture)
+      if (ps.some((p) => p.code === 'character')) {
+        const k = kanaFixText(line, forms, palette, input.language)
+        if (k !== null && k !== line) {
+          line = k
+          kana = true
+        }
+      }
+      if (ps.some((p) => p.code === 'pic_length')) picture = trimPicture(picture) ?? picture
+      return { scene: { line, picture }, kana }
+    }
     await Promise.all(
       failing.map(async (i) => {
         const was = by.get(i)!
-        // a scene whose ONLY fault is a picture description that is too long is shortened in code: no model call, no washi
-        if (was.length > 0 && was.every((p) => p.code === 'pic_length')) {
-          const cut = trimPicture(pictures[i])
-          if (cut && (scenesOf(checkFilmScript({ turning_point: 'x', lines, pictures: pictures.map((x, k) => (k === i ? cut : x)) }, input, palette)).get(i) ?? []).length === 0) {
-            pictures[i] = cut
-            reports[i] = { state: 'rewritten', rules: reports[i].rules }
-            logLine(log, 'film_scene', { attempt, scene: i + 1, state: 'rewritten', was: reports[i].rules, trimmed: true })
-            return
-          }
+        const original: Scene = { line: lines[i], picture: pictures[i] }
+        const first = inCode(i, original)
+        const firstProblems = problemsAt(i, first.scene.line, first.scene.picture)
+        let second: { scene: Scene; kana: boolean } | null = null
+        let asked = false
+        if (firstProblems.length > 0) {
+          // what the code could not mend: the scene is rewritten once, alone, carrying what still fails
+          asked = true
+          const now2 = await rewriteScene(i, lines.map((l, k) => ({ line: l, picture: pictures[k] })), firstProblems, callSignal(opts.signal, timeoutMs))
+          if (now2) second = inCode(i, now2)
         }
-        const now2 = await rewriteScene(i, lines.map((l, k) => ({ line: l, picture: pictures[k] })), was, callSignal(opts.signal, timeoutMs))
-        if (now2) {
-          const test = { turning_point: 'x', lines: lines.map((l, k) => (k === i ? now2.line : l)), pictures: pictures.map((x, k) => (k === i ? now2.picture : x)) }
-          let again = scenesOf(checkFilmScript(test, input, palette)).get(i) ?? []
-          // the rewrite fixed what was wrong but came back too long (and nothing else is wrong): cut it to the limit in code and draw it
-          if (again.length > 0 && again.every((p) => p.code === 'pic_length')) {
-            const cut = trimPicture(now2.picture)
-            if (cut) {
-              now2.picture = cut
-              test.pictures = pictures.map((x, k) => (k === i ? cut : x))
-              again = scenesOf(checkFilmScript(test, input, palette)).get(i) ?? []
-            }
-          }
-          if (again.length === 0) {
-            lines[i] = now2.line
-            pictures[i] = now2.picture
-            reports[i] = { state: 'rewritten', rules: reports[i].rules }
-            logLine(log, 'film_scene', { attempt, scene: i + 1, state: 'rewritten', was: reports[i].rules })
-            return
-          }
-          reports[i].rules = [...new Set([...reports[i].rules, ...blockCodes(again).map((c) => `r:${c}`)])].slice(0, 8)
+        // the picture and the line are judged APART: the first candidate that passes its own checks wins (the story's own first)
+        const candidates = [first, ...(second ? [second] : [])]
+        const picture = candidates.find((c) => !problemsAt(i, c.scene.line, c.scene.picture).some(isPic))
+        const lineCand = candidates.find((c) => !problemsAt(i, c.scene.line, c.scene.picture).some((p) => !isPic(p)))
+        if (picture) {
+          pictures[i] = picture.scene.picture
+          reports[i].state = picture.scene.picture === original.picture ? 'pass' : 'rewritten'
+        } else {
+          // the picture failed the picture checks even after its rewrite: the plain washi tile
+          pictures[i] = ''
+          reports[i].state = 'washi'
         }
-        // the rewrite failed too: this scene's picture is the plain washi tile; its line stays when the line passes by itself
-        pictures[i] = ''
-        if (lineFailed(was)) lines[i] = ''
-        reports[i] = { state: 'washi', rules: reports[i].rules }
-        logLine(log, 'film_scene', { attempt, scene: i + 1, state: 'washi', by: reports[i].rules })
+        if (lineCand) {
+          lines[i] = lineCand.scene.line
+          reports[i].line = lineCand.kana ? 'kana_fixed' : 'ok'
+        } else {
+          // the line still fails after its one rewrite: the picture is shown with an empty line
+          lines[i] = ''
+          reports[i].line = 'empty'
+        }
+        const lost = [...problemsAt(i, candidates.at(-1)!.scene.line, candidates.at(-1)!.scene.picture)].filter((p) => (reports[i].state === 'washi' && isPic(p)) || (reports[i].line === 'empty' && !isPic(p)))
+        if (lost.length > 0) reports[i].rules = [...new Set([...reports[i].rules, ...blockCodes(lost).filter((c) => !reports[i].rules.includes(c)).map((c) => `r:${c}`)])].slice(0, 8)
+        logLine(log, 'film_scene', { attempt, scene: i + 1, state: reports[i].state, line: reports[i].line, ...(asked ? { rewritten_by_model: true } : {}), was: was.length ? blockCodes(was).slice(0, 6) : [], ...(reports[i].state === 'washi' ? { by: reports[i].rules } : {}) })
       }),
     )
     for (const i of failing) blockedAll = [...blockedAll, ...reports[i].rules.map((c) => `a${attempt}s${i + 1}:${c}`)].slice(0, 30)
@@ -557,7 +618,7 @@ export async function makeFilm(input: FilmInput, opts: FilmOptions = {}): Promis
           // the one place a line of the story reaches the logs, asked for by the owner (spec v9.4): the turning point the script was built on, 80 characters at most
           logLine(log, 'film_turning_point', { attempt, turning_point: turning_point.slice(0, 80) })
           if (attempt === 1 && arcEnabled()) logLine(log, 'film_arc', { ok: verdict.ok, failed: verdict.failed, ms: Date.now() - t0 })
-          const scenes: SceneReport[] = [0, 1, 2, 3].map(() => ({ state: 'pass', rules: [] }))
+          const scenes: SceneReport[] = [0, 1, 2, 3].map(() => ({ state: 'pass', line: 'ok', rules: [] }))
           if (verdict.ok || attempt >= 2) {
             logLine(log, 'film_generated', { attempts: attempt, pictures: pictures.length, arc: verdict.ok ? 'ok' : 'kept', ...(attempt === safeAttempt ? { safe_rewrite: true } : {}), ms: Date.now() - t0 })
             return { status: 'ready', lines, pictures, turning_point, made_at: now.toISOString(), scenes, ...(attempt === safeAttempt ? { safe_rewrite: true } : {}) }

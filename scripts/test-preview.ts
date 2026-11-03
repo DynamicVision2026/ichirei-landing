@@ -370,7 +370,7 @@ const rig = () => {
 
 // ---- 9. v9.9: a scene the script could not make safe is a washi tile; the other scenes are drawn ---------------------------------------------------------------------------------------------
 {
-  const PARTIAL: FilmRecord = { ...clone(FILM), pictures: [FILM.pictures[0], FILM.pictures[1], '', FILM.pictures[3]], lines: [FILM.lines[0], FILM.lines[1], '', FILM.lines[3]], scenes: [{ state: 'pass', rules: [] }, { state: 'pass', rules: [] }, { state: 'washi', rules: ['picture_unsafe:crutches'] }, { state: 'rewritten', rules: ['character:待'] }] }
+  const PARTIAL: FilmRecord = { ...clone(FILM), pictures: [FILM.pictures[0], FILM.pictures[1], '', FILM.pictures[3]], lines: [FILM.lines[0], FILM.lines[1], '', FILM.lines[3]], scenes: [{ state: 'pass', line: 'ok', rules: [] }, { state: 'pass', line: 'ok', rules: [] }, { state: 'washi', line: 'ok', rules: ['picture_unsafe:crutches'] }, { state: 'rewritten', line: 'ok', rules: ['character:待'] }] }
   const store = new MemoryOrderStore()
   let drawn = 0
   const image: ImageClient = { async generate() { drawn++; return { bytes: PNG, model: 'fake-image' } } }

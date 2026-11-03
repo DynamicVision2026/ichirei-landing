@@ -185,7 +185,7 @@ export interface PictureOutcome {
   /** script_fallback after a block: the rules and listed terms that blocked it (codes, never story text) */
   script_blocked_by?: string[]
   /** per scene: pass | rewritten | washi, with the rule codes that failed it */
-  script_scenes?: { state: string; rules: string[] }[]
+  script_scenes?: { state: string; line: string; rules: string[] }[]
   /** launch freeze: per slot, drawn / drawn_on_retry / washi (the reason is in `reasons`) */
   slot_outcomes?: string[]
   art_status?: string | null
@@ -199,7 +199,7 @@ export interface PictureOutcome {
 
 export function outcomeOf(rec: AnimationRecord, art: ArtRecord | null): PictureOutcome {
   const film = rec.film
-  const base = { script_status: film?.status ?? 'none', script_reason: film?.reason ?? null, ...(film?.blocked_by?.length ? { script_blocked_by: film.blocked_by } : {}), ...(film?.scenes?.length ? { script_scenes: film.scenes.map((x) => ({ state: x.state, rules: x.rules })) } : {}), art_status: art?.status ?? null }
+  const base = { script_status: film?.status ?? 'none', script_reason: film?.reason ?? null, ...(film?.blocked_by?.length ? { script_blocked_by: film.blocked_by } : {}), ...(film?.scenes?.length ? { script_scenes: film.scenes.map((x) => ({ state: x.state, line: x.line ?? 'ok', rules: x.rules })) } : {}), art_status: art?.status ?? null }
   if (!film || film.status !== 'ready' || film.lines.length !== 4) return { outcome: 'all_failed', cause: 'script_fallback', ...base }
   if (art?.status === 'deferred') return { outcome: 'limit', limit: 'film_daily', ...base }
   const slots = art?.slots ?? []
