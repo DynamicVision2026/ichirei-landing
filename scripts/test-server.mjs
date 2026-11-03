@@ -66,6 +66,13 @@ try {
   // ---- B2. Which build is live (/api/health commit + deployedAt) and the per-request ?debug=1 -------
   check('health: without deploy settings (a local run) commit and deployedAt are null', health.commit === null && health.deployedAt === null, JSON.stringify([health.commit, health.deployedAt]))
   {
+    const withToken = await startServer({ upstreamUrl: upstream.url, env: { ICHIREI_SELFTEST_TOKEN: 'srv-selftest-secret', ICHIREI_RATES: 'off' } })
+    try {
+      const ht = await (await fetch(withToken.url + '/api/health')).json()
+      check('health: selftest.configured is false without the token and true once the deploy mounts it — and the token value never appears', health.selftest?.configured === false && ht.selftest?.configured === true && !JSON.stringify(ht).includes('srv-selftest-secret'), JSON.stringify([health.selftest, ht.selftest]))
+    } finally {
+      await withToken.stop()
+    }
     const stamped = await startServer({ upstreamUrl: upstream.url, env: { ICHIREI_COMMIT: 'ab12cd3', ICHIREI_DEPLOYED_AT: '2026-11-01T12:00:00Z', ICHIREI_RATES: 'off' } })
     try {
       const h = await (await fetch(stamped.url + '/api/health')).json()

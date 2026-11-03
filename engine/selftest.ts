@@ -37,10 +37,12 @@ export interface PoemCheck {
   code?: string
 }
 export interface FilmCheck {
-  /** passed = a real script; blocked = the safety checks (or a failure) left only the fallback; error = the step itself failed */
-  outcome: 'passed' | 'blocked' | 'error'
-  /** the rule/term codes of the blocked attempts (`a1:illness:けが`), the fallback's reason code */
+  /** passed = a real script, all four scenes real; partial = a real script in which some scene's picture is the plain washi tile (at least two scenes are real); blocked = fewer than two scenes survived, the whole film is washi; error = the step itself failed */
+  outcome: 'passed' | 'partial' | 'blocked' | 'error'
+  /** the rule/term codes of the failed checks (`a1:illness:けが`, `a1s2:picture_unsafe:crutch`), the fallback's reason code */
   rules: string[]
+  /** per scene: pass | rewritten | washi */
+  scenes?: string[]
   safe_rewrite?: boolean
 }
 export interface StoryReport {
@@ -269,8 +271,12 @@ async function runOne(c: PurposeCase, d: SelftestDeps, spend: Spend, palette: Pa
       },
       { signal, log: () => {}, client: countingClient(spend, d.apiKey), palette },
     )
-    film = fr.status === 'ready' ? { outcome: 'passed', rules: [], ...(fr.safe_rewrite ? { safe_rewrite: true } : {}) } : { outcome: 'blocked', rules: [...(fr.blocked_by ?? []), ...(fr.reason ? [`reason:${fr.reason}`] : [])].slice(0, 20) }
-    if (film.outcome !== 'passed') codes.push('film:blocked')
+    const washi = (fr.scenes ?? []).filter((x) => x.state === 'washi').length
+    film =
+      fr.status === 'ready'
+        ? { outcome: washi > 0 ? 'partial' : 'passed', rules: (fr.scenes ?? []).flatMap((x, i) => x.rules.map((c) => `s${i + 1}:${c}`)).slice(0, 20), scenes: (fr.scenes ?? []).map((x) => x.state), ...(fr.safe_rewrite ? { safe_rewrite: true } : {}) }
+        : { outcome: 'blocked', rules: [...(fr.blocked_by ?? []), ...(fr.reason ? [`reason:${fr.reason}`] : [])].slice(0, 20) }
+    if (film.outcome !== 'passed') codes.push(`film:${film.outcome}`)
   } catch {
     film = { outcome: 'error', rules: [] }
     codes.push('film:error')
@@ -341,7 +347,7 @@ export function publicReport(r: SelftestReport): SelftestReport {
         free: !!s.checks.free,
         reading: !!s.checks.reading,
         poem: { state: s.checks.poem.state, type: code(s.checks.poem.type), character_once: s.checks.poem.character_once, story_images: s.checks.poem.story_images, ...(s.checks.poem.code ? { code: code(s.checks.poem.code) } : {}) },
-        film: { outcome: s.checks.film.outcome, rules: s.checks.film.rules.map(code), ...(s.checks.film.safe_rewrite ? { safe_rewrite: true } : {}) },
+        film: { outcome: s.checks.film.outcome, rules: s.checks.film.rules.map(code), ...(s.checks.film.scenes ? { scenes: s.checks.film.scenes.map(code) } : {}), ...(s.checks.film.safe_rewrite ? { safe_rewrite: true } : {}) },
       },
       codes: s.codes.map(code),
       pass: !!s.pass,

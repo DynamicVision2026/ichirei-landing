@@ -130,6 +130,7 @@ const base = { engine: fakeEngine(), poem: fakePoem as never, film: fakeFilm as 
 {
   const yaml = readFileSync(new URL('../cloudbuild.yaml', import.meta.url), 'utf8')
   check('(4) Cloud Build: a step creates the secret ichirei-selftest-token (random, never printed), another step mounts it as ICHIREI_SELFTEST_TOKEN, and a step AFTER the deploy calls the route and waits — none of them can fail the build', yaml.includes('ichirei-selftest-token') && yaml.includes('ICHIREI_SELFTEST_TOKEN') && yaml.includes('/api/selftest/run') && yaml.includes('x-selftest-token') && /id: selftest-secret/.test(yaml) && /id: selftest\b/.test(yaml) && !/set -x/.test(yaml.slice(yaml.indexOf('selftest-secret'))) && yaml.includes('--max-time'))
+  check('(4) the deploy MOUNTS the token whenever the secret exists (even if granting access could not be confirmed), and if Cloud Run refuses the mount the deploy is run again without it — a missing grant can never break a deploy', yaml.includes('the token secret exists and will be mounted') && yaml.includes('deploying again without it') && yaml.includes('--set-secrets=__SECRETS__'))
   check('(4) the token is never in the repo: no literal token value appears in the YAML', !/ICHIREI_SELFTEST_TOKEN=[0-9a-f]{20,}/.test(yaml))
 }
 clearInterval(keepAlive)

@@ -565,6 +565,14 @@ async function renderLocked(deps: ArtDeps, input: RenderInput): Promise<ArtRecor
   const afterRewrite = new Set<number>()
   let calls = retry ? (cur!.calls ?? 0) : 0
   const cap = num(env.ICHIREI_FILM_CALL_CAP, 12)
+  // a scene the script could not make safe (v9.9) has no picture description: its slot is the plain washi tile, final — the other scenes are drawn as usual
+  for (let i = 0; i < n; i++) {
+    if (!String(descriptions[i] ?? '').trim()) {
+      slots[i] = 'washi'
+      reasons[i] = 'scene_blocked'
+      checkFails[i] = 2
+    }
+  }
   const todo = [...Array(n).keys()].filter((i) => slots[i] === 'pending')
   const toCheck = [...Array(n).keys()].filter((i) => slots[i] === 'unchecked')
   logLine(log, retry ? 'film_render_retry' : 'film_render_start', { pictures: n, pending: todo.length, unchecked: toCheck.length })
@@ -777,7 +785,8 @@ export async function markWashiForRetry(store: OrderStore, id: string, now: Date
   const art = await readArtRaw(store, id)
   if (!art || art.paid_retry || (art.status !== 'done' && art.status !== 'incomplete') || !art.slots.includes('washi')) return false
   const n = art.slots.length
-  const wash = art.slots.map((s) => s === 'washi')
+  const wash = art.slots.map((s, i) => s === 'washi' && art.reasons?.[i] !== 'scene_blocked') // (a scene the script could not make safe stays washi)
+  if (!wash.includes(true)) return false
   const next: ArtRecord = {
     ...art,
     status: 'incomplete',

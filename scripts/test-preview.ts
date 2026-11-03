@@ -367,6 +367,22 @@ const rig = () => {
   check('(8) the film prompt tells the writer: no knife, blade, weapon, fight or quarrel in a picture (the check refuses them), and no celebration image in a quiet gift (an apology, an encouragement)', (() => { const t = readFileSync(join(process.cwd(), 'engine/film-prompt.md'), 'utf8'); return t.includes('NO knife, blade, weapon, fight or quarrel') && t.includes('a quiet gift (an apology, an encouragement') })())
 }
 
+// ---- 9. v9.9: a scene the script could not make safe is a washi tile; the other scenes are drawn ---------------------------------------------------------------------------------------------
+{
+  const PARTIAL: FilmRecord = { ...clone(FILM), pictures: [FILM.pictures[0], FILM.pictures[1], '', FILM.pictures[3]], lines: [FILM.lines[0], FILM.lines[1], '', FILM.lines[3]], scenes: [{ state: 'pass', rules: [] }, { state: 'pass', rules: [] }, { state: 'washi', rules: ['picture_unsafe:crutches'] }, { state: 'rewritten', rules: ['character:待'] }] }
+  const store = new MemoryOrderStore()
+  let drawn = 0
+  const image: ImageClient = { async generate() { drawn++; return { bytes: PNG, model: 'fake-image' } } }
+  const H = createPreviewHandlers(() => ({ store, now: () => NOW, film: async () => clone(PARTIAL), image, vision: vision as never, env: { ICHIREI_FILM_DAILY_MAX: '1000', ICHIREI_FILM_RENDER_MS: '20000' } as never, log: () => {}, daily: new SlidingWindowLimiter(100, 86_400_000) }))
+  const a = (await (await H.start(new Request('http://x/api/preview?debug=1', { method: 'POST', headers: { 'x-forwarded-for': '203.0.113.50' }, body: JSON.stringify({ story: FIX.story, language: 'ja', ...FIX.context, shown: ['備'] }) }))).json()) as Record<string, any>
+  const v0 = (await (await H.view(a.id)).json()) as { slots: string[]; state: string }
+  check('(9) before anything is drawn the washi scene is already the plain tile in the view (the others are still pending)', v0.slots.join() === 'pending,pending,washi,pending' && v0.state === 'drawing', JSON.stringify(v0))
+  const out = (await (await H.render(a.id, new Request('http://x/r?debug=1', { method: 'POST' }))).json()) as { state: string; slots: string[]; pictures: (string | null)[]; debug: Record<string, any> }
+  check('(9) the render draws THREE pictures — never one for the washi scene — and the card is done: slots ai, ai, washi, ai', drawn === 3 && out.state === 'done' && out.slots.join() === 'ai,ai,washi,ai' && out.pictures[2] === null && out.pictures.filter(Boolean).length === 3, JSON.stringify([drawn, out.slots, out.state]))
+  check('(9) the debug shows the outcome ok with 3 pictures and 1 washi, and each scene\'s state with its rule codes (pass / rewritten / washi)', out.debug.outcome === 'ok' && out.debug.pictures === 3 && out.debug.washi === 1 && out.debug.script_scenes?.map((x: { state: string }) => x.state).join() === 'pass,pass,washi,rewritten' && out.debug.script_scenes[2].rules.includes('picture_unsafe:crutches'), JSON.stringify(out.debug))
+  check('(9) after payment the scene the script blocked stays washi (the paid retry only gives the OTHER washi slots another go)', await (async () => { const { markWashiForRetry } = await import('../engine/film-art.ts'); return (await markWashiForRetry(store, a.id)) === false })())
+}
+
 upstream.close()
 if (failures) {
   console.error(`\n${failures} preview check(s) FAILED`)

@@ -70,9 +70,9 @@ steps:
     name: gcr.io/cloud-builders/docker
     args: [push, '${_REGION}-docker.pkg.dev/$PROJECT_ID/${_REPO}/${_SERVICE}:latest']
 
-  # The post-deploy self-test (v9.8) needs a shared secret token. This step makes sure the Secret Manager secret ichirei-selftest-token exists (random, created once, NEVER printed), lets the Cloud Run
-  # service account and this build's own account read it, and writes the --set-secrets list the deploy step uses (with the token only when all of that worked). Every failure is non-fatal: without the token
-  # the deploy is exactly what it was and the self-test is simply off. (One-time permission note in DEPLOY.md.)
+  # The post-deploy self-test needs a shared secret token (Secret Manager secret `ichirei-selftest-token`). If the secret EXISTS (the owner creates it and grants the Cloud Run service account
+  # access), the deploy mounts it as ICHIREI_SELFTEST_TOKEN. If it does not exist yet, this step tries to create it (random, never printed). Granting access is attempted too but its outcome does not
+  # decide anything: the deploy step below retries without the token if Cloud Run refuses the mount, so a missing grant can never break a deploy. Every failure here is non-fatal.
   - id: selftest-secret
     name: gcr.io/google.com/cloudsdktool/cloud-sdk:slim
     entrypoint: bash
@@ -83,18 +83,15 @@ steps:
         echo "$$BASE" > /workspace/secrets.txt
         SECRET=ichirei-selftest-token
         if ! gcloud secrets describe "$$SECRET" >/dev/null 2>&1; then
-          head -c 32 /dev/urandom | od -An -tx1 | tr -d ' \n' | gcloud secrets create "$$SECRET" --replication-policy=automatic --data-file=- >/dev/null 2>&1 || { echo "selftest: the secret could not be created; the self-test is off for this deploy"; exit 0; }
+          head -c 32 /dev/urandom | od -An -tx1 | tr -d ' \n' | gcloud secrets create "$$SECRET" --replication-policy=automatic --data-file=- >/dev/null 2>&1 || { echo "selftest: the secret does not exist and could not be created; the self-test is off for this deploy"; exit 0; }
         fi
         SA=$$(gcloud run services describe ${_SERVICE} --region=${_REGION} --format='value(spec.template.spec.serviceAccountName)' 2>/dev/null)
         if [ -z "$$SA" ]; then SA="$$(gcloud projects describe $PROJECT_ID --format='value(projectNumber)' 2>/dev/null)-compute@developer.gserviceaccount.com"; fi
+        gcloud secrets add-iam-policy-binding "$$SECRET" --member="serviceAccount:$$SA" --role=roles/secretmanager.secretAccessor >/dev/null 2>&1 || true
         ME=$$(gcloud config get-value account 2>/dev/null)
-        [ -n "$$ME" ] && gcloud secrets add-iam-policy-binding "$$SECRET" --member="serviceAccount:$$ME" --role=roles/secretmanager.secretAccessor >/dev/null 2>&1
-        if gcloud secrets add-iam-policy-binding "$$SECRET" --member="serviceAccount:$$SA" --role=roles/secretmanager.secretAccessor >/dev/null 2>&1 || gcloud secrets get-iam-policy "$$SECRET" --format=json 2>/dev/null | grep -q "$$SA"; then
-          echo "$$BASE,ICHIREI_SELFTEST_TOKEN=$$SECRET:latest" > /workspace/secrets.txt
-          echo "selftest: the token secret is ready"
-        else
-          echo "selftest: access for the service account could not be confirmed; the self-test is off for this deploy"
-        fi
+        [ -n "$$ME" ] && gcloud secrets add-iam-policy-binding "$$SECRET" --member="serviceAccount:$$ME" --role=roles/secretmanager.secretAccessor >/dev/null 2>&1 || true
+        echo "$$BASE,ICHIREI_SELFTEST_TOKEN=$$SECRET:latest" > /workspace/secrets.txt
+        echo "selftest: the token secret exists and will be mounted"
         exit 0
 
   - id: deploy
@@ -104,12 +101,25 @@ steps:
     args:
       - -c
       - |
+        BASE="ANTHROPIC_API_KEY=ANTHROPIC_API_KEY:latest,SHOPIFY_STOREFRONT_TOKEN=SHOPIFY_STOREFRONT_TOKEN:latest"
         S=$$(cat /workspace/secrets.txt 2>/dev/null)
-        [ -n "$$S" ] || S="ANTHROPIC_API_KEY=ANTHROPIC_API_KEY:latest,SHOPIFY_STOREFRONT_TOKEN=SHOPIFY_STOREFRONT_TOKEN:latest"
+        [ -n "$$S" ] || S="$$BASE"
         D=$$(date -u +%Y-%m-%dT%H:%M:%SZ)
-        args=("$${@/__DEPLOYED_AT__/$$D}")
-        args=("$${args[@]/__SECRETS__/$$S}")
-        gcloud "$${args[@]}"
+        run_deploy() {
+          local args=("$${@:2}")
+          args=("$${args[@]/__DEPLOYED_AT__/$$D}")
+          args=("$${args[@]/__SECRETS__/$$1}")
+          gcloud "$${args[@]}"
+        }
+        if ! run_deploy "$$S" "$$@"; then
+          # Cloud Run refuses a secret it may not read: deploy again without the self-test token rather than lose the deploy
+          if [ "$$S" != "$$BASE" ]; then
+            echo "selftest: the deploy failed with the token mounted; deploying again without it"
+            run_deploy "$$BASE" "$$@"
+          else
+            exit 1
+          fi
+        fi
       - bash
       - run
       - deploy

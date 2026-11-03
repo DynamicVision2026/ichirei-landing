@@ -130,7 +130,7 @@ export async function startPreview(deps: PreviewDeps, input: PreviewStart, allow
     draft: { story_hash: hash, memorial: input.memorial, created_at: now.toISOString(), picked_at: pickedAt },
   }
   await deps.store.put(id, record)
-  ;(deps.log ?? console.log)(`[ichirei-preview] ${JSON.stringify({ event: 'preview_start', script: film.status, script_reason: film.reason ?? null, ...(film.blocked_by?.length ? { blocked_by: film.blocked_by } : {}), ...(film.safe_rewrite ? { safe_rewrite: true } : {}) })}`)
+  ;(deps.log ?? console.log)(`[ichirei-preview] ${JSON.stringify({ event: 'preview_start', script: film.status, script_reason: film.reason ?? null, ...(film.blocked_by?.length ? { blocked_by: film.blocked_by } : {}), ...(film.safe_rewrite ? { safe_rewrite: true } : {}), ...(film.scenes?.length ? { scenes: film.scenes.map((x) => x.state) } : {}) })}`)
   return { state: 'ok', id, reused: false, script: film.status === 'ready' ? 'ready' : 'fallback' }
 }
 
@@ -155,7 +155,8 @@ export interface PreviewView {
 export function viewOf(rec: AnimationRecord, art: ArtRecord | null): PreviewView {
   const film = rec.film
   if (!film || film.status !== 'ready' || film.lines.length !== 4) return { id: rec.id, state: 'failed', lines: [], pictures: [null, null, null, null], slots: ['washi', 'washi', 'washi', 'washi'] }
-  const slots: PreviewSlot[] = film.lines.map((_, i) => (art && art.slots[i] === 'ai' ? 'ai' : art && art.slots[i] === 'washi' ? 'washi' : 'pending'))
+  // (a scene without a picture description — blocked by the script's own checks — is the plain tile from the start)
+  const slots: PreviewSlot[] = film.lines.map((_, i) => (art && art.slots[i] === 'ai' ? 'ai' : (art && art.slots[i] === 'washi') || !String(film.pictures[i] ?? '').trim() ? 'washi' : 'pending'))
   const pictures = film.lines.map((_, i) => (slots[i] === 'ai' ? pictureUrl(rec.id, i + 1, art?.made_at) : null))
   const anyPicture = slots.includes('ai')
   const settled = !slots.includes('pending')
@@ -183,6 +184,8 @@ export interface PictureOutcome {
   script_reason?: string | null
   /** script_fallback after a block: the rules and listed terms that blocked it (codes, never story text) */
   script_blocked_by?: string[]
+  /** per scene: pass | rewritten | washi, with the rule codes that failed it */
+  script_scenes?: { state: string; rules: string[] }[]
   art_status?: string | null
   slots?: string[]
   reasons?: string[]
@@ -194,7 +197,7 @@ export interface PictureOutcome {
 
 export function outcomeOf(rec: AnimationRecord, art: ArtRecord | null): PictureOutcome {
   const film = rec.film
-  const base = { script_status: film?.status ?? 'none', script_reason: film?.reason ?? null, ...(film?.blocked_by?.length ? { script_blocked_by: film.blocked_by } : {}), art_status: art?.status ?? null }
+  const base = { script_status: film?.status ?? 'none', script_reason: film?.reason ?? null, ...(film?.blocked_by?.length ? { script_blocked_by: film.blocked_by } : {}), ...(film?.scenes?.length ? { script_scenes: film.scenes.map((x) => ({ state: x.state, rules: x.rules })) } : {}), art_status: art?.status ?? null }
   if (!film || film.status !== 'ready' || film.lines.length !== 4) return { outcome: 'all_failed', cause: 'script_fallback', ...base }
   if (art?.status === 'deferred') return { outcome: 'limit', limit: 'film_daily', ...base }
   const slots = art?.slots ?? []
@@ -265,7 +268,7 @@ export async function adoptDraft(store: OrderStore, draftId: string, record: Ord
   // the chosen character must not be in the film's lines (a character shown only after the draft was made could be)
   const forms = [p.kanji, p.glyph_to_carve].filter(Boolean)
   if (film.lines.some((l) => forms.some((f) => l.includes(f)))) return null
-  if (checkPictures(film.pictures, { glyph: p.glyph_to_carve, forms, names: [p.sender_name, p.receiver_name], memorial: expect.memorial, occasion: record.engine_result.occasion ?? null, language: expect.language, story: expect.story }).length > 0) return null
+  if (checkPictures(film.pictures.filter((x) => x.trim()), { glyph: p.glyph_to_carve, forms, names: [p.sender_name, p.receiver_name], memorial: expect.memorial, occasion: record.engine_result.occasion ?? null, language: expect.language, story: expect.story }).length > 0) return null
   // a preview that ended with washi slots: the first open after payment gives each of them one more full attempt (the other pictures stay)
   const adopted: AnimationRecord = { ...built, id: old.id, created_at: old.created_at, film, draft: null, retry_washi: true }
   return adopted
