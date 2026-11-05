@@ -368,7 +368,7 @@ export default function OrderForm({ result, story, followUps = [], promptQuestio
         <button type="button" data-testid="order-submit" className="btn primary" onClick={submit} disabled={!valid || busy}>
           {phase === 'submitting' ? o.submitting : phase === 'redirecting' ? o.redirecting : o.submit}
         </button>
-        <p className="sent">{o.privacy}</p>
+        <p className="sent">{memorial ? o.privacyMemorial : o.privacy}</p>
         <p className="sent"><a href="/legal" data-testid="legal-link" className="legalLink">{pc.legalLink}</a></p>
       </div>
     </motion.div>

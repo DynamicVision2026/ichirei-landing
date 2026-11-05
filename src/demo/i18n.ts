@@ -246,6 +246,8 @@ export interface Copy {
     shippingNote: string
     certificateLabel: string
     privacy: string
+    /** Remembrance: the same line without gift wording (the page is not a gift). */
+    privacyMemorial: string
     submit: string
     submitting: string
     redirecting: string
@@ -394,6 +396,7 @@ const ja: Copy = {
     shippingNote: '国内送料無料・海外送料 ¥6,000',
     certificateLabel: '添える一文',
     privacy: 'ご注文の際に、入力いただいたお名前・物語・選ばれた一字を、制作のために保存します。お名前の入力は任意です。入力された呼び名は、贈りものに表示するためだけに使います。',
+    privacyMemorial: 'ご注文の際に、入力いただいたお名前・物語・選ばれた一字を、制作のために保存します。お名前の入力は任意です。入力された呼び名は、表示するためだけに使います。',
     submit: 'お支払いへ進む',
     submitting: '準備しています…',
     redirecting: 'お支払いページへ移動します…',
@@ -551,6 +554,7 @@ const zhHans: Copy = {
     shippingNote: '日本国内免运费・海外运费 ¥6,000',
     certificateLabel: '随礼附上的一句话',
     privacy: '下单时，我们会保存你填写的姓名、故事和选定的字，用于制作。姓名为选填。你填写的称呼只会用来显示在礼物上。',
+    privacyMemorial: '下单时，我们会保存你填写的姓名、故事和选定的字，用于制作。姓名为选填。你填写的称呼只会用来显示。',
     submit: '前往付款',
     submitting: '正在准备…',
     redirecting: '正在前往付款页面…',
@@ -707,6 +711,7 @@ const zhHant: Copy = {
     shippingNote: '日本國內免運費・海外運費 ¥6,000',
     certificateLabel: '隨禮附上的一句話',
     privacy: '下單時，我們會保存你填寫的姓名、故事和選定的字，用於製作。姓名為選填。你填寫的稱呼只會用來顯示在禮物上。',
+    privacyMemorial: '下單時，我們會保存你填寫的姓名、故事和選定的字，用於製作。姓名為選填。你填寫的稱呼只會用來顯示。',
     submit: '前往付款',
     submitting: '正在準備…',
     redirecting: '正在前往付款頁面…',
@@ -869,6 +874,7 @@ const en: Copy = {
     shippingNote: 'Free shipping in Japan · ¥6,000 international shipping',
     certificateLabel: 'The line that comes with it',
     privacy: 'When you order, we keep the names, the story and the character you chose, so that your piece can be made. Names are optional. Any name you enter is used only to show on the gift.',
+    privacyMemorial: 'When you order, we keep the names, the story and the character you chose, so that your piece can be made. Names are optional. Any name you enter is used only to be shown.',
     submit: 'Continue to payment',
     submitting: 'Preparing…',
     redirecting: 'Taking you to payment…',
