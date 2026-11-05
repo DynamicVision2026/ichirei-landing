@@ -32,7 +32,8 @@ import { runReview } from './review.ts'
 import { completeMains, type RefillReport } from './replace.ts'
 import { canonicalRegisters } from '../src/order/register.ts'
 import { applyGazes, failingGazes, fixGazes, inventedFacts, shapeGate, subjectProblem } from './gaze.ts'
-import { LANGUAGE_REASON, convertLineScript, lineLanguageProblem } from './script.ts'
+import { LANGUAGE_REASON, convertLineScript, fullWidthPunctuation, lineLanguageProblem } from './script.ts'
+import { cleanInscriptionForm } from '../src/order/inscription.ts'
 import {
   DECLINE_MESSAGE,
   DEFAULT_CONTEXT,
@@ -194,7 +195,7 @@ export function normalizeModelOutput(raw: EngineResult): EngineResult {
     follow_up_question: r.follow_up_question ?? null,
     candidates: (Array.isArray(r.candidates) ? r.candidates : []).map((c) => ({
       ...c,
-      inscription_form: c.inscription_form ?? null,
+      inscription_form: cleanInscriptionForm(String(c.kanji ?? ''), c.inscription_form),
       unique_truth: c.unique_truth ?? '',
       eliminated: c.eliminated === true,
       eliminated_reason: c.eliminated === true ? (c.eliminated_reason ?? 'eliminated by the model') : null,
@@ -330,7 +331,12 @@ function enforceLineLanguage(result: EngineResult, language: Language): EngineRe
   const candidates = result.candidates.map((c) => {
     if (c.eliminated || !c.one_line_gaze) return c
     const problem = lineLanguageProblem(c.one_line_gaze, language)
-    if (!problem) return c
+    const punct = fullWidthPunctuation(c.one_line_gaze, language)
+    if (!problem) {
+      if (punct === c.one_line_gaze) return c
+      changed = true
+      return { ...c, one_line_gaze: punct }
+    }
     changed = true
     const converted = convertLineScript(c.one_line_gaze, language)
     if (converted !== null) return { ...c, one_line_gaze: converted }

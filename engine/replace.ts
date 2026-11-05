@@ -20,6 +20,7 @@ import { rewriteLines, subjectProblem } from './gaze.ts'
 import { ensureLineLanguage } from './script.ts'
 import { callSignal, replaceTimeoutMs } from './limits.ts'
 import type { Candidate, EngineContext, EngineResult, RefereeAction } from './contract.ts'
+import { cleanInscriptionForm } from '../src/order/inscription.ts'
 
 export const REPLACE_SLOTS = { surviving: '{{ SURVIVING }}', avoid: '{{ AVOID }}', slots: '{{ SLOTS }}' } as const
 export type RefillSlot = 'main' | 'second' | 'freestyle'
@@ -161,7 +162,7 @@ export const toCandidate = (obj: Record<string, unknown>, slot: RefillSlot): Can
     reading,
     one_line_gaze: gaze,
     story_anchor: anchor,
-    inscription_form: str(obj.inscription_form),
+    inscription_form: cleanInscriptionForm(kanji, str(obj.inscription_form)),
     truth_type: (str(obj.truth_type) ?? (slot === 'freestyle' ? 'Play' : 'Essence')) as Candidate['truth_type'],
     unique_truth: str(obj.unique_truth) ?? '',
     eliminated: false,
@@ -345,7 +346,7 @@ export async function completeMains(
       return fixes.get(cand0.kanji) ?? null
     })
     if (lang.how === 'dropped') { reject(cand0.slot as RefillSlot, cand0.kanji, 'language: the line is not in the page\'s language and script'); continue }
-    langChecked.push(lang.how === 'ok' ? cand0 : ({ ...cand0, one_line_gaze: lang.line } as Candidate))
+    langChecked.push(lang.line === cand0.one_line_gaze ? cand0 : ({ ...cand0, one_line_gaze: lang.line } as Candidate))
   }
   for (const cand of langChecked) {
     const slot = cand.slot as RefillSlot

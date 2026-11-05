@@ -2110,11 +2110,11 @@ const SECTION_ORDER = ['.hero', '.strip', '.philo', '#shape', '#angles', '#write
   check('suggestion accepted: the engine runs again with occasion memorial (same story), then the cards appear', calls.select.length === 3 && calls.select[2].purpose === 'memorial' && calls.select[2].story === calls.select[1].story && (await page.locator('#write article[data-slot]').count()) === 3)
   const colours = await page.evaluate(() => ({ main: getComputedStyle(document.querySelector('article[data-slot=main] [data-glyph]')).color, label: getComputedStyle(document.querySelector('article[data-slot=main] [data-slot-label]')).backgroundColor, border: getComputedStyle(document.querySelector('article[data-slot=main]')).borderTopColor, marked: document.querySelector('article[data-slot=main]').dataset.memorial }))
   check('memorial result: the main character, its label and its top rule are ink, never cinnabar; the card is marked data-memorial', colours.main === INK && colours.label === INK && colours.border === INK && colours.marked === 'yes', JSON.stringify(colours))
-  check('memorial result: the card button says 「この一字を、残す」 (nothing is given)', (await page.locator('article[data-slot=main] [data-select]').innerText()) === 'この一字を、残す')
+  check('memorial result: the card button says 「この字にする」 (nothing is given)', (await page.locator('article[data-slot=main] [data-select]').innerText()) === 'この字にする')
   const gift = (t) => /贈/.test(t)
   const chrome = await page.evaluate(() => { const root = document.querySelector('#write').cloneNode(true); root.querySelectorAll('article').forEach((n) => n.remove()); return root.innerText })
   check('memorial result: no 贈 (give / gift) wording anywhere in the flow outside the model-written cards', !gift(chrome), chrome.slice(0, 300))
-  await page.locator('article[data-slot=main]').locator('text=この一字を、残す').click()
+  await page.locator('article[data-slot=main]').locator('text=この字にする').click()
   const form = page.locator('[data-testid=order-form]')
   await form.waitFor()
   const slip = await page.evaluate(() => ({ glyph: getComputedStyle(document.querySelector('[data-order-glyph]')).color, top: getComputedStyle(document.querySelector('.slip')).borderTopColor, marked: document.querySelector('.slip').dataset.memorial }))
@@ -2603,6 +2603,49 @@ const SECTION_ORDER = ['.hero', '.strip', '.philo', '#shape', '#angles', '#write
     await W.page.locator('[data-testid=voice-button]').click()
     check(`voice (${lang}): default language ${want}, the listening label and the help line word for word`, (await W.page.locator('[data-testid=voice-lang]').inputValue()) === want && (await W.page.locator('[data-testid=voice-button]').innerText()).includes(label) && (await W.page.locator('[data-testid=voice-help]').innerText()) === help)
     await W.page.close()
+  }
+}
+
+// ---------- Run 21 (hotfix 2026-11-05): the character is always the character — never the word "same" — and the 刻字 line follows the rule; full-width punctuation ----------
+{
+  const orderOk = () => ({ json: { order_ref: 'IC-20261105-SAMEREF1', checkout_url: 'http://localhost:5173/__checkout?cart=same', glyph: '惜', certificate_text: 'x' } })
+  const SETS = [
+    [['惜', 'same', 'xī'], ['朴', '樸', 'pǔ'], ['笑', 'same', 'xiào']],
+    [['修', 'same', 'xiū'], ['忆', '憶', 'yì'], ['信', 'same', 'xìn']],
+  ]
+  // (the customer page has three languages — ja / zh-Hant / en; zh-Hans is covered by the unit suite scripts/test-same.ts)
+  for (const lang of ['zh-Hant', 'ja']) {
+    for (const [si, set] of SETS.entries()) {
+      const mk = (body) => {
+        const r = clone(FIXTURE)
+        r.language = body.language
+        r.inscription_script = body.language === 'ja' ? null : 'traditional'
+        r.candidates.slice(0, 3).forEach((c, i) => { c.kanji = set[i][0]; c.inscription_form = lang === 'ja' ? null : set[i][1]; c.reading = set[i][2]; if (lang !== 'ja') c.one_line_gaze = '把孩子留在院子裡，捨不得離開的人' })
+        r.primary_kanji = set[0][0]; r.runner_up_kanji = set[1][0]; r.freestyle_kanji = set[2][0]
+        return r
+      }
+      const { page, errors } = await mockPage(browser, { result: mk, order: orderOk })
+      await page.goto(`http://localhost:5173/?lang=${lang}`, { waitUntil: 'networkidle' })
+      await page.locator('#moment').fill('母は庭の花を毎朝替えていた。何も言わずに、ただ笑っていた。')
+      await pickContext(page, { relationship: 'parent_mother', direction: 'up', occasion: 'seasonal_thanks' })
+      await page.click(`#write >> text=${GO[lang === 'zh-Hans' ? 'zh-Hans' : lang]}`)
+      await page.waitForSelector('[data-all-revealed=yes]', { timeout: 15000 })
+      const cards = await page.evaluate(() => [...document.querySelectorAll('#write article[data-slot]')].map((a) => ({ glyph: a.querySelector('[data-glyph]')?.textContent ?? '', text: a.innerText })))
+      const want = set.map(([k, f]) => (lang === 'ja' ? k : f === 'same' ? k : f)) // Traditional is carved by default on a Chinese page
+      const glyphsOk = cards.length === 3 && cards.every((c, i) => c.glyph === want[i])
+      const noSame = cards.every((c) => !/same/i.test(c.text))
+      const notes = cards.map((c) => (c.text.match(/刻字：[^\n]*/) ?? [''])[0])
+      const wantNotes = set.map(([k, f]) => (lang === 'ja' ? '' : f === 'same' ? `刻字：${k}` : lang === 'zh-Hant' ? `刻字：繁體（簡體：${k}）` : `刻字：繁體（简体：${k}）`))
+      check(`${lang}, set ${si + 1} (${set.map((x) => x[0]).join('')}): every card shows the real character (${want.join('')}), never "same"; the 刻字 line is ${lang === 'ja' ? 'absent on a ja page' : '「刻字：<char>」 for identical forms and the pair for different ones'}`, glyphsOk && noSame && notes.join('|') === wantNotes.join('|'), JSON.stringify({ g: cards.map((c) => c.glyph), notes }))
+      // the order step for the main card and (set 2) the different-forms card
+      await page.locator('article[data-slot=main]').locator(`text=${GIVE[lang]}`).click()
+      await page.locator('[data-testid=order-form]').waitFor()
+      const og = await page.locator('[data-order-glyph]').innerText()
+      const formText = await page.locator('[data-testid=order-form]').innerText()
+      check(`${lang}, set ${si + 1}: the order step shows ${want[0]} and the word "same" appears nowhere on it`, og === want[0] && !/same/i.test(formText), og)
+      check(`no page errors (run 21, ${lang}, set ${si + 1})`, errors.length === 0, errors.join('; '))
+      await page.close()
+    }
   }
 }
 

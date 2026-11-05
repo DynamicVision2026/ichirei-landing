@@ -18,6 +18,7 @@ import { setMemorialSelected } from '../reveal/occasion-store'
 import { COPY, DEFAULT_GIFT_CONTEXT, FOLLOW_UP_COUNTER_FROM, FOLLOW_UP_MAX, clipStory, contextToPayload, occasionOf, purposeOf, storyLength, type Copy, type GiftContext } from './i18n'
 import { getLanguage, setLanguage } from '../lang-store'
 import { useLanguage } from '../useLanguage'
+import { cleanInscriptionForm } from '../order/inscription'
 
 // Validation-harness orchestrator: elicitation (§7) → engine call (§4) →
 // adaptive follow-up (§7.4, at most twice) → progressive reveal (§8), with the
@@ -465,7 +466,7 @@ export default function DemoApp({ mode = 'harness', aside }: { mode?: Mode; asid
   }
 
   // 「別の候補を見る」: three new characters for the same story, leaving out every character already shown (at most two retries).
-  const shownForms = () => [...new Set(sets.flatMap((r) => r.candidates.filter((c) => !c.eliminated).flatMap((c) => [c.kanji, c.inscription_form ?? ''])).filter(Boolean))]
+  const shownForms = () => [...new Set(sets.flatMap((r) => r.candidates.filter((c) => !c.eliminated).flatMap((c) => [c.kanji, cleanInscriptionForm(c.kanji, c.inscription_form) ?? ''])).filter(Boolean))]
   const seeOthers = () => {
     if (retryCount >= 2 || phase !== 'reveal') return
     void runEngine(story, followUps, context, { exclude: shownForms(), retry: (retryCount + 1) as 1 | 2 })

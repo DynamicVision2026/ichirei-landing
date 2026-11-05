@@ -28,6 +28,7 @@ import { ModelTimeoutError, callSignal, callTimeoutMs, runBudgetMs, timedOut } f
 import { thinkingTokensOf, watchThinkingTokens } from './usage.ts'
 import { cleanReading } from '../src/order/reading.ts'
 import { purposeFrame, toneLine } from './purpose.ts'
+import { cleanInscriptionForm } from '../src/order/inscription.ts'
 
 export type CardSlot = 'main' | 'second' | 'freestyle'
 
@@ -346,7 +347,7 @@ export function readCardReply(text: string, slot: CardSlot): ReplyRead {
       slot,
       kanji,
       reading: cleanReading(s(o.reading) ?? ''),
-      inscription_form: s(o.inscription_form),
+      inscription_form: cleanInscriptionForm(kanji, s(o.inscription_form)),
       truth_type: (s(o.truth_type) ?? (slot === 'freestyle' ? 'Play' : 'Essence')) as Candidate['truth_type'],
       one_line_gaze: String(o.one_line_gaze).trim(),
       story_anchor: s(o.story_anchor) ?? '',
@@ -673,7 +674,7 @@ export async function runCards(a: CardsArgs): Promise<CardsOut> {
             tried.push(eliminate(cand0, LANGUAGE_REASON, 'language'))
             continue
           }
-          const cand = lang.how === 'ok' ? cand0 : ({ ...cand0, one_line_gaze: lang.line } as Candidate)
+          const cand = lang.line === cand0.one_line_gaze ? cand0 : ({ ...cand0, one_line_gaze: lang.line } as Candidate)
           const ref = refereeOne(stampBase, cand)
           if (!ref.ok) {
             tried.push(ref.card)

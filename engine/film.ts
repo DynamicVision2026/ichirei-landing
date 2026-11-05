@@ -18,7 +18,7 @@ import type { Language } from './contract.ts'
 import { loadPalette, type Palette } from './palette.ts'
 import { kanaFixWords, loadTokenizer } from './kana.ts'
 import { EN_FORBIDDEN } from './poem-check.ts'
-import { captionLanguageProblem, convertCaptionScript } from './script.ts'
+import { captionLanguageProblem, convertCaptionScript, fullWidthPunctuation } from './script.ts'
 
 export const FILM_TIMEOUT_MS = 30_000
 
@@ -477,7 +477,7 @@ export async function makeFilm(input: FilmInput, opts: FilmOptions = {}): Promis
       const message = await stream.finalMessage()
       const raw = parseJson(message.content.filter((b): b is Anthropic.TextBlock => b.type === 'text').map((b) => b.text).join(''))
       if (!raw || typeof raw.line !== 'string' || typeof raw.picture !== 'string') return null
-      return { line: raw.line.trim(), picture: raw.picture.trim() }
+      return { line: fullWidthPunctuation(raw.line.trim(), input.language), picture: raw.picture.trim() }
     } catch {
       return null
     }
@@ -492,7 +492,7 @@ export async function makeFilm(input: FilmInput, opts: FilmOptions = {}): Promis
    *   - a line that still fails after that is shown EMPTY, the picture is drawn.
    */
   const repair = async (raw: Record<string, unknown>, problems: FilmProblem[], attempt: number): Promise<{ lines: string[]; pictures: string[]; scenes: SceneReport[]; real: number }> => {
-    const lines = (raw.lines as string[]).map((l) => l.trim())
+    const lines = (raw.lines as string[]).map((l) => fullWidthPunctuation(l.trim(), input.language))
     const pictures = (raw.pictures as string[]).map((x) => x.trim())
     const by = scenesOf(problems)
     const reports: SceneReport[] = [0, 1, 2, 3].map((i) => ({ state: 'pass', line: 'ok', rules: by.has(i) ? blockCodes(by.get(i)!).slice(0, 6) : [] }))
@@ -592,7 +592,7 @@ export async function makeFilm(input: FilmInput, opts: FilmOptions = {}): Promis
           blockedAll = [...blockedAll, ...blockCodes(whole, attempt)].slice(0, 30)
           logLine(log, 'film_blocked', { attempt, by: blockCodes(whole, attempt) })
         } else if (problems.length === 0) {
-          const lines = (raw.lines as string[]).map((l) => l.trim())
+          const lines = (raw.lines as string[]).map((l) => fullWidthPunctuation(l.trim(), input.language))
           const pictures = (raw.pictures as string[]).map((x) => x.trim())
           const turning_point = String(raw.turning_point).trim()
           // the arc review (one reader, a few seconds): after the first try only — a rewrite was told exactly what to fix and is kept

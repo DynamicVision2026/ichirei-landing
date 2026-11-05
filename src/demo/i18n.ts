@@ -10,6 +10,7 @@
 
 import { registerTable } from '../order/register.ts'
 import { cleanReading } from '../order/reading.ts'
+import { cleanInscriptionForm } from '../order/inscription.ts'
 import { effectivePurpose, effectiveState, mapOtherRelationship, occasionFromPurpose, purposeFromOccasion, PURPOSES, STATES, type Purpose, type State } from '../order/purpose.ts'
 import { SIZE_COPY } from './sizes-copy.ts'
 
@@ -200,7 +201,7 @@ export interface Copy {
   glyphReading: (c: { kanji: string; inscription_form: string | null; reading: string; meaning?: string | null; reading_zh?: string | null }, carved: string) => string
   /** Small note under the glyph about which form is carved. */
   inscriptionNote: (c: { kanji: string; inscription_form: string | null }, script: InscriptionScript | null) => string | null
-  previewNote: (c: { inscription_form: string | null }, script: InscriptionScript | null) => string | null
+  previewNote: (c: { kanji: string; inscription_form: string | null }, script: InscriptionScript | null) => string | null
   // v6: the three cards
   slotLabels: { main: string; second: string; freestyle: string }
   /** Spec v9.1 step 9: how the card matches the story — three short lines, never a percentage or a score. */
@@ -307,7 +308,7 @@ const ja: Copy = {
       down: '目下の方（子ども・後輩・部下など）',
       across: '対等な相手（配偶者・友人・きょうだいなど）',
     },
-    finalizeButton: 'この一字を、残す',
+    finalizeButton: 'この字にする',
     senderLabel: 'あなたの呼び名（任意）',
     receiverLabel: '偲ぶ方の呼び名（任意）',
     receiverPlaceholder: '例：お母さん、父、ハナちゃん',
@@ -358,7 +359,7 @@ const ja: Copy = {
     `結果が届く前に時間切れになりました（${s}秒）。もう一度お試しください。続く場合はサーバー側の制限の可能性があります。`,
   revealIntro: 'あなたの言葉から、一字ずつ浮かびあがります。気になった字に触れてください。',
   revealIntroCustomer: 'あなたの物語から見つかった字です。贈りたい一字を選んでください。',
-  revealIntroMemorial: 'あなたの物語から見つかった字です。残したい一字を選んでください。',
+  revealIntroMemorial: 'あなたの物語から見つかった字です。その人を偲ぶ一字を選んでください。',
   giveThis: 'この字で贈る',
   selectThis: 'この一字を選ぶ',
   selectedThis: 'この一字を選んでいます',
@@ -461,7 +462,7 @@ const zhHans: Copy = {
       down: '晚辈或下位者（孩子、晚辈、下属）',
       across: '平辈（伴侣、朋友、兄弟姐妹）',
     },
-    finalizeButton: '就留下这一个字',
+    finalizeButton: '就选这个字',
     senderLabel: '你的称呼（选填）',
     receiverLabel: '追思对象的称呼（选填）',
     receiverPlaceholder: '例如：妈妈、老爸、阿华',
@@ -510,7 +511,7 @@ const zhHans: Copy = {
   timeout: (s) => `结果送达前已超时（${s} 秒）。请再试一次；若持续出现，可能是服务器端的限制。`,
   revealIntro: '从你的文字里，一个字一个字浮现出来。请触碰让你在意的字。',
   revealIntroCustomer: '这些字是从你的故事里找到的。请选一个想送出的字。',
-  revealIntroMemorial: '这些字是从你的故事里找到的。请选一个想留下的字。',
+  revealIntroMemorial: '这些字是从你的故事里找到的。请选一个追思那个人的字。',
   giveThis: '送这个字',
   selectThis: '选择这个字',
   selectedThis: '已选择这个字',
@@ -525,13 +526,13 @@ const zhHans: Copy = {
   chooseHintCustomer: '请先选择其中一个字，再继续。',
   // The reading line is the pinyin only (2026-11-05): the other form of the character appears in the 刻字 note, never here (a Traditional page never shows the Simplified form on this line).
   glyphReading: (c) => cleanReading(c.reading),
-  inscriptionNote: (c, script) =>
-    c.inscription_form
-      ? script === 'simplified'
-        ? `刻字：简体（繁體：${c.inscription_form}）`
-        : `刻字：繁體（简体：${c.kanji}）`
-      : null,
-  previewNote: (c, script) => (c.inscription_form ? (script === 'simplified' ? '刻字使用简体字' : '刻字使用繁體字') : null),
+  // Identical forms: just the character (2026-11-05 hotfix); otherwise the script with the other form in brackets.
+  inscriptionNote: (c, script) => {
+    const other = cleanInscriptionForm(c.kanji, c.inscription_form)
+    if (!other) return `刻字：${c.kanji}`
+    return script === 'simplified' ? `刻字：简体（繁體：${other}）` : `刻字：繁體（简体：${c.kanji}）`
+  },
+  previewNote: (c, script) => (cleanInscriptionForm(c.kanji, c.inscription_form) ? (script === 'simplified' ? '刻字使用简体字' : '刻字使用繁體字') : null),
   slotLabels: { main: '本命', second: '次选', freestyle: '趣字' },
   match: { who: '对方是怎样的人', moment: '你的那一刻', feeling: '心情', resonates: '深深共鸣', registers: registerTable('zh-Hans') },
   order: {
@@ -619,7 +620,7 @@ const zhHant: Copy = {
       down: '晚輩或下位者（孩子、晚輩、部屬）',
       across: '平輩（伴侶、朋友、兄弟姊妹）',
     },
-    finalizeButton: '就留下這一個字',
+    finalizeButton: '就選這個字',
     senderLabel: '你的稱呼（選填）',
     receiverLabel: '追思對象的稱呼（選填）',
     receiverPlaceholder: '例如：媽媽、老爸、阿華',
@@ -668,7 +669,7 @@ const zhHant: Copy = {
   timeout: (s) => `結果送達前已逾時（${s} 秒）。請再試一次；若持續出現，可能是伺服器端的限制。`,
   revealIntro: '從你的文字裡，一個字一個字浮現出來。請觸碰讓你在意的字。',
   revealIntroCustomer: '這些字是從你的故事裡找到的。請選一個想送出的字。',
-  revealIntroMemorial: '這些字是從你的故事裡找到的。請選一個想留下的字。',
+  revealIntroMemorial: '這些字是從你的故事裡找到的。請選一個追思那個人的字。',
   giveThis: '送這個字',
   selectThis: '選擇這個字',
   selectedThis: '已選擇這個字',
@@ -682,13 +683,12 @@ const zhHant: Copy = {
   chooseHint: '打開一個字並點「選擇這個字」即可決定',
   chooseHintCustomer: '請先選擇其中一個字，再繼續。',
   glyphReading: (c) => cleanReading(c.reading),
-  inscriptionNote: (c, script) =>
-    c.inscription_form
-      ? script === 'simplified'
-        ? `刻字：簡體（繁體：${c.inscription_form}）`
-        : `刻字：繁體（簡體：${c.kanji}）`
-      : null,
-  previewNote: (c, script) => (c.inscription_form ? (script === 'simplified' ? '刻字使用簡體字' : '刻字使用繁體字') : null),
+  inscriptionNote: (c, script) => {
+    const other = cleanInscriptionForm(c.kanji, c.inscription_form)
+    if (!other) return `刻字：${c.kanji}`
+    return script === 'simplified' ? `刻字：簡體（繁體：${other}）` : `刻字：繁體（簡體：${c.kanji}）`
+  },
+  previewNote: (c, script) => (cleanInscriptionForm(c.kanji, c.inscription_form) ? (script === 'simplified' ? '刻字使用簡體字' : '刻字使用繁體字') : null),
   slotLabels: { main: '本命', second: '次選', freestyle: '趣字' },
   match: { who: '對方是怎樣的人', moment: '你的那一刻', feeling: '心情', resonates: '深深共鳴', registers: registerTable('zh-Hant') },
   order: {
@@ -779,7 +779,7 @@ const en: Copy = {
       down: 'Someone younger or in your care (child, junior)',
       across: 'An equal (partner, friend, sibling)',
     },
-    finalizeButton: 'Keep this character',
+    finalizeButton: 'Choose this character',
     senderLabel: 'Your name or nickname (optional)',
     receiverLabel: 'Name or nickname of the person you are remembering (optional)',
     receiverPlaceholder: 'e.g. Mom, Dad, Grandpa',
@@ -830,7 +830,7 @@ const en: Copy = {
     `The result did not arrive in time (${s} seconds). Please try again; if it keeps happening it may be a server-side limit.`,
   revealIntro: 'One character at a time, they rise out of your words. Touch the one that draws you.',
   revealIntroCustomer: 'These characters came from your story. Choose the one you want to give.',
-  revealIntroMemorial: 'These characters came from your story. Choose the one you want to keep.',
+  revealIntroMemorial: 'These characters came from your story. Choose the one to remember them by.',
   giveThis: 'Give this character',
   selectThis: 'Choose this character',
   selectedThis: 'This character is chosen',
@@ -904,7 +904,7 @@ export function carvedGlyph(
 ): string {
   if (!isChineseUi(language)) return c.kanji
   if (script === 'simplified') return c.kanji
-  return c.inscription_form ?? c.kanji
+  return cleanInscriptionForm(c.kanji, c.inscription_form) ?? c.kanji
 }
 
 /** What the API call body should carry for this context (empty selections are simply omitted). */

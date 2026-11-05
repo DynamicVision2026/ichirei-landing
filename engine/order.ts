@@ -13,7 +13,7 @@ import { CERTIFICATE_LINE_EN, certificateText } from '../src/order/certificate.t
 import { isMemorial } from '../src/order/memorial.ts'
 import { loadPalette, plainMeaning, type Palette } from './palette.ts'
 import { chooseReading, kanaToRomaji, romanizeReadings } from './romaji.ts'
-import { STYLES_BY_LANGUAGE, glyphFor, normalizeStyle, type InscriptionStyle } from '../src/order/inscription.ts'
+import { STYLES_BY_LANGUAGE, cleanInscriptionForm, glyphFor, normalizeStyle, type InscriptionStyle } from '../src/order/inscription.ts'
 import { carvedStrokes, simpleAvailable } from '../src/order/strokes.ts'
 import { simpleMaxStrokes, strokeInfo } from './strokes.ts'
 
@@ -116,7 +116,7 @@ export function parseShown(raw: unknown): ShownCharacter[] {
     if (c.inscription_form !== null && c.inscription_form !== undefined && typeof c.inscription_form !== 'string') continue
     if (JSON.stringify(c).length > SHOWN_CANDIDATE_MAX_CHARS) continue
     if (out.some((o) => o.candidate.kanji === c.kanji)) continue
-    out.push({ set, slot, candidate: { ...c, inscription_form: c.inscription_form ?? null } })
+    out.push({ set, slot, candidate: { ...c, inscription_form: cleanInscriptionForm(c.kanji, c.inscription_form) } })
   }
   return out
 }
@@ -215,7 +215,9 @@ export function parseOrderRequest(body: unknown, now: Date = new Date(), palette
   if (result.language !== lang) return fail('engine_result', '"engine_result.language" does not match "language"')
 
   if (!isText(body.selected_kanji)) return fail('selected_kanji', 'Missing "selected_kanji"')
-  const candidate = (result.candidates as Candidate[]).find((c) => isObject(c) && c.kanji === body.selected_kanji)
+  const picked = (result.candidates as Candidate[]).find((c) => isObject(c) && c.kanji === body.selected_kanji)
+  // (an older result may carry a stray word such as "same" where the other form belongs: it is no form)
+  const candidate = picked ? { ...picked, inscription_form: cleanInscriptionForm(picked.kanji, picked.inscription_form) } : undefined
   if (!candidate || candidate.eliminated === true) {
     return fail('selected_kanji', '"selected_kanji" is not one of the engine result\'s available candidates')
   }

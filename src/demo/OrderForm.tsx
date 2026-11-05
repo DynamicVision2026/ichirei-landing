@@ -21,6 +21,7 @@ import { trackPreview } from './analytics.ts'
 import { useCurrency } from '../reveal/useCurrency.ts'
 import { approxLine } from '../reveal/currency.ts'
 import { toRevealLang } from '../reveal/lang.ts'
+import { cleanInscriptionForm } from '../order/inscription'
 
 // The purchase step of the customer flow: after the sender has chosen a character, collect
 // sender name, receiver name, delivery date, inscription form and package, show the paper slip
@@ -92,8 +93,8 @@ export default function OrderForm({ result, story, followUps = [], promptQuestio
   const glyph = glyphFor(candidate, style)
   const pc = PREVIEW_COPY[toRevealLang(language)]
   // the pictures start NOW, the moment this character is chosen (never before): one set per story, whatever character or format is picked next
-  const shownForms = useMemo(() => [...new Set(shown.flatMap((s) => [s.candidate.kanji, s.candidate.inscription_form ?? '']).filter(Boolean))].slice(0, 24), [shown])
-  const pickedForms = useMemo(() => [candidate.kanji, candidate.inscription_form ?? ''].filter(Boolean), [candidate])
+  const shownForms = useMemo(() => [...new Set(shown.flatMap((s) => [s.candidate.kanji, cleanInscriptionForm(s.candidate.kanji, s.candidate.inscription_form) ?? '']).filter(Boolean))].slice(0, 24), [shown])
+  const pickedForms = useMemo(() => [candidate.kanji, cleanInscriptionForm(candidate.kanji, candidate.inscription_form) ?? ''].filter(Boolean), [candidate])
   const preview = usePreview({ result, story, followUps, shown: shownForms, picked: pickedForms, draftRef })
   // The carving check (spec v9.1 step 9): the Simple set only takes up to N strokes; a character above it is offered with the Standard set only.
   // The server re-checks with its own count; with no count at all (an old result) the form does not block and the server decides.

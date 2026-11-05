@@ -141,7 +141,7 @@ Span several types; do not mechanically force exactly one per type. For each can
 
 ```
 kanji:            (the character in SIMPLIFIED form)
-traditional_form: (the TRADITIONAL form, or "same" if identical — returned as `inscription_form`)
+traditional_form: (the TRADITIONAL form, or null if it is identical to `kanji` — returned as `inscription_form`; NEVER write a word such as "same" or "none" there, only one character or null)
 reading:          (pinyin with tone marks — the natural Mandarin reading)
 truth_type:       
 scarce_asset_it_preserves:

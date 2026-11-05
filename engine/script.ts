@@ -120,15 +120,15 @@ export interface LanguageOutcome {
  */
 export async function ensureLineLanguage(line: string, language: Language, rewrite?: (why: string) => Promise<string | null>): Promise<LanguageOutcome> {
   const problem = lineLanguageProblem(line, language)
-  if (!problem) return { how: 'ok', code: null, line }
+  if (!problem) return { how: 'ok', code: null, line: fullWidthPunctuation(line, language) }
   const converted = convertLineScript(line, language)
-  if (converted !== null) return { how: 'converted', code: problem.code, line: converted }
+  if (converted !== null) return { how: 'converted', code: problem.code, line: fullWidthPunctuation(converted, language) }
   if (rewrite) {
     const next = await rewrite(problem.message)
     if (next) {
-      if (lineLanguageProblem(next, language) === null) return { how: 'rewritten', code: problem.code, line: next }
+      if (lineLanguageProblem(next, language) === null) return { how: 'rewritten', code: problem.code, line: fullWidthPunctuation(next, language) }
       const again = convertLineScript(next, language)
-      if (again !== null) return { how: 'rewritten', code: problem.code, line: again }
+      if (again !== null) return { how: 'rewritten', code: problem.code, line: fullWidthPunctuation(again, language) }
     }
   }
   return { how: 'dropped', code: problem.code, line }
@@ -150,7 +150,7 @@ export function convertCaptionScript(line: string, language: Language): string |
   if (language !== 'zh-Hant' && language !== 'zh-Hans') return null
   const parts = line.split(QUOTE_SPLIT)
   const next = parts.map((p, i) => (i % 2 === 0 ? (language === 'zh-Hant' ? toTraditional(p) : toSimplified(p)) : p)).join('')
-  return next !== line && captionLanguageProblem(next, language) === null ? next : null
+  return next !== line && captionLanguageProblem(next, language) === null ? fullWidthPunctuation(next, language) : null
 }
 
 // ---- poems --------------------------------------------------------------------------------------------------------------------------------------------------------------------------
@@ -164,5 +164,29 @@ const taiwanToSimplifiedChars = OpenCC.Converter({ from: 'tw', to: 'cn' })
 export function poemLinesForLanguage(lines: string[], type: string, language: Language): { lines: string[]; problem: string | null } {
   if ((type !== 'tang' && type !== 'ci') || (language !== 'zh-Hant' && language !== 'zh-Hans')) return { lines, problem: null }
   if (lines.some((l) => hasKana(l))) return { lines, problem: 'a line has Japanese kana: write the poem in Chinese only' }
-  return { lines: lines.map((l) => (language === 'zh-Hant' ? toTraditionalChars(l) : taiwanToSimplifiedChars(l))), problem: null }
+  return { lines: lines.map((l) => fullWidthPunctuation(language === 'zh-Hant' ? toTraditionalChars(l) : taiwanToSimplifiedChars(l), language)), problem: null }
+}
+
+// ---- punctuation (hotfix 2026-11-05) -------------------------------------------------------------------------------------------------------------------------------------------------
+
+const HALF_TO_FULL: Record<string, string> = { ',': '，', ';': '；', ':': '：', '?': '？', '!': '！' }
+const CJK_BEFORE = /[\p{Script=Han}\u3000-\u303f\uff00-\uffef]$/u
+const CJK_AFTER = /^\s*(?:[\p{Script=Han}\u3000-\u303f\uff00-\uffef]|$)/u
+
+/**
+ * On a Chinese page a half-width , ; : ? ! that sits after a CJK character and before a CJK character (or the end of the line) becomes the full-width mark (，；：？！). The customer's own quotations
+ * (inside 「」 『』 “” "") are left exactly as written. Other languages are not touched.
+ */
+export function fullWidthPunctuation(text: string, language: Language): string {
+  if (language !== 'zh-Hant' && language !== 'zh-Hans') return text
+  const quoted: [number, number][] = []
+  for (const m of text.matchAll(/「[^」]*」|『[^』]*』|“[^”]*”|"[^"]*"/gu)) quoted.push([m.index, m.index + m[0].length])
+  const inQuote = (k: number) => quoted.some(([a, b]) => k >= a && k < b)
+  let out = ''
+  for (let k = 0; k < text.length; k++) {
+    const ch = text[k]
+    const full = HALF_TO_FULL[ch]
+    out += full && !inQuote(k) && CJK_BEFORE.test(text.slice(0, k)) && CJK_AFTER.test(text.slice(k + 1)) ? full : ch
+  }
+  return out
 }

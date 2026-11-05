@@ -17,7 +17,7 @@ import { EGIFT_JAPAN_ONLY, PACKAGE_SKU, type PackageId } from '../src/order/pack
 import type { OrderRecord } from './order.ts'
 import type { ArtRecord } from './film-art.ts'
 import type { Language } from './contract.ts'
-import { convertLineScript } from './script.ts'
+import { convertLineScript, fullWidthPunctuation } from './script.ts'
 
 export const GIFT_TOKEN_PATTERN = /^RG-[a-z2-9]{20}$/
 
@@ -105,7 +105,7 @@ export function buildGiftRecord(record: OrderRecord, animationId: string, token:
     reading: cleanReading(p.certificate.reading),
     romanization: cleanReading(p.certificate.romanization),
     meaning_en: p.certificate.meaning_en,
-    who: convertLineScript(p.gaze_line, p.language) ?? p.gaze_line, // (an older order whose line is in the wrong Chinese script is shown in the right one)
+    who: fullWidthPunctuation(convertLineScript(p.gaze_line, p.language) ?? p.gaze_line, p.language), // (an older order whose line is in the wrong Chinese script is shown in the right one)
     memorial: p.certificate.memorial === true,
     ...(p.certificate.purpose ? { purpose: p.certificate.purpose } : {}),
     certificate_line: certificateText(p.language),

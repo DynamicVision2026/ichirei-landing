@@ -26,6 +26,7 @@ import { readFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { chooseReading } from './romaji.ts'
+import { cleanInscriptionForm } from '../src/order/inscription.ts'
 import {
   DEFAULT_FOLLOW_UP,
   FAMILIES,
@@ -494,6 +495,8 @@ function deferred(result: EngineResult, referee: RefereeReport): EngineResult {
  */
 export function applyPalette(result: EngineResult, palette: Palette, story: string, opts: RefereeOptions = {}): EngineResult {
   if (result.status !== 'sufficient' || !Array.isArray(result.candidates) || result.candidates.length === 0) return result
+  // a stray word where the other form of the character belongs ("same") is no form at all (hotfix 2026-11-05)
+  if (result.candidates.some((c) => c.inscription_form !== cleanInscriptionForm(c.kanji, c.inscription_form))) result = { ...result, candidates: result.candidates.map((c) => ({ ...c, inscription_form: cleanInscriptionForm(c.kanji, c.inscription_form) })) }
   const requireEcho = opts.requireClassicalEcho ?? requireClassicalEchoFromEnv()
   const log = opts.log ?? ((l: string) => console.log(l))
   const families = refereeFamilies(result.language, result.reader)
