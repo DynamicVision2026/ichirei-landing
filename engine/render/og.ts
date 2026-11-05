@@ -30,8 +30,9 @@ export async function makeOgImage(input: OgInput, env: NodeJS.ProcessEnv = proce
   const paper = input.memorial ? '#CFC8BA' : '#E4D8BC'
   const paperDark = input.memorial ? '#C2BAAA' : '#D6C8A6'
   const seal = input.memorial ? ['#cdc3a4', '#a89a74', '#7c704f'] : ['#e6c97e', '#c9a45c', '#8f6f2f']
-  const to = input.language === 'en' ? `To ${input.to}` : input.language === 'ja' ? `${input.to}へ` : `致 ${input.to}`
-  const from = input.language === 'en' ? `From ${input.from}` : input.language === 'ja' ? `${input.from}より` : `${input.from} 敬上`
+  // A name nobody gave is left out of the picture (no placeholder).
+  const to = !input.to ? '' : input.language === 'en' ? `To ${input.to}` : input.language === 'ja' ? `${input.to}へ` : `致 ${input.to}`
+  const from = !input.from ? '' : input.language === 'en' ? `From ${input.from}` : input.language === 'ja' ? `${input.from}より` : `${input.from} 敬上`
 
   // the envelope: 640 × 427 at the middle of the picture
   const W = 640
@@ -41,10 +42,10 @@ export async function makeOgImage(input: OgInput, env: NodeJS.ProcessEnv = proce
   const flapH = H * 0.54
   const tipX = x0 + W / 2
   const tipY = y0 + flapH
-  const toSize = fit(body, to, 62, W - 100)
-  const fromSize = fit(body, from, 30, W - 100)
-  const t1 = textPaths(hero, to, toSize, OG_WIDTH / 2, y0 + H - 92, '#2A221B', 'middle')
-  const t2 = textPaths(body, from, fromSize, OG_WIDTH / 2, y0 + H - 40, '#5B4F3D', 'middle')
+  const toSize = to ? fit(body, to, 62, W - 100) : 0
+  const fromSize = from ? fit(body, from, 30, W - 100) : 0
+  const t1 = to ? textPaths(hero, to, toSize, OG_WIDTH / 2, y0 + H - 92, '#2A221B', 'middle') : { svg: '' }
+  const t2 = from ? textPaths(body, from, fromSize, OG_WIDTH / 2, y0 + H - 40, '#5B4F3D', 'middle') : { svg: '' }
   const sealGlyph = textPaths(hero, '礼', 46, tipX, tipY + 16, '#4A3510', 'middle')
   const brand = textPaths(body, '一字礼 · ICHIREI', 26, OG_WIDTH / 2, 590, input.memorial ? '#B9AD90' : '#C9A96E', 'middle')
 

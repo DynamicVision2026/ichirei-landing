@@ -166,17 +166,23 @@ export default function Reveal({ result, story, followUps = [], condition, copy,
     setSelected(c.kanji)
   }
 
-  const finalize = () => {
-    if (!selected || finalized) return
+  const finalize = (pick: string | null = selected) => {
+    if (!pick || finalized) return
     flushDwell()
-    log('final_selection', { kanji: selected })
-    const chosen = result.candidates.find((c) => c.kanji === selected)
+    log('final_selection', { kanji: pick })
+    const chosen = result.candidates.find((c) => c.kanji === pick)
     if (chosen) track('chosen', diagnostics ? 'harness' : 'customer', choiceOf(chosen, result.primary_kanji))
     if (onFinalize && chosen) {
       onFinalize(chosen) // the customer flow moves on to the order form; selection stays so "back" works
       return
     }
     setFinalized(true)
+  }
+  // Customer page: one button on each card gives that character at once (no separate confirm step).
+  const give = (c: Candidate) => {
+    if (selected !== c.kanji) log('selection_changed', { from: selected, to: c.kanji })
+    setSelected(c.kanji)
+    finalize(c.kanji)
   }
 
   const openPreview = (c: Candidate) => {
@@ -231,7 +237,7 @@ export default function Reveal({ result, story, followUps = [], condition, copy,
 
   return (
     <div>
-      <p className="font-serif-jp mb-8 text-sm text-mute" data-reveal-intro>{copy.revealIntro}</p>
+      <p className="font-serif-jp mb-8 text-sm text-mute" data-reveal-intro>{diagnostics ? copy.revealIntro : copy.revealIntroCustomer}</p>
 
       <div className="flex flex-col gap-6" role="list">
         {revealOrder.slice(0, revealedCount).map((c) => {
@@ -367,16 +373,16 @@ export default function Reveal({ result, story, followUps = [], condition, copy,
 
                       <button
                         type="button"
-                        onClick={() => select(c)}
-                        aria-pressed={isSelected}
+                        onClick={() => (diagnostics ? select(c) : give(c))}
+                        aria-pressed={diagnostics ? isSelected : undefined}
                         data-select={isFreestyle ? 'freestyle' : isPrimary ? 'main' : 'second'}
                         className={
                           diagnostics
                             ? `font-label rounded-full px-5 py-2 text-xs tracking-[0.1em] transition-all ${isSelected ? 'bg-accent text-page' : 'border border-accent/60 text-fg hover:bg-accent/10'}`
-                            : `btn ${isSelected ? 'primary' : 'ghost'}`
+                            : 'btn primary'
                         }
                       >
-                        {isSelected ? copy.selectedThis : copy.selectThis}
+                        {diagnostics ? (isSelected ? copy.selectedThis : copy.selectThis) : memorial ? copy.memorial.finalizeButton : copy.giveThis}
                       </button>
                     </div>
                   </motion.div>
@@ -423,10 +429,11 @@ export default function Reveal({ result, story, followUps = [], condition, copy,
             </details>
           )}
 
+          {diagnostics && (
           <div className="mt-12 flex flex-col items-center gap-4">
             <button
               type="button"
-              onClick={finalize}
+              onClick={() => finalize()}
               disabled={!selected || finalized}
               className={primaryBtn}
               data-testid="finalize"
@@ -439,6 +446,7 @@ export default function Reveal({ result, story, followUps = [], condition, copy,
               </p>
             )}
           </div>
+          )}
         </>
       )}
 

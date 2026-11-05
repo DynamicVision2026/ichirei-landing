@@ -12,14 +12,14 @@ import {
   READER_CHOICES,
   RELATIONSHIP_CODES,
   STORY_MAX,
-  appendSpoken,
   contextComplete,
   storyLength,
   type Copy,
   type GiftContext,
 } from '../demo/i18n.ts'
 import { PURPOSE_COPY } from '../demo/purpose-copy.ts'
-import { PURPOSE_OTHER_MAX, RELATIONSHIP_OTHER_MAX, STATE_OTHER_MAX } from '../order/purpose.ts'
+import { VOICE_LANGS, insertSpoken, isVoiceLang, loadVoiceLang, saveVoiceLang, shouldRestart, voiceLangForPage, type VoiceLang } from './voice.ts'
+import { PURPOSE_OTHER_MAX, RELATIONSHIP_OTHER_MAX, STATE_OTHER_MAX, directionForRelationship } from '../order/purpose.ts'
 import type { RevealLang } from './copy.ts'
 import { TEXT } from './copy.ts'
 
@@ -45,7 +45,7 @@ interface SpeechRecognitionLike {
   interimResults: boolean
   onresult: ((e: SpeechResultEvent) => void) | null
   onend: (() => void) | null
-  onerror: (() => void) | null
+  onerror: ((e: { error?: string }) => void) | null
   start(): void
   stop(): void
 }
@@ -110,6 +110,17 @@ export default function Composer({ story, onStoryChange, onSubmit, copy, lang, c
   const t = TEXT[lang]
   const o = OPENER[lang]
   const setCtx = (patch: Partial<GiftContext>) => onContextChange({ ...context, ...patch })
+  // Part 7: the direction chip that goes with the relationship is pre-selected (it looks exactly like a chosen chip and can be changed). Only a direction the sender has NOT chosen themselves
+  // is replaced when they change the relationship: `autoDirection` remembers what we put there.
+  const autoDirection = useRef<string>('')
+  const pickRelationship = (c: string) => {
+    const want = directionForRelationship(c) ?? ''
+    const mine = context.direction === '' || context.direction === autoDirection.current
+    if (mine) {
+      autoDirection.current = want
+      setCtx({ relationship: c as GiftContext['relationship'], direction: want as GiftContext['direction'] })
+    } else setCtx({ relationship: c as GiftContext['relationship'] })
+  }
   const n = storyLength(story)
   // A short sentence is enough, but not an empty or junk try: every submit costs real AI money (Part A3).
   const longEnough = storyLength(story.trim()) >= STORY_MIN
@@ -182,52 +193,102 @@ export default function Composer({ story, onStoryChange, onSubmit, copy, lang, c
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
-  const toggleVoice = () => {
-    if (listening) {
-      recognitionRef.current?.stop()
-      return
-    }
+  // Voice (2026-11-05, Part 9): the browser's own recognition in the language of the picker (the page language until the sender picks), words shown while speaking, listening kept on across
+  // the browser's own stops, speech ADDED at the cursor (typed text is never replaced). No audio and no text goes anywhere but into the box.
+  const [voiceLang, setVoiceLang] = useState<VoiceLang>(() => loadVoiceLang() ?? voiceLangForPage(context.language))
+  const voicePicked = useRef(loadVoiceLang() !== null)
+  useEffect(() => {
+    if (!voicePicked.current) setVoiceLang(voiceLangForPage(context.language))
+  }, [context.language])
+  const taRef = useRef<HTMLTextAreaElement | null>(null)
+  const wantRef = useRef(false) // the button is on
+  const errorRef = useRef<string | null>(null)
+  const cursorRef = useRef(0)
+  const restartsRef = useRef<number[]>([])
+  const voiceLangRef = useRef(voiceLang)
+  voiceLangRef.current = voiceLang
+
+  const stopVoice = () => {
+    wantRef.current = false
+    recognitionRef.current?.stop()
+    setListening(false)
+    setInterim('')
+  }
+  const beginVoice = () => {
     const Ctor = getSpeechRecognition()
-    if (!Ctor) return
-    setVoiceLimit(false)
-    trackFlow('voice_used', { language: context.language, set, qid: questionId })
+    if (!Ctor || !wantRef.current) return
     const rec = new Ctor()
-    rec.lang = copy.speechLang
+    rec.lang = voiceLangRef.current
     rec.continuous = true
     rec.interimResults = true
+    errorRef.current = null
     rec.onresult = (e) => {
       let interimText = ''
       for (let i = e.resultIndex; i < e.results.length; i++) {
         const r = e.results[i]
         if (r.isFinal) {
           const text = r[0].transcript.trim()
-          if (text) {
-            // never past the limit without a word: the first STORY_MAX characters are kept, the page says so and stops listening
-            const next = appendSpoken(storyRef.current, text)
-            storyRef.current = next.text
-            onStoryChange(next.text)
-            if (next.over) setVoiceLimit(true)
-            if (next.full) rec.stop()
-          }
+          if (!text) continue
+          // never past the limit without a word: what was said is kept whole, the page says so and stops listening
+          const next = insertSpoken(storyRef.current, text, cursorRef.current, STORY_MAX)
+          storyRef.current = next.text
+          cursorRef.current = next.cursor
+          onStoryChange(next.text)
+          window.setTimeout(() => {
+            const ta = taRef.current
+            if (ta && document.activeElement === ta) ta.setSelectionRange(next.cursor, next.cursor)
+          }, 0)
+          if (next.over) setVoiceLimit(true)
+          if (next.full) stopVoice()
         } else {
           interimText += r[0].transcript
         }
       }
       setInterim(interimText)
     }
+    rec.onerror = (e) => {
+      errorRef.current = e?.error ?? 'error'
+    }
     rec.onend = () => {
-      setListening(false)
       setInterim('')
       recognitionRef.current = null
-    }
-    rec.onerror = () => {
+      // the browser stops by itself on silence: while the button is still on, listen again (unless the microphone was refused, or it is stopping in a loop)
+      const now = Date.now()
+      restartsRef.current = restartsRef.current.filter((t) => now - t < 2000)
+      if (shouldRestart(wantRef.current, errorRef.current) && restartsRef.current.length < 6) {
+        restartsRef.current.push(now)
+        window.setTimeout(beginVoice, 120)
+        return
+      }
+      wantRef.current = false
       setListening(false)
-      setInterim('')
     }
     recognitionRef.current = rec
-    rec.start()
-    setListening(true)
+    try {
+      rec.start()
+    } catch {
+      wantRef.current = false
+      setListening(false)
+    }
   }
+  const toggleVoice = () => {
+    if (listening) {
+      stopVoice()
+      return
+    }
+    if (!getSpeechRecognition()) return
+    setVoiceLimit(false)
+    trackFlow('voice_used', { language: context.language, set, qid: questionId })
+    cursorRef.current = taRef.current?.selectionStart ?? storyRef.current.length
+    wantRef.current = true
+    restartsRef.current = []
+    setListening(true)
+    beginVoice()
+  }
+  useEffect(() => () => {
+    wantRef.current = false
+    recognitionRef.current?.stop()
+  }, [])
 
   return (
     <form
@@ -239,7 +300,7 @@ export default function Composer({ story, onStoryChange, onSubmit, copy, lang, c
         if (ready) onSubmit()
       }}
     >
-      <Chips name="relationship" label={copy.relationshipLabel} codes={[...RELATIONSHIP_CODES, 'other'] as const} labels={{ ...copy.relationships, other: pc.other }} value={context.relationship} onPick={(c) => setCtx({ relationship: c })} />
+      <Chips name="relationship" label={copy.relationshipLabel} codes={[...RELATIONSHIP_CODES, 'other'] as const} labels={{ ...copy.relationships, other: pc.other }} value={context.relationship} onPick={(c) => pickRelationship(c)} />
       {context.relationship === 'other' && <OtherText name="relationship_other" value={context.relationshipOther ?? ''} max={RELATIONSHIP_OTHER_MAX} placeholder={pc.relationshipOtherPlaceholder} onChange={(v) => setCtx({ relationshipOther: v })} />}
       <Chips name="direction" label={memorial ? copy.memorial.directionLabel : copy.directionLabel} codes={DIRECTION_CODES} labels={memorial ? copy.memorial.directions : copy.directions} value={context.direction} onPick={(c) => setCtx({ direction: c })} />
       <Chips name="purpose" label={pc.purposeLabel} codes={PURPOSE_CODES} labels={pc.purposes} value={purpose} onPick={(c) => setCtx({ purpose: c, occasion: '' })} />
@@ -299,10 +360,17 @@ export default function Composer({ story, onStoryChange, onSubmit, copy, lang, c
       )}
       <textarea
         id="moment"
+        ref={taRef}
         data-testid="story-input"
         rows={6}
         value={story}
-        onChange={(e) => onStoryChange(e.target.value)}
+        onChange={(e) => {
+          cursorRef.current = e.target.selectionStart ?? e.target.value.length
+          onStoryChange(e.target.value)
+        }}
+        onSelect={(e) => {
+          cursorRef.current = e.currentTarget.selectionStart ?? cursorRef.current
+        }}
         aria-invalid={over || undefined}
         placeholder={o.answerHint}
       />
@@ -319,18 +387,43 @@ export default function Composer({ story, onStoryChange, onSubmit, copy, lang, c
         </p>
       )}
 
-      {!speechSupported && (
-        <span className="sent" data-testid="voice-none">
-          {o.voiceNone}
-        </span>
+      {listening && (
+        <p className="voiceInterim" data-testid="voice-interim" aria-hidden="true">
+          {interim}
+        </p>
       )}
       {speechSupported && (
-        <button type="button" className={`btn ghost voice${listening ? ' on' : ''}`} onClick={toggleVoice} aria-pressed={listening}>
-          <span className="dot" aria-hidden="true" />
-          {listening ? copy.voiceListening : copy.voiceStart}
-        </button>
+        <div className="voiceRow">
+          <button type="button" className={`btn ghost voice${listening ? ' on' : ''}`} data-testid="voice-button" onClick={toggleVoice} aria-pressed={listening}>
+            <span className="dot" aria-hidden="true" />
+            {listening ? copy.voiceListening : copy.voiceStart}
+          </button>
+          <select
+            className="voiceLang"
+            data-testid="voice-lang"
+            aria-label="Speech language"
+            value={voiceLang}
+            disabled={listening}
+            onChange={(e) => {
+              const v = e.target.value
+              if (isVoiceLang(v)) {
+                voicePicked.current = true
+                saveVoiceLang(v)
+                setVoiceLang(v)
+              }
+            }}
+          >
+            {VOICE_LANGS.map((l) => (
+              <option key={l.code} value={l.code}>
+                {l.label}
+              </option>
+            ))}
+          </select>
+        </div>
       )}
-      {interim && <span className="sent">{interim}…</span>}
+      <span className="sent" data-testid="voice-help">
+        {o.voiceNone}
+      </span>
       {voiceLimit && (
         <span className="sent" role="status" data-testid="voice-limit-note">
           {copy.voiceLimit}

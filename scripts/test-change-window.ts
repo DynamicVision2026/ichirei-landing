@@ -181,9 +181,14 @@ paidAt['IC-20261023-CLOSED01'] = paid(-30) // paid 30 hours before T0 → at T0+
   const gift = (await store.get(inWin.token)) as GiftRecord
   check('(6) EDIT NAMES AND MESSAGE: the order, the card and the receiver\'s page carry them; the log says which fields, not their text', r.status === 200 && after.production.sender_name === '山田 次郎' && after.production.receiver_name === '山田 三郎' && after.production.gift_message === 'いつも ありがとう' && gift.from === '山田 次郎' && gift.to === '山田 三郎' && gift.message === 'いつも ありがとう' && after.ops?.log?.at(-1)?.detail === 'sender+receiver+message' && !JSON.stringify(after.ops).includes('次郎'))
   const long = await change({ order_ref: 'IC-20261023-INWINDOW', action: 'names', message: 'あ'.repeat(61) })
-  const blank = await change({ order_ref: 'IC-20261023-INWINDOW', action: 'names', sender: '   ' })
+  const tooLong = await change({ order_ref: 'IC-20261023-INWINDOW', action: 'names', sender: 'あ'.repeat(21) })
   const none = await change({ order_ref: 'IC-20261023-INWINDOW', action: 'names', sender: '山田 次郎' })
-  check('(6) a message over 60 characters, an empty name and "nothing changed" are refused', long.json.code === 'message_too_long' && blank.json.code === 'bad_sender' && none.json.code === 'nothing_changed')
+  check('(6) a message over 60 characters, a name over 20 characters and "nothing changed" are refused', long.json.code === 'message_too_long' && tooLong.json.code === 'bad_sender' && none.json.code === 'nothing_changed')
+  // 2026-11-05: names are optional — blanking one is allowed, and it is then left out of the card and the receiver's page
+  const cleared = await change({ order_ref: 'IC-20261023-INWINDOW', action: 'names', sender: '   ' })
+  const clearedRec = await get('IC-20261023-INWINDOW')
+  const clearedGift = (await store.get(inWin.token)) as GiftRecord
+  check('(6) names are optional: a blank sender clears the name on the order and on the receiver\'s page (no placeholder)', cleared.status === 200 && clearedRec.production.sender_name === '' && clearedGift.from === '' && clearedGift.to === '山田 三郎')
   const me = await addOrder('IC-20261023-SENDME01', { ship_to: 'me', gift_message: undefined })
   paidAt['IC-20261023-SENDME01'] = paid(0)
   const m = await change({ order_ref: 'IC-20261023-SENDME01', action: 'names', message: 'こんにちは' })

@@ -10,6 +10,7 @@ import { join } from 'node:path'
 import { SAMPLE_IDS, SAMPLE_RECORDS } from '../engine/animation.ts'
 import { kanaFixWords, loadTokenizer } from '../engine/kana.ts'
 import { PICTURE_WORDS, kanaFixText, trimPicture, buildFilmPrompt, checkFilmScript, checkPictures, fallbackFilm, lineLimits, lineSize, loadFilmPrompt, makeFilm, pictureWords, type FilmInput } from '../engine/film.ts'
+import { captionLanguageProblem, convertCaptionScript } from '../engine/script.ts'
 import { loadPalette } from '../engine/palette.ts'
 import { animationView, type AnimationRecord } from '../engine/animation.ts'
 import { outcomeOf } from '../engine/preview.ts'
@@ -339,6 +340,17 @@ const animationViewFor = (film: Awaited<ReturnType<typeof makeFilm>>) => animati
   check('(8) the character check looks at the GIFT character only: a line with another card\'s character (猫) passes when the gift is 待; with the gift 猫 it fails `character`', checkFilmScript({ ...SAFE, lines: [SAFE.lines[0], SAFE.lines[1], '野良猫が玄関にいて、\n母は笑っていた。', SAFE.lines[3]] }, hin({ story: QSTORY, glyph: '待', forms: ['待', '猫'], chosen: ['待'] }), palette).filter((p) => p.code === 'character').length === 0 && checkFilmScript({ ...SAFE, lines: [SAFE.lines[0], SAFE.lines[1], '野良猫が玄関にいて、\n母は笑っていた。', SAFE.lines[3]] }, hin({ story: QSTORY, glyph: '猫', forms: ['待', '猫'], chosen: ['猫'] }), palette).some((p) => p.code === 'character'))
   const fixedScript = { ...QSCRIPT, lines: QSCRIPT.lines.map((l, i) => (i === 2 ? fkana! : l)) }
   check('(8) the quote check ACCEPTS the kana form of a story quotation (まってたよ) and the script then has no problem at all; a quotation that differs in any other way is still refused', checkFilmScript(fixedScript, qin(), palette).length === 0 && checkFilmScript({ ...fixedScript, lines: fixedScript.lines.map((l, i) => (i === 2 ? '「ずっとまっていたよ」と、\n母は玄関で言った。' : l)) }, qin(), palette).some((p) => p.code === 'quote'))
+  // ---- 2026-11-05 Part 1: the captions are in the order's language and script; the customer's own quotations stay exactly as written
+  {
+    const zhIn = qin({ language: 'zh-Hant' })
+    const ZS = { ...SAFE, lines: ['夜里一直给我留着灯', '她把那一碗湯端了過來', '「ただいま」と言って笑った', '什麼都沒說，只是坐下'] }
+    const probs = checkFilmScript(ZS, zhIn, palette).filter((p) => p.code === 'language')
+    check('(9) zh-Hant captions: a Simplified line (夜里一直给我留着灯) and a line with kana outside a quotation are `language` problems; a line whose only Japanese is INSIDE 「 」 (the customer\'s own words) is not', probs.map((p) => p.scene).join() === '0' || probs.map((p) => p.scene).join() === '0,2' ? probs.some((p) => p.scene === 0) && !probs.some((p) => p.scene === 1) : false, JSON.stringify(probs))
+    check('(9) …the quotation test: 「ただいま」と言って笑った has kana OUTSIDE the quotation (と言って笑った), so it is a problem; 她說「ただいま」 is not', captionLanguageProblem('「ただいま」と言って笑った', 'zh-Hant') !== null && captionLanguageProblem('她說「ただいま」', 'zh-Hant') === null && captionLanguageProblem('她說「忆」', 'zh-Hant') === null)
+    check('(9) a Simplified caption is converted in code outside its quotation marks (no model call): 夜里一直给我留着灯 → 夜裡一直給我留著燈, and 她說「旧车」 keeps the customer\'s 旧车 exactly', convertCaptionScript('夜里一直给我留着灯', 'zh-Hant') === '夜裡一直給我留著燈' && convertCaptionScript('她说「旧车」', 'zh-Hant') === '她說「旧车」' && convertCaptionScript('すでに日本語', 'zh-Hant') === null)
+    const repaired = await run([{ ...SAFE, lines: ['她把那一碗熱湯默默地端了過來', '夜里整晚给我留着门口的亮光', '什麼都沒說，只是在我身旁安靜地坐下', '天亮了她還在那裡等著我回來'] }], zhIn, 'ok', {})
+    check('(9) a film for a zh-Hant order with one Simplified caption ends READY with the caption converted, all four pictures, and no scene rewrite call (the script call only)', repaired.status === 'ready' && repaired.lines[1] === '夜裡整晚給我留著門口的亮光' && seen.length === 1, `${repaired.status} ${JSON.stringify(repaired.lines)} calls ${seen.length} ${JSON.stringify((repaired as any).blocked_by)} ${logs.filter((l) => /film_blocked|scene/.test(l)).join(' | ').slice(0, 400)}`)
+  }
   const q1 = await run([QSCRIPT], qin(), 'ok', {})
   check('(8) THE LIVE CASE ends with FOUR drawn scenes: no scene is washi, all four pictures are there, scene 3 shows its line in kana (まってた), there was NO model call for it (the script call only), and the debug says line: kana_fixed beside the picture outcome pass', q1.status === 'ready' && q1.scenes?.every((x) => x.state !== 'washi') === true && q1.pictures.every((x) => x.trim().length > 0) && q1.lines[2] === fkana && q1.scenes?.[2].line === 'kana_fixed' && q1.scenes?.[2].state === 'pass' && q1.scenes?.[0].line === 'ok' && seen.length === 1, JSON.stringify([q1.status, q1.scenes, q1.lines[2], seen.length]))
   const qv = outcomeOf({ schema: 'animation', id: 'AN-x', order_ref: 'DRAFT', created_at: '', language: 'ja', glyph: '', reading: '', romanization: '', meaning_en: null, moment: '', who: '', memorial: false, film: q1 } as never, null)

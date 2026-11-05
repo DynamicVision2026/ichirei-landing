@@ -10,6 +10,7 @@ import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { callSignal } from './limits.ts'
 import type { Candidate, EngineResult, Language } from './contract.ts'
+import { convertLineScript, lineLanguageProblem } from './script.ts'
 
 export const GAZE_TIMEOUT_MS = 12_000
 export const gazeFixEnabled = (env: NodeJS.ProcessEnv = process.env): boolean => !/^(off|0|false|no)$/i.test((env.ICHIREI_GAZE_FIX ?? '').trim())
@@ -47,6 +48,9 @@ export function gazeIssues(gaze: string, language: Language): string[] {
   const t = strip(gaze)
   if (!t) return ['it is empty']
   const out: string[] = []
+  // The line must be in the page's language and script (2026-11-05). A line that only needs the Chinese script converted is mended in code (OpenCC) before it is shown, so it is not a model problem.
+  const lp = lineLanguageProblem(t, language)
+  if (lp && (lp.fix === 'rewrite' || convertLineScript(t, language) === null)) out.push(lp.message)
   if (language === 'ja') {
     const last = [...t].at(-1) ?? ''
     if (HIRAGANA_END.test(last) && !NOUNISH_END.test(t)) out.push('it ends on a verb or an adjective, not on a noun phrase (it must end on the person, e.g. 〜人 / 〜父)')

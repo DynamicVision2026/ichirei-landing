@@ -167,6 +167,12 @@ Repeats of main characters are counted from the orders themselves, not from anal
 
 ---
 
+## D2. Language and script of every line (2026-11-05)
+- Every line a customer reads on a card is in the page's language and script, **checked in code** (`engine/script.ts`), not only asked for in the prompt: zh-Hant — no kana, no Simplified-only characters; zh-Hans — no kana, no Traditional-only characters; ja — at least some kana; en — no CJK outside quotation marks. The story quote (「あなたの場面」) is the customer's own text and is never checked or converted.
+- Rescue order: only the Chinese script wrong → converted with OpenCC (Taiwan variant with phrases for zh-Hant); otherwise **one** rewrite in the right language; still wrong → the card is dropped and the slot's normal refill follows. Applies to rounds 1–3, the refill, the engine's last gate, the film captions (outside quotation marks; same order, a line that still fails is shown empty, the picture is drawn), the Chinese poems (converted character by character; kana = a failed check) and the gift page.
+- The free pick (趣字) has the same safety net in every round (a second hedged pair, told every character already shown); `free_retry` is logged with the round and the reason.
+- The reading aids of a 漢詩 (書き下し文, the summary / translation) follow the poem rule: no scenery, object or feeling the story does not give; the poem review reads them with the lines; one rewrite, then the poem in hand is kept.
+
 ## E. Settings (current)
 - Effort: medium.
 - Token limit: 14,000, with one retry at 20,000.

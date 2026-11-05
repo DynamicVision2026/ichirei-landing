@@ -10,7 +10,8 @@ import http from 'node:http'
 import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { CI_PATTERNS, blockedCharacters, checkCharacterOnce, checkContainsCharacter, checkCraft, checkForcedLabel, checkForm, checkPalette, meaningWords, moraCount } from '../engine/poem-check.ts'
-import { buyerAids, generatePoem, loadPoemPrompt, loadPoemReviewPrompt, poemFamilies, reasonCode, type PoemInput } from '../engine/poem.ts'
+import { poemLinesForLanguage } from '../engine/script.ts'
+import { aidsText, buyerAids, generatePoem, loadPoemPrompt, loadPoemReviewPrompt, poemFamilies, reasonCode, type PoemInput } from '../engine/poem.ts'
 import { createPoemHandler } from '../api/poem.ts'
 import { createOrderHandler } from '../api/order.ts'
 import { MemoryOrderStore } from '../engine/order-store.ts'
@@ -140,6 +141,31 @@ function count(k: 'poem' | 'review') { return seen.filter((s) => s.kind === k).l
   const prompt = (await gen(C04, 'tang', [C04.poems.tang]), seen[0].prompt)
   check('(3) the prompt the model gets: the context, the character and its forms, the story, the blocked characters for a MEMORIAL gift (祝 喜 …), the aids line — and no slot left', prompt.includes('occasion: memorial') && prompt.includes('character: 綴') && prompt.includes('Dozens') === false && prompt.includes('祝') && !/\{\{ [A-Z_]+ \}\}/.test(prompt) && prompt.includes('kakikudashi'))
   check('(3) the safety review prompt gets the poem, the story and the rules; its slots are filled', seen[1].prompt.includes('Poem Review Prompt') && seen[1].prompt.includes('舊箋幾十通') && !/\{\{ [A-Z_]+ \}\}/.test(seen[1].prompt))
+}
+
+// ---- 4b. (2026-11-05, Part 6) the 漢詩's 書き下し文 and its summary / translation follow the poem rule: no scenery, object or feeling the story does not give
+{
+  const MOON = { ...C20.poems.tang, gendaigo: '毎朝早く起きて庭の花を折り、月明かりの下で弁当を詰めてくれた。何も言わず、ただ家にいてくれた。' }
+  const r = await gen(C20, 'tang', [MOON, C20.poems.tang], [{ pass: false, rule: 'story_image', reason: 'the summary adds moonlight, which the story does not give' }, { pass: true, rule: null, reason: 'ok' }])
+  const reviewPrompt = seen.find((x) => x.kind === 'review')?.prompt ?? ''
+  const second = seen.filter((x) => x.kind === 'poem')[1]?.prompt ?? ''
+  check('(4b) the reviewer reads the 書き下し文 and the summary together with the lines (they are part of the poem)', reviewPrompt.includes('READING AIDS') && reviewPrompt.includes('現代語訳') && reviewPrompt.includes('月明かりの下で') && reviewPrompt.includes('書き下し文'))
+  check('(4b) a fake summary with an image that is not in the story (月明かり) → ONE rewrite asked for, naming the reading aids; the rewritten summary (no moon) is what the card gets', r.ok && count('poem') === 2 && second.includes('SECOND READER') && second.includes('reading aids') && !r.poem.aids.gendaigo!.includes('月明かり') && !r.poem.reading.includes('月明かり'))
+  const r2 = await gen(C20, 'tang', [MOON, MOON], [{ pass: false, rule: 'story_image', reason: 'moonlight' }, { pass: false, rule: 'story_image', reason: 'still moonlight' }])
+  check('(4b) …rejected again after the rewrite: one rewrite only, then the poem in hand is kept (a poem is never lost to the quality rule)', r2.ok && count('poem') === 2 && count('review') === 2 && logs.some((l) => l.includes('story_image_kept')))
+  check('(4b) the writer prompt says the aids follow the poem rule, and so does the review prompt', buyerAids('tang', 'ja').includes('THE SAME RULE AS THE POEM') && buyerAids('tang', 'en').includes('THE SAME RULE AS THE POEM') && loadPoemReviewPrompt().includes('PART OF THE POEM'))
+  check('(4b) aidsText lays the aids out for the reviewer (書き下し, 現代語訳, English, romaji) and is empty when there are none', aidsText({ kakikudashi: ['a'], romaji: ['b'], english: 'c', gendaigo: 'd' } as never).split('\n\n').length === 4 && aidsText({ kakikudashi: null, romaji: null, english: null, gendaigo: null } as never) === '')
+}
+
+// ---- 4c. (2026-11-05, Part 1) a Chinese poem is in the buyer's own script
+{
+  const simp = { ...C20.poems.tang, lines: ['晨起折庭花', '盒中春色华', '廿载备朝饭', '不言惟在家'] }
+  const r = await gen(C20, 'tang', [simp], [], 'zh-Hant')
+  check('(4c) a zh-Hant buyer\'s tang written in Simplified characters is converted in code, character by character (华 载 备 饭 → 華 載 備 飯), the length unchanged, no second poem call', r.ok && r.poem.lines.join() === '晨起折庭花,盒中春色華,廿載備朝飯,不言惟在家' && count('poem') === 1, JSON.stringify(r.ok ? r.poem.lines : r))
+  const kana = { ...C20.poems.tang, lines: ['晨起折庭花', '盒中春色の華', '廿載備朝飯', '不言惟在家'] }
+  const r2 = await gen(C20, 'tang', [kana, C20.poems.tang], [], 'zh-Hant')
+  check('(4c) a line with Japanese kana in a Chinese poem fails the check → the poem is written again once, and the second one stands', r2.ok && count('poem') === 2 && seen[1].prompt.includes('Japanese kana'))
+  check('(4c) a zh-Hans buyer gets the Simplified form of a Traditional tang; a ja buyer\'s tang, a tanka and an English poem are not touched', poemLinesForLanguage(['廿載備朝飯'], 'tang', 'zh-Hans').lines[0] === '廿载备朝饭' && poemLinesForLanguage(['廿載備朝飯'], 'tang', 'ja').lines[0] === '廿載備朝飯' && poemLinesForLanguage(['あさごとに'], 'tanka', 'zh-Hant').problem === null && poemLinesForLanguage(['Each morning'], 'en', 'en').lines[0] === 'Each morning' && (await gen(C20, 'tang', [C20.poems.tang])).ok === true)
 }
 
 // ---- 4. failures: regenerate once, then an error for that type only ---------------------------------------------------------------------------
@@ -363,9 +389,9 @@ const postOrder = (h: (r: Request) => Promise<Response>, b: unknown) => h(new Re
   const lines = shopSeen[0].variables.input.lines
   const attr = (l: any, k: string) => l.attributes.find((a: any) => a.key === k)?.value
   check('(6) an order with the included poem: ONE cart with ONE line item (the package) — no poem line item, no poem product, no variant', res.status === 200 && lines.length === 1 && lines[0].merchandiseId.endsWith('/2'), JSON.stringify(j).slice(0, 200))
-  check('(6) the poem goes on that main line as ichirei_poem_type, ichirei_poem_text (the lines, one per row) and ichirei_poem_reading', attr(lines[0], 'ichirei_poem_type') === 'tanka' && attr(lines[0], 'ichirei_poem_text') === C20.poems.tanka.lines.join('\n') && attr(lines[0], 'ichirei_poem_reading') === '-')
+  check('(6) the poem goes on that main line as ichirei_poem_type, ichirei_poem_text (the lines, one per row) and ichirei_poem_reading', attr(lines[0], '_ichirei_poem_type') === 'tanka' && attr(lines[0], '_ichirei_poem_text') === C20.poems.tanka.lines.join('\n') && attr(lines[0], '_ichirei_poem_reading') === '-')
   check('(6) poem text comes from the server\'s store, never from the browser: the "EVIL" lines sent with the poem_id are ignored', !JSON.stringify(shopSeen[0]).includes('EVIL'))
-  check('(6) the attribute order: the nine usual ones, then the poem (type, text, reading), then the animation link last', lines[0].attributes.map((a: any) => a.key).join() === 'kanji,inscription_form,reading,certificate_meaning_en,sender_name,receiver_name,delivery_date,language,order_ref,ichirei_size,ship_to,ichirei_poem_type,ichirei_poem_text,ichirei_poem_reading,ichirei_gift_url,ichirei_animation_url')
+  check('(6) the attribute order: the two visible ones and the hidden usual ones, then the poem (type, text, reading), then the animation link last', lines[0].attributes.map((a: any) => a.key).join() === '一字,開封日,_kanji,_inscription_form,_reading,_certificate_meaning_en,_sender_name,_receiver_name,_delivery_date,_opens_on,_language,_order_ref,_ichirei_size,_ship_to,_ichirei_poem_type,_ichirei_poem_text,_ichirei_poem_reading,_ichirei_gift_url,_ichirei_animation_url')
   const rec = store.records.get(j.order_ref) as any
   check('(6) the certificate object carries poems: [{type, lines, reading}] (response and stored record); the record has no price for it', j.certificate.poems.length === 1 && j.certificate.poems[0].type === 'tanka' && j.certificate.poems[0].lines.length === 5 && rec.production.certificate.poems.length === 1 && rec.production.poems.length === 1 && !('price_jpy' in rec.production.poems[0]))
   const anim = store.records.get(j.animation_url.split('/').pop()) as any

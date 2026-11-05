@@ -179,6 +179,9 @@ export interface Copy {
   timeout: (seconds: number) => string
   // reveal
   revealIntro: string
+  /** Customer page: the line above the cards, and the one button on every card. */
+  revealIntroCustomer: string
+  giveThis: string
   selectThis: string
   selectedThis: string
   explainButton: string
@@ -216,6 +219,8 @@ export interface Copy {
     senderPlaceholder: string
     receiverLabel: string
     receiverPlaceholder: string
+    /** The one line under both name fields (2026-11-05): names are optional, a nickname is enough. */
+    nameHelp: string
     dateLabel: string
     dateNotice: (days: number) => string
     inscriptionLabel: string
@@ -299,9 +304,9 @@ const ja: Copy = {
       across: '対等な相手（配偶者・友人・きょうだいなど）',
     },
     finalizeButton: 'この一字を、残す',
-    senderLabel: 'あなたのお名前',
-    receiverLabel: '偲ぶ方のお名前',
-    receiverPlaceholder: '例：山田 花子',
+    senderLabel: 'あなたの呼び名（任意）',
+    receiverLabel: '偲ぶ方の呼び名（任意）',
+    receiverPlaceholder: '例：お母さん、父、ハナちゃん',
     suggestTitle: '亡くなった方のお話のようです。',
     suggestBody: '「偲ぶ」として探しなおしますか？ 字の選びかたが、やわらかく変わります。選ぶのはあなたです。',
     suggestYes: '「偲ぶ」で探しなおす',
@@ -309,7 +314,7 @@ const ja: Copy = {
   },
   openingAsk: 'その人のことを、全部書かなくていい。その人らしい、小さなことを、ひとつだけ。',
   voiceStart: '声で話す',
-  voiceListening: '聞いています… タップで停止',
+  voiceListening: '話しています…（タップで停止）',
   voiceLimit: '5000字までです。音声入力を止めました（話した内容はすべて残っています）。',
   voiceUnsupported: 'このブラウザは音声入力に対応していません — 下に書いてください',
   storyPlaceholder: 'たとえば——いつも同じ場所に座って、同じ湯のみでお茶を飲んでいた……',
@@ -348,6 +353,8 @@ const ja: Copy = {
   timeout: (s) =>
     `結果が届く前に時間切れになりました（${s}秒）。もう一度お試しください。続く場合はサーバー側の制限の可能性があります。`,
   revealIntro: 'あなたの言葉から、一字ずつ浮かびあがります。気になった字に触れてください。',
+  revealIntroCustomer: 'あなたの物語から見つかった字です。贈りたい一字を選んでください。',
+  giveThis: 'この字で贈る',
   selectThis: 'この一字を選ぶ',
   selectedThis: 'この一字を選んでいます',
   explainButton: 'この一字を、深く読む',
@@ -367,10 +374,11 @@ const ja: Copy = {
   order: {
     heading: 'ご注文',
     chosenLabel: 'あなたが選んだ一字',
-    senderLabel: 'あなたのお名前（差出人）',
-    senderPlaceholder: '例：山田 太郎',
-    receiverLabel: '贈る方のお名前',
-    receiverPlaceholder: '例：山田 一郎',
+    senderLabel: 'あなたの呼び名（任意）',
+    senderPlaceholder: '例：まゆ、長女、息子',
+    receiverLabel: '贈る相手の呼び名（任意）',
+    receiverPlaceholder: '例：お母さん、父、ハナちゃん',
+    nameHelp: '本名でなくても大丈夫です。空欄の場合、カードに名前は入りません。',
     dateLabel: 'お届け希望日',
     dateNotice: (n) => `お届け希望日まで${n}日です。`,
     inscriptionLabel: '刻印の字体',
@@ -382,7 +390,7 @@ const ja: Copy = {
     packages: SIZE_COPY['ja'].names,
     shippingNote: '国内送料無料・海外送料 ¥6,000',
     certificateLabel: '添える一文',
-    privacy: 'ご注文の際に、入力いただいたお名前・物語・選ばれた一字を、制作のために保存します。',
+    privacy: 'ご注文の際に、入力いただいたお名前・物語・選ばれた一字を、制作のために保存します。お名前の入力は任意です。入力された呼び名は、贈りものに表示するためだけに使います。',
     submit: 'お支払いへ進む',
     submitting: '準備しています…',
     redirecting: 'お支払いページへ移動します…',
@@ -391,7 +399,7 @@ const ja: Copy = {
       generic: 'ご注文を受け付けられませんでした。お手数ですが、もう一度お試しください。',
       network: '通信に失敗しました。もう一度お試しください。',
       notConfigured: 'ただいまご注文を受け付けられません。時間をおいて、もう一度お試しください。',
-      field: (f) => `「${{ sender_name: 'あなたのお名前', receiver_name: '贈る方のお名前', delivery_date: 'お届け希望日', inscription_style: '刻印の字体', package: 'パッケージ' }[f]}」をご確認ください。`,
+      field: (f) => `「${{ sender_name: 'あなたの呼び名', receiver_name: '贈る相手の呼び名', delivery_date: 'お届け希望日', inscription_style: '刻印の字体', package: 'パッケージ' }[f]}」をご確認ください。`,
     },
   },
 }
@@ -448,9 +456,9 @@ const zhHans: Copy = {
       across: '平辈（伴侣、朋友、兄弟姐妹）',
     },
     finalizeButton: '就留下这一个字',
-    senderLabel: '你的姓名',
-    receiverLabel: '追思对象的姓名',
-    receiverPlaceholder: '例如：李华',
+    senderLabel: '你的称呼（选填）',
+    receiverLabel: '追思对象的称呼（选填）',
+    receiverPlaceholder: '例如：妈妈、老爸、阿华',
     suggestTitle: '这听起来是关于一位已经离世的人。',
     suggestBody: '要改用“追思”重新寻找吗？选字的方式会变得更温柔。由你来决定。',
     suggestYes: '改用“追思”重新寻找',
@@ -458,7 +466,7 @@ const zhHans: Copy = {
   },
   openingAsk: '不必写下那个人的全部。只写一件最像那个人的小事就好。',
   voiceStart: '用语音说',
-  voiceListening: '正在聆听… 点按停止',
+  voiceListening: '正在聆听…（点一下停止）',
   voiceLimit: '最多 5000 字，已停止语音输入（说过的内容都保留着）。',
   voiceUnsupported: '此浏览器不支持语音输入——请在下方书写',
   storyPlaceholder: '例如——总是坐在同一个位置，用同一只杯子喝茶……',
@@ -495,6 +503,8 @@ const zhHans: Copy = {
   rateLimited: '此连接在短时间内的请求过多。请稍候片刻再试。',
   timeout: (s) => `结果送达前已超时（${s} 秒）。请再试一次；若持续出现，可能是服务器端的限制。`,
   revealIntro: '从你的文字里，一个字一个字浮现出来。请触碰让你在意的字。',
+  revealIntroCustomer: '这些字是从你的故事里找到的。请选一个想送出的字。',
+  giveThis: '送这个字',
   selectThis: '选择这个字',
   selectedThis: '已选择这个字',
   explainButton: '深入读读这个字',
@@ -506,7 +516,8 @@ const zhHans: Copy = {
   finalized: (k) => `「${k}」已选定`,
   chooseHint: '打开一个字并点“选择这个字”即可决定',
   chooseHintCustomer: '请先选择其中一个字，再继续。',
-  glyphReading: (c, carved) => `${c.inscription_form ? `${carved === c.kanji ? c.inscription_form : c.kanji} ・ ` : ''}${cleanReading(c.reading)}`,
+  // The reading line is the pinyin only (2026-11-05): the other form of the character appears in the 刻字 note, never here (a Traditional page never shows the Simplified form on this line).
+  glyphReading: (c) => cleanReading(c.reading),
   inscriptionNote: (c, script) =>
     c.inscription_form
       ? script === 'simplified'
@@ -519,10 +530,11 @@ const zhHans: Copy = {
   order: {
     heading: '下单',
     chosenLabel: '你选定的这个字',
-    senderLabel: '你的姓名（送礼人）',
-    senderPlaceholder: '例如：李明',
-    receiverLabel: '收礼人的姓名',
-    receiverPlaceholder: '例如：李华',
+    senderLabel: '你的称呼（选填）',
+    senderPlaceholder: '例如：小美、大女儿、儿子',
+    receiverLabel: '收礼人的称呼（选填）',
+    receiverPlaceholder: '例如：妈妈、老爸、阿华',
+    nameHelp: '不必填写真实姓名。留空的话，卡片上不会出现名字。',
     dateLabel: '期望送达日',
     dateNotice: (n) => `距离期望送达日还有 ${n} 天。`,
     inscriptionLabel: '刻字字体',
@@ -534,7 +546,7 @@ const zhHans: Copy = {
     packages: SIZE_COPY['zh-Hans'].names,
     shippingNote: '日本国内免运费・海外运费 ¥6,000',
     certificateLabel: '随礼附上的一句话',
-    privacy: '下单时，我们会保存你填写的姓名、故事和选定的字，用于制作。',
+    privacy: '下单时，我们会保存你填写的姓名、故事和选定的字，用于制作。姓名为选填。你填写的称呼只会用来显示在礼物上。',
     submit: '前往付款',
     submitting: '正在准备…',
     redirecting: '正在前往付款页面…',
@@ -543,7 +555,7 @@ const zhHans: Copy = {
       generic: '未能受理订单，请再试一次。',
       network: '网络连接失败，请再试一次。',
       notConfigured: '目前暂时无法下单，请稍后再试。',
-      field: (f) => `请检查「${{ sender_name: '你的姓名', receiver_name: '收礼人的姓名', delivery_date: '期望送达日', inscription_style: '刻字字体', package: '套餐' }[f]}」。`,
+      field: (f) => `请检查「${{ sender_name: '你的称呼', receiver_name: '收礼人的称呼', delivery_date: '期望送达日', inscription_style: '刻字字体', package: '套餐' }[f]}」。`,
     },
   },
 }
@@ -600,9 +612,9 @@ const zhHant: Copy = {
       across: '平輩（伴侶、朋友、兄弟姊妹）',
     },
     finalizeButton: '就留下這一個字',
-    senderLabel: '你的姓名',
-    receiverLabel: '追思對象的姓名',
-    receiverPlaceholder: '例如：李華',
+    senderLabel: '你的稱呼（選填）',
+    receiverLabel: '追思對象的稱呼（選填）',
+    receiverPlaceholder: '例如：媽媽、老爸、阿華',
     suggestTitle: '這聽起來是關於一位已經離世的人。',
     suggestBody: '要改用「追思」重新尋找嗎？選字的方式會變得更溫柔。由你來決定。',
     suggestYes: '改用「追思」重新尋找',
@@ -610,7 +622,7 @@ const zhHant: Copy = {
   },
   openingAsk: '不必寫下那個人的全部。只寫一件最像那個人的小事就好。',
   voiceStart: '用語音說',
-  voiceListening: '正在聆聽… 點按停止',
+  voiceListening: '正在聆聽…（點一下停止）',
   voiceLimit: '最多 5000 字，已停止語音輸入（說過的內容都保留著）。',
   voiceUnsupported: '此瀏覽器不支援語音輸入——請在下方書寫',
   storyPlaceholder: '例如——總是坐在同一個位置，用同一只杯子喝茶……',
@@ -647,6 +659,8 @@ const zhHant: Copy = {
   rateLimited: '此連線在短時間內的請求過多。請稍候片刻再試。',
   timeout: (s) => `結果送達前已逾時（${s} 秒）。請再試一次；若持續出現，可能是伺服器端的限制。`,
   revealIntro: '從你的文字裡，一個字一個字浮現出來。請觸碰讓你在意的字。',
+  revealIntroCustomer: '這些字是從你的故事裡找到的。請選一個想送出的字。',
+  giveThis: '送這個字',
   selectThis: '選擇這個字',
   selectedThis: '已選擇這個字',
   explainButton: '深入讀讀這個字',
@@ -658,7 +672,7 @@ const zhHant: Copy = {
   finalized: (k) => `「${k}」已選定`,
   chooseHint: '打開一個字並點「選擇這個字」即可決定',
   chooseHintCustomer: '請先選擇其中一個字，再繼續。',
-  glyphReading: (c, carved) => `${c.inscription_form ? `${carved === c.kanji ? c.inscription_form : c.kanji} ・ ` : ''}${cleanReading(c.reading)}`,
+  glyphReading: (c) => cleanReading(c.reading),
   inscriptionNote: (c, script) =>
     c.inscription_form
       ? script === 'simplified'
@@ -671,10 +685,11 @@ const zhHant: Copy = {
   order: {
     heading: '下單',
     chosenLabel: '你選定的這個字',
-    senderLabel: '你的姓名（送禮人）',
-    senderPlaceholder: '例如：李明',
-    receiverLabel: '收禮人的姓名',
-    receiverPlaceholder: '例如：李華',
+    senderLabel: '你的稱呼（選填）',
+    senderPlaceholder: '例如：小美、大女兒、兒子',
+    receiverLabel: '收禮人的稱呼（選填）',
+    receiverPlaceholder: '例如：媽媽、老爸、阿華',
+    nameHelp: '不必填寫真實姓名。留空的話，卡片上不會出現名字。',
     dateLabel: '期望送達日',
     dateNotice: (n) => `距離期望送達日還有 ${n} 天。`,
     inscriptionLabel: '刻字字體',
@@ -686,7 +701,7 @@ const zhHant: Copy = {
     packages: SIZE_COPY['zh-Hant'].names,
     shippingNote: '日本國內免運費・海外運費 ¥6,000',
     certificateLabel: '隨禮附上的一句話',
-    privacy: '下單時，我們會保存你填寫的姓名、故事和選定的字，用於製作。',
+    privacy: '下單時，我們會保存你填寫的姓名、故事和選定的字，用於製作。姓名為選填。你填寫的稱呼只會用來顯示在禮物上。',
     submit: '前往付款',
     submitting: '正在準備…',
     redirecting: '正在前往付款頁面…',
@@ -695,7 +710,7 @@ const zhHant: Copy = {
       generic: '未能受理訂單，請再試一次。',
       network: '網路連線失敗，請再試一次。',
       notConfigured: '目前暫時無法下單，請稍後再試。',
-      field: (f) => `請檢查「${{ sender_name: '你的姓名', receiver_name: '收禮人的姓名', delivery_date: '期望送達日', inscription_style: '刻字字體', package: '方案' }[f]}」。`,
+      field: (f) => `請檢查「${{ sender_name: '你的稱呼', receiver_name: '收禮人的稱呼', delivery_date: '期望送達日', inscription_style: '刻字字體', package: '方案' }[f]}」。`,
     },
   },
 }
@@ -755,9 +770,9 @@ const en: Copy = {
       across: 'An equal (partner, friend, sibling)',
     },
     finalizeButton: 'Keep this character',
-    senderLabel: 'Your name',
-    receiverLabel: 'Name of the person you are remembering',
-    receiverPlaceholder: 'e.g. Margaret Carter',
+    senderLabel: 'Your name or nickname (optional)',
+    receiverLabel: 'Name or nickname of the person you are remembering (optional)',
+    receiverPlaceholder: 'e.g. Mom, Dad, Grandpa',
     suggestTitle: 'This sounds like a story about someone who has passed away.',
     suggestBody: 'Would you like to look again as “In memory”? The characters are chosen differently, more gently. It is your decision.',
     suggestYes: 'Yes, look again as “In memory”',
@@ -765,7 +780,7 @@ const en: Copy = {
   },
   openingAsk: "You don't have to write everything about them. Just one small thing that is so like them.",
   voiceStart: 'Speak instead',
-  voiceListening: 'Listening… tap to stop',
+  voiceListening: 'Listening… (tap to stop)',
   voiceLimit: 'Stories can be up to 5,000 characters; voice input stopped (everything you said is kept).',
   voiceUnsupported: 'This browser does not support voice input — please write below',
   storyPlaceholder: 'For example — they always sat in the same spot and drank tea from the same cup…',
@@ -804,6 +819,8 @@ const en: Copy = {
   timeout: (s) =>
     `The result did not arrive in time (${s} seconds). Please try again; if it keeps happening it may be a server-side limit.`,
   revealIntro: 'One character at a time, they rise out of your words. Touch the one that draws you.',
+  revealIntroCustomer: 'These characters came from your story. Choose the one you want to give.',
+  giveThis: 'Give this character',
   selectThis: 'Choose this character',
   selectedThis: 'This character is chosen',
   explainButton: 'Read this character more deeply',
@@ -820,14 +837,15 @@ const en: Copy = {
   inscriptionNote: () => null, // the character is carved in its modern Japanese form
   previewNote: () => null,
   slotLabels: { main: 'Main', second: 'Second', freestyle: 'Freestyle' },
-  match: { who: 'Who they are', moment: 'Your moment', feeling: 'The feeling', resonates: 'Resonates deeply', registers: registerTable('en') },
+  match: { who: 'What they\'re like', moment: 'Your moment', feeling: 'The feeling', resonates: 'Resonates deeply', registers: registerTable('en') },
   order: {
     heading: 'Your order',
     chosenLabel: 'The character you chose',
-    senderLabel: 'Your name (the sender)',
-    senderPlaceholder: 'e.g. Emily Carter',
-    receiverLabel: 'Name of the person receiving it',
-    receiverPlaceholder: 'e.g. Margaret Carter',
+    senderLabel: 'Your name or nickname (optional)',
+    senderPlaceholder: 'e.g. Mia, Your son',
+    receiverLabel: 'Their name or nickname (optional)',
+    receiverPlaceholder: 'e.g. Mom, Dad, Grandpa',
+    nameHelp: 'You don\'t need a real name. If you leave it blank, no name appears on the card.',
     dateLabel: 'Requested delivery date',
     dateNotice: (n) => `${n} ${n === 1 ? 'day' : 'days'} until your requested delivery date.`,
     inscriptionLabel: 'Carved form',
@@ -844,7 +862,7 @@ const en: Copy = {
     packages: SIZE_COPY['en'].names,
     shippingNote: 'Free shipping in Japan · ¥6,000 international shipping',
     certificateLabel: 'The line that comes with it',
-    privacy: 'When you order, we keep the names, the story and the character you chose, so that your piece can be made.',
+    privacy: 'When you order, we keep the names, the story and the character you chose, so that your piece can be made. Names are optional. Any name you enter is used only to show on the gift.',
     submit: 'Continue to payment',
     submitting: 'Preparing…',
     redirecting: 'Taking you to payment…',
@@ -853,7 +871,7 @@ const en: Copy = {
       generic: 'We could not take your order. Please try again.',
       network: 'The connection failed. Please try again.',
       notConfigured: 'Orders are not available right now. Please try again a little later.',
-      field: (f) => `Please check “${{ sender_name: 'Your name', receiver_name: 'Name of the person receiving it', delivery_date: 'Requested delivery date', inscription_style: 'Carved form', package: 'Package' }[f]}”.`,
+      field: (f) => `Please check “${{ sender_name: 'Your name or nickname', receiver_name: 'Their name or nickname', delivery_date: 'Requested delivery date', inscription_style: 'Carved form', package: 'Package' }[f]}”.`,
     },
   },
 }

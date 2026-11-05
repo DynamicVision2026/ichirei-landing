@@ -77,7 +77,7 @@ const DENIED = /protected customer data|not approved|access denied|ACCESS_DENIED
 const MAX_PAGES = 5
 
 const refOf = (o: { customAttributes?: Attr[] | null; lineItems?: { nodes?: { customAttributes?: Attr[] | null }[] } | null }): string | null => {
-  for (const a of [...(o.customAttributes ?? []), ...(o.lineItems?.nodes ?? []).flatMap((n) => n.customAttributes ?? [])]) if (a?.key === 'order_ref' && a.value) return a.value
+  for (const a of [...(o.customAttributes ?? []), ...(o.lineItems?.nodes ?? []).flatMap((n) => n.customAttributes ?? [])]) if ((a?.key === '_order_ref' || a?.key === 'order_ref') && a.value) return a.value
   return null
 }
 

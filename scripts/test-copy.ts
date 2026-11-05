@@ -25,6 +25,7 @@ import {
   type Copy,
 } from '../src/demo/i18n.ts'
 import { DIRECTIONS, LANGUAGES, OCCASIONS, OCCASION_DETAIL_MAX as ENGINE_DETAIL_MAX, RELATIONSHIPS, STORY_MAX as ENGINE_STORY_MAX, FOLLOW_UP_MAX as ENGINE_FOLLOW_UP_MAX, parseContext } from '../engine/contract.ts'
+import { PREVIEW_COPY } from '../src/demo/preview-copy.ts'
 
 let failures = 0
 function check(name: string, cond: boolean, detail?: string) {
@@ -131,7 +132,7 @@ check('carvedGlyph: zh defaults to the traditional form, simplified inscription 
 check('carvedGlyph: ja carves the kyūjitai whatever the script field says', carvedGlyph({ kanji: '守', inscription_form: '守' }, 'ja', 'simplified') === '守' && carvedGlyph(plain, 'ja', null) === '証')
 check('notes: zh names what is carved and shows the other form', COPY['zh-Hans'].inscriptionNote(lamp, 'traditional') === '刻字：繁體（简体：灯）' && COPY['zh-Hans'].inscriptionNote(lamp, 'simplified') === '刻字：简体（繁體：燈）' && COPY['zh-Hant'].inscriptionNote(lamp, 'traditional') === '刻字：繁體（簡體：灯）')
 check('notes: ja carves the modern form (新字体) — no kyūjitai pairing or note any more (spec v9.1 step 9)', COPY.ja.inscriptionNote({ kanji: '灯', inscription_form: '燈' }, null) === null && COPY.ja.previewNote({ inscription_form: '燈' }, null) === null)
-check('reading line pairs the carved form with the other form and the reading', COPY['zh-Hans'].glyphReading({ ...lamp, reading: 'dēng' }, '燈') === '灯 ・ dēng' && COPY['zh-Hans'].glyphReading({ ...lamp, reading: 'dēng' }, '灯') === '燈 ・ dēng' && COPY.ja.glyphReading({ kanji: '灯', inscription_form: '燈', reading: 'ひ' }, '灯') === 'ひ')
+check('reading line is the pinyin ONLY on a Chinese page (2026-11-05): the other form of the character appears in the 刻字 note, never on this line — a Traditional page never shows the Simplified form here', COPY['zh-Hans'].glyphReading({ ...lamp, reading: 'dēng' }, '燈') === 'dēng' && COPY['zh-Hant'].glyphReading({ ...lamp, reading: 'dēng' }, '燈') === 'dēng' && COPY['zh-Hant'].glyphReading({ kanji: '忆', inscription_form: '憶', reading: 'yì' }, '憶') === 'yì' && COPY['zh-Hant'].inscriptionNote({ kanji: '忆', inscription_form: '憶' } as never, 'traditional') === '刻字：繁體（簡體：忆）' && COPY.ja.glyphReading({ kanji: '灯', inscription_form: '燈', reading: 'ひ' }, '灯') === 'ひ')
 
 // ---- payload -----------------------------------------------------------------------------
 const full = { ...DEFAULT_GIFT_CONTEXT, language: 'zh-Hans' as const, relationship: 'friend' as const, direction: 'across' as const, occasion: 'wedding' as const, occasionDetail: '  結婚10年 \n', inscriptionScript: 'simplified' as const }
@@ -141,6 +142,19 @@ check('payload: ja sends no inscription_script; blank detail and unchosen fields
 check('payload: whatever the UI sends the engine accepts (parseContext round-trip)', (() => { const r = parseContext(payload); return r.ok && r.context.language === 'zh-Hans' && r.context.inscription_script === 'simplified' && r.context.occasion_detail === '結婚10年' })())
 check('payload: every code the selectors offer is accepted by the engine', RELATIONSHIP_CODES.every((x) => parseContext({ relationship: x }).ok) && DIRECTION_CODES.every((x) => parseContext({ direction: x }).ok) && OCCASION_CODES.every((x) => parseContext({ occasion: x }).ok))
 check('contextComplete: needs relationship, direction and occasion (language always set, detail optional)', !contextComplete(DEFAULT_GIFT_CONTEXT) && !contextComplete({ ...full, occasion: '' }) && contextComplete(full) && contextComplete({ ...full, occasionDetail: '' }))
+
+// ---- 2026-11-05 Part 4 / 9: the card-screen strings, word for word ------------------------------------------------------------------------------------------------
+{
+  const P = PREVIEW_COPY
+  check('card button + top line (ja / zh-Hant / en): この字で贈る / 送這個字 / Give this character; the top line word for word', COPY.ja.giveThis === 'この字で贈る' && COPY['zh-Hant'].giveThis === '送這個字' && COPY.en.giveThis === 'Give this character' && COPY.ja.revealIntroCustomer === 'あなたの物語から見つかった字です。贈りたい一字を選んでください。' && COPY['zh-Hant'].revealIntroCustomer === '這些字是從你的故事裡找到的。請選一個想送出的字。' && COPY.en.revealIntroCustomer === 'These characters came from your story. Choose the one you want to give.')
+  check('new round: 別の三字を探す（あと2回） / 再找三個新的字（還可以找2次） / Find three more (2 left); 偲ぶ: 二字 / 兩個 / two', P.ja.another(2, false) === '別の三字を探す（あと2回）' && P.ja.another(1, true) === '別の二字を探す（あと1回）' && P['zh-Hant'].another(2, false) === '再找三個新的字（還可以找2次）' && P['zh-Hant'].another(2, true) === '再找兩個新的字（還可以找2次）' && P.en.another(2, false) === 'Find three more (2 left)' && P.en.another(1, true) === 'Find two more (1 left)')
+  check('pager, no-rounds note, edit-story link, retry, choose-another — word for word', P.ja.prevSet === '‹ 前の組' && P.ja.nextSet === '次の組 ›' && P.ja.setLabel(2, 3) === '2 / 3' && P['zh-Hant'].prevSet === '‹ 上一組' && P['zh-Hant'].nextSet === '下一組 ›' && P.en.prevSet === '‹ Previous' && P.en.nextSet === 'Next ›' &&
+    P.ja.addDetail === '物語を少し書き足すと、新しい字が見つかります。' && P['zh-Hant'].addDetail === '把故事再多寫一些，就能找到新的字。' && P.en.addDetail === 'Add a little more to your story to find new characters.' &&
+    P.ja.editStory === '物語を書きなおす' && P['zh-Hant'].editStory === '修改故事' && P.en.editStory === 'Edit your story' && P.ja.retry === 'もう一度ためす' && P['zh-Hant'].retry === '再試一次' && P.en.retry === 'Try again' &&
+    P.ja.chooseOther === '字を選びなおす' && P['zh-Hant'].chooseOther === '重新選字' && P.en.chooseOther === 'Choose a different character')
+  check('the "what they\'re like" label follows the page language (どんな人か / 對方是怎樣的人 / What they\'re like)', COPY.ja.match.who === 'どんな人か' && COPY['zh-Hant'].match.who === '對方是怎樣的人' && COPY.en.match.who === "What they're like")
+  check('voice: the listening label (ja 話しています…（タップで停止） / zh-Hant 正在聆聽…（點一下停止） / en Listening… (tap to stop))', COPY.ja.voiceListening === '話しています…（タップで停止）' && COPY['zh-Hant'].voiceListening === '正在聆聽…（點一下停止）' && COPY.en.voiceListening === 'Listening… (tap to stop)')
+}
 
 console.log(failures === 0 ? '\nAll copy checks passed.' : `\n${failures} FAILED`)
 process.exit(failures === 0 ? 0 : 1)

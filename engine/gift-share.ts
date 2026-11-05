@@ -30,10 +30,13 @@ export function ogMeta(g: GiftRecord, env: NodeJS.ProcessEnv = process.env, now:
   const lang = pageLang(g.language)
   const base = publicUrl(env)
   const date = g.opens_on ? openDateText(lang, g.opens_on, now.getUTCFullYear()) : null
+  // A name nobody gave is left out — no placeholder, no relationship word.
+  const thing = lang === 'ja' ? (g.memorial ? '一字の便り' : '一字の贈りもの') : lang === 'zh-Hant' ? (g.memorial ? '一個字的來信' : '一個字的禮物') : g.memorial ? 'a letter of one character' : 'a gift of one character'
   const title =
-    lang === 'ja' ? `${g.to}へ　${g.memorial ? '一字の便り' : '一字の贈りもの'}` : lang === 'zh-Hant' ? `致 ${g.to}　${g.memorial ? '一個字的來信' : '一個字的禮物'}` : `To ${g.to} — ${g.memorial ? 'a letter of one character' : 'a gift of one character'}`
-  const description =
-    lang === 'ja' ? `${g.from}さんから${date ? ` · ${date}に開封` : ''}` : lang === 'zh-Hant' ? `來自 ${g.from}${date ? ` · ${date}開啟` : ''}` : `From ${g.from}${date ? ` · opens ${date}` : ''}`
+    lang === 'ja' ? (g.to ? `${g.to}へ　${thing}` : thing) : lang === 'zh-Hant' ? (g.to ? `致 ${g.to}　${thing}` : thing) : g.to ? `To ${g.to} — ${thing}` : thing[0].toUpperCase() + thing.slice(1)
+  const sentence = lang === 'ja' ? (g.from ? `${g.from}さんから` : '') : lang === 'zh-Hant' ? (g.from ? `來自 ${g.from}` : '') : g.from ? `From ${g.from}` : ''
+  const when = date ? (lang === 'ja' ? `${date}に開封` : lang === 'zh-Hant' ? `${date}開啟` : `opens ${date}`) : ''
+  const description = [sentence, when].filter(Boolean).join(' · ') || (lang === 'en' ? 'ICHIREI' : '一字礼')
   return { title, description, image: `${base}${ogPath(g)}`, url: `${base}/g/${g.token}`, lang }
 }
 

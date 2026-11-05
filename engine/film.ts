@@ -18,6 +18,7 @@ import type { Language } from './contract.ts'
 import { loadPalette, type Palette } from './palette.ts'
 import { kanaFixWords, loadTokenizer } from './kana.ts'
 import { EN_FORBIDDEN } from './poem-check.ts'
+import { captionLanguageProblem, convertCaptionScript } from './script.ts'
 
 export const FILM_TIMEOUT_MS = 30_000
 
@@ -236,6 +237,9 @@ export function checkFilmScript(raw: unknown, input: FilmInput, palette: Palette
     const named = input.names.map((x) => x.trim()).filter((x) => [...x].length >= 2 && l.includes(x))
     if (named.length > 0) at('names', `Line ${i + 1}: a personal name from the order is in the line; use relation words instead.`)
     if (/\bAI\b/.test(l)) at('names', `Line ${i + 1}: never mention AI.`)
+    // the page's language and script (2026-11-05): the customer's own quotations are left as written; the rest must be in the order's language
+    const langProblem = captionLanguageProblem(l, input.language)
+    if (langProblem) at('language', `Line ${i + 1}: ${langProblem.message}.`)
     // unsafe WORDS (whole words from the lists — never a single kanji inside a compound such as 邪魔 or 悪魔; the palette checks the offered characters elsewhere)
     const ill = findIllnessAll(l, lang)
     if (ill.length > 0) at('illness', `Line ${i + 1}: the word${ill.length > 1 ? 's' : ''} “${ill.join('”, “')}” (illness, hospital, injury, accident, decline or death) must not appear; tell the moment around it.`, { rule: 'illness', terms: ill.map((x) => x.toLowerCase()) })
@@ -509,6 +513,7 @@ export async function makeFilm(input: FilmInput, opts: FilmOptions = {}): Promis
           kana = true
         }
       }
+      if (ps.some((p) => p.code === 'language')) line = convertCaptionScript(line, input.language) ?? line
       if (ps.some((p) => p.code === 'pic_length')) picture = trimPicture(picture) ?? picture
       return { scene: { line, picture }, kana }
     }

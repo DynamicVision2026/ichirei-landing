@@ -77,6 +77,10 @@ node --experimental-strip-types scripts/test-story-run.ts   # the story-run scri
 node --experimental-strip-types scripts/test-reveal.ts      # Reveal landing: copy = the reference word for word, honesty rules, approximate prices, daily-rate cache, photos, dead code gone
 node --experimental-strip-types scripts/test-landing-copy.ts  # the earlier landing copy (still used by /track): four languages, neutral, AI invisible
 BASE=http://localhost:5173 OUT=./shots CHROMIUM_PATH=… node scripts/screenshots-reveal.mjs   # 375/1280px screenshots of the landing, composer, 3-card reveal and order form, each language (engine mocked)
+node --experimental-strip-types scripts/test-names.ts      # 2026-11-05: names optional (nickname, ≤ 20): blank names on the order, gift page, share meta, card captions; nowhere else
+node --experimental-strip-types scripts/test-email-snippet.ts   # 2026-11-05: the order-confirmation e-mail block (docs/ichirei-order-email.liquid) rendered with liquidjs; non-ICHIREI orders print nothing
+node --experimental-strip-types scripts/test-phrases.ts    # 2026-11-05: story phrases on the wait screen (browser only)
+node --experimental-strip-types scripts/test-voice.ts      # 2026-11-05: voice input helpers (language picker, insert at cursor, restart rules)
 node --experimental-strip-types scripts/test-copy.ts     # front-end copy: four languages, code coverage, occasion-neutral, right script
 node --experimental-strip-types scripts/test-palette-data.ts  # shape and completeness of the ~650 draft rows + review exports in sync
 node --experimental-strip-types scripts/test-engine-offline.ts   # real engine + API handler vs a fake model upstream — no key needed

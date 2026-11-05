@@ -18,6 +18,7 @@ import { REVIEW_VETO_RULES, familyOf, type Language, type Occasion, type Relatio
 import { plainMeaning, type Palette } from './palette.ts'
 import { reviewEnabled } from './review.ts'
 import { blockedCharacters, checkCharacterOnce, checkContainsCharacter, checkCraft, checkForcedLabel, checkForm, checkPalette, meaningWords, type PoemDraft } from './poem-check.ts'
+import { poemLinesForLanguage } from './script.ts'
 
 export const POEM_TIMEOUT_MS = 45_000
 export const poemTimeoutMs = (env: NodeJS.ProcessEnv = process.env): number => {
@@ -126,11 +127,11 @@ export function poemFamilies(type: PoemType, language: Language): ('ja' | 'zh')[
 export function buyerAids(type: PoemType, language: Language): string {
   const ja = language === 'ja'
   const zh = language === 'zh-Hans' || language === 'zh-Hant'
-  if (type === 'tanka' || type === 'haiku') return ja ? 'The buyer reads Japanese: `romaji` and `english` are null.' : 'The buyer does not read Japanese: also give `romaji` (the reading of each line in Latin letters, one string per line) and `english` (a short English rendering, one string).'
+  if (type === 'tanka' || type === 'haiku') return ja ? 'The buyer reads Japanese: `romaji` and `english` are null.' : 'The buyer does not read Japanese: also give `romaji` (the reading of each line in Latin letters, one string per line) and `english` (a short English rendering, one string). THE SAME RULE AS THE POEM APPLIES TO THE ENGLISH RENDERING: it may not add a scenery, an object or a feeling that the story does not give.'
   if (type === 'en') return 'No reading aids.'
-  if (ja) return 'The buyer reads Japanese: also give `kakikudashi` — the 書き下し文 (Japanese reading), one string per line of the poem — and `gendaigo` — a short modern Japanese 現代語訳 of the whole poem (one or two plain sentences in today\'s everyday Japanese, not a word-for-word gloss), one string; `english` is null.'
+  if (ja) return 'The buyer reads Japanese: also give `kakikudashi` — the 書き下し文 (Japanese reading), one string per line of the poem — and `gendaigo` — a short modern Japanese 現代語訳 of the whole poem (one or two plain sentences in today\'s everyday Japanese, not a word-for-word gloss), one string; `english` is null. THE SAME RULE AS THE POEM APPLIES TO EVERY AID: nothing in the 書き下し文 or the summary / translation may add a scenery, an object or a feeling that the story does not give — they restate the poem and the story, they do not decorate it.'
   if (zh) return 'The buyer reads Chinese: `kakikudashi`, `gendaigo` and `english` are null.'
-  return 'The buyer reads English: also give `english` — a short English rendering of the whole poem, one string; `kakikudashi` and `gendaigo` are null.'
+  return 'The buyer reads English: also give `english` — a short English rendering of the whole poem, one string; `kakikudashi` and `gendaigo` are null. THE SAME RULE AS THE POEM APPLIES TO THE RENDERING: it may not add a scenery, an object or a feeling that the story does not give — it restates the poem, it does not decorate it.'
 }
 
 const strArray = (v: unknown): string[] | null => (Array.isArray(v) && v.every((x) => typeof x === 'string') ? (v as string[]).map((s) => s.trim()) : null)
@@ -256,10 +257,14 @@ export async function generatePoem(input: PoemInput, palette: Palette, opts: Gen
         log(`[ichirei-poem] ${JSON.stringify({ type: input.type, ok: false, code: 'declined', language: input.language, ms: Date.now() - t0 })}`)
         return { ok: false, code: 'declined', error: 'No poem for this story.' }
       }
-      const lines = linesOf(raw)
-      if (!lines) throw new Error('the reply has no lines array')
+      const rawLines = linesOf(raw)
+      if (!rawLines) throw new Error('the reply has no lines array')
+      // a Chinese poem for a Chinese-reading buyer is in that buyer's script (converted here, character by character); kana in it is a failed check (2026-11-05)
+      const scripted = poemLinesForLanguage(rawLines, input.type, input.language)
+      const lines = scripted.lines
       const draft: PoemDraft = { type: input.type, lines, reading_kana: strArray(raw.reading_kana) ?? undefined, pattern: typeof raw.pattern === 'string' ? raw.pattern : undefined }
       const problems = [
+        ...(scripted.problem ? [scripted.problem] : []),
         ...checkForm(draft, palette),
         ...[checkContainsCharacter(draft, forms, input.type === 'en' ? meaningWords(meaning) : [])].filter((x): x is string => x !== null),
         ...[checkCharacterOnce(draft, forms), checkForcedLabel(draft, forms)].filter((x): x is string => x !== null),
@@ -268,7 +273,7 @@ export async function generatePoem(input: PoemInput, palette: Palette, opts: Gen
       ]
       let imageNote: string | null = null // the one quality rule (story_image): one rewrite is asked for, then the poem in hand is kept
       if (problems.length === 0 && reviewEnabled()) {
-        const verdict = await review(draft, input, callText)
+        const verdict = await review(draft, input, callText, aidsText(build(raw, draft).aids))
         if (verdict && (verdict.startsWith('review (story_image)') || verdict.startsWith('review (character)'))) imageNote = verdict
         else if (verdict) problems.push(verdict)
       }
@@ -282,7 +287,7 @@ export async function generatePoem(input: PoemInput, palette: Palette, opts: Gen
           opts.onNote?.(imageNote.startsWith('review (character)') ? 'character_rewritten' : 'story_image_rewritten')
           feedback = imageNote.startsWith('review (character)')
             ? `\nA SECOND READER FOUND THAT THE CHOSEN CHARACTER IS NOT USED NATURALLY (it is missing, or it is only a label that announces it) — write a new poem that keeps the story's image and puts the character, once, inside a real word of that image:\n- ${imageNote}\n`
-            : `\nA SECOND READER FOUND THAT YOUR POEM'S IMAGERY DOES NOT COME FROM THIS STORY — write a new poem (read the whole story again; carry its turning point through one concrete image the story itself gives; no scenery, object or feeling the story does not give):\n- ${imageNote}\n`
+            : `\nA SECOND READER FOUND THAT YOUR POEM'S IMAGERY DOES NOT COME FROM THIS STORY (the same goes for its reading aids — the 書き下し文 and the summary / translation) — write a new poem with new aids (read the whole story again; carry its turning point through one concrete image the story itself gives; no scenery, object or feeling the story does not give):\n- ${imageNote}\n`
           if (Date.now() - t0 > poemTimeoutMs() * 0.55) break
           continue
         }
@@ -333,10 +338,21 @@ export async function generatePoem(input: PoemInput, palette: Palette, opts: Gen
 }
 
 /** The safety review: a failure under a named safety rule is a problem string; an unusable review passes (logged by the caller's checks). */
+/** The reading aids as the reviewer reads them (2026-11-05): the 書き下し文, the modern-language summary / translation, the English rendering and the romaji are part of the poem and are judged by the same rules. */
+export function aidsText(aids: Poem['aids']): string {
+  const parts: string[] = []
+  if (aids.kakikudashi?.length) parts.push(`書き下し文 (Japanese reading):\n${aids.kakikudashi.join('\n')}`)
+  if (aids.gendaigo) parts.push(`現代語訳 (summary / translation in modern Japanese):\n${aids.gendaigo}`)
+  if (aids.english) parts.push(`English rendering:\n${aids.english}`)
+  if (aids.romaji?.length) parts.push(`Romaji:\n${aids.romaji.join('\n')}`)
+  return parts.join('\n\n')
+}
+
 async function review(
   draft: PoemDraft,
   input: PoemInput,
   callText: (stage: 'poem' | 'review', mdl: string, prompt: string, maxTokens: number, eff: 'low' | 'medium' | 'high') => Promise<string>,
+  aids = '',
 ): Promise<string | null> {
   try {
     const prompt = (input.tone ? `${input.tone}\n\n` : '') + fill(loadPoemReviewPrompt(), {
@@ -348,7 +364,7 @@ async function review(
       KANJI: input.kanji,
       STORY: input.story,
       TYPE: input.type,
-      POEM: draft.lines.join('\n'),
+      POEM: aids ? `${draft.lines.join('\n')}\n\nREADING AIDS (part of the poem — every rule applies to them too):\n${aids}` : draft.lines.join('\n'),
     })
     const raw = parseJson(await callText('review', process.env.ICHIREI_REVIEW_MODEL ?? DEFAULT_REVIEW_MODEL, prompt, Number(process.env.ICHIREI_REVIEW_MAX_TOKENS ?? 4000), 'low'))
     if (!raw || typeof raw.pass !== 'boolean' || raw.pass) return null

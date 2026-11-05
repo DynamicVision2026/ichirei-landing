@@ -87,7 +87,8 @@ try {
   check('(1) the review call is made for the PROMOTED main (灯), not for the removed 鐘, and it sees BOTH palette rows (palette_zh)', (() => { const r = seen.find((s) => s.kind === 'review')?.prompt ?? ''; return r.includes('"kanji": "灯"') && !r.includes('"kanji": "鐘"') && r.includes('"palette_zh"') })())
   const sameJa = await (async () => {
     const f = FIX['en-blocked-by-zh']
-    selectReply = { ...clone(f.model_reply), language: 'ja' }
+    // (the fixture's lines are English; a Japanese page needs Japanese lines — the page's language is now checked in code)
+    selectReply = { ...clone(f.model_reply), language: 'ja', candidates: clone(f.model_reply).candidates.map((c: { one_line_gaze: string }) => ({ ...c, one_line_gaze: 'いつも待っていてくれた人' })) }
     reviewReply = f.review_reply
     console.log = () => {}
     try { return await runEngine(f.story, 'A', { context: { ...f.context, language: 'ja' } }) } finally { console.log = origLog }
@@ -150,7 +151,7 @@ try {
   const rec = (await store.get(ref)) as any
   check('(3) stored with the order (order store): production.certificate, next to certificate_text; story and follow_ups kept apart', rec.production.certificate.meaning_en === 'lamp' && rec.production.certificate.character === '灯' && rec.production.certificate_text === CERTIFICATE_LINE_EN && Array.isArray(rec.follow_ups))
   const attrs = carts[0].variables.input.lines[0].attributes as { key: string; value: string }[]
-  check('(3) Shopify: certificate_meaning_en = "lamp" is a line attribute right next to kanji, inscription_form and reading', attrs.map((x) => x.key).slice(0, 4).join() === 'kanji,inscription_form,reading,certificate_meaning_en' && attrs[3].value === 'lamp' && attrs[2].value === 'akari', JSON.stringify(attrs))
+  check('(3) Shopify: certificate_meaning_en = "lamp" is a hidden line attribute right next to _kanji, _inscription_form and _reading', attrs.map((x) => x.key).slice(2, 6).join() === '_kanji,_inscription_form,_reading,_certificate_meaning_en' && attrs[5].value === 'lamp' && attrs[4].value === 'akari', JSON.stringify(attrs))
   check('(3) …and the story, the gaze line and why_this are NOT in what Shopify sees', !JSON.stringify(carts[0]).includes('porch light') && !JSON.stringify(carts[0]).includes('Lamplight'))
   const resModern = await handler(new Request('http://x/api/order', { method: 'POST', body: JSON.stringify(orderBody(f, '灯', 'modern')) }))
   check('(3) the sender\'s inscription choice changes the certificate character (modern 灯) but not the readings or meaning', ((await resModern.json()) as any).certificate.character === '灯')

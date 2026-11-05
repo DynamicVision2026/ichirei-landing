@@ -22,6 +22,7 @@ import { runReview } from './review.ts'
 import { FREE_FIELDS, FREE_REVIEW_TIMEOUT_MS_DEFAULT } from './replace.ts'
 import { SAME_CHARACTER_REASON, finalizeResult } from './slots.ts'
 import { appearanceProblem, failingGazes, fixGazes, inventedFacts, rewriteLines, subjectProblem } from './gaze.ts'
+import { LANGUAGE_REASON, ensureLineLanguage } from './script.ts'
 import { withDisplayReading } from './reading-display.ts'
 import { ModelTimeoutError, callSignal, callTimeoutMs, runBudgetMs, timedOut } from './limits.ts'
 import { thinkingTokensOf, watchThinkingTokens } from './usage.ts'
@@ -151,6 +152,8 @@ export interface CardsReport {
   looks_rewritten: { slot: CardSlot; rewritten: boolean }[]
   /** a card the review rejected under a LINE rule (insult, dignity, truth, subject) got its line rewritten once with the reviewer's note and was checked again: which slot, which rule, whether a new line came back, whether the card then stood */
   line_rescue: { slot: CardSlot; rule: string; rewritten: boolean; saved: boolean }[]
+  /** The page's language and script (2026-11-05): a line fixed by conversion, by one rewrite, or the card dropped (codes only). */
+  language: { slot: CardSlot; how: 'converted' | 'rewritten' | 'dropped'; code: string }[]
   /** the free pick's safety net: when the first pair of calls (or the first pair's cards) left no free card, a second hedged pair is asked once */
   free_retry: { asked: boolean; why: 'no_candidates' | 'all_set_aside' | null; won: boolean | null }
   collisions: { slot: CardSlot; resolved: 'runner_up' | 'none'; why?: 'character' | 'anchor' }[]
@@ -183,6 +186,7 @@ export interface CardsArgs {
     onDelta?: (text: string) => void
     onCard?: (partial: EngineResult) => void
     exclude?: string[]
+    round?: number
   }
   deps: {
     extractJson: (raw: string) => EngineResult
@@ -402,7 +406,7 @@ export async function runCards(a: CardsArgs): Promise<CardsOut> {
   const freeStop = new AbortController()
   const freeSignal = AbortSignal.any([signal, freeStop.signal, AbortSignal.timeout(freeLaneMs())])
 
-  const report: CardsReport = { calls: [], reviews: [], subject_removed: [], subject_rewritten: 0, looks_rewritten: [], line_rescue: [], free_retry: { asked: false, why: null, won: null }, collisions: [], runner_up_used: [], first_card_ms: null, all_cards_ms: 0, main_call_ms: 0, gaze_ms: 0, gaze_failing: 0, free_dropped: null, second_source: null }
+  const report: CardsReport = { calls: [], reviews: [], subject_removed: [], subject_rewritten: 0, looks_rewritten: [], line_rescue: [], language: [], free_retry: { asked: false, why: null, won: null }, collisions: [], runner_up_used: [], first_card_ms: null, all_cards_ms: 0, main_call_ms: 0, gaze_ms: 0, gaze_failing: 0, free_dropped: null, second_source: null }
   const verdicts: ReviewVerdict[] = []
   let anyReviewRan = false
   let skipped: string | null = null
@@ -654,9 +658,22 @@ export async function runCards(a: CardsArgs): Promise<CardsOut> {
       /** Try a list of candidates in order: referee, a higher card's character, review, the final check against the higher cards, the gaze line. The first that stands is the card. */
       const attempt = async (list: Candidate[], from: NonNullable<LaneOut['source']>): Promise<void> => {
         let n = 0
-        for (const cand of list) {
+        for (const cand0 of list) {
           if (early || sig.aborted || chosen) break
           n++
+          // The line must be in the page's language and script (2026-11-05): converted in code when only the Chinese script is wrong, otherwise ONE rewrite in the right language, otherwise the
+          // card is dropped (the next candidate of this call stands in, then the slot's normal refill).
+          const lang = await ensureLineLanguage(cand0.one_line_gaze, context.language, async (why) => {
+            if (early || sig.aborted) return null
+            const fixes = await rewriteLines([{ kanji: cand0.kanji, gaze: cand0.one_line_gaze, why }], story, context.language, { tone: toneLine(context), apiKey: opts.apiKey, signal: sig, client, log, timeoutMs: slot === 'freestyle' ? freeCallMs() : undefined })
+            return fixes.get(cand0.kanji) ?? null
+          })
+          if (lang.how !== 'ok') report.language.push({ slot, how: lang.how, code: lang.code ?? 'unknown' })
+          if (lang.how === 'dropped') {
+            tried.push(eliminate(cand0, LANGUAGE_REASON, 'language'))
+            continue
+          }
+          const cand = lang.how === 'ok' ? cand0 : ({ ...cand0, one_line_gaze: lang.line } as Candidate)
           const ref = refereeOne(stampBase, cand)
           if (!ref.ok) {
             tried.push(ref.card)
@@ -762,7 +779,7 @@ export async function runCards(a: CardsArgs): Promise<CardsOut> {
         const avoid = tried.filter((t) => t.eliminated).map((t) => ({ kanji: t.kanji, reason: `set aside (${String(t.eliminated_reason ?? 'refused').split(':').slice(0, 2).join(':').trim().slice(0, 40)}): choose another character from a different detail of the story` }))
         report.free_retry = { asked: true, why, won: null }
         freeRetrying = true
-        log(`[ichirei-engine] free_retry ${JSON.stringify({ why, avoided: avoid.length })}`)
+        log(`[ichirei-engine] free_retry ${JSON.stringify({ round: opts.round ?? 1, why, avoided: avoid.length + (opts.exclude?.length ?? 0) })}`)
         const out2 = await hedgedFree(2, avoid)
         await attempt(out2.cands, 'second_call')
         report.free_retry.won = !!chosen

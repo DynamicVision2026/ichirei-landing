@@ -32,6 +32,7 @@ import { runReview } from './review.ts'
 import { completeMains, type RefillReport } from './replace.ts'
 import { canonicalRegisters } from '../src/order/register.ts'
 import { applyGazes, failingGazes, fixGazes, inventedFacts, shapeGate, subjectProblem } from './gaze.ts'
+import { LANGUAGE_REASON, convertLineScript, lineLanguageProblem } from './script.ts'
 import {
   DECLINE_MESSAGE,
   DEFAULT_CONTEXT,
@@ -223,6 +224,8 @@ export interface RunEngineOptions {
   promptQuestion?: string | null
   /** 「別の候補を見る」: characters already shown to the sender for THIS story (any form). They are left out of the list, named in the prompt, and removed by the referee from every slot. */
   exclude?: string[]
+  /** Which round of THIS story this request is: 1 = the first three cards, 2 and 3 = after 「別の三字を探す」 (log only). */
+  round?: number
   /** Token usage of each model call (stage 'select' = the main call, 'review' = the separate review call) — for cost accounting by the test runner. */
   onUsage?: (stage: 'select' | 'review' | 'replace', usage: { model: string; input_tokens: number; output_tokens: number }) => void
   /**
@@ -317,6 +320,25 @@ function dropInvented(result: EngineResult, story: string, language: Language): 
   return changed ? { ...result, candidates } : result
 }
 
+/**
+ * The last gate for the page's language and script (2026-11-05): a line that is still in the wrong Chinese script is converted (OpenCC); a line in the wrong language is dropped with the card
+ * (the cards already passed the same check one by one, so this is for a refilled card and for anything that slipped through).
+ */
+function enforceLineLanguage(result: EngineResult, language: Language): EngineResult {
+  if (result.status !== 'sufficient') return result
+  let changed = false
+  const candidates = result.candidates.map((c) => {
+    if (c.eliminated || !c.one_line_gaze) return c
+    const problem = lineLanguageProblem(c.one_line_gaze, language)
+    if (!problem) return c
+    changed = true
+    const converted = convertLineScript(c.one_line_gaze, language)
+    if (converted !== null) return { ...c, one_line_gaze: converted }
+    return { ...c, eliminated: true, eliminated_reason: LANGUAGE_REASON, flags: [...new Set([...c.flags, 'language'])] }
+  })
+  return changed ? { ...result, candidates } : result
+}
+
 /** A reason is kept as its code ("review: truth", "palette: hard_block"): the model's own words after the second colon can quote the story. */
 const reasonCode = (r: unknown): string => String(r ?? '').split(':').slice(0, 2).join(':').trim().slice(0, 60)
 
@@ -334,7 +356,7 @@ function logCards(story: string, context: EngineContext, before: EngineResult, a
   try {
     const live = (r: EngineResult, slot: string) => r.candidates.filter((c) => !c.eliminated && c.slot === slot).length
     const removed = after.candidates.filter((c) => c.eliminated).map((c) => ({ slot: c.slot, reason: (c.eliminated_reason ?? 'unknown').slice(0, 80) }))
-    const payload = { cards_mode: parallel ? 'parallel' : 'single', purpose: purposeCodeOf(context), state: effectiveState(context), ...(otherTextMapped(context) ? { other_text_mapped: otherTextMapped(context) } : {}), ...(parallel ? { second_source: parallel.second_source } : {}), story_chars: [...story].length, language: context.language, occasion: context.occasion, status: after.status, live: { main: live(after, 'main'), second: live(after, 'second'), freestyle: live(after, 'freestyle') }, before_final: before.candidates.filter((c) => !c.eliminated).length, freestyle: context.occasion === 'memorial' ? 'not_offered' : undefined, ms, select: select ?? undefined, ...(parallel ? { parallel: { first_card_ms: parallel.first_card_ms, all_cards_ms: parallel.all_cards_ms, calls: parallel.calls, reviews: parallel.reviews, collisions: parallel.collisions, runner_up_used: parallel.runner_up_used, free_dropped: parallel.free_dropped, second_source: parallel.second_source, subject_removed: parallel.subject_removed, subject_rewritten: parallel.subject_rewritten, looks_rewritten: parallel.looks_rewritten, line_rescue: parallel.line_rescue, free_retry: parallel.free_retry } } : {}), calls: parallel ? { select: parallel.calls.reduce((n, c) => n + c.attempts, 0), review: parallel.reviews.length, refill: refill ? 1 : 0, gaze: ms.gaze_failing > 0 ? 1 : 0 } : { select: ms.select_attempts, review: ms.review > 0 ? 1 : 0, refill: refill ? 1 : 0, gaze: ms.gaze_failing > 0 ? 1 : 0 }, removed, refill: refill ? { asked: refill.asked, filled: refill.filled.map((f) => f.slot), rejected: refill.rejected, rescued: refill.rescued.map((f) => f.slot), ms: refill.ms } : null }
+    const payload = { cards_mode: parallel ? 'parallel' : 'single', purpose: purposeCodeOf(context), state: effectiveState(context), ...(otherTextMapped(context) ? { other_text_mapped: otherTextMapped(context) } : {}), ...(parallel ? { second_source: parallel.second_source } : {}), story_chars: [...story].length, language: context.language, occasion: context.occasion, status: after.status, live: { main: live(after, 'main'), second: live(after, 'second'), freestyle: live(after, 'freestyle') }, before_final: before.candidates.filter((c) => !c.eliminated).length, freestyle: context.occasion === 'memorial' ? 'not_offered' : undefined, ms, select: select ?? undefined, ...(parallel ? { parallel: { first_card_ms: parallel.first_card_ms, all_cards_ms: parallel.all_cards_ms, calls: parallel.calls, reviews: parallel.reviews, collisions: parallel.collisions, runner_up_used: parallel.runner_up_used, free_dropped: parallel.free_dropped, second_source: parallel.second_source, subject_removed: parallel.subject_removed, subject_rewritten: parallel.subject_rewritten, looks_rewritten: parallel.looks_rewritten, line_rescue: parallel.line_rescue, language: parallel.language, free_retry: parallel.free_retry } } : {}), calls: parallel ? { select: parallel.calls.reduce((n, c) => n + c.attempts, 0), review: parallel.reviews.length, refill: refill ? 1 : 0, gaze: ms.gaze_failing > 0 ? 1 : 0 } : { select: ms.select_attempts, review: ms.review > 0 ? 1 : 0, refill: refill ? 1 : 0, gaze: ms.gaze_failing > 0 ? 1 : 0 }, removed, refill: refill ? { asked: refill.asked, filled: refill.filled.map((f) => f.slot), rejected: refill.rejected, rescued: refill.rescued.map((f) => f.slot), ms: refill.ms } : null }
     console.log(`[ichirei-cards] ${JSON.stringify(payload)}`)
     onDebug?.(debugOf(payload))
   } catch {
@@ -742,7 +764,7 @@ async function runPipeline(a: PipelineArgs): Promise<PipelineOut> {
     // (the gate never fails a result)
   }
   const gazeMs = Date.now() - tGaze
-  const final = withDisplayReadings(finalizeResult(ensureMain(dropInvented(withGazes, story, context.language), undefined, mainEligibility(withGazes, palette, story, canBeMain))), palette)
+  const final = withDisplayReadings(finalizeResult(ensureMain(enforceLineLanguage(dropInvented(withGazes, story, context.language), context.language), undefined, mainEligibility(withGazes, palette, story, canBeMain))), palette)
   // Which cards leave the engine, and why a card is missing (reasons are the referee / review codes, no story text and no character): the log a missing card is traced from.
   const refillMs = tGaze - tReplace
   logCards(story, context, completed, final, refill, { total: Date.now() - tStart, select: selectMs, select_attempts: attempts, referee: refereeMs, review: reviewMs, refill: refillMs, gaze: gazeMs, gaze_failing: gazeFailing }, selectCallInfo(message), undefined, opts.onDebug)
@@ -777,7 +799,7 @@ async function runCardsPipeline(a: PipelineArgs): Promise<PipelineOut> {
     prompt,
     tStart,
     models: { select: MODEL, review: REVIEW_MODEL, free: process.env.ICHIREI_FREE_MODEL ?? process.env.ICHIREI_REFILL_FREE_MODEL ?? REVIEW_MODEL },
-    opts: { apiKey: opts.apiKey, signal: opts.signal, onUsage: opts.onUsage, onStage: opts.onStage, onDelta: opts.onDelta, onCard: opts.onCard, exclude: opts.exclude },
+    opts: { apiKey: opts.apiKey, signal: opts.signal, onUsage: opts.onUsage, onStage: opts.onStage, onDelta: opts.onDelta, onCard: opts.onCard, exclude: opts.exclude, round: opts.round },
     deps: { extractJson, stamp: (r) => stampResult(r, context) },
     canBeMain,
     excluded,
@@ -788,7 +810,7 @@ async function runCardsPipeline(a: PipelineArgs): Promise<PipelineOut> {
   const mainCall = out.report.calls.find((c) => c.slot === 'main')
   const timing = (t: { review_ms: number; replace_ms: number; status: string }) =>
     logTiming({ attempts: mainCall?.attempts ?? 1, max_tokens_used: 0, select_ms: selectMs, ...t, total_ms: Date.now() - tStart, stop_reason: mainCall?.stop_reason ?? null, output_tokens: mainCall?.output_tokens ?? null, lexicon: view !== null })
-  const earlyDebug = (status: string) => opts.onDebug?.(debugOf({ cards_mode: 'parallel', status, ms: { total: Date.now() - tStart, select: selectMs }, parallel: { first_card_ms: out.report.first_card_ms, all_cards_ms: out.report.all_cards_ms, calls: out.report.calls, reviews: out.report.reviews, collisions: out.report.collisions, runner_up_used: out.report.runner_up_used, free_dropped: out.report.free_dropped, second_source: out.report.second_source, subject_removed: out.report.subject_removed, subject_rewritten: out.report.subject_rewritten, looks_rewritten: out.report.looks_rewritten, line_rescue: out.report.line_rescue, free_retry: out.report.free_retry } }))
+  const earlyDebug = (status: string) => opts.onDebug?.(debugOf({ cards_mode: 'parallel', status, ms: { total: Date.now() - tStart, select: selectMs }, parallel: { first_card_ms: out.report.first_card_ms, all_cards_ms: out.report.all_cards_ms, calls: out.report.calls, reviews: out.report.reviews, collisions: out.report.collisions, runner_up_used: out.report.runner_up_used, free_dropped: out.report.free_dropped, second_source: out.report.second_source, subject_removed: out.report.subject_removed, subject_rewritten: out.report.subject_rewritten, looks_rewritten: out.report.looks_rewritten, line_rescue: out.report.line_rescue, language: out.report.language, free_retry: out.report.free_retry } }))
   // Goodwill check (selection or review): a polite decline, no cards.
   if (out.early?.kind === 'declined') {
     earlyDebug('declined')
@@ -859,7 +881,7 @@ async function runCardsPipeline(a: PipelineArgs): Promise<PipelineOut> {
     // (the gate never fails a result)
   }
   const gazeMs = Date.now() - tGaze + out.report.gaze_ms
-  const final = withDisplayReadings(finalizeResult(ensureMain(dropInvented(withGazes, story, context.language), undefined, canBeMain)), palette)
+  const final = withDisplayReadings(finalizeResult(ensureMain(enforceLineLanguage(dropInvented(withGazes, story, context.language), context.language), undefined, canBeMain)), palette)
   const refillMs = tGaze - tReplace
   out.report.all_cards_ms = Math.max(out.report.all_cards_ms, Date.now() - tStart)
   // where the second card came from: its own call, the main call's runner-up, or (only when both could not deliver) the refill

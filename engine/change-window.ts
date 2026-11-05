@@ -13,7 +13,7 @@ import { isGiftRecord, type GiftRecord } from './gift.ts'
 import { GIFT_MESSAGE_MAX, SHIPS, poemTypeAllowed, type PoemType } from '../src/order/packages.ts'
 import { glyphFor } from '../src/order/inscription.ts'
 import { isMemorial } from '../src/order/memorial.ts'
-import { NAME_MAX, buildCertificate, cleanName, simpleStrokeProblem, type OpsLogEntry, type OrderRecord, type StoredPoem } from './order.ts'
+import { NAME_MAX, buildCertificate, optionalName, simpleStrokeProblem, type OpsLogEntry, type OrderRecord, type StoredPoem } from './order.ts'
 import type { OrderStore } from './order-store.ts'
 import { loadPalette, type Palette } from './palette.ts'
 import type { PaymentInfo } from './shipping.ts'
@@ -172,14 +172,14 @@ export async function editNames(d: ChangeDeps, rec: OrderRecord, input: { sender
   let receiver = p.receiver_name
   let message = p.gift_message ?? ''
   if (input.sender !== undefined) {
-    const v = cleanName(input.sender)
-    if (!v) return refuse('bad_sender', `The sender's name must be 1–${NAME_MAX} characters.`)
+    const v = optionalName(input.sender)
+    if (v === null) return refuse('bad_sender', `The sender's name is optional: at most ${NAME_MAX} characters.`)
     if (v !== sender) changed.push('sender')
     sender = v
   }
   if (input.receiver !== undefined) {
-    const v = cleanName(input.receiver)
-    if (!v) return refuse('bad_receiver', `The receiver's name must be 1–${NAME_MAX} characters.`)
+    const v = optionalName(input.receiver)
+    if (v === null) return refuse('bad_receiver', `The receiver's name is optional: at most ${NAME_MAX} characters.`)
     if (v !== receiver) changed.push('receiver')
     receiver = v
   }

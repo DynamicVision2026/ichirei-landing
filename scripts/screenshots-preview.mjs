@@ -18,8 +18,8 @@ const LINES = {
 }
 const POEM = { ja: ['朝ごとに', '蓋の花添え', '備えたる', '母の背中を', '今も思へる'], 'zh-Hant': ['晨光入廚房', '一花覆盒蓋', '無言卻在側', '至今仍思量'], en: ['Each morning a flower', 'laid softly on the lid —', 'ready, before I asked'] }
 const GO = { ja: 'わたしの物語から字を見つける', 'zh-Hant': '從我的故事裡找出那個字', en: 'Find the character in my story' }
-const PICK = { ja: 'この一字を選ぶ', 'zh-Hant': '選擇這個字', en: 'Choose this character' }
-const FINAL = { ja: 'この一字を、贈る', 'zh-Hant': '就用這一個字', en: 'Give this character' }
+const PICK = { ja: 'この字で贈る', 'zh-Hant': '送這個字', en: 'Give this character' }
+const FINAL = PICK
 const pic = (n) => `<svg xmlns="http://www.w3.org/2000/svg" width="432" height="540" viewBox="0 0 432 540"><rect width="432" height="540" fill="#e4dac2"/><rect x="0" y="${300 - n * 18}" width="432" height="${240 + n * 18}" fill="#cfc4a6"/><circle cx="${110 + n * 60}" cy="${190 - n * 8}" r="${40 + n * 6}" fill="#8f8671" opacity=".55"/><path d="M0 ${380 + n * 10} Q 216 ${330 + n * 14} 432 ${390 + n * 6} L432 540 L0 540 Z" fill="#3b342b" opacity=".35"/></svg>`
 const rename = (r, map) => {
   const c = JSON.parse(JSON.stringify(r))
@@ -57,7 +57,6 @@ for (const lang of ['ja', 'zh-Hant', 'en']) {
     await page.waitForTimeout(500)
     await write.screenshot({ path: `${OUT}/choice-${lang}-${name}.png` })
     await page.locator('article[data-slot=main]').locator(`text=${PICK[lang]}`).click()
-    await page.click(`button:has-text("${FINAL[lang]}")`)
     await page.locator('[data-testid=card-preview]').waitFor()
     await page.locator('[data-poem-result][data-state=ready]').waitFor({ timeout: 8000 })
     await page.waitForFunction(() => document.querySelectorAll('[data-testid=card-pictures] .cardPic[data-ready=yes]').length >= 2, null, { timeout: 10000 })

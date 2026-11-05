@@ -196,13 +196,13 @@ try {
   // ---- 4. at most three cards; only an EMPTY slot is filled ----------------------------------------------------------------------
   const over = await run('s0080-wife-anniversary', {
     mutate: (r) => {
-      r.candidates.push({ slot: 'second', kanji: '信', reading: 'しんじる', truth_type: 'Forward Blessing', one_line_gaze: 'x', story_anchor: '節約も楽しいと笑います', unique_truth: 'u' })
-      r.candidates.push({ slot: 'main', kanji: '許', reading: 'ゆるす', truth_type: 'Role', one_line_gaze: 'x', story_anchor: '節約も楽しいと笑います', unique_truth: 'u' })
+      r.candidates.push({ slot: 'second', kanji: '信', reading: 'しんじる', truth_type: 'Forward Blessing', one_line_gaze: 'いつもそこにいた人', story_anchor: '節約も楽しいと笑います', unique_truth: 'u' })
+      r.candidates.push({ slot: 'main', kanji: '許', reading: 'ゆるす', truth_type: 'Role', one_line_gaze: 'いつもそこにいた人', story_anchor: '節約も楽しいと笑います', unique_truth: 'u' })
     },
   })
   check('(4) a model that writes extra candidates (2 mains + 2 seconds + freestyle): the sender still sees ONE main, ONE second, ONE freestyle; the extras are removed and logged', sound(over) === null && live(over).length === 3 && over.primary_kanji === '労' && over.runner_up_kanji === '寛' && over.freestyle_kanji === '煙' && logJson('[ichirei-engine] slot_overflow ')[0]?.removed.length === 2 && count('replace') === 0, JSON.stringify({ live: live(over).map((c) => c.kanji), logs }))
   check('(4) two live mains → no replacement call (it never adds a card beside a filled slot)', count('replace') === 0)
-  const twoFree = await run('s0080-wife-anniversary', { mutate: (r) => r.candidates.push({ slot: 'freestyle', kanji: '酒', reading: 'さけ', truth_type: 'Play', one_line_gaze: 'x', story_anchor: 'タバコは減らせとよく言われます' }) })
+  const twoFree = await run('s0080-wife-anniversary', { mutate: (r) => r.candidates.push({ slot: 'freestyle', kanji: '酒', reading: 'さけ', truth_type: 'Play', one_line_gaze: 'いつもそこにいた人', story_anchor: 'タバコは減らせとよく言われます' }) })
   check('(4) two freestyles → one is kept (the one named by freestyle_kanji)', live(twoFree).filter((c) => c.slot === 'freestyle').length === 1 && twoFree.freestyle_kanji === '煙')
   // The replacement for one empty slot, repeated runs: never more than three cards
   for (const name of ['s0020-mother-thanks', 's0032-friend-thanks']) {

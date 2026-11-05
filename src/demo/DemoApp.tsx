@@ -1,5 +1,5 @@
-import { useEffect, useRef, useState, type ReactNode } from 'react'
-import { motion, useReducedMotion } from 'framer-motion'
+import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
+import { AnimatePresence, motion, useReducedMotion } from 'framer-motion'
 import type { Candidate, Condition, EngineResult } from './types'
 import Elicitation from './Elicitation'
 import Reveal from './Reveal'
@@ -8,6 +8,7 @@ import Composer from '../reveal/Composer'
 import { toRevealLang } from '../reveal/lang'
 import { sessionId, trackFlow, trackPreview } from './analytics'
 import { PREVIEW_COPY } from './preview-copy'
+import { storyPhrases } from './phrases'
 import type { DraftRef } from './usePreview'
 import { clearDraft, draftOf, loadDraft, saveDraft, type Draft } from './draft'
 import { questionSetOf, questionTextOf } from './questions'
@@ -137,8 +138,15 @@ type Phase = 'elicit' | 'processing' | 'followup' | 'suggest' | 'reveal' | 'orde
  */
 export type Mode = 'harness' | 'customer'
 
-function ProcessingView({ stage, copy }: { stage: EngineStage; copy: Copy }) {
+function ProcessingView({ stage, copy, phrases, quoteOpen, quoteClose }: { stage: EngineStage; copy: Copy; phrases: string[]; quoteOpen: string; quoteClose: string }) {
   const reduceMotion = useReducedMotion()
+  // The visitor's own words, one at a time, fading in and out beside the ring (decorative: hidden from screen readers; nothing is sent anywhere).
+  const [phraseIdx, setPhraseIdx] = useState(0)
+  useEffect(() => {
+    if (phrases.length < 2) return
+    const id = window.setInterval(() => setPhraseIdx((i) => (i + 1) % phrases.length), 3200)
+    return () => window.clearInterval(id)
+  }, [phrases])
   // reading → choosing → checking are always listed; the extra "finding one more" step appears only when the engine really does it.
   const steps = STEP_ORDER.filter((s) => s !== 'replacing' || stage === 'replacing')
   const at = STEP_ORDER.indexOf(stage)
@@ -157,6 +165,23 @@ function ProcessingView({ stage, copy }: { stage: EngineStage; copy: Copy }) {
         />
         <circle cx="70" cy="70" r="3" fill="currentColor" fillOpacity="0.8" />
       </svg>
+      {phrases.length > 0 && (
+        <div className="storyPhraseBox" aria-hidden="true" data-testid="story-phrases" data-count={phrases.length}>
+          <AnimatePresence mode="wait">
+            <motion.p
+              key={phraseIdx}
+              className="storyPhrase font-serif-jp"
+              data-testid="story-phrase"
+              initial={{ opacity: reduceMotion ? 1 : 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: reduceMotion ? 1 : 0 }}
+              transition={{ duration: reduceMotion ? 0 : 0.9, ease: 'easeInOut' }}
+            >
+              {quoteOpen}{phrases[phraseIdx % phrases.length]}{quoteClose}
+            </motion.p>
+          </AnimatePresence>
+        </div>
+      )}
       <div className="text-center">
         <p className="font-serif-jp text-lg tracking-wider text-fg">
           {copy.processingTitle}
@@ -247,6 +272,8 @@ export default function DemoApp({ mode = 'harness', aside }: { mode?: Mode; asid
   const [followUps, setFollowUps] = useState<string[]>([])
   const followUpsUsed = useRef(0)
   const memorialDeclined = useRef(false)
+  // The request that just ran, so 「もう一度ためす」 (shown only after a failure) repeats exactly that request.
+  const lastRun = useRef<(() => void) | null>(null)
   const sessionLogged = useRef(false)
 
   // Customer site: when the flow moves on (processing → follow-up → cards → order form) bring the start of the
@@ -280,6 +307,7 @@ export default function DemoApp({ mode = 'harness', aside }: { mode?: Mode; asid
   }
 
   const runEngine = async (fullStory: string, answers: string[] = [], ctx: GiftContext = context, again: { exclude: string[]; retry: 1 | 2 } | null = null) => {
+    lastRun.current = () => void runEngine(fullStory, answers, ctx, again)
     setPhase('processing')
     setRetryNote(false)
     setError(null)
@@ -454,12 +482,18 @@ export default function DemoApp({ mode = 'harness', aside }: { mode?: Mode; asid
   }
 
   const revealLang = toRevealLang(context.language)
+  const phrases = useMemo(() => storyPhrases(story), [story])
   const body = (
     <>
       {error && (
-        <p role="alert" className="font-label mb-6 rounded-sm border border-seal/60 bg-seal/10 p-4 text-sm text-fg">
-          {error}
-        </p>
+        <div role="alert" className="font-label mb-6 rounded-sm border border-seal/60 bg-seal/10 p-4 text-sm text-fg">
+          <p>{error}</p>
+          {customer && lastRun.current && (
+            <button type="button" className="btn ghost mt-4" data-testid="retry-request" onClick={() => lastRun.current?.()}>
+              {pc.retry}
+            </button>
+          )}
+        </div>
       )}
 
       {phase === 'elicit' && customer && draftOffer && (
@@ -542,7 +576,7 @@ export default function DemoApp({ mode = 'harness', aside }: { mode?: Mode; asid
         </>
       )}
 
-      {phase === 'processing' && <ProcessingView stage={stage} copy={copy} />}
+      {phase === 'processing' && <ProcessingView stage={stage} copy={copy} phrases={customer ? phrases : []} quoteOpen={revealLang === 'en' ? '“' : '「'} quoteClose={revealLang === 'en' ? '”' : '」'} />}
 
       {phase === 'followup' && followUpQuestion && (
         <motion.div
@@ -654,6 +688,15 @@ export default function DemoApp({ mode = 'harness', aside }: { mode?: Mode; asid
           )}
           {customer && sets.length > 0 && result.primary_kanji !== null && (
             <div className="candidateSets" data-testid="candidate-sets">
+              {retryCount < 2 && !retryNote ? (
+                <button type="button" className="btn ghost" data-testid="see-others" onClick={seeOthers}>
+                  {pc.another(2 - retryCount, memorialNow)}
+                </button>
+              ) : (
+                <p className="sent" role="status" data-testid="retry-cap">
+                  {pc.addDetail}
+                </p>
+              )}
               {sets.length > 1 && (
                 <p className="setNav sent">
                   <button type="button" className="backLink" data-testid="set-prev" disabled={setIdx === 0} onClick={() => setSetIdx((i) => Math.max(0, i - 1))}>
@@ -665,24 +708,16 @@ export default function DemoApp({ mode = 'harness', aside }: { mode?: Mode; asid
                   </button>
                 </p>
               )}
-              {retryCount < 2 && !retryNote ? (
-                <button type="button" className="btn ghost" data-testid="see-others" onClick={seeOthers}>
-                  {pc.another}
-                </button>
-              ) : (
-                <p className="sent" role="status" data-testid="retry-cap">
-                  {pc.addDetail}
-                </p>
-              )}
             </div>
           )}
           <div className="mt-12 text-center">
             <button
               type="button"
               onClick={tryAgain}
-              className={customer ? 'btn ghost' : 'font-label rounded-full border border-accent/40 px-6 py-2.5 text-sm text-fg transition-colors hover:border-accent hover:bg-accent/10'}
+              data-testid={customer ? 'edit-story' : undefined}
+              className={customer ? 'backLink' : 'font-label rounded-full border border-accent/40 px-6 py-2.5 text-sm text-fg transition-colors hover:border-accent hover:bg-accent/10'}
             >
-              {copy.tryAgain}
+              {customer ? pc.editStory : copy.tryAgain}
             </button>
           </div>
         </div>

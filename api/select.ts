@@ -117,6 +117,7 @@ export async function POST(req: Request): Promise<Response> {
           context: parsed.context,
           promptQuestion: promptQuestion?.text ?? null,
           exclude: ex.exclude,
+          round: ex.retry + 1,
           followUpsUsed: fu.followUps.length,
           onStage: (stage) => send({ type: 'stage', stage }),
           onCard: (partial) => send({ type: 'card', result: partial }),

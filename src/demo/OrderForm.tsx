@@ -28,7 +28,7 @@ import { toRevealLang } from '../reveal/lang.ts'
 // checkout. The browser sends choices, never a price: the charge is the Shopify variant's price.
 // Styled in the Reveal design (light; the .composer card and .btn classes come from src/reveal/reveal.css).
 
-const NAME_MAX = 40
+const NAME_MAX = 20
 
 type Props = {
   result: EngineResult
@@ -101,8 +101,9 @@ export default function OrderForm({ result, story, followUps = [], promptQuestio
   const strokes = carvedStrokes(candidate, glyph)
   const simpleOk = candidate.strokes ? simpleAvailable(strokes, maxStrokes) : true
   const cert = certificateText(language)
-  const senderOk = sender.trim() !== '' && [...sender.trim()].length <= NAME_MAX
-  const receiverOk = receiver.trim() !== '' && [...receiver.trim()].length <= NAME_MAX
+  // Names are optional (a nickname is enough): blank is fine, only the length is checked.
+  const senderOk = [...sender.trim()].length <= NAME_MAX
+  const receiverOk = [...receiver.trim()].length <= NAME_MAX
   // the e-gift is delivered at once (or on its opening date), so only the wooden sizes ask for a desired delivery date
   const dateOk = pkg === 'egift' || (/^\d{4}-\d{2}-\d{2}$/.test(date) && date >= today)
   // (switching the carved form can make Simple unavailable after it was picked: the Standard set is then the only choice)
@@ -193,6 +194,11 @@ export default function OrderForm({ result, story, followUps = [], promptQuestio
       transition={{ duration: 0.8, ease: [0.16, 1, 0.3, 1] }}
     >
       <span className="eyebrow">{o.heading}</span>
+      <p className="sent">
+        <button type="button" className="backLink" data-testid="choose-other" onClick={onBack} disabled={busy}>
+          {pc.chooseOther}
+        </button>
+      </p>
 
       {/* The chosen character on its slip, with the certificate line */}
       <div className={`slip${memorial ? ' memorial' : ''}${quiet ? ' quietInk' : ''}`} data-memorial={memorial ? 'yes' : undefined} data-quiet={quiet ? 'yes' : undefined}>
@@ -239,7 +245,7 @@ export default function OrderForm({ result, story, followUps = [], promptQuestio
               id="sender_name"
               name="sender_name"
               type="text"
-              autoComplete="name"
+              autoComplete="off"
               maxLength={NAME_MAX}
               value={sender}
               onChange={(e) => setSender(e.target.value)}
@@ -258,6 +264,7 @@ export default function OrderForm({ result, story, followUps = [], promptQuestio
               placeholder={memorial ? copy.memorial.receiverPlaceholder : o.receiverPlaceholder}
             />
           </div>
+          <p className="sent nameHelp" data-testid="name-help">{o.nameHelp}</p>
           {pkg !== 'egift' && (
           <div>
             <label className="clab" htmlFor="delivery_date">{o.dateLabel}</label>
@@ -363,9 +370,6 @@ export default function OrderForm({ result, story, followUps = [], promptQuestio
         </button>
         <p className="sent">{o.privacy}</p>
         <p className="sent"><a href="/legal" data-testid="legal-link" className="legalLink">{pc.legalLink}</a></p>
-        <button type="button" className="backLink" onClick={onBack} disabled={busy}>
-          {o.back}
-        </button>
       </div>
     </motion.div>
   )

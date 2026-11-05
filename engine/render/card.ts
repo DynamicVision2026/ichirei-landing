@@ -27,6 +27,12 @@ const CAPTION = {
   'zh-Hant': { to: (n: string) => (n ? `${n} 收` : '＿＿＿＿＿＿ 收'), from: (n: string) => (n ? `${n} 贈` : '＿＿＿＿＿＿ 贈') },
   en: { to: (n: string) => (n ? `To ${n}` : 'To ______________'), from: (n: string) => (n ? `From ${n}` : 'From ______________') },
 }
+/** The two caption lines of a card: null = the line is not drawn at all. An empty name that nobody gave is left out (no placeholder); only the card the sender hands over keeps its lines to write on. */
+export function nameCaptions(a: Pick<Artwork, 'language' | 'to' | 'from' | 'handwrite'>): { to: string | null; from: string | null } {
+  const cap = capFor(a.language)
+  const hand = a.handwrite !== false
+  return { to: hand || a.to ? cap.to(a.to) : null, from: hand || a.from ? cap.from(a.from) : null }
+}
 const capFor = (l: Artwork['language']) => (l === 'ja' ? CAPTION.ja : l === 'en' ? CAPTION.en : CAPTION['zh-Hant'])
 
 type Doc = InstanceType<typeof PDFDocument>
@@ -178,12 +184,13 @@ function drawInside(doc: Doc, a: Artwork) {
   }
   centred(doc, a.certificateLine, rcx, y, rw, 6.8, MUTED)
   // to / from, and the short message (when it ships directly or as an e-gift)
-  const cap = capFor(a.language)
   const base = BLEED + TRIM_H - 11 * MM
   if (a.message) centred(doc, a.message, rcx, base - 38, rw, 7.6, INK)
   doc.font(names.body).fontSize(8.4).fillColor(INK)
-  doc.text(cap.to(a.to), rx, base - 20, { width: rw, align: 'left', lineBreak: false })
-  doc.text(cap.from(a.from), rx, base - 4, { width: rw, align: 'right', lineBreak: false })
+  // A name nobody gave is left out (no placeholder); only the card the sender hands over keeps its lines to write on.
+  const caps = nameCaptions(a)
+  if (caps.to !== null) doc.text(caps.to, rx, base - 20, { width: rw, align: 'left', lineBreak: false })
+  if (caps.from !== null) doc.text(caps.from, rx, base - 4, { width: rw, align: 'right', lineBreak: false })
 }
 
 /** One or many cards into one PDF (the owner's "all of today's cards"). */

@@ -19,7 +19,7 @@ import { flaggedEgifts, mailerFromEnv, purgeExpiredAddresses, readJsonl, runEgif
 import { readArt } from '../engine/film-art.ts'
 import { isGiftRecord, type GiftRecord } from '../engine/gift.ts'
 import { createOrderStore, type OrderStore } from '../engine/order-store.ts'
-import type { OrderRecord } from '../engine/order.ts'
+import { NO_NAME, type OrderRecord } from '../engine/order.ts'
 import { readPayments, readShippingAddresses, SHIPPING_SOURCE, type PaymentResult, type ShippingResult } from '../engine/shipping.ts'
 import { cancelOrder, changeCharacter, changePoemFormat, editNames, windowOf, type ChangeDeps, type WindowInfo } from '../engine/change-window.ts'
 import { createPoemHandler } from './poem.ts'
@@ -281,9 +281,10 @@ export function createOpsHandlers(deps: () => OpsDeps) {
           `<td>変更受付中（あと${r.win.hours_left}時間）${r.win.verified ? '' : '<br><small>注文作成時刻から計算</small>'}</td>` +
           `<td><details><summary>変更する</summary><div class="chg" data-ref="${esc(r.entry.order_ref)}">` +
           `<p>現在の字: <b>${esc(p?.glyph_to_carve ?? '')}</b></p>` +
+          `<p>差出人: <b>${esc(p?.sender_name || (p ? NO_NAME[p.language] : ''))}</b>　受取人: <b>${esc(p?.receiver_name || (p ? NO_NAME[p.language] : ''))}</b></p>` +
           `<p><label>字を変更 <select name="kanji" ${charOpts ? '' : 'disabled'}>${charOpts || '<option>他に候補なし</option>'}</select></label> <button data-act="character" ${charOpts ? '' : 'disabled'}>この字に変更（詩は書き直します）</button></p>` +
           `<p><label>詩の形式（1回だけ） <select name="poem_type" ${hasPoem && !poemUsed ? '' : 'disabled'}>${poemOpts}</select></label> <button data-act="poem" ${hasPoem && !poemUsed ? '' : 'disabled'}>形式を変更</button>${poemUsed ? ' <small>変更済み</small>' : ''}</p>` +
-          `<p><label>差出人 <input name="sender" value="${esc(p?.sender_name ?? '')}" maxlength="40"></label> <label>受取人 <input name="receiver" value="${esc(p?.receiver_name ?? '')}" maxlength="40"></label>` +
+          `<p><label>差出人 <input name="sender" value="${esc(p?.sender_name ?? '')}" maxlength="20"></label> <label>受取人 <input name="receiver" value="${esc(p?.receiver_name ?? '')}" maxlength="20"></label>` +
           `${canMsg ? ` <label>メッセージ（60字まで） <input name="message" value="${esc(p?.gift_message ?? '')}" maxlength="60"></label>` : ''} <button data-act="names">名前${canMsg ? '・メッセージ' : ''}を保存</button></p>` +
           `<p><button data-act="cancel">キャンセルとして記録</button> <small>返金はShopifyで行ってください（ここでは何も返金されません）</small></p>` +
           `<small>Shopifyの注文に入っている字・詩の情報は変わりません。製作はこのページのデータで行います。</small>` +

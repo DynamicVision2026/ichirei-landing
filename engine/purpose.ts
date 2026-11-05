@@ -35,7 +35,16 @@ const PLAYFUL: Record<FreePickMode, string> = {
   none: 'NONE: there is no free pick for this gift.',
 }
 
+/** The language and script every line you write must be in (2026-11-05). The code checks it afterwards; this is the instruction. */
+const LANGUAGE_LINE: Record<string, string> = {
+  ja: 'LANGUAGE OF EVERY LINE YOU WRITE: Japanese (kanji and kana). This holds even when the story is in another language; a quotation from the story stays exactly as the customer wrote it.',
+  'zh-Hant': 'LANGUAGE AND SCRIPT OF EVERY LINE YOU WRITE: Traditional Chinese (繁體中文) only — no Simplified characters, no Japanese kana. This holds even when the story is in another language; a quotation from the story stays exactly as the customer wrote it.',
+  'zh-Hans': 'LANGUAGE AND SCRIPT OF EVERY LINE YOU WRITE: Simplified Chinese (简体中文) only — no Traditional-only characters, no Japanese kana. This holds even when the story is in another language; a quotation from the story stays exactly as the customer wrote it.',
+  en: 'LANGUAGE OF EVERY LINE YOU WRITE: English only — no Chinese or Japanese characters outside quotation marks. This holds even when the story is in another language; a quotation from the story stays exactly as the customer wrote it.',
+}
+
 export interface FrameContext extends PurposeFacts {
+  language?: string
   relationship: Relationship | null
   relationship_other?: string | null
   direction?: string | null
@@ -66,6 +75,7 @@ export function purposeFrame(ctx: FrameContext): string {
     '5. What did the RECEIVER DO that shows it? One act, quoted from the story.',
     "Result: the character names the RECEIVER'S QUALITY, in the tone of the purpose. Never a quality of the sender; never a fact the story or the form does not give; never a tone that breaks the purpose's rules (a review rejects a line about the sender as `subject` and one that breaks the tone as `tone`).",
     `FREE PICK for this gift: ${PLAYFUL[mode]}`,
+    ...(ctx.language && LANGUAGE_LINE[ctx.language] ? [LANGUAGE_LINE[ctx.language]] : []),
   ].join('\n')
 }
 

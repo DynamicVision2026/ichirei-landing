@@ -17,7 +17,8 @@ import { STYLES_BY_LANGUAGE, glyphFor, normalizeStyle, type InscriptionStyle } f
 import { carvedStrokes, simpleAvailable } from '../src/order/strokes.ts'
 import { simpleMaxStrokes, strokeInfo } from './strokes.ts'
 
-export const NAME_MAX = 40
+/** Names are optional nicknames (2026-11-05): at most 20 characters, plain text. */
+export const NAME_MAX = 20
 /** Same cap as /api/select: a story that could not have been analysed cannot be ordered against. */
 export const STORY_MAX = ENGINE_STORY_MAX
 /** How far ahead a delivery date may be. */
@@ -181,6 +182,17 @@ export function cleanName(v: unknown): string | null {
   return s
 }
 
+/** What /ops shows where an optional name was left blank (2026-11-05), in the order's language. */
+export const NO_NAME: Record<Language, string> = { ja: '（なし）', 'zh-Hant': '（未填）', 'zh-Hans': '（未填）', en: '(none)' }
+
+/** An optional name: nothing sent = '' (the name is left out everywhere); something sent that is too long or has control characters = null (rejected). */
+export function optionalName(v: unknown): string | null {
+  if (v === undefined || v === null) return ''
+  if (typeof v !== 'string') return null
+  if (v.trim() === '') return ''
+  return cleanName(v)
+}
+
 export function parseOrderRequest(body: unknown, now: Date = new Date(), palette?: Palette): ParsedOrder {
   if (!isObject(body)) return fail('body', 'Body must be a JSON object')
 
@@ -214,10 +226,11 @@ export function parseOrderRequest(body: unknown, now: Date = new Date(), palette
     return fail('engine_result', 'The selected candidate has an invalid inscription_form')
   }
 
-  const sender = cleanName(body.sender_name)
-  if (!sender) return fail('sender_name', `"sender_name" must be 1–${NAME_MAX} characters, no control characters`)
-  const receiver = cleanName(body.receiver_name)
-  if (!receiver) return fail('receiver_name', `"receiver_name" must be 1–${NAME_MAX} characters, no control characters`)
+  // Names are optional (a nickname is enough); blank = the name is left out of the card, the gift page, the PDF, the scroll and the film.
+  const sender = optionalName(body.sender_name)
+  if (sender === null) return fail('sender_name', `"sender_name" is optional: at most ${NAME_MAX} characters, no control characters`)
+  const receiver = optionalName(body.receiver_name)
+  if (receiver === null) return fail('receiver_name', `"receiver_name" is optional: at most ${NAME_MAX} characters, no control characters`)
 
   const today = todayJst(now)
   const isEgift = body.package === 'egift'
@@ -328,37 +341,58 @@ export interface Attribute {
   value: string
 }
 
+/** The two properties a customer sees on the cart and in the order (2026-11-05), in the order's language: 「一字」 and 「開封日」. Everything else is hidden (a name starting with an underscore). */
+export const VISIBLE_PROPERTY: Record<Language, { character: string; opens: string }> = {
+  ja: { character: '一字', opens: '開封日' },
+  'zh-Hant': { character: '一字', opens: '開啟日期' },
+  'zh-Hans': { character: '一字', opens: '开启日期' },
+  en: { character: 'Character', opens: 'Opens on' },
+}
+
 /**
- * The nine line-item attributes (plus `ichirei_memorial=yes` as a tenth, for remembrance orders only), in this order (`certificate_meaning_en` sits next to the kanji and reading so the
- * workshop can print a bilingual card). `kanji` is the selected character in its display
- * form (ja: modern, zh: simplified); `inscription_form` is the glyph to CARVE (after the sender's
- * choice of kyūjitai/modern or traditional/simplified).
+ * The line-item properties of the order (2026-11-05). Shown to the customer: only two, in the order's language — 一字 | Character (the form chosen for the carving: 憶 on a Traditional
+ * order, never 忆) and 開封日 | 開啟日期 | Opens on (the opening date, or the desired delivery date when there is none). Every other property starts with an underscore, which Shopify
+ * hides from the cart, the checkout and the customer's e-mails (the workshop and the confirmation-e-mail snippet still read them): `_kanji` is the selected character in its display
+ * form, `_inscription_form` the glyph to CARVE, `_reading`, `_certificate_meaning_en` (next to them so the workshop can print a bilingual card), the two names (may be empty), `_delivery_date`,
+ * `_opens_on`, `_language`, `_order_ref`, `_ichirei_size`, and the optional ones. Orders made before this change carry the same keys without the underscore; readers accept both (see `attrOf`).
  */
 export function lineAttributes(order: ValidOrder, orderRef: string, animationLink?: string | null, giftLink?: string | null): Attribute[] {
+  const opensOn = order.open_date ?? order.delivery_date
+  const v = VISIBLE_PROPERTY[order.language]
   return [
-    { key: 'kanji', value: order.candidate.kanji },
-    { key: 'inscription_form', value: order.glyph },
-    { key: 'reading', value: order.candidate.reading },
-    { key: 'certificate_meaning_en', value: order.certificate.meaning_en ?? '' },
-    { key: 'sender_name', value: order.sender_name },
-    { key: 'receiver_name', value: order.receiver_name },
-    { key: 'delivery_date', value: order.delivery_date },
-    { key: 'language', value: order.language },
-    { key: 'order_ref', value: orderRef },
+    { key: v.character, value: order.glyph },
+    { key: v.opens, value: opensOn },
+    { key: '_kanji', value: order.candidate.kanji },
+    { key: '_inscription_form', value: order.glyph },
+    { key: '_reading', value: order.candidate.reading },
+    { key: '_certificate_meaning_en', value: order.certificate.meaning_en ?? '' },
+    { key: '_sender_name', value: order.sender_name },
+    { key: '_receiver_name', value: order.receiver_name },
+    { key: '_delivery_date', value: order.delivery_date },
+    { key: '_opens_on', value: opensOn },
+    { key: '_language', value: order.language },
+    { key: '_order_ref', value: orderRef },
     // Part C: the size code (the SKU) and where it goes. Direct: gift packaging and NO price slip, the receiver's address is the one at checkout.
-    { key: 'ichirei_size', value: PACKAGE_SKU[order.package] },
-    ...(order.ship_to !== 'none' ? [{ key: 'ship_to', value: order.ship_to }] : []),
-    ...(order.ship_to === 'direct' ? [{ key: 'gift_packaging', value: 'yes' }, { key: 'no_price_slip', value: 'yes' }] : []),
-    ...(order.gift_message ? [{ key: 'gift_message', value: order.gift_message }] : []),
+    { key: '_ichirei_size', value: PACKAGE_SKU[order.package] },
+    ...(order.ship_to !== 'none' ? [{ key: '_ship_to', value: order.ship_to }] : []),
+    ...(order.ship_to === 'direct' ? [{ key: '_gift_packaging', value: 'yes' }, { key: '_no_price_slip', value: 'yes' }] : []),
+    ...(order.gift_message ? [{ key: '_gift_message', value: order.gift_message }] : []),
     // Remembrance: tells the workshop to carve in black or gold — no red seal, no red-and-white cord.
-    ...(order.certificate.memorial ? [{ key: 'ichirei_memorial', value: 'yes' }] : []),
+    ...(order.certificate.memorial ? [{ key: '_ichirei_memorial', value: 'yes' }] : []),
     // The poem included with the gift (when there is one): type, the lines (one per row) and the reading aids.
     ...(order.certificate.poems[0] ? poemAttributes(order.certificate.poems[0]) : []),
     // The private address of the story animation (/a/<id>): for the confirmation e-mail and the QR code on the printed card.
     // The receiver's page (/g/<token>): the QR code on the printed card points here; and the sender's own private page.
-    ...(giftLink ? [{ key: 'ichirei_gift_url', value: giftLink }] : []),
-    ...(animationLink ? [{ key: 'ichirei_animation_url', value: animationLink }] : []),
+    ...(giftLink ? [{ key: '_ichirei_gift_url', value: giftLink }] : []),
+    ...(animationLink ? [{ key: '_ichirei_animation_url', value: animationLink }] : []),
   ]
+}
+
+/** A property of an order line by its new (underscore) name, or by the old name for an order made before 2026-11-05. */
+export function attrOf(attributes: { key: string; value: string }[] | null | undefined, name: string): string | null {
+  const list = attributes ?? []
+  const hit = list.find((a) => a?.key === `_${name}`) ?? list.find((a) => a?.key === name)
+  return hit && typeof hit.value === 'string' ? hit.value : null
 }
 
 // ---- the poem add-on ----------------------------------------------------------------------------
@@ -382,9 +416,9 @@ export const POEM_ID_PATTERN = /^PM-\d{8}-[A-Za-z0-9]{10,40}$/
 /** The attributes of the chosen poem on the main line item, so the workshop can print it on the card (the poem is included, free: no line item of its own). */
 export function poemAttributes(p: { type: PoemType; lines: string[]; reading: string }): Attribute[] {
   return [
-    { key: 'ichirei_poem_type', value: p.type },
-    { key: 'ichirei_poem_text', value: p.lines.join('\n') },
-    { key: 'ichirei_poem_reading', value: p.reading || '-' },
+    { key: '_ichirei_poem_type', value: p.type },
+    { key: '_ichirei_poem_text', value: p.lines.join('\n') },
+    { key: '_ichirei_poem_reading', value: p.reading || '-' },
   ]
 }
 

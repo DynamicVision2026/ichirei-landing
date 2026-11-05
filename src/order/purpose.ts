@@ -172,3 +172,26 @@ export function noCelebration(f: PurposeFacts): boolean {
 
 /** The same test on a stored purpose code (a result, an order, a gift: the effective purpose, or "other" when its text could not be mapped). */
 export const isQuietPurpose = (purpose: string | null | undefined): boolean => purpose === 'apology' || purpose === 'encourage' || purpose === 'memorial'
+
+/**
+ * The direction chip that goes with a relationship (ticket 2026-11-05, part 7): pre-selected when the sender picks the relationship, still changeable. up = to someone older or senior,
+ * across = an equal, down = younger or in the sender's care. null = it varies (work, in-laws, community, someone who cared for me, a pet, other): nothing is pre-selected.
+ */
+export const DIRECTION_FOR_RELATIONSHIP: Record<string, 'up' | 'across' | 'down' | null> = {
+  parent_mother: 'up',
+  parent_father: 'up',
+  grandparent: 'up',
+  mentor: 'up',
+  child: 'down',
+  spouse: 'across',
+  romance: 'across',
+  sibling: 'across',
+  friend: 'across',
+  work: null,
+  in_law: null,
+  community: null,
+  caregiver: null,
+  pet: null,
+  other: null,
+}
+export const directionForRelationship = (relationship: string | null | undefined): 'up' | 'across' | 'down' | null => DIRECTION_FOR_RELATIONSHIP[relationship ?? ''] ?? null

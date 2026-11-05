@@ -17,6 +17,7 @@ import { fileURLToPath } from 'node:url'
 import { anchorPresent, applyPalette, applyReviewVerdicts, type Palette } from './palette.ts'
 import { runReview } from './review.ts'
 import { rewriteLines, subjectProblem } from './gaze.ts'
+import { ensureLineLanguage } from './script.ts'
 import { callSignal, replaceTimeoutMs } from './limits.ts'
 import type { Candidate, EngineContext, EngineResult, RefereeAction } from './contract.ts'
 
@@ -336,7 +337,17 @@ export async function completeMains(
   const seen = new Set(result.candidates.flatMap((c) => [c.kanji, c.inscription_form ?? c.kanji]))
   const mainWanted = slots.includes('main')
   const usable: Candidate[] = []
-  for (const cand of cands) {
+  // The page's language and script (2026-11-05): a refilled card's line is converted in code when only the Chinese script is wrong, rewritten ONCE otherwise, and the candidate is refused if it is still wrong.
+  const langChecked: Candidate[] = []
+  for (const cand0 of cands) {
+    const lang = await ensureLineLanguage(cand0.one_line_gaze, context.language, async (why) => {
+      const fixes = await rewriteLines([{ kanji: cand0.kanji, gaze: cand0.one_line_gaze, why }], story, context.language, { tone: toneLine(context), apiKey: opts.apiKey, signal: opts.signal, client: opts.client, log, timeoutMs: freeOnly ? freeRefillTimeoutMs() : undefined })
+      return fixes.get(cand0.kanji) ?? null
+    })
+    if (lang.how === 'dropped') { reject(cand0.slot as RefillSlot, cand0.kanji, 'language: the line is not in the page\'s language and script'); continue }
+    langChecked.push(lang.how === 'ok' ? cand0 : ({ ...cand0, one_line_gaze: lang.line } as Candidate))
+  }
+  for (const cand of langChecked) {
     const slot = cand.slot as RefillSlot
     if (seen.has(cand.kanji) || (cand.inscription_form && seen.has(cand.inscription_form))) { reject(slot, cand.kanji, 'already offered or refused'); continue }
     if (usable.some((u) => u.kanji === cand.kanji)) { reject(slot, cand.kanji, 'the same character twice in the refill'); continue }

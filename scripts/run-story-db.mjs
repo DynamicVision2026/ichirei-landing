@@ -167,7 +167,7 @@ export function describeRun(row, ctx, outcome) {
         story: row.test_story_ja, engine_result: r, selected_kanji: mainCand.kanji, language: 'ja', sender_name: 'test', receiver_name: 'test',
         delivery_date: new Date(Date.now() + 30 * 86_400_000).toISOString().slice(0, 10), inscription_style: 'modern', package: 'simple',
       }, new Date(), palette)
-      if (!parsed.ok || parsed.order.certificate.memorial !== true || !lineAttributes(parsed.order, 'IC-TEST').some((a) => a.key === 'ichirei_memorial' && a.value === 'yes')) flags.push('memorial_data_path_broken')
+      if (!parsed.ok || parsed.order.certificate.memorial !== true || !lineAttributes(parsed.order, 'IC-TEST').some((a) => a.key === '_ichirei_memorial' && a.value === 'yes')) flags.push('memorial_data_path_broken')
     }
   }
   if (r.status === 'insufficient') flags.push('insufficient')

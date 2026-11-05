@@ -28,6 +28,8 @@ export interface Artwork {
   quiet: boolean
   /** Names printed on the card. Empty strings mean the line stays blank, for handwriting (the sender hands it over). */
   from: string
+  /** True = the printed card of a wooden size that the sender hands over: an empty name stays a line to write on. False = an empty name (none was given) is simply left out. */
+  handwrite?: boolean
   to: string
   message: string
   qrUrl: string
@@ -66,6 +68,7 @@ export async function loadArtwork(store: OrderStore, gift: GiftRecord, anim: Ani
     poemType: gift.poem?.type ?? '',
     memorial: gift.memorial,
     quiet: gift.memorial || isQuietPurpose(gift.purpose),
+    handwrite: blank,
     from: blank ? '' : gift.from,
     to: blank ? '' : gift.to,
     message: blank ? '' : gift.message,

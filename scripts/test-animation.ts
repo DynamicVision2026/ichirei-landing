@@ -307,14 +307,14 @@ const READY: FilmRecord = { status: 'ready', made_at: NOW.toISOString(), picture
   const res = await post(handler(), orderBody('ja'))
   const j = (await res.json()) as any
   const attrs = carts[0].variables.input.lines[0].attributes as { key: string; value: string }[]
-  const link = attrs.find((a) => a.key === 'ichirei_animation_url')?.value ?? ''
+  const link = attrs.find((a) => a.key === '_ichirei_animation_url')?.value ?? ''
   const id = link.split('/').pop() ?? ''
   check('(5) an order makes its film with no manual step: the response and the Shopify line item carry the private address (ichirei_animation_url), https://ichirei.soul-id.jp/a/AN-…', res.status === 200 && j.animation_url === link && /^https:\/\/ichirei\.soul-id\.jp\/a\/AN-[a-z2-9]{20}$/.test(link))
   const stored = (await store.get(id)) as AnimationRecord
   const order = (await store.get(j.order_ref)) as any
   check('(5) …the film script is saved on the animation record (what the page plays) AND with the order (production.film, beside the certificate data); the order points to the animation; the pictures are NOT drawn at order time (unpaid orders cost nothing for pictures)', isAnimationRecord(stored) && stored.film?.status === 'ready' && stored.film.lines.length === 4 && order.production.film?.status === 'ready' && order.production.film.pictures.join() === READY.pictures.join() && order.animation_id === id && stored.order_ref === j.order_ref && (await store.getObject(`films/${id}/art.json`)) === null && (await store.getObject(`films/${id}/1.webp`)) === null)
   check('(5) …the film step got the saved story, the language, the carved character and the "who they are" line of this order', inputs.length === 1 && inputs[0].story.includes('ちょうど今詰めてたところ') && inputs[0].glyph === '備' && inputs[0].language === 'ja' && inputs[0].who.startsWith('毎朝'))
-  check('(5) …and the cart sees only the link: no story, no film lines in any attribute', !JSON.stringify(carts[0]).includes('台所に戻りました') && !JSON.stringify(carts[0]).includes('庭の花を一輪') && attrs.at(-1)?.key === 'ichirei_animation_url')
+  check('(5) …and the cart sees only the link: no story, no film lines in any attribute', !JSON.stringify(carts[0]).includes('台所に戻りました') && !JSON.stringify(carts[0]).includes('庭の花を一輪') && attrs.at(-1)?.key === '_ichirei_animation_url')
   const pub = await post(handler({ env: { ICHIREI_PUBLIC_URL: 'https://example.test' } as never }), orderBody('ja'))
   check('(5) ICHIREI_PUBLIC_URL sets the address in the link', ((await pub.json()) as any).animation_url.startsWith('https://example.test/a/AN-'))
 
@@ -352,7 +352,7 @@ const READY: FilmRecord = { status: 'ready', made_at: NOW.toISOString(), picture
   const soft = await post(handler({ s: failing }), orderBody('ja'))
   console.error = quiet
   const softJ = (await soft.json()) as any
-  check('(5) if the animation record cannot be written the ORDER still goes through — without a link', soft.status === 200 && softJ.animation_url === null && !carts[0].variables.input.lines[0].attributes.some((a: any) => a.key === 'ichirei_animation_url'))
+  check('(5) if the animation record cannot be written the ORDER still goes through — without a link', soft.status === 200 && softJ.animation_url === null && !carts[0].variables.input.lines[0].attributes.some((a: any) => a.key === '_ichirei_animation_url'))
 
   const memBody = orderBody('ja')
   ;(memBody.engine_result as any).occasion = 'memorial'

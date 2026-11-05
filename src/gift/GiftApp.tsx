@@ -159,10 +159,10 @@ export default function GiftApp() {
   if (step === 'letter')
     return stage(
       <section className="gf-paper gf-letter" data-testid="gift-letter">
-        <p className="gf-to" data-testid="gift-to">{copy.to(view.to)}</p>
+        {view.to && <p className="gf-to" data-testid="gift-to">{copy.to(view.to)}</p>}
         {view.message && <blockquote className="gf-message" data-testid="gift-message">{view.message}</blockquote>}
         <p className="gf-lead" data-testid="gift-lead">{view.memorial ? copy.letterLeadMemorial(view.from) : copy.letterLead(view.from)}</p>
-        <p className="gf-from" data-testid="gift-from">{copy.from(view.from)}</p>
+        {view.from && <p className="gf-from" data-testid="gift-from">{copy.from(view.from)}</p>}
         <button type="button" className="gf-btn" data-testid="gift-to-film" onClick={() => setStep('film')}>{copy.letterButton}</button>
       </section>,
     )
@@ -192,7 +192,7 @@ export default function GiftApp() {
       <section className="gf-reveal" data-testid="gift-reveal">
         <p className="gf-char notranslate" translate="no" data-testid="gift-glyph" aria-label={view.glyph}>{view.glyph}</p>
         <p className="gf-reading notranslate" translate="no" data-testid="gift-reading">{readingLine(view)}</p>
-        <p className="gf-gold" data-testid="gift-gold">{copy.revealGold(view.from)}</p>
+        {view.from && <p className="gf-gold" data-testid="gift-gold">{copy.revealGold(view.from)}</p>}
         <p className="gf-who" data-testid="gift-who">{view.who}</p>
         <button type="button" className="gf-btn" data-testid="gift-to-poem" onClick={() => setStep(view.poem ? 'poem' : 'cert')}>{view.poem ? copy.poemButton : copy.certButton}</button>
       </section>,
@@ -219,9 +219,9 @@ export default function GiftApp() {
       <section className="gf-paper gf-cert" data-testid="gift-cert" data-cert-no={view.certificate_no ?? ''}>
         <h2 className="gf-cert-title" data-testid="gift-cert-title">{copy.certTitle(view.certificate_no ? String(view.certificate_no).padStart(4, '0') : null)}</h2>
         <p className="gf-cert-glyph notranslate" translate="no" data-testid="gift-cert-glyph">{view.glyph}</p>
-        <p className="gf-cert-to" data-testid="gift-cert-to">{copy.certTo(view.to)}</p>
-        <p className="gf-cert-line" data-testid="gift-cert-line">{copy.certLine(view.from)}</p>
-        <p className="gf-cert-from" data-testid="gift-cert-from">{copy.certFrom(view.from)}</p>
+        {view.to && <p className="gf-cert-to" data-testid="gift-cert-to">{copy.certTo(view.to)}</p>}
+        {view.from && <p className="gf-cert-line" data-testid="gift-cert-line">{copy.certLine(view.from)}</p>}
+        {view.from && <p className="gf-cert-from" data-testid="gift-cert-from">{copy.certFrom(view.from)}</p>}
         <p className="gf-cert-date" data-testid="gift-cert-date">{fullDateText(lang, view.opens_on ?? view.order_date)}</p>
         <p className="gf-cert-tag">{copy.certTagline}</p>
         <button type="button" className="gf-btn" data-testid="gift-to-keep" onClick={() => setStep('keep')}>{copy.certNext}</button>
@@ -283,8 +283,8 @@ function Envelope({ copy, lang, to, from, memorial, purpose, date, reduced, stat
         <div className="gf-env-back" />
         <div className="gf-env-letter" aria-hidden="true" />
         <div className="gf-env-front">
-          <p className="gf-env-to" data-testid="gift-env-to">{copy.to(to)}</p>
-          <p className="gf-env-from" data-testid="gift-env-from">{copy.from(from)}</p>
+          {to && <p className="gf-env-to" data-testid="gift-env-to">{copy.to(to)}</p>}
+          {from && <p className="gf-env-from" data-testid="gift-env-from">{copy.from(from)}</p>}
         </div>
         <div className="gf-env-flap" aria-hidden="true"><div className="gf-flap-out" /><div className="gf-flap-in" /></div>
         <div className="gf-seal" aria-hidden="true" data-testid="gift-seal"><i className="gf-seal-l" /><i className="gf-seal-r" /><b>一字礼</b></div>
