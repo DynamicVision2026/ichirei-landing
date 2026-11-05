@@ -181,6 +181,8 @@ export interface Copy {
   revealIntro: string
   /** Customer page: the line above the cards, and the one button on every card. */
   revealIntroCustomer: string
+  /** Remembrance: no gift wording (the character is kept, not given). */
+  revealIntroMemorial: string
   giveThis: string
   selectThis: string
   selectedThis: string
@@ -354,6 +356,7 @@ const ja: Copy = {
     `結果が届く前に時間切れになりました（${s}秒）。もう一度お試しください。続く場合はサーバー側の制限の可能性があります。`,
   revealIntro: 'あなたの言葉から、一字ずつ浮かびあがります。気になった字に触れてください。',
   revealIntroCustomer: 'あなたの物語から見つかった字です。贈りたい一字を選んでください。',
+  revealIntroMemorial: 'あなたの物語から見つかった字です。残したい一字を選んでください。',
   giveThis: 'この字で贈る',
   selectThis: 'この一字を選ぶ',
   selectedThis: 'この一字を選んでいます',
@@ -504,6 +507,7 @@ const zhHans: Copy = {
   timeout: (s) => `结果送达前已超时（${s} 秒）。请再试一次；若持续出现，可能是服务器端的限制。`,
   revealIntro: '从你的文字里，一个字一个字浮现出来。请触碰让你在意的字。',
   revealIntroCustomer: '这些字是从你的故事里找到的。请选一个想送出的字。',
+  revealIntroMemorial: '这些字是从你的故事里找到的。请选一个想留下的字。',
   giveThis: '送这个字',
   selectThis: '选择这个字',
   selectedThis: '已选择这个字',
@@ -660,6 +664,7 @@ const zhHant: Copy = {
   timeout: (s) => `結果送達前已逾時（${s} 秒）。請再試一次；若持續出現，可能是伺服器端的限制。`,
   revealIntro: '從你的文字裡，一個字一個字浮現出來。請觸碰讓你在意的字。',
   revealIntroCustomer: '這些字是從你的故事裡找到的。請選一個想送出的字。',
+  revealIntroMemorial: '這些字是從你的故事裡找到的。請選一個想留下的字。',
   giveThis: '送這個字',
   selectThis: '選擇這個字',
   selectedThis: '已選擇這個字',
@@ -820,6 +825,7 @@ const en: Copy = {
     `The result did not arrive in time (${s} seconds). Please try again; if it keeps happening it may be a server-side limit.`,
   revealIntro: 'One character at a time, they rise out of your words. Touch the one that draws you.',
   revealIntroCustomer: 'These characters came from your story. Choose the one you want to give.',
+  revealIntroMemorial: 'These characters came from your story. Choose the one you want to keep.',
   giveThis: 'Give this character',
   selectThis: 'Choose this character',
   selectedThis: 'This character is chosen',

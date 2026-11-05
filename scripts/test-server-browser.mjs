@@ -56,7 +56,7 @@ try {
   for (const c of ['relationship:parent_father', 'direction:up', 'occasion:parent_day']) await page.click(`[data-chip="${c}"]`)
   await page.locator('#moment').fill(STORY.slice(0, 200))
   await page.click('#write button[type=submit]')
-  await page.waitForSelector('article[data-slot=main] [data-select]', { timeout: 30_000 })
+  await page.waitForSelector('[data-all-revealed=yes]', { timeout: 30_000 })
   check('the landing composer posted to /api/select (ja, the chips\' context) and three cards came back through the real server', posted.length === 1 && posted[0].language === 'ja' && posted[0].relationship === 'parent_father' && (await page.locator('#write article[data-slot]').count()) === 3)
 
   // /demo via SPA fallback, then the full flow through the real streaming API.

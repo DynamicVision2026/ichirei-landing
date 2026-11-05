@@ -236,8 +236,8 @@ export default function Reveal({ result, story, followUps = [], condition, copy,
     : 'btn primary'
 
   return (
-    <div>
-      <p className="font-serif-jp mb-8 text-sm text-mute" data-reveal-intro>{diagnostics ? copy.revealIntro : copy.revealIntroCustomer}</p>
+    <div data-all-revealed={allRevealed ? 'yes' : 'no'}>
+      <p className="font-serif-jp mb-8 text-sm text-mute" data-reveal-intro>{diagnostics ? copy.revealIntro : memorial ? copy.revealIntroMemorial : copy.revealIntroCustomer}</p>
 
       <div className="flex flex-col gap-6" role="list">
         {revealOrder.slice(0, revealedCount).map((c) => {
