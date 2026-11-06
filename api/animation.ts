@@ -16,6 +16,10 @@ import { ensureArt, markWashiForRetry, picturePath, readArt, renderBudgetMs, typ
 import { createOrderStore, type OrderStore } from '../engine/order-store.ts'
 import { FILM_RETRY_AFTER_MS, ensureFilm, filmInFlight, raceTimeout } from '../engine/film-store.ts'
 import type { FilmInput, FilmRecord } from '../engine/film.ts'
+import { buyerOrderView, isOrderRecord } from '../engine/buyer.ts'
+import { windowOf } from '../engine/change-window.ts'
+import { shopifyPayments } from '../engine/payments-lookup.ts'
+import type { PaymentInfo, PaymentResult } from '../engine/shipping.ts'
 
 const headers = (extra: Record<string, string> = {}) => ({ 'x-robots-tag': 'noindex, nofollow', ...extra })
 const json = (status: number, body: unknown, extra: Record<string, string> = {}) =>
@@ -33,6 +37,25 @@ export interface AnimationDeps {
   log?: (line: string) => void
   /** Tests: how often a waiting open looks at the store (ms). */
   pollMs?: number
+  /** The payment lookup behind the 24-hour deadline on the buyer's page (read-only Shopify app); tests replace it. */
+  payments?: (refs: string[]) => Promise<PaymentResult>
+}
+
+/** The payment of one order, kept for a minute so a page that is opened again and again does not ask Shopify every time. `'unverified'` = Shopify could not be asked. */
+const payCache = new Map<string, { at: number; value: PaymentInfo | null | 'unverified' }>()
+async function paymentOf(ref: string, d: AnimationDeps): Promise<PaymentInfo | null | 'unverified'> {
+  const hit = payCache.get(ref)
+  const t = (d.now?.() ?? new Date()).getTime()
+  if (hit && t - hit.at < 60_000 && !d.payments) return hit.value
+  let value: PaymentInfo | null | 'unverified'
+  try {
+    const res = await (d.payments ?? shopifyPayments(d.env ?? process.env))([ref])
+    value = res.failure ? 'unverified' : (res.found.get(ref) ?? null)
+  } catch {
+    value = 'unverified'
+  }
+  if (!d.payments) payCache.set(ref, { at: t, value })
+  return value
 }
 
 async function load(id: string, d: AnimationDeps) {
@@ -82,6 +105,20 @@ export function createAnimationHandlers(deps: () => AnimationDeps) {
         try {
           const g = await d.store.get(rec.gift_token)
           if (isGiftRecord(g)) view.gift = { url: giftUrl(g.token, d.env), size_code: g.size_code, ship_to: g.ship_to, egift_state: g.egift?.state ?? null, opens_on: g.opens_on ?? null, certificate_no: g.certificate_no ?? null, reply: g.reply ?? null }
+        } catch {
+          // the page works without it
+        }
+      }
+      // the buyer's page only: when it was ordered, until when it can still be changed, and the wooden gift's step. Read-only; no price, no name, no address.
+      if (view.gift && d.store && rec.order_ref !== 'SAMPLE') {
+        try {
+          const o = await d.store.get(rec.order_ref)
+          if (isOrderRecord(o)) {
+            const now = d.now?.() ?? new Date()
+            view.order = buyerOrderView(o, windowOf(o, await paymentOf(rec.order_ref, d), now), d.env ?? process.env)
+            const mail = (d.env ?? process.env).ICHIREI_SUPPORT_EMAIL?.trim() ?? ''
+            view.support_email = /^[^\s@<>,;]+@[^\s@<>,;]+\.[^\s@<>,;]+$/.test(mail) ? mail : null
+          }
         } catch {
           // the page works without it
         }

@@ -91,6 +91,10 @@ export interface AnimationView {
   film: { status: 'ready' | 'fallback'; lines: string[]; pictures: string[] | null; deferred?: boolean; incomplete?: boolean } | null
   /** The sender's page only (api/animation.ts adds it): what to share and where the order stands. */
   gift?: { url: string; size_code: string; ship_to: string; egift_state: 'waiting' | 'received' | null; opens_on: string | null; certificate_no: number | null; reply: { text: string; at: string } | null } | null
+  /** The buyer's page only (engine/buyer.ts): when it was ordered, the end of the 24-hour change window while it is open, and the wooden gift's step. */
+  order?: import('./buyer.ts').BuyerOrderView | null
+  /** The shop's support address (ICHIREI_SUPPORT_EMAIL), printed as plain text on the buyer's page; null when none is set. */
+  support_email?: string | null
 }
 
 /** A film the pictures can be drawn for: a fallback script (nothing to draw) or one with its four descriptions (older films with scene IDs are written again). */

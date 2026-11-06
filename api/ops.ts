@@ -7,6 +7,7 @@
 //   GET  /ops/cards/today.pdf       every card of today's orders, one PDF
 //   GET  /ops/wooden-today.csv      today's wooden orders for the workshop
 //   POST /ops/mark                  { order_ref, what: printed | shipped }
+//   POST /ops/wood                  { order_ref, step: received | making | shipped | delivered, tracking_no? }  — the wooden gift's status on the buyer's page
 //   POST /ops/egift/run             send the due reminders, delete the addresses 90 days after shipping
 //
 // The list shows codes the owner needs (order number, size, remembrance, where it goes, address status) — never a story. The CSV carries the character in its
@@ -20,7 +21,8 @@ import { readArt } from '../engine/film-art.ts'
 import { isGiftRecord, type GiftRecord } from '../engine/gift.ts'
 import { createOrderStore, type OrderStore } from '../engine/order-store.ts'
 import { NO_NAME, type OrderRecord } from '../engine/order.ts'
-import { readPayments, readShippingAddresses, SHIPPING_SOURCE, type PaymentResult, type ShippingResult } from '../engine/shipping.ts'
+import { readShippingAddresses, SHIPPING_SOURCE, type PaymentResult, type ShippingResult } from '../engine/shipping.ts'
+import { TRACKING_PATTERN, WOOD_STEPS, woodStepOf, type WoodStep } from '../engine/buyer.ts'
 import { cancelOrder, changeCharacter, changePoemFormat, editNames, windowOf, type ChangeDeps, type WindowInfo } from '../engine/change-window.ts'
 import { createPoemHandler } from './poem.ts'
 import { mergeStory, type Candidate } from '../engine/contract.ts'
@@ -28,7 +30,8 @@ import type { Palette } from '../engine/palette.ts'
 import type { generatePoem } from '../engine/poem.ts'
 import { POEM_TYPES, PRINTED_CARD, poemTypesFor, type PoemType } from '../src/order/packages.ts'
 import type { StoredPoem } from '../engine/order.ts'
-import { AdminTokenCache, loadTrackConfig, readAdminSecret, readSecret, type TrackDeps } from '../engine/track.ts'
+import { readSecret } from '../engine/track.ts'
+import { adminTokens, shopifyPayments, trackDepsOf } from '../engine/payments-lookup.ts'
 import { loadArtwork } from '../engine/render/artwork.ts'
 import { cardsPdf } from '../engine/render/card.ts'
 import { PACKAGE_SKU, SHIPS, WOODEN, type PackageId } from '../src/order/packages.ts'
@@ -177,21 +180,10 @@ async function makePoemFor(store: OrderStore, d: OpsDeps, now: Date, rec: OrderR
   return ((await store.get(out.poem_id).catch(() => null)) as StoredPoem | null) ?? null
 }
 
-const adminTokens = new AdminTokenCache()
-
-function trackDepsOf(env: NodeJS.ProcessEnv): TrackDeps | null {
-  const { config } = loadTrackConfig(env)
-  return config ? { config, secret: () => readAdminSecret(env) } : null
-}
 
 /** The default address lookup: the read-only ICHIREI Tracking app, the way /track asks for its orders. */
 function shopifyShipping(env: NodeJS.ProcessEnv): (refs: string[]) => Promise<ShippingResult> {
   return (refs) => readShippingAddresses(refs, trackDepsOf(env), adminTokens)
-}
-
-/** The default payment lookup (when it was paid, cancelled or refunded): the same read-only app; no customer data. */
-function shopifyPayments(env: NodeJS.ProcessEnv): (refs: string[]) => Promise<PaymentResult> {
-  return (refs) => readPayments(refs, trackDepsOf(env), adminTokens)
 }
 
 /** The user name typed at the Basic Auth prompt: the log's "who". */
@@ -225,6 +217,8 @@ const isCardSize = (r: Row) => {
 
 /** 製作に進めるもの: the window has closed and the order is not cancelled. */
 const ready = (r: Classified) => r.win.phase === 'closed'
+
+const WOOD_STEP_LABEL: Record<WoodStep, string> = { received: '1 ご注文を承りました', making: '2 制作しています', shipped: '3 発送しました（追跡番号）', delivered: '4 お届け済み' }
 
 const POEM_LABEL: Record<string, string> = { tanka: '短歌', haiku: '俳句', tang: '漢詩（唐詩の形）', ci: '宋詞', en: '自由詩' }
 
@@ -261,11 +255,18 @@ export function createOpsHandlers(deps: () => OpsDeps) {
         return `<tr>${common(r)}<td>${esc(addrOf(r))}</td><td>${esc(e.delivery_date)}</td>` +
           `<td>${size && PRINTED_CARD[size] ? `<a href="/ops/card/${esc(e.order_ref)}.pdf">カードPDF</a>` : ''}</td>` +
           `<td>${ops?.printed_at ? '印刷済み' : size && PRINTED_CARD[size] ? `<button name="what" value="printed" data-ref="${esc(e.order_ref)}">印刷した</button>` : ''}</td>` +
-          `<td>${ops?.shipped_at ? '発送済み' : size && SHIPS[size] ? `<button name="what" value="shipped" data-ref="${esc(e.order_ref)}">発送した</button>` : ''}</td></tr>`
+          `<td>${ops?.shipped_at ? '発送済み' : size && SHIPS[size] ? `<button name="what" value="shipped" data-ref="${esc(e.order_ref)}">発送した</button>` : ''}</td>` +
+          `<td>${size && SHIPS[size] ? woodCell(e.order_ref, ops) : ''}</td></tr>`
+      }
+      // 木の贈りもの: the step the buyer's page shows (4 steps) and the tracking number — the owner sets both here; the buyer only reads them
+      const woodCell = (ref: string, ops: OrderRecord['ops']) => {
+        const cur = woodStepOf(ops)
+        const opts = WOOD_STEPS.map((k) => `<option value="${k}"${k === cur ? ' selected' : ''}>${WOOD_STEP_LABEL[k]}</option>`).join('')
+        return `<span class="wood" data-ref="${esc(ref)}"><select name="wood_step">${opts}</select> <input name="tracking_no" value="${esc(ops?.tracking_no ?? '')}" placeholder="追跡番号" maxlength="40" size="14"> <button data-wood="1">保存</button></span>`
       }
       const readyTable = (list: Classified[]) =>
-        `<div class="wide"><table><thead><tr><th>注文番号</th><th>サイズ</th><th>偲ぶ</th><th>お届け</th><th>相手の住所</th><th>希望日</th><th>カード</th><th>印刷</th><th>発送</th></tr></thead>` +
-        `<tbody>${list.map(readyLine).join('') || '<tr><td colspan="9">なし</td></tr>'}</tbody></table></div>`
+        `<div class="wide"><table><thead><tr><th>注文番号</th><th>サイズ</th><th>偲ぶ</th><th>お届け</th><th>相手の住所</th><th>希望日</th><th>カード</th><th>印刷</th><th>発送</th><th>お客様の画面（木の贈りもの）</th></tr></thead>` +
+        `<tbody>${list.map(readyLine).join('') || '<tr><td colspan="10">なし</td></tr>'}</tbody></table></div>`
       const openLine = (r: Classified) => {
         const rec = r.record
         const p = rec?.production
@@ -312,6 +313,7 @@ export function createOpsHandlers(deps: () => OpsDeps) {
         `const act=b.dataset.act;if(act){const box=b.closest('.chg');const f=(n)=>box.querySelector('[name='+n+']');if(act==='cancel'&&!confirm('この注文をキャンセルとして記録します。製作の対象から外れます。よろしいですか？'))return;` +
         `const body={order_ref:box.dataset.ref,action:act};if(act==='character')body.kanji=f('kanji').value;if(act==='poem')body.poem_type=f('poem_type').value;if(act==='names'){body.sender=f('sender').value;body.receiver=f('receiver').value;if(f('message'))body.message=f('message').value}` +
         `b.disabled=true;const r=await fetch('/ops/change',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify(body)});const j=await r.json().catch(()=>({}));alert(r.ok?'変更しました: '+(j.message||''):'できませんでした: '+(j.error||r.status));location.reload();return}` +
+        `if(b.dataset.wood){const w=b.closest('.wood');const r=await fetch('/ops/wood',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({order_ref:w.dataset.ref,step:w.querySelector('[name=wood_step]').value,tracking_no:w.querySelector('[name=tracking_no]').value})});const j=await r.json().catch(()=>({}));if(r.ok)location.reload();else alert('できませんでした: '+(j.error||r.status));return}` +
         `const ref=b.dataset.ref;if(!ref)return;const r=await fetch('/ops/mark',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({order_ref:ref,what:b.value})});if(r.ok)location.reload();else alert('失敗しました')})</script></body></html>`
       return text(200, html, 'text/html; charset=utf-8')
     },
@@ -439,6 +441,41 @@ export function createOpsHandlers(deps: () => OpsDeps) {
         if (isGiftRecord(gift)) await store.put(rec.gift_token, { ...gift, shipped_at: iso })
       }
       return jsonRes(200, { ok: true })
+    },
+
+    /** 木の贈りもの: the step (1 received · 2 making · 3 shipped · 4 delivered) and the tracking number the buyer's page shows. Our own record only. */
+    async wood(req: Request): Promise<Response> {
+      const g = await guard(req)
+      if (g instanceof Response) return g
+      if (!sameSitePost(req)) return jsonRes(403, { error: 'cross_site' })
+      const { now, store } = g
+      let body: { order_ref?: unknown; step?: unknown; tracking_no?: unknown }
+      try {
+        body = (await req.json()) as typeof body
+      } catch {
+        return jsonRes(400, { error: 'bad_json' })
+      }
+      const ref = typeof body.order_ref === 'string' ? body.order_ref : ''
+      const step = (WOOD_STEPS as readonly unknown[]).includes(body.step) ? (body.step as WoodStep) : null
+      const tracking = typeof body.tracking_no === 'string' ? body.tracking_no.trim() : ''
+      if (!/^IC-\d{8}-[A-Z0-9]{8}$/.test(ref) || !step) return jsonRes(400, { error: 'bad_request' })
+      if (tracking && !TRACKING_PATTERN.test(tracking)) return jsonRes(422, { error: '追跡番号は英数字とハイフンで入力してください（4〜40文字）', code: 'bad_tracking' })
+      const rec = (await store.get(ref)) as OrderRecord | null
+      if (!rec || !rec.production) return jsonRes(404, { error: 'not_found' })
+      if (!SHIPS[rec.production.package]) return jsonRes(422, { error: 'このサイズは郵送しません', code: 'not_wooden' })
+      const win = (await classify([{ entry: { order_ref: ref } as OrderIndexEntry, record: rec, gift: null }], g.d, g.env, now)).rows[0].win
+      if (win.phase !== 'closed') return jsonRes(409, { error: win.phase === 'open' ? 'まだ変更受付中です' : 'キャンセル済み、または入金を確認できない注文です', code: win.phase })
+      const iso = now.toISOString()
+      const ops = { ...(rec.ops ?? {}), wood_step: step, ...(tracking ? { tracking_no: tracking } : { tracking_no: undefined }) }
+      if (!tracking) delete ops.tracking_no
+      if ((step === 'shipped' || step === 'delivered') && !ops.shipped_at) ops.shipped_at = iso
+      await store.put(ref, { ...rec, ops })
+      // shipped starts the 90 days after which the receiver's address is deleted (as /ops/mark does)
+      if ((step === 'shipped' || step === 'delivered') && rec.gift_token) {
+        const gift = await store.get(rec.gift_token)
+        if (isGiftRecord(gift) && !gift.shipped_at) await store.put(rec.gift_token, { ...gift, shipped_at: ops.shipped_at })
+      }
+      return jsonRes(200, { ok: true, step })
     },
 
     async egiftRun(req: Request): Promise<Response> {

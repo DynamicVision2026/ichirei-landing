@@ -4,7 +4,8 @@ import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } fr
 import { COPY, pageLang, type PageCopy } from './copy.ts'
 import { clamp, frameAt, makeFilmTimeline, phrases, type FilmTimeline } from '../order/film-timeline.ts'
 import type { AnimationView } from './types.ts'
-import { SenderPanel } from './GiftPanels.tsx'
+import BuyerPage from './BuyerPage.tsx'
+import { BUYER_COPY } from './buyer-copy.ts'
 import '../fonts.css'
 import './animation.css'
 
@@ -31,14 +32,16 @@ export default function AnimationApp() {
   const [lang, setLang] = useState(() => pageLang('ja'))
   const copy = COPY[lang]
 
+  // a real order's page (the view carries the gift) is the buyer's welcome page; the reserved sample films have none and stay a film
+  const buyer = load.state === 'ready' && !!load.view.gift
   useEffect(() => {
-    document.title = COPY[lang].title
+    document.title = buyer ? BUYER_COPY[lang].title : COPY[lang].title
     const meta = document.createElement('meta')
     meta.name = 'robots'
     meta.content = 'noindex, nofollow'
     document.head.appendChild(meta)
     return () => meta.remove()
-  }, [lang])
+  }, [lang, buyer])
 
   // fetch the view; while the script is still being written ask again every few seconds
   useEffect(() => {
@@ -99,10 +102,15 @@ export default function AnimationApp() {
     }
   }, [needsPictures, id, renderUrl])
 
-  // below the film: where the order stands and the 「贈る」 buttons
-  const panel = load.state === 'ready' && load.view.film?.pictures ? <SenderPanel view={load.view} lang={lang} /> : null
+  // the buyer's welcome page (/a/<id> of an order): no film here — the film plays in the preview of what the receiver sees; its pictures are still drawn on this first open
+  if (load.state === 'ready' && load.view.gift)
+    return (
+      <main className={`an-page an-buyer${inkOnly(load.view) ? ' an-memorial' : ''}`} data-testid="animation-page" lang={lang}>
+        <BuyerPage view={load.view} lang={lang} preparing={copy.preparing} />
+      </main>
+    )
   return (
-    <main className={`an-page${load.state === 'ready' && inkOnly(load.view) ? ' an-memorial' : ''}${panel ? ' an-with-panel' : ''}`} data-testid="animation-page" lang={lang}>
+    <main className="an-page" data-testid="animation-page" lang={lang}>
       {load.state === 'loading' && <p className="an-note">{copy.loading}</p>}
       {load.state === 'error' && (
         <p className="an-note" role="alert" data-testid="animation-error">
@@ -121,11 +129,10 @@ export default function AnimationApp() {
         </p>
       )}
       {load.state === 'ready' && load.view.film?.pictures && (
-        <section className={panel ? 'an-stage' : undefined}>
+        <section>
           <Film key={load.view.id} view={load.view} film={{ ...load.view.film, pictures: load.view.film.pictures }} copy={copy} />
         </section>
       )}
-      {panel}
     </main>
   )
 }

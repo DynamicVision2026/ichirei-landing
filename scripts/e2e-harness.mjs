@@ -994,11 +994,12 @@ const mockPage = async (browser, { onExplain, result, order, track } = {}) => {
   await sp.goto('http://localhost:5173/a/AN-testtesttesttesttest', { waitUntil: 'networkidle' })
   const panel = sp.locator('[data-testid=sender-panel]')
   await panel.waitFor()
-  check('sender page: below the film, 「贈る」 with LINE, copy-the-link, QR and e-mail; the receiver\'s link as selectable text', (await panel.locator('h2').innerText()) === '贈る' && (await panel.locator('[data-testid=give-link]').inputValue()) === GIFT && (await panel.locator('[data-testid=give-line]').getAttribute('href')).startsWith('https://line.me/R/share?text=') && decodeURIComponent(await panel.locator('[data-testid=give-line]').getAttribute('href')).includes(GIFT) && (await panel.locator('[data-testid=give-mail]').getAttribute('href')).startsWith('mailto:?subject='))
+  check('buyer page: B 「贈りものを送る」 with its line, LINE, copy-the-link, QR and e-mail; the receiver\'s link as selectable text', (await panel.locator('h2').innerText()) === '贈りものを送る' && (await panel.locator('[data-testid=buyer-send-line]').innerText()) === '相手が開くのは、封をした贈りものです。下のどれかで送ってください。' && (await panel.locator('[data-testid=give-link]').inputValue()) === GIFT && (await panel.locator('[data-testid=give-line]').getAttribute('href')).startsWith('https://line.me/R/share?text=') && decodeURIComponent(await panel.locator('[data-testid=give-line]').getAttribute('href')).includes(GIFT) && (await panel.locator('[data-testid=give-mail]').getAttribute('href')).startsWith('mailto:?subject='))
   await panel.locator('[data-testid=give-qr]').click()
-  check('sender page: the QR code of the receiver\'s page shows on screen', (await panel.locator('[data-testid=give-qr-img] img').getAttribute('src')) === '/api/gift/RG-testtesttesttesttest/qr.svg')
-  check('sender page: order details — size 木札, delivery e-gift, waiting for the receiver\'s address — and no price', (await panel.locator('[data-testid=status-size]').innerText()) === '木札（シンプル）' && (await panel.locator('[data-testid=status-ship]').innerText()).startsWith('eギフト') && (await panel.locator('[data-testid=status-egift]').innerText()).includes('待っています') && !/¥/.test(await panel.innerText()))
-  check('sender page (Part 3): a link to see it as the receiver will (with the sender\'s own id), the receiver\'s reply, the opening date and the certificate number', (await panel.locator('[data-testid=give-preview] a').getAttribute('href')) === `${GIFT}?preview=AN-testtesttesttesttest` && (await panel.locator('[data-testid=sender-reply]').innerText()) === 'ありがとう。大切にします。' && (await panel.locator('[data-testid=status-opens]').innerText()) === '開封日 2027-01-05' && (await panel.locator('[data-testid=status-number]').innerText()) === '0012')
+  check('buyer page: the QR code of the receiver\'s page shows on screen', (await panel.locator('[data-testid=give-qr-img] img').getAttribute('src')) === '/api/gift/RG-testtesttesttesttest/qr.svg')
+  check('buyer page: A the welcome (「ご注文ありがとうございます。」, the character large, its reading, the 「どんな人か」 line), no film and no price anywhere', (await sp.locator('[data-testid=buyer-welcome-line]').innerText()) === 'ご注文ありがとうございます。' && (await sp.locator('[data-testid=buyer-glyph]').innerText()) === '備' && (await sp.locator('[data-testid=buyer-who]').innerText()).includes('頼まれる前に') && (await sp.locator('[data-testid=film]').count()) === 0 && !/¥/.test(await sp.locator('[data-testid=buyer-page]').innerText()))
+  check('buyer page: the opening date (with the sealed-until line), the preview link (with the buyer\'s own id), the receiver\'s reply', (await panel.locator('[data-testid=give-preview] a').getAttribute('href')) === `${GIFT}?preview=AN-testtesttesttesttest` && (await panel.locator('[data-testid=give-preview] a').innerText()) === '相手が見る画面を確かめる' && (await panel.locator('[data-testid=sender-reply]').innerText()) === 'ありがとう。大切にします。' && (await panel.locator('[data-testid=status-opens]').innerText()) === '開封日：1月5日（それまでは封が閉じたままです）')
+  check('buyer page: no wooden section and no 24-hour line when the view carries no order data', (await sp.locator('[data-testid=buyer-wood]').count()) === 0 && (await sp.locator('[data-testid=buyer-deadline]').count()) === 0)
   check('no page errors (run 8c-5, sender page)', errors.length === 0, errors.join('; '))
   await sp.close()
 }
@@ -1369,20 +1370,126 @@ const mockPage = async (browser, { onExplain, result, order, track } = {}) => {
   }
 }
 
-// ---------- Run 8g: the order-complete line of the 24-hour change window, on the sender's page, in three languages ----------
+// ---------- Run 8g: E — the 24-hour change line on the buyer's page: the real deadline in the buyer's own time zone, three languages; gone after it ----------
 {
-  const NOTE = {
-    ja: 'ご注文から24時間以内であれば、ご覧いただいた他の字への変更・キャンセルを承ります。ご注文確認メールにご返信ください。',
-    'zh-Hant': '下單後 24 小時內，可更換為您看過的其他字，或取消訂單。請回覆訂單確認信。',
-    en: 'Within 24 hours of your order you can switch to another character you have seen, or cancel. Please reply to your order confirmation e-mail.',
+  const UNTIL = '2026-11-07T05:30:00Z' // 14:30 in Tokyo
+  const WHEN = { ja: '11月7日 14時30分', 'zh-Hant': '11月7日 14時30分', en: '7 Nov, 14:30' }
+  const LINE = {
+    ja: `ご注文から24時間以内（${WHEN.ja}まで）なら、確認メールに返信して、字の変更や取り消しができます。`,
+    'zh-Hant': `下單後24小時內（${WHEN['zh-Hant']}前），回覆確認郵件即可更換字或取消訂單。`,
+    en: `Until ${WHEN.en} (24 hours after ordering), reply to the confirmation email to change the character or cancel.`,
   }
+  const mkView = (lang, order, extra = {}) => ({ id: 'AN-testtesttesttesttest', language: lang, glyph: '備', reading: 'そなえる', romanization: 'sonaeru', meaning_en: 'to be ready', who: 'x', memorial: false, film: { status: 'fallback', lines: ['a', 'b'], pictures: ['/film/washi-1.webp', '/film/washi-2.webp'] }, gift: { url: 'https://ichirei.soul-id.jp/g/RG-testtesttesttesttest', size_code: 'ICHIREI-SIMPLE', ship_to: 'me', egift_state: null }, order, ...extra })
   for (const lang of ['ja', 'zh-Hant', 'en']) {
+    const ctx = await browser.newContext({ locale: 'ja-JP', timezoneId: 'Asia/Tokyo', viewport: { width: 390, height: 800 } })
+    const p = await ctx.newPage()
+    await p.clock.install({ time: new Date('2026-11-06T06:00:00Z') })
+    await p.route('**/api/animation/AN-testtesttesttesttest', (r) => r.fulfill({ json: mkView(lang, { ordered_at: '2026-11-06T05:30:00Z', change_until: UNTIL, wood: null }, { support_email: 'help@example.com' }) }))
+    await p.route('**/api/gift/RG-testtesttesttesttest/qr.svg', (r) => r.fulfill({ status: 200, contentType: 'image/svg+xml', body: '<svg xmlns="http://www.w3.org/2000/svg" width="10" height="10"/>' }))
+    await p.goto('http://localhost:5173/a/AN-testtesttesttesttest', { waitUntil: 'networkidle' })
+    await p.locator('[data-testid=buyer-help]').waitFor()
+    check(`E (${lang}): the 24-hour line states the real deadline in the buyer's time zone — word for word`, (await p.locator('[data-testid=buyer-deadline]').innerText()) === LINE[lang], await p.locator('[data-testid=buyer-deadline]').innerText())
+    check(`E (${lang}): the support address is plain, selectable text`, (await p.locator('[data-testid=buyer-support]').innerText()) === 'help@example.com' && (await p.locator('[data-testid=buyer-support] a').count()) === 0)
+    await p.clock.fastForward('24:00:00')
+    await p.waitForTimeout(300)
+    check(`E (${lang}): the line disappears by itself when the deadline passes while the page is open`, (await p.locator('[data-testid=buyer-deadline]').count()) === 0)
+    await ctx.close()
+  }
+  {
     const p = await browser.newPage({ locale: 'ja-JP', viewport: { width: 390, height: 800 } })
-    await p.route('**/api/animation/AN-testtesttesttesttest', (r) => r.fulfill({ json: { id: 'AN-testtesttesttesttest', language: lang, glyph: '備', reading: 'そなえる', romanization: 'sonaeru', meaning_en: 'to be ready', who: 'x', memorial: false, film: { status: 'fallback', lines: ['a', 'b'], pictures: ['/film/washi-1.webp', '/film/washi-2.webp'] }, gift: { url: 'https://ichirei.soul-id.jp/g/RG-testtesttesttesttest', size_code: 'ICHIREI-SIMPLE', ship_to: 'me', egift_state: null } } }))
+    await p.route('**/api/animation/AN-testtesttesttesttest', (r) => r.fulfill({ json: mkView('ja', { ordered_at: '2020-01-01T00:00:00Z', change_until: '2020-01-02T00:00:00Z', wood: null }) }))
     await p.route('**/api/gift/RG-testtesttesttesttest/qr.svg', (r) => r.fulfill({ status: 200, contentType: 'image/svg+xml', body: '<svg xmlns="http://www.w3.org/2000/svg" width="10" height="10"/>' }))
     await p.goto('http://localhost:5173/a/AN-testtesttesttesttest', { waitUntil: 'networkidle' })
     await p.locator('[data-testid=sender-panel]').waitFor()
-    check(`order-complete line (${lang}): the 24-hour change window is stated on the sender's page, with 「reply to the order confirmation e-mail」`, (await p.locator('[data-testid=change-window-note]').innerText()) === NOTE[lang])
+    check('E: a page opened after the deadline has no 24-hour line at all (and no empty help block)', (await p.locator('[data-testid=buyer-deadline]').count()) === 0 && (await p.locator('[data-testid=buyer-help]').count()) === 0)
+    await p.close()
+  }
+}
+
+// ---------- Run 8g-2: C — the wooden gift's four steps (木札 / 版木 only; never for an e-gift, never while the wooden sizes are "coming soon"), three languages ----------
+{
+  const STEPS = {
+    ja: { title: '木の贈りもの', steps: ['ご注文を承りました', '制作しています', '発送しました（JP1234567890）', 'お届け済み'], ship: { me: 'お届け先：ご自身', direct: 'お届け先：相手の方へ直接' } },
+    'zh-Hant': { title: '木製禮物', steps: ['已收到訂單', '製作中', '已出貨（JP1234567890）', '已送達'], ship: { me: '寄送對象：寄給自己', direct: '寄送對象：直接寄給對方' } },
+    en: { title: 'Your wooden gift', steps: ['Order received', 'Being made', 'Shipped (JP1234567890)', 'Delivered'], ship: { me: 'Ship to: you', direct: 'Ship to: them directly' } },
+  }
+  const mk = (lang, order, size = 'ICHIREI-SIMPLE', ship = 'me') => ({ id: 'AN-testtesttesttesttest', language: lang, glyph: '備', reading: 'そなえる', romanization: 'sonaeru', meaning_en: 'to be ready', who: 'x', memorial: false, film: { status: 'fallback', lines: ['a', 'b'], pictures: ['/film/washi-1.webp', '/film/washi-2.webp'] }, gift: { url: 'https://ichirei.soul-id.jp/g/RG-testtesttesttesttest', size_code: size, ship_to: ship, egift_state: null }, order })
+  for (const lang of ['ja', 'zh-Hant', 'en']) {
+    for (let step = 1; step <= 4; step++) {
+      const p = await browser.newPage({ locale: 'ja-JP', viewport: { width: 390, height: 800 } })
+      await p.route('**/api/animation/AN-testtesttesttesttest', (r) => r.fulfill({ json: mk(lang, { ordered_at: '2026-11-06T05:30:00Z', change_until: null, wood: { step, tracking_no: step >= 3 ? 'JP1234567890' : null, ship_to: step === 2 ? 'direct' : 'me' } }) }))
+      await p.route('**/api/gift/RG-testtesttesttesttest/qr.svg', (r) => r.fulfill({ status: 200, contentType: 'image/svg+xml', body: '<svg xmlns="http://www.w3.org/2000/svg" width="10" height="10"/>' }))
+      await p.goto('http://localhost:5173/a/AN-testtesttesttesttest', { waitUntil: 'networkidle' })
+      await p.locator('[data-testid=buyer-wood]').waitFor()
+      const items = await p.locator('[data-testid=wood-steps] li').allInnerTexts()
+      const states = await p.locator('[data-testid=wood-steps] li').evaluateAll((els) => els.map((e) => e.getAttribute('data-state')))
+      const want = STEPS[lang].steps.map((t, i) => (i === 2 && step < 3 ? t.replace(/（.*）| \(.*\)/, '') : t))
+      check(`C (${lang}, step ${step}): the title, the four steps word for word (the tracking number only from "shipped"), the current one highlighted, the ship-to line`, (await p.locator('[data-testid=buyer-wood] h2').innerText()) === STEPS[lang].title && items.join('|') === want.join('|') && states.join() === [1, 2, 3, 4].map((n) => (n < step ? 'done' : n === step ? 'current' : 'next')).join() && (await p.locator('[data-testid=wood-ship]').innerText()) === STEPS[lang].ship[step === 2 ? 'direct' : 'me'], `${items.join('|')} ${states.join()}`)
+      if (step === 3 && lang === 'ja') await p.screenshot({ path: 'shots/buyer-wood-step3-ja.png', fullPage: true })
+      await p.close()
+    }
+  }
+  // not shown: an e-gift order, a view with no wood data (a wooden size that is "coming soon" has none), an order that is only partly known
+  for (const [name, view] of [['an e-gift order', mk('ja', { ordered_at: '2026-11-06T05:30:00Z', change_until: null, wood: null }, 'ICHIREI-EGIFT', 'none')], ['wooden sizes "coming soon" (the server sends no wood data)', mk('ja', { ordered_at: '2026-11-06T05:30:00Z', change_until: null, wood: null })], ['no order data', mk('ja', null)]]) {
+    const p = await browser.newPage({ locale: 'ja-JP', viewport: { width: 390, height: 800 } })
+    await p.route('**/api/animation/AN-testtesttesttesttest', (r) => r.fulfill({ json: view }))
+    await p.route('**/api/gift/RG-testtesttesttesttest/qr.svg', (r) => r.fulfill({ status: 200, contentType: 'image/svg+xml', body: '<svg xmlns="http://www.w3.org/2000/svg" width="10" height="10"/>' }))
+    await p.goto('http://localhost:5173/a/AN-testtesttesttesttest', { waitUntil: 'networkidle' })
+    await p.locator('[data-testid=sender-panel]').waitFor()
+    check(`C: the wooden section is hidden — ${name}`, (await p.locator('[data-testid=buyer-wood]').count()) === 0 && !(await p.locator('body').innerText()).includes('木の贈りもの'))
+    await p.close()
+  }
+}
+
+// ---------- Run 8g-3: a remembrance order's buyer page (B retitled, no red anywhere, no celebration words), and the receiver's page in PREVIEW mode (nothing can be received or answered; nothing is written) ----------
+{
+  const TITLE = { ja: '贈りものを届ける', 'zh-Hant': '把它傳給家人', en: 'Share it with family' }
+  const WELCOME = { ja: 'ご注文ありがとうございます。', 'zh-Hant': '謝謝你的訂購。', en: 'Thank you for your order.' }
+  for (const lang of ['ja', 'zh-Hant', 'en']) {
+    const p = await browser.newPage({ locale: 'ja-JP', viewport: { width: 390, height: 800 } })
+    const errors = []
+    p.on('pageerror', (e) => errors.push(String(e)))
+    await p.route('**/api/animation/AN-testtesttesttesttest', (r) => r.fulfill({ json: { id: 'AN-testtesttesttesttest', language: lang, glyph: '偲', reading: 'しのぶ', romanization: 'shinobu', meaning_en: 'to remember', who: 'x', memorial: true, film: { status: 'fallback', lines: ['a', 'b'], pictures: ['/film/washi-1.webp', '/film/washi-2.webp'] }, gift: { url: 'https://ichirei.soul-id.jp/g/RG-testtesttesttesttest', size_code: 'ICHIREI-EGIFT', ship_to: 'none', egift_state: null, opens_on: null }, order: { ordered_at: '2026-11-06T05:30:00Z', change_until: null, wood: null } } }))
+    await p.route('**/api/gift/RG-testtesttesttesttest/qr.svg', (r) => r.fulfill({ status: 200, contentType: 'image/svg+xml', body: '<svg xmlns="http://www.w3.org/2000/svg" width="10" height="10"/>' }))
+    await p.goto('http://localhost:5173/a/AN-testtesttesttesttest', { waitUntil: 'networkidle' })
+    await p.locator('[data-testid=buyer-page]').waitFor()
+    await p.waitForTimeout(700)
+    const red = await p.evaluate(() => [...document.querySelectorAll('.by-page, .by-page *')].filter((e) => ['color', 'backgroundColor', 'borderTopColor', 'borderLeftColor', 'boxShadow'].some((k) => /192,\s*57,\s*43/.test(getComputedStyle(e)[k]))).map((e) => e.className || e.tagName))
+    const text = await p.locator('[data-testid=buyer-page]').innerText()
+    check(`remembrance buyer page (${lang}): B is 「${TITLE[lang]}」, the welcome is as for everyone, the character is ink — no red anywhere — and no celebration words`, (await p.locator('[data-testid=buyer-send-title]').innerText()) === TITLE[lang] && (await p.locator('[data-testid=buyer-welcome-line]').innerText()) === WELCOME[lang] && (await p.locator('[data-testid=buyer-page]').getAttribute('data-quiet')) === 'yes' && red.length === 0 && !/おめでとう|恭喜|祝|Congratulations|🎉/.test(text), `${red.join(',')}`)
+    if (lang === 'ja') await p.screenshot({ path: 'shots/buyer-remembrance-ja.png', fullPage: true })
+    check(`no page errors (remembrance buyer page ${lang})`, errors.length === 0, errors.join('; '))
+    await p.close()
+  }
+  // celebration: the character IS cinnabar
+  {
+    const p = await browser.newPage({ locale: 'ja-JP', viewport: { width: 390, height: 800 } })
+    await p.route('**/api/animation/AN-testtesttesttesttest', (r) => r.fulfill({ json: { id: 'AN-testtesttesttesttest', language: 'ja', glyph: '備', reading: 'そなえる', romanization: 'sonaeru', meaning_en: 'to be ready', who: 'x', memorial: false, film: { status: 'fallback', lines: ['a', 'b'], pictures: ['/film/washi-1.webp', '/film/washi-2.webp'] }, gift: { url: 'https://ichirei.soul-id.jp/g/RG-testtesttesttesttest', size_code: 'ICHIREI-EGIFT', ship_to: 'none', egift_state: null, opens_on: null }, order: { ordered_at: '2026-11-06T05:30:00Z', change_until: null, wood: null } } }))
+    await p.route('**/api/gift/RG-testtesttesttesttest/qr.svg', (r) => r.fulfill({ status: 200, contentType: 'image/svg+xml', body: '<svg xmlns="http://www.w3.org/2000/svg" width="10" height="10"/>' }))
+    await p.goto('http://localhost:5173/a/AN-testtesttesttesttest', { waitUntil: 'networkidle' })
+    await p.locator('[data-testid=buyer-page]').waitFor()
+    check('buyer page (e-gift, not a remembrance): the character is cinnabar and B is 「贈りものを送る」; the order line reads 一字 · 贈り方 · 注文日', (await p.locator('[data-testid=buyer-glyph]').evaluate((e) => getComputedStyle(e).color)) === 'rgb(192, 57, 43)' && (await p.locator('[data-testid=buyer-send-title]').innerText()) === '贈りものを送る' && (await p.locator('[data-testid=buyer-order-line]').innerText()).replace(/\s+/g, ' ') === '一字：備 贈り方：eギフト 注文日：11月6日')
+    await p.close()
+  }
+  // the receiver's page in preview mode: no receive form, no reply box, and nothing is POSTed
+  {
+    const TOKEN = 'RG-testtesttesttesttest'
+    const p = await browser.newPage({ locale: 'ja-JP', viewport: { width: 375, height: 844 } })
+    const posts = []
+    p.on('request', (r) => { if (r.method() === 'POST') posts.push(new URL(r.url()).pathname) })
+    const view = { id: TOKEN, token: TOKEN, language: 'ja', glyph: '備', reading: 'そな.える', romanization: 'sonaeru', meaning_en: 'to be ready', who: 'いつも、頼まれる前に備えている人。', memorial: false, film: { status: 'fallback', lines: ['「ちょうど今詰めてたところ」', 'いつも、頼まれる前に備えている人。'], pictures: ['/film/washi-1.webp', '/film/washi-2.webp'] }, certificate_line: 'この字は、あなたの目に映る、その人です。', poem: null, locked: false, from: '山田 太郎', to: '山田 一郎', message: 'いつもありがとう。', egift: { state: 'waiting', japan_only: true }, certificate_no: 12, order_date: '2026-11-06', opens_on: null, replied: false, package: 'simple' }
+    await p.route(`**/api/gift/${TOKEN}**`, (r) => { const u = new URL(r.request().url()); return u.pathname.endsWith('/render') ? r.fulfill({ json: { state: 'ready', view } }) : r.fulfill({ json: view }) })
+    await p.goto(`http://localhost:5173/g/${TOKEN}?preview=AN-testtesttesttesttest`, { waitUntil: 'networkidle' })
+    check('receiver page in preview mode: the preview note is shown', (await p.locator('[data-testid=gift-preview-note]').count()) === 1)
+    await p.locator('[data-testid=gift-open]').click()
+    await p.locator('[data-testid=gift-to-film]').click({ timeout: 4000 })
+    await p.waitForSelector('[data-testid=film][data-ready=yes]', { timeout: 8000 }).catch(() => {})
+    await p.evaluate(() => window.__ichireiFilm?.seek(window.__ichireiFilm.total))
+    await p.locator('[data-testid=gift-to-cert]').click({ timeout: 8000 }).catch(async () => { await p.locator('[data-testid=gift-skip]').click().catch(() => {}); })
+    for (const id of ['gift-to-poem', 'gift-to-cert', 'gift-to-keep']) { const b = p.locator(`[data-testid=${id}]`); if (await b.count()) await b.click().catch(() => {}) }
+    await p.locator('[data-testid=gift-keep]').waitFor({ timeout: 8000 })
+    check('receiver page in preview mode: the end screen has NO receive button / address form and NO thank-you box — nothing can be received or answered from a preview', (await p.locator('[data-testid=gift-receive]').count()) === 0 && (await p.locator('[data-testid=gift-form]').count()) === 0 && (await p.locator('[data-testid=gift-reply]').count()) === 0 && (await p.locator('[data-testid=gift-panel]').count()) === 0)
+    check('receiver page in preview mode: it sent nothing (no POST except the harmless picture render)', posts.every((u) => u.endsWith('/render')), posts.join())
     await p.close()
   }
 }

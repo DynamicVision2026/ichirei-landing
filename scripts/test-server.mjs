@@ -354,6 +354,12 @@ try {
       const other = await fetch(`${gs.url}/g/RG-zzzzzzzzzzzzzzzzzzzz`)
       const generic = await other.text()
       check('link preview: an unknown token gets the plain page (no gift tags)', other.status === 200 && generic.includes('<div id="root">') && !generic.includes('og.png'))
+      // preview mode (the buyer's "preview what they'll see", ?preview=<their page id>): a thank-you or an address can never be sent from it
+      const before = readFileSync(join(dir, `${token}.json`), 'utf8')
+      const pv = await fetch(`${gs.url}/api/gift/${token}/reply?preview=${gift.animation_id}`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ text: 'ありがとう' }) })
+      const pa = await fetch(`${gs.url}/api/gift/${token}/address?preview=${gift.animation_id}`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ name: 'x' }) })
+      const pg = await fetch(`${gs.url}/api/gift/${token}?preview=${gift.animation_id}`)
+      check('preview mode: reply and address are refused (403 preview_only), the preview view itself opens (200), and the gift file is byte-for-byte unchanged', pv.status === 403 && pa.status === 403 && (await pv.json()).error === 'preview_only' && pg.status === 200 && readFileSync(join(dir, `${token}.json`), 'utf8') === before)
       const f = await fetch(`${gs.url}/fonts/zen-old-mincho-900.woff2`)
       check('our own fonts are served under /fonts/ (woff2, 200)', f.status === 200 && (await f.arrayBuffer()).byteLength > 50_000)
     } finally {

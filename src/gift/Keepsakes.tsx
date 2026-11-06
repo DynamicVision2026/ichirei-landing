@@ -81,11 +81,13 @@ export interface KeepsakesProps {
   scroll: boolean
   /** An e-gift: its card is the A4 home-print; the wooden sizes' card is a keepsake copy. */
   egift: boolean
+  /** Another title (the buyer's page says 「保存する」). */
+  title?: string
 }
 
 type Phase = 'idle' | 'making' | 'ready' | 'failed'
 
-export default function Keepsakes({ lang, base, q = '', complete, scroll, egift }: KeepsakesProps) {
+export default function Keepsakes({ lang, base, q = '', complete, scroll, egift, title }: KeepsakesProps) {
   const c = COPY[lang]
   const [phase, setPhase] = useState<Phase>('idle')
   const [saved, setSaved] = useState(false)
@@ -127,7 +129,7 @@ export default function Keepsakes({ lang, base, q = '', complete, scroll, egift 
 
   return (
     <section className="gf-save" data-testid="keepsakes">
-      <h3 className="gf-label" data-testid="keepsakes-title">{c.title}</h3>
+      <h3 className="gf-label" data-testid="keepsakes-title">{title ?? c.title}</h3>
       <div className="gf-save-list">
         {complete && (
           <>

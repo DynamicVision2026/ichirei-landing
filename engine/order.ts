@@ -438,6 +438,10 @@ export interface OpsLogEntry {
 export interface OrderOps {
   printed_at?: string
   shipped_at?: string
+  /** The step of the wooden gift the buyer's page shows (the owner sets it on /ops); when absent it follows printed_at / shipped_at. */
+  wood_step?: 'received' | 'making' | 'shipped' | 'delivered'
+  /** The parcel's tracking number, typed on /ops (letters, digits and hyphens); shown on the buyer's page from the "shipped" step on. */
+  tracking_no?: string
   /** Flag only: the order leaves the print list and the workshop CSV. The refund is made in Shopify by the owner. */
   cancelled_at?: string
   /** The poem format may be changed once per order. */

@@ -77,6 +77,8 @@ export function orderReadiness(env: NodeJS.ProcessEnv = process.env) {
   }
 }
 
+const previewRefused = () => new Response(JSON.stringify({ error: 'preview_only', message: 'This is a preview: nothing here is sent.' }), { status: 403, headers: { 'content-type': 'application/json; charset=utf-8', 'cache-control': 'no-store', 'x-robots-tag': 'noindex, nofollow' } })
+
 export function createApp(config: ServerConfig): Hono {
   const app = new Hono()
 
@@ -185,7 +187,8 @@ export function createApp(config: ServerConfig): Hono {
     app.get(`/api/animation/:id/scroll.${ext}`, limited(scrollLimit), (c) => giftHandlers.scrollForSender(c.req.param('id'), ext))
   }
   const replyLimit = envRunLimiter('ICHIREI_GIFT_REPLY_LIMIT', { max: 20, minutes: 60 })
-  app.post('/api/gift/:token/reply', limited(replyLimit), async (c) => giftHandlers.reply(c.req.param('token'), await c.req.json().catch(() => null)))
+  // a sender looking at the gift in preview mode (?preview=…) can never answer it or receive it: nothing in preview marks the gift as opened, replied to or received
+  app.post('/api/gift/:token/reply', limited(replyLimit), async (c) => (c.req.query('preview') ? previewRefused() : giftHandlers.reply(c.req.param('token'), await c.req.json().catch(() => null))))
   // The keepsakes: the film as a video (made once per order, about half a minute of one CPU — a tight per-IP limit) and the card as a PDF.
   const videoLimit = envRunLimiter('ICHIREI_FILM_VIDEO_LIMIT', { max: 8, minutes: 10 })
   app.post('/api/gift/:token/film/make', limited(videoLimit), (c) => giftHandlers.filmMake(c.req.param('token'), c.req.query('preview')))
@@ -195,7 +198,7 @@ export function createApp(config: ServerConfig): Hono {
   app.get('/api/animation/:id/film.mp4', limited(animationLimit), (c) => giftHandlers.filmGetForSender(c.req.param('id'), c.req.raw))
   app.get('/api/animation/:id/card.pdf', limited(scrollLimit), (c) => giftHandlers.cardPdfForSender(c.req.param('id')))
   const addressLimit = envRunLimiter('ICHIREI_GIFT_ADDRESS_LIMIT', { max: 20, minutes: 60 })
-  app.post('/api/gift/:token/address', limited(addressLimit), async (c) => giftHandlers.address(c.req.param('token'), await c.req.json().catch(() => null)))
+  app.post('/api/gift/:token/address', limited(addressLimit), async (c) => (c.req.query('preview') ? previewRefused() : giftHandlers.address(c.req.param('token'), await c.req.json().catch(() => null))))
   // The owner's page (Basic Auth, ICHIREI_OPS_PASSWORD; refused outright without it). Never indexed, never cached.
   const opsLimit = envRunLimiter('ICHIREI_OPS_LIMIT', { max: 120, minutes: 10 })
   app.get('/ops', limited(opsLimit), (c) => opsHandlers.page(c.req.raw))
@@ -203,6 +206,7 @@ export function createApp(config: ServerConfig): Hono {
   app.get('/ops/cards/today.pdf', limited(opsLimit), (c) => opsHandlers.cardsToday(c.req.raw))
   app.get('/ops/wooden-today.csv', limited(opsLimit), (c) => opsHandlers.woodenCsv(c.req.raw))
   app.post('/ops/mark', limited(opsLimit), (c) => opsHandlers.mark(c.req.raw))
+  app.post('/ops/wood', limited(opsLimit), (c) => opsHandlers.wood(c.req.raw))
   app.post('/ops/change', limited(opsLimit), (c) => opsHandlers.change(c.req.raw))
   app.post('/ops/egift/run', limited(opsLimit), (c) => opsHandlers.egiftRun(c.req.raw))
   app.post('/api/log', adaptVercelHandler(logHandler))

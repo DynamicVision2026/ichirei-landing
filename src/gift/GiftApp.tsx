@@ -232,7 +232,7 @@ export default function GiftApp() {
   return stage(
     <section className="gf-keep" data-testid="gift-keep">
       <Keepsakes lang={lang} base={`/api/gift/${view.token}`} q={q} complete={filmComplete(view)} scroll={scrollAvailable(view)} egift={view.package === 'egift'} />
-      {view.egift && <EgiftReceive view={view} lang={lang} />}
+      {view.egift && !preview && <EgiftReceive view={view} lang={lang} />}
       {!preview && <ReplyBox token={view.token} copy={copy} from={view.from} replied={view.replied} />}
       <p className="gf-row">
         <button type="button" className="gf-btn gf-btn-quiet" data-testid="gift-replay" onClick={() => setStep('film')}>{FILM_COPY[lang].replay}</button>

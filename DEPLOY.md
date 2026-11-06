@@ -627,12 +627,13 @@ Every other property starts with an underscore, which Shopify hides from the car
 
 *I could not see your template, so the two anchor lines above are those of Shopify's standard Order-confirmation template; if yours was edited, use the "above the order summary" rule.* The block runs on Shopify's servers inside the e-mail; **it has been tested here with a Liquid engine against the shape of Shopify's objects (`scripts/test-email-snippet.ts`), but has never run inside a real Shopify notification — send the test e-mail before you rely on it.**
 
-What it prints, only for an ICHIREI item (SKU `ICHIREI-…` or a `_order_ref` property), in the language in `_language`: the heading, the gift link with the one-line "send this to the person you're giving it to", 一字 / 開封日 (Character / Opens on) with their values, and the 24-hour change note. For any other product it prints nothing, so those orders get exactly today's e-mail.
+What it prints, only for an ICHIREI item (SKU `ICHIREI-…` or a `_order_ref` property), in the language in `_language`: the heading, one lead line, **one button to the buyer's own private page** (`/a/AN-…`, read from the hidden property `_ichirei_animation_url`, which `POST /api/order` puts on the line item when the cart is made — so the link is known before checkout and no later step is needed), the line saying the link is for the buyer only, 一字 (Character) and 贈り方 / 方案 / Gift (E-gift · Wooden tag · Carved block), and the 24-hour change note. **The e-mail never links to the receiver's gift page (`/g/…`)**: the block ignores `_ichirei_gift_url`, and a link that is not a `/a/` page is not printed. If an order has no buyer-page link (the order record could not be written — the order still goes through), the lead, button and under-button lines are left out and the rest stays. For any other product it prints nothing, so those orders get exactly today's e-mail. We never e-mail the receiver.
 
 ```liquid
 {%- comment -%}
   ICHIREI — block for the order-confirmation e-mail. Prints ONLY for an ICHIREI line item (its SKU starts with ICHIREI-, or it carries the hidden property _order_ref);
-  an order of any other product gets exactly the e-mail it gets today. Reads the hidden "_" properties (and the old names, for orders made before 2026-11-05).
+  an order of any other product gets exactly the e-mail it gets today. One welcoming link, to the BUYER'S OWN private page (/a/AN-…, from the hidden property
+  _ichirei_animation_url, which the order already carries when the cart is made) — never to the receiver's gift page (/g/…). Reads the hidden "_" properties (and the old names, for orders made before 2026-11-05).
 {%- endcomment -%}
 {%- for line in subtotal_line_items -%}
   {%- assign ichirei_ref = line.properties['_order_ref'] | default: line.properties['order_ref'] -%}
@@ -640,48 +641,71 @@ What it prints, only for an ICHIREI item (SKU `ICHIREI-…` or a `_order_ref` pr
     {%- assign ichirei_lang = line.properties['_language'] | default: line.properties['language'] -%}
     {%- unless ichirei_lang == 'ja' or ichirei_lang == 'zh-Hant' or ichirei_lang == 'zh-Hans' or ichirei_lang == 'en' -%}{%- assign ichirei_lang = 'ja' -%}{%- endunless -%}
     {%- assign ichirei_glyph = line.properties['_inscription_form'] | default: line.properties['inscription_form'] -%}
-    {%- assign ichirei_date = line.properties['_opens_on'] | default: line.properties['_delivery_date'] | default: line.properties['delivery_date'] -%}
-    {%- assign ichirei_link = line.properties['_ichirei_gift_url'] | default: line.properties['ichirei_gift_url'] -%}
+    {%- assign ichirei_size = line.properties['_ichirei_size'] | default: line.sku -%}
+    {%- assign ichirei_link = line.properties['_ichirei_animation_url'] | default: line.properties['ichirei_animation_url'] -%}
+    {%- unless ichirei_link contains '/a/' -%}{%- assign ichirei_link = '' -%}{%- endunless -%}
     {%- case ichirei_lang -%}
       {%- when 'ja' -%}
         {%- assign t_heading = '一字礼のご注文ありがとうございます。' -%}
-        {%- assign t_link_label = '贈りものリンク' -%}
-        {%- assign t_link_note = 'このリンクを、贈る相手に送ってください。開封日から開けます。' -%}
+        {%- assign t_lead = 'あなたの贈りものの準備ができました。下のボタンから、ご注文ページを開いてください。' -%}
+        {%- assign t_button = 'ご注文ページを開く' -%}
+        {%- assign t_under = 'このページから、贈りものを相手に送れます。このリンクはご自身用です。相手には送らないでください。' -%}
         {%- assign t_change = 'ご注文から24時間以内なら、このメールに返信して、字の変更や取り消しができます。' -%}
         {%- assign t_char = '一字' -%}
-        {%- assign t_date = '開封日' -%}
+        {%- assign t_size = '贈り方' -%}
+        {%- if ichirei_size contains 'STANDARD' -%}{%- assign t_size_value = '版木' -%}{%- elsif ichirei_size contains 'SIMPLE' -%}{%- assign t_size_value = '木札' -%}{%- else -%}{%- assign t_size_value = 'eギフト' -%}{%- endif -%}
         {%- assign t_colon = '：' -%}
       {%- when 'zh-Hant' -%}
         {%- assign t_heading = '感謝你訂購一字禮。' -%}
-        {%- assign t_link_label = '禮物連結' -%}
-        {%- assign t_link_note = '請把這個連結傳給收禮人。從開啟日期起就能打開。' -%}
+        {%- assign t_lead = '你的禮物已經準備好了。請點下方按鈕，打開你的訂單頁面。' -%}
+        {%- assign t_button = '打開訂單頁面' -%}
+        {%- assign t_under = '你可以在這個頁面把禮物送給對方。這個連結是你自己專用的，請不要轉傳給對方。' -%}
         {%- assign t_change = '下單後24小時內，回覆這封郵件即可更換字或取消訂單。' -%}
         {%- assign t_char = '一字' -%}
-        {%- assign t_date = '開啟日期' -%}
+        {%- assign t_size = '方案' -%}
+        {%- if ichirei_size contains 'STANDARD' -%}{%- assign t_size_value = '版木' -%}{%- elsif ichirei_size contains 'SIMPLE' -%}{%- assign t_size_value = '木牌' -%}{%- else -%}{%- assign t_size_value = 'e禮物' -%}{%- endif -%}
         {%- assign t_colon = '：' -%}
       {%- when 'zh-Hans' -%}
         {%- assign t_heading = '感谢你订购一字礼。' -%}
-        {%- assign t_link_label = '礼物链接' -%}
-        {%- assign t_link_note = '请把这个链接传给收礼人。从开启日期起就能打开。' -%}
+        {%- assign t_lead = '你的礼物已经准备好了。请点下方按钮，打开你的订单页面。' -%}
+        {%- assign t_button = '打开订单页面' -%}
+        {%- assign t_under = '你可以在这个页面把礼物送给对方。这个链接是你自己专用的，请不要转传给对方。' -%}
         {%- assign t_change = '下单后24小时内，回复这封邮件即可更换字或取消订单。' -%}
         {%- assign t_char = '一字' -%}
-        {%- assign t_date = '开启日期' -%}
+        {%- assign t_size = '方案' -%}
+        {%- if ichirei_size contains 'STANDARD' -%}{%- assign t_size_value = '版木' -%}{%- elsif ichirei_size contains 'SIMPLE' -%}{%- assign t_size_value = '木牌' -%}{%- else -%}{%- assign t_size_value = 'e礼物' -%}{%- endif -%}
         {%- assign t_colon = '：' -%}
       {%- else -%}
         {%- assign t_heading = 'Thank you for your ICHIREI order.' -%}
-        {%- assign t_link_label = 'Gift link' -%}
-        {%- assign t_link_note = "Send this link to the person you're giving it to. It opens from the date below." -%}
+        {%- assign t_lead = 'Your gift is ready. Open your order page with the button below.' -%}
+        {%- assign t_button = 'Open your order page' -%}
+        {%- assign t_under = "Send your gift from this page. This link is for you only; please don't forward it." -%}
         {%- assign t_change = 'Within 24 hours of ordering, reply to this email to change the character or cancel.' -%}
         {%- assign t_char = 'Character' -%}
-        {%- assign t_date = 'Opens on' -%}
+        {%- assign t_size = 'Gift' -%}
+        {%- if ichirei_size contains 'STANDARD' -%}{%- assign t_size_value = 'Carved block' -%}{%- elsif ichirei_size contains 'SIMPLE' -%}{%- assign t_size_value = 'Wooden tag' -%}{%- else -%}{%- assign t_size_value = 'E-gift' -%}{%- endif -%}
         {%- assign t_colon = ': ' -%}
     {%- endcase -%}
     <p><strong>{{ t_heading }}</strong></p>
     {%- if ichirei_link != blank %}
-    <p>{{ t_link_label }}{{ t_colon }}<a href="{{ ichirei_link | escape }}">{{ ichirei_link | escape }}</a><br>{{ t_link_note }}</p>
+    <p>{{ t_lead }}</p>
+    <p><a href="{{ ichirei_link | escape }}" style="display:inline-block;padding:12px 28px;background:#1a1813;color:#ffffff;text-decoration:none;border-radius:4px">{{ t_button }}</a></p>
+    <p>{{ t_under }}</p>
     {%- endif %}
-    <p>{{ t_char }}{{ t_colon }}{{ ichirei_glyph | escape }}<br>{{ t_date }}{{ t_colon }}{{ ichirei_date | escape }}</p>
+    <p>{{ t_char }}{{ t_colon }}{{ ichirei_glyph | escape }}<br>{{ t_size }}{{ t_colon }}{{ t_size_value }}</p>
     <p>{{ t_change }}</p>
   {%- endif -%}
 {%- endfor -%}
 ```
+
+## The buyer's page after payment (2026-11-06)
+
+The person who pays is the only person we deal with; we never contact the receiver. **The confirmation e-mail has one link: the buyer's own private page `/a/<AN-…>`** (the block above; never `/g/…`). The address is known before checkout: `POST /api/order` makes the page's record and puts its address on the Shopify line as the hidden property `_ichirei_animation_url` when the cart is made (if that record could not be written the order still goes through, and the e-mail then leaves out the button and its two lines).
+
+The page, top to bottom: **A** welcome (the character, its reading, the 「どんな人か」 line, a small line 一字 · 贈り方 · 注文日) · **B** send the gift (LINE, WhatsApp, WeChat QR, copy, e-mail, the receiver's link as selectable text, the opening date, and 「相手が見る画面を確かめる」 = the receiver's page in **preview mode** `/g/<token>?preview=<AN-…>`) · **C** the wooden gift's four steps (木札 / 版木 only; never for an e-gift; never while `ICHIREI_WOOD_SIZES=coming_soon`) · **D** save (film MP4, story scroll, card PDF) · **E** the 24-hour change line with the real deadline in the buyer's own time zone (gone after it passes) and the support address. A remembrance order says 「贈りものを届ける」 / 「把它傳給家人」 / "Share it with family", with no red.
+
+- **Preview mode writes nothing.** The receiver's page has no "opened" state; in preview it also hides the address form and the thank-you box, and `POST /api/gift/<token>/reply` and `/address` refuse any request carrying `?preview=` (403 `preview_only`).
+- **Deadline.** `change_until` = Shopify's payment time + 24 hours (read-only Tracking app, the same lookup as /ops; when Shopify cannot be asked, the order's own time — the same fallback /ops uses). After it, or for a cancelled / unpaid order, the view carries none and the line is not shown.
+- **Wooden gift status.** On `/ops`, the "お客様の画面（木の贈りもの）" column of each wooden order that may be made lets the owner choose 1 ご注文を承りました · 2 制作しています · 3 発送しました（追跡番号） · 4 お届け済み and type the tracking number (`POST /ops/wood`; letters, digits, hyphens, 4–40; our own record only). With nothing chosen the step follows 印刷した (2) and 発送した (3). Step 3 or 4 also records the shipped time (which starts the 90-day address clean-up, as 発送した does).
+- **Support address.** There is none in the repo: set Cloud Build `_SUPPORT_EMAIL` (→ `ICHIREI_SUPPORT_EMAIL`); the page prints it as plain, selectable text, and prints nothing when it is empty.
+- Tests: `scripts/test-email-snippet.ts`, `scripts/test-buyer.ts`, `scripts/test-server.mjs` (preview refusal), e2e Runs 8c-5, 8g, 8g-2, 8g-3. Screenshots: `scripts/screenshots-buyer.mjs`.

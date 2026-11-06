@@ -136,3 +136,26 @@
 .an-status dt { color: var(--muted); } .an-status dd { margin: 0; }
 .an-error { color: #e7a39b; }
 .an-panel > p { margin: .9rem 0; }
+
+/* The buyer's welcome page /a/<id> (2026-11-06): a plain scrolling page, top to bottom. The character is cinnabar (ink on a remembrance page — never red there). */
+.an-page.an-buyer { height: auto; display: block; padding: 0; }
+.by-page { box-sizing: border-box; max-width: 36rem; margin: 0 auto; padding: 0 0 3rem; text-align: center; }
+.by-welcome { padding: 2.4rem 1.2rem 1rem; }
+.by-welcome-line { font-family: var(--f-body); font-weight: 700; font-size: 1.35rem; line-height: 1.6; margin: 0 0 .6rem; }
+.by-char { font-size: 7.5rem; margin: .4rem 0 .1rem; }
+.by-reading { font-size: 1.05rem; color: var(--gold); margin: 0 0 .8rem; letter-spacing: .06em; }
+.by-who { font-size: 1.05rem; line-height: 1.9; margin: .4rem auto 1.4rem; max-width: 26rem; }
+.by-order-line { display: flex; flex-wrap: wrap; justify-content: center; gap: .2rem 1.1rem; margin: 0; font-family: var(--f-label); font-size: .78rem; letter-spacing: .06em; color: var(--muted); }
+.by-opens { color: var(--gold); }
+.by-steps { list-style: none; margin: 1rem auto; padding: 0; max-width: 22rem; text-align: left; }
+.by-step { position: relative; margin: 0; padding: .55rem .8rem .55rem 2.2rem; color: var(--muted); border-left: 1px solid #4a3f31; margin-left: .6rem; }
+.by-step::before { content: ''; position: absolute; left: -.45rem; top: 50%; width: .8rem; height: .8rem; margin-top: -.4rem; border-radius: 50%; border: 1px solid #6b5a3a; background: var(--ink); }
+.by-step-done { color: var(--ivory); }
+.by-step-done::before { background: var(--gold); border-color: var(--gold); }
+.by-step-current { color: var(--ivory); font-weight: 700; }
+.by-step-current::before { background: var(--cinnabar); border-color: var(--cinnabar); box-shadow: 0 0 0 4px rgba(192, 57, 43, .22); }
+.by-support { user-select: all; -webkit-user-select: all; font-family: var(--f-label); font-size: .9rem; color: var(--gold); word-break: break-all; }
+.by-help { padding-top: 1rem; }
+.by-save { padding-top: 1rem; }
+.an-memorial .by-step-current::before { background: var(--ivory); border-color: var(--ivory); box-shadow: 0 0 0 4px rgba(245, 237, 216, .18); }
+.an-memorial .an-btn-hot { border-color: var(--gold); }
