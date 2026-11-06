@@ -1,12 +1,12 @@
 import { useEffect } from 'react'
-import { PLACEHOLDER, LEGAL } from './legal-copy.ts'
+import { LEGAL } from './legal-copy.ts'
 import { toRevealLang } from '../reveal/lang.ts'
 import { useLanguage } from '../useLanguage.ts'
 import type { UiLanguage } from '../demo/i18n.ts'
 import '../reveal/reveal.css'
 
 // /legal — 特定商取引法に基づく表記, the return rules and three short questions, in ja / zh-Hant / en. Linked from the footer and from beside the order button.
-// The seller's details are 【 】 until the owner fills them in (src/legal/legal-copy.ts); nothing is invented.
+// The seller's details are the owner's own (src/legal/legal-copy.ts); the e-mail address is plain, selectable text.
 
 const LANGS: { id: UiLanguage; label: string }[] = [
   { id: 'ja', label: '日本語' },
@@ -18,7 +18,6 @@ export default function LegalApp() {
   const [language, setLanguage] = useLanguage()
   const lang = toRevealLang(language)
   const t = LEGAL[lang]
-  const unfinished = t.rows.some((r) => r.value.includes(PLACEHOLDER))
   useEffect(() => {
     document.title = `${t.title} · ICHIREI`
     document.documentElement.lang = lang === 'zh-Hant' ? 'zh-Hant' : lang
@@ -40,11 +39,10 @@ export default function LegalApp() {
           {t.rows.map((r) => (
             <div key={r.label} className="legalRow">
               <dt>{r.label}</dt>
-              <dd data-placeholder={r.value.includes(PLACEHOLDER) ? 'yes' : undefined}>{r.value}</dd>
+              <dd data-testid={/^[^\s@]+@[^\s@]+$/.test(r.value) ? 'legal-email' : undefined}>{r.value}</dd>
             </div>
           ))}
         </dl>
-        {unfinished && <p className="sent" data-testid="legal-note">{t.note}</p>}
         <h2 id="returns">{t.returnsTitle}</h2>
         <ul className="legalReturns" data-testid="legal-returns">
           {t.returns.map((x) => (

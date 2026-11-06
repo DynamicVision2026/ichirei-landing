@@ -1494,7 +1494,7 @@ const mockPage = async (browser, { onExplain, result, order, track } = {}) => {
   }
 }
 
-// ---------- Run 8h: /legal — 特定商取引法に基づく表記 with 【 】 placeholders, the return rules, three questions, in three languages; the footer link ----------
+// ---------- Run 8h: /legal — 特定商取引法に基づく表記 with the owner's seller details (no 【 】), the return rules, three questions, in three languages; the footer link ----------
 {
   const T = {
     ja: { title: '特定商取引法に基づく表記', ret: ['本商品は、お客様の物語から選ばれた一字でつくる受注制作品です。', 'ご注文から24時間以内であれば、ご注文時に表示された他の字への変更、名入れ・メッセージの修正、詩の形式の変更（1回）、またはキャンセル（全額返金）を承ります。ご注文確認メールにご返信ください。', '24時間を過ぎたお客様都合による変更・返品・返金はお受けできません。', '商品の破損、誤った字・誤印刷など当方の不備があった場合は、お届けから14日以内にご連絡ください。作り直し、または返金いたします。', 'eギフトは、ギフトページのお届け後の返金はいたしかねます（正常に表示されない場合を除きます）。'], faq: ['注文後に字を変えられますか？', 'キャンセルできますか？', '届いた品物に問題があったら？'], rows: ['販売業者', '運営責任者', '所在地', '電話番号', 'メールアドレス'] },
@@ -1509,7 +1509,10 @@ const mockPage = async (browser, { onExplain, result, order, track } = {}) => {
     await p.locator('[data-testid=legal-page]').waitFor()
     const t = T[lang]
     const rows = await p.locator('[data-testid=legal-rows]').innerText()
-    check(`legal (${lang}): the title, the five seller rows with 【 】 placeholders (nothing invented), and the owner's note`, (await p.locator('h1').innerText()).includes(t.title) && t.rows.every((r) => rows.includes(r)) && (await p.locator('[data-testid=legal-rows] dd[data-placeholder]').count()) >= 5 && !!(await p.locator('[data-testid=legal-note]').count()) && (await p.locator('[data-testid=legal-rows] dd').first().innerText()) === '【 】')
+    const EMAIL = 'info@beyondculture.ai'
+    check(`legal (${lang}): the title and the five seller rows, filled with the owner's own details — and no 【 】 anywhere on the page, no placeholder note`, (await p.locator('h1').innerText()).includes(t.title) && t.rows.every((r) => rows.includes(r)) && !/[【】]/.test(await p.locator('body').innerText()) && (await p.locator('[data-testid=legal-note]').count()) === 0 && rows.includes('Beyond Culture 獨歩文化株式会社'))
+    check(`legal (${lang}): the e-mail address is plain, selectable text (not a link)`, (await p.locator('[data-testid=legal-email]').innerText()) === EMAIL && (await p.locator('[data-testid=legal-email] a').count()) === 0)
+    if (lang === 'ja') await p.screenshot({ path: 'shots/legal-ja.png', fullPage: true })
     check(`legal (${lang}): the prices and the shipping come from the product (¥3,980 / ¥9,800 / ¥18,850; EMS ¥6,000)`, ['3,980', '9,800', '18,850', '6,000'].every((x) => rows.includes(x)))
     const ret = await p.locator('[data-testid=legal-returns]').innerText()
     check(`legal (${lang}): the return section — made to order, 24 hours, our mistakes within 14 days, the e-gift`, lang === 'ja' ? t.ret.every((x) => ret.includes(x)) && (await p.locator('[data-testid=legal-returns] li').count()) === 5 : t.ret.every((x) => ret.includes(x)) && (await p.locator('[data-testid=legal-returns] li').count()) === 5)
