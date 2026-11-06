@@ -6,6 +6,7 @@ import { COPY as FILM_COPY, pageLang, type PageLang } from '../animation/copy.ts
 import { Film } from '../animation/AnimationApp.tsx'
 import { EgiftReceive } from '../animation/GiftPanels.tsx'
 import Keepsakes from './Keepsakes.tsx'
+import ShareSection from './ShareSection.tsx'
 import type { GiftLockedView, GiftView } from '../animation/types.ts'
 import { GIFT_COPY, fullDateText, openDateText, type GiftCopy } from './copy.ts'
 import { linerFor } from './liner.ts'
@@ -22,7 +23,7 @@ import './gift.css'
 
 
 type Step = 'envelope' | 'opening' | 'letter' | 'film' | 'reveal' | 'poem' | 'cert' | 'keep'
-type Load = { state: 'loading' } | { state: 'error'; kind: 'notFound' | 'unavailable' } | { state: 'locked'; view: GiftLockedView } | { state: 'ready'; view: GiftView }
+type Load = { state: 'loading' } | { state: 'error'; kind: 'notFound' | 'unavailable' | 'gone' } | { state: 'locked'; view: GiftLockedView } | { state: 'ready'; view: GiftView }
 
 export const OPENING_MS = 1500
 export const FADE_MS = 450
@@ -67,6 +68,12 @@ export default function GiftApp() {
       try {
         const res = await fetch(`/api/gift/${token}${q}`, { signal: ac.signal })
         if (res.status === 404) return setLoad({ state: 'error', kind: 'notFound' })
+        if (res.status === 410) {
+          // a cancelled order: the link says only that the gift is no longer available
+          const j = (await res.json().catch(() => ({}))) as { language?: GiftView['language'] }
+          if (j.language) setLang(pageLang(j.language))
+          return setLoad({ state: 'error', kind: 'gone' })
+        }
         if (!res.ok) return setLoad({ state: 'error', kind: 'unavailable' })
         const view = (await res.json()) as GiftView | GiftLockedView
         setLang(pageLang(view.language))
@@ -129,7 +136,7 @@ export default function GiftApp() {
     return (
       <main className={shell} lang={lang} data-testid="gift-page" data-step="loading">
         <p className="gf-note" role={load.state === 'error' ? 'alert' : 'status'} data-testid={load.state === 'error' ? 'animation-error' : undefined}>
-          {load.state === 'loading' ? copy.loading : load.kind === 'notFound' ? copy.notFound : copy.unavailable}
+          {load.state === 'loading' ? copy.loading : load.kind === 'notFound' ? copy.notFound : load.kind === 'gone' ? copy.gone : copy.unavailable}
         </p>
       </main>
     )
@@ -138,7 +145,7 @@ export default function GiftApp() {
     const v = load.view
     return (
       <main className={shell} lang={lang} data-testid="gift-page" data-step="envelope" data-locked="yes">
-        <Envelope copy={copy} lang={lang} to={v.to} from={v.from} memorial={v.memorial} purpose={v.purpose ?? null} date={v.opens_on} reduced={reduced} state="closed" locked={{ opens_on: v.opens_on, days_left: v.days_left }} />
+        <Envelope copy={copy} lang={lang} to={v.to} from={v.from} memorial={v.memorial} purpose={v.purpose ?? null} date={v.opens_on} reduced={reduced} state="closed" locked={{ opens_on: v.opens_on, days_left: v.days_left, arriving: v.arriving === true }} />
       </main>
     )
   }
@@ -231,7 +238,8 @@ export default function GiftApp() {
   // 8. what to keep, and the one thank-you
   return stage(
     <section className="gf-keep" data-testid="gift-keep">
-      <Keepsakes lang={lang} base={`/api/gift/${view.token}`} q={q} complete={filmComplete(view)} scroll={scrollAvailable(view)} egift={view.package === 'egift'} />
+      {!preview && <Keepsakes lang={lang} base={`/api/gift/${view.token}`} q={q} complete={filmComplete(view)} scroll={scrollAvailable(view)} egift={view.package === 'egift'} />}
+      {!preview && !view.memorial && filmComplete(view) && <ShareSection lang={lang} base={`/api/gift/${view.token}`} role="receiver" />}
       {view.egift && !preview && <EgiftReceive view={view} lang={lang} />}
       {!preview && <ReplyBox token={view.token} copy={copy} from={view.from} replied={view.replied} />}
       <p className="gf-row">
@@ -260,7 +268,7 @@ function Envelope({ copy, lang, to, from, memorial, purpose, date, reduced, stat
   date: string
   reduced: boolean
   state: 'closed' | 'opening'
-  locked?: { opens_on: string; days_left: number }
+  locked?: { opens_on: string; days_left: number; arriving?: boolean }
   onOpen?: () => void
 }) {
   const letterLike = purpose === 'apology' || purpose === 'encourage'
@@ -289,7 +297,9 @@ function Envelope({ copy, lang, to, from, memorial, purpose, date, reduced, stat
         <div className="gf-env-flap" aria-hidden="true"><div className="gf-flap-out" /><div className="gf-flap-in" /></div>
         <div className="gf-seal" aria-hidden="true" data-testid="gift-seal"><i className="gf-seal-l" /><i className="gf-seal-r" /><b>一字礼</b></div>
       </div>
-      {locked ? (
+      {locked?.arriving ? (
+        <p className="gf-locked" data-testid="gift-arriving">{copy.arriving}</p>
+      ) : locked ? (
         <>
           <p className="gf-locked" data-testid="gift-locked-date">{copy.opensOn(openDateText(lang, locked.opens_on, thisYear))}</p>
           <p className="gf-locked-note" data-testid="gift-locked-note">{copy.daysLeft(locked.days_left)}</p>

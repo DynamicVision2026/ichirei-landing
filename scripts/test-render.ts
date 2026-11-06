@@ -42,6 +42,7 @@ async function addOrder(store: MemoryOrderStore, over: Record<string, unknown>, 
   const p = parseOrderRequest(body, NOW)
   if (!p.ok) throw new Error(p.error)
   const record = buildRecord(p.order, ref, NOW)
+  record.collected_at = NOW.toISOString() // these tests are about what a COLLECTED gift offers (test-collect.ts covers the locked side)
   record.production.certificate.poems = [{ type: 'tanka', lines: ['朝ごとに', '蓋の花添え', '備えたる'], reading: 'あさごとに' }]
   const animId = newAnimationId()
   const token = newGiftToken()

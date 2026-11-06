@@ -17,7 +17,17 @@ export function woodStepOf(ops: OrderOps | undefined | null): WoodStep {
 /** Letters, digits and hyphens, up to 40: a parcel number. Anything else is refused (it is shown on a page and put in a link-free line). */
 export const TRACKING_PATTERN = /^[A-Za-z0-9-]{4,40}$/
 
+/** What a gift may do: `pending` = not collected yet (the receiver's link is sealed, nothing can be sent or saved), `cancelled` = the order was cancelled (nothing is shown). */
+export type OrderGate = 'ok' | 'pending' | 'cancelled'
+export function orderGate(rec: OrderRecord | null | undefined): OrderGate {
+  if (!rec) return 'ok'
+  if (rec.ops?.cancelled_at) return 'cancelled'
+  return rec.collect_required && !rec.collected_at ? 'pending' : 'ok'
+}
+
 export interface BuyerOrderView {
+  /** True once the buyer pressed 「贈りものを受け取る」 (and for every order made before that button existed): the send buttons, the link and the downloads are then shown. */
+  collected: boolean
   /** When the payment went through (else when the order was made); an ISO time the page shows in the buyer's own time zone. */
   ordered_at: string | null
   /** The end of the 24-hour change window while it is open, else null (after it, or when the order is not paid / cancelled, the page shows no such line). */
@@ -27,13 +37,14 @@ export interface BuyerOrderView {
 }
 
 export function buyerOrderView(rec: OrderRecord | null, win: WindowInfo, env: NodeJS.ProcessEnv = process.env): BuyerOrderView {
-  if (!rec) return { ordered_at: null, change_until: null, wood: null }
+  if (!rec) return { collected: true, ordered_at: null, change_until: null, wood: null }
   const pkg = rec.production.package
   const alive = win.phase === 'open' || win.phase === 'closed'
   const wooden = !!SHIPS[pkg] && !comingSoonSizes(env.ICHIREI_WOOD_SIZES).includes(pkg)
   const step = woodStepOf(rec.ops)
   const ship = rec.production.ship_to ?? 'me'
   return {
+    collected: orderGate(rec) === 'ok',
     ordered_at: win.paid_at ?? rec.created_at,
     change_until: win.phase === 'open' ? win.ends_at : null,
     wood: wooden && alive && ship !== 'none'

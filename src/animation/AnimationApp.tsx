@@ -21,7 +21,7 @@ const routeFromPath = (): { id: string } | null => {
   return a ? { id: a } : null
 }
 
-type Load = { state: 'loading' } | { state: 'error'; kind: 'notFound' | 'unavailable' } | { state: 'ready'; view: AnimationView }
+type Load = { state: 'loading' } | { state: 'error'; kind: 'notFound' | 'unavailable' | 'gone' } | { state: 'ready'; view: AnimationView }
 
 export default function AnimationApp() {
   const route = useMemo(routeFromPath, [])
@@ -55,6 +55,12 @@ export default function AnimationApp() {
       try {
         const res = await fetch(viewUrl, { signal: ac.signal })
         if (res.status === 404) return setLoad({ state: 'error', kind: 'notFound' })
+        if (res.status === 410) {
+          // a cancelled order: the page says only that the gift is no longer available
+          const j = (await res.json().catch(() => ({}))) as { language?: AnimationView['language'] }
+          if (j.language) setLang(pageLang(j.language))
+          return setLoad({ state: 'error', kind: 'gone' })
+        }
         if (!res.ok) return setLoad({ state: 'error', kind: 'unavailable' })
         const view = (await res.json()) as AnimationView
         setLang(pageLang(view.language))
@@ -106,7 +112,7 @@ export default function AnimationApp() {
   if (load.state === 'ready' && load.view.gift)
     return (
       <main className={`an-page an-buyer${inkOnly(load.view) ? ' an-memorial' : ''}`} data-testid="animation-page" lang={lang}>
-        <BuyerPage view={load.view} lang={lang} preparing={copy.preparing} />
+        <BuyerPage view={load.view} lang={lang} preparing={copy.preparing} onCollected={() => setLoad((cur) => (cur.state === 'ready' ? { state: 'ready', view: { ...cur.view, order: cur.view.order ? { ...cur.view.order, collected: true } : cur.view.order } } : cur))} />
       </main>
     )
   return (
@@ -114,7 +120,7 @@ export default function AnimationApp() {
       {load.state === 'loading' && <p className="an-note">{copy.loading}</p>}
       {load.state === 'error' && (
         <p className="an-note" role="alert" data-testid="animation-error">
-          {load.kind === 'notFound' ? copy.notFound : copy.unavailable}
+          {load.kind === 'notFound' ? copy.notFound : load.kind === 'gone' ? BUYER_COPY[lang].gone : copy.unavailable}
         </p>
       )}
       {load.state === 'ready' && !load.view.film?.pictures && !load.view.film?.deferred && (

@@ -162,6 +162,8 @@ export interface GiftLockedView {
   to: string
   opens_on: string
   days_left: number
+  /** The buyer has not collected the gift yet (2026-11-06): the envelope stays sealed with no open button and says it is arriving soon. */
+  arriving?: boolean
 }
 
 const JST = 9 * 3600_000
@@ -174,6 +176,11 @@ export const isLocked = (g: GiftRecord, now: Date): boolean => !!g.opens_on && t
 export function lockedView(g: GiftRecord, now: Date): GiftLockedView {
   const opens = g.opens_on ?? todayJst(now)
   return { locked: true, token: g.token, language: g.language, memorial: g.memorial, ...(g.purpose ? { purpose: g.purpose } : {}), from: g.from, to: g.to, opens_on: opens, days_left: Math.max(1, dayNumber(opens) - dayNumber(todayJst(now))) }
+}
+
+/** The sealed envelope of a gift the buyer has not collected yet: the two names, nothing else, no open button. */
+export function arrivingView(g: GiftRecord): GiftLockedView {
+  return { locked: true, arriving: true, token: g.token, language: g.language, memorial: g.memorial, ...(g.purpose ? { purpose: g.purpose } : {}), from: g.from, to: g.to, opens_on: g.opens_on ?? '', days_left: 0 }
 }
 
 export const REPLY_MAX = 200

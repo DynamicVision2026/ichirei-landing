@@ -159,3 +159,9 @@
 .by-save { padding-top: 1rem; }
 .an-memorial .by-step-current::before { background: var(--ivory); border-color: var(--ivory); box-shadow: 0 0 0 4px rgba(245, 237, 216, .18); }
 .an-memorial .an-btn-hot { border-color: var(--gold); }
+
+.by-collect-btn { font-size: 1.15rem; padding: 14px 32px; min-height: 56px; }
+.by-collect-btn:disabled { opacity: .6; cursor: default; }
+.by-cancel-by { color: var(--gold); font-size: .95rem; margin: 1.2rem 0 .6rem; }
+.by-confirm { border: 1px solid var(--gold); border-radius: 4px; padding: .6rem 1rem; margin: 1rem auto; max-width: 24rem; }
+.an-memorial .by-cancel-by { color: var(--gold); }

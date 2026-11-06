@@ -24,8 +24,20 @@ export interface BuyerCopy {
   woodShip: { me: string; direct: string }
   /** D. Save */
   saveTitle: string
-  /** E. Changes and help */
+  /** E. Cancelling (the only thing that can still be done after payment) */
   changeUntil: (when: string) => string
+  /** 「贈りものを受け取る」: the one tap that unlocks sending and saving, and ends the right to cancel. */
+  collect: string
+  collectLine: string
+  collectLineLate: string
+  collectFinishing: string
+  collectConfirm: string
+  collectYes: string
+  collectNo: string
+  cancelBy: (when: string) => string
+  checkFirst: string
+  /** A cancelled order. */
+  gone: string
 }
 
 export const BUYER_COPY: Record<PageLang, BuyerCopy> = {
@@ -45,7 +57,17 @@ export const BUYER_COPY: Record<PageLang, BuyerCopy> = {
     woodSteps: ['ご注文を承りました', '制作しています', '発送しました', 'お届け済み'],
     woodShip: { me: 'お届け先：ご自身', direct: 'お届け先：相手の方へ直接' },
     saveTitle: '保存する',
-    changeUntil: (w) => `ご注文から24時間以内（${w}まで）なら、確認メールに返信して、字の変更や取り消しができます。`,
+    changeUntil: (w) => `お支払い完了から24時間以内（${w}まで）なら、確認メールにご返信いただくとキャンセル（全額返金）ができます。`,
+    collect: '贈りものを受け取る',
+    collectLine: '受け取ると、送る・保存するができるようになります。受け取った後はキャンセルできません。',
+    collectLineLate: '受け取ると、送る・保存するができるようになります。',
+    collectFinishing: '贈りものを仕上げています…',
+    collectConfirm: '受け取りますか？この後はキャンセルできません。',
+    collectYes: '受け取る',
+    collectNo: 'まだ',
+    cancelBy: (w) => `キャンセル期限：${w}まで（受け取る前に限ります）。期限を過ぎると、お客様都合による返金はできません。`,
+    checkFirst: '受け取る前に、相手に届く内容をご確認ください。',
+    gone: 'この贈りものは、現在ご覧いただけません。',
   },
   'zh-Hant': {
     title: '一字禮 — 訂單頁面',
@@ -63,7 +85,17 @@ export const BUYER_COPY: Record<PageLang, BuyerCopy> = {
     woodSteps: ['已收到訂單', '製作中', '已出貨', '已送達'],
     woodShip: { me: '寄送對象：寄給自己', direct: '寄送對象：直接寄給對方' },
     saveTitle: '儲存',
-    changeUntil: (w) => `下單後24小時內（${w}前），回覆確認郵件即可更換字或取消訂單。`,
+    changeUntil: (w) => `付款完成後24小時內（${w}前），回覆確認郵件即可取消並全額退款。`,
+    collect: '領取禮物',
+    collectLine: '領取後即可傳送與儲存。領取後將無法取消訂單。',
+    collectLineLate: '領取後即可傳送與儲存。',
+    collectFinishing: '禮物製作中…',
+    collectConfirm: '確定領取嗎？領取後將無法取消。',
+    collectYes: '領取',
+    collectNo: '先不要',
+    cancelBy: (w) => `取消期限：${w}前（限領取前）。超過期限後，恕不接受個人因素退款。`,
+    checkFirst: '領取前，請先確認對方將收到的內容。',
+    gone: '這份禮物目前無法查看。',
   },
   en: {
     title: 'ICHIREI — your order',
@@ -81,7 +113,17 @@ export const BUYER_COPY: Record<PageLang, BuyerCopy> = {
     woodSteps: ['Order received', 'Being made', 'Shipped', 'Delivered'],
     woodShip: { me: 'Ship to: you', direct: 'Ship to: them directly' },
     saveTitle: 'Save',
-    changeUntil: (w) => `Until ${w} (24 hours after ordering), reply to the confirmation email to change the character or cancel.`,
+    changeUntil: (w) => `Until ${w} (24 hours after payment), reply to the confirmation email to cancel for a full refund.`,
+    collect: 'Collect your gift',
+    collectLine: "Once collected, you can send and save it. After that, the order can't be cancelled.",
+    collectLineLate: 'Once collected, you can send and save it.',
+    collectFinishing: 'Finishing your gift…',
+    collectConfirm: "Collect it now? You won't be able to cancel after this.",
+    collectYes: 'Collect',
+    collectNo: 'Not yet',
+    cancelBy: (w) => `Cancel by: ${w} (before you collect). After that, no refunds for change of mind.`,
+    checkFirst: "Before collecting, check what they'll receive.",
+    gone: 'This gift is no longer available.',
   },
 }
 

@@ -76,7 +76,7 @@ for (const r of [eg.ref, wd.ref, bl.ref]) pay[r] = { state: 'paid', paid_at: T0.
   pay[eg.ref] = { state: 'paid', paid_at: at(-30).toISOString() }
   check('(1) an order paid 30 hours ago (a cart that was paid late is measured from its payment) has no deadline line', (await view(eg.animId)).order?.change_until === null)
   pay[eg.ref] = { state: 'cancelled', paid_at: null }
-  check('(1) a cancelled order has none, and never paid has none', (await view(eg.animId)).order?.change_until === null)
+  check('(1) a cancelled order shows nothing at all (410: the page says only that the gift is no longer available)', (await A.view(eg.animId)).status === 410)
   pay[eg.ref] = undefined
   const unpaid = await view(eg.animId)
   check('(1) never paid (Shopify has no such order): no deadline line, no wooden section', unpaid.order?.change_until === null && unpaid.order?.wood === null)

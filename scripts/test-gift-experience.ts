@@ -48,6 +48,8 @@ const o1 = await post(body({ sender_email: 'taro@example.com', open_date: '2026-
 const o2 = await post(body({ sender_email: 'taro@example.com' }))
 const rec1 = (await mem.get(o1.json.order_ref as string)) as { gift_token: string; animation_id: string; certificate_no?: number }
 const rec2 = (await mem.get(o2.json.order_ref as string)) as { gift_token: string; certificate_no?: number }
+// these tests are about what a COLLECTED gift shows (test-collect.ts covers the locked side): the buyer has pressed 「贈りものを受け取る」
+for (const o of [o1, o2]) await mem.put(o.json.order_ref as string, { ...((await mem.get(o.json.order_ref as string)) as object), collected_at: NOW.toISOString() })
 const g1 = (await mem.get(rec1.gift_token)) as GiftRecord
 const g2 = (await mem.get(rec2.gift_token)) as GiftRecord
 check('(2) two orders get two running numbers, kept on the order AND on the gift', rec1.certificate_no === 1 && rec2.certificate_no === 2 && g1.certificate_no === 1 && g2.certificate_no === 2, `${rec1.certificate_no},${rec2.certificate_no}`)

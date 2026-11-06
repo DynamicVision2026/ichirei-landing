@@ -627,7 +627,7 @@ Every other property starts with an underscore, which Shopify hides from the car
 
 *I could not see your template, so the two anchor lines above are those of Shopify's standard Order-confirmation template; if yours was edited, use the "above the order summary" rule.* The block runs on Shopify's servers inside the e-mail; **it has been tested here with a Liquid engine against the shape of Shopify's objects (`scripts/test-email-snippet.ts`), but has never run inside a real Shopify notification — send the test e-mail before you rely on it.**
 
-What it prints, only for an ICHIREI item (SKU `ICHIREI-…` or a `_order_ref` property), in the language in `_language`: the heading, one lead line, **one button to the buyer's own private page** (`/a/AN-…`, read from the hidden property `_ichirei_animation_url`, which `POST /api/order` puts on the line item when the cart is made — so the link is known before checkout and no later step is needed), the line saying the link is for the buyer only, 一字 (Character) and 贈り方 / 方案 / Gift (E-gift · Wooden tag · Carved block), and the 24-hour change note. **The e-mail never links to the receiver's gift page (`/g/…`)**: the block ignores `_ichirei_gift_url`, and a link that is not a `/a/` page is not printed. If an order has no buyer-page link (the order record could not be written — the order still goes through), the lead, button and under-button lines are left out and the rest stays. For any other product it prints nothing, so those orders get exactly today's e-mail. We never e-mail the receiver.
+What it prints, only for an ICHIREI item (SKU `ICHIREI-…` or a `_order_ref` property), in the language in `_language`: the heading, one lead line, **one button to the buyer's own private page** (`/a/AN-…`, read from the hidden property `_ichirei_animation_url`, which `POST /api/order` puts on the line item when the cart is made — so the link is known before checkout and no later step is needed), the line saying the link is for the buyer only, 一字 (Character) and 贈り方 / 方案 / Gift (E-gift · Wooden tag · Carved block), and the cancel note (「お支払い完了から24時間以内なら、確認メールにご返信いただくとキャンセル（全額返金）ができます。」 — since 2026-11-06 the only thing that can be done after payment). **The e-mail never links to the receiver's gift page (`/g/…`)**: the block ignores `_ichirei_gift_url`, and a link that is not a `/a/` page is not printed. If an order has no buyer-page link (the order record could not be written — the order still goes through), the lead, button and under-button lines are left out and the rest stays. For any other product it prints nothing, so those orders get exactly today's e-mail. We never e-mail the receiver.
 
 ```liquid
 {%- comment -%}
@@ -650,7 +650,7 @@ What it prints, only for an ICHIREI item (SKU `ICHIREI-…` or a `_order_ref` pr
         {%- assign t_lead = 'あなたの贈りものの準備ができました。下のボタンから、ご注文ページを開いてください。' -%}
         {%- assign t_button = 'ご注文ページを開く' -%}
         {%- assign t_under = 'このページから、贈りものを相手に送れます。このリンクはご自身用です。相手には送らないでください。' -%}
-        {%- assign t_change = 'ご注文から24時間以内なら、このメールに返信して、字の変更や取り消しができます。' -%}
+        {%- assign t_change = 'お支払い完了から24時間以内なら、確認メールにご返信いただくとキャンセル（全額返金）ができます。' -%}
         {%- assign t_char = '一字' -%}
         {%- assign t_size = '贈り方' -%}
         {%- if ichirei_size contains 'STANDARD' -%}{%- assign t_size_value = '版木' -%}{%- elsif ichirei_size contains 'SIMPLE' -%}{%- assign t_size_value = '木札' -%}{%- else -%}{%- assign t_size_value = 'eギフト' -%}{%- endif -%}
@@ -660,7 +660,7 @@ What it prints, only for an ICHIREI item (SKU `ICHIREI-…` or a `_order_ref` pr
         {%- assign t_lead = '你的禮物已經準備好了。請點下方按鈕，打開你的訂單頁面。' -%}
         {%- assign t_button = '打開訂單頁面' -%}
         {%- assign t_under = '你可以在這個頁面把禮物送給對方。這個連結是你自己專用的，請不要轉傳給對方。' -%}
-        {%- assign t_change = '下單後24小時內，回覆這封郵件即可更換字或取消訂單。' -%}
+        {%- assign t_change = '付款完成後24小時內，回覆確認郵件即可取消並全額退款。' -%}
         {%- assign t_char = '一字' -%}
         {%- assign t_size = '方案' -%}
         {%- if ichirei_size contains 'STANDARD' -%}{%- assign t_size_value = '版木' -%}{%- elsif ichirei_size contains 'SIMPLE' -%}{%- assign t_size_value = '木牌' -%}{%- else -%}{%- assign t_size_value = 'e禮物' -%}{%- endif -%}
@@ -670,7 +670,7 @@ What it prints, only for an ICHIREI item (SKU `ICHIREI-…` or a `_order_ref` pr
         {%- assign t_lead = '你的礼物已经准备好了。请点下方按钮，打开你的订单页面。' -%}
         {%- assign t_button = '打开订单页面' -%}
         {%- assign t_under = '你可以在这个页面把礼物送给对方。这个链接是你自己专用的，请不要转传给对方。' -%}
-        {%- assign t_change = '下单后24小时内，回复这封邮件即可更换字或取消订单。' -%}
+        {%- assign t_change = '付款完成后24小时内，回复确认邮件即可取消并全额退款。' -%}
         {%- assign t_char = '一字' -%}
         {%- assign t_size = '方案' -%}
         {%- if ichirei_size contains 'STANDARD' -%}{%- assign t_size_value = '版木' -%}{%- elsif ichirei_size contains 'SIMPLE' -%}{%- assign t_size_value = '木牌' -%}{%- else -%}{%- assign t_size_value = 'e礼物' -%}{%- endif -%}
@@ -680,7 +680,7 @@ What it prints, only for an ICHIREI item (SKU `ICHIREI-…` or a `_order_ref` pr
         {%- assign t_lead = 'Your gift is ready. Open your order page with the button below.' -%}
         {%- assign t_button = 'Open your order page' -%}
         {%- assign t_under = "Send your gift from this page. This link is for you only; please don't forward it." -%}
-        {%- assign t_change = 'Within 24 hours of ordering, reply to this email to change the character or cancel.' -%}
+        {%- assign t_change = 'Within 24 hours of payment, reply to the confirmation email to cancel for a full refund.' -%}
         {%- assign t_char = 'Character' -%}
         {%- assign t_size = 'Gift' -%}
         {%- if ichirei_size contains 'STANDARD' -%}{%- assign t_size_value = 'Carved block' -%}{%- elsif ichirei_size contains 'SIMPLE' -%}{%- assign t_size_value = 'Wooden tag' -%}{%- else -%}{%- assign t_size_value = 'E-gift' -%}{%- endif -%}
@@ -709,3 +709,13 @@ The page, top to bottom: **A** welcome (the character, its reading, the 「ど�
 - **Wooden gift status.** On `/ops`, the "お客様の画面（木の贈りもの）" column of each wooden order that may be made lets the owner choose 1 ご注文を承りました · 2 制作しています · 3 発送しました（追跡番号） · 4 お届け済み and type the tracking number (`POST /ops/wood`; letters, digits, hyphens, 4–40; our own record only). With nothing chosen the step follows 印刷した (2) and 発送した (3). Step 3 or 4 also records the shipped time (which starts the 90-day address clean-up, as 発送した does).
 - **Support address.** There is none in the repo: set Cloud Build `_SUPPORT_EMAIL` (→ `ICHIREI_SUPPORT_EMAIL`); the page prints it as plain, selectable text, and prints nothing when it is empty.
 - Tests: `scripts/test-email-snippet.ts`, `scripts/test-buyer.ts`, `scripts/test-server.mjs` (preview refusal), e2e Runs 8c-5, 8g, 8g-2, 8g-3. Screenshots: `scripts/screenshots-buyer.mjs`.
+
+## After payment: refund policy, 「贈りものを受け取る」 and sharing (2026-11-06, second ticket)
+
+- **Launch with the e-gift only** (`_WOOD_SIZES=coming_soon`, already set). The policy is written for all three sizes, so nothing changes when wood launches.
+- **After payment nothing is changed. The only option is to cancel within 24 hours of payment, for a full refund** (Shopify's payment time starts the 24 hours; a request received in time is honoured even if handled later). No other character, no poem-format change, no name or message edits: the customer cancels and orders again (the same story offers the characters already shown for it, `shown_characters`, which are still stored). `/ops` now offers only 「キャンセルとして記録」 (a flag — the refund is made in Shopify). `/legal` (section 返品・交換・キャンセルについて: four paragraphs, `#refund`), its FAQ, the landing FAQ, the order step, the buyer page and the confirmation e-mail all say the same thing; the e-mail block above was updated — **paste the new block into Shopify** (設定 → 通知 → 注文の確認 → コードを編集).
+- **Order step.** One line above the order button (cancel only within 24 hours of payment and before 「贈りものを受け取る」), a link to `/legal#refund`, and a **required checkbox that is never pre-ticked** — the order button stays disabled until it is ticked. The tick time is stored on the order (`refund_ack_at`) and shown in `/ops` (「返金条件の確認」). Under 木札 / 版木 the delivery sentence shows (only while wood is on sale; `/legal`'s 商品のお届け時期 row follows the same rule).
+- **「贈りものを受け取る」 (`POST /api/animation/<id>/collect`).** Until the buyer taps it, the buyer page shows only the welcome, 「相手が見る画面を確かめる」 (the preview plays the FINAL film in the page — never an MP4 file) and the button, which is disabled with 「贈りものを仕上げています…」 while the final film is still being made. Server side, for every order made since this change (`collect_required`), **before the tap**: the receiver's link answers a sealed envelope with 「まもなく届きます」 (no open button, no character, poem or film); the film pictures, render, reply and address calls are refused (403 `not_collected`); the film MP4, the story scroll, the card PDF and the share files are refused for everyone, preview key included. The tap records `collected_at` once, server side, and cannot be undone; within 24 hours of payment the page asks for a confirm first, after them it unlocks at once. **After the tap the order can no longer be cancelled**: `/ops` refuses it unless the owner overrides with a second confirm (for our own mistakes). `/ops` shows 「受け取り：済（時刻）/ 未」. Orders made before this change have no `collect_required` and work as before. Wood: same button and rule; production still starts after the 24 hours whether or not it was tapped.
+- **Cancelled orders.** The buyer page and the receiver's link answer 410 and show only 「この贈りものは、現在ご覧いただけません。」 / 「這份禮物目前無法查看。」 / "This gift is no longer available." Cancelled wood orders stay out of the print list and the workshop CSV (as before).
+- **Sharing (Part B).** On the buyer page (after collecting) and on the receiver page's last screen (after opening), under the save buttons: 「SNSでシェアする」 with 「動画をシェア」 (MP4 1080×1920) and 「歌のカードをシェア」 (PNG 1080×1350). The share film is one relationship line (from the relationship chip only; none for 「その他」), the four story pictures, the character with its reading, the poem — and it ends on the poem. **Nothing else**: no captions, names, message, dates, order data, logo, seal, brand name, website, hashtag, picture credit or end card; nothing is posted as text on our behalf (the share sheet receives the file only). Made once per order from the stored pictures and poem (no model call), kept as `films/<AN-id>/share.mp4` next to the personal film, which is unchanged. On a phone the system share sheet takes the file (`navigator.share({ files })`); where that is not possible the file is saved and the page says to post it from the social app. Not shown for remembrance; never reachable from a preview. Endpoints: `POST /api/animation/<id>/share/film/make`, `GET /api/animation/<id>/share-film.mp4`, `GET /api/animation/<id>/share-card.png` and the same under `/api/gift/<token>/…`. Analytics (codes only): `share_film_tap`, `share_card_tap`, each with `role: sender|receiver`. The relationship lines (母へ / 給媽媽 / For Mom …) for all 14 chips are in `src/order/relation-line.ts` for the owner to review.
+- Tests: `scripts/test-legal.ts`, `scripts/test-collect.ts`, `scripts/test-social-share.ts`, `scripts/test-change-window.ts` (cancel only), `scripts/test-email-snippet.ts`, `scripts/test-server.mjs`, e2e Runs 8g-4, 8g-5, 8h, 11.

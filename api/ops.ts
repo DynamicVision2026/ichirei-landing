@@ -20,16 +20,11 @@ import { flaggedEgifts, mailerFromEnv, purgeExpiredAddresses, readJsonl, runEgif
 import { readArt } from '../engine/film-art.ts'
 import { isGiftRecord, type GiftRecord } from '../engine/gift.ts'
 import { createOrderStore, type OrderStore } from '../engine/order-store.ts'
-import { NO_NAME, type OrderRecord } from '../engine/order.ts'
+import { type OrderRecord } from '../engine/order.ts'
 import { readShippingAddresses, SHIPPING_SOURCE, type PaymentResult, type ShippingResult } from '../engine/shipping.ts'
 import { TRACKING_PATTERN, WOOD_STEPS, woodStepOf, type WoodStep } from '../engine/buyer.ts'
-import { cancelOrder, changeCharacter, changePoemFormat, editNames, windowOf, type ChangeDeps, type WindowInfo } from '../engine/change-window.ts'
-import { createPoemHandler } from './poem.ts'
-import { mergeStory, type Candidate } from '../engine/contract.ts'
-import type { Palette } from '../engine/palette.ts'
-import type { generatePoem } from '../engine/poem.ts'
-import { POEM_TYPES, PRINTED_CARD, poemTypesFor, type PoemType } from '../src/order/packages.ts'
-import type { StoredPoem } from '../engine/order.ts'
+import { cancelOrder, windowOf, type ChangeDeps, type WindowInfo } from '../engine/change-window.ts'
+import { PRINTED_CARD } from '../src/order/packages.ts'
 import { readSecret } from '../engine/track.ts'
 import { adminTokens, shopifyPayments, trackDepsOf } from '../engine/payments-lookup.ts'
 import { loadArtwork } from '../engine/render/artwork.ts'
@@ -51,9 +46,6 @@ export interface OpsDeps {
   shipping?: (refs: string[]) => Promise<ShippingResult>
   /** The payment lookup (when it was paid, cancelled, refunded): tests replace it. */
   payments?: (refs: string[]) => Promise<PaymentResult>
-  /** Tests: the poem writer (production: the same one as the page's poem step). */
-  generatePoem?: typeof generatePoem
-  palette?: Palette
 }
 
 const sha = (s: string) => createHash('sha256').update(s).digest()
@@ -167,18 +159,6 @@ async function artworkFor(store: OrderStore, row: Row, env: NodeJS.ProcessEnv) {
 }
 
 /** One poem for the character of an order, written and checked by the same code as the page's poem step (api/poem.ts); null when it cannot be written. */
-async function makePoemFor(store: OrderStore, d: OpsDeps, now: Date, rec: OrderRecord, cand: Candidate, type: PoemType): Promise<StoredPoem | null> {
-  const er = rec.engine_result
-  const handler = createPoemHandler(() => ({ store, now: () => now, generate: d.generatePoem, palette: d.palette }))
-  const res = await handler(new Request('http://internal/api/poem', {
-    method: 'POST',
-    body: JSON.stringify({ story: rec.story, ...(rec.follow_ups?.length ? { follow_ups: rec.follow_ups } : {}), language: rec.production.language, relationship: er.relationship ?? undefined, direction: er.direction ?? undefined, occasion: er.occasion ?? undefined, purpose: er.purpose ?? undefined, state: er.state ?? undefined, occasion_detail: er.occasion_detail ?? undefined, kanji: cand.kanji, gaze: cand.one_line_gaze, type, source: 'ops' }),
-  }))
-  if (!res.ok) return null
-  const out = (await res.json()) as { poem_id?: string }
-  if (!out.poem_id) return null
-  return ((await store.get(out.poem_id).catch(() => null)) as StoredPoem | null) ?? null
-}
 
 
 /** The default address lookup: the read-only ICHIREI Tracking app, the way /track asks for its orders. */
@@ -220,8 +200,6 @@ const ready = (r: Classified) => r.win.phase === 'closed'
 
 const WOOD_STEP_LABEL: Record<WoodStep, string> = { received: '1 ご注文を承りました', making: '2 制作しています', shipped: '3 発送しました（追跡番号）', delivered: '4 お届け済み' }
 
-const POEM_LABEL: Record<string, string> = { tanka: '短歌', haiku: '俳句', tang: '漢詩（唐詩の形）', ci: '宋詞', en: '自由詩' }
-
 export function createOpsHandlers(deps: () => OpsDeps) {
   const guard = async (req: Request): Promise<{ d: OpsDeps; env: NodeJS.ProcessEnv; now: Date; store: OrderStore } | Response> => {
     const d = deps()
@@ -256,7 +234,7 @@ export function createOpsHandlers(deps: () => OpsDeps) {
           `<td>${size && PRINTED_CARD[size] ? `<a href="/ops/card/${esc(e.order_ref)}.pdf">カードPDF</a>` : ''}</td>` +
           `<td>${ops?.printed_at ? '印刷済み' : size && PRINTED_CARD[size] ? `<button name="what" value="printed" data-ref="${esc(e.order_ref)}">印刷した</button>` : ''}</td>` +
           `<td>${ops?.shipped_at ? '発送済み' : size && SHIPS[size] ? `<button name="what" value="shipped" data-ref="${esc(e.order_ref)}">発送した</button>` : ''}</td>` +
-          `<td>${size && SHIPS[size] ? woodCell(e.order_ref, ops) : ''}</td></tr>`
+          `<td>${size && SHIPS[size] ? woodCell(e.order_ref, ops) : ''}</td><td>${esc(collectedCell(r))}</td><td>${esc(ackCell(r))}</td><td>${cancelCell(r)}</td></tr>`
       }
       // 木の贈りもの: the step the buyer's page shows (4 steps) and the tracking number — the owner sets both here; the buyer only reads them
       const woodCell = (ref: string, ops: OrderRecord['ops']) => {
@@ -265,54 +243,39 @@ export function createOpsHandlers(deps: () => OpsDeps) {
         return `<span class="wood" data-ref="${esc(ref)}"><select name="wood_step">${opts}</select> <input name="tracking_no" value="${esc(ops?.tracking_no ?? '')}" placeholder="追跡番号" maxlength="40" size="14"> <button data-wood="1">保存</button></span>`
       }
       const readyTable = (list: Classified[]) =>
-        `<div class="wide"><table><thead><tr><th>注文番号</th><th>サイズ</th><th>偲ぶ</th><th>お届け</th><th>相手の住所</th><th>希望日</th><th>カード</th><th>印刷</th><th>発送</th><th>お客様の画面（木の贈りもの）</th></tr></thead>` +
-        `<tbody>${list.map(readyLine).join('') || '<tr><td colspan="10">なし</td></tr>'}</tbody></table></div>`
-      const openLine = (r: Classified) => {
-        const rec = r.record
-        const p = rec?.production
-        const shown = (rec?.shown_characters ?? []).filter((x) => x.candidate.kanji !== p?.kanji)
-        const charOpts = shown.map((x) => `<option value="${esc(x.candidate.kanji)}">${esc(x.candidate.kanji)}（候補${x.set}）</option>`).join('')
-        const poemUsed = (rec?.ops?.poem_format_changes ?? 0) >= 1
-        const hasPoem = (p?.poems.length ?? 0) > 0
-        const offered = p ? poemTypesFor(p.language, mergeStory(rec?.story ?? '', rec?.follow_ups ?? [])) : []
-        const poemOpts = Object.entries(POEM_LABEL).filter(([k]) => k !== p?.poems[0]?.type && (offered as readonly string[]).includes(k)).map(([k, v]) => `<option value="${k}">${v}</option>`).join('')
-        const log = (rec?.ops?.log ?? []).map((l) => `<li>${esc(l.at.slice(0, 16).replace('T', ' '))} ${esc(l.who)} ${esc(l.action)} ${esc(l.detail)}</li>`).join('')
-        const canMsg = !!p && SHIPS[p.package] && p.ship_to !== 'me' && p.ship_to !== 'none'
-        return `<tr class="inwindow"><td>${esc(r.entry.order_ref)}</td><td>${esc(SIZE_LABEL[r.entry.size_code] ?? r.entry.size_code)}</td><td>${r.entry.memorial ? '偲ぶ' : ''}</td>` +
-          `<td>変更受付中（あと${r.win.hours_left}時間）${r.win.verified ? '' : '<br><small>注文作成時刻から計算</small>'}</td>` +
-          `<td><details><summary>変更する</summary><div class="chg" data-ref="${esc(r.entry.order_ref)}">` +
-          `<p>現在の字: <b>${esc(p?.glyph_to_carve ?? '')}</b></p>` +
-          `<p>差出人: <b>${esc(p?.sender_name || (p ? NO_NAME[p.language] : ''))}</b>　受取人: <b>${esc(p?.receiver_name || (p ? NO_NAME[p.language] : ''))}</b></p>` +
-          `<p><label>字を変更 <select name="kanji" ${charOpts ? '' : 'disabled'}>${charOpts || '<option>他に候補なし</option>'}</select></label> <button data-act="character" ${charOpts ? '' : 'disabled'}>この字に変更（詩は書き直します）</button></p>` +
-          `<p><label>詩の形式（1回だけ） <select name="poem_type" ${hasPoem && !poemUsed ? '' : 'disabled'}>${poemOpts}</select></label> <button data-act="poem" ${hasPoem && !poemUsed ? '' : 'disabled'}>形式を変更</button>${poemUsed ? ' <small>変更済み</small>' : ''}</p>` +
-          `<p><label>差出人 <input name="sender" value="${esc(p?.sender_name ?? '')}" maxlength="20"></label> <label>受取人 <input name="receiver" value="${esc(p?.receiver_name ?? '')}" maxlength="20"></label>` +
-          `${canMsg ? ` <label>メッセージ（60字まで） <input name="message" value="${esc(p?.gift_message ?? '')}" maxlength="60"></label>` : ''} <button data-act="names">名前${canMsg ? '・メッセージ' : ''}を保存</button></p>` +
-          `<p><button data-act="cancel">キャンセルとして記録</button> <small>返金はShopifyで行ってください（ここでは何も返金されません）</small></p>` +
-          `<small>Shopifyの注文に入っている字・詩の情報は変わりません。製作はこのページのデータで行います。</small>` +
-          `${log ? `<ul class="log">${log}</ul>` : ''}</div></details></td></tr>`
-      }
+        `<div class="wide"><table><thead><tr><th>注文番号</th><th>サイズ</th><th>偲ぶ</th><th>お届け</th><th>相手の住所</th><th>希望日</th><th>カード</th><th>印刷</th><th>発送</th><th>お客様の画面（木の贈りもの）</th><th>受け取り</th><th>返金条件の確認</th><th>操作</th></tr></thead>` +
+        `<tbody>${list.map(readyLine).join('') || '<tr><td colspan="13">なし</td></tr>'}</tbody></table></div>`
+      const jst = (t: string | null | undefined) => (t && Number.isFinite(Date.parse(t)) ? new Date(Date.parse(t) + 9 * 3_600_000).toISOString().slice(5, 16).replace('T', ' ') : '')
+      const collectedCell = (r: Classified) => (r.record?.collected_at ? `済（${jst(r.record.collected_at)}）` : '未')
+      const ackCell = (r: Classified) => (r.record?.refund_ack_at ? `確認済み（${jst(r.record.refund_ack_at)}）` : '—')
+      // After payment nothing is changed (no other character, no poem or name edits): the only action is cancelling, and it ends when the buyer presses 「贈りものを受け取る」 (済).
+      const cancelCell = (r: Classified) =>
+        r.win.phase === 'open' || r.win.phase === 'closed'
+          ? `<button data-act="cancel" data-ref="${esc(r.entry.order_ref)}" data-collected="${r.record?.collected_at ? '1' : '0'}" data-closed="${r.win.phase === 'closed' ? '1' : '0'}"${r.record?.collected_at ? ' class="warn"' : ''}>キャンセルとして記録</button>`
+          : ''
+      const openLine = (r: Classified) =>
+        `<tr class="inwindow"><td>${esc(r.entry.order_ref)}</td><td>${esc(SIZE_LABEL[r.entry.size_code] ?? r.entry.size_code)}</td><td>${r.entry.memorial ? '偲ぶ' : ''}</td>` +
+        `<td>キャンセル受付中（あと${r.win.hours_left}時間）${r.win.verified ? '' : '<br><small>注文作成時刻から計算</small>'}</td><td>${esc(collectedCell(r))}</td><td>${esc(ackCell(r))}</td><td>${cancelCell(r)}</td></tr>`
       const openTable = (list: Classified[]) =>
-        `<div class="wide"><table class="openT"><thead><tr><th>注文番号</th><th>サイズ</th><th>偲ぶ</th><th>状態</th><th>操作</th></tr></thead><tbody>${list.map(openLine).join('') || '<tr><td colspan="5">なし</td></tr>'}</tbody></table></div>`
-      const otherLine = (r: Classified) => `<tr class="inwindow">${common(r)}<td>${r.win.phase === 'cancelled' ? 'キャンセル' : r.win.phase === 'unpaid' ? '入金を確認できません' : '製作なし（eギフトなど）'}</td></tr>`
+        `<div class="wide"><table class="openT"><thead><tr><th>注文番号</th><th>サイズ</th><th>偲ぶ</th><th>状態</th><th>受け取り</th><th>返金条件の確認</th><th>操作</th></tr></thead><tbody>${list.map(openLine).join('') || '<tr><td colspan="7">なし</td></tr>'}</tbody></table></div>`
+      const otherLine = (r: Classified) => `<tr class="inwindow">${common(r)}<td>${r.win.phase === 'cancelled' ? 'キャンセル' : r.win.phase === 'unpaid' ? '入金を確認できません' : '製作なし（eギフトなど）'}</td><td>${esc(collectedCell(r))}</td><td>${esc(ackCell(r))}</td><td>${cancelCell(r)}</td></tr>`
       const otherTable = (list: Classified[]) =>
-        `<div class="wide"><table><thead><tr><th>注文番号</th><th>サイズ</th><th>偲ぶ</th><th>お届け</th><th>状態</th></tr></thead><tbody>${list.map(otherLine).join('') || '<tr><td colspan="5">なし</td></tr>'}</tbody></table></div>`
+        `<div class="wide"><table><thead><tr><th>注文番号</th><th>サイズ</th><th>偲ぶ</th><th>お届け</th><th>状態</th><th>受け取り</th><th>返金条件の確認</th><th>操作</th></tr></thead><tbody>${list.map(otherLine).join('') || '<tr><td colspan="8">なし</td></tr>'}</tbody></table></div>`
       const readyRows = rows.filter((r) => ready(r) && isCardSize(r))
       const openRows = rows.filter((r) => r.win.phase === 'open')
       const otherRows = rows.filter((r) => r.win.phase === 'cancelled' || r.win.phase === 'unpaid' || (ready(r) && !isCardSize(r)))
       const html = `<!doctype html><html lang="ja"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="robots" content="noindex,nofollow"><title>ICHIREI ops</title>` +
         `<style>body{font:15px/1.6 system-ui,'Hiragino Sans',sans-serif;margin:1.2rem;color:#2a221b;background:#efe6d2}table{border-collapse:collapse;width:100%;background:#fff}th,td{border:1px solid #d7ccb4;padding:.35rem .5rem;text-align:left;white-space:nowrap}.wide{overflow-x:auto}a,button{color:#2a221b}button{cursor:pointer}h1,h2{font-weight:600}.bar a,.bar button{margin-right:.8rem}tr.inwindow td{color:#8a8070;background:#f4efe3}tr.inwindow summary{cursor:pointer;color:#2a221b}.chg{white-space:normal;min-width:30rem;color:#2a221b}.chg p{margin:.4rem 0}.note{background:#fff;border:1px solid #d7ccb4;padding:.5rem .8rem}.log{font-size:.85rem}</style></head><body>` +
         `<h1>ICHIREI 注文</h1>` +
-        `<p class="note">ご注文から24時間は「変更受付中」です。この間に製作は始めません。24時間が過ぎてキャンセルのないものだけが、下のPDFと木札・版木CSVに入ります。</p>` +
+        `<p class="note">お支払い完了から24時間は「キャンセル受付中」です。この間に製作は始めません。24時間が過ぎてキャンセルのないものだけが、下のPDFと木札・版木CSVに入ります。お支払い後の内容の変更（字・歌・お名前・メッセージ）は行いません。お客様が「贈りものを受け取る」を押した後（受け取り：済）は、キャンセルできません。期限内に受信したキャンセルのメールは、24時間を過ぎても対応できます（その場合は「キャンセルとして記録」を押してください）。</p>` +
         `${verified ? '' : '<p class="note">⚠ Shopifyから入金を確認できませんでした。いまは注文を作成した時刻から24時間で数えています（入金が確認できていない注文も含まれます）。</p>'}` +
         `<p class="bar"><a href="/ops/cards/today.pdf">製作に進めるカードをまとめてPDF</a><a href="/ops/wooden-today.csv">製作に進める木札・版木 CSV</a><button id="egift-run">eギフトの確認を今すぐ実行</button></p>` +
         `<h2>製作に進めるもの（${readyRows.length}）</h2>${readyTable(readyRows)}` +
-        `<h2>変更受付中（${openRows.length}）</h2>${openTable(openRows)}` +
+        `<h2>キャンセル受付中（${openRows.length}）</h2>${openTable(openRows)}` +
         `<h2>そのほか（キャンセル・入金未確認・製作なし ${otherRows.length}）</h2>${otherTable(otherRows)}` +
         `<p>${flagged.length ? `⚠ 住所が30日たっても入力されていないeギフト: ${flagged.length}件（自動の返金はしません。ご判断ください）` : ''}</p>` +
         `<script>document.addEventListener('click',async(e)=>{const b=e.target.closest('button');if(!b)return;if(b.id==='egift-run'){const r=await fetch('/ops/egift/run',{method:'POST'});alert(await r.text());return}` +
-        `const act=b.dataset.act;if(act){const box=b.closest('.chg');const f=(n)=>box.querySelector('[name='+n+']');if(act==='cancel'&&!confirm('この注文をキャンセルとして記録します。製作の対象から外れます。よろしいですか？'))return;` +
-        `const body={order_ref:box.dataset.ref,action:act};if(act==='character')body.kanji=f('kanji').value;if(act==='poem')body.poem_type=f('poem_type').value;if(act==='names'){body.sender=f('sender').value;body.receiver=f('receiver').value;if(f('message'))body.message=f('message').value}` +
-        `b.disabled=true;const r=await fetch('/ops/change',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify(body)});const j=await r.json().catch(()=>({}));alert(r.ok?'変更しました: '+(j.message||''):'できませんでした: '+(j.error||r.status));location.reload();return}` +
+        `const act=b.dataset.act;if(act==='cancel'){let override=false;if(b.dataset.collected==='1'){if(!confirm('お客様はすでに「贈りものを受け取る」を押しています（キャンセルの権利は終了しています）。当方の不備などで、それでもキャンセルとして記録しますか？'))return;override=true}else{if(b.dataset.closed==='1'&&!confirm('24時間を過ぎています。期限内に受信したキャンセルのメールがある場合だけ、続けてください。'))return;if(!confirm('この注文をキャンセルとして記録します。製作の対象から外れ、贈りものは表示されなくなります。返金はShopifyで行ってください。よろしいですか？'))return}b.disabled=true;const r=await fetch('/ops/change',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({order_ref:b.dataset.ref,action:'cancel',override})});const j=await r.json().catch(()=>({}));alert(r.ok?'キャンセルとして記録しました':'できませんでした: '+(j.error||r.status));location.reload();return}` +
         `if(b.dataset.wood){const w=b.closest('.wood');const r=await fetch('/ops/wood',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({order_ref:w.dataset.ref,step:w.querySelector('[name=wood_step]').value,tracking_no:w.querySelector('[name=tracking_no]').value})});const j=await r.json().catch(()=>({}));if(r.ok)location.reload();else alert('できませんでした: '+(j.error||r.status));return}` +
         `const ref=b.dataset.ref;if(!ref)return;const r=await fetch('/ops/mark',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({order_ref:ref,what:b.value})});if(r.ok)location.reload();else alert('失敗しました')})</script></body></html>`
       return text(200, html, 'text/html; charset=utf-8')
@@ -381,7 +344,8 @@ export function createOpsHandlers(deps: () => OpsDeps) {
       return text(200, '﻿' + out.join('\r\n') + '\r\n', 'text/csv; charset=utf-8', { 'content-disposition': `attachment; filename="ichirei-wooden-${today}.csv"` })
     },
 
-    /** The 24-hour change window: change the character (from those already shown), the poem format (once), the names and message, or flag the order cancelled. */
+    /** After payment nothing is changed. The only action is cancelling (a flag; the refund is made in Shopify): within 24 hours of payment — and for a request received in time, after them too —
+     *  and, once the buyer has pressed 「贈りものを受け取る」, only with `override: true` (the owner's second confirm, for our own mistakes). */
     async change(req: Request): Promise<Response> {
       const g = await guard(req)
       if (g instanceof Response) return g
@@ -395,22 +359,12 @@ export function createOpsHandlers(deps: () => OpsDeps) {
       }
       const ref = typeof body.order_ref === 'string' ? body.order_ref : ''
       if (!/^IC-\d{8}-[A-Z0-9]{8}$/.test(ref)) return jsonRes(400, { error: 'bad_request' })
+      if (body.action !== 'cancel') return jsonRes(400, { error: 'bad_action' })
       const rec = (await store.get(ref).catch(() => null)) as OrderRecord | null
       if (!rec || !rec.production) return jsonRes(404, { error: 'not_found' })
       const win = (await classify([{ entry: { order_ref: ref } as OrderIndexEntry, record: rec, gift: null }], d, env, now)).rows[0].win
-      if (win.phase !== 'open') {
-        const why = win.phase === 'closed' ? '支払いから24時間を過ぎているため、変更できません（受注製作のため、お客様都合の変更は受けられません）。当方の不備の修正は別途行います。' : win.phase === 'cancelled' ? 'この注文はキャンセル済みです。' : '入金を確認できない注文です。'
-        return jsonRes(409, { error: why, code: win.phase === 'closed' ? 'window_closed' : win.phase })
-      }
-      const cd: ChangeDeps = { store, now, who: whoOf(req), makePoem: (r, cand, type) => makePoemFor(store, d, now, r, cand, type), palette: d.palette }
-      const action = body.action
-      const res =
-        action === 'character' ? await changeCharacter(cd, rec, typeof body.kanji === 'string' ? body.kanji : '')
-        : action === 'poem' ? await changePoemFormat(cd, rec, (POEM_TYPES as readonly string[]).includes(String(body.poem_type)) ? (body.poem_type as PoemType) : ('' as PoemType))
-        : action === 'names' ? await editNames(cd, rec, { sender: body.sender, receiver: body.receiver, message: body.message })
-        : action === 'cancel' ? await cancelOrder(cd, rec)
-        : null
-      if (!res) return jsonRes(400, { error: 'bad_action' })
+      if (win.phase !== 'open' && win.phase !== 'closed') return jsonRes(409, { error: win.phase === 'cancelled' ? 'この注文はキャンセル済みです。' : '入金を確認できない注文です。', code: win.phase })
+      const res = await cancelOrder({ store, now, who: whoOf(req) } as ChangeDeps, rec, { override: body.override === true })
       return res.ok ? jsonRes(200, { ok: true, message: res.message }) : jsonRes(422, { error: res.error, code: res.code })
     },
 

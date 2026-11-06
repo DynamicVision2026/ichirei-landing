@@ -115,7 +115,10 @@ export function createAnimationHandlers(deps: () => AnimationDeps) {
           const o = await d.store.get(rec.order_ref)
           if (isOrderRecord(o)) {
             const now = d.now?.() ?? new Date()
-            view.order = buyerOrderView(o, windowOf(o, await paymentOf(rec.order_ref, d), now), d.env ?? process.env)
+            const win = windowOf(o, await paymentOf(rec.order_ref, d), now)
+            // a cancelled order shows nothing at all (the page says only that the gift is no longer available)
+            if (win.phase === 'cancelled') return json(410, { error: 'unavailable', language: rec.language }, { 'cache-control': 'private, no-store' })
+            view.order = buyerOrderView(o, win, d.env ?? process.env)
             const mail = (d.env ?? process.env).ICHIREI_SUPPORT_EMAIL?.trim() ?? ''
             view.support_email = /^[^\s@<>,;]+@[^\s@<>,;]+\.[^\s@<>,;]+$/.test(mail) ? mail : null
           }
@@ -124,6 +127,37 @@ export function createAnimationHandlers(deps: () => AnimationDeps) {
         }
       }
       return json(200, view, { 'cache-control': 'private, no-store' })
+    },
+
+    /**
+     * 「贈りものを受け取る」: the one tap that unlocks the gift (the receiver's link, sending, saving) and ends the right to cancel. Recorded once, server side; it cannot be undone.
+     * Refused while the final gift is still being made (the film's pictures), for a cancelled order, and for one that was never paid.
+     */
+    async collect(id: string): Promise<Response> {
+      const d = deps()
+      const r = await load(id, d)
+      if (r.status === 503) return json(503, { error: 'unavailable' }, { 'cache-control': 'no-store' })
+      if (r.status === 404) return json(404, { error: 'not_found' }, { 'cache-control': 'no-store' })
+      if (!d.store || r.rec.order_ref === 'SAMPLE') return json(404, { error: 'not_found' }, { 'cache-control': 'no-store' })
+      try {
+        const o = await d.store.get(r.rec.order_ref)
+        if (!isOrderRecord(o)) return json(404, { error: 'not_found' }, { 'cache-control': 'no-store' })
+        const now = d.now?.() ?? new Date()
+        const win = windowOf(o, await paymentOf(r.rec.order_ref, d), now)
+        if (win.phase === 'cancelled') return json(410, { error: 'unavailable' }, { 'cache-control': 'no-store' })
+        if (win.phase === 'unpaid') return json(409, { error: 'unpaid', code: 'unpaid' }, { 'cache-control': 'no-store' })
+        if (o.collected_at) return json(200, { collected: true, collected_at: o.collected_at }, { 'cache-control': 'private, no-store' })
+        // the final gift must be ready: the film's four pictures drawn (or the plain washi film), never a draft
+        const rec = await withScript(r.rec, d, false)
+        const art = filmUsable(rec.film) && rec.film.status === 'ready' ? await safeArt(d.store, rec.id) : null
+        const f = animationView(rec, art).film
+        if (!f || !f.pictures || f.deferred || f.incomplete) return json(409, { error: 'not_ready', code: 'not_ready' }, { 'cache-control': 'no-store' })
+        const at = now.toISOString()
+        await d.store.put(o.order_ref, { ...o, collected_at: at, updated_at: at })
+        return json(200, { collected: true, collected_at: at }, { 'cache-control': 'private, no-store' })
+      } catch {
+        return json(503, { error: 'unavailable' }, { 'cache-control': 'no-store' })
+      }
     },
 
     /** The first open of a film: write its script if it is missing, then draw its four pictures. The answer carries the view (with the pictures when done). */

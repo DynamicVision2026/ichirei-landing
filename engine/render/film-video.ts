@@ -18,9 +18,9 @@ import { credit, type Artwork } from './artwork.ts'
 export const VIDEO_W = 1080
 export const VIDEO_H = 1920
 export const VIDEO_FPS = 24
-const U = VIDEO_W / 100 // one hundredth of the frame's width, as on the page
+export const U = VIDEO_W / 100 // one hundredth of the frame's width, as on the page
 
-interface Colours {
+export interface Colours {
   frame: [number, number, number]
   ivory: string
   gold: string
@@ -28,11 +28,11 @@ interface Colours {
   muted: string
   washi: [number, number, number]
 }
-const INK: Colours = { frame: [26, 20, 16], ivory: '#F5EDD8', gold: '#C9A96E', kanji: '#C0392B', muted: '#A89B83', washi: [232, 222, 198] }
-const QUIET: Colours = { frame: [207, 198, 177], ivory: '#1D1913', gold: '#6B5A3A', kanji: '#14110D', muted: '#4C4538', washi: [232, 222, 198] }
+export const INK: Colours = { frame: [26, 20, 16], ivory: '#F5EDD8', gold: '#C9A96E', kanji: '#C0392B', muted: '#A89B83', washi: [232, 222, 198] }
+export const QUIET: Colours = { frame: [207, 198, 177], ivory: '#1D1913', gold: '#6B5A3A', kanji: '#14110D', muted: '#4C4538', washi: [232, 222, 198] }
 
 /** A picture-sized layer of straight-alpha RGBA pixels. */
-interface Layer {
+export interface Layer {
   data: Buffer
   w: number
   h: number
@@ -44,7 +44,7 @@ const QUOTE_OPEN = new Set(['「', '『', '“'])
 const QUOTE_CLOSE = new Set(['」', '』', '”'])
 
 /** One block of text (wrapped lines, quotations in gold) as a transparent layer. */
-async function textBlock(font: unknown, text: string, size: number, lineHeight: number, maxWidth: number, left: number, top: number, c: Colours, opts: { centre?: boolean; width?: number } = {}): Promise<Layer> {
+export async function textBlock(font: unknown, text: string, size: number, lineHeight: number, maxWidth: number, left: number, top: number, c: Colours, opts: { centre?: boolean; width?: number } = {}): Promise<Layer> {
   const lines = wrapText(font, text.replace(/\n+/g, ''), size, maxWidth)
   const w = opts.width ?? maxWidth
   const h = Math.ceil(lines.length * lineHeight + size * 0.4)
@@ -77,7 +77,7 @@ async function textBlock(font: unknown, text: string, size: number, lineHeight: 
 }
 
 /** One line of text, centred on `cx`, as a transparent layer. */
-async function lineLayer(font: unknown, text: string, size: number, cx: number, top: number, fill: string, letterSpacing = 0): Promise<Layer> {
+export async function lineLayer(font: unknown, text: string, size: number, cx: number, top: number, fill: string, letterSpacing = 0): Promise<Layer> {
   const chars = Array.from(text)
   const widths = chars.map((ch) => textWidth(font, ch, size))
   const total = widths.reduce((a, b) => a + b, 0) + letterSpacing * (chars.length - 1)
@@ -94,7 +94,7 @@ async function lineLayer(font: unknown, text: string, size: number, cx: number, 
 }
 
 /** Blend a layer over the frame (RGBA, straight alpha → opaque frame), with an extra opacity and an optional vertical wipe (0..1 of the layer's height shown). */
-function blend(dst: Buffer, L: Layer, opacity: number, wipe = 1, dy = 0): void {
+export function blend(dst: Buffer, L: Layer, opacity: number, wipe = 1, dy = 0): void {
   if (opacity <= 0.003 || wipe <= 0) return
   const soft = Math.max(8, Math.round(L.h * 0.12))
   const edge = wipe >= 1 ? L.h + soft : wipe * (L.h + soft)
@@ -128,7 +128,7 @@ export interface FilmVideo {
   renderMs: number
 }
 
-const run = (cmd: string, args: string[]) => spawn(cmd, args, { stdio: ['pipe', 'pipe', 'pipe'] })
+export const run = (cmd: string, args: string[]) => spawn(cmd, args, { stdio: ['pipe', 'pipe', 'pipe'] })
 
 /** Render the film. `a.pictures` must hold the real pictures (a washi slot is drawn as plain washi). `onlyFirstSeconds` is for the tests. */
 export async function makeFilmVideo(a: Artwork, opts: { fps?: number; ffmpeg?: string; seconds?: number } = {}): Promise<FilmVideo> {

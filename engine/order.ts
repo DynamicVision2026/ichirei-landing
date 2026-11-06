@@ -146,6 +146,8 @@ export interface ValidOrder {
   gift_message: string
   /** The day the receiver's envelope can be opened (YYYY-MM-DD, JST), or null = it opens at once. */
   open_date: string | null
+  /** When the buyer ticked the refund terms on the order step (ISO); null when the request carried none (e.g. a direct API call). */
+  refund_ack_at: string | null
   /** Every character shown for this story, with its slot (see ShownCharacter); always contains the chosen one. */
   shown: ShownCharacter[]
 }
@@ -315,6 +317,7 @@ export function parseOrderRequest(body: unknown, now: Date = new Date(), palette
       ship_to,
       gift_message,
       open_date,
+      refund_ack_at: (() => { const t = typeof body.refund_ack_at === 'string' ? Date.parse(body.refund_ack_at) : NaN; return Number.isFinite(t) && t <= now.getTime() + 5 * 60_000 && t >= now.getTime() - 24 * 3_600_000 ? new Date(t).toISOString() : null })(),
       sender_email,
       shown: withChosen(parseShown(body.shown_characters), candidate),
     },
@@ -506,6 +509,12 @@ export interface OrderRecord {
   prompt_question_id?: string | null
   /** Every character shown for this story, with its slot and its lines (the switch list of the 24-hour change window). */
   shown_characters?: ShownCharacter[]
+  /** When the buyer ticked the refund terms on the order step (ISO); absent / null = none was sent. Shown in /ops. */
+  refund_ack_at?: string | null
+  /** When the buyer pressed 「贈りものを受け取る」 on the order page (ISO, set once, server side): the gift is unlocked and the order can no longer be cancelled. */
+  collected_at?: string | null
+  /** True on every order made since 2026-11-06: the gift stays sealed for the receiver (and no send / save is reachable) until collected_at is set. Older orders have none and work as before. */
+  collect_required?: boolean
   engine_result: EngineResult
   shopify: { cart_id: string; checkout_url: string; variant_id: string } | null
   error: string | null
@@ -550,6 +559,9 @@ export function buildRecord(order: ValidOrder, orderRef: string, now: Date = new
     follow_ups: order.follow_ups,
     prompt_question_id: order.prompt_question_id ?? null,
     shown_characters: order.shown,
+    refund_ack_at: order.refund_ack_at,
+    collect_required: true,
+    collected_at: null,
     engine_result: order.engine_result,
     shopify: null,
     error: null,

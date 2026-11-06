@@ -1,5 +1,7 @@
 import { useEffect } from 'react'
-import { LEGAL } from './legal-copy.ts'
+import { LEGAL, rowValue } from './legal-copy.ts'
+import { useComingSoon, useSizes } from '../demo/useSizes.ts'
+import { SHIPS } from '../order/packages.ts'
 import { toRevealLang } from '../reveal/lang.ts'
 import { useLanguage } from '../useLanguage.ts'
 import type { UiLanguage } from '../demo/i18n.ts'
@@ -18,6 +20,10 @@ export default function LegalApp() {
   const [language, setLanguage] = useLanguage()
   const lang = toRevealLang(language)
   const t = LEGAL[lang]
+  const sizes = useSizes()
+  const soon = useComingSoon()
+  // the wooden sizes' delivery sentence shows only while they are on sale (the page asks /api/sizes once)
+  const woodOnSale = !!sizes && sizes.some((p) => SHIPS[p] && !soon.includes(p))
   useEffect(() => {
     document.title = `${t.title} · ICHIREI`
     document.documentElement.lang = lang === 'zh-Hant' ? 'zh-Hant' : lang
@@ -39,16 +45,19 @@ export default function LegalApp() {
           {t.rows.map((r) => (
             <div key={r.label} className="legalRow">
               <dt>{r.label}</dt>
-              <dd data-testid={/^[^\s@]+@[^\s@]+$/.test(r.value) ? 'legal-email' : undefined}>{r.value}</dd>
+              <dd data-testid={/^[^\s@]+@[^\s@]+$/.test(r.value) ? 'legal-email' : r.key === 'delivery' ? 'legal-delivery' : undefined}>{rowValue(lang, r, woodOnSale)}</dd>
             </div>
           ))}
         </dl>
         <h2 id="returns">{t.returnsTitle}</h2>
-        <ul className="legalReturns" data-testid="legal-returns">
-          {t.returns.map((x) => (
-            <li key={x}>{x}</li>
+        <div className="legalReturns" data-testid="legal-returns">
+          {t.sections.map((x, i) => (
+            <section key={x.heading} id={i === 0 ? 'refund' : undefined} data-testid="legal-section">
+              <h3>{x.heading}</h3>
+              <p>{x.body}</p>
+            </section>
           ))}
-        </ul>
+        </div>
         <h2 id="faq">{t.faqTitle}</h2>
         <div className="legalFaq" data-testid="legal-faq">
           {t.faq.map((f) => (

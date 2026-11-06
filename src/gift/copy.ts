@@ -23,6 +23,10 @@ export interface GiftCopy {
   open: string
   opensOn: (date: string) => string
   daysLeft: (n: number) => string
+  /** The buyer has not collected the gift yet: the sealed envelope says so, with no open button. */
+  arriving: string
+  /** A cancelled order: the only thing the link says. */
+  gone: string
   /** The sender looking at their own gift before the day. */
   previewNote: string
   // 3. the letter
@@ -100,6 +104,8 @@ export const GIFT_COPY: Record<PageLang, GiftCopy> = {
     open: '封を開く',
     opensOn: (d) => `${d}に開きます`,
     daysLeft: (n) => `あと${n}日。その日まで、封は閉じたままです。`,
+    arriving: 'まもなく届きます',
+    gone: 'この贈りものは、現在ご覧いただけません。',
     previewNote: 'あなたは贈り主として、相手に届くとおりに見ています。',
     letterLead: (n) => (n ? `${n}さんの目に映る、あなたを一字にしました。まずは、ふたりの物語から。` : 'あなたを一字にしました。まずは、ふたりの物語から。'),
     letterLeadMemorial: (n) => (n ? `${n}さんの目に映る、あなたを一字にしました。まずは、ふたりの物語から。` : 'あなたを一字にしました。まずは、ふたりの物語から。'),
@@ -149,6 +155,8 @@ export const GIFT_COPY: Record<PageLang, GiftCopy> = {
     open: '拆開信封',
     opensOn: (d) => `${d}開啟`,
     daysLeft: (n) => `還有 ${n} 天。在那天之前，信封會一直封著。`,
+    arriving: '即將送達',
+    gone: '這份禮物目前無法查看。',
     previewNote: '你以贈送者的身分，看到的就是對方會看到的樣子。',
     letterLead: (n) => (n ? `把${n}眼中的你，化成了一個字。先從你們兩人的故事開始。` : '把你化成了一個字。先從你們兩人的故事開始。'),
     letterLeadMemorial: (n) => (n ? `把${n}眼中的你，化成了一個字。先從你們兩人的故事開始。` : '把你化成了一個字。先從你們兩人的故事開始。'),
@@ -198,6 +206,8 @@ export const GIFT_COPY: Record<PageLang, GiftCopy> = {
     open: 'Open the envelope',
     opensOn: (d) => `Opens on ${d}`,
     daysLeft: (n) => `${n} ${n === 1 ? 'day' : 'days'} to go. The envelope stays sealed until then.`,
+    arriving: 'Arriving soon',
+    gone: 'This gift is no longer available.',
     previewNote: 'You are the sender, seeing it exactly as they will.',
     letterLead: (n) => (n ? `This is you, as ${n} sees you, made into one character. First, the story of the two of you.` : 'This is you, made into one character. First, the story of the two of you.'),
     letterLeadMemorial: (n) => (n ? `This is you, as ${n} sees you, made into one character. First, the story of the two of you.` : 'This is you, made into one character. First, the story of the two of you.'),

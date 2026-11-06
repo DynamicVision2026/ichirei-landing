@@ -7,6 +7,7 @@ import { sessionId } from './analytics'
 import { clearDraft } from './draft'
 import { EGIFT_JAPAN_ONLY, GIFT_MESSAGE_MAX, OPEN_DATE_MAX_DAYS, PACKAGE_DISPLAY_ORDER, PACKAGE_PRICE_JPY, RECOMMENDED_PACKAGE, SHIPS, SHIP_TO, WOODEN, formatYen, type ShipTo } from '../order/packages.ts'
 import { SIZE_COPY } from './sizes-copy.ts'
+import { LEGAL } from '../legal/legal-copy.ts'
 import { useComingSoon, useSizes } from './useSizes.ts'
 import { isMemorial } from '../order/memorial.ts'
 import { isQuietPurpose } from '../order/purpose.ts'
@@ -86,6 +87,8 @@ export default function OrderForm({ result, story, followUps = [], promptQuestio
   const [poemIds, setPoemIds] = useState<string[]>([]) // the included poem of this order (zero or one); the server reads it back by id
   const [poemShown, setPoemShown] = useState<{ lines: string[]; reading: string; type?: string } | null>(null)
   const [poemStep, setPoemStep] = useState<PoemStep>('loading') // the buyer sees the whole poem before paying: the order waits while it is being written
+  // the refund terms (2026-11-06): ticked by the buyer (never pre-ticked); the moment of the tick is kept on the order
+  const [refundAckAt, setRefundAckAt] = useState<string | null>(null)
   const [phase, setPhase] = useState<'edit' | 'submitting' | 'redirecting'>('edit')
   const [error, setError] = useState<string | null>(null)
 
@@ -118,7 +121,7 @@ export default function OrderForm({ result, story, followUps = [], promptQuestio
   }, [today])
   const openDateOk = openDate === '' || (/^\d{4}-\d{2}-\d{2}$/.test(openDate) && openDate >= today && openDate <= lastOpenDay)
   const emailOk = shipTo !== 'egift' || pkg === '' || !SHIPS[pkg] || /^[^\s@]{1,64}@[^\s@]{1,190}\.[^\s@]{2,}$/.test(senderEmail.trim())
-  const valid = senderOk && receiverOk && dateOk && pkg !== '' && onSale && messageOk && openDateOk && emailOk && !(pkg === 'simple' && !simpleOk) && poemStep !== 'loading'
+  const valid = refundAckAt !== null && senderOk && receiverOk && dateOk && pkg !== '' && onSale && messageOk && openDateOk && emailOk && !(pkg === 'simple' && !simpleOk) && poemStep !== 'loading'
 
   const submit = async () => {
     if (!valid || phase !== 'edit') return
@@ -146,6 +149,7 @@ export default function OrderForm({ result, story, followUps = [], promptQuestio
           ...(giftMessage.trim() ? { gift_message: giftMessage.trim() } : {}),
           ...(openDate ? { open_date: openDate } : {}),
           ...(poemIds.length ? { poems: poemIds.map((poem_id) => ({ poem_id })) } : {}),
+          ...(refundAckAt ? { refund_ack_at: refundAckAt } : {}),
           session: sessionId,
           source: 'customer',
         }),
@@ -308,6 +312,7 @@ export default function OrderForm({ result, story, followUps = [], promptQuestio
           </div>
           {memorial && <p className="sent" data-memorial-sizes>{sc.memorialNote}</p>}
           {pkg === 'egift' && <p className="sent" data-egift-note>{memorial ? sc.egiftNoteMemorial : sc.egiftNote}</p>}
+          {pkg !== '' && WOODEN[pkg] && !soon.includes(pkg) && <p className="sent" data-testid="order-delivery-wood">{LEGAL[toRevealLang(language)].deliveryWood}</p>}
           {(pkg === '' || WOODEN[pkg]) && (
             <p data-shipping className="sent">
               {o.shippingNote}
@@ -365,7 +370,11 @@ export default function OrderForm({ result, story, followUps = [], promptQuestio
           </p>
         )}
 
-        <p className="sent orderNote" data-testid="order-made-to-order">{pc.madeToOrder}</p>
+        <p className="sent orderNote" data-testid="order-refund-line">{pc.refundLine} <a href="/legal#refund" data-testid="order-refund-details" className="legalLink">{pc.refundDetails}</a></p>
+        <label className="refundCheck" data-testid="order-refund-check-label">
+          <input type="checkbox" data-testid="order-refund-check" checked={refundAckAt !== null} onChange={(e) => setRefundAckAt(e.target.checked ? new Date().toISOString() : null)} />
+          <span>{pc.refundCheck}</span>
+        </label>
         <button type="button" data-testid="order-submit" className="btn primary" onClick={submit} disabled={!valid || busy}>
           {phase === 'submitting' ? o.submitting : phase === 'redirecting' ? o.redirecting : o.submit}
         </button>

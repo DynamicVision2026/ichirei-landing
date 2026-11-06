@@ -63,3 +63,17 @@ export function trackPreview(event: PreviewEvent, fields: { language?: string; n
     // analytics must never get in the way
   }
 }
+
+/** Sharing the film or the poem card (engine/analytics.ts SHARE_EVENTS): the kind and the role only — never a character, a name or a story. */
+export function trackShare(event: 'share_film_tap' | 'share_card_tap', role: 'sender' | 'receiver'): void {
+  try {
+    void fetch('/api/analytics', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ session: sessionId, source: 'customer', event, role }),
+      keepalive: true,
+    }).catch(() => {})
+  } catch {
+    // analytics must never get in the way
+  }
+}

@@ -162,6 +162,7 @@ export function createApp(config: ServerConfig): Hono {
   // The film's pictures: drawn on the first open (the request stays open until they are done — it holds one image-model run, so a tight per-IP limit),
   // then served from the private bucket through the server.
   const filmRenderLimit = envRunLimiter('ICHIREI_FILM_RENDER_LIMIT', { max: 30, minutes: 10 })
+  app.post('/api/animation/:id/collect', limited(animationLimit), (c) => animationHandlers.collect(c.req.param('id')))
   app.post('/api/film/:id/render', requireApiKey, limited(filmRenderLimit), (c) => animationHandlers.render(c.req.param('id')))
   // The post-deploy self-test (v9.8): the internal purpose stories through the real pipeline (no pictures). The run needs the secret token (header x-selftest-token), is capped at 6 a day and skipped for a commit
   // already tested; the latest report is public, read-only and cached 60 s — codes and characters only, never a line of any story.
@@ -194,6 +195,13 @@ export function createApp(config: ServerConfig): Hono {
   app.post('/api/gift/:token/film/make', limited(videoLimit), (c) => giftHandlers.filmMake(c.req.param('token'), c.req.query('preview')))
   app.get('/api/gift/:token/film.mp4', limited(animationLimit), (c) => giftHandlers.filmGet(c.req.param('token'), c.req.raw, c.req.query('preview')))
   app.get('/api/gift/:token/card.pdf', limited(scrollLimit), (c) => giftHandlers.cardPdf(c.req.param('token'), c.req.query('preview')))
+  // sharing to social media (2026-11-06): the share film (MP4 1080×1920) and the poem card (PNG 1080×1350) — only after collecting / opening, never for remembrance, never in preview mode
+  app.post('/api/animation/:id/share/film/make', limited(videoLimit), (c) => giftHandlers.shareFilmMakeForSender(c.req.param('id')))
+  app.get('/api/animation/:id/share-film.mp4', limited(animationLimit), (c) => giftHandlers.shareFilmGetForSender(c.req.param('id'), c.req.raw))
+  app.get('/api/animation/:id/share-card.png', limited(scrollLimit), (c) => giftHandlers.shareCardForSender(c.req.param('id')))
+  app.post('/api/gift/:token/share/film/make', limited(videoLimit), (c) => (c.req.query('preview') ? previewRefused() : giftHandlers.shareFilmMake(c.req.param('token'))))
+  app.get('/api/gift/:token/share-film.mp4', limited(animationLimit), (c) => (c.req.query('preview') ? previewRefused() : giftHandlers.shareFilmGet(c.req.param('token'), c.req.raw)))
+  app.get('/api/gift/:token/share-card.png', limited(scrollLimit), (c) => (c.req.query('preview') ? previewRefused() : giftHandlers.shareCard(c.req.param('token'))))
   app.post('/api/animation/:id/film/make', limited(videoLimit), (c) => giftHandlers.filmMakeForSender(c.req.param('id')))
   app.get('/api/animation/:id/film.mp4', limited(animationLimit), (c) => giftHandlers.filmGetForSender(c.req.param('id'), c.req.raw))
   app.get('/api/animation/:id/card.pdf', limited(scrollLimit), (c) => giftHandlers.cardPdfForSender(c.req.param('id')))

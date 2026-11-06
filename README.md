@@ -81,6 +81,8 @@ node --experimental-strip-types scripts/test-same.ts       # hotfix 2026-11-05: 
 node --experimental-strip-types scripts/test-names.ts      # 2026-11-05: names optional (nickname, ≤ 20): blank names on the order, gift page, share meta, card captions; nowhere else
 node --experimental-strip-types scripts/test-email-snippet.ts   # the order-confirmation e-mail block (docs/ichirei-order-email.liquid) rendered with liquidjs: an ICHIREI order links to the buyer's page (/a/…), never /g/…; non-ICHIREI orders print nothing
 node --experimental-strip-types scripts/test-legal.ts           # 2026-11-06: /legal carries the owner's seller details word for word; no 【 】 left on the page
+node --experimental-strip-types scripts/test-collect.ts         # 2026-11-06 (2): 「贈りものを受け取る」 — sealed until collected (page and server), cancel ends at the tap, cancelled orders show nothing
+node --experimental-strip-types scripts/test-social-share.ts    # 2026-11-06 (2): the share film (MP4) and the poem card (PNG): relationship line + character + poem only, no brand; endpoints; analytics
 node --experimental-strip-types scripts/test-buyer.ts           # 2026-11-06: the buyer's page data — 24-hour deadline (gone after it), wooden-gift steps (hidden for e-gift and while 'coming soon'), /ops/wood, preview mode writes nothing
 node --experimental-strip-types scripts/test-phrases.ts    # 2026-11-05: story phrases on the wait screen (browser only)
 node --experimental-strip-types scripts/test-voice.ts      # 2026-11-05: voice input helpers (language picker, insert at cursor, restart rules)

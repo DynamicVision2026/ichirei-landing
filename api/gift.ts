@@ -10,7 +10,8 @@
 import { isQuietPurpose } from '../src/order/purpose.ts'
 import QRCode from 'qrcode'
 import { ANIMATION_ID_PATTERN, isAnimationRecord, type AnimationRecord } from '../engine/animation.ts'
-import { GIFT_TOKEN_PATTERN, checkAddress, checkReply, giftUrl, giftView, isGiftRecord, isLocked, lockedView, type GiftRecord } from '../engine/gift.ts'
+import { orderGate, type OrderGate } from '../engine/buyer.ts'
+import { GIFT_TOKEN_PATTERN, arrivingView, checkAddress, checkReply, giftUrl, giftView, isGiftRecord, isLocked, lockedView, type GiftRecord } from '../engine/gift.ts'
 import { readArt, picturePath, type ArtRecord } from '../engine/film-art.ts'
 import { createOrderStore, type OrderStore } from '../engine/order-store.ts'
 import { createAnimationHandlers, type AnimationDeps } from './animation.ts'
@@ -19,7 +20,9 @@ import { loadArtwork, scrollReady } from '../engine/render/artwork.ts'
 import { makeScroll, scrollPdf } from '../engine/render/scroll.ts'
 import { makeOgImage } from '../engine/render/og.ts'
 import { injectOg, ogKey, ogMeta } from '../engine/gift-share.ts'
-import { ensureFilmVideo, filmComplete, filmVideoPath, serveBytes } from '../engine/film-video-store.ts'
+import { ensureFilmVideo, ensureShareFilm, filmComplete, filmVideoPath, serveBytes, shareFilmPath } from '../engine/film-video-store.ts'
+import { makeShareCard, type ShareArtwork } from '../engine/render/share.ts'
+import { relationLine } from '../src/order/relation-line.ts'
 import { cardsPdf, homePrintPdf } from '../engine/render/card.ts'
 
 const headers = (extra: Record<string, string> = {}) => ({ 'x-robots-tag': 'noindex, nofollow', ...extra })
@@ -46,6 +49,18 @@ async function loadGift(token: string, d: GiftDeps): Promise<{ status: 200; gift
     return { status: 503 }
   }
 }
+
+/** Whether the buyer has collected the gift (2026-11-06) and whether the order was cancelled: read from the order record (an older order, or one with no record, is open as before). */
+async function gateOf(g: GiftRecord, d: GiftDeps): Promise<OrderGate> {
+  if (!d.store || !g.order_ref) return 'ok'
+  try {
+    return orderGate((await d.store.get(g.order_ref)) as never)
+  } catch {
+    return 'ok'
+  }
+}
+const gone = (g: GiftRecord) => json(410, { error: 'unavailable', language: g.language }, { 'cache-control': 'no-store' })
+const notCollected = () => json(403, { error: 'not_collected' }, { 'cache-control': 'no-store' })
 
 /** The closed envelope: true while the opening date has not come — unless the caller holds the SENDER's own id (the sender may always look). */
 const closed = (g: GiftRecord, d: GiftDeps, preview?: string | null): boolean => !senderPreview(g, preview) && isLocked(g, d.now?.() ?? new Date())
@@ -120,6 +135,63 @@ async function cardResponse(f: Found, d: GiftDeps): Promise<Response> {
   }
 }
 
+/** The artwork of the share film and the poem card: the stored pictures and poem plus the ONE relationship line (the relationship chip only; none for 「その他」). */
+async function shareArtwork(f: Found, art: ArtRecord | null, d: GiftDeps): Promise<{ work: () => Promise<ShareArtwork>; relation: string | null }> {
+  let relationship: string | null = null
+  try {
+    const o = (await d.store!.get(f.gift.order_ref)) as { engine_result?: { relationship?: string | null } } | null
+    relationship = o?.engine_result?.relationship ?? null
+  } catch {
+    relationship = null
+  }
+  const relation = relationLine(relationship, f.gift.language)
+  return { relation, work: async () => ({ ...(await loadArtwork(d.store!, f.gift, f.anim, art, d.env)), relation }) }
+}
+
+/** Sharing is for gifts that are not remembrance (the page shows nothing there). */
+const shareOffered = (f: Found) => !f.gift.memorial
+
+async function shareFilmMake(f: Found, d: GiftDeps): Promise<Response> {
+  if (!shareOffered(f)) return json(404, { error: 'not_offered' }, { 'cache-control': 'no-store' })
+  const art = await safeArt(d.store, f.anim.id)
+  if (!filmComplete(f.anim, art)) return json(409, { state: 'not_ready' }, noStore)
+  try {
+    const { work, relation } = await shareArtwork(f, art, d)
+    const r = await ensureShareFilm({ store: d.store!, now: d.now }, f.gift, f.anim, art, work, relation)
+    if (r.state === 'ready') return json(200, { state: 'ready', seconds: r.meta.seconds, bytes: r.meta.bytes }, noStore)
+    return json(r.state === 'busy' ? 202 : 409, { state: r.state === 'busy' ? 'pending' : 'not_ready' }, noStore)
+  } catch (err) {
+    console.error('[ichirei-share-film] failed', err instanceof Error ? err.message : err)
+    return json(500, { state: 'failed' }, noStore)
+  }
+}
+
+async function shareFilmGet(f: Found, d: GiftDeps, req: Request): Promise<Response> {
+  if (!shareOffered(f)) return json(404, { error: 'not_offered' }, { 'cache-control': 'no-store' })
+  let bytes: Buffer | null
+  try {
+    bytes = await d.store!.getObject(shareFilmPath(f.anim.id))
+  } catch {
+    return json(503, { error: 'unavailable' }, { 'cache-control': 'no-store' })
+  }
+  if (!bytes) return json(404, { error: 'not_ready' }, { 'cache-control': 'no-store' })
+  return serveBytes(bytes, 'video/mp4', req.headers.get('range'), { 'cache-control': 'private, max-age=3600', 'x-robots-tag': 'noindex, nofollow', 'content-disposition': 'attachment; filename="ichirei-share.mp4"' })
+}
+
+async function shareCardGet(f: Found, d: GiftDeps): Promise<Response> {
+  if (!shareOffered(f)) return json(404, { error: 'not_offered' }, { 'cache-control': 'no-store' })
+  const art = await safeArt(d.store, f.anim.id)
+  if (!filmComplete(f.anim, art)) return json(404, { error: 'not_ready' }, { 'cache-control': 'no-store' })
+  try {
+    const { work } = await shareArtwork(f, art, d)
+    const png = await makeShareCard(await work())
+    return new Response(new Uint8Array(png), { status: 200, headers: headers({ 'content-type': 'image/png', 'content-disposition': 'attachment; filename="ichirei-poem-card.png"', 'cache-control': 'private, no-store' }) })
+  } catch (err) {
+    console.error('[ichirei-share-card] failed', err instanceof Error ? err.message : err)
+    return json(500, { error: 'card_failed' }, { 'cache-control': 'no-store' })
+  }
+}
+
 async function bySender(animationId: string, d: GiftDeps): Promise<Found | Response> {
   if (!ANIMATION_ID_PATTERN.test(animationId) || !d.store) return json(404, { error: 'not_found' }, { 'cache-control': 'no-store' })
   try {
@@ -139,6 +211,10 @@ export function createGiftHandlers(deps: () => GiftDeps) {
       const d = deps()
       const r = await loadGift(token, d)
       if (r.status !== 200) return json(r.status, { error: r.status === 404 ? 'not_found' : 'unavailable' }, { 'cache-control': 'no-store' })
+      const gate = await gateOf(r.gift, d)
+      if (gate === 'cancelled') return gone(r.gift)
+      // not collected yet: the sealed envelope with no open button (the buyer's own preview sees the final gift)
+      if (gate === 'pending' && !senderPreview(r.gift, preview)) return json(200, arrivingView(r.gift), noStore)
       if (closed(r.gift, d, preview)) return json(200, lockedView(r.gift, d.now?.() ?? new Date()), noStore)
       const art = filmUsable(r.anim.film) && r.anim.film.status === 'ready' ? await safeArt(d.store, r.anim.id) : null
       const v = giftView(r.gift, r.anim, art)
@@ -150,6 +226,9 @@ export function createGiftHandlers(deps: () => GiftDeps) {
       const d = deps()
       const r = await loadGift(token, d)
       if (r.status !== 200) return json(r.status, { error: r.status === 404 ? 'not_found' : 'unavailable' }, { 'cache-control': 'no-store' })
+      const gate = await gateOf(r.gift, d)
+      if (gate === 'cancelled') return gone(r.gift)
+      if (gate === 'pending' && !senderPreview(r.gift, preview)) return notCollected()
       if (closed(r.gift, d, preview)) return json(403, { error: 'locked' }, { 'cache-control': 'no-store' })
       const res = await anim.render(r.gift.animation_id)
       if (!res.ok) return json(res.status, { error: 'unavailable' }, { 'cache-control': 'no-store' })
@@ -169,6 +248,9 @@ export function createGiftHandlers(deps: () => GiftDeps) {
       const r = await loadGift(token, d)
       if (r.status !== 200) return json(r.status, { error: r.status === 404 ? 'not_found' : 'unavailable' }, { 'cache-control': 'no-store' })
       if (!ANIMATION_ID_PATTERN.test(r.gift.animation_id)) return json(404, { error: 'not_found' }, { 'cache-control': 'no-store' })
+      const gate = await gateOf(r.gift, d)
+      if (gate === 'cancelled') return gone(r.gift)
+      if (gate === 'pending' && !senderPreview(r.gift, preview)) return notCollected()
       if (closed(r.gift, d, preview)) return json(403, { error: 'locked' }, { 'cache-control': 'no-store' })
       let bytes: Buffer | null
       try {
@@ -237,6 +319,7 @@ export function createGiftHandlers(deps: () => GiftDeps) {
       const r = await loadGift(token, d)
       if (r.status !== 200) return json(r.status, { error: r.status === 404 ? 'not_found' : 'unavailable' }, { 'cache-control': 'no-store' })
       if (closed(r.gift, d, preview)) return json(403, { error: 'locked' }, { 'cache-control': 'no-store' })
+      { const gate = await gateOf(r.gift, d); if (gate === 'cancelled') return gone(r.gift); if (gate === 'pending') return notCollected() }
       return videoMake(r, d)
     },
     async filmGet(token: string, req: Request, preview?: string | null): Promise<Response> {
@@ -244,6 +327,7 @@ export function createGiftHandlers(deps: () => GiftDeps) {
       const r = await loadGift(token, d)
       if (r.status !== 200) return json(r.status, { error: r.status === 404 ? 'not_found' : 'unavailable' }, { 'cache-control': 'no-store' })
       if (closed(r.gift, d, preview)) return json(403, { error: 'locked' }, { 'cache-control': 'no-store' })
+      { const gate = await gateOf(r.gift, d); if (gate === 'cancelled') return gone(r.gift); if (gate === 'pending') return notCollected() }
       return videoGet(r, d, req)
     },
     async cardPdf(token: string, preview?: string | null): Promise<Response> {
@@ -251,22 +335,29 @@ export function createGiftHandlers(deps: () => GiftDeps) {
       const r = await loadGift(token, d)
       if (r.status !== 200) return json(r.status, { error: r.status === 404 ? 'not_found' : 'unavailable' }, { 'cache-control': 'no-store' })
       if (closed(r.gift, d, preview)) return json(403, { error: 'locked' }, { 'cache-control': 'no-store' })
+      { const gate = await gateOf(r.gift, d); if (gate === 'cancelled') return gone(r.gift); if (gate === 'pending') return notCollected() }
       return cardResponse(r, d)
     },
     async filmMakeForSender(animationId: string): Promise<Response> {
       const d = deps()
       const f = await bySender(animationId, d)
-      return f instanceof Response ? f : videoMake(f, d)
+      if (f instanceof Response) return f
+      { const gate = await gateOf(f.gift, d); if (gate === 'cancelled') return gone(f.gift); if (gate === 'pending') return notCollected() }
+      return videoMake(f, d)
     },
     async filmGetForSender(animationId: string, req: Request): Promise<Response> {
       const d = deps()
       const f = await bySender(animationId, d)
-      return f instanceof Response ? f : videoGet(f, d, req)
+      if (f instanceof Response) return f
+      { const gate = await gateOf(f.gift, d); if (gate === 'cancelled') return gone(f.gift); if (gate === 'pending') return notCollected() }
+      return videoGet(f, d, req)
     },
     async cardPdfForSender(animationId: string): Promise<Response> {
       const d = deps()
       const f = await bySender(animationId, d)
-      return f instanceof Response ? f : cardResponse(f, d)
+      if (f instanceof Response) return f
+      { const gate = await gateOf(f.gift, d); if (gate === 'cancelled') return gone(f.gift); if (gate === 'pending') return notCollected() }
+      return cardResponse(f, d)
     },
 
     /** The story scroll (PNG or PDF) of the receiver's gift. Only when all four pictures are real: never with a washi slot. */
@@ -275,6 +366,7 @@ export function createGiftHandlers(deps: () => GiftDeps) {
       const r = await loadGift(token, d)
       if (r.status !== 200) return json(r.status, { error: r.status === 404 ? 'not_found' : 'unavailable' }, { 'cache-control': 'no-store' })
       if (closed(r.gift, d, preview)) return json(403, { error: 'locked' }, { 'cache-control': 'no-store' })
+      { const gate = await gateOf(r.gift, d); if (gate === 'cancelled') return gone(r.gift); if (gate === 'pending') return notCollected() }
       return scrollResponse(r.gift, r.anim, ext, d)
     },
 
@@ -286,10 +378,59 @@ export function createGiftHandlers(deps: () => GiftDeps) {
         const a = await d.store.get(animationId)
         if (!isAnimationRecord(a) || !a.gift_token) return json(404, { error: 'not_found' }, { 'cache-control': 'no-store' })
         const r = await loadGift(a.gift_token, d)
-        return r.status === 200 ? scrollResponse(r.gift, r.anim, ext, d) : json(404, { error: 'not_found' }, { 'cache-control': 'no-store' })
+        if (r.status !== 200) return json(404, { error: 'not_found' }, { 'cache-control': 'no-store' })
+        { const gate = await gateOf(r.gift, d); if (gate === 'cancelled') return gone(r.gift); if (gate === 'pending') return notCollected() }
+        return scrollResponse(r.gift, r.anim, ext, d)
       } catch {
         return json(503, { error: 'unavailable' }, { 'cache-control': 'no-store' })
       }
+    },
+
+    // ---- sharing the film and the poem card to social media (2026-11-06): after collecting (the buyer) / after the envelope is open (the receiver); never for remembrance ----
+    async shareFilmMake(token: string): Promise<Response> {
+      const d = deps()
+      const r = await loadGift(token, d)
+      if (r.status !== 200) return json(r.status, { error: r.status === 404 ? 'not_found' : 'unavailable' }, { 'cache-control': 'no-store' })
+      if (closed(r.gift, d, null)) return json(403, { error: 'locked' }, { 'cache-control': 'no-store' })
+      { const gate = await gateOf(r.gift, d); if (gate === 'cancelled') return gone(r.gift); if (gate === 'pending') return notCollected() }
+      return shareFilmMake(r, d)
+    },
+    async shareFilmGet(token: string, req: Request): Promise<Response> {
+      const d = deps()
+      const r = await loadGift(token, d)
+      if (r.status !== 200) return json(r.status, { error: r.status === 404 ? 'not_found' : 'unavailable' }, { 'cache-control': 'no-store' })
+      if (closed(r.gift, d, null)) return json(403, { error: 'locked' }, { 'cache-control': 'no-store' })
+      { const gate = await gateOf(r.gift, d); if (gate === 'cancelled') return gone(r.gift); if (gate === 'pending') return notCollected() }
+      return shareFilmGet(r, d, req)
+    },
+    async shareCard(token: string): Promise<Response> {
+      const d = deps()
+      const r = await loadGift(token, d)
+      if (r.status !== 200) return json(r.status, { error: r.status === 404 ? 'not_found' : 'unavailable' }, { 'cache-control': 'no-store' })
+      if (closed(r.gift, d, null)) return json(403, { error: 'locked' }, { 'cache-control': 'no-store' })
+      { const gate = await gateOf(r.gift, d); if (gate === 'cancelled') return gone(r.gift); if (gate === 'pending') return notCollected() }
+      return shareCardGet(r, d)
+    },
+    async shareFilmMakeForSender(animationId: string): Promise<Response> {
+      const d = deps()
+      const f = await bySender(animationId, d)
+      if (f instanceof Response) return f
+      { const gate = await gateOf(f.gift, d); if (gate === 'cancelled') return gone(f.gift); if (gate === 'pending') return notCollected() }
+      return shareFilmMake(f, d)
+    },
+    async shareFilmGetForSender(animationId: string, req: Request): Promise<Response> {
+      const d = deps()
+      const f = await bySender(animationId, d)
+      if (f instanceof Response) return f
+      { const gate = await gateOf(f.gift, d); if (gate === 'cancelled') return gone(f.gift); if (gate === 'pending') return notCollected() }
+      return shareFilmGet(f, d, req)
+    },
+    async shareCardForSender(animationId: string): Promise<Response> {
+      const d = deps()
+      const f = await bySender(animationId, d)
+      if (f instanceof Response) return f
+      { const gate = await gateOf(f.gift, d); if (gate === 'cancelled') return gone(f.gift); if (gate === 'pending') return notCollected() }
+      return shareCardGet(f, d)
     },
 
     /** The receiver's one thank-you (200 characters at most, once). It is shown on the sender's page; there is no e-mail and no second reply. */
@@ -297,6 +438,7 @@ export function createGiftHandlers(deps: () => GiftDeps) {
       const d = deps()
       const r = await loadGift(token, d)
       if (r.status !== 200) return json(r.status, { error: r.status === 404 ? 'not_found' : 'unavailable' }, { 'cache-control': 'no-store' })
+      { const gate = await gateOf(r.gift, d); if (gate === 'cancelled') return gone(r.gift); if (gate === 'pending') return notCollected() }
       if (closed(r.gift, d, null)) return json(403, { error: 'locked' }, { 'cache-control': 'no-store' })
       if (r.gift.reply) return json(409, { error: 'The reply has already been sent', code: 'already_replied' }, noStore)
       const checked = checkReply(body)
@@ -317,6 +459,7 @@ export function createGiftHandlers(deps: () => GiftDeps) {
       const r = await loadGift(token, d)
       if (r.status !== 200) return json(r.status, { error: r.status === 404 ? 'not_found' : 'unavailable' }, { 'cache-control': 'no-store' })
       const g = r.gift
+      { const gate = await gateOf(g, d); if (gate === 'cancelled') return gone(g); if (gate === 'pending') return notCollected() }
       if (!g.egift) return json(409, { error: 'This gift is not an e-gift', code: 'not_egift' }, noStore)
       if (g.egift.state === 'received') return json(409, { error: 'The address has already been received', code: 'already_received' }, noStore)
       const checked = checkAddress(body, g.package)

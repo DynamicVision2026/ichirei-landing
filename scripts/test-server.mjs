@@ -360,6 +360,12 @@ try {
       const pa = await fetch(`${gs.url}/api/gift/${token}/address?preview=${gift.animation_id}`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ name: 'x' }) })
       const pg = await fetch(`${gs.url}/api/gift/${token}?preview=${gift.animation_id}`)
       check('preview mode: reply and address are refused (403 preview_only), the preview view itself opens (200), and the gift file is byte-for-byte unchanged', pv.status === 403 && pa.status === 403 && (await pv.json()).error === 'preview_only' && pg.status === 200 && readFileSync(join(dir, `${token}.json`), 'utf8') === before)
+      // sharing to social media is never reachable from a preview, and the buyer's collect route exists
+      const sh1 = await fetch(`${gs.url}/api/gift/${token}/share/film/make?preview=${gift.animation_id}`, { method: 'POST' })
+      const sh2 = await fetch(`${gs.url}/api/gift/${token}/share-card.png?preview=${gift.animation_id}`)
+      const sh3 = await fetch(`${gs.url}/api/gift/${token}/share-film.mp4?preview=${gift.animation_id}`)
+      const col = await fetch(`${gs.url}/api/animation/${gift.animation_id}/collect`, { method: 'POST' })
+      check('preview mode: the share film and the poem card are refused (403 preview_only); the collect route answers (not a 404 route miss: an order that was never paid is refused)', sh1.status === 403 && sh2.status === 403 && sh3.status === 403 && (await sh1.json()).error === 'preview_only' && [404, 409, 503].includes(col.status) && readFileSync(join(dir, `${token}.json`), 'utf8') === before)
       const f = await fetch(`${gs.url}/fonts/zen-old-mincho-900.woff2`)
       check('our own fonts are served under /fonts/ (woff2, 200)', f.status === 200 && (await f.arrayBuffer()).byteLength > 50_000)
     } finally {

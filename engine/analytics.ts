@@ -27,12 +27,18 @@ export const PREVIEW_EVENTS = ['card_preview_shown', 'candidates_retry', 'pictur
 export type PreviewEvent = (typeof PREVIEW_EVENTS)[number]
 export const PICTURE_STATES = ['shown', 'limited', 'failed'] as const
 export type PictureState = (typeof PICTURE_STATES)[number]
-export const CLIENT_EVENTS = ['chosen', 'explain_opened', ...FLOW_EVENTS, ...PREVIEW_EVENTS] as const
+/** Sharing the film or the poem card to social media (2026-11-06): codes only — which one, and who shares (sender = the buyer, receiver = the person who opened the gift). */
+export const SHARE_EVENTS = ['share_film_tap', 'share_card_tap'] as const
+export type ShareEvent = (typeof SHARE_EVENTS)[number]
+export const SHARE_ROLES = ['sender', 'receiver'] as const
+export type ShareRole = (typeof SHARE_ROLES)[number]
+export const CLIENT_EVENTS = ['chosen', 'explain_opened', ...FLOW_EVENTS, ...PREVIEW_EVENTS, ...SHARE_EVENTS] as const
 
 export type AnalyticsEvent =
   | { ts: string; session: string; source: Source; event: 'shown'; language: Language; relationship: Relationship | null; occasion: Occasion | null; purpose?: string | null; state?: string | null; status: 'sufficient' | 'insufficient'; main_slot: 'main' | 'second' | null; has_freestyle: boolean }
   | { ts: string; session: string; source: Source; event: FlowEvent; language: Language | null; set: QuestionSet | null; qid: string | null }
   | { ts: string; session: string; source: Source; event: PreviewEvent; language: Language | null; n: 1 | 2 | null; state: PictureState | null; secs: number | null }
+  | { ts: string; session: string; source: Source; event: ShareEvent; role: ShareRole }
   | { ts: string; session: string; source: Source; event: 'chosen'; choice: Choice }
   | { ts: string; session: string; source: Source; event: 'explain_opened'; choice: Choice | null }
   | { ts: string; session: string; source: Source; event: 'ordered'; poem_types?: PoemType[] }
@@ -67,6 +73,7 @@ export function parseClientEvent(body: unknown, now: Date): AnalyticsEvent | nul
     const secs = typeof b.secs === 'number' && Number.isFinite(b.secs) && b.secs >= 0 && b.secs < 3600 ? Math.round(b.secs) : null
     return { ts, session, source, event: b.event as PreviewEvent, language, n, state, secs }
   }
+  if ((SHARE_EVENTS as readonly string[]).includes(b.event as string)) return (SHARE_ROLES as readonly string[]).includes(b.role as string) ? { ts, session, source, event: b.event as ShareEvent, role: b.role as ShareRole } : null
   if (b.event === 'chosen') return choice ? { ts, session, source, event: 'chosen', choice } : null
   return { ts, session, source, event: 'explain_opened', choice }
 }
