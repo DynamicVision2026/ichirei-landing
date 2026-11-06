@@ -103,7 +103,7 @@ export default function BuyerPage({ view, lang, preparing, onCollected }: { view
             <>
               <p>
                 <button type="button" className="an-btn an-btn-hot by-collect-btn" data-testid="collect-button" onClick={tap} disabled={!ready || collecting}>
-                  {ready ? c.collect : c.collectFinishing}
+                  {ready ? (view.memorial ? c.collectMemorial : c.collect) : c.collectFinishing}
                 </button>
               </p>
               <p className="an-small" data-testid="collect-line">{until ? c.collectLine : c.collectLineLate}</p>

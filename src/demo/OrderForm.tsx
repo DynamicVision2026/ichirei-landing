@@ -370,7 +370,7 @@ export default function OrderForm({ result, story, followUps = [], promptQuestio
           </p>
         )}
 
-        <p className="sent orderNote" data-testid="order-refund-line">{pc.refundLine} <a href="/legal#refund" data-testid="order-refund-details" className="legalLink">{pc.refundDetails}</a></p>
+        <p className="sent orderNote" data-testid="order-refund-line">{memorial ? pc.refundLineMemorial : pc.refundLine} <a href="/legal#refund" data-testid="order-refund-details" className="legalLink">{pc.refundDetails}</a></p>
         <label className="refundCheck" data-testid="order-refund-check-label">
           <input type="checkbox" data-testid="order-refund-check" checked={refundAckAt !== null} onChange={(e) => setRefundAckAt(e.target.checked ? new Date().toISOString() : null)} />
           <span>{pc.refundCheck}</span>

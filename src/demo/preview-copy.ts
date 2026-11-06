@@ -33,6 +33,8 @@ export interface PreviewCopy {
   chooseOther: string
   /** The refund line above the order button (2026-11-06): cancel only within 24 hours of payment and before 「贈りものを受け取る」. */
   refundLine: string
+  /** The same line on a remembrance order: the button is called 「一字を受け取る」 / 「領取這個字」 / "Collect it" (nothing is "given"). */
+  refundLineMemorial: string
   /** The small link after it, to /legal#refund. */
   refundDetails: string
   /** The required checkbox: the button stays disabled until it is ticked (never pre-ticked). */
@@ -60,6 +62,7 @@ export const PREVIEW_COPY: Record<RevealLang, PreviewCopy> = {
     retry: 'もう一度ためす',
     chooseOther: '字を選びなおす',
     refundLine: 'キャンセル（全額返金）は、お支払い完了から24時間以内、かつご注文ページで「贈りものを受け取る」を押す前に限ります。24時間を過ぎると、お客様都合による返金は一切できません。お支払い後の内容の変更もできません。',
+    refundLineMemorial: 'キャンセル（全額返金）は、お支払い完了から24時間以内、かつご注文ページで「一字を受け取る」を押す前に限ります。24時間を過ぎると、お客様都合による返金は一切できません。お支払い後の内容の変更もできません。',
     refundDetails: '詳しくはこちら',
     refundCheck: 'キャンセル・返金の条件（お支払い完了から24時間以内、受け取り前に限る）を確認しました。',
     legalLink: '特定商取引法に基づく表記・返品について',
@@ -82,6 +85,7 @@ export const PREVIEW_COPY: Record<RevealLang, PreviewCopy> = {
     retry: '再試一次',
     chooseOther: '重新選字',
     refundLine: '取消（全額退款）僅限付款完成後24小時內，且在訂單頁面按下「領取禮物」之前。超過24小時後，一律不接受個人因素退款。付款後亦不可更改內容。',
+    refundLineMemorial: '取消（全額退款）僅限付款完成後24小時內，且在訂單頁面按下「領取這個字」之前。超過24小時後，一律不接受個人因素退款。付款後亦不可更改內容。',
     refundDetails: '詳細說明',
     refundCheck: '我已確認取消與退款條件（限付款完成後24小時內、領取前）。',
     legalLink: '特定商取引法標示・退換貨說明',
@@ -104,6 +108,7 @@ export const PREVIEW_COPY: Record<RevealLang, PreviewCopy> = {
     retry: 'Try again',
     chooseOther: 'Choose a different character',
     refundLine: 'You can cancel for a full refund only within 24 hours of payment and before you press "Collect your gift" on your order page. After 24 hours, there are no refunds for change of mind. Orders can\'t be changed after payment.',
+    refundLineMemorial: 'You can cancel for a full refund only within 24 hours of payment and before you press "Collect it" on your order page. After 24 hours, there are no refunds for change of mind. Orders can\'t be changed after payment.',
     refundDetails: 'Details',
     refundCheck: "I've read the cancellation and refund terms (within 24 hours of payment, before collecting).",
     legalLink: 'Legal notice (特定商取引法) and returns',

@@ -7,6 +7,7 @@ import { rich } from './rich.tsx'
 import Picture from './Picture.tsx'
 import { CURRENCIES, approxLine, type Currency, type Rates } from './currency.ts'
 import { PACKAGE_PRICE_JPY, formatYen } from '../order/packages.ts'
+import { LEGAL, rowValue } from '../legal/legal-copy.ts'
 
 type T = (typeof TEXT)[RevealLang]
 
@@ -172,12 +173,13 @@ export function Angles({ t, lang }: { t: T; lang: RevealLang }) {
   )
 }
 
-export function Steps({ t, memorial = false }: { t: T; memorial?: boolean }) {
+export function Steps({ t, memorial = false, woodOnSale = false }: { t: T; memorial?: boolean; woodOnSale?: boolean }) {
   // remembrance (偲ぶ picked in the form): two cards, no free pick
   const steps = [
     [t.st1, t.st1p, t.st1t],
     memorial ? [t.st2M, t.st2pM, t.st2t] : [t.st2, t.st2p, t.st2t],
-    [t.st3, t.st3p, t.st3t],
+    // while the wooden sizes are "coming soon" the third step is the sealed e-gift sent by LINE or e-mail (no timing line); the wooden version shows only while wood is on sale
+    woodOnSale ? [t.st3, t.st3p, t.st3t] : [t.st3S, t.st3pS, ''],
   ] as const
   return (
     <section className="tintBand" id="how">
@@ -193,7 +195,7 @@ export function Steps({ t, memorial = false }: { t: T; memorial?: boolean }) {
             </span>
             <h3>{h}</h3>
             <p>{p}</p>
-            <span className="time">{time}</span>
+            {time && <span className="time">{time}</span>}
           </li>
         ))}
       </ol>
@@ -379,12 +381,15 @@ export function Gifts({
   )
 }
 
-export function Faq({ t }: { t: T }) {
+export function Faq({ t, lang, woodOnSale = false }: { t: T; lang: RevealLang; woodOnSale?: boolean }) {
+  // 「いつ届く？」 answers with the delivery row of /legal: the e-gift part always, the wooden part only while the wooden sizes are on sale
+  const delivery = LEGAL[lang].rows.find((r) => r.key === 'delivery')
+  const fa4 = delivery ? rowValue(lang, delivery, woodOnSale) : t.fa4
   const rows = [
     [t.fq1, t.fa1],
     [t.fq2, t.fa2],
     [t.fq3, t.fa3],
-    [t.fq4, t.fa4],
+    [t.fq4, fa4],
     [t.fq5, t.fa5],
     [t.fq6, t.fa6],
     [t.fq7, t.fa7],

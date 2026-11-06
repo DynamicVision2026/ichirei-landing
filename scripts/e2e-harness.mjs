@@ -1506,7 +1506,7 @@ const mockPage = async (browser, { onExplain, result, order, track } = {}) => {
     'zh-Hant': { btn: '領取禮物', line: '領取後即可傳送與儲存。領取後將無法取消訂單。', late: '領取後即可傳送與儲存。', confirm: '確定領取嗎？領取後將無法取消。', yes: '領取', no: '先不要', by: '取消期限：11月7日 14時30分前（限領取前）。超過期限後，恕不接受個人因素退款。', wait: '禮物製作中…', first: '領取前，請先確認對方將收到的內容。', preview: '預覽對方會看到的畫面' },
     en: { btn: 'Collect your gift', line: "Once collected, you can send and save it. After that, the order can't be cancelled.", late: 'Once collected, you can send and save it.', confirm: "Collect it now? You won't be able to cancel after this.", yes: 'Collect', no: 'Not yet', by: 'Cancel by: 7 Nov, 14:30 (before you collect). After that, no refunds for change of mind.', wait: 'Finishing your gift…', first: "Before collecting, check what they'll receive.", preview: "Preview what they'll see" },
   }
-  const mkView = (lang, order, film) => ({ id: 'AN-testtesttesttesttest', language: lang, glyph: '備', reading: 'そなえる', romanization: 'sonaeru', meaning_en: 'to be ready', who: 'x', memorial: false, film: film ?? { status: 'fallback', lines: ['a', 'b'], pictures: ['/film/washi-1.webp', '/film/washi-2.webp'] }, gift: { url: 'https://ichirei.soul-id.jp/g/RG-testtesttesttesttest', size_code: 'ICHIREI-EGIFT', ship_to: 'none', egift_state: null, opens_on: null }, order })
+  const mkView = (lang, order, film, memorial = false) => ({ id: 'AN-testtesttesttesttest', language: lang, glyph: '備', reading: 'そなえる', romanization: 'sonaeru', meaning_en: 'to be ready', who: 'x', memorial, film: film ?? { status: 'fallback', lines: ['a', 'b'], pictures: ['/film/washi-1.webp', '/film/washi-2.webp'] }, gift: { url: 'https://ichirei.soul-id.jp/g/RG-testtesttesttesttest', size_code: 'ICHIREI-EGIFT', ship_to: 'none', egift_state: null, opens_on: null }, order })
   for (const lang of ['ja', 'zh-Hant', 'en']) {
     const ctx = await browser.newContext({ locale: 'ja-JP', timezoneId: 'Asia/Tokyo', viewport: { width: 390, height: 844 } })
     const p = await ctx.newPage()
@@ -1532,6 +1532,15 @@ const mockPage = async (browser, { onExplain, result, order, track } = {}) => {
     check(`collect (${lang}): after 「${t.yes}」 the server is told once, and the page shows the send buttons, the receiver link and the save section; the collect block and the cancel lines are gone`, posts.filter((u) => u.endsWith('/collect')).length === 1 && (await p.locator('[data-testid=give-link]').inputValue()).includes('/g/RG-') && (await p.locator('[data-testid=buyer-collect-section]').count()) === 0 && (await p.locator('[data-testid=buyer-deadline]').count()) === 0 && (await p.locator('[data-testid=buyer-cancel-by]').count()) === 0)
     if (lang === 'ja') await p.screenshot({ path: 'shots/buyer-after-collect-ja.png', fullPage: true })
     await ctx.close()
+  }
+  // a remembrance order: nothing is "given" — the one tap is called 「一字を受け取る」 / 「領取這個字」 / "Collect it"
+  for (const [lang, want] of [['ja', '一字を受け取る'], ['zh-Hant', '領取這個字'], ['en', 'Collect it']]) {
+    const p = await browser.newPage({ locale: 'ja-JP', viewport: { width: 390, height: 844 } })
+    await p.route('**/api/animation/AN-testtesttesttesttest', (r) => r.fulfill({ json: mkView(lang, { collected: false, ordered_at: '2026-11-06T05:30:00Z', change_until: '2099-11-07T05:30:00Z', wood: null }, undefined, true) }))
+    await p.goto('http://localhost:5173/a/AN-testtesttesttesttest', { waitUntil: 'networkidle' })
+    await p.locator('[data-testid=collect-button]').waitFor()
+    check(`remembrance (${lang}): the collect button is 「${want}」, and no 贈 / gift wording is on the page's button`, (await p.locator('[data-testid=collect-button]').innerText()) === want && !/贈|禮物|gift/i.test(await p.locator('[data-testid=collect-button]').innerText()))
+    await p.close()
   }
   // the final gift is still being made: the button waits
   {
@@ -1746,6 +1755,36 @@ const mockPage = async (browser, { onExplain, result, order, track } = {}) => {
   check('legal: the landing footer links to /legal', (await home.locator('[data-testid=footer-legal]').getAttribute('href')) === '/legal' && (await home.locator('[data-testid=footer-legal]').innerText()).includes('特定商取引法'))
   check('legal: the landing\'s own questions now include the three (change after ordering, cancel, a problem)', (await home.locator('.faq details').count()) === 10 && (await home.locator('.faq').textContent())?.includes('注文後に字を変えられますか？') && (await home.locator('.faq').textContent())?.includes('ギフトページは少なくとも10年間公開します。映像・絵巻・カードは、いつでもスマートフォンに保存できます。'))
   await home.close()
+}
+
+// ---------- Run 8h-2: the landing — step 3 and 「いつ届く？」 follow the wooden switch: sealed e-gift while wood is "coming soon", the 2–3 weeks wording only while wood is on sale ----------
+{
+  const L = {
+    ja: { soon: ['封をして、届ける', '一字と歌と物語の絵を、封をした贈りものに。LINEやメールで、すぐに届けられます。'], wood: '国内 約2〜3週間 ・ 海外はさらに1〜2週間', egift: 'eギフト：お支払い後すぐ（開封日を指定した場合はその日）。', woodAns: '木札・版木：お支払い完了から24時間のキャンセル受付期間ののちに制作を始め、国内は約2〜3週間でお届けします（海外はさらに1〜2週間）。', q: 'いつ届く？' },
+    'zh-Hant': { soon: ['封好，送出', '把一個字、詩與故事的畫，封成一份禮物。用LINE或電子郵件，立刻就能送出。'], wood: '日本國內約2〜3週 · 海外另需1〜2週', egift: 'e禮物：付款後立即送達（若指定開啟日期，則於當天開啟）。', woodAns: '木牌、版木：付款完成後24小時的取消受理期間結束後開始製作，日本國內約2〜3週送達（海外另需1〜2週）。', q: '什麼時候送到？' },
+    en: { soon: ['Sealed, then sent', 'The character, the poem and your story’s pictures, sealed as a gift. Send it right away by LINE or email.'], wood: 'Japan about 2–3 weeks · Overseas 1–2 weeks more', egift: 'E-gift: right after payment (or on the opening date you set).', woodAns: 'Wooden tag and carved block: made after the 24-hour cancellation period, delivered in about 2–3 weeks in Japan (1–2 weeks more overseas).', q: 'When will it arrive?' },
+  }
+  for (const lang of ['ja', 'zh-Hant', 'en']) {
+    for (const soon of [true, false]) {
+      const p = await browser.newPage({ locale: 'ja-JP', viewport: { width: 1000, height: 900 } })
+      await p.route('**/api/**', (r) => r.fulfill({ status: 204, body: '' }))
+      await p.route('**/api/sizes', (r) => r.fulfill({ json: { sizes: ['egift', 'simple', 'standard'], ...(soon ? { coming_soon: ['simple', 'standard'] } : {}) } }))
+      await p.goto(`http://localhost:5173/?lang=${lang}`, { waitUntil: 'networkidle' })
+      await p.locator('#how li').nth(2).waitFor()
+      await p.waitForTimeout(500)
+      const li = p.locator('#how li').nth(2)
+      const h = (await li.locator('h3').first().textContent())?.trim()
+      const txt = (await li.locator('p').first().textContent())?.trim()
+      const time = (await li.locator('.time').count()) ? (await li.locator('.time').textContent())?.trim() : null
+      const faq = p.locator('.faq details').filter({ hasText: L[lang].q }).first()
+      const ans = (await faq.locator('p').textContent())?.replace(/\s+/g, ' ').trim()
+      const sep = lang === 'en' ? ' ' : ''
+      check(`landing (${lang}), wooden sizes ${soon ? '"coming soon"' : 'on sale'}: step 3 is ${soon ? 'the sealed e-gift (title and text word for word, no timing line)' : 'the wooden version with the 2–3 weeks timing'}`, soon ? h === L[lang].soon[0] && txt === L[lang].soon[1] && time === null : h !== L[lang].soon[0] && time === L[lang].wood, `${h} | ${txt} | ${time}`)
+      check(`landing (${lang}), wooden sizes ${soon ? '"coming soon"' : 'on sale'}: 「${L[lang].q}」 answers with the /legal delivery row — ${soon ? 'the e-gift part only' : 'the e-gift part and the wooden part'}`, ans === (soon ? L[lang].egift : `${L[lang].egift}${sep}${L[lang].woodAns}`), ans)
+      check(`landing (${lang}): no 約10営業日 / 10 working days anywhere`, !/営業日|工作日|working days/.test(await p.locator('body').innerText()))
+      await p.close()
+    }
+  }
 }
 
 // ---------- Run 8f: the free card preview — character FIRST, pictures after the pick, 「別の候補を見る」, no download, the made-to-order note ----------
@@ -2462,8 +2501,8 @@ const SECTION_ORDER = ['.hero', '.strip', '.philo', '#shape', '#angles', '#write
   await form.waitFor()
   const slip = await page.evaluate(() => ({ glyph: getComputedStyle(document.querySelector('[data-order-glyph]')).color, top: getComputedStyle(document.querySelector('.slip')).borderTopColor, marked: document.querySelector('.slip').dataset.memorial }))
   check('memorial order form: the slip glyph and rule are ink, not cinnabar', slip.glyph === INK && slip.top === INK && slip.marked === 'yes', JSON.stringify(slip))
-  // the refund line and its checkbox must name the button 「贈りものを受け取る」 exactly as the owner wrote them (all sizes, no remembrance variant was given): they are the one place 贈 may appear
-  const formText = (await form.evaluate((el) => { const c = el.cloneNode(true); c.querySelectorAll('[data-testid=order-refund-line], [data-testid=order-refund-check-label]').forEach((n) => n.remove()); return c.innerText }))
+  const formText = await form.innerText()
+  check('memorial order form: the refund line calls the button 「一字を受け取る」 (not 「贈りものを受け取る」), and the checkbox line has no 贈', (await page.locator('[data-testid=order-refund-line]').innerText()).includes('「一字を受け取る」') && !(await page.locator('[data-testid=order-refund-line]').innerText()).includes('贈') && !(await page.locator('[data-testid=order-refund-check-label]').innerText()).includes('贈'))
   check('memorial order form: the receiver field is 「偲ぶ方の呼び名（任意）」, there is no 贈 wording, the certificate line is the usual one', formText.includes('偲ぶ方の呼び名（任意）') && !gift(formText) && (await page.locator('[data-certificate]').innerText()) === 'この字は、あなたの目に映る、その人です。', formText.slice(0, 300))
   await page.fill('input[name=sender_name]', '山田 花子')
   await page.fill('input[name=receiver_name]', '山田 一郎')

@@ -28,6 +28,8 @@ export interface BuyerCopy {
   changeUntil: (when: string) => string
   /** 「贈りものを受け取る」: the one tap that unlocks sending and saving, and ends the right to cancel. */
   collect: string
+  /** A remembrance order: nothing is "given", the one tap is called 「一字を受け取る」 / 「領取這個字」 / "Collect it". */
+  collectMemorial: string
   collectLine: string
   collectLineLate: string
   collectFinishing: string
@@ -59,6 +61,7 @@ export const BUYER_COPY: Record<PageLang, BuyerCopy> = {
     saveTitle: '保存する',
     changeUntil: (w) => `お支払い完了から24時間以内（${w}まで）なら、確認メールにご返信いただくとキャンセル（全額返金）ができます。`,
     collect: '贈りものを受け取る',
+    collectMemorial: '一字を受け取る',
     collectLine: '受け取ると、送る・保存するができるようになります。受け取った後はキャンセルできません。',
     collectLineLate: '受け取ると、送る・保存するができるようになります。',
     collectFinishing: '贈りものを仕上げています…',
@@ -87,6 +90,7 @@ export const BUYER_COPY: Record<PageLang, BuyerCopy> = {
     saveTitle: '儲存',
     changeUntil: (w) => `付款完成後24小時內（${w}前），回覆確認郵件即可取消並全額退款。`,
     collect: '領取禮物',
+    collectMemorial: '領取這個字',
     collectLine: '領取後即可傳送與儲存。領取後將無法取消訂單。',
     collectLineLate: '領取後即可傳送與儲存。',
     collectFinishing: '禮物製作中…',
@@ -115,6 +119,7 @@ export const BUYER_COPY: Record<PageLang, BuyerCopy> = {
     saveTitle: 'Save',
     changeUntil: (w) => `Until ${w} (24 hours after payment), reply to the confirmation email to cancel for a full refund.`,
     collect: 'Collect your gift',
+    collectMemorial: 'Collect it',
     collectLine: "Once collected, you can send and save it. After that, the order can't be cancelled.",
     collectLineLate: 'Once collected, you can send and save it.',
     collectFinishing: 'Finishing your gift…',
