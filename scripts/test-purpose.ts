@@ -188,7 +188,7 @@ try {
   const t1 = set.find((s) => s.id === 'apology-1')!
   const ctxA = { relationship: t1.relationship, direction: t1.direction, purpose: 'apology', state: 'strained' }
   vetoRule = { chars: new Set(['誠', '守']), rule: 'tone' }
-  refillReply = { candidates: [{ ...cand('main', '律', 'りつ', GOOD, anchors().main) }] }
+  refillReply = { candidates: [{ ...cand('main', '律', 'りつ', GOOD, piece(t1.story.split(/(?<=。)/).filter(Boolean)[0] ?? t1.story, 'start', 8)) }] } // (an anchor taken from THIS story)
   const rA = await run(ctxA, t1.story)
   check('(7a) both main characters rejected: the refill prompt carries the reading frame first (and says apology / strained), and the review rejection named `tone`', (kinds.refill?.length ?? 0) === 1 && kinds.refill[0].startsWith('READING FRAME') && /apology/.test(kinds.refill[0]) && /never announce a reconciliation/.test(kinds.refill[0]) && rA.candidates.some((c) => c.eliminated && /review: tone/.test(c.eliminated_reason ?? '')), JSON.stringify(rA.candidates.map((c) => [c.kanji, c.eliminated_reason])))
   vetoRule = { chars: new Set(), rule: 'dignity' }
@@ -225,11 +225,11 @@ try {
   const rOther2 = await run({ relationship: 'sibling', direction: 'across', purpose: 'other', purpose_other: '喧嘩した兄へ' }, t1.story)
   check('(9b) 「喧嘩した兄へ」: mapped to apology — gentle free pick, no celebration characters, the frame says apology', cardsLine().other_text_mapped?.purpose === 'apology' && /GENTLE/.test(kinds.free[0]) && /apology/.test(kinds.main[0]) && rOther2.purpose === 'apology')
   const rOther3 = await run({ relationship: 'friend', direction: 'across', purpose: 'other', purpose_other: 'ひみつ' }, t1.story)
-  check('(9c) unmappable text: a neutral warm tone — the frame says so, the log says null, the free pick is gentle, and the engine still returns three cards', cardsLine().other_text_mapped?.purpose === null && /neutral warm tone/.test(kinds.main[0]) && /GENTLE/.test(kinds.free[0]) && live(rOther3).length === 3)
+  check('(9c) unmappable text: a neutral warm tone — the frame says so, the log says null, the free pick is gentle, and the engine still returns two cards (本命 + 遊び字)', cardsLine().other_text_mapped?.purpose === null && /neutral warm tone/.test(kinds.main[0]) && /GENTLE/.test(kinds.free[0]) && live(rOther3).length === 2)
 
   // the old way still works: an older client that sends only an occasion
   const rOld = await run({ relationship: 'parent_mother', direction: 'up', occasion: 'retirement_farewell' }, set.find((s) => s.id === 'farewell-1')!.story)
-  check('(10) an older client (only an occasion, no purpose): the same result as before — occasion kept, no purpose echo, three cards; the frame reads the purpose the occasion stands for (farewell)', rOld.occasion === 'retirement_farewell' && rOld.purpose === undefined && live(rOld).length === 3 && /farewell: the character carries what they leave behind/.test(kinds.main[0]))
+  check('(10) an older client (only an occasion, no purpose): the same result as before — occasion kept, no purpose echo, two cards; the frame reads the purpose the occasion stands for (farewell)', rOld.occasion === 'retirement_farewell' && rOld.purpose === undefined && live(rOld).length === 2 && /farewell: the character carries what they leave behind/.test(kinds.main[0]))
 
   // the gift page and the colours
   const giftWords = (l: 'ja' | 'zh-Hant' | 'en') => [GIFT_COPY[l].envLine, GIFT_COPY[l].envLineThanks, GIFT_COPY[l].envLabel, GIFT_COPY[l].envLabelMemorial, GIFT_COPY[l].envLineMemorial, GIFT_COPY[l].letterLead('X'), GIFT_COPY[l].letterLeadMemorial('X')].join(' ')

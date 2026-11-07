@@ -19,7 +19,14 @@ export function enforceSlots(result: EngineResult, log: (line: string) => void =
   const mains = live.filter(isMain)
   const frees = live.filter((c) => !isMain(c))
   const rank = (c: Candidate) => (c.kanji === result.primary_kanji ? 0 : c.kanji === result.runner_up_kanji ? 1 : 2)
-  const keepMains = new Set([...mains].sort((a, b) => rank(a) - rank(b)).slice(0, 2).map((c) => c))
+  // one live card per slot, and two main-side cards at most: never two `second` (or two `main`) in a result (2026-11-07)
+  const seenSlot = new Set<string>()
+  const keepMains = new Set(
+    [...mains]
+      .sort((a, b) => rank(a) - rank(b))
+      .filter((c) => (seenSlot.has(c.slot) ? false : (seenSlot.add(c.slot), true)))
+      .slice(0, 2),
+  )
   const keepFree = new Set([...frees].sort((a, b) => (a.kanji === result.freestyle_kanji ? 0 : 1) - (b.kanji === result.freestyle_kanji ? 0 : 1)).slice(0, 1))
   const extras = [...mains.filter((c) => !keepMains.has(c)), ...frees.filter((c) => !keepFree.has(c))]
   if (extras.length === 0) return result

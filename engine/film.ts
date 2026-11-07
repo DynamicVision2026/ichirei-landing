@@ -19,6 +19,7 @@ import { loadPalette, type Palette } from './palette.ts'
 import { kanaFixWords, loadTokenizer } from './kana.ts'
 import { EN_FORBIDDEN } from './poem-check.ts'
 import { captionLanguageProblem, convertCaptionScript, fullWidthPunctuation } from './script.ts'
+import { inventedInPicture, isShortStory, lineBorrowsFromStory } from './film-truth.ts'
 
 export const FILM_TIMEOUT_MS = 30_000
 
@@ -162,6 +163,12 @@ export function checkPictures(pictures: string[], input: Pick<FilmInput, 'glyph'
     if (PICTURE_RELIGIOUS.test(d) && !STORY_RELIGIOUS.test(story)) add(i, 'pic_blocked', 'no religious symbol (cross, altar, shrine, temple, incense …) — the story does not mention one.', 'picture_religious')
     if ((input.memorial || input.quiet) && PICTURE_CELEBRATION.test(d)) add(i, 'pic_blocked', input.memorial ? 'no celebration image in a remembrance film.' : 'no celebration image in a quiet film (apology, encouragement).', 'picture_celebration')
     if (input.occasion && EN_FORBIDDEN[input.occasion]?.test(d)) add(i, 'pic_blocked', `a word that does not suit this occasion (${input.occasion}) is in it.`, 'picture_occasion')
+    // nothing is added to the story (2026-11-07): a person, an animal or an object the story does not have is refused — mood, light, weather, season and camera distance are free
+    // (a short story only — a long one gives four real moments of its own; the prompt asks for the same there, the code enforces it where the extra scenes are made up)
+    if (story && isShortStory(story)) {
+      const added = inventedInPicture(d, story)
+      if (added.length > 0) add(i, 'pic_invented', `“${added.join('”, “')}” is not in the story: add no person, animal or object the story does not have — use only what it names, and vary the place, the light, the camera distance (far, near, a detail) and the moment.`, 'picture_invented', added)
+    }
   })
   const seenPic = new Map<string, number>()
   pictures.forEach((d, i) => {
@@ -223,7 +230,12 @@ export function checkFilmScript(raw: unknown, input: FilmInput, palette: Palette
   lines.forEach((l, i) => {
     const at = (code: string, detail: string, extra: Partial<FilmProblem> = {}) => out.push({ code, scene: i, detail, ...extra })
     const n = lineSize(l, input.language)
-    if (n < lim.min || n > lim.max) at('line_length', `Line ${i + 1} has ${n} ${lim.unit}; it must have ${lim.min}–${lim.max}.`)
+    // a SHORT story (fewer than four sentences) has scenes with nothing of their own to say: their caption is a short phrase of the story, or empty
+    const shortStory = isShortStory(story)
+    if (shortStory && n === 0) return
+    if (shortStory && !lineBorrowsFromStory(l, story, input.language)) at('line_invented', `Line ${i + 1}: the story is short, so a caption must reuse a short phrase of the story; this one says something the story does not. Use a phrase of the story, or leave the line empty.`)
+    // (a short story's borrowed phrase may be shorter than the usual minimum — only the maximum counts)
+    if (n > lim.max || (n < lim.min && !shortStory)) at('line_length', `Line ${i + 1} has ${n} ${lim.unit}; it must have ${lim.min}–${lim.max}.`)
     if ((l.match(/\n/g) ?? []).length > 1) at('line_length', `Line ${i + 1} has more than one line break; at most one.`)
     for (const re of QUOTES) {
       for (const m of l.normalize('NFC').matchAll(re)) {

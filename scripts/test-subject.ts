@@ -72,11 +72,14 @@ for (const k of ['ICHIREI_CARDS', 'ICHIREI_GAZE_FIX', 'ICHIREI_REVIEW', 'REQUIRE
 
 const logs: string[] = []
 const origLog = console.log
-const run = async (): Promise<EngineResult> => {
+// The second-card scenarios run in REMEMBRANCE (2026-11-07: the only occasion that still has a second card — a 本命 and a 次点); the guard itself is the same on every card.
+const BASE = { language: 'ja', relationship: 'sibling', direction: 'across', purpose: 'apology', state: 'strained' }
+const MEM = { ...BASE, state: 'lost' } // (state 「もう会えない」 = remembrance)
+const run = async (ctx: object = MEM): Promise<EngineResult> => {
   for (const k of Object.keys(kinds)) delete kinds[k]
   logs.length = 0
   console.log = (...a: unknown[]) => { logs.push(a.map(String).join(' ')) }
-  try { return await runEngine(STORY, 'A', { context: { language: 'ja', relationship: 'sibling', direction: 'across', purpose: 'apology', state: 'strained' } as never }) } finally { console.log = origLog }
+  try { return await runEngine(STORY, 'A', { context: ctx as never }) } finally { console.log = origLog }
 }
 const live = (r: EngineResult) => r.candidates.filter((c) => !c.eliminated)
 const sum = (r: EngineResult) => ['main', 'second', 'freestyle'].map((sl) => live(r).find((c) => c.slot === sl)).filter(Boolean).map((c) => `${c!.slot}:${c!.kanji}`).join()
@@ -92,12 +95,14 @@ try {
   const mag = a.candidates.find((c) => c.kanji === '磨')
   check('(2) the exact card: 磨 with that line and that anchor is set aside as `subject` BEFORE the review (the review is never asked about it), and the second call\'s runner-up 灯 stands', sum(a).includes('second:灯') && !!mag?.eliminated && /^subject/.test(mag.eliminated_reason ?? '') && mag.flags.includes('subject') && !reviewed('磨') && reviewed('灯'), JSON.stringify([sum(a), mag?.eliminated_reason]))
   check('(2) …no line rewrite and no refill were needed; the log names the cause (subject_removed: second / anchor) and the removed card shows the code', !kinds.gaze && !kinds.refill && cardsLine().parallel?.subject_removed?.some((x: { slot: string; where: string }) => x.slot === 'second' && x.where === 'anchor') && (cardsLine().removed ?? []).some((r: { reason: string }) => /^subject/.test(r.reason)), JSON.stringify(cardsLine().parallel?.subject_removed))
-  check('(2) the four checks (about the receiver · no invented facts · tone · free pick) pass on the result', (() => { const c: PurposeCase = { id: 'x', purpose: 'apology', relationship: 'sibling', direction: 'across', state: 'strained', occasion_detail: null, language: 'ja', story: STORY }; const f = fourChecks(a, c); return f.receiver && f.facts && f.tone && f.free })())
+  replies = { ...replies, main: mainOk, free: freeOk }
+  const a0 = await run(BASE) // (the four checks are for an ordinary round: a 本命 and a 遊び字)
+  check('(2) the four checks (about the receiver · no invented facts · tone · free pick) pass on the result', (() => { const c: PurposeCase = { id: 'x', purpose: 'apology', relationship: 'sibling', direction: 'across', state: 'strained', occasion_detail: null, language: 'ja', story: STORY }; const f = fourChecks(a0, c); return f.receiver && f.facts && f.tone && f.free })())
 
   // B. both cards of the call stand on the narrator, and so does the main call's runner-up → the refill fills the second card
   replies = { ...replies, main: sel(cand('main', '誠', 'まこと', GOOD, A.lamp, 'Turning Point'), cand('main', '整', 'ととのえる', '毎晩、削った面を確かめていた。', A.narrator2)), second: sel(cand('second', '磨', 'みがく', '三週間かけて、削って、加えて…', A.narrator1, 'Hidden Cost'), cand('second', '継', 'つぐ', '計測して、削って、加えて。', A.narrator1)), refill: { candidates: [cand('second', '灯', 'あかり', 'いつも、遅くまで灯りをつけて待っていてくれた人。', A.lamp, 'Private Symbol')] } }
   const b = await run()
-  check('(3) every candidate of the second call AND the main call\'s runner-up stand on the narrator → all set aside as `subject`, then the refill fills the second card (3 cards)', sum(b) === 'main:誠,second:灯,freestyle:待' && !reviewed('磨') && !reviewed('継') && !reviewed('整') && (kinds.refill?.length ?? 0) === 1 && cardsLine().second_source === 'refill', `${sum(b)} | ${cardsLine().second_source} | refill ${kinds.refill?.length}`)
+  check('(3) every candidate of the second call AND the main call\'s runner-up stand on the narrator → all set aside as `subject`, then the refill fills the second card (remembrance: a 本命 and a 次点)', sum(b) === 'main:誠,second:灯' && !reviewed('磨') && !reviewed('継') && !reviewed('整') && (kinds.refill?.length ?? 0) === 1 && cardsLine().second_source === 'refill', `${sum(b)} | ${cardsLine().second_source} | refill ${kinds.refill?.length}`)
   // …and a refill that stands on the narrator is refused too
   replies = { ...replies, refill: { candidates: [cand('second', '整', 'ととのえる', '毎晩、削った面を確かめていた。', A.narrator2)] } }
   const b2 = await run()
@@ -134,7 +139,7 @@ try {
   replies = { ...replies, main: sel(cand('main', '誠', 'まこと', GOOD, A.narrator1, 'Turning Point'), cand('main', '整', 'ととのえる', '毎晩、整えている人。', A.narrator2, 'Hidden Cost')), second: sel(cand('second', '信', 'しんじる', GOOD, A.nod, 'Private Symbol')), free: freeOk, gaze: { gazes: [] }, refill: { none: true } }
   const g = await run()
   const gm = live(g).filter((x) => x.slot === 'main')
-  check('(final touch) every main candidate set aside + refill gives nothing → the result is still `sufficient`, the live second card (信) is the MAIN (primary_kanji 信), there is no second, and the free pick stays', g.status === 'sufficient' && gm.length === 1 && gm[0].kanji === '信' && g.primary_kanji === '信' && !live(g).some((x) => x.slot === 'second') && live(g).some((x) => x.slot === 'freestyle') && logs.some((l) => l.includes('main_from_second')), JSON.stringify([g.status, sum(g), g.primary_kanji]))
+  check('(final touch) every main candidate set aside + refill gives nothing → the result is still `sufficient`, the live second card (信) is the MAIN (primary_kanji 信), there is no second', g.status === 'sufficient' && gm.length === 1 && gm[0].kanji === '信' && g.primary_kanji === '信' && !live(g).some((x) => x.slot === 'second') && logs.some((l) => l.includes('main_from_second')), JSON.stringify([g.status, sum(g), g.primary_kanji]))
   // …and when the refill DOES give a card, the result has a main and a second (the live second card leads, the refilled card is its partner) — no promotion log needed
   replies = { ...replies, refill: { candidates: [cand('main', '守', 'まもる', 'いつも、夕飯を取っておいてくれた人。', A.supper, 'Private Symbol')] } }
   const g2 = await run()
@@ -142,7 +147,7 @@ try {
 
   // H. final touch (self-test celebrate-2 焦, reconnect-1 辛): a free pick whose common meaning is a negative feeling or state is refused by the referee and the runner-up stands
   replies = { ...replies, main: sel(cand('main', '誠', 'まこと', GOOD, A.lamp, 'Turning Point')), second: sel(cand('second', '信', 'しんじる', GOOD, A.supper, 'Private Symbol')), free: { candidates: [cand('freestyle', '焦', 'こげる', 'うなずくだけで、全部を受け止める人。', A.nod, 'Play'), cand('freestyle', '笑', 'わらう', 'うなずいて、にこっと笑ってくれる人。', A.nod, 'Play')] }, gaze: { gazes: [] }, refill: { none: true } }
-  const h = await run()
+  const h = await run(BASE)
   const hf = live(h).find((x) => x.slot === 'freestyle')
   check('(final touch) the free pick 焦 (a negative feeling) is refused; its runner-up 笑 stands; 辛 and 苦 are refused the same way', hf?.kanji === '笑' && ['辛', '苦', '怒', '嫌', '怠', '寒'].every((k) => loadPalette().freestyleCategory('ja', [k]) === 'negative_feeling'), JSON.stringify([sum(h), hf?.kanji]))
   check('(final touch) the free-pick prompt and the review prompt both say it: no negative feeling or state, even as a joke', ['card-free-prompt.md', 'refill-free-prompt.md'].every((f) => /negative feeling or state/.test(readFileSync(join(process.cwd(), 'engine', f), 'utf8'))) && /negative feeling or state/.test(readFileSync(join(process.cwd(), 'engine', 'review-prompt.md'), 'utf8')))

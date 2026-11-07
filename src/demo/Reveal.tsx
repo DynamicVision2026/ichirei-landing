@@ -14,8 +14,9 @@ import { carvedGlyph, contextToPayload, isChineseUi, occasionOf, purposeOf, type
 // Progressive reveal (build spec §8) + condition presentation (§5) + the
 // behavioral instrumentation that makes this an experiment (§6).
 //
-// - v6: at most three cards — the MAIN candidate (本命, the cinnabar primary, shown first), the
-//   SECOND (次点) and the FREESTYLE (遊び字: lighter, dashed, never cinnabar, no deep explanation).
+// - 2026-11-07: TWO cards a round, equal in size — the MAIN candidate (本命, character in cinnabar, shown first) and the
+//   FREESTYLE (遊び字, character in ink). Side by side on a wide screen, stacked on a phone (本命 first). Only remembrance has a
+//   SECOND (次点) instead of the 遊び字, and its main character is ink as well.
 //   Each main card shows three layers: the story anchor in quotes, the one-line gaze, and — only when
 //   the server attached one from a reviewed palette row — a classical line with its source.
 // - Candidates surface one at a time (discovery, not menu).
@@ -232,6 +233,8 @@ export default function Reveal({ result, story, followUps = [], condition, copy,
   // left out — an English word is never shown on a Japanese or Chinese page.
   const feelingText = feelingLine(result.fingerprint?.emotional_register ?? [], language)
   const allRevealed = revealedCount >= revealOrder.length
+  // two equal cards (side by side from the md width, stacked below it)
+  const pairLayout = revealOrder.length >= 2
   const primaryBtn = diagnostics
     ? 'font-label rounded-full bg-seal px-10 py-4 text-sm tracking-[0.15em] text-white transition-all disabled:cursor-not-allowed disabled:opacity-40'
     : 'btn primary'
@@ -240,7 +243,7 @@ export default function Reveal({ result, story, followUps = [], condition, copy,
     <div data-all-revealed={allRevealed ? 'yes' : 'no'}>
       <p className="font-serif-jp mb-8 text-sm text-mute" data-reveal-intro>{diagnostics ? copy.revealIntro : memorial ? copy.revealIntroMemorial : copy.revealIntroCustomer}</p>
 
-      <div className="flex flex-col gap-6" role="list">
+      <div className={pairLayout ? 'grid grid-cols-1 gap-6 md:grid-cols-2' : 'flex flex-col gap-6'} role="list" data-layout={pairLayout ? 'pair' : 'single'}>
         {revealOrder.slice(0, revealedCount).map((c) => {
           const isPrimary = c.kanji === result.primary_kanji
           const isFreestyle = c.slot === 'freestyle'
@@ -256,31 +259,29 @@ export default function Reveal({ result, story, followUps = [], condition, copy,
               transition={{ duration: 0.9, ease: [0.16, 1, 0.3, 1] }}
               data-slot={isFreestyle ? 'freestyle' : isPrimary ? 'main' : 'second'}
               data-memorial={memorial ? 'yes' : undefined}
-              className={`rounded-2xl px-6 ${alwaysOpen ? '' : 'cursor-pointer'} ${
-                isFreestyle
-                  ? 'border border-dashed border-accent/60 bg-transparent py-6'
-                  : `border border-line bg-surface py-8 ${diagnostics ? PAPER_SHADOW : CARD_SHADOW} ${isPrimary ? (quiet ? 'border-t-4 border-t-fg' : 'border-t-4 border-t-seal') : ''}`
+              className={`flex flex-col rounded-2xl border border-line border-t-4 bg-surface px-6 py-8 ${diagnostics ? PAPER_SHADOW : CARD_SHADOW} ${alwaysOpen ? '' : 'cursor-pointer'} ${
+                isPrimary ? (quiet ? 'border-t-fg' : 'border-t-seal') : 'border-t-fg/25'
               } ${isSelected ? 'ring-2 ring-accent' : ''}`}
               onClick={alwaysOpen ? undefined : () => toggleOpen(c)}
             >
               <p
                 data-slot-label
                 className={`font-label mb-4 inline-block rounded-full px-3 py-1 text-[12px] tracking-[0.12em] ${
-                  isPrimary ? (quiet ? 'bg-fg text-page' : 'bg-seal text-white') : isFreestyle ? 'border border-dashed border-accent text-accent' : 'bg-fg/10 text-fg'
+                  isPrimary ? (quiet ? 'bg-fg text-page' : 'bg-seal text-white') : 'bg-fg/10 text-fg'
                 }`}
               >
                 {slotLabel}
               </p>
-              <div className="flex flex-col items-center gap-6 sm:flex-row sm:items-center">
-                <div className="sm:w-44 sm:shrink-0">
+              <div className={`flex flex-col items-center gap-6 ${pairLayout ? '' : 'sm:flex-row sm:items-center'}`}>
+                <div className={pairLayout ? '' : 'sm:w-44 sm:shrink-0'}>
                   <InscriptionGlyph
                     candidate={c}
                     copy={copy}
                     language={language}
                     script={script}
                     customerGlyph={!diagnostics}
-                    size={isFreestyle ? 'text-6xl' : 'text-7xl'}
-                    color={isPrimary ? (quiet ? 'text-fg' : 'text-seal') : isFreestyle ? 'text-mute' : 'text-fg'}
+                    size="text-7xl"
+                    color={isPrimary ? (quiet ? 'text-fg' : 'text-seal') : 'text-fg'}
                   />
                 </div>
                 <div className="w-full min-w-0 flex-1 text-left">
@@ -398,6 +399,10 @@ export default function Reveal({ result, story, followUps = [], condition, copy,
         <p className="font-label mt-8 animate-pulse text-center text-xs tracking-[0.3em] text-mute" aria-hidden="true">
           …
         </p>
+      )}
+
+      {allRevealed && pairLayout && !memorial && (
+        <p className="font-serif-jp mx-auto mt-6 max-w-xl text-center text-sm leading-relaxed text-mute" data-pair-note>{copy.pairNote}</p>
       )}
 
       {allRevealed && (

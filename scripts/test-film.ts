@@ -53,11 +53,11 @@ const withLine = (n: number, line: string) => ({ ...GOOD, lines: GOOD.lines.map(
   check('(2) pictures: a remembrance film has no celebration image (party, cake, candles, wedding, festival, balloons); a normal film may', ['a birthday cake', 'candles on a table', 'a wedding bouquet', 'festival lanterns', 'balloons'].every((w) => codes(withPic(3, `a quiet room with two hands resting on a wooden table in soft afternoon light, ${w} beside a window and a cup`), input({ memorial: true, occasion: 'memorial' })).includes('pic_blocked')) && codes(withPic(3, 'a quiet room with two hands resting on a wooden table in soft afternoon light, a birthday cake beside a window and a cup'), input()).length === 0)
   check('(2) pictures: the four must be four different moments; the occasion\'s forbidden English words apply (a wedding film: no "goodbye")', codes({ ...GOOD, pictures: [GOOD.pictures[0], GOOD.pictures[0], GOOD.pictures[2], GOOD.pictures[3]] }).includes('pic_same') && codes(withPic(0, GOOD.pictures[0] + ' goodbye'), input({ occasion: 'wedding' })).includes('pic_blocked'))
   const ja = input()
-  const zhIn = input({ language: 'zh-Hant', story: '每次晚歸，媽媽都替我留一盞燈。', glyph: '守', forms: ['守'] })
-  const enIn = input({ language: 'en', story: 'My mother waited at the station every time.', glyph: '待', forms: ['待'] })
+  const zhIn = input({ language: 'zh-Hant', story: '每次晚歸，媽媽都替我留一盞燈。她常常泡茶給我。我們坐在窗邊。外面下著雨。', glyph: '守', forms: ['守'] })
+  const enIn = input({ language: 'en', story: 'My mother waited at the station every time. She made tea for me. We sat by the window. It rained outside.', glyph: '待', forms: ['待'] })
   const base = 'two hands resting on a wooden table in soft afternoon light beside a window and a cup of tea in a quiet room'
   check('(2) clothes: a kimono, yukata, hanbok, qipao or "traditional dress" in a picture description is refused — unless the story itself mentions one (着物 / kimono)', ['a woman in a kimono', 'a girl wearing a yukata', 'a mother in a traditional dress', 'a grandmother in a qipao', 'a man in hakama'].every((w) => codes(withPic(1, `${w} seen from behind, ${base}`)).includes('pic_blocked')) && codes(withPic(1, `a woman in a kimono seen from behind, ${base}`), input({ story: STORY + '母は着物で来てくれた。' })).length === 0 && codes(withPic(1, `a young woman in a plain sweater seen from behind, ${base}`)).length === 0)
-  check('(2) setting: a Chinese-language film may not have tatami, shoji, paper lanterns, a torii or a "Japanese house" (the story does not name Japan); a Japanese film may have a Japanese home; an English film may not either', ['a tatami room', 'paper lanterns by the door', 'a torii gate', 'a Japanese house', 'shoji screens'].every((w) => checkPictures([`${w}, ${base}`, GOOD.pictures[1], GOOD.pictures[2], GOOD.pictures[3]], zhIn).some((p) => p.code === 'pic_blocked')) && checkPictures([`a tatami room with two hands resting on a low table in afternoon light and a cup of tea beside a window`, GOOD.pictures[1], GOOD.pictures[2], GOOD.pictures[3]], ja).length === 0 && checkPictures([`a tatami room, ${base}`, GOOD.pictures[1], GOOD.pictures[2], GOOD.pictures[3]], enIn).some((p) => p.code === 'pic_blocked') && checkPictures([`a tatami room, ${base}`, GOOD.pictures[1], GOOD.pictures[2], GOOD.pictures[3]], { ...zhIn, story: '我們住在日本的老房子，榻榻米，日本' }).length === 0)
+  check('(2) setting: a Chinese-language film may not have tatami, shoji, paper lanterns, a torii or a "Japanese house" (the story does not name Japan); a Japanese film may have a Japanese home; an English film may not either', ['a tatami room', 'paper lanterns by the door', 'a torii gate', 'a Japanese house', 'shoji screens'].every((w) => checkPictures([`${w}, ${base}`, GOOD.pictures[1], GOOD.pictures[2], GOOD.pictures[3]], zhIn).some((p) => p.code === 'pic_blocked')) && checkPictures([`a tatami room with two hands resting on a low table in afternoon light and a cup of tea beside a window`, GOOD.pictures[1], GOOD.pictures[2], GOOD.pictures[3]], ja).length === 0 && checkPictures([`a tatami room, ${base}`, GOOD.pictures[1], GOOD.pictures[2], GOOD.pictures[3]], enIn).some((p) => p.code === 'pic_blocked') && checkPictures([`a tatami room, ${base}`, GOOD.pictures[1], GOOD.pictures[2], GOOD.pictures[3]], { ...zhIn, story: '我們住在日本的老房子，榻榻米，日本。她常常泡茶給我。我們坐在窗邊。外面下著雨。' }).length === 0)
   check('(2) religious symbols: a cross (also from a window frame), an altar, a shrine, a temple, a torii, incense, prayer beads, a church are refused — unless the story mentions them; a plain window and a quiet table are fine, most of all in a remembrance film', ['a cross', 'a window frame forming a cross', 'a Buddhist altar', 'a small shrine', 'a temple roof', 'a church window', 'burning incense', 'prayer beads'].every((w) => codes(withPic(2, `${w} beside ${base}`), input({ memorial: true, occasion: 'memorial' })).includes('pic_blocked')) && codes(withPic(2, `a small Buddhist altar beside ${base}`), input({ memorial: true, occasion: 'memorial', story: STORY + '毎朝、仏壇に手を合わせていた。' })).length === 0 && codes(withPic(2, base), input({ memorial: true, occasion: 'memorial' })).length === 0)
   check('(2) the picture prompt carries the two new rules (clothes and setting by language; no religious symbols, a window frame cross included, "most important in a remembrance film")', (() => { const p = loadFilmPrompt(); return p.includes('CLOTHES AND SETTING') && p.includes('contemporary everyday clothes') && p.includes('never a kimono, yukata, hanbok, qipao') && p.includes('ja → a modern Japanese home and town') && p.includes('modern Taiwanese, Hong Kong or Chinese home and street') && p.includes('never Japanese houses, paper lanterns, tatami') && p.includes('en → a neutral modern home') && p.includes('follow the story') && p.includes('NO RELIGIOUS SYMBOLS') && p.includes('made by a window frame') && p.includes('most in a remembrance film') && !p.includes('neutral East Asian') })())
   check('(2) checkPictures stands alone too (the same function the referee calls) and the sample scripts pass it', checkPictures(GOOD.pictures, input()).length === 0 && Object.values(SAMPLE_RECORDS).every((r) => checkPictures(r.film!.pictures, { glyph: r.glyph, forms: [r.glyph], names: [], memorial: r.memorial, occasion: r.memorial ? 'memorial' : null }).length === 0))
@@ -65,9 +65,9 @@ const withLine = (n: number, line: string) => ({ ...GOOD, lines: GOOD.lines.map(
   check('(2) line length: ja 12–40 characters, zh 10–32 characters, en 4–20 words (a line break and spaces do not count)', lim.min === 12 && lim.max === 40 && lineLimits('zh-Hant').min === 10 && lineLimits('zh-Hant').max === 32 && lineLimits('en').min === 4 && lineLimits('en').max === 20 && lineSize('春には、お弁当に\n庭の花を一輪のせてくれた母。', 'ja') === 22 && lineSize('one two  three\nfour', 'en') === 4)
   check('(2) …a ja line of 11 or 41 characters is refused, 12 and 40 pass', codes(withLine(0, '春にはお弁当に庭の花を一輪')).length === 0 && !codes(withLine(0, '短い一行です')).every((c) => c !== 'line_length') && codes(withLine(0, 'あ'.repeat(40))).includes('character') === false && codes(withLine(0, 'あ'.repeat(41))).includes('line_length') && codes(withLine(0, 'あ'.repeat(11))).includes('line_length') && !codes(withLine(0, 'あ'.repeat(12))).includes('line_length') && !codes(withLine(0, 'あ'.repeat(40))).includes('line_length'))
   check('(2) …a line with two line breaks is refused (one at most)', codes(withLine(0, '春には、\nお弁当に\n庭の花を一輪のせた母。')).includes('line_length'))
-  const zh = input({ language: 'zh-Hant', occasion: 'parent_day', glyph: '守', forms: ['守'], story: '每次晚歸，媽媽都替我留一盞燈。她說：「家裡的燈還亮著。」' })
+  const zh = input({ language: 'zh-Hant', occasion: 'parent_day', glyph: '守', forms: ['守'], story: '每次晚歸，媽媽都替我留一盞燈。她說：「家裡的燈還亮著。」下雨的夜裡，媽媽撐著傘在門口等。我出門念書，她在月台上揮著手。' })
   const zhGood = { turning_point: '她每晚都為我留著門口的燈', lines: ['每次晚歸，玄關總有一盞燈亮著。', '下雨的夜裡，媽媽撐著傘在門口等。', '我出門念書，她在月台上揮著手。', '她只說：「家裡的燈還亮著。」'], pictures: [...SAMPLE_RECORDS[SAMPLE_IDS.zh].film!.pictures] }
-  const en = input({ language: 'en', occasion: 'parent_day', glyph: '待', forms: ['待'], story: 'My mother waited at the station every time. She only said, "The tea is ready."' })
+  const en = input({ language: 'en', occasion: 'parent_day', glyph: '待', forms: ['待'], story: 'My mother waited at the station every time. She only said, "The tea is ready." When it rained, she was there with an umbrella. I came home late, and the shoes were already set by the door.' })
   const enGood = { turning_point: 'She was always at the station before I asked', lines: ['Every time I left, she stood\nat the station and waved.', 'When it rained, she was there\nwith an umbrella, before I asked.', 'I came home late, and the shoes\nwere already set by the door.', 'She only said, "The tea is ready."'], pictures: [...SAMPLE_RECORDS[SAMPLE_IDS.en].film!.pictures] }
   check('(2) the Chinese and the English golden scripts pass too (zh with its exact quotation, en with straight quotation marks)', codes(zhGood, zh).length === 0 && codes(enGood, en).length === 0, JSON.stringify([checkFilmScript(zhGood, zh, palette), checkFilmScript(enGood, en, palette)]))
   check('(2) en length counts words: 3 words and 21 words are refused', codes({ ...enGood, lines: ['too few words', ...enGood.lines.slice(1)] }, en).includes('line_length') && codes({ ...enGood, lines: ['one two three four five six seven eight nine ten eleven twelve thirteen fourteen fifteen sixteen seventeen eighteen nineteen twenty twentyone', ...enGood.lines.slice(1)] }, en).includes('line_length'))
@@ -398,6 +398,82 @@ const animationViewFor = (film: Awaited<ReturnType<typeof makeFilm>>) => animati
   check('(8) pictures: an old tree stump, brush strokes, crashing waves, a drip of water, stitching a cloth pass; an ambulance, a prosthetic leg, a car crash, an IV drip are caught', ['an old tree stump by the path', 'ink brush strokes across the paper', 'crashing waves below the rocks', 'a drip of water from the eaves', 'hands stitching a cloth on a table'].every((d) => !pic(d)) && ['an ambulance at the roadside', 'a prosthetic leg by the bed', 'a car crash on a wet road', 'an IV drip beside a bed'].every((d) => pic(d)))
   // launch freeze: age is not unsafe — elderly, old age, aging, aged, senior in a picture, and 高齢 / 老人 / 高齡 in a line, are no reason to block a scene (decline words such as 老い stay)
   check('(8) age is not unsafe: "an elderly woman", "an old man aged eighty", "a senior couple", "aging hands", "old age" pass the picture check; 高齢の母 / 老人 / 高齡 / "elderly mother" pass the line check; 老いた父 and "frail" still do not', ['an elderly woman holding a teacup', 'an old man aged eighty on a bench', 'a senior couple walking', 'aging hands resting on a table', 'a quiet garden in old age'].every((d) => !pic(d)) && findIllness('高齢の母は、毎朝庭に出る', 'ja') === null && findIllness('老人は笑った', 'ja') === null && findIllness('我的高齡母親每天早起', 'zh') === null && findIllness('an elderly mother, aging well', 'en') === null && findIllness('老いた父', 'ja') !== null && pic('frail hands'))
+}
+
+// ---- (9) a SHORT story still gets four pictures (2026-11-07, B5): four views of one moment, nothing added ------------------------------------------------------------------------------
+{
+  const { isShortStory, momentCount, inventedInPicture, lineBorrowsFromStory } = await import('../engine/film-truth.ts')
+  const SHORT = {
+    ja1: '祖母は毎朝、猫の水を替えてくれた。',
+    ja2: '祖母は毎朝、猫の水を替えてくれた。縁側の日だまりで、猫が私の帰りを待っていた。',
+    zh1: '奶奶每天早上都替貓換水。',
+    zh2: '奶奶每天早上都替貓換水。貓在曬太陽的走廊上等我回家。',
+    en1: 'My grandmother changed the cat\'s water every morning.',
+    en2: 'My grandmother changed the cat\'s water every morning. The cat waited for me on the sunny porch.',
+  } as const
+  const lang = (k: string) => (k.startsWith('ja') ? 'ja' : k.startsWith('zh') ? 'zh-Hant' : 'en') as FilmInput['language']
+  // four views of ONE moment: the place and its light · the receiver's act · a close-up of a detail the story has · the quiet after (pictures in English, nothing the story lacks)
+  const VIEWS: Record<string, { lines: string[]; pictures: string[] }> = {
+    ja1: { lines: ['祖母は毎朝、猫の水を替えてくれた。', '', '猫の水を替えてくれた。', ''], pictures: [
+      'a quiet morning room seen from the doorway, pale light on the floor and a small bowl waiting near the wall',
+      'a grandmother\'s hands pouring fresh water into a small bowl for the cat, seen from behind in soft window light',
+      'a close view of clear water trembling in the cat\'s bowl, bright ripples catching the early morning light',
+      'the same bowl full and still, the cat already drinking beside it, the room quiet in the pale morning light'] },
+    ja2: { lines: ['祖母は毎朝、猫の水を替えてくれた。', '', '縁側の日だまりで、猫が待っていた。', ''], pictures: [
+      'a sunny veranda seen from far away, warm light pooled on the boards and a cat sitting small in the middle of it',
+      'a grandmother\'s hands pouring fresh water into a bowl for the cat, seen from behind in soft morning light',
+      'a close view of the cat\'s bowl with clear water, a few bright ripples caught in the light',
+      'the cat resting in the pool of sunlight beside the full bowl, the veranda quiet and warm in the late afternoon'] },
+    zh1: { lines: ['奶奶每天早上都替貓換水。', '', '替貓換水。', ''], pictures: [
+      'a quiet morning room seen from the doorway, pale light on the floor and a small bowl waiting near the wall',
+      'a grandmother\'s hands pouring fresh water into a small bowl for the cat, seen from behind in soft window light',
+      'a close view of clear water trembling in the cat\'s bowl, bright ripples catching the early morning light',
+      'the same bowl full and still, the cat already drinking beside it, the room quiet in the pale morning light'] },
+    zh2: { lines: ['奶奶每天早上都替貓換水。', '', '貓在走廊上等我回家。', ''], pictures: [
+      'a sunny corridor seen from far away, warm light pooled on the floor and a cat sitting small in the middle of it',
+      'a grandmother\'s hands pouring fresh water into a bowl for the cat, seen from behind in soft morning light',
+      'a close view of the cat\'s bowl with clear water, a few bright ripples caught in the light',
+      'the cat resting in the pool of sunlight beside the full bowl, the corridor quiet and warm in the late afternoon'] },
+    en1: { lines: ['My grandmother changed the cat\'s water every morning.', '', 'Changed the cat\'s water every morning.', ''], pictures: [
+      'a quiet morning room seen from the doorway, pale light on the floor and a small bowl waiting near the wall',
+      'a grandmother\'s hands pouring fresh water into a small bowl for the cat, seen from behind in soft window light',
+      'a close view of clear water trembling in the cat\'s bowl, bright ripples catching the early morning light',
+      'the same bowl full and still, the cat already drinking beside it, the room quiet in the pale morning light'] },
+    en2: { lines: ['My grandmother changed the cat\'s water every morning.', '', 'The cat waited for me on the sunny porch.', ''], pictures: [
+      'a sunny porch seen from far away, warm light pooled on the boards and a cat sitting small in the middle of it',
+      'a grandmother\'s hands pouring fresh water into a bowl for the cat, seen from behind in soft morning light',
+      'a close view of the cat\'s bowl with clear water, a few bright ripples caught in the light',
+      'the cat resting in the pool of sunlight beside the full bowl, the porch quiet and warm in the late afternoon'] },
+  }
+  check('(9) B5: a story of fewer than four sentences is a SHORT story (one and two sentences, in ja / zh / en); a four-sentence story is not', Object.values(SHORT).every((t) => isShortStory(t)) && momentCount(SHORT.ja1) === 1 && momentCount(SHORT.en2) === 2 && !isShortStory('一つ目です。二つ目です。三つ目です。四つ目です。') && !isShortStory('One here. Two here. Three here. Four here.'))
+  for (const [k, text] of Object.entries(SHORT)) {
+    const i = input({ story: text, language: lang(k), glyph: '守', forms: ['守'], names: [], moment: 'x', who: 'x', relationship: 'grandparent', occasion: null })
+    const script = { turning_point: 'x', ...VIEWS[k] }
+    const probs = checkFilmScript(script, i, palette)
+    check(`(9) B5 ${k}: ${text.length > 40 ? 'two' : 'one'} sentence${text.length > 40 ? 's' : ''} → FOUR scene scripts (four distinct pictures of 15–40 words, empty captions allowed for the extra scenes) pass the truth check`, probs.length === 0 && script.pictures.length === 4 && new Set(script.pictures).size === 4, JSON.stringify(probs))
+  }
+  // the truth check itself
+  const ST = SHORT.ja1
+  check('(9) B5: a picture that adds a person or an object the story does not have is refused — a child, a dog, an umbrella, a bicycle, a friend; the same words are fine when the story has them', ['a little girl', 'a dog', 'an umbrella', 'a bicycle', 'a friend', 'a teacher'].every((w) => inventedInPicture(`${w} beside a small bowl in soft morning light`, ST).length > 0) && inventedInPicture('a cat beside a small bowl of water in soft morning light, a grandmother\'s hands', ST).length === 0 && inventedInPicture('a dog at the door', '犬が玄関で待っていた。').length === 0 && inventedInPicture('an umbrella by the door', 'She left her umbrella by the door.').length === 0)
+  check('(9) B5: mood, light, weather, season and camera distance are free (no list word is touched): "pale snow light, wide and far", "close detail, autumn dusk"', inventedInPicture('wide and far, pale snow light on a quiet wooden floor, evening mood, a close detail', ST).length === 0)
+  check('(9) B5: a caption of a short story must borrow a phrase of the story, or be empty — an invented caption is refused, an empty one is fine', lineBorrowsFromStory('', ST, 'ja') && lineBorrowsFromStory('猫の水を替えてくれた', ST, 'ja') && !lineBorrowsFromStory('夕焼けの空を二人で見上げた', ST, 'ja') && lineBorrowsFromStory('Changed the cat\'s water', SHORT.en1, 'en') && !lineBorrowsFromStory('They watched the sunset together', SHORT.en1, 'en'))
+  const shortIn = input({ story: SHORT.ja2, glyph: '守', forms: ['守'], names: [], moment: 'x', who: 'x', relationship: 'grandparent', occasion: null })
+  const invented = { turning_point: 'x', lines: VIEWS.ja2.lines, pictures: [VIEWS.ja2.pictures[0], 'a little girl holding an umbrella beside a bicycle in the rain on the veranda, seen from far away in grey light', VIEWS.ja2.pictures[2], VIEWS.ja2.pictures[3]] }
+  const iprobs = checkFilmScript(invented, shortIn, palette)
+  check('(9) B5: a fake script whose picture 2 adds a child, an umbrella and a bicycle is refused for that scene only (picture_invented, scene 2), the other three pass', iprobs.length > 0 && iprobs.every((p) => p.scene === 1 && p.code === 'pic_invented') && iprobs[0].terms!.length === 3, JSON.stringify(iprobs))
+  // the whole flow: the invented picture is rewritten ALONE (one small call) and the film is ready with four real pictures
+  const fixedScene = { line: '', picture: 'a grandmother\'s hands pouring fresh water into a bowl for the cat, seen from behind in soft morning light and warm air' }
+  const fr = await run([invented], shortIn, 'ok', { 2: fixedScene })
+  check('(9) B5: the invented picture is REWRITTEN (one scene call, nothing else): the film is ready, all four pictures are drawn (no washi), none adds a person or an object the story lacks', fr.status === 'ready' && (fr.scenes ?? []).map((x) => x.state).join() === 'pass,rewritten,pass,pass' && fr.pictures.every((x) => x !== '' && inventedInPicture(x, SHORT.ja2).length === 0), JSON.stringify({ s: fr.status, scenes: fr.scenes, pics: fr.pictures }))
+  // and when the rewrite still adds something, only THAT scene is washi — the other three are drawn
+  const fw = await run([invented], shortIn, 'ok', { 2: { line: '', picture: 'a little girl with an umbrella standing near a bicycle on the veranda, seen from behind in grey light' } })
+  check('(9) B5: if the rewrite still adds something, only that scene becomes the washi tile — the other three pictures are drawn and the film is ready', fw.status === 'ready' && (fw.scenes ?? []).map((x) => x.state).join() === 'pass,washi,pass,pass' && fw.pictures[1] === '', JSON.stringify(fw.scenes))
+  // an invented CAPTION in a short story: rewritten once, then empty — the picture is kept
+  const inventedLine = { turning_point: 'x', lines: ['祖母は毎朝、猫の水を替えてくれた。', '夕焼けの空を二人で見上げた', '縁側の日だまりで、猫が待っていた。', ''], pictures: VIEWS.ja2.pictures }
+  const fl = await run([inventedLine], shortIn, 'ok', {})
+  check('(9) B5: an invented caption on an extra scene (a sunset the story never mentions) is never shown: the line ends up empty, the picture of that scene is kept', fl.status === 'ready' && fl.lines[1] === '' && fl.pictures[1] !== '' && (fl.scenes ?? [])[1]?.line === 'empty', JSON.stringify({ lines: fl.lines, scenes: fl.scenes }))
+  const pr = loadFilmPrompt()
+  check('(9) B5: the film prompt carries the short-story rule — four views of one moment (place and light · the receiver\'s act · a close-up detail from the story · the quiet after), nothing added, an extra caption reuses a phrase of the story or is empty', /SHORT STORY/.test(pr) && /the place and its light/.test(pr) && /the receiver's act/.test(pr) && /close-up of a detail that is already in the story/.test(pr) && /the quiet after/.test(pr) && /NEVER add a person, an animal, an object, an event, a place or a word/.test(pr) && /empty string/.test(pr) && /NOTHING ADDED/.test(pr))
 }
 
 upstream.closeAllConnections?.()

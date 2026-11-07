@@ -78,16 +78,16 @@ gcs.close()
 
 // ---- what is recorded: codes and booleans, never text ----------------------------------------------------
 const shown = shownEvent(clone(GOLDEN), S1, 'customer', NOW)
-check('shown event: language, relationship, occasion, status, which slot was shown as main, whether a freestyle was offered', shown.event === 'shown' && shown.language === 'ja' && shown.relationship === 'parent_father' && shown.occasion === 'parent_day' && shown.status === 'sufficient' && shown.main_slot === 'main' && shown.has_freestyle === true)
+check('shown event: language, relationship, occasion, status, which slot was shown as main, whether a freestyle was offered', shown.event === 'shown' && shown.language === 'ja' && shown.relationship === 'parent_father' && shown.occasion === 'parent_day' && shown.status === 'sufficient' && shown.main_slot === 'main' && shown.has_free === true)
 const promotedResult = clone(GOLDEN)
 promotedResult.primary_kanji = '守'
 check('shown event: when slot 2 was promoted, the slot shown as main is "second"', (shownEvent(promotedResult, S1, 'customer', NOW) as { main_slot: string }).main_slot === 'second')
-check('shown event: an insufficient result has no main slot and no freestyle', (() => { const r = { ...clone(GOLDEN), status: 'insufficient' as const, candidates: [], primary_kanji: null, freestyle_kanji: null }; const e = shownEvent(r, S1, 'customer', NOW) as { main_slot: unknown; has_freestyle: boolean; status: string }; return e.status === 'insufficient' && e.main_slot === null && e.has_freestyle === false })())
-const KEYS_OK = new Set(['ts', 'session', 'source', 'event', 'language', 'relationship', 'occasion', 'purpose', 'state', 'status', 'main_slot', 'has_freestyle', 'choice'])
+check('shown event: an insufficient result has no main slot and no freestyle', (() => { const r = { ...clone(GOLDEN), status: 'insufficient' as const, candidates: [], primary_kanji: null, freestyle_kanji: null }; const e = shownEvent(r, S1, 'customer', NOW) as { main_slot: unknown; has_free: boolean; status: string }; return e.status === 'insufficient' && e.main_slot === null && e.has_free === false })())
+const KEYS_OK = new Set(['ts', 'session', 'source', 'event', 'language', 'relationship', 'occasion', 'purpose', 'state', 'status', 'main_slot', 'has_free', 'choice'])
 check('privacy: an event has ONLY whitelisted keys — no story, gaze, kanji, name, email, order_ref', Object.keys(shown).every((k) => KEYS_OK.has(k)) && !JSON.stringify(shown).includes('父') && !JSON.stringify(shown).includes('証'))
 check('client events: only "chosen" (with a valid choice) and "explain_opened" are accepted; extra fields are dropped; bad session / unknown event / bad choice are refused', (() => {
-  const ok = parseClientEvent({ session: S1, event: 'chosen', choice: 'freestyle', source: 'harness', story: 'SECRET STORY', name: '山田', order_ref: 'IC-1' }, NOW)
-  return ok?.event === 'chosen' && ok.choice === 'freestyle' && ok.source === 'harness' && !JSON.stringify(ok).includes('SECRET') && !JSON.stringify(ok).includes('山田') && !JSON.stringify(ok).includes('IC-1') &&
+  const ok = parseClientEvent({ session: S1, event: 'chosen', choice: 'free', source: 'harness', story: 'SECRET STORY', name: '山田', order_ref: 'IC-1' }, NOW)
+  return ok?.event === 'chosen' && ok.choice === 'free' && ok.source === 'harness' && !JSON.stringify(ok).includes('SECRET') && !JSON.stringify(ok).includes('山田') && !JSON.stringify(ok).includes('IC-1') &&
     parseClientEvent({ session: 'x', event: 'chosen', choice: 'main' }, NOW) === null && parseClientEvent({ session: S1, event: 'ordered', choice: 'main' }, NOW) === null &&
     parseClientEvent({ session: S1, event: 'shown' }, NOW) === null && parseClientEvent({ session: S1, event: 'chosen', choice: 'primary' }, NOW) === null && parseClientEvent({ session: S1, event: 'explain_opened' }, NOW)?.event === 'explain_opened' && parseClientEvent(null, NOW) === null
 })())
@@ -143,7 +143,7 @@ await sel.text()
 await new Promise((r) => setTimeout(r, 150))
 console.log = logq
 const shownLine = readLines().slice(before).find((l) => l.event === 'shown')
-check('/api/select with a session id writes ONE "shown" event: language, relationship, occasion, main slot, freestyle offered', shownLine?.language === 'ja' && shownLine.relationship === 'parent_father' && shownLine.occasion === 'parent_day' && shownLine.status === 'sufficient' && shownLine.main_slot === 'main' && shownLine.has_freestyle === true && shownLine.session === 'Sess' + 'B'.repeat(20), JSON.stringify(readLines().slice(before)))
+check('/api/select with a session id writes ONE "shown" event: language, relationship, occasion, main slot, freestyle offered', shownLine?.language === 'ja' && shownLine.relationship === 'parent_father' && shownLine.occasion === 'parent_day' && shownLine.status === 'sufficient' && shownLine.main_slot === 'main' && shownLine.has_free === true && shownLine.session === 'Sess' + 'B'.repeat(20), JSON.stringify(readLines().slice(before)))
 check('privacy: nothing of the story, the gaze lines or the kanji is in the analytics files', !readdirSync(join(adir, 'analytics')).some((f) => /父|駅|封筒|証|守|あなた/.test(readFileSync(join(adir, 'analytics', f), 'utf8'))))
 const beforeNo = readLines().length
 console.log = () => {}
@@ -176,27 +176,27 @@ check('a failed checkout (no cart) is NOT counted as "ordered"', [...ostore.line
 // ---- the report ------------------------------------------------------------------------------------------
 const T = '2026-10-26T01:00:00Z'
 const ev = (session: string, event: string, extra: object = {}, source = 'customer', ts = T) => ({ ts, session, source, event, ...extra })
-const sh = (s: string, language: string, extra: object = {}, source = 'customer', ts = T) => ev(s, 'shown', { language, relationship: 'friend', occasion: 'wedding', status: 'sufficient', main_slot: 'main', has_freestyle: true, ...extra }, source, ts)
+const sh = (s: string, language: string, extra: object = {}, source = 'customer', ts = T) => ev(s, 'shown', { language, relationship: 'friend', occasion: 'wedding', status: 'sufficient', main_slot: 'main', has_free: true, ...extra }, source, ts)
 const events = [
   // ja: 4 shown; 3 chose (2 main, 1 freestyle); 1 ordered; 1 explained
   sh('ja1', 'ja'), ev('ja1', 'chosen', { choice: 'main' }), ev('ja1', 'ordered'),
   sh('ja2', 'ja'), ev('ja2', 'chosen', { choice: 'main' }), ev('ja2', 'explain_opened', { choice: 'main' }),
-  sh('ja3', 'ja'), ev('ja3', 'chosen', { choice: 'freestyle' }),
+  sh('ja3', 'ja'), ev('ja3', 'chosen', { choice: 'free' }),
   sh('ja4', 'ja'),
   // en: 3 shown; 2 chose (second, main — the LAST chosen counts); 1 ordered
   sh('en1', 'en'), ev('en1', 'chosen', { choice: 'main' }), ev('en1', 'chosen', { choice: 'second' }), ev('en1', 'ordered'),
   sh('en2', 'en'), ev('en2', 'chosen', { choice: 'main' }),
   sh('en3', 'en'),
   // noise that must not count: insufficient result, harness source, a choice for a session never shown, an out-of-range day
-  sh('ja5', 'ja', { status: 'insufficient', main_slot: null, has_freestyle: false }), ev('ja5', 'chosen', { choice: 'main' }),
+  sh('ja5', 'ja', { status: 'insufficient', main_slot: null, has_free: false }), ev('ja5', 'chosen', { choice: 'main' }),
   sh('ja6', 'ja', {}, 'harness'), ev('ja6', 'chosen', { choice: 'second' }, 'harness'),
   ev('ghost', 'chosen', { choice: 'main' }), ev('ghost', 'ordered'),
 ]
 const rows = summarize(events)
 const ja = rows.find((r: { language: string }) => r.language === 'ja')
 const en = rows.find((r: { language: string }) => r.language === 'en')
-check('report: per language — ja: 4 shown, 3 chose → 66.7% main, 0% second, 33.3% freestyle; 25% ordered; 25% explained', ja.shown === 4 && ja.chose === 3 && ja.pct_main === 66.7 && ja.pct_second === 0 && ja.pct_freestyle === 33.3 && ja.pct_ordered === 25 && ja.pct_explained === 25, JSON.stringify(ja))
-check('report: en — the LAST choice counts (en1: main then second): 3 shown, 2 chose → 50% main, 50% second, 0% freestyle; 33.3% ordered', en.shown === 3 && en.chose === 2 && en.pct_main === 50 && en.pct_second === 50 && en.pct_freestyle === 0 && en.pct_ordered === 33.3, JSON.stringify(en))
+check('report: per language — ja: 4 shown, 3 chose → 66.7% main, 0% second, 33.3% freestyle; 25% ordered; 25% explained', ja.shown === 4 && ja.chose === 3 && ja.pct_main === 66.7 && ja.pct_second === 0 && ja.pct_free === 33.3 && ja.pct_ordered === 25 && ja.pct_explained === 25, JSON.stringify(ja))
+check('report: en — the LAST choice counts (en1: main then second): 3 shown, 2 chose → 50% main, 50% second, 0% freestyle; 33.3% ordered', en.shown === 3 && en.chose === 2 && en.pct_main === 50 && en.pct_second === 50 && en.pct_free === 0 && en.pct_ordered === 33.3, JSON.stringify(en))
 check('report: insufficient results, the harness source and sessions never shown are excluded; only customer sessions by default', rows.length === 2 && ja.shown === 4 && summarize(events, { source: 'all' }).find((r: { language: string }) => r.language === 'ja').shown === 5)
 check('report: --from/--to filter by day', summarize(events, { from: '2026-10-27' }).length === 0 && summarize(events, { from: '2026-10-26', to: '2026-10-26' }).length === 2)
 check('report: the table prints every language row with percentages, and the definitions', (() => { const t = format(rows); return /ja\s+4\s+3\s+66\.7%\s+0\.0%\s+33\.3%\s+25\.0%/.test(t) && /en\s+3\s+2\s+50\.0%\s+50\.0%\s+0\.0%\s+33\.3%/.test(t) && t.includes('% ordered') && t.includes('share of the sessions that chose') })(), format(rows))

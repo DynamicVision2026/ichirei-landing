@@ -57,13 +57,8 @@ export const FREE_OPTIONS = 5
 export const FREE_MAX_TOKENS = 2600
 /** The time the last step (a runner-up from the main/second calls) is given for its checks, counted from when it starts. */
 export const FREE_RUNNER_MS_DEFAULT = 25_000
-export const FREE_GRACE_MS_DEFAULT = 5_000
 const freeCallMs = () => num(process.env.ICHIREI_FREE_CALL_TIMEOUT_MS, FREE_CALL_MS_DEFAULT)
 const freeLaneMs = () => num(process.env.ICHIREI_FREE_LANE_MS, FREE_LANE_MS_DEFAULT)
-const freeGraceMs = () => num(process.env.ICHIREI_FREE_GRACE_MS, FREE_GRACE_MS_DEFAULT)
-/** The free pick's safety net (a second hedged pair of calls when the first pair left no free card) and the extra wait it is given after the other two cards are settled. */
-export const FREE_RETRY_GRACE_MS_DEFAULT = 15_000
-const freeRetryGraceMs = () => num(process.env.ICHIREI_FREE_RETRY_GRACE_MS, FREE_RETRY_GRACE_MS_DEFAULT)
 const freeRunnerMs = () => num(process.env.ICHIREI_FREE_RUNNER_MS, FREE_RUNNER_MS_DEFAULT)
 const freeRunnerOn = (): boolean => !/^(off|0|false|no)$/i.test((process.env.ICHIREI_FREE_RUNNER_UP ?? '').trim())
 const freeRetryOn = (): boolean => !/^(off|0|false|no)$/i.test((process.env.ICHIREI_FREE_RETRY ?? '').trim())
@@ -190,7 +185,6 @@ export interface CardsReport {
   main_call_ms: number
   gaze_ms: number
   gaze_failing: number
-  free_dropped: 'late' | null
   /** where the second card came from: its own call, the main call's runner-up, or the refill (set by the engine); null = no second card */
   second_source: 'second_call' | 'main_runner_up' | 'refill' | null
 }
@@ -455,15 +449,13 @@ export async function runCards(a: CardsArgs): Promise<CardsOut> {
   const freeStop = new AbortController()
   let freeSignal = AbortSignal.any([signal, freeStop.signal, AbortSignal.timeout(freeLaneMs())]) // (replaced by a fresh one for the last step, which starts when the other cards are done)
 
-  const report: CardsReport = { calls: [], reviews: [], subject_removed: [], subject_rewritten: 0, looks_rewritten: [], line_rescue: [], language: [], free_retry: { asked: false, why: null, won: null }, free_source: null, free_fallbacks: [], free_set_aside: {}, collisions: [], runner_up_used: [], first_card_ms: null, all_cards_ms: 0, main_call_ms: 0, gaze_ms: 0, gaze_failing: 0, free_dropped: null, second_source: null }
+  const report: CardsReport = { calls: [], reviews: [], subject_removed: [], subject_rewritten: 0, looks_rewritten: [], line_rescue: [], language: [], free_retry: { asked: false, why: null, won: null }, free_source: null, free_fallbacks: [], free_set_aside: {}, collisions: [], runner_up_used: [], first_card_ms: null, all_cards_ms: 0, main_call_ms: 0, gaze_ms: 0, gaze_failing: 0, second_source: null }
   const verdicts: ReviewVerdict[] = []
   let anyReviewRan = false
   let skipped: string | null = null
   let early: CardsOut['early'] = null
   let mainRaw: EngineResult | null = null
   let mainExtracted: EngineResult | null = null
-  let freeClosed = false
-  let freeRetrying = false // the free pick's second pair of calls is under way (the join waits a little longer for it)
 
   // progress for the page: only ever forward (reading → choosing → checking)
   const order = ['reading', 'choosing', 'checking'] as const
@@ -622,7 +614,8 @@ export async function runCards(a: CardsArgs): Promise<CardsOut> {
     })
   }
   const callMain = cardCall('main')
-  const callSecond = cardCall('second')
+  // Two cards per round (2026-11-07): the main (本命) and the free pick (遊び字). The second (次点) call exists only for remembrance, which has no free pick.
+  const callSecond = memorial ? cardCall('second') : null
   // The free pick is asked TWICE at the same moment (the same prompt, the small model, low effort, no extended thinking, five options, the same ceiling): the first answer that is
   // readable and offers a card wins and the other call is cancelled. If both fail or time out, the sender sees two cards, as before.
   const hedgedFree = (round: 1 | 2 = 1, avoid: { kanji: string; reason: string }[] = []): Promise<CallOut> => {
@@ -837,21 +830,6 @@ export async function runCards(a: CardsArgs): Promise<CardsOut> {
             }
             continue
           }
-          // the final check against what the higher cards ended up with
-          const finals = await Promise.all(higher())
-          if (finals.some((f) => f.chosen && sameChar(rv.card, f.chosen))) {
-            tried.push(eliminate(rv.card, SAME_CHARACTER_REASON, 'same_character'))
-            report.collisions.push({ slot, resolved: n < list.length ? 'runner_up' : 'none', why: 'character' })
-            if (picked[slot] === ref.card) delete picked[slot]
-            continue
-          }
-          const mainFinal = finals.find((f) => f.slot === 'main')?.chosen
-          if (slot === 'freestyle' && !anchorClashOk && mainFinal && anchorsClash(rv.card.story_anchor, mainFinal.story_anchor, story)) {
-            tried.push(eliminate(rv.card, SAME_ANCHOR_REASON, 'same_anchor'))
-            report.collisions.push({ slot, resolved: n < list.length ? 'runner_up' : 'none', why: 'anchor' })
-            if (picked[slot] === ref.card) delete picked[slot]
-            continue
-          }
           const lined = await gazeOne(rv.card, sig)
           // the line still states a fact about the sender or a relative that the story does not give (after its one rewrite): it is a `truth` failure, the next candidate is tried
           const invented = inventedFacts(lined.one_line_gaze, story, context.language)
@@ -864,6 +842,22 @@ export async function runCards(a: CardsArgs): Promise<CardsOut> {
           const fin = a.settle ? await a.settle(lined, slot) : { card: lined }
           if ('reject' in fin) {
             tried.push(eliminate(lined, `final: ${fin.reject}`, 'final_gate'))
+            if (picked[slot] === ref.card) delete picked[slot]
+            continue
+          }
+          // the final check against what the higher cards ended up with — AFTER this card's own last steps, so a card that is ready never waits for the main card to finish its own
+          // (2026-11-07 regression: the waiting came first, and a free pick that had passed its review at 2.8 s was still unfinished when the join let it go as late)
+          const finals = await Promise.all(higher())
+          if (finals.some((f) => f.chosen && sameChar(fin.card, f.chosen))) {
+            tried.push(eliminate(fin.card, SAME_CHARACTER_REASON, 'same_character'))
+            report.collisions.push({ slot, resolved: n < list.length ? 'runner_up' : 'none', why: 'character' })
+            if (picked[slot] === ref.card) delete picked[slot]
+            continue
+          }
+          const mainFinal = finals.find((f) => f.slot === 'main')?.chosen
+          if (slot === 'freestyle' && !anchorClashOk && mainFinal && anchorsClash(fin.card.story_anchor, mainFinal.story_anchor, story)) {
+            tried.push(eliminate(fin.card, SAME_ANCHOR_REASON, 'same_anchor'))
+            report.collisions.push({ slot, resolved: n < list.length ? 'runner_up' : 'none', why: 'anchor' })
             if (picked[slot] === ref.card) delete picked[slot]
             continue
           }
@@ -891,19 +885,18 @@ export async function runCards(a: CardsArgs): Promise<CardsOut> {
         report.free_retry = { asked: true, why, won: null }
         report.free_fallbacks.push({ to: 'retry', why: whyNot() })
         freeStep = 'retry'
-        freeRetrying = true
         log(`[ichirei-engine] free_retry ${JSON.stringify({ round: opts.round ?? 1, why, avoided: avoid.length + (opts.exclude?.length ?? 0) })}`)
         const out2 = await hedgedFree(2, avoid)
         await attempt(out2.cands, 'second_call')
         report.free_retry.won = !!chosen
       }
       // Step 3: the best unused candidate of this round's main/second calls. It starts when the main and second cards are settled (it needs to know which characters they took), with a time of its own.
-      if (slot === 'freestyle' && !chosen && !early && !freeClosed && signal.aborted === false && freeRunnerOn()) {
-        const [lm0, ls0] = await Promise.all(higher())
-        if (!early && !freeClosed && !signal.aborted) {
-          const done = new Set([...lm0.tried, ...ls0.tried].map((t) => t.kanji))
+      if (slot === 'freestyle' && !chosen && !early && signal.aborted === false && freeRunnerOn()) {
+        const [lm0, ls0] = await Promise.all(higher()) // (ls0 is undefined: the free pick has only the main card above it)
+        if (!early && !signal.aborted) {
+          const done = new Set([...lm0.tried, ...(ls0?.tried ?? [])].map((t) => t.kanji))
           const usable = (c: Candidate): boolean => !done.has(c.kanji) && !c.eliminated && c.reading !== '' && c.story_anchor !== ''
-          const pool = [...(await callSecond).cands, ...(await callMain).cands].filter(usable)
+          const pool = [...(callSecond ? (await callSecond).cands : []), ...(await callMain).cands].filter(usable)
           const seen = new Set<string>()
           const mainAnchor = lm0.chosen?.story_anchor ?? ''
           const spare = pool
@@ -916,7 +909,6 @@ export async function runCards(a: CardsArgs): Promise<CardsOut> {
           log(`[ichirei-engine] free_runner_up ${JSON.stringify({ round: opts.round ?? 1, why: entry.why, spare: spare.length })}`)
           if (spare.length > 0) {
             freeStep = 'runner_up'
-            freeRetrying = true
             anchorClashOk = true
             freeSignal = AbortSignal.any([signal, freeStop.signal, AbortSignal.timeout(freeRunnerMs())])
             sig = freeSignal
@@ -956,11 +948,11 @@ export async function runCards(a: CardsArgs): Promise<CardsOut> {
 
   // The lanes. Each starts as soon as its call is done; none waits for a lower card. (`higher` is read lazily so a lane can wait for the cards above it.)
   let laneMain!: Promise<LaneOut>
-  let laneSecond!: Promise<LaneOut>
+  let laneSecond: Promise<LaneOut> | null = null
   let laneFree: Promise<LaneOut> | null = null
   laneMain = lane('main', callMain, () => [], signal)
-  laneSecond = lane('second', callSecond, () => [laneMain], signal)
-  if (callFree) laneFree = lane('freestyle', callFree, () => [laneMain, laneSecond], freeSignal)
+  if (callSecond) laneSecond = lane('second', callSecond, () => [laneMain], signal)
+  if (callFree) laneFree = lane('freestyle', callFree, () => [laneMain], freeSignal)
 
   // ---- show each card as soon as it passes: main, then second, then free ---------------------------------------------------------------------------------------------------
   const snapshot = (cards: Candidate[]): EngineResult | null => {
@@ -980,16 +972,14 @@ export async function runCards(a: CardsArgs): Promise<CardsOut> {
       // (showing a card early is a courtesy; the final result carries everything)
     }
   }
+  // The second card (remembrance) or the free pick (everything else) is shown as soon as it passes — whether or not the other lane did well.
   const emitter = (async () => {
     const m = await laneMain
     if (!m.chosen || early) return
     fire([m.chosen])
-    const s = await laneSecond
-    if (!s.chosen || early) return
-    fire([m.chosen, s.chosen])
-    if (!laneFree) return
-    const f = await laneFree
-    if (f.chosen && !freeClosed && !early) fire([m.chosen, s.chosen, f.chosen])
+    const other = await (laneSecond ?? laneFree ?? Promise.resolve(null))
+    if (!other?.chosen || early) return
+    fire([m.chosen, other.chosen])
   })()
 
   // ---- join -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
@@ -999,23 +989,9 @@ export async function runCards(a: CardsArgs): Promise<CardsOut> {
     opts.signal?.removeEventListener('abort', onOuter)
     throw mainOut.err
   }
-  const [lm, ls] = await Promise.all([laneMain, laneSecond])
-  // the free pick never delays the others: it gets a short grace after the main and second cards are settled, then it is let go (two cards)
-  let lf: LaneOut | null = null
-  if (laneFree) {
-    const grace = new Promise<null>((r) => setTimeout(() => r(null), freeGraceMs()).unref?.())
-    lf = await Promise.race([laneFree, grace])
-    if (!lf && freeRetrying) {
-      const more = new Promise<null>((r) => setTimeout(() => r(null), freeRetryGraceMs()).unref?.())
-      lf = await Promise.race([laneFree, more])
-    }
-    if (!lf) {
-      freeClosed = true
-      freeStop.abort()
-      report.free_dropped = 'late'
-      lf = { slot: 'freestyle', chosen: null, tried: [], done_ms: at() }
-    }
-  }
+  // A card that passed its review is never dropped for arriving late (2026-11-07): the join waits for the lane to finish. The lane is bounded by its own time limits (the free pick's lane limit,
+  // the last step's own limit), so this cannot hang.
+  const [lm, ls, lf] = await Promise.all([laneMain, laneSecond ?? Promise.resolve(null), laneFree ?? Promise.resolve(null)])
   await emitter.catch(() => {})
   opts.signal?.removeEventListener('abort', onOuter)
   report.all_cards_ms = at()
@@ -1024,7 +1000,7 @@ export async function runCards(a: CardsArgs): Promise<CardsOut> {
     const e = early as NonNullable<CardsOut['early']>
     return { early: e, base: e.stamped, candidates: [], review: { ran: anyReviewRan, skipped_reason: skipped, verdicts }, report, mainRaw, mainExtracted }
   }
-  report.second_source = ls.chosen ? (ls.source ?? 'second_call') : null
-  const candidates = [...lm.tried, ...ls.tried, ...(lf?.tried ?? [])]
+  report.second_source = ls?.chosen ? (ls.source ?? 'second_call') : null
+  const candidates = [...lm.tried, ...(ls?.tried ?? []), ...(lf?.tried ?? [])]
   return { early: null, base: mainRaw, candidates, review: { ran: anyReviewRan, skipped_reason: anyReviewRan ? null : skipped, verdicts }, report, mainRaw, mainExtracted }
 }

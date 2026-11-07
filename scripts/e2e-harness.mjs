@@ -6,6 +6,7 @@
 // all §6 behavioral events.
 import { chromium } from 'playwright'
 import { readFileSync } from 'node:fs'
+import { shapeRound } from './mock-shape.mjs'
 
 const SHOTS = process.env.E2E_SHOTS_DIR ?? '.'
 const STORY =
@@ -72,7 +73,7 @@ const browser = await chromium.launch({
   await page.route('**/api/select', async (route) => {
     selectCalls++
     await new Promise((r) => setTimeout(r, 600)) // let the processing view show
-    await route.fulfill({ json: FIXTURE })
+    await route.fulfill({ json: shapeRound(FIXTURE, JSON.parse(route.request().postData() ?? '{}')) })
   })
   await page.route('**/api/explain', async (route) => {
     explainCalls++
@@ -108,15 +109,15 @@ const browser = await chromium.launch({
   const firstGlyph = await page.locator('article').first().locator('span').first().textContent()
   check('v8: the main 証 surfaces first', firstGlyph === '証')
   await page.waitForTimeout(2600) // let all three land
-  check('all survivors revealed', (await page.locator('article').count()) === 3)
+  check('all survivors revealed (two cards, 2026-11-07)', (await page.locator('article').count()) === 2)
   const lastGlyph = await page.locator('article').last().locator('span').first().textContent()
-  check('v8: the freestyle (封) comes last', lastGlyph === '封')
+  check('v8: the 遊び字 (守 plays it in this fixture) comes last', lastGlyph === '守')
   const primaryColor = await page.locator('article[data-slot=main]').locator('span').first()
     .evaluate((el) => getComputedStyle(el).color)
   check('primary rendered in cinnabar', primaryColor === 'rgb(192, 57, 43)')
 
   // Japanese buyers carve the modern form (新字体, spec v9.1 step 9): the card shows the glyph with its reading only — no old-form pairing or note
-  const mokuCard = page.locator('article', { hasText: '静けさのまま' })
+  const mokuCard = page.locator('article[data-slot=freestyle]')
   check('modern form used as the carved glyph (no old form)', (await mokuCard.locator('span').first().textContent()) === '守')
   check('the reading is shown with the glyph, with no old-form pairing', await mokuCard.locator('text=まもる').first().isVisible() && (await mokuCard.locator('text=守 ・ まもる').count()) === 0)
   check('no old-form (kyūjitai) note on a Japanese card', (await mokuCard.locator('text=古体字').count()) === 0)
@@ -138,6 +139,8 @@ const browser = await chromium.launch({
   // Condition toggle B — presentation only, engine NOT re-called
   await page.click('header >> text="B"')
   await page.waitForTimeout(300)
+  await page.locator('article[data-slot=main]').click() // (the 遊び字 card has no deep explanation: open the 本命)
+  await page.waitForTimeout(300)
   check('condition B: deep-explain button appears', await page.locator('text=この一字を、深く読む').first().isVisible())
   await page.click('text=この一字を、深く読む')
   await page.waitForSelector('text=こんどは私があなたを迎えにいく番', { timeout: 5000 })
@@ -155,7 +158,9 @@ const browser = await chromium.launch({
   await page.click('text=閉じる')
 
   // Selection: select 守 first, then 証 (selection_changed x2), finalize
-  await page.locator('article', { hasText: '静けさのまま' }).locator('text=この一字を選ぶ').click()
+  await mokuCard.click() // (the 本命 is the open card here: open the 遊び字)
+  await page.waitForTimeout(300)
+  await mokuCard.locator('text=この一字を選ぶ').click()
   await page.locator('article[data-slot=main]').click() // open 証
   await page.waitForTimeout(400)
   await page.locator('article[data-slot=main]').locator('text=この一字を選ぶ').click()
@@ -163,17 +168,17 @@ const browser = await chromium.launch({
   await page.waitForTimeout(300)
   check('finalize confirms selection', await page.locator('text=「証」に決めました').isVisible())
 
-  // v8: three cards — 本命 first, 次点, 遊び字 last (DOM order AND visual order) — each labelled; the freestyle is lighter and never cinnabar
+  // 2026-11-07: TWO equal cards — 本命 first (character in cinnabar), 遊び字 second (character in ink); side by side on a wide screen. No dashed "lesser" style any more.
   const cards = page.locator('article')
-  check('v8: three cards in the DOM order 本命 → 次点 → 遊び字 (main, second, freestyle)', (await cards.evaluateAll((els) => els.map((e) => e.getAttribute('data-slot')))).join() === 'main,second,freestyle')
+  check('v8: two cards in the DOM order 本命 → 遊び字 (main, freestyle)', (await cards.evaluateAll((els) => els.map((e) => e.getAttribute('data-slot')))).join() === 'main,freestyle')
   check('v8: the VISUAL order is the same (top-to-bottom, then left-to-right)', await cards.evaluateAll((els) => { const r = els.map((e) => e.getBoundingClientRect()); const key = (x) => Math.round(x.top / 4) * 100000 + x.left; return r.every((x, i) => i === 0 || key(r[i - 1]) <= key(x)) }))
-  check('v6: each card carries its label (本命 / 次点 / 遊び字)', (await cards.evaluateAll((els) => els.map((e) => e.querySelector('[data-slot-label]')?.textContent))).join() === '本命,次点,遊び字')
-  check('v8: every kanji glyph is marked notranslate (Chrome auto-translate must not touch it)', await page.evaluate(() => { const g = [...document.querySelectorAll('[data-glyph]')]; return g.length >= 3 && g.every((n) => n.classList.contains('notranslate') && n.getAttribute('translate') === 'no') }))
+  check('v6: each card carries its label (本命 / 遊び字)', (await cards.evaluateAll((els) => els.map((e) => e.querySelector('[data-slot-label]')?.textContent))).join() === '本命,遊び字')
+  check('v8: every kanji glyph is marked notranslate (Chrome auto-translate must not touch it)', await page.evaluate(() => { const g = [...document.querySelectorAll('[data-glyph]')]; return g.length >= 2 && g.every((n) => n.classList.contains('notranslate') && n.getAttribute('translate') === 'no') }))
   check('v8: the page opts out of auto-translate (<html translate=no>, meta google notranslate)', await page.evaluate(() => document.documentElement.getAttribute('translate') === 'no' && document.querySelector('meta[name=google][content=notranslate]') !== null))
   const freeCard = page.locator('article[data-slot=freestyle]')
-  check('v6: the freestyle card (封) is lighter: dashed border, no shadow class, glyph NOT cinnabar', (await freeCard.getAttribute('class')).includes('border-dashed') && !(await freeCard.getAttribute('class')).includes('shadow-') && (await freeCard.locator('[data-glyph]').evaluate((el) => getComputedStyle(el).color)) !== 'rgb(192, 57, 43)' && (await freeCard.locator('[data-glyph]').innerText()) === '封')
-  check('v6: only the main card\'s glyph is cinnabar', (await page.locator('article[data-slot=second] [data-glyph]').evaluate((el) => getComputedStyle(el).color)) !== 'rgb(192, 57, 43)' && (await page.locator('article[data-slot=main] [data-glyph]').evaluate((el) => getComputedStyle(el).color)) === 'rgb(192, 57, 43)')
-  check('v6: each card shows its story anchor in quotes and its gaze; the freestyle has the light line', await freeCard.locator('[data-anchor]:has-text("「封筒を押し付けてきた」")').isVisible() && (await freeCard.innerText()).includes('押し付けてくる人') && (await page.locator('article[data-slot=main] [data-anchor]').innerText()) === '「盆に帰るたびに車で駅まで迎えに来て」')
+  check('v6: the 遊び字 card (守) is a full card like the 本命: solid border (no dashed), the same shadow, its character in ink (NOT cinnabar)', !(await freeCard.getAttribute('class')).includes('border-dashed') && (await freeCard.getAttribute('class')).includes('shadow-') && (await freeCard.evaluate((el) => getComputedStyle(el).borderStyle)) === 'solid' && (await freeCard.locator('[data-glyph]').evaluate((el) => getComputedStyle(el).color)) !== 'rgb(192, 57, 43)' && (await freeCard.locator('[data-glyph]').innerText()) === '守')
+  check('v6: only the main card\'s glyph is cinnabar', (await page.locator('article[data-slot=freestyle] [data-glyph]').evaluate((el) => getComputedStyle(el).color)) !== 'rgb(192, 57, 43)' && (await page.locator('article[data-slot=main] [data-glyph]').evaluate((el) => getComputedStyle(el).color)) === 'rgb(192, 57, 43)')
+  check('v6: each card shows its story anchor in quotes and its gaze', await freeCard.locator('[data-anchor]:has-text("「相変わらず、ほとんど何も話さないけど」")').isVisible() && (await freeCard.innerText()).includes('静けさのまま') && (await page.locator('article[data-slot=main] [data-anchor]').innerText()) === '「盆に帰るたびに車で駅まで迎えに来て」')
   check('v6: no classical line is shown (no reviewed palette row, nothing attached), and the freestyle card never offers the deep explanation', (await page.locator('[data-classical]').count()) === 0)
   await freeCard.click()
   await page.waitForTimeout(400)
@@ -268,7 +273,7 @@ const browser = await chromium.launch({
   // When the terminal result line lands, the reveal begins
   await page.waitForSelector('article', { timeout: 10000 })
   await page.waitForTimeout(2600)
-  check('stream: all survivors revealed after stream completes', (await page.locator('article').count()) === 3)
+  check('stream: all survivors revealed after stream completes (two cards)', (await page.locator('article').count()) === 2)
   check('stream: the main 証 comes first', (await page.locator('article').first().locator('span').first().textContent()) === '証')
   check('no page errors (run 3)', errors.length === 0)
   if (errors.length) console.log('page errors:', errors)
@@ -291,12 +296,12 @@ const browser = await chromium.launch({
   check('cards: the main card appears on its own, before the others and before the terminal result (1 card on screen, the processing view is gone)', first === 1 && !(await page.locator('[data-testid=processing-steps]').isVisible().catch(() => false)), String(first))
   await page.waitForFunction(() => document.querySelectorAll('article').length === 2, null, { timeout: 5000 })
   check('cards: then the second card joins (2 cards)', (await page.locator('article').count()) === 2)
-  await page.waitForFunction(() => document.querySelectorAll('article').length === 3, null, { timeout: 5000 })
-  check('cards: then the free pick (3 cards), in the order main, second, free', (await page.locator('article').count()) === 3 && (await page.locator('article').first().locator('span').first().textContent()) === '証')
+  await page.waitForFunction(() => document.querySelectorAll('article').length === 2, null, { timeout: 5000 })
+  check('cards: then the free pick (two cards, 2026-11-07), in the order main, free', (await page.locator('article').count()) === 2 && (await page.locator('article').first().locator('span').first().textContent()) === '証')
   await page.waitForTimeout(1600) // the terminal result lands and replaces the partial one
   const firstCard = await page.locator('article').first().innerText()
   check('reading: the main card shows its reading plain (しょう) although the engine\'s answer carried a dictionary marker (しょ-う)', firstCard.includes('しょう') && !firstCard.includes('しょ-う') && !/しょ[-.]う/.test(await page.locator('body').innerText()), firstCard.slice(0, 80))
-  check('cards: the terminal result keeps the three cards and the reveal on screen (nobody is sent back to the processing view)', (await page.locator('article').count()) === 3 && !(await page.locator('[data-testid=processing-steps]').isVisible().catch(() => false)))
+  check('cards: the terminal result keeps the two cards and the reveal on screen (nobody is sent back to the processing view)', (await page.locator('article').count()) === 2 && !(await page.locator('[data-testid=processing-steps]').isVisible().catch(() => false)))
   check('no page errors (run 3b, cards)', errors.length === 0)
   if (errors.length) console.log('page errors:', errors)
   await page.close()
@@ -391,7 +396,7 @@ const mockPage = async (browser, { onExplain, result, order, track } = {}) => {
   await page.route('**/api/select', async (route) => {
     const body = JSON.parse(route.request().postData() ?? '{}')
     calls.select.push(body)
-    await route.fulfill({ json: typeof result === 'function' ? result(body) : (result ?? FIXTURE) })
+    await route.fulfill({ json: shapeRound(typeof result === 'function' ? result(body) : (result ?? FIXTURE), body) })
   })
   await page.route('**/api/explain', async (route) => {
     calls.explain.push(JSON.parse(route.request().postData() ?? '{}'))
@@ -543,7 +548,7 @@ const mockPage = async (browser, { onExplain, result, order, track } = {}) => {
 
 // ---------- Run 8b: v6 — labels in four languages, classical line, two cards without a freestyle, promotion ----------
 {
-  const LABELS = { ja: ['本命', '次点', '遊び字'], 'zh-Hans': ['本命', '次选', '趣字'], 'zh-Hant': ['本命', '次選', '趣字'], en: ['Main', 'Second', 'Freestyle'] }
+  const LABELS = { ja: ['本命', '遊び字'], 'zh-Hans': ['本命', '趣字'], 'zh-Hant': ['本命', '趣字'], en: ['Main', 'Playful'] }
   const withEcho = (body) => {
     const r = clone(FIXTURE)
     r.language = body.language
@@ -741,7 +746,7 @@ const mockPage = async (browser, { onExplain, result, order, track } = {}) => {
     await ign.page.click(`#write >> text=${GO.ja}`)
     await ign.page.waitForSelector('article[data-slot=freestyle]', { timeout: 15000 })
     const slots = await ign.page.locator('article[data-slot]').evaluateAll((els) => els.map((e) => e.getAttribute('data-slot')))
-    check('story box: …it still gets its three cards; the whole story is sent, and the hint travels only as context (prompt_question id), never inside the story', slots.join() === 'main,second,freestyle' && ign.calls.select.length === 1 && [...ign.calls.select[0].story].length === 1500 && ign.calls.select[0].story === STORY1500 && ign.calls.select[0].prompt_question?.id === hintId, JSON.stringify([slots, ign.calls.select[0]?.prompt_question]))
+    check('story box: …it still gets its two cards; the whole story is sent, and the hint travels only as context (prompt_question id), never inside the story', slots.join() === 'main,freestyle' && ign.calls.select.length === 1 && [...ign.calls.select[0].story].length === 1500 && ign.calls.select[0].story === STORY1500 && ign.calls.select[0].prompt_question?.id === hintId, JSON.stringify([slots, ign.calls.select[0]?.prompt_question]))
     check('no page errors (run 8c-2, hint)', ign.errors.length === 0, JSON.stringify(ign.errors))
     await ign.page.close()
   }
@@ -840,29 +845,29 @@ const mockPage = async (browser, { onExplain, result, order, track } = {}) => {
     await long.page.locator('#write [data-testid=story-input]').fill(LONG_MEM)
     check('long remembrance: 4105 characters in the box — "4105 / 5000字", no over-limit line, the button is enabled', [...LONG_MEM].length === 4105 && (await long.page.locator('#write [data-testid=story-counter]').innerText()) === '4105 / 5000字' && (await long.page.locator('#write [data-testid=story-over]').count()) === 0 && !(await long.page.locator('#write button[type=submit]').isDisabled()))
     await long.page.click(`#write >> text=${GO.ja}`)
-    await long.page.waitForSelector('article[data-slot=freestyle]', { timeout: 15000 })
+    await long.page.waitForSelector('article[data-slot=second]', { timeout: 15000 })
     const slots = await long.page.locator('article[data-slot]').evaluateAll((els) => els.map((e) => e.getAttribute('data-slot')))
-    check('long remembrance: the whole 4105-character story is sent (occasion memorial, father, up) and THREE cards come back: main, second, freestyle', long.calls.select.length === 1 && [...long.calls.select[0].story].length === 4105 && long.calls.select[0].purpose === 'memorial' && slots.join() === 'main,second,freestyle', JSON.stringify([long.calls.select.length, slots]))
+    check('long remembrance: the whole 4105-character story is sent (occasion memorial, father, up) and TWO cards come back: main and second (no free pick in remembrance)', long.calls.select.length === 1 && [...long.calls.select[0].story].length === 4105 && long.calls.select[0].purpose === 'memorial' && slots.join() === 'main,second', JSON.stringify([long.calls.select.length, slots]))
     check('no page errors (run 8c-3, long remembrance)', long.errors.length === 0, JSON.stringify(long.errors))
     await long.page.close()
   }
 
   // 2026-11-01: remembrance is TWO cards (main + second, no free pick). While 偲ぶ / 追思 / In memory is picked, the steps and the examples say so; every other occasion is unchanged.
   for (const [lang, st2, st2p, note, st2Other, noteOther] of [
-    ['ja', '二つの字に出会う', '本命の二字。読み方、意味、選ばれた理由とともに。選ぶのはあなたです。', '見本です。あなたの物語には、本命の二字が届きます。', '三つの字に出会う', '見本です。あなたの物語には、本命の二字と遊び字の一字が届きます。'],
-    ['zh-Hant', '遇見兩個字', '兩個本命字，各附讀音、意思和選擇的理由。由你來選。', '以上為範例。你的故事會得到屬於自己的兩個本命字。', '遇見三個字', '以上為範例。你的故事會得到屬於自己的三個字：兩個本命字，加上一個玩心字。'],
-    ['en', 'Meet two characters', 'Two main characters, each with its reading, its meaning and why it fits. You choose.', 'Examples for illustration. Your story gets two main characters of its own.', 'Meet three characters', 'Examples for illustration. Your story gets three characters of its own: two main ones and one freestyle.'],
+    ['ja', '二つの字に出会う', '本命の二字。読み方、意味、選ばれた理由とともに。選ぶのはあなたです。', '見本です。あなたの物語には、本命の二字が届きます。', '二つの字に出会う', '見本です。あなたの物語には、本命の一字と遊び字の一字が届きます。'],
+    ['zh-Hant', '遇見兩個字', '兩個本命字，各附讀音、意思和選擇的理由。由你來選。', '以上為範例。你的故事會得到屬於自己的兩個本命字。', '遇見兩個字', '以上為範例。你的故事會得到屬於自己的兩個字：本命一字與趣字一字。'],
+    ['en', 'Meet two characters', 'Two main characters, each with its reading, its meaning and why it fits. You choose.', 'Examples for illustration. Your story gets two main characters of its own.', 'Meet two characters', 'Examples for illustration. Your story gets two characters of its own: a main one and a playful one.'],
   ]) {
     const c = await mockPage(browser)
     await c.page.goto(`http://localhost:5173/?lang=${lang}`, { waitUntil: 'networkidle' })
     const h3 = () => c.page.locator('#how ol.steps li:nth-child(2) h3').innerText()
     const p2 = () => c.page.locator('#how ol.steps li:nth-child(2) p').innerText()
     const mm = async () => ((await c.page.locator('p.from').first().textContent()) ?? '').trim()
-    check(`copy (${lang}): before an occasion is picked the steps and the examples are unchanged — 「${st2Other}」 and the three-card note`, (await h3()) === st2Other && (await mm()) === noteOther, `${await h3()} | ${await mm()}`)
+    check(`copy (${lang}): before an occasion is picked the steps and the examples are unchanged — 「${st2Other}」 and the main-and-playful note`, (await h3()) === st2Other && (await mm()) === noteOther, `${await h3()} | ${await mm()}`)
     await pickContext(c.page, { occasion: 'memorial' })
     check(`copy (${lang}): with 偲ぶ picked the second step reads 「${st2}」 and says two main characters only, and the examples note says two (no free pick)`, (await h3()) === st2 && (await p2()) === st2p && (await mm()) === note, `${await h3()} | ${await p2()} | ${await mm()}`)
     await pickContext(c.page, { occasion: 'birthday_milestone' })
-    check(`copy (${lang}): picking another occasion again restores the three-card wording`, (await h3()) === st2Other && (await mm()) === noteOther)
+    check(`copy (${lang}): picking another occasion again restores the main-and-playful wording`, (await h3()) === st2Other && (await mm()) === noteOther)
     check(`no page errors (run 8c-3, remembrance copy ${lang})`, c.errors.length === 0, JSON.stringify(c.errors))
     await c.page.close()
   }
@@ -1848,13 +1853,13 @@ const mockPage = async (browser, { onExplain, result, order, track } = {}) => {
     await page.locator('[data-testid=order-form]').waitFor()
   }
   const ja = await mk('ja')
-  check('preview: CHARACTER FIRST — the three characters are on screen and not one picture was asked for (no /api/preview call before a character is picked)', ja.pv.start.length === 0 && (await ja.page.locator('[data-testid=card-preview]').count()) === 0)
+  check('preview: CHARACTER FIRST — the two characters are on screen and not one picture was asked for (no /api/preview call before a character is picked)', ja.pv.start.length === 0 && (await ja.page.locator('[data-testid=card-preview]').count()) === 0)
   await ja.page.locator('article[data-slot=main]').click()
   await ja.page.locator('article[data-slot=main]').locator('text=この字で贈る').click()
   await ja.page.locator('[data-testid=order-form]').waitFor()
   await ja.page.locator('[data-testid=card-preview]').waitFor()
   await ja.page.waitForTimeout(400)
-  check('preview: picking the character starts the draft at once (one /api/preview call with the story, the context and every character shown — both forms)', ja.pv.start.length >= 1 && ja.pv.start[0].story === STORY && ja.pv.start[0].language === 'ja' && ja.pv.start[0].shown.join('') === '証證守封' && ja.pv.start[0].draft_id === undefined)
+  check('preview: picking the character starts the draft at once (one /api/preview call with the story, the context and every character shown — both forms)', ja.pv.start.length >= 1 && ja.pv.start[0].story === STORY && ja.pv.start[0].language === 'ja' && ja.pv.start[0].shown.join('') === '証證守' && ja.pv.start[0].draft_id === undefined)
   const sheet = ja.page.locator('[data-testid=card-sheet]')
   check('preview: the card\'s inside is marked 「見本」 and shows the chosen character', (await sheet.locator('[data-testid=sample-mark]').innerText()) === '見本' && (await sheet.locator('[data-testid=card-glyph]').innerText()) === '證' || (await sheet.locator('[data-testid=card-glyph]').innerText()) === '証')
   check('preview: while drawing it says 「あなたの物語を描いています」 and the four picture places are there', (await ja.page.locator('[data-testid=card-status]').innerText()) === 'あなたの物語を描いています' && (await sheet.locator('.cardPic').count()) === 4)
@@ -1871,22 +1876,22 @@ const mockPage = async (browser, { onExplain, result, order, track } = {}) => {
   // another character of the same story: the same draft is asked for (nothing drawn again)
   await ja.page.click('[data-testid=choose-other]')
   await ja.page.waitForSelector('[data-all-revealed=yes]', { timeout: 8000 }).catch(() => {})
-  await ja.page.locator('article[data-slot=second]').click()
-  await ja.page.locator('article[data-slot=second]').locator('text=この字で贈る').click()
+  await ja.page.locator('article[data-slot=freestyle]').click()
+  await ja.page.locator('article[data-slot=freestyle]').locator('text=この字で贈る').click()
   await ja.page.locator('[data-testid=card-preview]').waitFor()
   await ja.page.waitForTimeout(500)
   check('preview: another character of the SAME story asks for the same draft (draft_id sent back), so nothing is drawn again', ja.pv.start.length >= 2 && ja.pv.start.at(-1).draft_id === DRAFT)
   // 「別の候補を見る」
   await ja.page.click('[data-testid=choose-other]')
   await ja.page.locator('[data-testid=see-others]').waitFor()
-  check('new round: 「別の三字を探す（あと2回）」 sits under the cards, the pager is not there yet (one round), and 「物語を書きなおす」 is the last thing on the screen', (await ja.page.locator('[data-testid=see-others]').innerText()) === '別の三字を探す（あと2回）' && (await ja.page.locator('[data-testid=set-label]').count()) === 0 && (await ja.page.evaluate(() => { const a = document.querySelector('article[data-slot=main]'); const b = document.querySelector('[data-testid=see-others]'); const c = document.querySelector('[data-testid=edit-story]'); return !!(a && b && c && (a.compareDocumentPosition(b) & 4) && (b.compareDocumentPosition(c) & 4)) })))
+  check('new round: 「別の二字を探す（あと2回）」 sits under the cards, the pager is not there yet (one round), and 「物語を書きなおす」 is the last thing on the screen', (await ja.page.locator('[data-testid=see-others]').innerText()) === '別の二字を探す（あと2回）' && (await ja.page.locator('[data-testid=set-label]').count()) === 0 && (await ja.page.evaluate(() => { const a = document.querySelector('article[data-slot=main]'); const b = document.querySelector('[data-testid=see-others]'); const c = document.querySelector('[data-testid=edit-story]'); return !!(a && b && c && (a.compareDocumentPosition(b) & 4) && (b.compareDocumentPosition(c) & 4)) })))
   await ja.page.click('[data-testid=see-others]')
   await ja.page.waitForFunction(() => document.querySelector('article[data-slot=main] .k, article[data-slot=main]')?.textContent?.includes('備'), null, { timeout: 8000 })
-  check('retry 1: 「別の三字を探す（あと2回）」 asks the engine again with every character already shown (both forms) and retry 1 — and three NEW characters are on screen', ja.calls.select.length === 2 && ja.calls.select[1].retry === 1 && ja.calls.select[1].exclude.join('') === '証證守封' && (await ja.page.locator('article[data-slot=main]').innerText()).includes('備'))
-  check('after round 2 the button counts down — 「別の三字を探す（あと1回）」 — and the pager appears: 「‹ 前の組　2 / 2　次の組 ›」', (await ja.page.locator('[data-testid=see-others]').innerText()) === '別の三字を探す（あと1回）' && (await ja.page.locator('[data-testid=set-prev]').innerText()) === '‹ 前の組' && (await ja.page.locator('[data-testid=set-label]').innerText()) === '2 / 2' && (await ja.page.locator('[data-testid=set-next]').innerText()) === '次の組 ›')
+  check('retry 1: 「別の二字を探す（あと2回）」 asks the engine again with every character already shown (both forms) and retry 1 — and two NEW characters are on screen', ja.calls.select.length === 2 && ja.calls.select[1].retry === 1 && ja.calls.select[1].exclude.join('') === '証證守' && (await ja.page.locator('article[data-slot=main]').innerText()).includes('備'))
+  check('after round 2 the button counts down — 「別の二字を探す（あと1回）」 — and the pager appears: 「‹ 前の組　2 / 2　次の組 ›」', (await ja.page.locator('[data-testid=see-others]').innerText()) === '別の二字を探す（あと1回）' && (await ja.page.locator('[data-testid=set-prev]').innerText()) === '‹ 前の組' && (await ja.page.locator('[data-testid=set-label]').innerText()) === '2 / 2' && (await ja.page.locator('[data-testid=set-next]').innerText()) === '次の組 ›')
   await ja.page.click('[data-testid=see-others]')
   await ja.page.waitForFunction(() => document.querySelector('article[data-slot=main]')?.textContent?.includes('恵'), null, { timeout: 8000 })
-  check('retry 2: the second retry excludes all six characters shown so far (up to nine in all) and says retry 2', ja.calls.select.length === 3 && ja.calls.select[2].retry === 2 && ja.calls.select[2].exclude.join('') === '証證守封備憶想')
+  check('retry 2: the second retry excludes every character shown so far (up to six in all) and says retry 2', ja.calls.select.length === 3 && ja.calls.select[2].retry === 2 && ja.calls.select[2].exclude.join('') === '証證守備憶')
   check('after two retries the button is gone and the message says to write a little more: 「物語を少し書き足すと、新しい字が見つかります。」', (await ja.page.locator('[data-testid=see-others]').count()) === 0 && (await ja.page.locator('[data-testid=retry-cap]').innerText()) === '物語を少し書き足すと、新しい字が見つかります。')
   check('the earlier sets can be looked at again (前の候補): nothing already shown is lost', (await ja.page.locator('[data-testid=set-label]').innerText()) === '3 / 3' && (await ja.page.locator('[data-testid=set-prev]').isEnabled()))
   await ja.page.click('[data-testid=set-prev]')
@@ -1906,7 +1911,7 @@ const mockPage = async (browser, { onExplain, result, order, track } = {}) => {
   await ja.page.click('[data-testid=order-submit]')
   await ja.page.waitForSelector('#co', { timeout: 8000 })
   const ob = ja.calls.order[0]
-  check('order: the request carries the draft the buyer saw (draft_id) and EVERY character shown for this story with its set (9 in all)', ob.draft_id === DRAFT && Array.isArray(ob.shown_characters) && ob.shown_characters.length === 9 && new Set(ob.shown_characters.map((x) => x.set)).size === 3 && ob.shown_characters.every((x) => x.candidate && x.candidate.kanji))
+  check('order: the request carries the draft the buyer saw (draft_id) and EVERY character shown for this story with its set (6 in all)', ob.draft_id === DRAFT && Array.isArray(ob.shown_characters) && ob.shown_characters.length === 6 && new Set(ob.shown_characters.map((x) => x.set)).size === 3 && ob.shown_characters.every((x) => x.candidate && x.candidate.kanji))
   check('analytics: card_preview_shown, candidates_retry (1, 2), pictures_before_pay (shown) and preview_to_order are reported — codes only, never a character or a story', ['card_preview_shown', 'pictures_before_pay', 'preview_to_order'].every((e) => ja.calls.analytics.some((a) => a.event === e)) && ja.calls.analytics.filter((a) => a.event === 'candidates_retry').map((a) => a.n).join() === '1,2' && ja.calls.analytics.some((a) => a.event === 'pictures_before_pay' && a.state === 'shown') && !JSON.stringify(ja.calls.analytics.filter((a) => /preview|retry|pictures/.test(a.event))).match(/証|備|story/))
   check('no page errors (run 8f, ja)', ja.errors.length === 0, JSON.stringify(ja.errors))
   await ja.page.close()
@@ -2226,10 +2231,10 @@ const SECTION_ORDER = ['.hero', '.strip', '.philo', '#shape', '#angles', '#write
   check('customer: no condition toggle, no diagnostics ("見送った字"), no raw contract, no honesty flags in the reveal', (await page.locator('text=見送った字').count()) === 0 && (await page.locator('text=raw contract').count()) === 0 && (await page.locator('text=⚑').count()) === 0 && (await page.locator('#write details').count()) === 0)
   check('customer: 「再試一次」 is gone from the card screen — a quiet 「物語を書きなおす」 link is at the bottom instead; the harness controls are not there', (await page.locator('button:has-text("もう一度試す")').count()) === 0 && (await page.locator('button:has-text("もう一度ためす")').count()) === 0 && (await page.locator('[data-testid=edit-story]').innerText()) === '物語を書きなおす' && (await page.locator('text=ログ書き出し').count()) === 0)
   check('customer: the select call is plain condition A with the context (same engine as /demo)', calls.select[0].condition === 'A' && calls.select[0].language === 'ja' && calls.select[0].relationship === 'parent_father' && !('inscription_script' in calls.select[0]))
-  // the three cards: main (cinnabar glyph), second, freestyle (labelled 遊び字, lighter, never cinnabar)
+  // the two cards: main (cinnabar glyph) and freestyle (labelled 遊び字, an equal card, its character in ink)
   const cardInfo = await page.evaluate(() => [...document.querySelectorAll('#write article[data-slot]')].map((a) => ({ slot: a.dataset.slot, label: a.querySelector('[data-slot-label]').innerText, glyph: getComputedStyle(a.querySelector('[data-glyph]')).color, border: getComputedStyle(a).borderStyle, choose: !!a.querySelector('[data-select]') })))
-  check('three cards: main 本命 (cinnabar character), second 次点, freestyle 遊び字 (dashed, lighter, its character is NOT cinnabar); each has its own choose button', cardInfo.length === 3 && cardInfo.find((c) => c.slot === 'main').label === '本命' && cardInfo.find((c) => c.slot === 'main').glyph === 'rgb(200, 64, 45)' && cardInfo.find((c) => c.slot === 'second').label === '次点' && cardInfo.find((c) => c.slot === 'second').glyph !== 'rgb(200, 64, 45)' && cardInfo.find((c) => c.slot === 'freestyle').label === '遊び字' && cardInfo.find((c) => c.slot === 'freestyle').glyph !== 'rgb(200, 64, 45)' && cardInfo.find((c) => c.slot === 'freestyle').border === 'dashed' && cardInfo.every((c) => c.choose), JSON.stringify(cardInfo))
-  check('one button per card, 「この字で贈る」 — no separate confirm button, no 「就用這一個字」 hint, no 「選ぶ」 button, and the top line is the new one', (await page.locator('#write article [data-select]').count()) === 3 && (await page.locator('#write article [data-select]').allInnerTexts()).every((t) => t === 'この字で贈る') && (await page.locator('[data-testid=finalize]').count()) === 0 && (await page.locator('text=ひとつ選ぶと、先へ進めます。').count()) === 0 && (await page.locator('[data-reveal-intro]').innerText()) === 'あなたの物語から見つかった字です。贈りたい一字を選んでください。')
+  check('two cards: main 本命 (cinnabar character) and freestyle 遊び字 (an equal card, solid border, its character is ink — NOT cinnabar); each has its own choose button', cardInfo.length === 2 && cardInfo.find((c) => c.slot === 'main').label === '本命' && cardInfo.find((c) => c.slot === 'main').glyph === 'rgb(200, 64, 45)' && cardInfo.find((c) => c.slot === 'freestyle').label === '遊び字' && cardInfo.find((c) => c.slot === 'freestyle').glyph !== 'rgb(200, 64, 45)' && cardInfo.find((c) => c.slot === 'freestyle').border === 'solid' && cardInfo.every((c) => c.choose), JSON.stringify(cardInfo))
+  check('one button per card, 「この字で贈る」 — no separate confirm button, no 「就用這一個字」 hint, no 「選ぶ」 button, and the top line is the new one', (await page.locator('#write article [data-select]').count()) === 2 && (await page.locator('#write article [data-select]').allInnerTexts()).every((t) => t === 'この字で贈る') && (await page.locator('[data-testid=finalize]').count()) === 0 && (await page.locator('text=ひとつ選ぶと、先へ進めます。').count()) === 0 && (await page.locator('[data-reveal-intro]').innerText()) === 'あなたの物語から見つかった字です。贈りたい一字を選んでください。')
   // choose 守 (it has a distinct old form 默) — one click goes straight to the order step
   await page.locator('article', { hasText: '静けさのまま' }).click()
   await page.locator('article', { hasText: '静けさのまま' }).locator('text=この字で贈る').click()
@@ -2259,7 +2264,7 @@ const SECTION_ORDER = ['.hero', '.strip', '.philo', '#shape', '#angles', '#write
   await page.screenshot({ path: `${SHOTS}/e2e-order-form-ja.png`, fullPage: true })
   // back keeps the selection
   await page.click('text=字を選びなおす')
-  check('"字を選びなおす" returns to the cards (same round, nothing lost), the order form is gone', (await page.locator('#write article[data-slot] [data-select]').count()) === 3 && (await form.isHidden()))
+  check('"字を選びなおす" returns to the cards (same round, nothing lost), the order form is gone', (await page.locator('#write article[data-slot] [data-select]').count()) === 2 && (await form.isHidden()))
   await page.locator('article', { hasText: '静けさのまま' }).locator('text=この字で贈る').click()
   await form.waitFor()
   // submit
@@ -2273,7 +2278,7 @@ const SECTION_ORDER = ['.hero', '.strip', '.philo', '#shape', '#angles', '#write
   await page.waitForSelector('#co', { timeout: 8000 })
   check('submit → redirected to the Shopify checkout URL the server returned', page.url().includes('/__checkout?cart=fake'))
   const body = calls.order[0]
-  check('POST /api/order: story, the engine result, the chosen kanji, language, names, date, inscription style and package', body.story === STORY && body.engine_result.candidates.length === 3 && body.selected_kanji === '守' && body.language === 'ja' && body.sender_name === '山田 太郎' && body.receiver_name === '山田 一郎' && body.delivery_date === iso && body.inscription_style === 'modern' && body.package === 'standard', JSON.stringify({ ...body, engine_result: '…', story: body.story?.slice(0, 10) }))
+  check('POST /api/order: story, the engine result, the chosen kanji, language, names, date, inscription style and package', body.story === STORY && body.engine_result.candidates.length === 2 && body.selected_kanji === '守' && body.language === 'ja' && body.sender_name === '山田 太郎' && body.receiver_name === '山田 一郎' && body.delivery_date === iso && body.inscription_style === 'modern' && body.package === 'standard', JSON.stringify({ ...body, engine_result: '…', story: body.story?.slice(0, 10) }))
   check('POST /api/order carries no price and no glyph (the server derives both)', !('price' in body) && !('glyph' in body) && !('amount' in body))
   check('no page errors (run 11)', errors.length === 0)
   if (errors.length) console.log('page errors:', errors)
@@ -2526,7 +2531,7 @@ const SECTION_ORDER = ['.hero', '.strip', '.philo', '#shape', '#angles', '#write
   await page.waitForSelector('[data-testid=memorial-suggest]', { timeout: 15000 })
   await page.click('[data-testid=memorial-yes]')
   await page.waitForSelector('[data-all-revealed=yes]', { timeout: 15000 })
-  check('suggestion accepted: the engine runs again with occasion memorial (same story), then the cards appear', calls.select.length === 3 && calls.select[2].purpose === 'memorial' && calls.select[2].story === calls.select[1].story && (await page.locator('#write article[data-slot]').count()) === 3)
+  check('suggestion accepted: the engine runs again with occasion memorial (same story), then the cards appear', calls.select.length === 3 && calls.select[2].purpose === 'memorial' && calls.select[2].story === calls.select[1].story && (await page.locator('#write article[data-slot]').count()) === 2)
   const colours = await page.evaluate(() => ({ main: getComputedStyle(document.querySelector('article[data-slot=main] [data-glyph]')).color, label: getComputedStyle(document.querySelector('article[data-slot=main] [data-slot-label]')).backgroundColor, border: getComputedStyle(document.querySelector('article[data-slot=main]')).borderTopColor, marked: document.querySelector('article[data-slot=main]').dataset.memorial }))
   check('memorial result: the main character, its label and its top rule are ink, never cinnabar; the card is marked data-memorial', colours.main === INK && colours.label === INK && colours.border === INK && colours.marked === 'yes', JSON.stringify(colours))
   check('memorial result: the card button says 「この字にする」 (nothing is given)', (await page.locator('article[data-slot=main] [data-select]').innerText()) === 'この字にする')
@@ -3013,7 +3018,7 @@ const SECTION_ORDER = ['.hero', '.strip', '.philo', '#shape', '#angles', '#write
   // the top line and the buttons
   check('top line: あなたの物語から見つかった字です。贈りたい一字を選んでください。', (await page.locator('[data-reveal-intro]').innerText()) === 'あなたの物語から見つかった字です。贈りたい一字を選んでください。')
   // order: cards → new round → pager → edit-story
-  check('order top to bottom: cards → 別の三字を探す → 物語を書きなおす (no pager with one round)', await page.evaluate(() => { const q = (s) => document.querySelector(s); const pos = (a, b) => !!(a && b && (a.compareDocumentPosition(b) & 4)); return pos(q('article[data-slot=freestyle], article[data-slot=second]'), q('[data-testid=see-others]')) && pos(q('[data-testid=see-others]'), q('[data-testid=edit-story]')) && !q('[data-testid=set-label]') }))
+  check('order top to bottom: cards → 別の二字を探す → 物語を書きなおす (no pager with one round)', await page.evaluate(() => { const q = (s) => document.querySelector(s); const pos = (a, b) => !!(a && b && (a.compareDocumentPosition(b) & 4)); return pos(q('article[data-slot=freestyle], article[data-slot=second]'), q('[data-testid=see-others]')) && pos(q('[data-testid=see-others]'), q('[data-testid=edit-story]')) && !q('[data-testid=set-label]') }))
   // choose, then go back: same round, nothing lost
   await page.locator('article[data-slot=main]').locator('text=この字で贈る').click()
   await page.locator('[data-testid=order-form]').waitFor()
@@ -3178,11 +3183,11 @@ const SECTION_ORDER = ['.hero', '.strip', '.philo', '#shape', '#angles', '#write
       await page.click(`#write >> text=${GO[lang === 'zh-Hans' ? 'zh-Hans' : lang]}`)
       await page.waitForSelector('[data-all-revealed=yes]', { timeout: 15000 })
       const cards = await page.evaluate(() => [...document.querySelectorAll('#write article[data-slot]')].map((a) => ({ glyph: a.querySelector('[data-glyph]')?.textContent ?? '', text: a.innerText })))
-      const want = set.map(([k, f]) => (lang === 'ja' ? k : f === 'same' ? k : f)) // Traditional is carved by default on a Chinese page
-      const glyphsOk = cards.length === 3 && cards.every((c, i) => c.glyph === want[i])
+      const want = [set[0], set[1]].map(([k, f]) => (lang === 'ja' ? k : f === 'same' ? k : f)) // Traditional is carved by default on a Chinese page
+      const glyphsOk = cards.length === 2 && cards.every((c, i) => c.glyph === want[i])
       const noSame = cards.every((c) => !/same/i.test(c.text))
       const notes = cards.map((c) => (c.text.match(/刻字：[^\n]*/) ?? [''])[0])
-      const wantNotes = set.map(([k, f]) => (lang === 'ja' ? '' : f === 'same' ? `刻字：${k}` : lang === 'zh-Hant' ? `刻字：繁體（簡體：${k}）` : `刻字：繁體（简体：${k}）`))
+      const wantNotes = set.slice(0, 2).map(([k, f]) => (lang === 'ja' ? '' : f === 'same' ? `刻字：${k}` : lang === 'zh-Hant' ? `刻字：繁體（簡體：${k}）` : `刻字：繁體（简体：${k}）`))
       check(`${lang}, set ${si + 1} (${set.map((x) => x[0]).join('')}): every card shows the real character (${want.join('')}), never "same"; the 刻字 line is ${lang === 'ja' ? 'absent on a ja page' : '「刻字：<char>」 for identical forms and the pair for different ones'}`, glyphsOk && noSame && notes.join('|') === wantNotes.join('|'), JSON.stringify({ g: cards.map((c) => c.glyph), notes }))
       // the order step for the main card and (set 2) the different-forms card
       await page.locator('article[data-slot=main]').locator(`text=${GIVE[lang]}`).click()
@@ -3193,6 +3198,56 @@ const SECTION_ORDER = ['.hero', '.strip', '.philo', '#shape', '#angles', '#write
       check(`no page errors (run 21, ${lang}, set ${si + 1})`, errors.length === 0, errors.join('; '))
       await page.close()
     }
+  }
+}
+
+// ---------- Run 22 (2026-11-07): the card screen — two EQUAL cards, side by side on a wide screen and stacked on a phone; 本命 character cinnabar, 遊び字 character ink; the line under the cards; the new-round button; remembrance 本命 + 次点 ----------
+{
+  const LABELS = { ja: ['本命', '遊び字'], 'zh-Hant': ['本命', '趣字'], en: ['Main', 'Playful'] }
+  const PAIR_NOTE = { ja: '本命は、その人の芯を表す一字。遊び字は、ふたりだけに通じる一字。', 'zh-Hant': '本命，是那個人最核心的一個字；趣字，是只有你們之間才懂的一個字。', en: 'The main character captures who they are. The playful one is something only the two of you would get.' }
+  const AGAIN = { ja: '別の二字を探す（あと2回）', 'zh-Hant': '再找兩個新的字（還可以找2次）', en: 'Find two more (2 left)' }
+  const MEM_LABELS = { ja: ['本命', '次点'], 'zh-Hant': ['本命', '次選'], en: ['Main', 'Second'] }
+  const SEAL = 'rgb(200, 64, 45)'
+  const geom = (page) => page.evaluate(() => [...document.querySelectorAll('#write article[data-slot]')].map((a) => { const r = a.getBoundingClientRect(); return { slot: a.dataset.slot, top: Math.round(r.top), left: Math.round(r.left), w: Math.round(r.width), h: Math.round(r.height), border: getComputedStyle(a).borderStyle, glyph: getComputedStyle(a.querySelector('[data-glyph]')).color, label: a.querySelector('[data-slot-label]')?.innerText ?? '' } }))
+  for (const lang of ['ja', 'zh-Hant', 'en']) {
+    for (const [vw, vh, tag] of [[1280, 900, 'desktop'], [390, 844, 'phone']]) {
+      const { page, errors } = await mockPage(browser)
+      await page.setViewportSize({ width: vw, height: vh })
+      await page.goto(`http://localhost:5173/?lang=${lang}`, { waitUntil: 'networkidle' })
+      await page.locator('#moment').fill('母は庭の花を毎朝替えていた。何も言わずに、ただ笑っていた。')
+      await pickContext(page, { relationship: 'parent_mother', direction: 'up', occasion: 'seasonal_thanks' })
+      await page.click(`#write >> text=${GO[lang]}`)
+      await page.waitForSelector('[data-all-revealed=yes]', { timeout: 15000 })
+      await page.waitForTimeout(600)
+      const g = await geom(page)
+      const [m, f] = g
+      check(`cards (${lang}, ${tag}): exactly two cards — 本命 first, 遊び字 second — labelled ${LABELS[lang].join(' / ')}`, g.length === 2 && m.slot === 'main' && f.slot === 'freestyle' && g.map((c) => c.label).join() === LABELS[lang].join(), JSON.stringify(g))
+      check(`cards (${lang}, ${tag}): the two cards are EQUAL (same width — and, side by side, the same height), and ${vw >= 900 ? 'side by side on one row (本命 on the left)' : 'stacked, 本命 on top'}`, Math.abs(m.w - f.w) <= 2 && (vw < 900 || Math.abs(m.h - f.h) <= 12) && (vw >= 900 ? Math.abs(m.top - f.top) <= 2 && m.left < f.left : f.top > m.top + m.h - 2 && Math.abs(m.left - f.left) <= 2), JSON.stringify(g))
+      check(`cards (${lang}, ${tag}): the 本命 character is cinnabar, the 遊び字 character is ink (not cinnabar); both cards have a solid border — no dashed "lesser" style`, m.glyph === SEAL && f.glyph !== SEAL && m.border === 'solid' && f.border === 'solid', JSON.stringify(g))
+      check(`cards (${lang}, ${tag}): the line under the cards says what 本命 and the playful character are, word for word`, (await page.locator('[data-pair-note]').innerText()) === PAIR_NOTE[lang])
+      check(`cards (${lang}, ${tag}): the new-round button reads 「${AGAIN[lang]}」`, (await page.locator('[data-testid=see-others]').innerText()) === AGAIN[lang])
+      check(`cards (${lang}, ${tag}): no sideways scroll and the line under the cards is below both cards`, await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 1 && document.querySelector('[data-pair-note]').getBoundingClientRect().top >= Math.max(...[...document.querySelectorAll('#write article[data-slot]')].map((a) => a.getBoundingClientRect().bottom)) - 1))
+      await page.locator('#write').scrollIntoViewIfNeeded()
+      await page.locator('#write').screenshot({ path: `${SHOTS}/cards-${lang}-${tag}.png` })
+      check(`no page errors (run 22, ${lang}, ${tag})`, errors.length === 0, errors.join('; '))
+      await page.close()
+    }
+    // remembrance: 本命 + 次点, no 遊び字 and no line under the cards; both characters ink; the same new-round button
+    const { page, errors } = await mockPage(browser)
+    await page.setViewportSize({ width: 1280, height: 900 })
+    await page.goto(`http://localhost:5173/?lang=${lang}`, { waitUntil: 'networkidle' })
+    await page.locator('#moment').fill('母は庭の花を毎朝替えていた。何も言わずに、ただ笑っていた。')
+    await pickContext(page, { relationship: 'parent_mother', direction: 'up', occasion: 'memorial' })
+    await page.click(`#write >> text=${GO[lang]}`)
+    await page.waitForSelector('[data-all-revealed=yes]', { timeout: 15000 })
+    await page.waitForTimeout(600)
+    const gm = await geom(page)
+    check(`remembrance (${lang}): 本命 + 次点 — ${MEM_LABELS[lang].join(' / ')} — two equal cards, no 遊び字, no line under the cards, both characters ink`, gm.length === 2 && gm.map((c) => c.slot).join() === 'main,second' && gm.map((c) => c.label).join() === MEM_LABELS[lang].join() && Math.abs(gm[0].w - gm[1].w) <= 2 && gm.every((c) => c.glyph !== SEAL) && (await page.locator('[data-pair-note]').count()) === 0, JSON.stringify(gm))
+    check(`remembrance (${lang}): the new-round button is the same 「${AGAIN[lang]}」`, (await page.locator('[data-testid=see-others]').innerText()) === AGAIN[lang])
+    await page.locator('#write').scrollIntoViewIfNeeded()
+    await page.locator('#write').screenshot({ path: `${SHOTS}/cards-${lang}-remembrance.png` })
+    check(`no page errors (run 22, ${lang}, remembrance)`, errors.length === 0, errors.join('; '))
+    await page.close()
   }
 }
 

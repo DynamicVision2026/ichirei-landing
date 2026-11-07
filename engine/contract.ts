@@ -623,11 +623,12 @@ export function validateEngineResult(raw: unknown): string[] {
   }
   const cands = Array.isArray(r.candidates) ? r.candidates : []
   // 2 or 3 candidates (2 main + optional freestyle); a replacement call (engine/replace.ts) can add a fourth, leaving the removed one in place, eliminated
-  if (cands.length < 2 || cands.length > 6) problems.push(`expected 2 to 6 candidates (2 main + optional freestyle, + one refill for each empty slot), got ${cands.length}`)
+  // (2026-11-07: a round is a 本命 and a 遊び字 — remembrance a 本命 and a 次点; a 本命 alone is possible when the 遊び字 could not be made)
+  if (cands.length < 1 || cands.length > 6) problems.push(`expected 1 to 6 candidates (a main + a free pick or, in remembrance, a second; + one refill for each empty slot), got ${cands.length}`)
   const bySlot = (slot: Slot) => cands.filter((c) => c?.slot === slot)
   for (const slot of ['main', 'second'] as const) {
-    // one per slot — except that a replacement (engine/replace.ts) may sit next to the candidate it replaced, which is then eliminated
-    if (bySlot(slot).length < 1 || bySlot(slot).length > 2 || (bySlot(slot).length === 2 && !bySlot(slot).some((c) => c.eliminated) && slot === 'main')) problems.push(`expected exactly one "${slot}" candidate, got ${bySlot(slot).length}`)
+    // one per slot — except that a replacement (engine/replace.ts) may sit next to the candidate it replaced, which is then eliminated; the second slot exists in remembrance only (2026-11-07)
+    if ((bySlot(slot).length < 1 && (slot === 'main' || r.occasion === 'memorial')) || bySlot(slot).length > 2 || (bySlot(slot).length === 2 && !bySlot(slot).some((c) => c.eliminated) && slot === 'main')) problems.push(`expected exactly one "${slot}" candidate, got ${bySlot(slot).length}`)
   }
   // The sender sees at most three cards: one main (the primary), one second, one freestyle.
   const liveMains = cands.filter((c) => c?.slot !== 'freestyle' && !c?.eliminated)

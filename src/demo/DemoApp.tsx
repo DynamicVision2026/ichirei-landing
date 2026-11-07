@@ -696,7 +696,7 @@ export default function DemoApp({ mode = 'harness', aside }: { mode?: Mode; asid
             <div className="candidateSets" data-testid="candidate-sets">
               {retryCount < 2 && !retryNote ? (
                 <button type="button" className="btn ghost" data-testid="see-others" onClick={seeOthers}>
-                  {pc.another(2 - retryCount, memorialNow)}
+                  {pc.another(2 - retryCount)}
                 </button>
               ) : (
                 <p className="sent" role="status" data-testid="retry-cap">

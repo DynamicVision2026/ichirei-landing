@@ -15,11 +15,11 @@ function makeId(): string {
 
 export const sessionId: string = makeId()
 export type Source = 'customer' | 'harness'
-export type Choice = 'main' | 'second' | 'freestyle'
+export type Choice = 'main' | 'second' | 'free'
 
-/** Which kind of card: the cinnabar primary, the other main card, or the freestyle. */
+/** Which kind of card (2026-11-07): the 本命 (`main`), the 遊び字 (`free`) or, in remembrance only, the 次点 (`second`). */
 export const choiceOf = (c: { slot: string; kanji: string }, primaryKanji: string | null): Choice =>
-  c.slot === 'freestyle' ? 'freestyle' : c.kanji === primaryKanji ? 'main' : 'second'
+  c.slot === 'freestyle' ? 'free' : c.kanji === primaryKanji ? 'main' : 'second'
 
 export function track(event: 'chosen' | 'explain_opened', source: Source, choice: Choice): void {
   try {

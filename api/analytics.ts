@@ -1,5 +1,5 @@
 // POST /api/analytics — the browser reports two events of the learning loop (engine/analytics.ts):
-//   chosen          { session, source, event: "chosen", choice: "main" | "second" | "freestyle" }
+//   chosen          { session, source, event: "chosen", choice: "main" | "second" | "free" }
 //   explain_opened  { session, source, event: "explain_opened", choice? }
 //   the story step: { session, source, event: story_opened | question_shown | question_switched | voice_used | draft_restored |
 //                     story_submitted | followup_shown | reveal_shown, language?, set?, qid? }  (codes only)

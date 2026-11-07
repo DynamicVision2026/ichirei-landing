@@ -29,7 +29,12 @@ STEP 2 — FOUR SCENES, FOLLOWING THIS ARC (not just "the first four things that
   2. LEAD-UP — the moment that leads to the discovery.
   3. THE TURNING POINT (required) — scene 3 shows `turning_point` directly: the discovery, the act or the sentence itself.
   4. AFTER — the image the story ends on, or what remains. Scene 4 must be RESOLVED: never end on a setup, a question, a cliff-hanger or an object still waiting to be opened, developed or answered. If the story ends on such a moment, scene 4 is the answer the story gives afterwards.
-  A story that is only one moment (a single short anecdote) has no arc to find: use that same moment from four different distances (far, near, an object, what is left). Nothing else changes for it.
+  A SHORT STORY (one or two sentences, fewer than four different moments) has no arc to find, and it STILL gets four pictures: build four scenes from the SAME moment, seen differently —
+    1. the place and its light (the setting the story names, wide, far away);
+    2. the receiver's act (the act the story tells, as hands or seen from behind);
+    3. a close-up of a detail that is already in the story (an object or a gesture it names);
+    4. the quiet after (the feeling the story states or implies, shown through the same place or the same object).
+  In a short story NEVER add a person, an animal, an object, an event, a place or a word that the story does not have. Mood, light, weather, season and camera distance are yours to choose, as long as nothing in the story contradicts them. The caption (line) of an extra scene reuses a short phrase of the story; if no phrase of the story fits, the line is the empty string "" (never invented). Do not leave a picture out: the washi tile is only for a picture that cannot be drawn safely.
 STEP 3 — Each line tells what happened at one moment — a scene a painter could draw — complete and readable on its own, in the sender's view and voice. For each line, also one PICTURE DESCRIPTION (rule 7).
 
 RULES
@@ -55,7 +60,8 @@ RULES
    - No names, no real place names, no schools or companies; no digits; no Japanese or Chinese characters.
    - NO illness, hospital, injury, blood, funeral or decline image, even if the story mentions it — paint the moment around it. For a remembrance film, and for a quiet gift (an apology, an encouragement — the tone line above says so), no celebration image either (no party, cake, candles, festival, wedding).
    - NO knife, blade, weapon, fight or quarrel in a picture, in word or in image (a work tool is a plane, a chisel, sandpaper, a ruler; a quarrel is told by its quiet aftermath: a table laid for one more, a door left unlatched, two cups).
-   - Four different moments, following the arc above. Do not name or hint at the chosen character.
+   - Four different moments, following the arc above (a short story: four views of its one moment, as in step 2). Do not name or hint at the chosen character.
+   - NOTHING ADDED: a person, an animal or an object that the story does not name is never in a picture (no extra child, no dog, no bicycle, no umbrella "for atmosphere").
 {{ FEEDBACK }}
 
 OUTPUT. Reply with exactly one JSON object and nothing else (no code fence, no commentary):

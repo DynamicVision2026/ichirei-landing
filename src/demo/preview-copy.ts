@@ -21,7 +21,7 @@ export interface PreviewCopy {
   /** "Who they are" label on the card. */
   who: string
   /** Under the cards (2026-11-05): 「別の三字を探す（あと2回）」 — two cards instead of three on a memorial page — and what follows it. */
-  another: (left: number, quiet: boolean) => string
+  another: (left: number) => string
   anotherBusy: string
   addDetail: string
   prevSet: string
@@ -55,7 +55,7 @@ export const PREVIEW_COPY: Record<RevealLang, PreviewCopy> = {
     afterOrder: '物語の絵は、ご注文後にお届けします',
     waiting: '描いています…',
     who: 'その人は',
-    another: (left, quiet) => `別の${quiet ? '二' : '三'}字を探す（あと${left}回）`,
+    another: (left) => `別の二字を探す（あと${left}回）`,
     anotherBusy: '新しい候補を探しています…',
     addDetail: '物語を少し書き足すと、新しい字が見つかります。',
     prevSet: '‹ 前の組',
@@ -79,7 +79,7 @@ export const PREVIEW_COPY: Record<RevealLang, PreviewCopy> = {
     afterOrder: '故事的畫，會在訂購後為您送上',
     waiting: '描繪中…',
     who: '這個人是',
-    another: (left, quiet) => `再找${quiet ? '兩' : '三'}個新的字（還可以找${left}次）`,
+    another: (left) => `再找兩個新的字（還可以找${left}次）`,
     anotherBusy: '正在尋找新的候選…',
     addDetail: '把故事再多寫一些，就能找到新的字。',
     prevSet: '‹ 上一組',
@@ -103,7 +103,7 @@ export const PREVIEW_COPY: Record<RevealLang, PreviewCopy> = {
     afterOrder: "The pictures of your story are delivered after you order.",
     waiting: 'Drawing…',
     who: 'They are',
-    another: (left, quiet) => `Find ${quiet ? 'two' : 'three'} more (${left} left)`,
+    another: (left) => `Find two more (${left} left)`,
     anotherBusy: 'Looking for new candidates…',
     addDetail: 'Add a little more to your story to find new characters.',
     prevSet: '‹ Previous',

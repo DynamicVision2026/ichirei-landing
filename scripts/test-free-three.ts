@@ -132,7 +132,7 @@ try {
   reset()
   freeAsk = [{ candidates: [...repeats().slice(0, 3), F_朝(), F_箱()] }, { candidates: [] }]
   const r2 = await run(BIRTHDAY, 2, SHOWN)
-  check('(2) round 2: three already-shown options come first, the fourth stands — three cards, source "first", no second pair asked', sum(r2) === 'main:誠,second:灯,freestyle:朝' && counts.free === 2 && par().free_source === 'first' && par().free_fallbacks.length === 0 && freeInfos[0]?.source === 'first', sum(r2) + JSON.stringify(par().free_fallbacks))
+  check('(2) round 2: three already-shown options come first, the fourth stands — two cards (本命 + 遊び字), source "first", no second pair asked', sum(r2) === 'main:誠,freestyle:朝' && counts.free === 2 && par().free_source === 'first' && par().free_fallbacks.length === 0 && freeInfos[0]?.source === 'first', sum(r2) + JSON.stringify(par().free_fallbacks))
   check('(2) …the three shown options were set aside with the code already_shown (counted), the prompt named every shown character, and no model review was spent on them', par().free_set_aside?.already_shown === 3 && SHOWN.every((k) => bodies.free.prompt.includes(k)), JSON.stringify(par().free_set_aside))
   check('(2) …the free call asked for five options within the new token ceiling', bodies.free.max_tokens === 2600)
 
@@ -140,69 +140,84 @@ try {
   reset()
   const r3 = await run(BIRTHDAY, 2, SHOWN)
   const fb = par().free_fallbacks ?? []
-  check('(3) round 2, every free option in BOTH pairs repeats an earlier character: the third card still appears — the best unused candidate of the main/second calls, shown in the free slot', live(r3).length === 3 && live(r3).some((c) => c.slot === 'freestyle') && !SHOWN.includes(live(r3).find((c) => c.slot === 'freestyle')!.kanji), sum(r3))
-  check('(3) …the free slot holds a candidate neither main nor second took, and it is not a character shown before', (() => { const f = live(r3).find((c) => c.slot === 'freestyle')!; return ['守', '待'].includes(f.kanji) && live(r3).filter((c) => c.kanji === f.kanji).length === 1 })(), sum(r3))
+  check('(3) round 2, every free option in BOTH pairs repeats an earlier character: the 遊び字 still appears — the unused candidate of the main call (its runner-up), shown in the free slot', live(r3).length === 2 && live(r3).some((c) => c.slot === 'freestyle') && !SHOWN.includes(live(r3).find((c) => c.slot === 'freestyle')!.kanji), sum(r3))
+  check('(3) …the free slot holds a candidate the main card did not take, and it is not a character shown before', (() => { const f = live(r3).find((c) => c.slot === 'freestyle')!; return f.kanji === '守' && live(r3).filter((c) => c.kanji === f.kanji).length === 1 })(), sum(r3))
   check('(3) …source "runner_up"; two fallbacks logged — retry then runner_up — each with the reason already_shown; the second pair was asked once, no third pair', par().free_source === 'runner_up' && fb.length === 2 && fb[0].to === 'retry' && fb[1].to === 'runner_up' && fb.every((f: any) => f.why.includes('already_shown')) && counts.free === 4, JSON.stringify({ s: par().free_source, fb, free: counts.free }))
   check('(3) …the engine log line carries it: "[ichirei-engine] free_source" with round 2, source runner_up and the fallbacks', logs.some((l) => l.startsWith('[ichirei-engine] free_source') && l.includes('"round":2') && l.includes('"source":"runner_up"') && l.includes('already_shown')))
   check('(3) …the /ops callback gets the round, the source and the reasons in codes', freeInfos.length === 1 && freeInfos[0].round === 2 && freeInfos[0].source === 'runner_up' && freeInfos[0].reasons.includes('already_shown'), JSON.stringify(freeInfos))
-  check('(3) …the card is shown as the free card in the progressive events too: main, then main+second, then all three', events.map((e) => e.slots).join('|') === 'main|main,second|main,second,freestyle', JSON.stringify(events))
+  check('(3) …the card is shown as the free card in the progressive events too: main, then main+free; no second-lane call was made', events.map((e) => e.slots).join('|') === 'main|main,freestyle' && !counts.second, JSON.stringify(events))
   check('(3) …the spare card carries the free card\'s fields (reading, a verbatim anchor from the story, a line) and is an ordinary contract card', (() => { const f = live(r3).find((c) => c.slot === 'freestyle')!; return f.reading !== '' && STORY.includes(f.story_anchor) && f.one_line_gaze !== '' && f.truth_type === 'Play' })())
 
   // round 3: the same, with six characters shown
   const r3b = await run(BIRTHDAY, 3, [...SHOWN, '朝'])
-  check('(3) round 3 (six characters shown): three cards as well', live(r3b).length === 3 && par().free_source === 'runner_up', sum(r3b))
+  check('(3) round 3 (six characters shown): one 本命 and one 遊び字 as well', live(r3b).length === 2 && par().free_source === 'runner_up', sum(r3b))
 
   // ---- (4) the second pair succeeds ---------------------------------------------------------------------------------------------------------------------------------------------------------
   reset()
   freeAsk = [{ candidates: repeats() }, { candidates: [F_朝(), F_箱()] }]
   const r4 = await run(BIRTHDAY, 2, SHOWN)
-  check('(4) the first pair repeats shown characters, the second pair gives a fresh one: three cards, source "retry", one fallback (retry) with the reason already_shown', sum(r4) === 'main:誠,second:灯,freestyle:朝' && par().free_source === 'retry' && par().free_fallbacks.length === 1 && par().free_fallbacks[0].why.includes('already_shown'), sum(r4) + JSON.stringify(par().free_fallbacks))
+  check('(4) the first pair repeats shown characters, the second pair gives a fresh one: two cards, source "retry", one fallback (retry) with the reason already_shown', sum(r4) === 'main:誠,freestyle:朝' && par().free_source === 'retry' && par().free_fallbacks.length === 1 && par().free_fallbacks[0].why.includes('already_shown'), sum(r4) + JSON.stringify(par().free_fallbacks))
 
   // ---- (4b) the other way the slot used to stay empty: the options are NEW characters, but they stand on the main card's sentence (a short story has no other place) ---------------------------------
   reset()
   freeAsk = [{ candidates: [F('朝', 'あさ', '車の窓の霜'), F('箱', 'はこ', '車の窓の霜をお湯で溶かして')] }, { candidates: [F('朝', 'あさ', '車の窓の霜'), F('箱', 'はこ', '車の窓の霜をお湯で溶かして')] }]
   const r4b = await run(BIRTHDAY, 2, SHOWN)
   const f4b = live(r4b).find((c) => c.slot === 'freestyle')
-  check('(4b) round 2, the free options are new characters but all stand on the main card\'s place in the story: they are set aside (same_anchor) in both pairs, and the third card is a spare from the main/second calls — three cards, source runner_up, reason same_anchor', live(r4b).length === 3 && !!f4b && ['待', '守'].includes(f4b.kanji) && par().free_source === 'runner_up' && par().free_fallbacks.every((f: any) => f.why.includes('same_anchor')) && par().free_set_aside?.same_anchor >= 2, sum(r4b) + JSON.stringify({ fb: par().free_fallbacks, aside: par().free_set_aside }))
-  check('(4b) …the spare that stands on a DIFFERENT place in the story than the main card comes first (待 on 「黙って新聞を読んで」, not 守 on the main card\'s own sentence)', f4b?.kanji === '待', sum(r4b))
+  check('(4b) round 2, the free options are new characters but all stand on the main card\'s place in the story: they are set aside (same_anchor) in both pairs, and the 遊び字 is the main call\'s spare — two cards, source runner_up, reason same_anchor', live(r4b).length === 2 && !!f4b && f4b.kanji === '守' && par().free_source === 'runner_up' && par().free_fallbacks.every((f: any) => f.why.includes('same_anchor')) && par().free_set_aside?.same_anchor >= 2, sum(r4b) + JSON.stringify({ fb: par().free_fallbacks, aside: par().free_set_aside }))
 
   // ---- (5) the spare card goes through the normal review ---------------------------------------------------------------------------------------------------------------------------------
   reset()
-  vetoed = new Set(['待'])
-  const r5 = await run(BIRTHDAY, 2, SHOWN)
-  const f5 = live(r5).find((c) => c.slot === 'freestyle')
-  check('(5) a spare card the review rejects is not shown: the next spare stands in (守), still three cards', f5?.kanji === '守' && live(r5).length === 3, sum(r5))
-  reset()
-  vetoed = new Set(['待', '守'])
+  vetoed = new Set(['守'])
   const r5b = await run(BIRTHDAY, 2, SHOWN)
-  check('(5) when every spare is rejected too, two cards — nothing weak is forced in — and the log says why (source none; reasons already_shown and the review rule)', sum(r5b) === 'main:誠,second:灯' && par().free_source === null && freeInfos[0]?.source === null && freeInfos[0].reasons.some((x) => x.startsWith('review:')), sum(r5b) + JSON.stringify(freeInfos))
+  check('(5) when the only spare is rejected by the review, nothing weak is forced in — the last-resort refill is asked (and has nothing) — and the log says why (source none; reasons already_shown and the review rule)', sum(r5b) === 'main:誠' && par().free_source === null && freeInfos[0]?.source === null && freeInfos[0].reasons.some((x) => x.startsWith('review:')), sum(r5b) + JSON.stringify(freeInfos))
+  check('(5) …and the refill for the 遊び字 was tried once before the round ended', (counts.refill ?? 0) >= 1, JSON.stringify(counts))
 
   // ---- (6) the spare card must not be a character the main or second card took; excluded spares are not shown -----------------------------------------------------------------------------
   reset()
-  const r6 = await run(BIRTHDAY, 2, [...SHOWN, '待'])
-  check('(6) a spare that was shown in an earlier round is never used (待 is excluded → 守)', live(r6).find((c) => c.slot === 'freestyle')?.kanji === '守', sum(r6))
+  const r6 = await run(BIRTHDAY, 2, [...SHOWN, '守'])
+  check('(6) a spare that was shown in an earlier round is never used (守 is excluded → no spare; the refill finds nothing)', !live(r6).some((c) => c.kanji === '守'), sum(r6))
 
   // ---- (7) the main cards never wait for the free pick ---------------------------------------------------------------------------------------------------------------------------------------
   reset()
   freeDelay = 400
   const r7 = await run(BIRTHDAY, 2, SHOWN)
-  check('(7) main and second cards are shown long before the free pick finishes its pairs (slow free calls): main < 250 ms, second < 400 ms, the free card last', events.length === 3 && events[0].at < 250 && events[1].at < 400 && events[2].at > events[1].at && live(r7).length === 3, JSON.stringify(events))
+  check('(7) the main card is shown long before the free pick finishes its pairs (slow free calls): main < 250 ms, the free card last', events.length === 2 && events[0].at < 250 && events[1].at > events[0].at && live(r7).length === 2, JSON.stringify(events))
+  // Part 0: a reviewed 遊び字 is never dropped as "late" — however long it takes, it is shown
+  freeDelay = 1800
+  freeAsk = [{ candidates: [F_朝(), F_箱()] }, { candidates: [] }]
+  const r7b = await run(BIRTHDAY, 1, [])
+  check('(7) Part 0: a free card that arrives long after the main card (1.8 s per free call here) is still shown, final, and nothing is dropped as late', sum(r7b) === 'main:誠,freestyle:朝' && par().free_dropped == null && events.at(-1)?.slots === 'main,freestyle', sum(r7b) + JSON.stringify(events))
 
   // ---- (8) switches ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
   reset()
   process.env.ICHIREI_FREE_RUNNER_UP = 'off'
   const r8 = await run(BIRTHDAY, 2, SHOWN)
-  check('(8) ICHIREI_FREE_RUNNER_UP=off switches the third step off (rollback): two cards, source none', sum(r8) === 'main:誠,second:灯' && par().free_source === null)
+  check('(8) ICHIREI_FREE_RUNNER_UP=off switches the third step off (rollback): the 遊び字 has no spare, source none', sum(r8) === 'main:誠' && par().free_source === null)
   reset()
 
   // ---- (9) remembrance keeps two cards, with no free call at all --------------------------------------------------------------------------------------------------------------------------------
   const r9 = await run(MEMORIAL, 2, [])
-  check('(9) remembrance (偲ぶ): two cards, no free call, no spare card, nothing counted for /ops', live(r9).filter((c) => c.slot === 'freestyle').length === 0 && live(r9).length === 2 && counts.free === 0 && freeInfos.length === 0, sum(r9) + JSON.stringify(counts))
+  check('(9) remembrance (偲ぶ): 本命 + 次点 (the only place `second` remains), no free call, no spare card, nothing counted for /ops', sum(r9) === 'main:誠,second:灯' && counts.free === 0 && counts.second === 1 && freeInfos.length === 0, sum(r9) + JSON.stringify(counts))
+  // Part 0: a remembrance 次点 replaced by its runner-up leaves exactly ONE second card
+  vetoed = new Set(['灯'])
+  const r9b = await run(MEMORIAL, 2, [])
+  check('(9) Part 0: the 次点 灯 fails the review and the runner-up 待 replaces it — exactly one `second` card, never two', sum(r9b) === 'main:誠,second:待' && r9b.candidates.filter((c) => !c.eliminated && c.slot === 'second').length === 1, sum(r9b))
+  reset()
 
   // ---- (10) round 1 is unchanged ---------------------------------------------------------------------------------------------------------------------------------------------------------------
   freeAsk = [{ candidates: [F_朝(), F_箱()] }, { candidates: [] }]
   const r10 = await run(BIRTHDAY, 1, [])
-  check('(10) round 1: three cards from the first pair, source "first", no fallback, no spare', sum(r10) === 'main:誠,second:灯,freestyle:朝' && par().free_source === 'first' && par().free_fallbacks.length === 0 && freeInfos[0]?.round === 1)
+  check('(10) round 1: a 本命 and a 遊び字 from the first pair, source "first", no fallback, no spare', sum(r10) === 'main:誠,freestyle:朝' && par().free_source === 'first' && par().free_fallbacks.length === 0 && freeInfos[0]?.round === 1)
+
+  // ---- (10b) rounds 1-3: always exactly one 本命 and one 遊び字, even when every free option repeats a shown character; the second lane is never called outside remembrance
+  for (const [round, shown] of [[1, []], [2, SHOWN], [3, [...SHOWN, '朝']]] as [number, string[]][]) {
+    reset()
+    freeAsk = [{ candidates: repeats() }, { candidates: repeats() }]
+    const rr = await run(BIRTHDAY, round, shown)
+    const lv = live(rr)
+    check(`(10b) round ${round}: exactly one 本命 and one 遊び字 (${sum(rr)}), no second card, no second-lane call`, lv.filter((c) => c.slot === 'main').length === 1 && lv.filter((c) => c.slot === 'freestyle').length === 1 && lv.length === 2 && !counts.second, sum(rr) + JSON.stringify(counts))
+  }
+  reset()
 
   // ---- (11) the codes ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
   check('(11) set-aside reasons become short codes (no story text)', setAsideCode('palette: already shown for this story') === 'already_shown' && setAsideCode('slots: same story detail as the main card') === 'same_anchor' && setAsideCode('review: dignity: could read as a negative trait') === 'review:dignity' && setAsideCode('subject: the quoted act is the narrator\'s own, not the receiver\'s') === 'subject' && setAsideCode(null) === 'other')
@@ -221,7 +236,7 @@ try {
   // ---- (13) the owner's page shows the counts -------------------------------------------------------------------------------------------------------------------------------------------------------
   const O = createOpsHandlers((): OpsDeps => ({ store, env: { ICHIREI_OPS_PASSWORD: 'correct horse' } as NodeJS.ProcessEnv, now: () => now, mailer: async () => true, payments: async () => ({ found: new Map(), failure: null }), shipping: async () => ({ found: new Map(), failure: null }) }))
   const page = await (await O.page(new Request('https://ichirei.example/ops', { headers: { authorization: `Basic ${Buffer.from('owner:correct horse').toString('base64')}` } }))).text()
-  const part = page.slice(page.indexOf('三枚目の字（趣字）の出どころ'))
+  const part = page.slice(page.indexOf('遊び字の出どころ'))
   check('(13) /ops shows the free card\'s sources for the last 8 days — per round: first, retry, runner_up, none — and the reasons with their counts', part.includes('class="freeT"') && /<td>2回目<\/td><td>0<\/td><td>0<\/td><td>1<\/td><td>0<\/td>/.test(part) && /<td>3回目<\/td><td>0<\/td><td>0<\/td><td>0<\/td><td>1<\/td>/.test(part) && /合計（3回）/.test(part) && part.includes('already_shown 1') && part.includes('late 1'), part.slice(0, 700))
   check('(13) …only codes and counts are on the page: no story, no character', !/父|朝|誠/.test(part))
 

@@ -176,6 +176,16 @@ Repeats of main characters are counted from the orders themselves, not from anal
 - **The label and the line (2026-11-07).** Where a label is shown before the line (the cards: どんな人か / 對方是怎樣的人 / What they're like; the order step's card preview: その人は / 這個人是 / They are), an opening on the line that repeats it (その人は、 · 這個人是 / 這個人 / 那個人是 / 他是 / 她是 · This person is / They are / Someone who) is taken off when the line is displayed (`src/order/who-line.ts`; the stored line is unchanged). Surfaces with no label (the gift page, the PDF, the scroll, the film, the buyer page) show the line as written. Tests: `scripts/test-who-line.ts`, browser suite (the preview run).
 - The reading aids of a 漢詩 (書き下し文, the summary / translation) follow the poem rule: no scenery, object or feeling the story does not give; the poem review reads them with the lines; one rewrite, then the poem in hand is kept.
 
+## D3. Two cards a round (2026-11-07)
+
+A round shows a **本命** and a **遊び字**. Remembrance (and the state 「もう会えない」) shows a **本命** and a **次点** and no 遊び字 — the only place a second card remains.
+
+- Two lanes start together: the main call (its runner-up is an internal fallback, never shown by itself) and the 遊び字 lane (five ranked options → a second hedged pair → the main call's unused candidate → one compact refill as the last resort). No second-lane call outside remembrance.
+- Up to three rounds, each excluding every character already shown: up to **six** characters in all. Every round has exactly one 本命 and one 遊び字 (the rescue steps above guarantee it unless every step fails; then the 本命 stands alone and the log says why).
+- A reviewed card is never dropped as "late". A card is shown only when it is final; the final gate may remove a card only for a real rule failure, and then the rescue steps run.
+- Analytics and `/ops` record the slot as `main` / `free` (`second` for remembrance).
+- Short stories (fewer than four sentences) still get four pictures: four views of the same moment, nothing added (`engine/film-truth.ts`).
+
 ## E. Settings (current)
 - Effort: medium.
 - Token limit: 14,000, with one retry at 20,000.

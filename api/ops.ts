@@ -264,7 +264,7 @@ export function createOpsHandlers(deps: () => OpsDeps) {
       const otherLine = (r: Classified) => `<tr class="inwindow">${common(r)}<td>${r.win.phase === 'cancelled' ? 'キャンセル' : r.win.phase === 'unpaid' ? '入金を確認できません' : '製作なし（eギフトなど）'}</td><td>${esc(collectedCell(r))}</td><td>${esc(ackCell(r))}</td><td>${cancelCell(r)}</td></tr>`
       const otherTable = (list: Classified[]) =>
         `<div class="wide"><table><thead><tr><th>注文番号</th><th>サイズ</th><th>偲ぶ</th><th>お届け</th><th>状態</th><th>受け取り</th><th>返金条件の確認</th><th>操作</th></tr></thead><tbody>${list.map(otherLine).join('') || '<tr><td colspan="8">なし</td></tr>'}</tbody></table></div>`
-      // 三枚目の字（趣字）の出どころ: コードと件数だけ（物語も字も入っていません）
+      // 遊び字の出どころ: コードと件数だけ（物語も字も入っていません）
       const freeTable = (c: FreeSourceCounts | null) => {
         if (!c) return '<p>集計を読み込めませんでした。</p>'
         const row = (label: string, v: FreeSourceCounts['by_source']) => `<tr><td>${label}</td><td>${v.first}</td><td>${v.retry}</td><td>${v.runner_up}</td><td>${v.none}</td></tr>`
@@ -286,7 +286,7 @@ export function createOpsHandlers(deps: () => OpsDeps) {
         `<h2>製作に進めるもの（${readyRows.length}）</h2>${readyTable(readyRows)}` +
         `<h2>キャンセル受付中（${openRows.length}）</h2>${openTable(openRows)}` +
         `<h2>そのほか（キャンセル・入金未確認・製作なし ${otherRows.length}）</h2>${otherTable(otherRows)}` +
-        `<h2>三枚目の字（趣字）の出どころ（直近8日）</h2>${freeTable(freeCounts)}` +
+        `<h2>遊び字の出どころ（直近8日）</h2>${freeTable(freeCounts)}` +
         `<h2>本命（メインの字）上位10（直近30日）</h2>${mainTable(mainCounts)}` +
         `<p>${flagged.length ? `⚠ 住所が30日たっても入力されていないeギフト: ${flagged.length}件（自動の返金はしません。ご判断ください）` : ''}</p>` +
         `<script>document.addEventListener('click',async(e)=>{const b=e.target.closest('button');if(!b)return;if(b.id==='egift-run'){const r=await fetch('/ops/egift/run',{method:'POST'});alert(await r.text());return}` +

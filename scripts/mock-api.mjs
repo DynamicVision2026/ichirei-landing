@@ -13,6 +13,7 @@ import { createServer } from 'node:http'
 import { readFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
+import { shapeRound } from './mock-shape.mjs'
 
 const here = dirname(fileURLToPath(import.meta.url))
 const FIXTURE = JSON.parse(readFileSync(join(here, 'golden-fixture.json'), 'utf8'))
@@ -37,22 +38,26 @@ const server = createServer(async (req, res) => {
       res.write(JSON.stringify({ type: 'error', error: 'Engine failed: simulated model parse failure' }) + '\n')
       return res.end()
     }
+    let reqBody = {}
+    try { reqBody = JSON.parse(body || '{}') } catch {}
     if (mode === 'cards') {
       // Parallel cards: each card is announced as it passes its checks (main; main + second; all three), then the terminal result.
       // the main card's reading carries a dictionary okurigana marker (しょ-う): the page must show it plain
       const dashed = (list) => list.map((c, i) => (i === 0 ? { ...c, reading: c.reading.slice(0, -1) + '-' + c.reading.slice(-1) } : c))
-      const partial = (n) => ({ ...FIXTURE, candidates: dashed(FIXTURE.candidates.slice(0, n)), runner_up_kanji: n >= 2 ? FIXTURE.runner_up_kanji : null, freestyle_kanji: n >= 3 ? FIXTURE.freestyle_kanji : null })
+      const round = shapeRound(FIXTURE, reqBody)
+      const total = round.candidates.length
+      const partial = (n) => ({ ...round, candidates: dashed(round.candidates.slice(0, n)), runner_up_kanji: n >= 2 ? round.runner_up_kanji : null, freestyle_kanji: n >= 2 ? round.freestyle_kanji : null })
       res.write(JSON.stringify({ type: 'stage', stage: 'reading' }) + '\n')
       await sleep(300)
       res.write(JSON.stringify({ type: 'stage', stage: 'choosing' }) + '\n')
       await sleep(400)
       res.write(JSON.stringify({ type: 'stage', stage: 'checking' }) + '\n')
-      for (const n of [1, 2, 3]) {
+      for (const n of Array.from({ length: total }, (_, i) => i + 1)) {
         await sleep(1500)
         res.write(JSON.stringify({ type: 'card', result: partial(n) }) + '\n')
       }
       await sleep(800)
-      res.write(JSON.stringify({ type: 'result', result: { ...FIXTURE, candidates: dashed(FIXTURE.candidates) } }) + '\n')
+      res.write(JSON.stringify({ type: 'result', result: { ...round, candidates: dashed(round.candidates) } }) + '\n')
       return res.end()
     }
     // Simulate the model streaming: 10 progress lines spread over TOTAL_MS.
@@ -65,7 +70,7 @@ const server = createServer(async (req, res) => {
     }
     res.write(JSON.stringify({ type: 'stage', stage: 'checking' }) + '\n')
     await sleep(Math.max(1500, TOTAL_MS / (steps + 1))) // the "checking" step stays on screen long enough to be observed
-    res.write(JSON.stringify({ type: 'result', result: FIXTURE }) + '\n')
+    res.write(JSON.stringify({ type: 'result', result: shapeRound(FIXTURE, reqBody) }) + '\n')
     return res.end()
   }
 

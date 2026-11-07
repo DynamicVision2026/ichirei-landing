@@ -184,6 +184,8 @@ export interface Copy {
   revealIntroCustomer: string
   /** Remembrance: no gift wording (the character is kept, not given). */
   revealIntroMemorial: string
+  /** The line under the two cards (not shown in remembrance): what 本命 and 遊び字 are. */
+  pairNote: string
   giveThis: string
   selectThis: string
   selectedThis: string
@@ -362,6 +364,7 @@ const ja: Copy = {
   revealIntro: 'あなたの言葉から、一字ずつ浮かびあがります。気になった字に触れてください。',
   revealIntroCustomer: 'あなたの物語から見つかった字です。贈りたい一字を選んでください。',
   revealIntroMemorial: 'あなたの物語から見つかった字です。その人を偲ぶ一字を選んでください。',
+  pairNote: '本命は、その人の芯を表す一字。遊び字は、ふたりだけに通じる一字。',
   giveThis: 'この字で贈る',
   selectThis: 'この一字を選ぶ',
   selectedThis: 'この一字を選んでいます',
@@ -514,6 +517,7 @@ const zhHans: Copy = {
   revealIntro: '从你的文字里，一个字一个字浮现出来。请触碰让你在意的字。',
   revealIntroCustomer: '这些字是从你的故事里找到的。请选一个想送出的字。',
   revealIntroMemorial: '这些字是从你的故事里找到的。请选一个追思那个人的字。',
+  pairNote: '本命，是那个人最核心的一个字；趣字，是只有你们之间才懂的一个字。',
   giveThis: '送这个字',
   selectThis: '选择这个字',
   selectedThis: '已选择这个字',
@@ -672,6 +676,7 @@ const zhHant: Copy = {
   revealIntro: '從你的文字裡，一個字一個字浮現出來。請觸碰讓你在意的字。',
   revealIntroCustomer: '這些字是從你的故事裡找到的。請選一個想送出的字。',
   revealIntroMemorial: '這些字是從你的故事裡找到的。請選一個追思那個人的字。',
+  pairNote: '本命，是那個人最核心的一個字；趣字，是只有你們之間才懂的一個字。',
   giveThis: '送這個字',
   selectThis: '選擇這個字',
   selectedThis: '已選擇這個字',
@@ -833,6 +838,7 @@ const en: Copy = {
   revealIntro: 'One character at a time, they rise out of your words. Touch the one that draws you.',
   revealIntroCustomer: 'These characters came from your story. Choose the one you want to give.',
   revealIntroMemorial: 'These characters came from your story. Choose the one to remember them by.',
+  pairNote: 'The main character captures who they are. The playful one is something only the two of you would get.',
   giveThis: 'Give this character',
   selectThis: 'Choose this character',
   selectedThis: 'This character is chosen',
@@ -849,7 +855,7 @@ const en: Copy = {
     `${c.inscription_form && carved !== c.kanji ? `${c.kanji} · ` : ''}${cleanReading(c.reading)}${c.reading_zh ? ` · pinyin ${c.reading_zh}` : ''}${c.meaning ? ` — ${c.meaning}` : ''}`,
   inscriptionNote: () => null, // the character is carved in its modern Japanese form
   previewNote: () => null,
-  slotLabels: { main: 'Main', second: 'Second', freestyle: 'Freestyle' },
+  slotLabels: { main: 'Main', second: 'Second', freestyle: 'Playful' },
   match: { who: 'What they\'re like', moment: 'Your moment', feeling: 'The feeling', resonates: 'Resonates deeply', registers: registerTable('en') },
   order: {
     heading: 'Your order',

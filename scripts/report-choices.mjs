@@ -1,4 +1,4 @@
-// What do buyers actually choose? Per language: % main, % second, % freestyle, % ordered.
+// What do buyers actually choose? Per language: % main, % second, % free, % ordered.
 //
 //   node scripts/report-choices.mjs --bucket ichirei-orders-581109768569     # reads gs://<bucket>/analytics/*.jsonl (needs gcloud; Cloud Shell has it)
 //   node scripts/report-choices.mjs --dir ./some/folder                       # reads <dir>/analytics/*.jsonl, or <dir>/*.jsonl
@@ -10,7 +10,7 @@
 // Definitions (printed under the table):
 //   shown      sessions that were shown a result (status sufficient)
 //   chose      sessions that made a final choice (their LAST "chosen" event counts)
-//   main / second / freestyle   share of the sessions that chose — which kind of card they picked
+//   main / second / free   share of the sessions that chose — which kind of card they picked
 //   ordered    share of the SHOWN sessions that went on to order
 //   explained  share of the SHOWN sessions that opened a deeper explanation
 
@@ -36,7 +36,7 @@ export function summarize(events, { source = 'customer', from = null, to = null 
   const byLang = new Map()
   for (const s of sessions.values()) {
     if (!s.shown || !s.language) continue // a choice or an order we never saw the result of cannot be attributed to a language
-    const r = byLang.get(s.language) ?? { language: s.language, shown: 0, chose: 0, main: 0, second: 0, freestyle: 0, ordered: 0, explained: 0 }
+    const r = byLang.get(s.language) ?? { language: s.language, shown: 0, chose: 0, main: 0, second: 0, free: 0, ordered: 0, explained: 0 }
     r.shown++
     if (s.chosen) { r.chose++; r[s.chosen]++ }
     if (s.ordered) r.ordered++
@@ -46,7 +46,7 @@ export function summarize(events, { source = 'customer', from = null, to = null 
   const pct = (n, d) => (d > 0 ? Math.round((1000 * n) / d) / 10 : null)
   return [...byLang.values()]
     .sort((a, b) => a.language.localeCompare(b.language))
-    .map((r) => ({ ...r, pct_main: pct(r.main, r.chose), pct_second: pct(r.second, r.chose), pct_freestyle: pct(r.freestyle, r.chose), pct_ordered: pct(r.ordered, r.shown), pct_explained: pct(r.explained, r.shown) }))
+    .map((r) => ({ ...r, pct_main: pct(r.main, r.chose), pct_second: pct(r.second, r.chose), pct_free: pct(r.free, r.chose), pct_ordered: pct(r.ordered, r.shown), pct_explained: pct(r.explained, r.shown) }))
 }
 
 /** The poem add-on per type: sessions that previewed it, sessions that added it to an order, and orders completed with it. Pure. */
@@ -74,14 +74,14 @@ export function formatPoems(rows) {
 
 export function format(rows) {
   const f = (v) => (v === null ? '   —' : `${v.toFixed(1)}%`.padStart(6))
-  const head = ['language', 'shown', 'chose', '% main', '% second', '% freestyle', '% ordered', '% explained']
+  const head = ['language', 'shown', 'chose', '% main', '% second', '% free', '% ordered', '% explained']
   const lines = [head.map((h, i) => (i === 0 ? h.padEnd(10) : h.padStart(i === 1 || i === 2 ? 6 : 12))).join(' ')]
   for (const r of rows) {
-    lines.push([r.language.padEnd(10), String(r.shown).padStart(6), String(r.chose).padStart(6), f(r.pct_main).padStart(12), f(r.pct_second).padStart(12), f(r.pct_freestyle).padStart(12), f(r.pct_ordered).padStart(12), f(r.pct_explained).padStart(12)].join(' '))
+    lines.push([r.language.padEnd(10), String(r.shown).padStart(6), String(r.chose).padStart(6), f(r.pct_main).padStart(12), f(r.pct_second).padStart(12), f(r.pct_free).padStart(12), f(r.pct_ordered).padStart(12), f(r.pct_explained).padStart(12)].join(' '))
   }
   if (rows.length === 0) lines.push('(no sessions with a shown result in this range)')
   lines.push('', 'shown = sessions shown a result · chose = sessions with a final choice')
-  lines.push('% main / second / freestyle = share of the sessions that chose · % ordered, % explained = share of the shown sessions')
+  lines.push('% main / second / free = share of the sessions that chose · % ordered, % explained = share of the shown sessions')
   return lines.join('\n')
 }
 

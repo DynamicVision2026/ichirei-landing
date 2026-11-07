@@ -65,12 +65,13 @@ export function missingMains(result: EngineResult): { live: Candidate[]; gone: {
 }
 
 /** Which of the three places are empty, in the order main, second, freestyle. A freestyle that was never produced counts as empty (the free pick is always offered, spec step 5). */
-export function emptySlots(result: EngineResult): RefillSlot[] {
+export function emptySlots(result: EngineResult, needSecond = true): RefillSlot[] {
   const { live } = missingMains(result)
   const out: RefillSlot[] = []
-  if (live.length === 0) out.push('main', 'second')
+  // two cards per round (2026-11-07): only remembrance has a second card, so only remembrance asks for one
+  if (live.length === 0) out.push(...(needSecond ? (['main', 'second'] as const) : (['main'] as const)))
   else if (result.primary_kanji === null) out.push('main')
-  else if (live.length < 2) out.push('second')
+  else if (needSecond && live.length < 2) out.push('second')
   // Remembrance has no free pick: it is never asked for and never counted as an empty slot (2026-11-01).
   if (result.occasion !== 'memorial' && !result.candidates.some((c) => c.slot === 'freestyle' && !c.eliminated)) out.push('freestyle')
   return out
@@ -259,6 +260,8 @@ export interface ReplaceOptions {
   excluded?: ReadonlySet<string>
   /** Parallel cards (2026-11-01): the free pick is written by its own call at the start and is never refilled. Default: it is refilled when empty (the single-call engine). */
   refillFree?: boolean
+  /** The parallel path shows two cards per round: a second card is asked for only in remembrance (default true: the single-call path keeps three cards). */
+  needSecond?: boolean
   /** Called once with what the refill asked for and what came of it (the [ichirei-cards] log line). */
   onRefill?: (report: RefillReport) => void
 }
@@ -278,7 +281,7 @@ export async function completeMains(
   const log = opts.log ?? ((l: string) => console.log(l))
   if (result.status !== 'sufficient') return result
   const { live, gone } = missingMains(result)
-  const slots = emptySlots(result).filter((sl) => sl !== 'freestyle' || opts.refillFree !== false)
+  const slots = emptySlots(result, opts.needSecond !== false).filter((sl) => sl !== 'freestyle' || opts.refillFree !== false)
   const freeGone = result.candidates.filter((c) => c.slot === 'freestyle' && c.eliminated).map((c) => ({ slot: 'freestyle', kanji: c.kanji, cause: (c.eliminated_reason?.startsWith('palette:') ? 'referee' : c.eliminated_reason?.startsWith('review:') ? 'review' : 'model') as MissingCause, reason: c.eliminated_reason ?? '' }))
   if (live.length < 2) log(`[ichirei-engine] ${slots.includes('main') ? 'main_slot_empty' : 'second_slot_empty'} ${JSON.stringify({ live: live.map((c) => ({ slot: c.slot, kanji: c.kanji })), missing: gone, will_replace: slots.length > 0 && replaceEnabled() })}`)
   if (slots.includes('freestyle')) log(`[ichirei-engine] free_slot_empty ${JSON.stringify({ missing: freeGone, will_replace: replaceEnabled() })}`)

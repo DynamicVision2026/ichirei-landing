@@ -111,12 +111,12 @@ try {
   check('(5) the first pair offered 猫 and it was set aside (not a line problem) → the second pair is told which character was set aside and why (a code), and 水 stands; log why all_set_aside', sum(f).includes('freestyle:水') && cardsLine().parallel?.free_retry?.why === 'all_set_aside' && /"kanji": "猫"/.test(ask2) && /set aside \(review: register\)/.test(ask2), `${sum(f)} | ${ask2.slice(-300)}`)
   freeReplies = [{ none: true }, { none: true }]
   const g = await run()
-  check('(5) both pairs fail → two cards, as before (never a third pair), free_retry won false', sum(g) === 'main:誠,second:灯' && cardsLine().parallel?.free_retry?.won === false && (cardsLine().parallel?.calls ?? []).filter((x: { slot: string }) => x.slot === 'freestyle').length <= 4, `${sum(g)} | ${(cardsLine().parallel?.calls ?? []).filter((x: { slot: string }) => x.slot === 'freestyle').length}`)
+  check('(5) both pairs fail → no free card is invented (never a third pair; the main card stands alone here because the spare and the refill are off/empty), free_retry won false', sum(g) === 'main:誠' && cardsLine().parallel?.free_retry?.won === false && (cardsLine().parallel?.calls ?? []).filter((x: { slot: string }) => x.slot === 'freestyle').length <= 4, `${sum(g)} | ${(cardsLine().parallel?.calls ?? []).filter((x: { slot: string }) => x.slot === 'freestyle').length}`)
   process.env.ICHIREI_FREE_RETRY = 'off'
   freeReplies = [{ none: true }, { candidates: [cand('freestyle', '水', 'みず', '毎朝、猫の水を替えてくれた人。', A.water, 'Play')] }]
   const h = await run()
   delete process.env.ICHIREI_FREE_RETRY
-  check('(5) ICHIREI_FREE_RETRY=off switches the safety net off (rollback)', sum(h) === 'main:誠,second:灯' && cardsLine().parallel?.free_retry?.asked === false)
+  check('(5) ICHIREI_FREE_RETRY=off switches the safety net off (rollback)', sum(h) === 'main:誠' && cardsLine().parallel?.free_retry?.asked === false)
   // ---- 5b. (2026-11-05, Part 5) the 趣字 in EVERY round: round 2 / 3 use the same safety net
   reviewer = () => ({ pass: true, rule: null, reason: 'ok' })
   gazeReply = { gazes: [] }
@@ -149,25 +149,25 @@ try {
   freeReplies = [{ none: true }, { none: true }]
   const ZH = { relationship: 'grandparent', direction: 'up', purpose: 'thanks', language: 'zh-Hant' }
   const zhMain = (line: string) => sel(cand('main', '誠', 'chéng', line, A.lamp, 'Turning Point'), cand('main', '守', 'shǒu', '每天早上替我裝好便當的人。', A.water))
-  const zhSecond = (line: string) => sel(cand('second', '灯', 'dēng', line, A.lamp, 'Private Symbol'), cand('second', '待', 'dài', '等著我回家的人。', A.cat))
+  const zhFree = (line: string) => [{ candidates: [cand('freestyle', '灯', 'dēng', line, A.cat, 'Play')] }, { none: true }]
   // 1. a Simplified line on a Traditional page is converted (no model call for it)
-  main = zhMain('夜里一直给我留着灯的人。'); second = zhSecond('直到我睡着都替我留著走廊燈的人。'); gazeReply = { gazes: [] }
+  main = zhMain('夜里一直给我留着灯的人。'); freeReplies = zhFree('直到我睡著都替我留著走廊燈的人。'); gazeReply = { gazes: [] }
   const z1 = await run(ZH)
   check('(5c) zh-Hant page: a Simplified line (夜里一直给我留着灯的人) is CONVERTED in code (OpenCC) — the card shows Traditional, and no rewrite call was spent', card(z1, 'main')?.one_line_gaze === '夜裡一直給我留著燈的人。' && !kinds.gaze && cardsLine().parallel?.language?.some((x: { slot: string; how: string }) => x.slot === 'main' && x.how === 'converted'), `${card(z1, 'main')?.one_line_gaze} | gaze ${kinds.gaze?.length}`)
   // 2. a Japanese line on a Traditional page is rewritten ONCE in the right language
-  main = zhMain('夜里一直给我留着灯的人。'); second = zhSecond('眠るまで廊下の灯りをつけていてくれた人。'); gazeReply = { gazes: [{ kanji: '灯', one_line_gaze: '直到我睡著都替我留著走廊燈的人。' }] }
+  main = zhMain('夜里一直给我留着灯的人。'); freeReplies = zhFree('眠るまで廊下の灯りをつけていてくれた人。'); gazeReply = { gazes: [{ kanji: '灯', one_line_gaze: '直到我睡著都替我留著走廊燈的人。' }] }
   const z2 = await run(ZH)
-  check('(5c) zh-Hant page: a JAPANESE line (眠るまで…) is rewritten ONCE in Traditional Chinese, and the rewritten line stands', card(z2, 'second')?.one_line_gaze === '直到我睡著都替我留著走廊燈的人。' && (kinds.gaze ?? []).length === 1 && cardsLine().parallel?.language?.some((x: { slot: string; how: string; code: string }) => x.slot === 'second' && x.how === 'rewritten' && x.code === 'kana'), `${card(z2, 'second')?.one_line_gaze} | gaze ${kinds.gaze?.length}`)
+  check('(5c) zh-Hant page: a JAPANESE line (眠るまで…) is rewritten ONCE in Traditional Chinese, and the rewritten line stands', card(z2, 'freestyle')?.one_line_gaze === '直到我睡著都替我留著走廊燈的人。' && (kinds.gaze ?? []).length === 1 && cardsLine().parallel?.language?.some((x: { slot: string; how: string; code: string }) => x.slot === 'freestyle' && x.how === 'rewritten' && x.code === 'kana'), `${card(z2, 'freestyle')?.one_line_gaze} | gaze ${kinds.gaze?.length}`)
   // 3. the rewrite is Japanese again → the card is dropped (never shown)
-  main = zhMain('夜里一直给我留着灯的人。'); second = zhSecond('眠るまで廊下の灯りをつけていてくれた人。'); gazeReply = { gazes: [{ kanji: '灯', one_line_gaze: 'まだ廊下の灯りをつけていてくれた人。' }] }
+  main = zhMain('夜里一直给我留着灯的人。'); freeReplies = zhFree('眠るまで廊下の灯りをつけていてくれた人。'); gazeReply = { gazes: [{ kanji: '灯', one_line_gaze: 'まだ廊下の灯りをつけていてくれた人。' }] }
   const z3 = await run(ZH)
   const lines3 = live(z3).map((c) => c.one_line_gaze)
-  check('(5c) …and when the rewrite is still Japanese the card is DROPPED — no Japanese line is ever shown on a Traditional page (the runner-up 待 or nothing stands in the slot)', !lines3.some((l) => /[ぁ-んァ-ン]/.test(l)) && card(z3, 'second')?.kanji !== '灯' && cardsLine().parallel?.language?.some((x: { slot: string; how: string }) => x.slot === 'second' && x.how === 'dropped'), JSON.stringify(lines3))
+  check('(5c) …and when the rewrite is still Japanese the card is DROPPED — no Japanese line is ever shown on a Traditional page (the spare or nothing stands in the slot)', !lines3.some((l) => /[ぁ-んァ-ン]/.test(l)) && card(z3, 'freestyle')?.kanji !== '灯' && cardsLine().parallel?.language?.some((x: { slot: string; how: string }) => x.slot === 'freestyle' && x.how === 'dropped'), JSON.stringify(lines3))
   // 4. a Traditional line passes untouched; the ja page needs kana; the en page tolerates CJK only inside quotation marks
-  main = zhMain('夜裡一直給我留著燈的人。'); second = zhSecond('直到我睡著都替我留著走廊燈的人。'); gazeReply = { gazes: [] }
+  main = zhMain('夜裡一直給我留著燈的人。'); freeReplies = zhFree('直到我睡著都替我留著走廊燈的人。'); gazeReply = { gazes: [] }
   const z4 = await run(ZH)
   check('(5c) zh-Hant page: a Traditional line passes untouched (no conversion, no rewrite)', card(z4, 'main')?.one_line_gaze === '夜裡一直給我留著燈的人。' && !kinds.gaze && !cardsLine().parallel?.language?.length)
-  main = sel(cand('main', '誠', 'まこと', '夜遅くまで灯をともして待っていてくれた人。', A.lamp, 'Turning Point'), cand('main', '守', 'まもる', '毎朝、私の弁当を詰めてくれた人。', A.water)); second = SECOND; gazeReply = { gazes: [] }
+  main = sel(cand('main', '誠', 'まこと', '夜遅くまで灯をともして待っていてくれた人。', A.lamp, 'Turning Point'), cand('main', '守', 'まもる', '毎朝、私の弁当を詰めてくれた人。', A.water)); second = SECOND; freeReplies = [{ none: true }, { none: true }]; gazeReply = { gazes: [] }
   const j1 = await run()
   check('(5c) ja page: a line with kana passes untouched', card(j1, 'main')?.one_line_gaze.startsWith('夜遅くまで') === true && !kinds.gaze && !(cardsLine().parallel?.language?.length ?? 0))
   main = sel(cand('main', '誠', 'まこと', '夜遅くまで待っていた祖母', A.lamp, 'Turning Point'), cand('main', '守', 'まもる', '毎朝、私の弁当を詰めてくれた人。', A.water))

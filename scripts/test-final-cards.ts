@@ -79,7 +79,7 @@ const logs: string[] = []
 const origLog = console.log
 let mainInfos: { round: number; language: string; main: string; second: string | null }[] = []
 let events: { at: number; cards: { slot: string; kanji: string; line: string }[] }[] = []
-const run = async (): Promise<EngineResult> => {
+const run = async (ctx: any = BIRTHDAY): Promise<EngineResult> => {
   for (const k of Object.keys(counts)) counts[k] = 0
   for (const k of Object.keys(bodies)) delete bodies[k]
   logs.length = 0
@@ -88,7 +88,7 @@ const run = async (): Promise<EngineResult> => {
   console.log = (...a: unknown[]) => { logs.push(a.map(String).join(' ')) }
   t0 = Date.now()
   try {
-    return await runEngine(STORY, 'A', { context: BIRTHDAY, round: 1, exclude: [], onMain: (i) => mainInfos.push(i), onCard: (p) => { events.push({ at: Date.now() - t0, cards: p.candidates.filter((c) => !c.eliminated).map((c) => ({ slot: c.slot, kanji: c.kanji, line: c.one_line_gaze })) }) } })
+    return await runEngine(STORY, 'A', { context: ctx, round: 1, exclude: [], onMain: (i) => mainInfos.push(i), onCard: (p) => { events.push({ at: Date.now() - t0, cards: p.candidates.filter((c) => !c.eliminated).map((c) => ({ slot: c.slot, kanji: c.kanji, line: c.one_line_gaze })) }) } })
   } finally { console.log = origLog }
 }
 const live = (r: EngineResult) => r.candidates.filter((c) => !c.eliminated)
@@ -101,8 +101,8 @@ try {
   // ---- (1) the ordinary run: every shown card is the final card -----------------------------------------------------------------------------------------------------------------------------
   reset()
   const r1 = await run()
-  check('(1) three cards; each one the page was shown is, character and line, the card the result carries; nothing changed after it was shown', live(r1).length === 3 && events.length === 3 && shownIsFinal(r1), JSON.stringify(events))
-  check('(1) the main character that stands is reported once for the owner\'s top 10 (round, language, main, second), and logged', mainInfos.length === 1 && mainInfos[0].main === '誠' && mainInfos[0].second === '灯' && mainInfos[0].round === 1 && logs.some((l) => l.startsWith('[ichirei-engine] main_character')), JSON.stringify(mainInfos))
+  check('(1) two cards (本命 + 遊び字); each one the page was shown is, character and line, the card the result carries; nothing changed after it was shown', live(r1).length === 2 && events.length === 2 && shownIsFinal(r1), JSON.stringify(events))
+  check('(1) the main character that stands is reported once for the owner\'s top 10 (round, language, main; second only in remembrance), and logged', mainInfos.length === 1 && mainInfos[0].main === '誠' && mainInfos[0].second === null && mainInfos[0].round === 1 && logs.some((l) => l.startsWith('[ichirei-engine] main_character')), JSON.stringify(mainInfos))
 
   // ---- (2) a line the last gate has to fix is fixed BEFORE the card is shown ------------------------------------------------------------------------------------------------------------------
   reset()
@@ -120,11 +120,13 @@ try {
   // ---- (4) no extended thinking on the main and second calls; the switch puts it back ----------------------------------------------------------------------------------------------------
   reset()
   await run()
-  check('(4) the main and second calls are sent with thinking disabled (the 110 s case: thinking used the 6,000-token budget, the answer was cut off and the call repeated)', bodies.main?.[0].thinking?.type === 'disabled' && bodies.second?.[0].thinking?.type === 'disabled' && counts.main === 1 && counts.second === 1, JSON.stringify(bodies.main))
+  check('(4) the main and second calls are sent with thinking disabled (the 110 s case: thinking used the 6,000-token budget, the answer was cut off and the call repeated)', bodies.main?.[0].thinking?.type === 'disabled' && counts.main === 1 && !counts.second, JSON.stringify(bodies.main))
+  await run(fx.context) // remembrance: the second (次点) call exists and is sent without thinking too
+  check('(4) …and in remembrance the second call is also sent with thinking disabled (it is the only occasion with a second call)', bodies.second?.[0].thinking?.type === 'disabled' && counts.second === 1 && !counts.free, JSON.stringify(bodies.second))
   reset()
   process.env.ICHIREI_CARD_THINKING = 'on'
   await run()
-  check('(4) ICHIREI_CARD_THINKING=on puts the model\'s own thinking back (no override on the request)', bodies.main?.[0].thinking === undefined && bodies.second?.[0].thinking === undefined)
+  check('(4) ICHIREI_CARD_THINKING=on puts the model\'s own thinking back (no override on the request)', bodies.main?.[0].thinking === undefined)
 
   // ---- (5) a stalled call is hedged ----------------------------------------------------------------------------------------------------------------------------------------------------------------
   reset()
@@ -133,7 +135,7 @@ try {
   const r5 = await run()
   const tm = timing()
   const mainEntries = (tm?.calls ?? []).filter((c: any) => c.slot === 'main')
-  check('(5) a main call that has not answered after the hedge time is asked again (no thinking); the faster answer wins: all three cards are out long before the stalled call would have answered, and every shown card is final', counts.main === 2 && bodies.main[1].thinking?.type === 'disabled' && events[0].at < 800 && live(r5).length === 3 && shownIsFinal(r5), JSON.stringify({ counts, events: events.map((e) => e.at) }))
+  check('(5) a main call that has not answered after the hedge time is asked again (no thinking); the faster answer wins: both cards are out long before the stalled call would have answered, and every shown card is final', counts.main === 2 && bodies.main[1].thinking?.type === 'disabled' && events[0].at < 800 && live(r5).length === 2 && shownIsFinal(r5), JSON.stringify({ counts, events: events.map((e) => e.at) }))
   check('(5) …the log says so: card_hedge, and the timing line names the second call as the winner', logs.some((l) => l.startsWith('[ichirei-engine] card_hedge') && l.includes('"slot":"main"')) && mainEntries.some((c: any) => c.hedge === 2 && c.won === true), JSON.stringify(mainEntries))
   reset()
   process.env.ICHIREI_CARD_HEDGE_MS = '0'
@@ -143,13 +145,13 @@ try {
   reset()
   mainDelays = [250]
   await run()
-  check('(5) a main call that answers in time is never asked twice (default hedge time 40 s)', counts.main === 1 && counts.second === 1)
+  check('(5) a main call that answers in time is never asked twice (default hedge time 40 s)', counts.main === 1 && !counts.second)
 
   // ---- (6) the timing line --------------------------------------------------------------------------------------------------------------------------------------------------------------------------
   reset()
   await run()
   const t = timing()
-  check('(6) one line says where the time went: every call with its model, ms, tries, tokens and stop reason; first and last card; review, refill and line-fix times; `slow` empty when the run took under 30 s', !!t && t.round === 1 && t.calls.length >= 4 && t.calls.every((c: any) => typeof c.ms === 'number' && typeof c.attempts === 'number' && 'stop_reason' in c && 'thinking_tokens' in c) && typeof t.first_card_ms === 'number' && typeof t.all_cards_ms === 'number' && typeof t.review_ms === 'number' && typeof t.refill_ms === 'number' && typeof t.gaze_ms === 'number' && Array.isArray(t.slow) && t.slow.length === 0 && t.total_ms < 30_000, JSON.stringify(t))
+  check('(6) one line says where the time went: every call with its model, ms, tries, tokens and stop reason; first and last card; review, refill and line-fix times; `slow` empty when the run took under 30 s', !!t && t.round === 1 && t.calls.length >= 3 && t.calls.every((c: any) => typeof c.ms === 'number' && typeof c.attempts === 'number' && 'stop_reason' in c && 'thinking_tokens' in c) && typeof t.first_card_ms === 'number' && typeof t.all_cards_ms === 'number' && typeof t.review_ms === 'number' && typeof t.refill_ms === 'number' && typeof t.gaze_ms === 'number' && Array.isArray(t.slow) && t.slow.length === 0 && t.total_ms < 30_000, JSON.stringify(t))
   check('(6) …it holds codes and numbers only — no story text', !JSON.stringify(t).includes('父') && !JSON.stringify(t).includes('霜'))
 
   // ---- (7) part 6: the recurring characters rule is in the main/second prompt, in ja / zh / en, and in the lexicon rules ---------------------------------------------------------------------------

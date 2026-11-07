@@ -15,8 +15,8 @@ import type { PoemType } from '../src/order/packages.ts'
 export const SESSION_PATTERN = /^[A-Za-z0-9_-]{16,64}$/
 export const SOURCES = ['customer', 'harness'] as const
 export type Source = (typeof SOURCES)[number]
-/** What the buyer picked, relative to what was shown: the cinnabar primary, the other main card, or the freestyle. */
-export const CHOICES = ['main', 'second', 'freestyle'] as const
+/** What the buyer picked, relative to what was shown (2026-11-07): the 本命 (`main`), the 遊び字 (`free`), or — remembrance only — the 次点 (`second`). Older events say `freestyle`; it is read as `free`. */
+export const CHOICES = ['main', 'second', 'free'] as const
 export type Choice = (typeof CHOICES)[number]
 /** Events the BROWSER may report; `shown` and `ordered` are written by the server itself. */
 /** The story step of the page (Part A, 2026-10-30): codes only — the language, the question set and the question id (a known id, never text). */
@@ -35,7 +35,7 @@ export type ShareRole = (typeof SHARE_ROLES)[number]
 export const CLIENT_EVENTS = ['chosen', 'explain_opened', ...FLOW_EVENTS, ...PREVIEW_EVENTS, ...SHARE_EVENTS] as const
 
 export type AnalyticsEvent =
-  | { ts: string; session: string; source: Source; event: 'shown'; language: Language; relationship: Relationship | null; occasion: Occasion | null; purpose?: string | null; state?: string | null; status: 'sufficient' | 'insufficient'; main_slot: 'main' | 'second' | null; has_freestyle: boolean }
+  | { ts: string; session: string; source: Source; event: 'shown'; language: Language; relationship: Relationship | null; occasion: Occasion | null; purpose?: string | null; state?: string | null; status: 'sufficient' | 'insufficient'; main_slot: 'main' | 'second' | null; has_free: boolean }
   | { ts: string; session: string; source: Source; event: FlowEvent; language: Language | null; set: QuestionSet | null; qid: string | null }
   | { ts: string; session: string; source: Source; event: PreviewEvent; language: Language | null; n: 1 | 2 | null; state: PictureState | null; secs: number | null }
   | { ts: string; session: string; source: Source; event: ShareEvent; role: ShareRole }
@@ -58,7 +58,8 @@ export function parseClientEvent(body: unknown, now: Date): AnalyticsEvent | nul
   const session = cleanSession(b.session)
   if (!session || !(CLIENT_EVENTS as readonly string[]).includes(b.event as string)) return null
   const source = cleanSource(b.source)
-  const choice = (CHOICES as readonly string[]).includes(b.choice as string) ? (b.choice as Choice) : null
+  const rawChoice = b.choice === 'freestyle' ? 'free' : b.choice
+  const choice = (CHOICES as readonly string[]).includes(rawChoice as string) ? (rawChoice as Choice) : null
   const ts = now.toISOString()
   if ((FLOW_EVENTS as readonly string[]).includes(b.event as string)) {
     const language = (LANGUAGES as readonly string[]).includes(b.language as string) ? (b.language as Language) : null
@@ -94,7 +95,7 @@ export function shownEvent(result: EngineResult, session: string, source: Source
     state: (STATES as readonly string[]).includes(result.state as string) ? (result.state as string) : null,
     status: result.status,
     main_slot: result.status === 'sufficient' && primary ? (primary.slot === 'second' ? 'second' : 'main') : null,
-    has_freestyle: result.status === 'sufficient' && Boolean(result.freestyle_kanji),
+    has_free: result.status === 'sufficient' && Boolean(result.freestyle_kanji),
   }
 }
 
