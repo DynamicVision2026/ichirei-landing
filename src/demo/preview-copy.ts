@@ -8,6 +8,8 @@ export interface PreviewCopy {
   heading: string
   /** Under it: what this is. */
   lead: string
+  /** The same for the e-gift (2026-11-07): there is no printed card; it comes as a PDF to print at home. */
+  leadEgift: string
   /** The light mark on the card. */
   sample: string
   /** While the pictures are being drawn. */
@@ -47,10 +49,11 @@ export const PREVIEW_COPY: Record<RevealLang, PreviewCopy> = {
   ja: {
     heading: 'カードの中面（見本）',
     lead: 'ご注文いただくカードの内側です。字と詩、あなたの物語の四つの場面が入ります。',
+    leadEgift: 'カードの内側（見本）：字と歌、そして物語の四つの場面。eギフトでは、ご自宅で印刷できるPDFでお届けします。',
     sample: '見本',
     drawing: 'あなたの物語を描いています',
     afterOrder: '物語の絵は、ご注文後にお届けします',
-    waiting: '描いています',
+    waiting: '描いています…',
     who: 'その人は',
     another: (left, quiet) => `別の${quiet ? '二' : '三'}字を探す（あと${left}回）`,
     anotherBusy: '新しい候補を探しています…',
@@ -70,10 +73,11 @@ export const PREVIEW_COPY: Record<RevealLang, PreviewCopy> = {
   'zh-Hant': {
     heading: '卡片內頁（樣本）',
     lead: '這是您訂購的卡片內側：有字、有詩，還有您故事的四個場景。',
+    leadEgift: '卡片內頁（樣本）：有字、有詩，還有你故事的四個場景。e禮物會以可在家列印的PDF提供。',
     sample: '樣本',
     drawing: '正在描繪你的故事',
     afterOrder: '故事的畫，會在訂購後為您送上',
-    waiting: '描繪中',
+    waiting: '描繪中…',
     who: '這個人是',
     another: (left, quiet) => `再找${quiet ? '兩' : '三'}個新的字（還可以找${left}次）`,
     anotherBusy: '正在尋找新的候選…',
@@ -93,10 +97,11 @@ export const PREVIEW_COPY: Record<RevealLang, PreviewCopy> = {
   en: {
     heading: 'Inside the card (sample)',
     lead: 'This is the inside of the card you are ordering: the character, the poem and four scenes from your story.',
+    leadEgift: 'Inside of the card (sample): the character, the poem and four scenes from your story. With the e-gift, it comes as a PDF you can print at home.',
     sample: 'Sample',
     drawing: 'Drawing your story',
     afterOrder: "The pictures of your story are delivered after you order.",
-    waiting: 'Drawing',
+    waiting: 'Drawing…',
     who: 'They are',
     another: (left, quiet) => `Find ${quiet ? 'two' : 'three'} more (${left} left)`,
     anotherBusy: 'Looking for new candidates…',

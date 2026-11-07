@@ -24,12 +24,14 @@ type Props = {
   /** The poem_ids to send with the order (zero or one) and whether the step is still working. */
   onChange: (poemIds: string[], step: PoemStep, poem?: { lines: string[]; reading: string; type: PoemType }) => void
   disabled?: boolean
+  /** The e-gift has no printed card: the note says the poem is on the gift page and on the card PDF printed at home. */
+  egift?: boolean
 }
 
 const TRIES = 2
 const CALL_TIMEOUT_MS = 60_000
 
-export default function PoemAddOn({ result, story, followUps, candidate, copy, language, onChange, disabled }: Props) {
+export default function PoemAddOn({ result, story, followUps, candidate, copy, language, onChange, disabled, egift = false }: Props) {
   const p = copy.order.poem
   // the formats follow the story's language (spec v9.4): 短歌 / 漢詩 for a Japanese story, 漢詩 / 宋詞 for a Chinese one, free verse for an English one
   const offered = poemTypesFor(language, [story, ...followUps].join('\n'))
@@ -145,7 +147,7 @@ export default function PoemAddOn({ result, story, followUps, candidate, copy, l
                 {st.reading}
               </span>
             )}
-            <span style={{ display: 'block', marginTop: '0.5em' }}>{p.printedOnCard}</span>
+            <span style={{ display: 'block', marginTop: '0.5em' }}>{egift ? p.printedOnCardEgift : p.printedOnCard}</span>
           </>
         )}
         {st?.state === 'failed' && (

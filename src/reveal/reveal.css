@@ -341,9 +341,10 @@
 .rv .cardPic{margin:0;display:flex;flex-direction:column;gap:.35rem}
 .rv .cardPic img,.rv .cardPicWait,.rv .cardPicWashi{display:block;width:100%;aspect-ratio:4/5;object-fit:cover;background:#E2D8BF;border-radius:2px}
 .rv .cardPic img{-webkit-touch-callout:none;user-select:none}
-.rv .cardPicWait{animation:cardPicPulse 1.8s ease-in-out infinite}
-@keyframes cardPicPulse{0%,100%{opacity:.55}50%{opacity:1}}
-@media (prefers-reduced-motion:reduce){.rv .cardPicWait{animation:none}}
+.rv .cardPicWait{background:#E8DFC8 url(/film/washi-2.webp) center/cover;display:flex;align-items:center;justify-content:center}
+.rv .cardPicWaitText{font-size:.74rem;letter-spacing:.12em;color:#7A6F5E;animation:cardPicPulse 1.8s ease-in-out infinite}
+@keyframes cardPicPulse{0%,100%{opacity:.5}50%{opacity:1}}
+@media (prefers-reduced-motion:reduce){.rv .cardPicWaitText{animation:none}}
 .rv .cardPic figcaption{font-size:.74rem;line-height:1.55;color:#4A4034;min-height:2.3em;white-space:pre-line}
 .rv .cardText{display:flex;flex-direction:column;align-items:center;text-align:center;gap:.35rem}
 .rv .cardGlyph{font-size:clamp(4.2rem,16vw,6rem);line-height:1.05;color:var(--seal)}

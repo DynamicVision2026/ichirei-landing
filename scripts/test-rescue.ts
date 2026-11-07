@@ -53,6 +53,7 @@ process.env.ANTHROPIC_BASE_URL = `http://127.0.0.1:${(upstream.address() as { po
 process.env.ANTHROPIC_API_KEY = 'test-key-not-real'
 process.env.ICHIREI_LEXICON_MODE = 'off'
 for (const k of ['ICHIREI_CARDS', 'ICHIREI_GAZE_FIX', 'ICHIREI_REVIEW', 'REQUIRE_CLASSICAL_ECHO', 'ICHIREI_REPLACE', 'ICHIREI_FREE_RETRY']) delete process.env[k]
+process.env.ICHIREI_FREE_RUNNER_UP = 'off' // (the third step — a spare card from the main/second calls — is tested in test-free-three.ts; this suite is about the second pair)
 
 const logs: string[] = []
 const origLog = console.log

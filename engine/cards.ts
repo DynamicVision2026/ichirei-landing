@@ -5,10 +5,11 @@
 //   free   — the small model,     lens "a playful or surprising angle: a habit, place, object or saying; positive; never a negative trait"
 //            (not called for remembrance: two calls)
 //
-// Every call returns its TOP TWO characters, ranked. Each card then goes through its own referee, review and gaze check as soon as it is
+// The main and second calls return their TOP TWO characters, ranked; the free pick returns FIVE (2026-11-07). Each card then goes through its own referee, review and gaze check as soon as it is
 // written, in parallel with the others. A rejected character, or a character another (higher) card already took, falls back to the SAME
 // call's runner-up — no new selection call, no rerun. Only when both are gone does the slot stay empty: main and second are refilled by
-// the existing refill, the free pick is simply not shown (two cards). Pure plumbing: this file chooses no character; it orders, checks and
+// the existing refill. The free pick has three steps (2026-11-07): its five ranked options (the first that stands), a second hedged pair, then the best unused
+// candidate of this round's main/second calls — so a third card is shown in every round except remembrance (two cards). Pure plumbing: this file chooses no character; it orders, checks and
 // joins what the calls wrote, with the same referee, review and gaze code as the single-call engine.
 
 import { usageOf } from './cache-usage.ts'
@@ -17,7 +18,7 @@ import { readFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import type { Candidate, EngineContext, EngineResult, ReviewVerdict } from './contract.ts'
-import { applyPalette, applyReviewVerdicts, type Palette } from './palette.ts'
+import { ALREADY_SHOWN_REASON, applyPalette, applyReviewVerdicts, type Palette } from './palette.ts'
 import { runReview } from './review.ts'
 import { FREE_FIELDS, FREE_REVIEW_TIMEOUT_MS_DEFAULT } from './replace.ts'
 import { SAME_CHARACTER_REASON, finalizeResult } from './slots.ts'
@@ -40,15 +41,22 @@ export const CARD_EFFORT = (): 'low' | 'medium' | 'high' => (process.env.ICHIREI
 export const CARD_MAX_TOKENS = (): number => Number(process.env.ICHIREI_CARD_MAX_TOKENS ?? 6000)
 export const CARD_MAX_TOKENS_RETRY = (): number => Number(process.env.ICHIREI_CARD_MAX_TOKENS_RETRY ?? 14000)
 const num = (v: string | undefined, d: number): number => (Number.isFinite(Number(v)) && Number(v) > 0 ? Number(v) : d)
-export const FREE_CALL_MS_DEFAULT = 15_000
-export const FREE_LANE_MS_DEFAULT = 30_000
+export const FREE_CALL_MS_DEFAULT = 20_000
+export const FREE_LANE_MS_DEFAULT = 45_000
+/** The free pick asks for five options (it was two). */
+export const FREE_OPTIONS = 5
+export const FREE_MAX_TOKENS = 2600
+/** The time the last step (a runner-up from the main/second calls) is given for its checks, counted from when it starts. */
+export const FREE_RUNNER_MS_DEFAULT = 25_000
 export const FREE_GRACE_MS_DEFAULT = 5_000
 const freeCallMs = () => num(process.env.ICHIREI_FREE_CALL_TIMEOUT_MS, FREE_CALL_MS_DEFAULT)
 const freeLaneMs = () => num(process.env.ICHIREI_FREE_LANE_MS, FREE_LANE_MS_DEFAULT)
 const freeGraceMs = () => num(process.env.ICHIREI_FREE_GRACE_MS, FREE_GRACE_MS_DEFAULT)
 /** The free pick's safety net (a second hedged pair of calls when the first pair left no free card) and the extra wait it is given after the other two cards are settled. */
-export const FREE_RETRY_GRACE_MS_DEFAULT = 12_000
+export const FREE_RETRY_GRACE_MS_DEFAULT = 15_000
 const freeRetryGraceMs = () => num(process.env.ICHIREI_FREE_RETRY_GRACE_MS, FREE_RETRY_GRACE_MS_DEFAULT)
+const freeRunnerMs = () => num(process.env.ICHIREI_FREE_RUNNER_MS, FREE_RUNNER_MS_DEFAULT)
+const freeRunnerOn = (): boolean => !/^(off|0|false|no)$/i.test((process.env.ICHIREI_FREE_RUNNER_UP ?? '').trim())
 const freeRetryOn = (): boolean => !/^(off|0|false|no)$/i.test((process.env.ICHIREI_FREE_RETRY ?? '').trim())
 const RESERVE_MS = 30_000 // time kept for the checks after a retried call
 const MIN_RETRY_MS = 30_000
@@ -87,7 +95,7 @@ export function cardPrompt(basePrompt: string, slot: 'main' | 'second', lexicon 
   return basePrompt + block.replace(/\{\{ SLOT \}\}/g, slot).replace('{{ LENS }}', LENS[slot]).replace('{{ EXTRA }}', extra)
 }
 
-/** The compact free-pick prompt for the parallel call: the context, the story, the characters not to use; ranked top two. */
+/** The compact free-pick prompt for the parallel call: the context, the story, the characters not to use; five ranked options. */
 export function freeCardPrompt(story: string, context: EngineContext, avoid: (string | { kanji: string; reason: string })[], retry = false): string {
   const f = FREE_FIELDS[context.language === 'ja' ? 'ja' : context.language === 'en' ? 'en' : 'zh']
   const v: Record<string, string> = {
@@ -102,7 +110,7 @@ export function freeCardPrompt(story: string, context: EngineContext, avoid: (st
     EXTRA: f.extra,
   }
   const body = `${purposeFrame(context)}\n\n${readEngineFile('card-free-prompt.md', process.env.ICHIREI_CARD_FREE_PROMPT_PATH).replace(/\{\{ ([A-Z_]+) \}\}/g, (m, k: string) => v[k] ?? m)}`
-  return retry ? `${body}\n\nSECOND ASK: your first answer could not be used (nothing readable, or every card in it was set aside — see the characters to avoid above). Give two usable candidates now, from a different detail of the story, with a line that says only what the story states and nothing about the person's body or looks.` : body
+  return retry ? `${body}\n\nSECOND ASK: your first answer could not be used (nothing readable, or every card in it was set aside — see the characters to avoid above). Give five usable candidates now, none on the list above, from different details of the story, with a line that says only what the story states and nothing about the person's body or looks.` : body
 }
 
 // ---- types -------------------------------------------------------------------------------------------------------------------------------------------------------------------------
@@ -157,6 +165,14 @@ export interface CardsReport {
   language: { slot: CardSlot; how: 'converted' | 'rewritten' | 'dropped'; code: string }[]
   /** the free pick's safety net: when the first pair of calls (or the first pair's cards) left no free card, a second hedged pair is asked once */
   free_retry: { asked: boolean; why: 'no_candidates' | 'all_set_aside' | null; won: boolean | null }
+  /**
+   * Where the free card (趣字) came from, 2026-11-07: `first` = the first pair of calls (its five ranked options, the first that stood), `retry` = the second hedged pair, `runner_up` = the best unused
+   * candidate of this round's main/second calls; null = none was shown (remembrance, or all three steps failed). `free_fallbacks` says WHY each step after the first was needed, in codes
+   * (no_candidates, already_shown, same_character, same_anchor, subject, language, review:<rule>, palette, other, late); `free_set_aside` counts every option set aside, by code.
+   */
+  free_source: 'first' | 'retry' | 'runner_up' | null
+  free_fallbacks: { to: 'retry' | 'runner_up'; why: string[] }[]
+  free_set_aside: Record<string, number>
   collisions: { slot: CardSlot; resolved: 'runner_up' | 'none'; why?: 'character' | 'anchor' }[]
   runner_up_used: CardSlot[]
   /** from the start of the request */
@@ -319,7 +335,7 @@ const CARD_FIELDS = ['kanji', 'reading', 'one_line_gaze', 'story_anchor'] as con
 
 /**
  * Read one card's answer: the object, the elements that are candidates (in any of the shapes a model writes them: `candidates`, `candidate`, one candidate, a bare array, or an
- * object keyed by the slot) and a verdict in codes. Never throws. Two candidates at most, different characters. A candidate needs its character and its line; a missing reading or
+ * object keyed by the slot) and a verdict in codes. Never throws. Two candidates at most (five for the free pick), different characters. A candidate needs its character and its line; a missing reading or
  * anchor is left to the referee (a free pick without a verbatim anchor is dropped there).
  */
 export function readCardReply(text: string, slot: CardSlot): ReplyRead {
@@ -358,7 +374,7 @@ export function readCardReply(text: string, slot: CardSlot): ReplyRead {
       palette_status: 'ok',
       flags: Array.isArray(o.flags) ? (o.flags as unknown[]).filter((f): f is string => typeof f === 'string') : [],
     } as Candidate)
-    if (out.length === 2) break
+    if (out.length === (slot === 'freestyle' ? FREE_OPTIONS : 2)) break
   }
   const parse: CardCallInfo['parse'] = insufficient ? 'none' : out.length > 0 ? 'ok' : elems.length > 0 ? 'offered_unusable' : 'no_candidates'
   return { cands: insufficient ? [] : out, obj, parse, keys, offered, insufficient }
@@ -394,6 +410,22 @@ export function anchorsClash(a: string, b: string, story: string): boolean {
   return ia !== -1 && ia === ib
 }
 
+/** Why an option was set aside, as a short code for the logs and /ops (never any story text). */
+export function setAsideCode(reason: string | null | undefined): string {
+  const r = reason ?? ''
+  if (r === ALREADY_SHOWN_REASON || /already shown/i.test(r)) return 'already_shown'
+  if (r === SAME_CHARACTER_REASON) return 'same_character'
+  if (r === SAME_ANCHOR_REASON) return 'same_anchor'
+  if (r === SUBJECT_REASON) return 'subject'
+  if (r === LANGUAGE_REASON) return 'language'
+  if (r === INVENTED_FACT_REASON) return 'invented_fact'
+  const rule = /^review:\s*([a-z_]+):/i.exec(r)
+  if (rule) return `review:${rule[1].toLowerCase()}`
+  if (/^review/i.test(r)) return 'review'
+  if (/^palette/i.test(r)) return 'palette'
+  return 'other'
+}
+
 export async function runCards(a: CardsArgs): Promise<CardsOut> {
   const { story, context, palette, client, tStart, models, opts, deps } = a
   const log = (l: string) => console.log(l)
@@ -405,9 +437,9 @@ export async function runCards(a: CardsArgs): Promise<CardsOut> {
   opts.signal?.addEventListener('abort', onOuter)
   const signal = stop.signal
   const freeStop = new AbortController()
-  const freeSignal = AbortSignal.any([signal, freeStop.signal, AbortSignal.timeout(freeLaneMs())])
+  let freeSignal = AbortSignal.any([signal, freeStop.signal, AbortSignal.timeout(freeLaneMs())]) // (replaced by a fresh one for the last step, which starts when the other cards are done)
 
-  const report: CardsReport = { calls: [], reviews: [], subject_removed: [], subject_rewritten: 0, looks_rewritten: [], line_rescue: [], language: [], free_retry: { asked: false, why: null, won: null }, collisions: [], runner_up_used: [], first_card_ms: null, all_cards_ms: 0, main_call_ms: 0, gaze_ms: 0, gaze_failing: 0, free_dropped: null, second_source: null }
+  const report: CardsReport = { calls: [], reviews: [], subject_removed: [], subject_rewritten: 0, looks_rewritten: [], line_rescue: [], language: [], free_retry: { asked: false, why: null, won: null }, free_source: null, free_fallbacks: [], free_set_aside: {}, collisions: [], runner_up_used: [], first_card_ms: null, all_cards_ms: 0, main_call_ms: 0, gaze_ms: 0, gaze_failing: 0, free_dropped: null, second_source: null }
   const verdicts: ReviewVerdict[] = []
   let anyReviewRan = false
   let skipped: string | null = null
@@ -534,7 +566,7 @@ export async function runCards(a: CardsArgs): Promise<CardsOut> {
       : p
   const callMain = modelCall('main', contentOf(cardPrompt(a.prompt, 'main', !!a.lexicon)), models.select, CARD_EFFORT(), CARD_MAX_TOKENS(), callTimeoutMs(), true, signal)
   const callSecond = modelCall('second', contentOf(cardPrompt(a.prompt, 'second', !!a.lexicon)), models.select, CARD_EFFORT(), CARD_MAX_TOKENS(), callTimeoutMs(), true, signal)
-  // The free pick is asked TWICE at the same moment (the same prompt, the small model, low effort, no extended thinking, 1,500 tokens, the same ceiling): the first answer that is
+  // The free pick is asked TWICE at the same moment (the same prompt, the small model, low effort, no extended thinking, five options, the same ceiling): the first answer that is
   // readable and offers a card wins and the other call is cancelled. If both fail or time out, the sender sees two cards, as before.
   const hedgedFree = (round: 1 | 2 = 1, avoid: { kanji: string; reason: string }[] = []): Promise<CallOut> => {
     const content = freeCardPrompt(story, context, [...(opts.exclude ?? []), ...avoid], round === 2)
@@ -553,7 +585,7 @@ export async function runCards(a: CardsArgs): Promise<CardsOut> {
         resolve(out)
       }
       ;([1, 2] as const).forEach((h, i) => {
-        void modelCall('freestyle', content, models.free, 'low', 1500, freeCallMs(), false, AbortSignal.any([freeSignal, stops[i].signal]), { noThinking: true, hedge: h, round }).then((out) => {
+        void modelCall('freestyle', content, models.free, 'low', FREE_MAX_TOKENS, freeCallMs(), false, AbortSignal.any([freeSignal, stops[i].signal]), { noThinking: true, hedge: h, round }).then((out) => {
           results[i] = out
           if (decided) return
           if (out.cands.length > 0) {
@@ -633,7 +665,10 @@ export async function runCards(a: CardsArgs): Promise<CardsOut> {
     }
   }
 
-  const lane = async (slot: CardSlot, call: Promise<CallOut>, higher: () => Promise<LaneOut>[], sig: AbortSignal): Promise<LaneOut> => {
+  const lane = async (slot: CardSlot, call: Promise<CallOut>, higher: () => Promise<LaneOut>[], sig0: AbortSignal): Promise<LaneOut> => {
+    let sig = sig0 // (the free pick's last step swaps in a fresh one)
+    let anchorClashOk = false // the free pick's last step: a spare card from the main/second calls may stand on the same place in the story as the main card, rather than leave the slot empty
+    let freeStep: 'first' | 'retry' | 'runner_up' = 'first'
     const tried: Candidate[] = []
     let chosen: Candidate | null = null
     let source: LaneOut['source']
@@ -662,6 +697,11 @@ export async function runCards(a: CardsArgs): Promise<CardsOut> {
         for (const cand0 of list) {
           if (early || sig.aborted || chosen) break
           n++
+          // A character already shown for this story (or its carved form) is never worth a language rewrite or a review: set aside at once, with its code.
+          if (a.excluded && (a.excluded.has(cand0.kanji) || (cand0.inscription_form && a.excluded.has(cand0.inscription_form)))) {
+            tried.push({ ...eliminate(cand0, ALREADY_SHOWN_REASON, 'already_shown') })
+            continue
+          }
           // The line must be in the page's language and script (2026-11-05): converted in code when only the Chinese script is wrong, otherwise ONE rewrite in the right language, otherwise the
           // card is dropped (the next candidate of this call stands in, then the slot's normal refill).
           const lang = await ensureLineLanguage(cand0.one_line_gaze, context.language, async (why) => {
@@ -696,7 +736,7 @@ export async function runCards(a: CardsArgs): Promise<CardsOut> {
             continue
           }
           // the free pick must stand on a different sentence or detail than the main card: the same place in the story → its runner-up
-          if (slot === 'freestyle' && picked.main && anchorsClash(ref.card.story_anchor, picked.main.story_anchor, story)) {
+          if (slot === 'freestyle' && !anchorClashOk && picked.main && anchorsClash(ref.card.story_anchor, picked.main.story_anchor, story)) {
             tried.push(eliminate(ref.card, SAME_ANCHOR_REASON, 'same_anchor'))
             report.collisions.push({ slot, resolved: n < list.length ? 'runner_up' : 'none', why: 'anchor' })
             continue
@@ -749,7 +789,7 @@ export async function runCards(a: CardsArgs): Promise<CardsOut> {
             continue
           }
           const mainFinal = finals.find((f) => f.slot === 'main')?.chosen
-          if (slot === 'freestyle' && mainFinal && anchorsClash(rv.card.story_anchor, mainFinal.story_anchor, story)) {
+          if (slot === 'freestyle' && !anchorClashOk && mainFinal && anchorsClash(rv.card.story_anchor, mainFinal.story_anchor, story)) {
             tried.push(eliminate(rv.card, SAME_ANCHOR_REASON, 'same_anchor'))
             report.collisions.push({ slot, resolved: n < list.length ? 'runner_up' : 'none', why: 'anchor' })
             if (picked[slot] === ref.card) delete picked[slot]
@@ -767,23 +807,59 @@ export async function runCards(a: CardsArgs): Promise<CardsOut> {
           picked[slot] = chosen
           tried.push(chosen)
           source = from
+          if (slot === 'freestyle') report.free_source = freeStep
           if (n > 1 && from === 'second_call') report.runner_up_used.push(slot)
           break
         }
       }
       await attempt(out.cands, 'second_call')
-      // The free pick's SAFETY NET: when the first pair of calls left no free card (both failed or came back empty, or every card they offered was set aside — by the referee, a collision with a
-      // higher card, the review, or the `subject` guard), the pair is asked ONCE more at the same moment, told which characters were set aside and why (codes), within the free lane's own time.
-      // The first two cards never wait for it; the join gives it a short extra wait (ICHIREI_FREE_RETRY_GRACE_MS). ICHIREI_FREE_RETRY=off switches it off.
+      // The free pick has THREE steps (2026-11-07), so the third card cannot stay empty: (1) its five ranked options — the first that is not already shown and passes the rules; (2) when none
+      // stands, the second hedged pair, told which characters were set aside and why (codes); (3) when that gives nothing either, the best unused candidate of THIS round's main/second calls
+      // (not shown before, through the normal referee and review), still shown as the free card. The first two cards never wait for any of it; the join gives the free lane a short extra wait
+      // (ICHIREI_FREE_RETRY_GRACE_MS). ICHIREI_FREE_RETRY=off / ICHIREI_FREE_RUNNER_UP=off switch steps 2 / 3 off. Every step after the first is logged with its reason (`free_source`).
+      const whyNot = (): string[] => {
+        const codes = [...new Set(tried.filter((t) => t.eliminated).map((t) => setAsideCode(t.eliminated_reason)))]
+        return codes.length ? codes : ['no_candidates']
+      }
       if (slot === 'freestyle' && !chosen && !early && !sig.aborted && freeRetryOn()) {
-        const why: 'no_candidates' | 'all_set_aside' = out.cands.length === 0 ? 'no_candidates' : 'all_set_aside'
+        const why: 'no_candidates' | 'all_set_aside' = out.cands.length === 0 && tried.length === 0 ? 'no_candidates' : 'all_set_aside'
         const avoid = tried.filter((t) => t.eliminated).map((t) => ({ kanji: t.kanji, reason: `set aside (${String(t.eliminated_reason ?? 'refused').split(':').slice(0, 2).join(':').trim().slice(0, 40)}): choose another character from a different detail of the story` }))
         report.free_retry = { asked: true, why, won: null }
+        report.free_fallbacks.push({ to: 'retry', why: whyNot() })
+        freeStep = 'retry'
         freeRetrying = true
         log(`[ichirei-engine] free_retry ${JSON.stringify({ round: opts.round ?? 1, why, avoided: avoid.length + (opts.exclude?.length ?? 0) })}`)
         const out2 = await hedgedFree(2, avoid)
         await attempt(out2.cands, 'second_call')
         report.free_retry.won = !!chosen
+      }
+      // Step 3: the best unused candidate of this round's main/second calls. It starts when the main and second cards are settled (it needs to know which characters they took), with a time of its own.
+      if (slot === 'freestyle' && !chosen && !early && !freeClosed && signal.aborted === false && freeRunnerOn()) {
+        const [lm0, ls0] = await Promise.all(higher())
+        if (!early && !freeClosed && !signal.aborted) {
+          const done = new Set([...lm0.tried, ...ls0.tried].map((t) => t.kanji))
+          const usable = (c: Candidate): boolean => !done.has(c.kanji) && !c.eliminated && c.reading !== '' && c.story_anchor !== ''
+          const pool = [...(await callSecond).cands, ...(await callMain).cands].filter(usable)
+          const seen = new Set<string>()
+          const mainAnchor = lm0.chosen?.story_anchor ?? ''
+          const spare = pool
+            .filter((c) => (seen.has(c.kanji) ? false : (seen.add(c.kanji), true)))
+            // the cards that stand on a different place in the story than the main card come first
+            .sort((x, y) => Number(anchorsClash(x.story_anchor, mainAnchor, story)) - Number(anchorsClash(y.story_anchor, mainAnchor, story)))
+            .map((c) => ({ ...c, slot: 'freestyle', truth_type: 'Play' }) as Candidate)
+          const entry = { to: 'runner_up' as const, why: whyNot() }
+          report.free_fallbacks.push(entry)
+          log(`[ichirei-engine] free_runner_up ${JSON.stringify({ round: opts.round ?? 1, why: entry.why, spare: spare.length })}`)
+          if (spare.length > 0) {
+            freeStep = 'runner_up'
+            freeRetrying = true
+            anchorClashOk = true
+            freeSignal = AbortSignal.any([signal, freeStop.signal, AbortSignal.timeout(freeRunnerMs())])
+            sig = freeSignal
+            await attempt(spare, 'main_runner_up')
+            entry.why = whyNot() // (now with the reasons the spare cards were set aside, if they were)
+          }
+        }
       }
       // The second card: when its own call could not deliver (a failed or unreadable answer, nothing offered, or everything it offered was set aside), the MAIN call's runner-up
       // becomes the second card, after its own referee and review — no refill. It is reviewed in parallel with the main card's own review. The refill is for when this fails too.
@@ -810,6 +886,7 @@ export async function runCards(a: CardsArgs): Promise<CardsOut> {
     } catch (err) {
       log(`[ichirei-engine] card_lane_failed ${JSON.stringify({ slot, error: (err instanceof Error ? err.message : String(err)).slice(0, 120) })}`)
     }
+    if (slot === 'freestyle') for (const t of tried) if (t.eliminated) report.free_set_aside[setAsideCode(t.eliminated_reason)] = (report.free_set_aside[setAsideCode(t.eliminated_reason)] ?? 0) + 1
     return { slot, chosen, tried, done_ms: at(), source }
   }
 

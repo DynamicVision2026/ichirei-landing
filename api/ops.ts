@@ -15,6 +15,7 @@
 
 import { createHash, timingSafeEqual } from 'node:crypto'
 import { analyticsDay } from '../engine/analytics.ts'
+import { readFreeSourceCounts, type FreeSourceCounts } from '../engine/free-source.ts'
 import { isAnimationRecord } from '../engine/animation.ts'
 import { flaggedEgifts, mailerFromEnv, purgeExpiredAddresses, readJsonl, runEgiftReminders, type Mailer, type OrderIndexEntry } from '../engine/egift-ops.ts'
 import { readArt } from '../engine/film-art.ts'
@@ -218,6 +219,7 @@ export function createOpsHandlers(deps: () => OpsDeps) {
       const days = lastDays(now, 8)
       const { rows, verified } = await classify(await loadRows(store, days), d, env, now)
       const flagged = await flaggedEgifts(store, now)
+      const freeCounts = await readFreeSourceCounts(store, days).catch(() => null)
       const common = (r: Classified) => {
         const e = r.entry
         return `<td>${esc(e.order_ref)}</td><td>${esc(SIZE_LABEL[e.size_code] ?? e.size_code)}</td><td>${e.memorial ? '偲ぶ' : ''}</td><td>${esc(SHIP_LABEL[e.ship_to] ?? e.ship_to)}</td>`
@@ -261,6 +263,13 @@ export function createOpsHandlers(deps: () => OpsDeps) {
       const otherLine = (r: Classified) => `<tr class="inwindow">${common(r)}<td>${r.win.phase === 'cancelled' ? 'キャンセル' : r.win.phase === 'unpaid' ? '入金を確認できません' : '製作なし（eギフトなど）'}</td><td>${esc(collectedCell(r))}</td><td>${esc(ackCell(r))}</td><td>${cancelCell(r)}</td></tr>`
       const otherTable = (list: Classified[]) =>
         `<div class="wide"><table><thead><tr><th>注文番号</th><th>サイズ</th><th>偲ぶ</th><th>お届け</th><th>状態</th><th>受け取り</th><th>返金条件の確認</th><th>操作</th></tr></thead><tbody>${list.map(otherLine).join('') || '<tr><td colspan="8">なし</td></tr>'}</tbody></table></div>`
+      // 三枚目の字（趣字）の出どころ: コードと件数だけ（物語も字も入っていません）
+      const freeTable = (c: FreeSourceCounts | null) => {
+        if (!c) return '<p>集計を読み込めませんでした。</p>'
+        const row = (label: string, v: FreeSourceCounts['by_source']) => `<tr><td>${label}</td><td>${v.first}</td><td>${v.retry}</td><td>${v.runner_up}</td><td>${v.none}</td></tr>`
+        const reasons = Object.entries(c.reasons).sort((a, b) => b[1] - a[1]).map(([k, n]) => `${esc(k)} ${n}`).join(' / ')
+        return `<div class="wide"><table class="freeT"><thead><tr><th>ラウンド</th><th>最初の五候補から (first)</th><th>やり直し (retry)</th><th>他のカードの予備 (runner_up)</th><th>出なかった</th></tr></thead><tbody>${row('1回目', c.by_round[1])}${row('2回目', c.by_round[2])}${row('3回目', c.by_round[3])}${row(`合計（${c.runs}回）`, c.by_source)}</tbody></table></div><p class="log">理由（やり直しが必要だった・出なかった）: ${reasons || 'なし'}</p>`
+      }
       const readyRows = rows.filter((r) => ready(r) && isCardSize(r))
       const openRows = rows.filter((r) => r.win.phase === 'open')
       const otherRows = rows.filter((r) => r.win.phase === 'cancelled' || r.win.phase === 'unpaid' || (ready(r) && !isCardSize(r)))
@@ -273,6 +282,7 @@ export function createOpsHandlers(deps: () => OpsDeps) {
         `<h2>製作に進めるもの（${readyRows.length}）</h2>${readyTable(readyRows)}` +
         `<h2>キャンセル受付中（${openRows.length}）</h2>${openTable(openRows)}` +
         `<h2>そのほか（キャンセル・入金未確認・製作なし ${otherRows.length}）</h2>${otherTable(otherRows)}` +
+        `<h2>三枚目の字（趣字）の出どころ（直近8日）</h2>${freeTable(freeCounts)}` +
         `<p>${flagged.length ? `⚠ 住所が30日たっても入力されていないeギフト: ${flagged.length}件（自動の返金はしません。ご判断ください）` : ''}</p>` +
         `<script>document.addEventListener('click',async(e)=>{const b=e.target.closest('button');if(!b)return;if(b.id==='egift-run'){const r=await fetch('/ops/egift/run',{method:'POST'});alert(await r.text());return}` +
         `const act=b.dataset.act;if(act==='cancel'){let override=false;if(b.dataset.collected==='1'){if(!confirm('お客様はすでに「贈りものを受け取る」を押しています（キャンセルの権利は終了しています）。当方の不備などで、それでもキャンセルとして記録しますか？'))return;override=true}else{if(b.dataset.closed==='1'&&!confirm('24時間を過ぎています。期限内に受信したキャンセルのメールがある場合だけ、続けてください。'))return;if(!confirm('この注文をキャンセルとして記録します。製作の対象から外れ、贈りものは表示されなくなります。返金はShopifyで行ってください。よろしいですか？'))return}b.disabled=true;const r=await fetch('/ops/change',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({order_ref:b.dataset.ref,action:'cancel',override})});const j=await r.json().catch(()=>({}));alert(r.ok?'キャンセルとして記録しました':'できませんでした: '+(j.error||r.status));location.reload();return}` +

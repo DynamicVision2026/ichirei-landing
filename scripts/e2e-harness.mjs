@@ -1799,8 +1799,8 @@ const mockPage = async (browser, { onExplain, result, order, track } = {}) => {
     return c
   }
   const sets = [FIXTURE, rename(FIXTURE, { 証: '備', 守: '憶', 封: '想' }), rename(FIXTURE, { 証: '恵', 守: '誠', 封: '光' })]
-  const mk = async (lang, { limited = false, order, mode = 'normal' } = {}) => {
-    const f = await mockPage(browser, { order: order ?? (() => ({ json: { order_ref: 'IC-20261030-PREVIEW1', checkout_url: 'http://localhost:5173/__checkout?cart=pv', glyph: '証', certificate_text: 'x' } })), result: (b) => ({ ...sets[b.retry ?? 0], language: b.language, inscription_script: b.language === 'en' ? null : b.language === 'ja' ? sets[0].inscription_script : 'traditional' }) })
+  const mk = async (lang, { limited = false, order, mode = 'normal', gazePrefix = '' } = {}) => {
+    const f = await mockPage(browser, { order: order ?? (() => ({ json: { order_ref: 'IC-20261030-PREVIEW1', checkout_url: 'http://localhost:5173/__checkout?cart=pv', glyph: '証', certificate_text: 'x' } })), result: (b) => ({ ...sets[b.retry ?? 0], candidates: sets[b.retry ?? 0].candidates.map((c) => (gazePrefix && c.slot === 'main' ? { ...c, one_line_gaze: gazePrefix + c.one_line_gaze } : c)), language: b.language, inscription_script: b.language === 'en' ? null : b.language === 'ja' ? sets[0].inscription_script : 'traditional' }) })
     const pv = { start: [], render: 0, polls: 0 }
     await f.page.route('**/api/preview', async (route) => {
       const b = JSON.parse(route.request().postData() ?? '{}')
@@ -1809,11 +1809,20 @@ const mockPage = async (browser, { onExplain, result, order, track } = {}) => {
     })
     await f.page.route('**/api/preview/*/render', async (route) => {
       pv.render++
+      // 'slow4': the first two render requests end while the fourth scene is still being drawn (a retried scene takes longer than one request is held); the page must ask again
+      if (mode === 'slow4' && pv.render <= 2) {
+        await new Promise((r) => setTimeout(r, 700))
+        return route.fulfill({ json: { id: DRAFT, state: 'drawing', lines: ['朝、母は台所に立っていた。', '「もういらない」と私は言った。', '母は黙って戻っていった。', '今も、庭の花が添えてある。'], pictures: [1, 2, 3, null].map((k) => (k ? `/api/film/${DRAFT}/picture/${k}.webp` : null)), slots: ['ai', 'ai', 'ai', 'pending'] } })
+      }
       await new Promise((r) => setTimeout(r, 4000))
       await route.fulfill({ json: { id: DRAFT, state: 'done', lines: ['朝、母は台所に立っていた。', '「もういらない」と私は言った。', '母は黙って戻っていった。', '今も、庭の花が添えてある。'], pictures: [1, 2, 3, 4].map((n) => `/api/film/${DRAFT}/picture/${n}.webp`) } })
     })
     await f.page.route(/\/api\/preview\/AN-[a-z0-9]+$/, async (route) => {
       pv.polls++
+      if (mode === 'slow4') {
+        const done = pv.render >= 3
+        return route.fulfill({ json: { id: DRAFT, state: done ? 'done' : 'drawing', lines: ['朝、母は台所に立っていた。', '「もういらない」と私は言った。', '母は黙って戻っていった。', '今も、庭の花が添えてある。'], pictures: [1, 2, 3, done ? 4 : null].map((k) => (k ? `/api/film/${DRAFT}/picture/${k}.webp` : null)), slots: ['ai', 'ai', 'ai', done ? 'ai' : 'pending'] } })
+      }
       if (mode === 'washi') return route.fulfill({ json: { id: DRAFT, state: 'done', lines: ['朝、母は台所に立っていた。', '「もういらない」と私は言った。', '母は黙って戻っていった。', '今も、庭の花が添えてある。'], pictures: [null, 2, 3, 4].map((k) => (k ? `/api/film/${DRAFT}/picture/${k}.webp` : null)), slots: ['washi', 'ai', 'ai', 'ai'] } })
       if (mode === 'allfail') return route.fulfill({ json: { id: DRAFT, state: 'failed', lines: ['朝、母は台所に立っていた。', '「もういらない」と私は言った。', '母は黙って戻っていった。', '今も、庭の花が添えてある。'], pictures: [null, null, null, null], slots: ['washi', 'washi', 'washi', 'washi'] } })
       const n = pv.polls === 1 ? 0 : pv.polls === 2 ? 2 : 4
@@ -1915,7 +1924,35 @@ const mockPage = async (browser, { onExplain, result, order, track } = {}) => {
   await pickMain(wa.page, 'ja')
   await wa.page.waitForFunction(() => document.querySelectorAll('[data-testid=card-pictures] .cardPic[data-ready=yes]').length === 3, null, { timeout: 8000 })
   check('washi: three pictures are shown, the fourth place is the plain washi tile, no message — never "after the order" while any picture is there', (await wa.page.locator('[data-testid=washi-tile]').count()) === 1 && (await wa.page.locator('[data-testid=card-pictures] .cardPic[data-kind=washi]').getAttribute('data-slot')) === '1' && (await wa.page.locator('[data-testid=card-status]').innerText()) === '' && (await wa.page.locator('[data-testid=card-preview]').getAttribute('data-state')) === 'done')
+  check('washi: the washi tile of a scene that could not be drawn is the paper texture with no text and no "drawing" line (the final state, not a waiting one)', (await wa.page.locator('[data-testid=washi-tile]').innerText()) === '' && (await wa.page.locator('[data-testid=pic-wait]').count()) === 0)
   await wa.page.close()
+  // 2026-11-07: the line never repeats the label. A line that begins with the label's own wording is shown without it (cards and the order step); the stored line is unchanged.
+  for (const [lang, prefix, label, cardLabel, stripped] of [['zh-Hant', '這個人是', '這個人是', '對方是怎樣的人', '這個人是'], ['ja', 'その人は、', 'その人は', 'どんな人か', 'その人は'], ['en', 'They are ', 'They are', "What they're like", 'They are']]) {
+    const dp = await mk(lang, { gazePrefix: prefix })
+    const cardWho = await dp.page.locator('article[data-slot=main] [data-match-who] dd').innerText()
+    await pickMain(dp.page, lang)
+    await dp.page.locator('[data-testid=card-preview]').waitFor()
+    const whoP = await dp.page.locator('.cardWho').innerText()
+    const labelP = await dp.page.locator('.cardWhoLabel').innerText()
+    check(`label + line (${lang}): the card shows 「${cardLabel}」 and a line that does NOT repeat the opening; the order step shows 「${label}」 once, then the line`, labelP === label && !cardWho.startsWith(stripped) && !whoP.slice(labelP.length).trimStart().startsWith(stripped) && cardWho.length > 0 && whoP.startsWith(label) && whoP.split(stripped).length === 2, JSON.stringify({ cardWho, whoP }))
+    await dp.page.close()
+  }
+  // 2026-11-07: the fourth scene is slow — its place is the paper texture with a small line (never a flat empty box), in each language; when it arrives it is replaced; the page asked again after the first render request ended
+  for (const [lang, want] of [['ja', '描いています…'], ['zh-Hant', '描繪中…'], ['en', 'Drawing…']]) {
+    const sl = await mk(lang, { mode: 'slow4' })
+    await pickMain(sl.page, lang)
+    await sl.page.waitForFunction(() => document.querySelectorAll('[data-testid=card-pictures] .cardPic[data-ready=yes]').length === 3, null, { timeout: 8000 })
+    const wait = sl.page.locator('[data-testid=card-pictures] .cardPic[data-slot="4"] [data-testid=pic-wait]')
+    const bg = await wait.evaluate((el) => getComputedStyle(el).backgroundImage)
+    const washiBg = await sl.page.locator('[data-testid=card-pictures] .cardPic[data-slot="4"]').count()
+    check(`slow scene (${lang}): while the fourth scene is still being drawn its place shows the paper texture with the small line 「${want}」 inside — not a flat empty box — and its caption stays`, (await wait.innerText()) === want && /washi-2\.webp/.test(bg) && washiBg === 1 && (await sl.page.locator('[data-testid=card-pictures] .cardPic[data-slot="4"] figcaption').innerText()).length > 0 && (await sl.page.locator('[data-testid=card-status]').innerText()) !== '')
+    if (lang === 'zh-Hant') await sl.page.locator('[data-testid=card-preview]').screenshot({ path: `${SHOTS}/e2e-card-preview-drawing-zh-Hant.png` })
+    if (lang === 'ja') {
+      await sl.page.waitForFunction(() => document.querySelectorAll('[data-testid=card-pictures] .cardPic[data-ready=yes]').length === 4, null, { timeout: 20000 })
+      check('slow scene: the render request ended twice with the fourth scene unfinished and the page asked again (3 or more render requests), then all four pictures show and the "drawing" line is gone', sl.pv.render >= 3 && (await sl.page.locator('[data-testid=pic-wait]').count()) === 0 && (await sl.page.locator('[data-testid=card-status]').innerText()) === '', String(sl.pv.render))
+    }
+    await sl.page.close()
+  }
   const af = await mk('ja', { mode: 'allfail' })
   await pickMain(af.page, 'ja')
   await af.page.waitForFunction(() => document.querySelector('[data-testid=card-preview]')?.getAttribute('data-state') === 'failed', null, { timeout: 8000 })
@@ -2608,6 +2645,65 @@ const SECTION_ORDER = ['.hero', '.strip', '.philo', '#shape', '#angles', '#write
       else check('wood sizes switch OFF: the order form has no disabled size and no 「近日公開」', radios.length === 3 && radios.every((r) => r.soon === null && r.badge === null), JSON.stringify(radios))
     }
     check(`no page errors (run 13d, ${lang}${soonOn ? '' : ', off'})`, errors.length === 0, errors.join('; '))
+    await page.close()
+  }
+}
+
+// ---------- Run 13e (2026-11-07): the e-gift has no printed card — the poem note and the card-preview line on the order step say so; the printed-card wording stays for 木札 / 版木 (only while wood is on sale) ----------
+{
+  const NEW = {
+    ja: { note: 'この歌は、贈りものページと、ご自宅で印刷できるカードPDFに入ります。', lead: 'カードの内側（見本）：字と歌、そして物語の四つの場面。eギフトでは、ご自宅で印刷できるPDFでお届けします。' },
+    'zh-Hant': { note: '這首詩會出現在禮物頁面，以及可在家列印的卡片PDF上。', lead: '卡片內頁（樣本）：有字、有詩，還有你故事的四個場景。e禮物會以可在家列印的PDF提供。' },
+    en: { note: 'This poem appears on the gift page and on the card PDF you can print at home.', lead: 'Inside of the card (sample): the character, the poem and four scenes from your story. With the e-gift, it comes as a PDF you can print at home.' },
+  }
+  const OLD = {
+    ja: { note: 'この歌が、カードに印刷されます', lead: 'ご注文いただくカードの内側です。字と詩、あなたの物語の四つの場面が入ります。' },
+    'zh-Hant': { note: '這首詩將印在卡片上', lead: '這是您訂購的卡片內側：有字、有詩，還有您故事的四個場景。' },
+    en: { note: 'This poem is printed on your card', lead: 'This is the inside of the card you are ordering: the character, the poem and four scenes from your story.' },
+  }
+  const open = async (lang, soonOn) => {
+    const { page, errors } = await mockPage(browser, { result: (b) => ({ ...clone(FIXTURE), language: b.language, occasion: null, purpose: b.purpose }), order: () => ({ json: { order_ref: 'IC-20261107-EGIFT111', checkout_url: 'http://localhost:5173/__checkout?cart=e', glyph: '証', certificate_text: 'x' } }) })
+    await page.route('**/api/sizes', (r) => r.fulfill({ json: soonOn ? { sizes: ['egift', 'simple', 'standard'], coming_soon: ['simple', 'standard'] } : { sizes: ['egift', 'simple', 'standard'] } }))
+    await page.route('**/api/poem', async (route) => {
+      const b = JSON.parse(route.request().postData() ?? '{}')
+      await route.fulfill({ json: { poem_id: 'PM-20261107-abcdefghj1', type: b.type, lines: ['朝ごとに', '蓋の花添え', '備えたる'], reading: '', aids: {}, preview: 'x' } })
+    })
+    await page.goto(`http://localhost:5173/?lang=${lang}`, { waitUntil: 'networkidle' })
+    await page.locator('#moment').fill('母は、私が何を言っても黙って台所に立っていた。あの日の言葉を、今でも悔やんでいる。')
+    await pickContext(page, { relationship: 'parent_mother', direction: 'up', occasion: 'birthday_milestone' })
+    await page.click(`#write >> text=${GO[lang]}`)
+    await page.waitForSelector('[data-all-revealed=yes]', { timeout: 15000 })
+    await page.locator('article[data-slot=main]').locator(`text=${GIVE[lang]}`).click()
+    await page.locator('[data-testid=order-form]').waitFor()
+    await page.locator('[data-poem-result][data-state=ready]').waitFor({ timeout: 15000 })
+    return { page, errors }
+  }
+  const texts = async (page) => ({ note: await page.locator('[data-poem-result]').innerText(), lead: await page.locator('[data-testid=card-lead]').innerText() })
+  for (const lang of ['ja', 'zh-Hant', 'en']) {
+    const { page, errors } = await open(lang, true)
+    let t = await texts(page)
+    check(`e-gift wording (${lang}, wood coming soon): the poem note and the card-preview line are the owner's words, exactly, before any size is picked (the e-gift is the only gift)`, t.note.includes(NEW[lang].note) && t.lead === NEW[lang].lead, JSON.stringify(t))
+    await page.locator('label[data-size=egift]').click()
+    t = await texts(page)
+    check(`e-gift wording (${lang}): with the e-gift selected the same words stay, and the printed-card wording is nowhere on the page`, t.note.includes(NEW[lang].note) && t.lead === NEW[lang].lead && !t.note.includes(OLD[lang].note) && !(await page.locator('[data-testid=order-form]').innerText()).includes(OLD[lang].lead), JSON.stringify(t))
+    if (lang === 'zh-Hant') await page.screenshot({ path: `${SHOTS}/e2e-order-egift-zh-Hant.png`, fullPage: true })
+    check(`no page errors (run 13e, ${lang}, wood coming soon)`, errors.length === 0, errors.join('; '))
+    await page.close()
+  }
+  for (const lang of ['ja', 'zh-Hant', 'en']) {
+    const { page, errors } = await open(lang, false)
+    let t = await texts(page)
+    check(`printed-card wording (${lang}, wood on sale): before a size is picked the current wording stays`, t.note.includes(OLD[lang].note) && t.lead === OLD[lang].lead, JSON.stringify(t))
+    await page.locator('label[data-size=simple]').click()
+    t = await texts(page)
+    check(`printed-card wording (${lang}): 木札 selected → the printed-card wording (the card is printed and sent)`, t.note.includes(OLD[lang].note) && t.lead === OLD[lang].lead && !t.note.includes(NEW[lang].note), JSON.stringify(t))
+    await page.locator('label[data-size=standard]').click()
+    t = await texts(page)
+    check(`printed-card wording (${lang}): 版木 selected → the printed-card wording`, t.note.includes(OLD[lang].note) && t.lead === OLD[lang].lead, JSON.stringify(t))
+    await page.locator('label[data-size=egift]').click()
+    t = await texts(page)
+    check(`e-gift wording (${lang}, wood on sale): choosing the e-gift switches to the e-gift words, choosing 木札 switches back`, t.note.includes(NEW[lang].note) && t.lead === NEW[lang].lead, JSON.stringify(t))
+    check(`no page errors (run 13e, ${lang}, wood on sale)`, errors.length === 0, errors.join('; '))
     await page.close()
   }
 }

@@ -113,6 +113,10 @@ export default function OrderForm({ result, story, followUps = [], promptQuestio
   // (switching the carved form can make Simple unavailable after it was picked: the Standard set is then the only choice)
   if (pkg === 'simple' && !simpleOk) setTimeout(() => setPkg(''), 0)
   const onSale = pkg !== '' && (sizes ?? []).includes(pkg)
+  // The e-gift has no printed card (2026-11-07): when it is the selected gift — or, while the wooden sizes are not on sale, the only gift there is — the poem note and the card-preview line say it
+  // comes as a PDF the receiver prints at home. The printed-card wording stays for 木札 / 版木 (shown only while wood is on sale).
+  const woodOnSale = (sizes ?? []).some((id) => WOODEN[id] && !soon.includes(id))
+  const egiftCopy = pkg === 'egift' || (pkg === '' && sizes !== null && !woodOnSale)
   const messageOk = [...giftMessage].length <= GIFT_MESSAGE_MAX
   const lastOpenDay = useMemo(() => {
     const d = new Date(`${today}T00:00:00Z`)
@@ -220,7 +224,7 @@ export default function OrderForm({ result, story, followUps = [], promptQuestio
 
       <div className="composer">
         {/* The included poem: one format, shown in full before checkout */}
-        <PoemAddOn result={result} story={story} followUps={followUps} candidate={candidate} copy={copy} language={language} onChange={(ids, step, poem) => { setPoemIds(ids); setPoemStep(step); setPoemShown(poem ?? null) }} disabled={busy} />
+        <PoemAddOn egift={egiftCopy} result={result} story={story} followUps={followUps} candidate={candidate} copy={copy} language={language} onChange={(ids, step, poem) => { setPoemIds(ids); setPoemStep(step); setPoemShown(poem ?? null) }} disabled={busy} />
 
         {/* Inscription form: only a real choice when the character has a distinct old/traditional form */}
         <fieldset className="cgroup">
@@ -241,7 +245,7 @@ export default function OrderForm({ result, story, followUps = [], promptQuestio
         </fieldset>
 
         {/* The free card preview: the character, who they are, the poem and the four scenes of the story (drawn once per story) */}
-        <CardPreview copy={pc} glyph={glyph} reading={copy.glyphReading(candidate, glyph)} who={candidate.one_line_gaze} poem={poemShown} certificateLine={cert} memorial={memorial} quiet={quiet} language={language} preview={preview} />
+        <CardPreview egift={egiftCopy} copy={pc} glyph={glyph} reading={copy.glyphReading(candidate, glyph)} who={candidate.one_line_gaze} poem={poemShown} certificateLine={cert} memorial={memorial} quiet={quiet} language={language} preview={preview} />
 
         <div className="orderGrid">
           <div>

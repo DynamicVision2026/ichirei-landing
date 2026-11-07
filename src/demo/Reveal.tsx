@@ -1,6 +1,7 @@
 import { feelingLine } from '../order/register.ts'
 import { cleanReading } from '../order/reading.ts'
 import { quoteScene } from '../order/quote.ts'
+import { whoLine } from '../order/who-line.ts'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { AnimatePresence, motion, useReducedMotion } from 'framer-motion'
 import type { Candidate, Condition, EngineResult } from './types'
@@ -292,7 +293,7 @@ export default function Reveal({ result, story, followUps = [], condition, copy,
                   <dl className="space-y-2" data-match>
                     <div data-match-who>
                       <dt className="font-label text-[11px] tracking-[0.12em] text-mute">{copy.match.who}</dt>
-                      <dd className="font-label text-base font-semibold leading-relaxed text-fg">{c.one_line_gaze}</dd>
+                      <dd className="font-label text-base font-semibold leading-relaxed text-fg">{whoLine(c.one_line_gaze, language, true)}</dd>
                     </div>
                     <div data-match-moment>
                       <dt className="font-label text-[11px] tracking-[0.12em] text-mute">{copy.match.moment}</dt>

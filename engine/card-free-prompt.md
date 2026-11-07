@@ -1,5 +1,5 @@
 ICHIREI — Free Pick Card Prompt (v9, parallel cards)
-Write the FREE PICK (遊び字) card of this gift. The main card and the second card are written by other calls at this very moment; you do not see them. Give your TOP TWO characters for the free pick, ranked, in a single short answer. Reply with the JSON object only: no prose, no code fence. Be quick: the sender is waiting; do not deliberate at length.
+Write the FREE PICK (遊び字) card of this gift. The main card and the second card are written by other calls at this very moment; you do not see them. Give FIVE characters for the free pick, ranked from your best to your fifth, in a single short answer. Reply with the JSON object only: no prose, no code fence. Be quick: the sender is waiting; do not deliberate at length.
 
 CONTEXT (supplied by the harness — take it as given)
 language: {{ LANGUAGE }}
@@ -32,10 +32,10 @@ ANCHOR ELSEWHERE. The main card stands on the story's TURNING POINT: the sentenc
 
 THE OTHER CARDS (written at the same moment by other calls): the MAIN card carries the person's deepest truth, from the story's turning point; the SECOND card carries another side of the person. Both carry the big feelings (warmth, care, strength, gratitude). Look elsewhere: a habit, a place, an object or a saying from the story, played with a smile. Not another word for the same feeling.
 
-CHARACTERS YOU MUST NOT USE (already shown for this story):
+CHARACTERS YOU MUST NOT USE (already shown for this story, or set aside; not one of your five may be on this list, nor its carved form):
 {{ AVOID }}
 
 OUTPUT FIELDS (the customer-facing strings are written in the language given above)
 {{ FIELDS }}
 
-OUTPUT. Reply with exactly one JSON object and nothing else: {"candidates": [ <candidate 1>, <candidate 2> ]}, each candidate shaped {"slot": "freestyle", "kanji": …, "reading": …, "inscription_form": …, "truth_type": "Play", "one_line_gaze": …, "story_anchor": …{{ EXTRA }} }. Candidate 1 is your best. Candidate 2 is your own runner-up, a DIFFERENT character that follows every rule above; it is used only if candidate 1 is removed by a check or another card chose the same character. If you honestly find only one, give one; never fill the second place with a weak one. If you cannot find a light, kind, story-anchored character at all, reply exactly {"none": true}. A quick, honest answer beats a forced one.
+OUTPUT. Reply with exactly one JSON object and nothing else: {"candidates": [ <candidate 1>, <candidate 2>, <candidate 3>, <candidate 4>, <candidate 5> ]}, each candidate shaped {"slot": "freestyle", "kanji": …, "reading": …, "inscription_form": …, "truth_type": "Play", "one_line_gaze": …, "story_anchor": …{{ EXTRA }} }. Candidate 1 is your best, candidate 5 your fifth. All five are DIFFERENT characters, none on the list above, and each follows every rule above; take them from different details of the story where the story allows (a habit, an object, a place, a saying). They are tried in order and the first one that passes the checks is used, so the later ones matter: an earlier one may be removed because it was already shown, because another card chose the same character or the same place in the story, or by a check. Give five whenever you honestly can; if you find fewer that are light, kind and story-anchored, give fewer; never fill a place with a weak one. If you cannot find a light, kind, story-anchored character at all, reply exactly {"none": true}. A quick, honest answer beats a forced one.

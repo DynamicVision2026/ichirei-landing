@@ -93,12 +93,22 @@ export function usePreview(args: { result: EngineResult; story: string; followUp
       draftRef.current = { key, id: out.id }
       if (alive) setState((s) => ({ ...s, draftId: out.id }))
       // the drawing: one request that stays open until the pictures are done, and a look every few seconds so each picture shows when it arrives
-      const render = fetch(`/api/preview/${out.id}/render`, { method: 'POST' }).then((r) => (r.ok ? (r.json() as Promise<View>) : null)).catch(() => null)
       let last: View | null = null
       let done = false
-      void render.then((v) => {
-        if (v) last = v
-      })
+      // The render request is held open for about two minutes, then answers with whatever is there. A scene that needs a second try (a failed check, a wait for the image quota) can take longer,
+      // so the page asks again — it joins the same render, nothing is drawn twice — until every scene is a picture or a washi tile, or the time is up. (The first ask ending is not the end:
+      // before this, scene 4 stayed "being drawn" until the page gave up.)
+      const terminalView = (v: View | null) => !!v && (v.state === 'done' || v.state === 'failed' || v.state === 'deferred')
+      void (async () => {
+        while (alive && !done && Date.now() - t0 < GIVE_UP_MS) {
+          const asked = Date.now()
+          const v = await fetch(`/api/preview/${out.id}/render`, { method: 'POST' }).then((r) => (r.ok ? (r.json() as Promise<View>) : null)).catch(() => null)
+          if (v) last = v
+          if (terminalView(v)) return
+          // (an answer that came back at once — the film is waiting for its retry time — is not asked again straight away)
+          await sleep(Date.now() - asked < 3000 ? 5000 : 1000)
+        }
+      })()
       while (alive && Date.now() - t0 < GIVE_UP_MS) {
         const v = await fetch(`/api/preview/${out.id}`).then((r) => (r.ok ? (r.json() as Promise<View>) : null)).catch(() => null)
         if (v) last = v

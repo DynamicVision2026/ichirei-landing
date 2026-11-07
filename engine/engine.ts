@@ -14,7 +14,7 @@
 
 import { usageOf } from './cache-usage.ts'
 import { purposeFrame, toneLine, effectivePurpose, effectiveState, mapOtherPurpose, mapOtherRelationship, mapOtherState, type Purpose } from './purpose.ts'
-import { cardsMode, runCards, INVENTED_FACT_REASON, SUBJECT_REASON, type CardsReport } from './cards.ts'
+import { cardsMode, runCards, INVENTED_FACT_REASON, SUBJECT_REASON, setAsideCode, type CardsReport } from './cards.ts'
 import { withDisplayReadings } from './reading-display.ts'
 import { thinkingTokensOf, watchThinkingTokens } from './usage.ts'
 import Anthropic from '@anthropic-ai/sdk'
@@ -244,6 +244,11 @@ export interface RunEngineOptions {
    * request asked for `?debug=1`. Never story text, never another customer's data.
    */
   onDebug?: (info: Record<string, unknown>) => void
+  /**
+   * Called once per finished run with where the free card (趣字) came from — `first` (its five ranked options), `retry` (the second hedged pair) or `runner_up` (the best unused candidate of the main/second
+   * calls) — or null when none is shown, and the reasons in codes why a later step was needed or the card was lost. Codes only; the API turns it into the /ops count. Not called for remembrance (two cards).
+   */
+  onFreeSource?: (info: { round: number; source: 'first' | 'retry' | 'runner_up' | null; reasons: string[] }) => void
   /** How many follow-up answers the sender has already given (the API layer passes it). Lexicon mode: after one, a second "no lexicon character fits" falls back to the palette engine. */
   followUpsUsed?: number
   /** ICHIREI_LEXICON_MODE for this run (tests); default: the environment. */
@@ -362,7 +367,7 @@ function logCards(story: string, context: EngineContext, before: EngineResult, a
   try {
     const live = (r: EngineResult, slot: string) => r.candidates.filter((c) => !c.eliminated && c.slot === slot).length
     const removed = after.candidates.filter((c) => c.eliminated).map((c) => ({ slot: c.slot, reason: (c.eliminated_reason ?? 'unknown').slice(0, 80) }))
-    const payload = { cards_mode: parallel ? 'parallel' : 'single', purpose: purposeCodeOf(context), state: effectiveState(context), ...(otherTextMapped(context) ? { other_text_mapped: otherTextMapped(context) } : {}), ...(parallel ? { second_source: parallel.second_source } : {}), story_chars: [...story].length, language: context.language, occasion: context.occasion, status: after.status, live: { main: live(after, 'main'), second: live(after, 'second'), freestyle: live(after, 'freestyle') }, before_final: before.candidates.filter((c) => !c.eliminated).length, freestyle: context.occasion === 'memorial' ? 'not_offered' : undefined, ms, select: select ?? undefined, ...(parallel ? { parallel: { first_card_ms: parallel.first_card_ms, all_cards_ms: parallel.all_cards_ms, calls: parallel.calls, reviews: parallel.reviews, collisions: parallel.collisions, runner_up_used: parallel.runner_up_used, free_dropped: parallel.free_dropped, second_source: parallel.second_source, subject_removed: parallel.subject_removed, subject_rewritten: parallel.subject_rewritten, looks_rewritten: parallel.looks_rewritten, line_rescue: parallel.line_rescue, language: parallel.language, free_retry: parallel.free_retry } } : {}), calls: parallel ? { select: parallel.calls.reduce((n, c) => n + c.attempts, 0), review: parallel.reviews.length, refill: refill ? 1 : 0, gaze: ms.gaze_failing > 0 ? 1 : 0 } : { select: ms.select_attempts, review: ms.review > 0 ? 1 : 0, refill: refill ? 1 : 0, gaze: ms.gaze_failing > 0 ? 1 : 0 }, removed, refill: refill ? { asked: refill.asked, filled: refill.filled.map((f) => f.slot), rejected: refill.rejected, rescued: refill.rescued.map((f) => f.slot), ms: refill.ms } : null }
+    const payload = { cards_mode: parallel ? 'parallel' : 'single', purpose: purposeCodeOf(context), state: effectiveState(context), ...(otherTextMapped(context) ? { other_text_mapped: otherTextMapped(context) } : {}), ...(parallel ? { second_source: parallel.second_source } : {}), story_chars: [...story].length, language: context.language, occasion: context.occasion, status: after.status, live: { main: live(after, 'main'), second: live(after, 'second'), freestyle: live(after, 'freestyle') }, before_final: before.candidates.filter((c) => !c.eliminated).length, freestyle: context.occasion === 'memorial' ? 'not_offered' : undefined, ms, select: select ?? undefined, ...(parallel ? { parallel: { first_card_ms: parallel.first_card_ms, all_cards_ms: parallel.all_cards_ms, calls: parallel.calls, reviews: parallel.reviews, collisions: parallel.collisions, runner_up_used: parallel.runner_up_used, free_dropped: parallel.free_dropped, second_source: parallel.second_source, subject_removed: parallel.subject_removed, subject_rewritten: parallel.subject_rewritten, looks_rewritten: parallel.looks_rewritten, line_rescue: parallel.line_rescue, language: parallel.language, free_retry: parallel.free_retry, free_source: parallel.free_source, free_fallbacks: parallel.free_fallbacks, free_set_aside: parallel.free_set_aside } } : {}), calls: parallel ? { select: parallel.calls.reduce((n, c) => n + c.attempts, 0), review: parallel.reviews.length, refill: refill ? 1 : 0, gaze: ms.gaze_failing > 0 ? 1 : 0 } : { select: ms.select_attempts, review: ms.review > 0 ? 1 : 0, refill: refill ? 1 : 0, gaze: ms.gaze_failing > 0 ? 1 : 0 }, removed, refill: refill ? { asked: refill.asked, filled: refill.filled.map((f) => f.slot), rejected: refill.rejected, rescued: refill.rescued.map((f) => f.slot), ms: refill.ms } : null }
     console.log(`[ichirei-cards] ${JSON.stringify(payload)}`)
     onDebug?.(debugOf(payload))
   } catch {
@@ -816,7 +821,7 @@ async function runCardsPipeline(a: PipelineArgs): Promise<PipelineOut> {
   const mainCall = out.report.calls.find((c) => c.slot === 'main')
   const timing = (t: { review_ms: number; replace_ms: number; status: string }) =>
     logTiming({ attempts: mainCall?.attempts ?? 1, max_tokens_used: 0, select_ms: selectMs, ...t, total_ms: Date.now() - tStart, stop_reason: mainCall?.stop_reason ?? null, output_tokens: mainCall?.output_tokens ?? null, lexicon: view !== null })
-  const earlyDebug = (status: string) => opts.onDebug?.(debugOf({ cards_mode: 'parallel', status, ms: { total: Date.now() - tStart, select: selectMs }, parallel: { first_card_ms: out.report.first_card_ms, all_cards_ms: out.report.all_cards_ms, calls: out.report.calls, reviews: out.report.reviews, collisions: out.report.collisions, runner_up_used: out.report.runner_up_used, free_dropped: out.report.free_dropped, second_source: out.report.second_source, subject_removed: out.report.subject_removed, subject_rewritten: out.report.subject_rewritten, looks_rewritten: out.report.looks_rewritten, line_rescue: out.report.line_rescue, language: out.report.language, free_retry: out.report.free_retry } }))
+  const earlyDebug = (status: string) => opts.onDebug?.(debugOf({ cards_mode: 'parallel', status, ms: { total: Date.now() - tStart, select: selectMs }, parallel: { first_card_ms: out.report.first_card_ms, all_cards_ms: out.report.all_cards_ms, calls: out.report.calls, reviews: out.report.reviews, collisions: out.report.collisions, runner_up_used: out.report.runner_up_used, free_dropped: out.report.free_dropped, second_source: out.report.second_source, subject_removed: out.report.subject_removed, subject_rewritten: out.report.subject_rewritten, looks_rewritten: out.report.looks_rewritten, line_rescue: out.report.line_rescue, language: out.report.language, free_retry: out.report.free_retry, free_source: out.report.free_source, free_fallbacks: out.report.free_fallbacks, free_set_aside: out.report.free_set_aside } }))
   // Goodwill check (selection or review): a polite decline, no cards.
   if (out.early?.kind === 'declined') {
     earlyDebug('declined')
@@ -890,6 +895,24 @@ async function runCardsPipeline(a: PipelineArgs): Promise<PipelineOut> {
   const final = withDisplayReadings(finalizeResult(ensureMain(enforceLineLanguage(dropInvented(withGazes, story, context.language), context.language), undefined, canBeMain)), palette)
   const refillMs = tGaze - tReplace
   out.report.all_cards_ms = Math.max(out.report.all_cards_ms, Date.now() - tStart)
+  // The free card (2026-11-07): where it came from, and why a later step was needed — one log line, and the /ops count. A free card the lane chose but the last gates removed counts as lost.
+  if (context.occasion !== 'memorial') {
+    const freeLive = final.candidates.some((c) => !c.eliminated && c.slot === 'freestyle')
+    const reasons = [...new Set(out.report.free_fallbacks.flatMap((f) => f.why))]
+    if (out.report.free_source && !freeLive) {
+      const lost = final.candidates.find((c) => c.slot === 'freestyle' && c.eliminated)
+      reasons.push(`final_gate:${setAsideCode(lost?.eliminated_reason)}`)
+      out.report.free_source = null
+    }
+    if (!out.report.free_source && out.report.free_dropped === 'late') reasons.push('late')
+    if (!out.report.free_source && reasons.length === 0) reasons.push('none')
+    console.log(`[ichirei-engine] free_source ${JSON.stringify({ round: opts.round ?? 1, source: out.report.free_source, fallbacks: out.report.free_fallbacks, set_aside: out.report.free_set_aside })}`)
+    try {
+      opts.onFreeSource?.({ round: opts.round ?? 1, source: out.report.free_source, reasons })
+    } catch {
+      // (a count for /ops is never a reason to lose a result)
+    }
+  }
   // where the second card came from: its own call, the main call's runner-up, or (only when both could not deliver) the refill
   const refillFilled = (refill as RefillReport | null)?.filled ?? []
   const secondLive = final.candidates.some((c) => !c.eliminated && c.slot === 'second')

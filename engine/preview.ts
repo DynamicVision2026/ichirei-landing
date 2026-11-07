@@ -191,6 +191,11 @@ export interface PictureOutcome {
   script_scenes?: { state: string; line: string; rules: string[] }[]
   /** launch freeze: per slot, drawn / drawn_on_retry / washi (the reason is in `reasons`) */
   slot_outcomes?: string[]
+  /**
+   * Per scene (2026-11-07), codes and numbers only: how it ended (`drawn`, `drawn_on_retry`, `washi`, `pending` = still being drawn, `unchecked`), the seconds from the start of the
+   * render to the moment it passed its check, how many checks it failed, whether its description was rewritten, and the reason when it is washi or was retried.
+   */
+  scenes?: { scene: number; outcome: string; secs: number | null; check_fails: number; rewritten: boolean; reason: string | null }[]
   art_status?: string | null
   slots?: string[]
   reasons?: string[]
@@ -200,6 +205,19 @@ export interface PictureOutcome {
   model?: string | null
 }
 
+/** One entry per scene for the debug view: where each one stands and how long it took (the owner asks "which scene was slow, which was retried"). */
+export function sceneReport(art: ArtRecord | null): NonNullable<PictureOutcome['scenes']> {
+  if (!art) return []
+  return art.slots.map((s, i) => ({
+    scene: i + 1,
+    outcome: art.outcomes?.[i] ?? (s === 'ai' ? 'drawn' : s === 'washi' ? 'washi' : s === 'unchecked' ? 'unchecked' : 'pending'),
+    secs: typeof art.ready_ms?.[i] === 'number' ? Math.round((art.ready_ms[i] as number) / 100) / 10 : null,
+    check_fails: art.check_fails?.[i] ?? 0,
+    rewritten: (art.rewrites?.[i] ?? 0) > 0,
+    reason: s === 'ai' ? null : art.reasons?.[i] || null,
+  }))
+}
+
 export function outcomeOf(rec: AnimationRecord, art: ArtRecord | null): PictureOutcome {
   const film = rec.film
   const base = { script_status: film?.status ?? 'none', script_reason: film?.reason ?? null, ...(film?.blocked_by?.length ? { script_blocked_by: film.blocked_by } : {}), ...(film?.scenes?.length ? { script_scenes: film.scenes.map((x) => ({ state: x.state, line: x.line ?? 'ok', rules: x.rules })) } : {}), art_status: art?.status ?? null }
@@ -207,7 +225,7 @@ export function outcomeOf(rec: AnimationRecord, art: ArtRecord | null): PictureO
   if (art?.status === 'deferred') return { outcome: 'limit', limit: 'film_daily', ...base }
   const slots = art?.slots ?? []
   const pictures = slots.filter((x) => x === 'ai').length
-  const info = { ...base, slots: [...slots], reasons: [...(art?.reasons ?? [])], ...(art?.outcomes ? { slot_outcomes: [...art.outcomes] } : {}), pictures, washi: slots.filter((x) => x === 'washi').length, calls: art?.calls ?? 0, model: art?.model ?? null }
+  const info = { ...base, slots: [...slots], reasons: [...(art?.reasons ?? [])], ...(art?.outcomes ? { slot_outcomes: [...art.outcomes] } : {}), scenes: sceneReport(art), pictures, washi: slots.filter((x) => x === 'washi').length, calls: art?.calls ?? 0, model: art?.model ?? null }
   if (pictures > 0) return { outcome: 'ok', ...info }
   if (!art || art.status === 'rendering') return { outcome: 'drawing', ...info }
   if (art.status === 'done' || art.status === 'incomplete') return { outcome: 'all_failed', cause: 'images_failed', ...info }

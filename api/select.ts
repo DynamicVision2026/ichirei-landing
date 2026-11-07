@@ -16,6 +16,8 @@
 import { runEngine } from '../engine/engine.ts'
 import { ModelTimeoutError, callTimeoutMs } from '../engine/limits.ts'
 import { cleanSession, cleanSource, recordEvent, shownEvent } from '../engine/analytics.ts'
+import { recordFreeSource } from '../engine/free-source.ts'
+import { createOrderStore } from '../engine/order-store.ts'
 import { parsePromptQuestion } from '../engine/story-questions.ts'
 import { FOLLOW_UP_MAX, STORY_MAX, parseExclude, countChars, mergeStory, parseContext, parseFollowUps, type Condition } from '../engine/contract.ts'
 
@@ -121,6 +123,8 @@ export async function POST(req: Request): Promise<Response> {
           followUpsUsed: fu.followUps.length,
           onStage: (stage) => send({ type: 'stage', stage }),
           onCard: (partial) => send({ type: 'card', result: partial }),
+          // The /ops count of where the third card (趣字) came from (codes only; best effort)
+          onFreeSource: (info) => void recordFreeSource(createOrderStore(), info),
           ...(wantsDebug ? { onDebug: (d: Record<string, unknown>) => { debug = d } } : {}),
           onDelta: (text) => {
             received += text.length

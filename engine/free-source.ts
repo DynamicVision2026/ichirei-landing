@@ -1,0 +1,62 @@
+// Where the free card (趣字) of each run came from — a count for /ops (2026-11-07). One line per run in `ops/cards-<day>.jsonl`: the round, the source and the reasons, in CODES only.
+// Never a story, a character, a name or a session id. Best effort: a count is never a reason to lose a result.
+
+import { analyticsDay } from './analytics.ts'
+import { readJsonl } from './egift-ops.ts'
+import type { OrderStore } from './order-store.ts'
+
+export const FREE_SOURCES = ['first', 'retry', 'runner_up'] as const
+export type FreeSource = (typeof FREE_SOURCES)[number]
+export interface FreeSourceLine {
+  ts: string
+  round: 1 | 2 | 3
+  source: FreeSource | null
+  reasons: string[]
+}
+
+export const freeSourcePath = (now: Date): string => `ops/cards-${analyticsDay(now)}.jsonl`
+
+const cleanCode = (s: unknown): string => String(s ?? '').toLowerCase().replace(/[^a-z0-9_:]/g, '').slice(0, 40)
+
+export async function recordFreeSource(store: OrderStore | null, info: { round: number; source: FreeSource | null; reasons: string[] }, now: Date = new Date()): Promise<void> {
+  if (!store) return
+  try {
+    const round = info.round === 2 || info.round === 3 ? info.round : 1
+    const line: FreeSourceLine = { ts: now.toISOString(), round, source: info.source && (FREE_SOURCES as readonly string[]).includes(info.source) ? info.source : null, reasons: [...new Set(info.reasons.map(cleanCode).filter(Boolean))].slice(0, 12) }
+    await store.appendJsonl(freeSourcePath(now), line)
+  } catch (err) {
+    console.error('[ichirei-ops] free_source append failed', err instanceof Error ? err.message : err)
+  }
+}
+
+export interface FreeSourceCounts {
+  runs: number
+  by_source: Record<FreeSource | 'none', number>
+  /** per round (1, 2, 3): the same split — the rounds where the third card used to go missing */
+  by_round: Record<1 | 2 | 3, Record<FreeSource | 'none', number>>
+  /** how often each reason made a later step necessary (or cost the card) */
+  reasons: Record<string, number>
+}
+
+const emptySplit = (): Record<FreeSource | 'none', number> => ({ first: 0, retry: 0, runner_up: 0, none: 0 })
+
+export async function readFreeSourceCounts(store: OrderStore, days: string[]): Promise<FreeSourceCounts> {
+  const out: FreeSourceCounts = { runs: 0, by_source: emptySplit(), by_round: { 1: emptySplit(), 2: emptySplit(), 3: emptySplit() }, reasons: {} }
+  for (const day of days) {
+    let lines: FreeSourceLine[] = []
+    try {
+      lines = await readJsonl<FreeSourceLine>(store, `ops/cards-${day}.jsonl`)
+    } catch {
+      lines = []
+    }
+    for (const l of lines) {
+      const key = l.source && (FREE_SOURCES as readonly string[]).includes(l.source) ? l.source : 'none'
+      const round = l.round === 2 || l.round === 3 ? l.round : 1
+      out.runs++
+      out.by_source[key]++
+      out.by_round[round][key]++
+      for (const r of Array.isArray(l.reasons) ? l.reasons : []) out.reasons[r] = (out.reasons[r] ?? 0) + 1
+    }
+  }
+  return out
+}
