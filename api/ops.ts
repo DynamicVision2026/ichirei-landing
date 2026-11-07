@@ -233,7 +233,7 @@ export function createOpsHandlers(deps: () => OpsDeps) {
         const e = r.entry
         const size = sizeOf(e.size_code)
         const ops = r.record?.ops
-        return `<tr>${common(r)}<td>${esc(addrOf(r))}</td><td>${esc(e.delivery_date)}</td>` +
+        return `<tr id="o-${esc(e.order_ref)}">${common(r)}<td>${esc(addrOf(r))}</td><td>${esc(e.delivery_date)}</td>` +
           `<td>${size && PRINTED_CARD[size] ? `<a href="/ops/card/${esc(e.order_ref)}.pdf">カードPDF</a>` : ''}</td>` +
           `<td>${ops?.printed_at ? '印刷済み' : size && PRINTED_CARD[size] ? `<button name="what" value="printed" data-ref="${esc(e.order_ref)}">印刷した</button>` : ''}</td>` +
           `<td>${ops?.shipped_at ? '発送済み' : size && SHIPS[size] ? `<button name="what" value="shipped" data-ref="${esc(e.order_ref)}">発送した</button>` : ''}</td>` +
@@ -257,11 +257,11 @@ export function createOpsHandlers(deps: () => OpsDeps) {
           ? `<button data-act="cancel" data-ref="${esc(r.entry.order_ref)}" data-collected="${r.record?.collected_at ? '1' : '0'}" data-closed="${r.win.phase === 'closed' ? '1' : '0'}"${r.record?.collected_at ? ' class="warn"' : ''}>キャンセルとして記録</button>`
           : ''
       const openLine = (r: Classified) =>
-        `<tr class="inwindow"><td>${esc(r.entry.order_ref)}</td><td>${esc(SIZE_LABEL[r.entry.size_code] ?? r.entry.size_code)}</td><td>${r.entry.memorial ? '偲ぶ' : ''}</td>` +
+        `<tr class="inwindow" id="o-${esc(r.entry.order_ref)}"><td>${esc(r.entry.order_ref)}</td><td>${esc(SIZE_LABEL[r.entry.size_code] ?? r.entry.size_code)}</td><td>${r.entry.memorial ? '偲ぶ' : ''}</td>` +
         `<td>キャンセル受付中（あと${r.win.hours_left}時間）${r.win.verified ? '' : '<br><small>注文作成時刻から計算</small>'}</td><td>${esc(collectedCell(r))}</td><td>${esc(ackCell(r))}</td><td>${cancelCell(r)}</td></tr>`
       const openTable = (list: Classified[]) =>
         `<div class="wide"><table class="openT"><thead><tr><th>注文番号</th><th>サイズ</th><th>偲ぶ</th><th>状態</th><th>受け取り</th><th>返金条件の確認</th><th>操作</th></tr></thead><tbody>${list.map(openLine).join('') || '<tr><td colspan="7">なし</td></tr>'}</tbody></table></div>`
-      const otherLine = (r: Classified) => `<tr class="inwindow">${common(r)}<td>${r.win.phase === 'cancelled' ? 'キャンセル' : r.win.phase === 'unpaid' ? '入金を確認できません' : '製作なし（eギフトなど）'}</td><td>${esc(collectedCell(r))}</td><td>${esc(ackCell(r))}</td><td>${cancelCell(r)}</td></tr>`
+      const otherLine = (r: Classified) => `<tr class="inwindow" id="o-${esc(r.entry.order_ref)}">${common(r)}<td>${r.win.phase === 'cancelled' ? 'キャンセル' : r.win.phase === 'unpaid' ? '入金を確認できません' : '製作なし（eギフトなど）'}</td><td>${esc(collectedCell(r))}</td><td>${esc(ackCell(r))}</td><td>${cancelCell(r)}</td></tr>`
       const otherTable = (list: Classified[]) =>
         `<div class="wide"><table><thead><tr><th>注文番号</th><th>サイズ</th><th>偲ぶ</th><th>お届け</th><th>状態</th><th>受け取り</th><th>返金条件の確認</th><th>操作</th></tr></thead><tbody>${list.map(otherLine).join('') || '<tr><td colspan="8">なし</td></tr>'}</tbody></table></div>`
       // 遊び字の出どころ: コードと件数だけ（物語も字も入っていません）
@@ -282,7 +282,7 @@ export function createOpsHandlers(deps: () => OpsDeps) {
         `<h1>ICHIREI 注文</h1>` +
         `<p class="note">お支払い完了から24時間は「キャンセル受付中」です。この間に製作は始めません。24時間が過ぎてキャンセルのないものだけが、下のPDFと木札・版木CSVに入ります。お支払い後の内容の変更（字・歌・お名前・メッセージ）は行いません。お客様が「贈りものを受け取る」を押した後（受け取り：済）は、キャンセルできません。期限内に受信したキャンセルのメールは、24時間を過ぎても対応できます（その場合は「キャンセルとして記録」を押してください）。</p>` +
         `${verified ? '' : '<p class="note">⚠ Shopifyから入金を確認できませんでした。いまは注文を作成した時刻から24時間で数えています（入金が確認できていない注文も含まれます）。</p>'}` +
-        `<p class="bar"><a href="/ops/cards/today.pdf">製作に進めるカードをまとめてPDF</a><a href="/ops/wooden-today.csv">製作に進める木札・版木 CSV</a><button id="egift-run">eギフトの確認を今すぐ実行</button></p>` +
+        `<p class="bar"><a href="/ops/stats">数字（ダッシュボード）</a><a href="/ops/cards/today.pdf">製作に進めるカードをまとめてPDF</a><a href="/ops/wooden-today.csv">製作に進める木札・版木 CSV</a><button id="egift-run">eギフトの確認を今すぐ実行</button></p>` +
         `<h2>製作に進めるもの（${readyRows.length}）</h2>${readyTable(readyRows)}` +
         `<h2>キャンセル受付中（${openRows.length}）</h2>${openTable(openRows)}` +
         `<h2>そのほか（キャンセル・入金未確認・製作なし ${otherRows.length}）</h2>${otherTable(otherRows)}` +

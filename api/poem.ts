@@ -11,6 +11,7 @@
 import { noCelebration, toneLine } from '../engine/purpose.ts'
 import { randomBytes } from 'node:crypto'
 import { cleanSession, cleanSource, recordEvent } from '../engine/analytics.ts'
+import { costCollector } from '../engine/ai-cost.ts'
 import { STORY_MAX, countChars, mergeStory, parseContext, parseFollowUps, type Language } from '../engine/contract.ts'
 import { POEM_ID_PATTERN, todayJst, type StoredPoem } from '../engine/order.ts'
 import { createOrderStore, type OrderStore } from '../engine/order-store.ts'
@@ -82,11 +83,13 @@ export function createPoemHandler(deps: () => PoemDeps) {
     const forms = [...new Set([kanji, row?.inscription_form, row?.kanji].filter((x): x is string => Boolean(x)))]
 
     const gen = d.generate ?? generatePoem
+    const cost = costCollector('poem', cleanSource(body.source))
     const result = await gen(
       { story: mergeStory(body.story, fu.followUps), language: language as Language, relationship, direction, occasion, occasion_detail, tone: toneLine(ctx.context), quiet: noCelebration(ctx.context), kanji, inscription_form: forms.find((f) => f !== kanji) ?? null, gaze, type: type as PoemType },
       palette,
-      d.generateOptions,
+      { ...d.generateOptions, onUsage: (stage: 'poem' | 'review', u: { model: string; input_tokens: number; output_tokens: number }) => cost.add(stage, u) },
     )
+    void cost.flush(d.store, now, cleanSession(body.session) ?? undefined)
     if (!result.ok) {
       const status = result.code === 'poem_timeout' ? 504 : result.code === 'declined' ? 422 : 502
       return json(status, { error: result.error, code: result.code, type, ...(result.reasons?.length ? { reasons: result.reasons } : {}) })

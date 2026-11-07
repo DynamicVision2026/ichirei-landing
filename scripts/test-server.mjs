@@ -366,6 +366,9 @@ try {
       const sh3 = await fetch(`${gs.url}/api/gift/${token}/share-film.mp4?preview=${gift.animation_id}`)
       const col = await fetch(`${gs.url}/api/animation/${gift.animation_id}/collect`, { method: 'POST' })
       check('preview mode: the share film and the poem card are refused (403 preview_only); the collect route answers (not a 404 route miss: an order that was never paid is refused)', sh1.status === 403 && sh2.status === 403 && sh3.status === 403 && (await sh1.json()).error === 'preview_only' && [404, 409, 503].includes(col.status) && readFileSync(join(dir, `${token}.json`), 'utf8') === before)
+      const st = await fetch(`${gs.url}/ops/stats`)
+      const sj = await fetch(`${gs.url}/ops/stats.json`)
+      check('the owner dashboard routes /ops/stats and /ops/stats.json exist and never answer without the owner password (401 or 503, never the page)', [401, 503].includes(st.status) && [401, 503].includes(sj.status) && !(await st.text()).includes('ダッシュボード'))
       const f = await fetch(`${gs.url}/fonts/zen-old-mincho-900.woff2`)
       check('our own fonts are served under /fonts/ (woff2, 200)', f.status === 200 && (await f.arrayBuffer()).byteLength > 50_000)
     } finally {

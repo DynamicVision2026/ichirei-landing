@@ -6,6 +6,7 @@
 // Plumbing only: nothing here judges a character. Failures are logged and swallowed — analytics must never
 // cost a customer their result.
 
+import { createHash } from 'node:crypto'
 import { PURPOSES, STATES } from '../src/order/purpose.ts'
 import { LANGUAGES, OCCASIONS, RELATIONSHIPS, type EngineResult, type Language, type Occasion, type Relationship } from './contract.ts'
 import { createOrderStore, type OrderStore } from './order-store.ts'
@@ -20,7 +21,7 @@ export const CHOICES = ['main', 'second', 'free'] as const
 export type Choice = (typeof CHOICES)[number]
 /** Events the BROWSER may report; `shown` and `ordered` are written by the server itself. */
 /** The story step of the page (Part A, 2026-10-30): codes only — the language, the question set and the question id (a known id, never text). */
-export const FLOW_EVENTS = ['story_opened', 'question_shown', 'question_switched', 'voice_used', 'draft_restored', 'story_submitted', 'followup_shown', 'reveal_shown'] as const
+export const FLOW_EVENTS = ['chips_done', 'story_opened', 'question_shown', 'question_switched', 'voice_used', 'draft_restored', 'story_submitted', 'followup_shown', 'reveal_shown'] as const
 export type FlowEvent = (typeof FLOW_EVENTS)[number]
 /** The free card preview (2026-10-30): codes only — never a character or a story. `n` = which retry (1 or 2); `state` = how the pictures went; `secs` = seconds from the pick to a complete preview. */
 export const PREVIEW_EVENTS = ['card_preview_shown', 'candidates_retry', 'pictures_before_pay', 'preview_to_order'] as const
@@ -32,13 +33,36 @@ export const SHARE_EVENTS = ['share_film_tap', 'share_card_tap'] as const
 export type ShareEvent = (typeof SHARE_EVENTS)[number]
 export const SHARE_ROLES = ['sender', 'receiver'] as const
 export type ShareRole = (typeof SHARE_ROLES)[number]
-export const CLIENT_EVENTS = ['chosen', 'explain_opened', ...FLOW_EVENTS, ...PREVIEW_EVENTS, ...SHARE_EVENTS] as const
+/** The owner dashboard (/ops/stats, 2026-11-07): a page view (once per tab session; the referrer's HOST is turned into a bucket on arrival and never stored) and the receiver opening the envelope (a short hash of the gift link, never the link itself). */
+export const SOURCE_BUCKETS = ['direct', 'instagram', 'facebook', 'x', 'line', 'xhs', 'other'] as const
+export type SourceBucket = (typeof SOURCE_BUCKETS)[number]
+export const CLIENT_EVENTS = ['chosen', 'explain_opened', 'page_view', 'receiver_opened', ...FLOW_EVENTS, ...PREVIEW_EVENTS, ...SHARE_EVENTS] as const
+
+/** The referrer's host → a bucket (the dashboard's 「どこから」). Search engines and no referrer are `direct`; a shared post carries no tag, so it shows under the platform it came from. */
+export function sourceBucket(host: unknown, ownHost?: string): SourceBucket {
+  const h = typeof host === 'string' ? host.toLowerCase().trim().replace(/^www\./, '').slice(0, 100) : ''
+  if (!h || (ownHost && h === ownHost.toLowerCase())) return 'direct'
+  if (/(^|\.)instagram\.com$/.test(h)) return 'instagram'
+  if (/(^|\.)(facebook\.com|fb\.com|fb\.me)$/.test(h)) return 'facebook'
+  if (/(^|\.)(x\.com|twitter\.com|t\.co)$/.test(h)) return 'x'
+  if (/(^|\.)(line\.me|line\.naver\.jp|lin\.ee)$/.test(h)) return 'line'
+  if (/(^|\.)(xiaohongshu\.com|xhslink\.com)$/.test(h)) return 'xhs'
+  if (/(^|\.)(google\.[a-z.]+|yahoo\.[a-z.]+|bing\.com|duckduckgo\.com|baidu\.com|ecosia\.org)$/.test(h)) return 'direct'
+  return 'other'
+}
+
+/** A short hash that links an order to the receiver's open event without storing the private gift link. */
+export const tokenHash = (token: string): string => createHash('sha256').update(token).digest('hex').slice(0, 16)
 
 export type AnalyticsEvent =
-  | { ts: string; session: string; source: Source; event: 'shown'; language: Language; relationship: Relationship | null; occasion: Occasion | null; purpose?: string | null; state?: string | null; status: 'sufficient' | 'insufficient'; main_slot: 'main' | 'second' | null; has_free: boolean }
+  | { ts: string; session: string; source: Source; event: 'shown'; ms?: number | null; language: Language; relationship: Relationship | null; occasion: Occasion | null; purpose?: string | null; state?: string | null; status: 'sufficient' | 'insufficient'; main_slot: 'main' | 'second' | null; has_free: boolean }
   | { ts: string; session: string; source: Source; event: FlowEvent; language: Language | null; set: QuestionSet | null; qid: string | null }
   | { ts: string; session: string; source: Source; event: PreviewEvent; language: Language | null; n: 1 | 2 | null; state: PictureState | null; secs: number | null }
   | { ts: string; session: string; source: Source; event: ShareEvent; role: ShareRole }
+  | { ts: string; session: string; source: Source; event: 'page_view'; language: Language | null; src: SourceBucket }
+  | { ts: string; session: string; source: Source; event: 'receiver_opened'; gift: string | null }
+  /** What the model and picture calls of one request cost to run (tokens only; the dashboard prices them with engine/ops-costs.ts). No story, no session needed. */
+  | { ts: string; session?: string; source: Source; event: 'ai_cost'; kind: string; model: string; in: number; out: number; cr: number; cw: number }
   | { ts: string; session: string; source: Source; event: 'chosen'; choice: Choice }
   | { ts: string; session: string; source: Source; event: 'explain_opened'; choice: Choice | null }
   | { ts: string; session: string; source: Source; event: 'ordered'; poem_types?: PoemType[] }
@@ -61,6 +85,11 @@ export function parseClientEvent(body: unknown, now: Date): AnalyticsEvent | nul
   const rawChoice = b.choice === 'freestyle' ? 'free' : b.choice
   const choice = (CHOICES as readonly string[]).includes(rawChoice as string) ? (rawChoice as Choice) : null
   const ts = now.toISOString()
+  if (b.event === 'page_view') {
+    const language = (LANGUAGES as readonly string[]).includes(b.language as string) ? (b.language as Language) : null
+    return { ts, session, source, event: 'page_view', language, src: sourceBucket(b.ref, typeof b.own === 'string' ? b.own : undefined) }
+  }
+  if (b.event === 'receiver_opened') return { ts, session, source, event: 'receiver_opened', gift: typeof b.gift === 'string' && /^RG-[A-Za-z0-9_-]{8,80}$/.test(b.gift) ? tokenHash(b.gift) : null }
   if ((FLOW_EVENTS as readonly string[]).includes(b.event as string)) {
     const language = (LANGUAGES as readonly string[]).includes(b.language as string) ? (b.language as Language) : null
     const qid = findQuestion(b.qid)?.question.id ?? null
@@ -80,13 +109,14 @@ export function parseClientEvent(body: unknown, now: Date): AnalyticsEvent | nul
 }
 
 /** The `shown` event for a finished engine run (codes and booleans only). */
-export function shownEvent(result: EngineResult, session: string, source: Source, now: Date): AnalyticsEvent {
+export function shownEvent(result: EngineResult, session: string, source: Source, now: Date, ms: number | null = null): AnalyticsEvent {
   const primary = result.candidates?.find((c) => c.kanji === result.primary_kanji)
   return {
     ts: now.toISOString(),
     session,
     source,
     event: 'shown',
+    ...(ms !== null && Number.isFinite(ms) && ms >= 0 && ms < 600_000 ? { ms: Math.round(ms) } : {}),
     language: (LANGUAGES as readonly string[]).includes(result.language) ? result.language : 'ja',
     relationship: (RELATIONSHIPS as readonly string[]).includes(result.relationship as string) ? result.relationship : null,
     occasion: (OCCASIONS as readonly string[]).includes(result.occasion as string) ? result.occasion : null,

@@ -180,7 +180,7 @@ export function createOrderHandler(deps: () => OrderDeps) {
       return json(503, { error: 'Could not save the order. Nothing was charged; please try again.', code: 'store_failed' })
     }
     // The owner's list (/ops) and the e-gift reminders read this small index: codes only, no story, no names, no address.
-    await recordOrderIndex(d.store, record, now)
+    await recordOrderIndex(d.store, record, now, cleanSession((body as { session?: unknown } | null)?.session))
 
     // 3. The Shopify cart.
     try {

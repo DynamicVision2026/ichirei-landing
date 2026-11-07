@@ -16,6 +16,7 @@
 import { runEngine } from '../engine/engine.ts'
 import { ModelTimeoutError, callTimeoutMs } from '../engine/limits.ts'
 import { cleanSession, cleanSource, recordEvent, shownEvent } from '../engine/analytics.ts'
+import { costCollector } from '../engine/ai-cost.ts'
 import { recordFreeSource, recordMain } from '../engine/free-source.ts'
 import { createOrderStore } from '../engine/order-store.ts'
 import { parsePromptQuestion } from '../engine/story-questions.ts'
@@ -110,6 +111,8 @@ export async function POST(req: Request): Promise<Response> {
     async start(controller) {
       const send = (obj: unknown) =>
         controller.enqueue(encoder.encode(JSON.stringify(obj) + '\n'))
+      const t0 = Date.now()
+      const cost = costCollector('select', cleanSource(source))
       let received = 0
       let lastSent = 0
       // `?debug=1`: this request's own timings and outcome (engine onDebug: numbers and codes, no story text) ride along on the terminal line. Without it nothing changes.
@@ -122,6 +125,7 @@ export async function POST(req: Request): Promise<Response> {
           round: ex.retry + 1,
           followUpsUsed: fu.followUps.length,
           onStage: (stage) => send({ type: 'stage', stage }),
+          onUsage: (stage, usage) => cost.add(stage, usage),
           onCard: (partial) => send({ type: 'card', result: partial }),
           // The /ops count of where the third card (趣字) came from (codes only; best effort)
           onFreeSource: (info) => void recordFreeSource(createOrderStore(), info),
@@ -138,12 +142,13 @@ export async function POST(req: Request): Promise<Response> {
         })
         // Learning loop: codes and booleans only, tied to a random browser session id (engine/analytics.ts). Never awaited.
         const sessionId = cleanSession(session)
-        if (sessionId) void recordEvent(shownEvent(result, sessionId, cleanSource(source), new Date()))
+        if (sessionId) void recordEvent(shownEvent(result, sessionId, cleanSource(source), new Date(), Date.now() - t0))
         send({ type: 'result', result, ...(wantsDebug && debug ? { debug } : {}) })
       } catch (err) {
         const message = err instanceof Error ? err.message : String(err)
         send({ type: 'error', error: `Engine failed: ${message}`, ...(err instanceof ModelTimeoutError ? { code: 'model_timeout', seconds: Math.round(callTimeoutMs() / 1000) } : {}) })
       } finally {
+        void cost.flush(createOrderStore(), new Date(), cleanSession(session) ?? undefined)
         controller.close()
       }
     },

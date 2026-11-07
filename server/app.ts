@@ -19,6 +19,7 @@ import { handlers as selftestHandlers } from '../api/selftest.ts'
 import { readFile } from 'node:fs/promises'
 import { handlers as giftHandlers } from '../api/gift.ts'
 import { handlers as opsHandlers } from '../api/ops.ts'
+import { statsHandlers } from '../api/ops-stats.ts'
 import { POST as analyticsPost } from '../api/analytics.ts'
 import { GET as ratesGet } from '../api/rates.ts'
 import { GET as sizesGet } from '../api/sizes.ts'
@@ -210,6 +211,8 @@ export function createApp(config: ServerConfig): Hono {
   // The owner's page (Basic Auth, ICHIREI_OPS_PASSWORD; refused outright without it). Never indexed, never cached.
   const opsLimit = envRunLimiter('ICHIREI_OPS_LIMIT', { max: 120, minutes: 10 })
   app.get('/ops', limited(opsLimit), (c) => opsHandlers.page(c.req.raw))
+  app.get('/ops/stats', limited(opsLimit), (c) => statsHandlers.page(c.req.raw))
+  app.get('/ops/stats.json', limited(opsLimit), (c) => statsHandlers.json(c.req.raw))
   app.get('/ops/card/:file', limited(opsLimit), (c) => opsHandlers.card(c.req.raw, c.req.param('file').replace(/\.pdf$/, '')))
   app.get('/ops/cards/today.pdf', limited(opsLimit), (c) => opsHandlers.cardsToday(c.req.raw))
   app.get('/ops/wooden-today.csv', limited(opsLimit), (c) => opsHandlers.woodenCsv(c.req.raw))

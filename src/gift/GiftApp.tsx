@@ -13,6 +13,7 @@ import { linerFor } from './liner.ts'
 import '../animation/animation.css'
 import '../fonts.css'
 import './gift.css'
+import { trackReceiverOpened } from '../demo/analytics'
 
 // The receiver's gift page /g/<token> (Part 3 of the 2026-10-31 ticket). One screen at a time:
 //   1 the sealed envelope (or, before the opening date, the same envelope with the date instead of the button)
@@ -123,9 +124,10 @@ export default function GiftApp() {
   }, [needsPictures, token, q])
 
   const openEnvelope = useCallback(() => {
+    if (!preview && token) trackReceiverOpened(token)
     setStep('opening')
     window.setTimeout(() => setStep('letter'), reduced ? FADE_MS : OPENING_MS)
-  }, [reduced])
+  }, [reduced, preview, token])
 
   const memorial = load.state === 'ready' || load.state === 'locked' ? load.view.memorial : false
   // v9.6: an apology and an encouragement are as quiet as a remembrance — no red, no celebration words (the page keeps its words about a letter, not a gift)

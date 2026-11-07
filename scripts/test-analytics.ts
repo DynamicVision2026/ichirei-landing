@@ -150,7 +150,7 @@ console.log = () => {}
 await (await selectPost(new Request('http://x/api/select', { method: 'POST', body: JSON.stringify({ story: STORY, language: 'ja' }) }))).text()
 await new Promise((r) => setTimeout(r, 150))
 console.log = logq
-check('/api/select without a session id records nothing (analytics is opt-in per session, never inferred from the IP)', readLines().length === beforeNo)
+check('/api/select without a session id records no choice event (analytics is opt-in per session, never inferred from the IP); the only line it may add is the anonymous AI-cost count (tokens only: no session, no text)', readLines().slice(beforeNo).every((l) => l.event === 'ai_cost' && !('session' in l) && Object.keys(l).sort().join() === 'cr,cw,event,in,kind,model,out,source,ts'), JSON.stringify(readLines().slice(beforeNo)))
 upstream.close()
 
 // order success → "ordered" (the session id only)

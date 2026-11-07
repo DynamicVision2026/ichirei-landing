@@ -3251,6 +3251,83 @@ const SECTION_ORDER = ['.hero', '.strip', '.philo', '#shape', '#angles', '#write
   }
 }
 
+// ---------- Run 23 (2026-11-07): the owner dashboard /ops/stats — four languages with a switch, remembered; periods; values never change with the language; screenshots ----------
+{
+  const { spawn } = await import('node:child_process')
+  const child = spawn(process.execPath, ['--experimental-strip-types', '--disable-warning=ExperimentalWarning', 'scripts/stats-fixture-server.ts'], { stdio: ['ignore', 'pipe', 'inherit'] })
+  const port = await new Promise((resolve, reject) => {
+    const t = setTimeout(() => reject(new Error('fixture server did not start')), 30000)
+    child.stdout.on('data', (b) => { const m = /listening (\d+)/.exec(String(b)); if (m) { clearTimeout(t); resolve(Number(m[1])) } })
+  })
+  const URL0 = `http://127.0.0.1:${port}/ops/stats`
+  const L = {
+    ja: { title: '一字礼 ダッシュボード', periods: ['今日', '7日間', '30日間', '全期間'], tiles: ['ページ訪問', '物語を書いた', '字に出会った', 'ご注文（支払済）', '売上', 'AI費用（推定）'], funnel: '流れ（どこで離れているか）', steps: ['ページ訪問', '関係・理由を選んだ', '物語を送った', '字に出会った', 'この字で贈る', 'お支払い完了', '受け取った', '相手が開封', 'SNSでシェア'], daily: '日別：訪問とご注文', source: 'どこから / 言語', orders: 'ご注文一覧（最新50件）', cols: ['日時', '注文番号', '贈り方', '一字', '種類', '言語', '理由', '金額', '受け取り', '開封', '状態'], choice: '選ばれた字：本命 / 遊び字', rounds: '2回目・3回目を使った人', privacy: '物語の本文・お名前は表示しません。' },
+    en: { title: 'ICHIREI dashboard', periods: ['Today', '7 days', '30 days', 'All time'], tiles: ['Page visits', 'Stories written', 'Saw characters', 'Paid orders', 'Revenue', 'AI cost (est.)'], funnel: 'Funnel (where people drop off)', steps: ['Page visits', 'Chose relationship & purpose', 'Sent story', 'Saw characters', 'Chose a character', 'Paid', 'Collected', 'Receiver opened', 'Shared on social'], daily: 'Daily visits and orders', source: 'Sources / languages', orders: 'Latest 50 orders', cols: ['Time', 'Order', 'Gift', 'Character', 'Type', 'Language', 'Purpose', 'Amount', 'Collected', 'Opened', 'Status'], choice: 'Chosen: main / playful', rounds: 'Used round 2 / round 3', privacy: 'Story text and names are never shown.' },
+    'zh-Hant': { title: '一字禮 儀表板', periods: ['今天', '7天', '30天', '全部期間'], tiles: ['頁面造訪', '寫下故事', '看到字', '已付款訂單', '營收', 'AI 成本（估計）'], funnel: '流程（在哪裡流失）', steps: ['頁面造訪', '選了關係與理由', '送出故事', '看到字', '選定要送的字', '完成付款', '已領取', '對方已開啟', '分享到社群'], daily: '每日造訪與訂單', source: '來源 / 語言', orders: '最新50筆訂單', cols: ['時間', '訂單編號', '方案', '字', '類型', '語言', '理由', '金額', '領取', '開啟', '狀態'], choice: '被選的字：本命 / 趣字', rounds: '使用第2次、第3次的人', privacy: '不顯示故事內容與姓名。' },
+    'zh-Hans': { title: '一字礼 仪表板', periods: ['今天', '7天', '30天', '全部期间'], tiles: ['页面造访', '写下故事', '看到字', '已付款订单', '营收', 'AI 成本（估计）'], funnel: '流程（在哪里流失）', steps: ['页面造访', '选了关系与理由', '送出故事', '看到字', '选定要送的字', '完成付款', '已领取', '对方已打开', '分享到社群'], daily: '每日造访与订单', source: '来源 / 语言', orders: '最新50笔订单', cols: ['时间', '订单编号', '方案', '字', '类型', '语言', '理由', '金额', '领取', '打开', '状态'], choice: '被选的字：本命 / 趣字', rounds: '使用第2次、第3次的人', privacy: '不显示故事内容与姓名。' },
+  }
+  const ctx = await browser.newContext({ httpCredentials: { username: 'owner', password: 'pw' }, viewport: { width: 1280, height: 900 }, deviceScaleFactor: 1 })
+  const page = await ctx.newPage()
+  const errors = []
+  page.on('pageerror', (e) => errors.push(String(e)))
+  page.on('console', (m) => { if (m.type() === 'error') errors.push(m.text()) })
+  const externalCalls = []
+  page.on('request', (r) => { if (!r.url().startsWith(`http://127.0.0.1:${port}`) && !r.url().startsWith('data:')) externalCalls.push(r.url()) })
+  await page.goto(URL0, { waitUntil: 'load' })
+  const text = () => page.locator('body').innerText()
+  const tileLabels = () => page.locator('#numbers .num > span').allInnerTexts()
+  const tileValues = () => page.locator('#numbers .num > b').allInnerTexts()
+  const ordersSnapshot = () => page.evaluate(() => [...document.querySelectorAll('table')].at(-1).querySelectorAll('tbody tr')).then(async () => page.evaluate(() => [...[...document.querySelectorAll('table')].at(-1).querySelectorAll('tbody tr')].map((tr) => { const c = [...tr.children].map((td) => td.textContent); return [c[0], c[1], c[3], c[7]].join('|') })))
+  check('dashboard: opens in Japanese by default with the title and the four period tabs', (await page.title()) === L.ja.title && (await page.locator('#title').innerText()) === L.ja.title && (await page.locator('#tabs button').allInnerTexts()).join() === L.ja.periods.join() && (await page.locator('html').getAttribute('lang')) === 'ja')
+  check('dashboard: the language switch is at the top right with the four names, 日本語 pressed', (await page.locator('#langs button').allInnerTexts()).join() === '日本語,English,繁體中文,简体中文' && (await page.locator('#langs button[data-lang=ja]').getAttribute('aria-pressed')) === 'true' && (await page.evaluate(() => { const r = document.getElementById('langs').getBoundingClientRect(); return r.right > window.innerWidth - 40 && r.top < 80 })))
+  const jaValues = await tileValues()
+  const jaOrders = await ordersSnapshot()
+  check('dashboard: six numbers for today (made-up month): 46 visits, 2 paid, revenue with ¥ and thousands separator', jaValues.length === 6 && jaValues[0] === '46' && jaValues[3] === '2' && /^¥\d{1,3}(,\d{3})*$/.test(jaValues[4]) && /^¥\d/.test(jaValues[5]), jaValues.join(' '))
+  check('dashboard: period tabs switch the numbers (today → 7 days → 30 days → all time grow) and the daily bars (1 / 7 / 30 / 60)', await (async () => {
+    const seen = []
+    for (const [i, bars] of [[0, 1], [1, 7], [2, 30], [3, 60]]) {
+      await page.locator('#tabs button').nth(i).click()
+      seen.push([Number((await tileValues())[0].replace(/,/g, '')), await page.locator('.days > div').count(), (await page.locator('#tabs button').nth(i).getAttribute('aria-pressed')) === 'true', bars])
+    }
+    await page.locator('#tabs button').nth(0).click()
+    return seen.every((x, i) => x[1] === x[3] && x[2] && (i === 0 || x[0] > seen[i - 1][0]))
+  })())
+  for (const lang of ['ja', 'en', 'zh-Hant', 'zh-Hans']) {
+    const w = L[lang]
+    await page.locator(`#langs button[data-lang=${lang}]`).click()
+    const body = await text()
+    const labels = await tileLabels()
+    check(`dashboard (${lang}): title, period tabs, six number labels, funnel title, nine funnel steps, daily and source headings, orders heading, choice heading, privacy line — all in this language`,
+      (await page.title()) === w.title && (await page.locator('#tabs button').allInnerTexts()).join() === w.periods.join() && w.tiles.every((x, i) => labels[i] === x) && body.includes(w.funnel) && w.steps.every((x) => body.includes(x)) && body.includes(w.daily) && body.includes(w.source) && body.includes(w.orders) && body.includes(w.choice) && body.includes(w.rounds) && body.includes(w.privacy), `${labels.join('|')}`)
+    check(`dashboard (${lang}): the eleven column headings are the owner's`, (await page.locator('table').last().locator('thead th').allInnerTexts()).join() === w.cols.join(), (await page.locator('table').last().locator('thead th').allInnerTexts()).join())
+    const keysSeen = await page.evaluate(() => { const keys = JSON.parse(document.getElementById('d').textContent).keys; const b = document.body.innerText; const leaked = keys.filter((k) => k.includes('_') && new RegExp('(^|[^a-z0-9_])' + k + '([^a-z0-9_]|$)').test(b)); const bare = [...document.querySelectorAll('#app *, #tabs *')].filter((e) => e.children.length === 0 && keys.includes((e.textContent ?? '').trim())).map((e) => e.textContent.trim()); return [...leaked, ...bare] })
+    check(`dashboard (${lang}): no label key, no {placeholder}, no "undefined" shows`, keysSeen.length === 0 && !/[{}]|undefined|NaN/.test(body), keysSeen.join(' ') || body.match(/[{}]|undefined|NaN/)?.[0])
+    check(`dashboard (${lang}): the data does not change with the language (same numbers, same characters, order numbers and amounts)`, (await tileValues()).join() === jaValues.join() && (await ordersSnapshot()).join('\n') === jaOrders.join('\n'))
+    check(`dashboard (${lang}): <html lang> follows the switch and the page has no sideways scroll`, (await page.locator('html').getAttribute('lang')) === lang && (await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 1)))
+    check(`dashboard (${lang}): every order row links to the order on /ops, the status words are this language's, dates are Japan time`, await page.evaluate(() => [...[...document.querySelectorAll('table')].at(-1).querySelectorAll('tbody tr')].every((tr) => /^\/ops#o-IC-/.test(tr.querySelector('a')?.getAttribute('href') ?? '') && /^\d\d-\d\d \d\d:\d\d$/.test(tr.children[0].textContent))))
+    await page.screenshot({ path: `${SHOTS}/stats-${lang}-desktop.png`, fullPage: true })
+  }
+  // remembered: the choice survives a reload (localStorage), even in a fresh tab of the same browser
+  await page.locator('#langs button[data-lang=zh-Hans]').click()
+  await page.reload({ waitUntil: 'load' })
+  check('dashboard: the chosen language is remembered after a reload', (await page.locator('#title').innerText()) === L['zh-Hans'].title && (await page.locator('#langs button[data-lang=zh-Hans]').getAttribute('aria-pressed')) === 'true')
+  const statusWords = await page.evaluate(() => [...[...document.querySelectorAll('table')].at(-1).querySelectorAll('tbody tr')].map((tr) => tr.children[10].textContent))
+  check('dashboard (简体中文): the order statuses read 完成 / 可取消（剩N小时） / 已取消并退款', statusWords.length === 50 && statusWords.every((x) => x === '完成' || /^可取消（剩\d+小时）$/.test(x) || x === '已取消并退款') && statusWords.some((x) => x.startsWith('可取消')))
+  check('dashboard: the other shop\'s order (¥55,555) is nowhere on the page', !(await text()).includes('55,555') && !(await page.content()).includes('OTHER001'))
+  check('dashboard: the page makes no call to any other host (no analytics, no fonts, no third party)', externalCalls.length === 0, externalCalls.join(' '))
+  check('dashboard: a wrong password gets 401 and shows no number', await (async () => { const r = await fetch(URL0, { headers: { authorization: 'Basic ' + Buffer.from('o:nope').toString('base64') } }); const t = await r.text(); return r.status === 401 && !t.includes('ICHIREI') })())
+  check('dashboard: no page errors', errors.length === 0, errors.join('; '))
+  // a phone
+  const phone = await ctx.newPage()
+  await phone.setViewportSize({ width: 390, height: 844 })
+  await phone.goto(URL0, { waitUntil: 'load' })
+  check('dashboard (phone): the six numbers, the funnel and the daily bars fit without sideways scrolling of the page', await phone.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 1) && (await phone.locator('#numbers .num').count()) === 6, await phone.evaluate(() => [...document.querySelectorAll('body *')].filter((e) => e.getBoundingClientRect().right > window.innerWidth + 1 && !e.closest('.wide') && !e.closest('.days')).slice(0, 4).map((e) => e.tagName + '.' + e.className + ' ' + Math.round(e.getBoundingClientRect().right) + '/' + window.innerWidth).join(' ; ')))
+  check('dashboard (phone): the order table scrolls inside its own box instead of widening the page', await phone.evaluate(() => { const w = [...document.querySelectorAll('.wide')].at(-1); return w.scrollWidth > w.clientWidth && document.documentElement.scrollWidth <= window.innerWidth + 1 }))
+  await phone.screenshot({ path: `${SHOTS}/stats-phone.png`, fullPage: true })
+  await ctx.close()
+  child.kill()
+}
+
 await browser.close()
 console.log(failures === 0 ? '\nALL E2E CHECKS PASSED' : `\n${failures} CHECKS FAILED`)
 process.exit(failures === 0 ? 0 : 1)

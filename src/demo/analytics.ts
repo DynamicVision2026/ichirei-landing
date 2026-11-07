@@ -13,7 +13,20 @@ function makeId(): string {
   return Array.from(bytes, (b) => alphabet[b % alphabet.length]).join('')
 }
 
-export const sessionId: string = makeId()
+// One anonymous id per browser TAB (sessionStorage only — never a cookie, never sent to a third party): the dashboard counts visitors by it. Without storage it is per page load.
+function tabSessionId(): string {
+  try {
+    const k = 'ichirei-sid'
+    const had = window.sessionStorage.getItem(k)
+    if (had && /^[A-Za-z0-9_-]{16,64}$/.test(had)) return had
+    const id = makeId()
+    window.sessionStorage.setItem(k, id)
+    return id
+  } catch {
+    return makeId()
+  }
+}
+export const sessionId: string = tabSessionId()
 export type Source = 'customer' | 'harness'
 export type Choice = 'main' | 'second' | 'free'
 
@@ -35,7 +48,7 @@ export function track(event: 'chosen' | 'explain_opened', source: Source, choice
 }
 
 /** The story step of the page (engine/analytics.ts FLOW_EVENTS): codes only — the language, the question set and a known question id. Never text. */
-export type FlowEvent = 'story_opened' | 'question_shown' | 'question_switched' | 'voice_used' | 'draft_restored' | 'story_submitted' | 'followup_shown' | 'reveal_shown'
+export type FlowEvent = 'chips_done' | 'story_opened' | 'question_shown' | 'question_switched' | 'voice_used' | 'draft_restored' | 'story_submitted' | 'followup_shown' | 'reveal_shown'
 export function trackFlow(event: FlowEvent, fields: { language?: string; set?: string | null; qid?: string | null } = {}): void {
   try {
     void fetch('/api/analytics', {
@@ -71,6 +84,47 @@ export function trackShare(event: 'share_film_tap' | 'share_card_tap', role: 'se
       method: 'POST',
       headers: { 'content-type': 'application/json' },
       body: JSON.stringify({ session: sessionId, source: 'customer', event, role }),
+      keepalive: true,
+    }).catch(() => {})
+  } catch {
+    // analytics must never get in the way
+  }
+}
+
+/** A page view for the owner dashboard (once per tab session): the page language and the referrer's HOST only (the server turns it into a bucket and keeps only the bucket). */
+export function trackPageView(language: string): void {
+  try {
+    const flag = 'ichirei-pv'
+    if (window.sessionStorage.getItem(flag)) return
+    window.sessionStorage.setItem(flag, '1')
+  } catch {
+    // (without storage every load counts as a visit)
+  }
+  try {
+    let ref = ''
+    try {
+      ref = document.referrer ? new URL(document.referrer).hostname : ''
+    } catch {
+      ref = ''
+    }
+    void fetch('/api/analytics', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ session: sessionId, source: 'customer', event: 'page_view', language, ref, own: window.location.hostname }),
+      keepalive: true,
+    }).catch(() => {})
+  } catch {
+    // analytics must never get in the way
+  }
+}
+
+/** The receiver opened the envelope of a gift: the gift link goes to the server only to be hashed (never stored as it is). */
+export function trackReceiverOpened(token: string): void {
+  try {
+    void fetch('/api/analytics', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ session: sessionId, source: 'customer', event: 'receiver_opened', gift: token }),
       keepalive: true,
     }).catch(() => {})
   } catch {

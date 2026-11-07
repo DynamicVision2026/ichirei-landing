@@ -1,5 +1,6 @@
 import { Suspense, lazy, useEffect, type ReactNode } from 'react'
 import { useLanguage } from '../useLanguage'
+import { trackPageView } from '../demo/analytics'
 import { DOCUMENT, REVEAL_LANGS, TEXT, type RevealLang } from './copy'
 import { Angles, Closing, Dock, Faq, Footer, Gifts, Moments, Philosophy, Reviews, Steps, StoryShape, Strip } from './Sections'
 import Hero from './Hero'
@@ -33,6 +34,12 @@ export default function RevealPage() {
   const soon = useComingSoon()
   const woodOnSale = !!sizes && sizes.some((p) => SHIPS[p] && !soon.includes(p))
   const memorial = useMemorialSelected() // 偲ぶ picked in the form → the copy says two cards, no free pick
+
+  // the owner dashboard's page view: once per tab session, no cookie, no third party
+  useEffect(() => {
+    trackPageView(lang)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
   // A visitor whose stored language is Simplified Chinese (from /demo) gets the page in Traditional Chinese.
   useEffect(() => {

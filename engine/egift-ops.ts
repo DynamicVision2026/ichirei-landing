@@ -21,16 +21,18 @@ export interface OrderIndexEntry {
   ship_to: string
   memorial: boolean
   delivery_date: string
+  /** The anonymous browser session that made the order (a random id, never anything typed): links an order to its source in /ops/stats. */
+  session?: string
 }
 
 export const ordersIndexPath = (now: Date): string => `ops/orders-${analyticsDay(now)}.jsonl`
 export const EGIFT_INDEX_PATH = 'ops/egift.jsonl'
 
 /** Best effort: the owner's list must never be a reason for an order to fail. */
-export async function recordOrderIndex(store: OrderStore, record: OrderRecord, now: Date): Promise<void> {
+export async function recordOrderIndex(store: OrderStore, record: OrderRecord, now: Date, session?: string | null): Promise<void> {
   try {
     const p = record.production
-    const entry: OrderIndexEntry = { ts: now.toISOString(), order_ref: record.order_ref, token: record.gift_token ?? null, size_code: p.size_code ?? '', ship_to: p.ship_to ?? 'none', memorial: p.certificate.memorial === true, delivery_date: p.delivery_date }
+    const entry: OrderIndexEntry = { ts: now.toISOString(), order_ref: record.order_ref, token: record.gift_token ?? null, size_code: p.size_code ?? '', ship_to: p.ship_to ?? 'none', memorial: p.certificate.memorial === true, delivery_date: p.delivery_date, ...(session ? { session } : {}) }
     await store.appendJsonl(ordersIndexPath(now), entry)
     if (p.ship_to === 'egift' && record.gift_token) await store.appendJsonl(EGIFT_INDEX_PATH, { ts: now.toISOString(), token: record.gift_token })
   } catch (err) {

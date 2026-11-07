@@ -127,6 +127,14 @@ export default function Composer({ story, onStoryChange, onSubmit, copy, lang, c
   // Never cut silently: past STORY_MAX the text stays exactly as pasted, the counter turns red, one line says why, and the button waits.
   const over = n > STORY_MAX
   const ready = contextComplete(context) && longEnough && !over
+  // the owner dashboard's funnel: the relationship and the purpose are chosen (once per page load)
+  const chipsDone = useRef(false)
+  useEffect(() => {
+    if (!chipsDone.current && contextComplete(context)) {
+      chipsDone.current = true
+      trackFlow('chips_done', { language: context.language })
+    }
+  }, [context])
   const set = questionSetOf(context)
   const questions = set ? questionsOf(set, lang) : []
   const question = questions.find((q) => q.id === questionId) ?? null

@@ -151,7 +151,7 @@ const gift = { relationship: 'parent_mother', direction: 'up', occasion: 'parent
 {
   const now = new Date('2026-10-30T03:00:00Z')
   const session = 'abcdefghijklmnopqrstuvwx'
-  check('(5) the eight story-step events are accepted from the browser', FLOW_EVENTS.join() === 'story_opened,question_shown,question_switched,voice_used,draft_restored,story_submitted,followup_shown,reveal_shown' && FLOW_EVENTS.every((e) => (CLIENT_EVENTS as readonly string[]).includes(e)) && FLOW_EVENTS.every((e) => parseClientEvent({ session, event: e }, now)?.event === e))
+  check('(5) the nine story-step events (the eight and chips_done) are accepted from the browser', FLOW_EVENTS.join() === 'chips_done,story_opened,question_shown,question_switched,voice_used,draft_restored,story_submitted,followup_shown,reveal_shown' && FLOW_EVENTS.every((e) => (CLIENT_EVENTS as readonly string[]).includes(e)) && FLOW_EVENTS.every((e) => parseClientEvent({ session, event: e }, now)?.event === e))
   const e = parseClientEvent({ session, source: 'customer', event: 'question_shown', language: 'ja', set: 'up', qid: 'up-habit', story: '秘密の物語', text: 'x', kanji: '証' }, now) as Record<string, unknown> | null
   check('(5) an event holds codes only — language, question set, a known question id; any text, story or character sent along is dropped', !!e && Object.keys(e).sort().join() === 'event,language,qid,session,set,source,ts' && e.language === 'ja' && e.set === 'up' && e.qid === 'up-habit' && !JSON.stringify(e).includes('秘密') && !JSON.stringify(e).includes('証'))
   const bad = parseClientEvent({ session, event: 'question_shown', language: 'xx', set: 'nonsense', qid: 'free text' }, now) as Record<string, unknown> | null
