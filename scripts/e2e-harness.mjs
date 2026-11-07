@@ -1061,6 +1061,39 @@ const mockPage = async (browser, { onExplain, result, order, track } = {}) => {
     await shot(page, 'shots/gift-locked-ja.png')
     await ctx.close()
   }
+  /** The e-card the film ends on (2026-11-07): the paper card on the dark frame with the character, reading, who line, poem and seal; the poem vertical for 短歌 / 俳句 and horizontal otherwise; at least 4.4% of the frame's width; the sound button; muted. */
+  async function checkEndCard(page, label, { vertical, lines, quietInk = false, shot }) {
+    await page.evaluate(() => window.__ichireiFilm.seek(window.__ichireiFilm.total - 2))
+    await page.waitForTimeout(150)
+    const r = await page.evaluate(() => {
+      const q = (sel) => document.querySelector(sel)
+      const frame = q('[data-testid=film]').getBoundingClientRect()
+      const card = q('[data-card]')
+      const cb = card.getBoundingClientRect()
+      const poem = q('[data-testid=film-poem]')
+      const pr = poem?.getBoundingClientRect()
+      const cs = poem ? getComputedStyle(poem) : null
+      const lineEls = [...document.querySelectorAll('[data-testid=film-poem-line]')]
+      const xs = lineEls.map((e) => e.getBoundingClientRect().left)
+      const ys = lineEls.map((e) => e.getBoundingClientRect().top)
+      const kanji = q('[data-testid=film-card-kanji]')
+      const kb = kanji.getBoundingClientRect()
+      const seal = q('[data-card-seal]').getBoundingClientRect()
+      return {
+        opacity: Number(getComputedStyle(card).opacity), widthRatio: cb.width / frame.width, aspect: cb.height / cb.width, inside: cb.left >= frame.left - 1 && cb.right <= frame.right + 1 && cb.top >= frame.top - 1 && cb.bottom <= frame.bottom + 1,
+        poemVertical: poem?.getAttribute('data-poem-vertical'), writing: cs?.writingMode, fontRatio: cs ? parseFloat(cs.fontSize) / frame.width : 0, lines: lineEls.length,
+        nowrap: lineEls.every((e) => getComputedStyle(e).whiteSpace === 'nowrap'), oneRow: lineEls.length > 0 && lineEls.every((e) => e.getBoundingClientRect().height < parseFloat(getComputedStyle(e).fontSize) * 9),
+        rightToLeft: xs.every((x, i) => i === 0 || x < xs[i - 1] - 1), topToBottom: ys.every((y, i) => i === 0 || y > ys[i - 1] - 1),
+        poemInCard: !!pr && pr.left >= cb.left && pr.right <= cb.right && pr.bottom <= cb.bottom, noSealClash: !pr || pr.right < seal.left || pr.bottom < seal.top,
+        glyph: kanji.textContent, kanjiRatio: parseFloat(getComputedStyle(kanji).fontSize) / cb.width, kanjiColour: getComputedStyle(kanji).color, kanjiInCard: kb.left >= cb.left && kb.right <= cb.right,
+        sound: q('[data-testid=film-sound]')?.textContent ?? '', muted: q('[data-testid=film-music]')?.muted, black: Number(getComputedStyle(q('[data-black]')).opacity),
+      }
+    })
+    check(`${label}: the film ends on the e-card — a paper card, 74% of the frame wide and 5:8, inside the frame, the character about 45% of its width${quietInk ? ' in ink (no red)' : ' in cinnabar'}, not yet black`, r.opacity > 0.99 && Math.abs(r.widthRatio - 0.74) < 0.01 && Math.abs(r.aspect - 1.6) < 0.02 && r.inside && Math.abs(r.kanjiRatio - 0.45) < 0.01 && r.kanjiInCard && r.black === 0 && (quietInk ? /rgb\((\d+), (\d+), (\d+)/.exec(r.kanjiColour).slice(1).every((x) => Number(x) < 60) : r.kanjiColour === 'rgb(192, 57, 43)'), JSON.stringify(r))
+    check(`${label}: the poem is ${vertical ? 'vertical (縦書き): one line per column, right to left, never wrapped' : 'horizontal and centred, one line per line'} — ${lines} lines, at least 4.4% of the frame's width, inside the card, clear of the seal`, r.lines === lines && (vertical ? r.poemVertical === 'yes' && String(r.writing).startsWith('vertical') && r.nowrap && r.rightToLeft : r.poemVertical === 'no' && !String(r.writing).startsWith('vertical') && r.topToBottom) && r.fontRatio >= 0.044 && r.poemInCard && r.noSealClash, JSON.stringify(r))
+    check(`${label}: the film starts muted and the sound button is at its corner (${r.sound})`, r.muted === true && r.sound.length > 0)
+    if (shot) await page.locator('[data-testid=film]').screenshot({ path: shot }).catch(() => {})
+  }
   function seenHas(urls) { return urls.some((u) => /\/render|\/picture\/|\/scroll\./.test(u)) }
   async function pageUrls(page) { return page.evaluate(() => performance.getEntriesByType('resource').map((e) => e.name)) }
 
@@ -1085,7 +1118,8 @@ const mockPage = async (browser, { onExplain, result, order, track } = {}) => {
     await shot(page, 'shots/gift-letter-ja.png')
     await T(page, 'gift-to-film').click()
     await page.waitForSelector('[data-testid=film][data-ready=yes]', { timeout: 8000 })
-    check('film: the 30-second film plays on the receiver\'s page (no share button — the receiver has nothing to share)', (await step(page)) === 'film' && (await page.locator('[data-testid=animation-share]').count()) === 0)
+    check('film: the 34-second film plays on the receiver\'s page (no share button — the receiver has nothing to share)', (await step(page)) === 'film' && (await page.locator('[data-testid=animation-share]').count()) === 0)
+    await checkEndCard(page, 'film end (ja, 短歌)', { vertical: true, lines: 5, shot: 'shots/film-card-ja.png' })
     await page.evaluate(() => window.__ichireiFilm.seek(window.__ichireiFilm.total))
     await T(page, 'gift-reveal').waitFor({ timeout: 6000 })
     const rv = await page.evaluate(() => ({ colour: getComputedStyle(document.querySelector('[data-testid=gift-glyph]')).color, size: parseFloat(getComputedStyle(document.querySelector('[data-testid=gift-glyph]')).fontSize) }))
@@ -1201,7 +1235,7 @@ const mockPage = async (browser, { onExplain, result, order, track } = {}) => {
 
   // zh-Hant and en
   for (const [lang, locale, v] of [
-    ['zh-Hant', 'zh-TW', { language: 'zh-Hant', glyph: '備', reading: 'bèi', who: '總是比別人先一步準備好的人。' }],
+    ['zh-Hant', 'zh-TW', { language: 'zh-Hant', glyph: '備', reading: 'bèi', who: '總是比別人先一步準備好的人。', poem: { type: 'tang', lines: ['晨光入廚房', '一花覆盒蓋', '無言卻在側', '至今仍思量'], reading: '' } }],
     ['en', 'en-US', { language: 'en', glyph: '備', reading: 'sonaeru', who: 'Someone who is ready before you ask.', poem: { type: 'en', lines: ['Each morning, a flower set', 'beside the cup.'], reading: '' } }],
   ]) {
     const want = lang === 'en'
@@ -1225,6 +1259,7 @@ const mockPage = async (browser, { onExplain, result, order, track } = {}) => {
       await page.screenshot({ path: `shots/gift-letter-${lang}.png` }).catch(() => {})
       await T(page, 'gift-to-film').click()
       await page.waitForSelector('[data-testid=film][data-ready=yes]', { timeout: 8000 })
+      await checkEndCard(page, `film end (${lang}, ${lang === 'en' ? 'English verse' : '漢詩'})`, { vertical: false, lines: lang === 'en' ? 2 : 4, shot: `shots/film-card-${lang}.png` })
       await page.evaluate(() => window.__ichireiFilm.seek(window.__ichireiFilm.total))
       await T(page, 'gift-reveal').waitFor({ timeout: 6000 })
       await page.screenshot({ path: `shots/gift-reveal-${lang}.png` }).catch(() => {})
@@ -2602,7 +2637,7 @@ const SECTION_ORDER = ['.hero', '.strip', '.philo', '#shape', '#angles', '#write
     await p.route('**/api/animation/AN-testtesttesttesttest', (r) => r.fulfill({ json: view({ purpose }) }))
     await p.goto('http://localhost:5173/a/AN-testtesttesttesttest', { waitUntil: 'networkidle' })
     await p.waitForSelector('[data-testid=film-still]')
-    const still = await p.evaluate(() => ({ quiet: document.querySelector('[data-testid=film-still]').dataset.quiet, kanji: getComputedStyle(document.querySelector('.an-kanji-still')).color }))
+    const still = await p.evaluate(() => ({ quiet: document.querySelector('[data-testid=film-still]').dataset.quiet, kanji: getComputedStyle(document.querySelector('.an-card-kanji')).color }))
     check(`film (${purpose}): the character is ${quiet ? 'ink, never cinnabar (data-quiet=yes)' : 'cinnabar'}`, quiet ? still.quiet === 'yes' && still.kanji !== 'rgb(192, 57, 43)' && /^rgb\((\d+), (\d+), (\d+)\)$/.test(still.kanji) && Number(still.kanji.match(/\d+/g)[0]) < 60 : still.quiet === 'no' && still.kanji === 'rgb(192, 57, 43)', JSON.stringify(still))
     check(`no page errors (run 13c, film ${purpose})`, errs.length === 0, errs.join('; '))
     await p.close()

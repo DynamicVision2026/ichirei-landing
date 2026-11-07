@@ -27,6 +27,9 @@ export interface PageCopy {
   deferred: string
   play: string
   pause: string
+  /** The small sound button on the film: shown while the film is muted / while its music plays. */
+  soundOn: string
+  soundOff: string
 }
 
 export const COPY: Record<PageLang, PageCopy> = {
@@ -48,6 +51,8 @@ export const COPY: Record<PageLang, PageCopy> = {
     deferred: '映像は明日お届けします',
     play: '再生',
     pause: '一時停止',
+    soundOn: '音を出す',
+    soundOff: '音を消す',
   },
   'zh-Hant': {
     title: '一字禮 — 你的故事',
@@ -67,6 +72,8 @@ export const COPY: Record<PageLang, PageCopy> = {
     deferred: '影片將於明天送達',
     play: '播放',
     pause: '暫停',
+    soundOn: '開啟聲音',
+    soundOff: '關閉聲音',
   },
   en: {
     title: 'ICHIREI — your story',
@@ -86,5 +93,7 @@ export const COPY: Record<PageLang, PageCopy> = {
     deferred: 'Your film will arrive tomorrow',
     play: 'Play',
     pause: 'Pause',
+    soundOn: 'Sound on',
+    soundOff: 'Sound off',
   },
 }

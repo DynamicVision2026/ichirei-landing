@@ -1,4 +1,4 @@
-// The story film: a 30-second film that RETELLS the customer's own story in four short scenes and ends with the chosen character as the answer.
+// The story film: a 34-second film (the four scenes, then the character on a paper e-card with its poem, with quiet music) that RETELLS the customer's own story in four short scenes and ends with the chosen character as the answer.
 // This module is the SCRIPT side. One small model call (engine/film-prompt.md — the writing rules live THERE) returns four lines and four scene
 // IDs; the CODE below checks them (the referee) and, if they fail twice, uses a fallback script. The film itself is played by the page from the
 // saved JSON with a fixed template (src/animation/): no model call happens when it is played. A film is never allowed to block an order:

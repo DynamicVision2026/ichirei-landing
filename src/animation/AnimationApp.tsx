@@ -3,14 +3,16 @@ import { cleanReading } from '../order/reading.ts'
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { COPY, pageLang, type PageCopy } from './copy.ts'
 import { clamp, frameAt, makeFilmTimeline, phrases, type FilmTimeline } from '../order/film-timeline.ts'
+import { CARD_ASPECT, CARD_RISE_U, CARD_WIDTH, cardLayout, isVerticalPoemType } from '../order/film-card.ts'
+import { MUSIC_FILE, moodOf, musicGain } from '../order/film-music.ts'
 import type { AnimationView } from './types.ts'
 import BuyerPage from './BuyerPage.tsx'
 import { BUYER_COPY } from './buyer-copy.ts'
 import '../fonts.css'
 import './animation.css'
 
-// The story film page /a/<id>: a 30-second film that RETELLS the customer's own story in four short scenes and ends with the chosen character as
-// the answer. Fixed template, the same for every order; the script (four lines, four picture descriptions) was written once when the order was made and
+// The story film page /a/<id>: a 34-second film (41 s for a remembrance) that RETELLS the customer's own story in four short scenes and ends with the chosen character as
+// the answer, on a paper e-card with its reading, the poem and a small seal. Fixed template, the same for every order; the script (four lines, four picture descriptions) was written once when the order was made and
 // the four pictures were drawn once, on the first open (POST /api/film/<id>/render) — both are saved, nothing is generated when the film is played. The timing and every frame's maths are src/order/film-timeline.ts; this file draws them.
 // prefers-reduced-motion gets a still page (the four scenes, then the character). While the script or the pictures are still being made the page waits quietly.
 
@@ -168,6 +170,14 @@ export function Film({ view, film, copy, giftMode = false, onEnd }: { view: Anim
   const t = useRef(0)
   const raf = useRef(0)
   const last = useRef(0)
+  // quiet music under the film (public/music): the film starts muted (a phone blocks sound before a tap); the sound button turns it on; the choice is kept for this session only
+  const audio = useRef<HTMLAudioElement>(null)
+  const readSound = (): boolean => {
+    try { return sessionStorage.getItem('ichirei-film-sound') === 'on' } catch { return false }
+  }
+  const [sound, setSound] = useState(false)
+  const soundWanted = useRef(readSound())
+  const poemLines = useMemo(() => (view.poem?.lines ?? []).map((l) => l.replace(/\s+/g, ' ').trim()).filter(Boolean), [view.poem])
 
   // the frame is as large as a 9:16 box can be in the space above the buttons
   useLayoutEffect(() => {
@@ -202,7 +212,7 @@ export function Film({ view, film, copy, giftMode = false, onEnd }: { view: Anim
     (sec: number) => {
       const root = frame.current
       if (!root) return
-      const f = frameAt(sec, tl, film.lines)
+      const f = frameAt(sec, tl, film.lines, poemLines.length)
       root.querySelectorAll<HTMLElement>('[data-scene]').forEach((el, i) => {
         const s = f.scenes[i]
         if (!s) return
@@ -229,12 +239,34 @@ export function Film({ view, film, copy, giftMode = false, onEnd }: { view: Anim
         if (el) el.style.opacity = String(v)
       }
       set('[data-reading]', f.final.reading)
-      set('[data-who]', f.final.who)
-      set('[data-seal]', f.final.seal)
+      // the e-card: it settles (fade and a 12 px rise), then its parts come one after another
+      const card = root.querySelector<HTMLElement>('[data-card]')
+      if (card) {
+        card.style.opacity = String(f.card.opacity)
+        card.style.transform = `translateY(calc(var(--u) * ${(CARD_RISE_U * (1 - f.card.rise)).toFixed(3)}))`
+      }
+      set('[data-card-reading]', f.card.reading)
+      set('[data-card-rule]', f.card.rule)
+      set('[data-card-who]', f.card.who)
+      set('[data-card-seal]', f.card.seal)
+      root.querySelectorAll<HTMLElement>('[data-card-line]').forEach((el, i) => { el.style.opacity = String(f.card.poem[i] ?? 0) })
+      set('[data-black]', f.black)
+      // a quiet film's light frame turns to the dark ink frame as the card comes
+      if (root.dataset.quiet === 'yes') {
+        const k = f.frameDark
+        const mix = (a: number, b: number) => Math.round(a + (b - a) * k)
+        root.style.setProperty('--frame', `rgb(${mix(207, 26)}, ${mix(198, 20)}, ${mix(177, 16)})`)
+      }
+      // the music follows the picture's clock: its volume is the fade in and the fade out; a drift of more than a third of a second is corrected
+      const au = audio.current
+      if (au) {
+        au.volume = clamp(musicGain(sec, tl.total))
+        if (!au.paused && Math.abs(au.currentTime - sec) > 0.35) au.currentTime = Math.min(sec, Math.max(0, (au.duration || tl.total) - 0.05))
+      }
       const bar = root.querySelector<HTMLElement>('[data-progress]')
       if (bar) bar.style.width = `${f.progress * 100}%`
     },
-    [tl, film.lines, reducedAtStart, forcePlay],
+    [tl, film.lines, reducedAtStart, forcePlay, poemLines.length],
   )
 
   const tick = useCallback(
@@ -245,6 +277,7 @@ export function Film({ view, film, copy, giftMode = false, onEnd }: { view: Anim
       if (t.current >= tl.total) {
         setPlaying(false)
         setClock(tl.total)
+        audio.current?.pause()
         return
       }
       raf.current = requestAnimationFrame(tick)
@@ -257,12 +290,31 @@ export function Film({ view, film, copy, giftMode = false, onEnd }: { view: Anim
     setPlaying(true)
     cancelAnimationFrame(raf.current)
     raf.current = requestAnimationFrame(tick)
+    const au = audio.current
+    if (au) {
+      try { au.currentTime = Math.min(t.current, Math.max(0, (au.duration || tl.total) - 0.05)) } catch { /* not loaded yet: it starts from the top */ }
+      au.muted = !soundWanted.current
+      // a muted film may start by itself; if the phone refuses sound without a tap it simply stays muted
+      void au.play().catch(() => { au.muted = true; soundWanted.current = false; setSound(false) })
+      if (soundWanted.current) setSound(true)
+    }
   }, [tick, tl.total])
   const pause = useCallback(() => {
     cancelAnimationFrame(raf.current)
     setPlaying(false)
     setClock(t.current)
+    audio.current?.pause()
   }, [])
+  const toggleSound = useCallback(() => {
+    const au = audio.current
+    const next = !soundWanted.current
+    soundWanted.current = next
+    setSound(next)
+    try { sessionStorage.setItem('ichirei-film-sound', next ? 'on' : 'off') } catch { /* the choice is simply not kept */ }
+    if (!au) return
+    au.muted = !next
+    if (next && playing) void au.play().catch(() => { au.muted = true; soundWanted.current = false; setSound(false) })
+  }, [playing])
   const replay = useCallback(() => {
     t.current = 0
     render(0)
@@ -291,10 +343,11 @@ export function Film({ view, film, copy, giftMode = false, onEnd }: { view: Anim
   // a seam for the tests: seek to a moment, play, pause (nothing else uses it)
   useEffect(() => {
     ;(window as unknown as { __ichireiFilm?: unknown }).__ichireiFilm = {
-      seek: (s: number) => { cancelAnimationFrame(raf.current); setPlaying(false); t.current = clamp(s, 0, tl.total); render(t.current) },
+      seek: (s: number) => { cancelAnimationFrame(raf.current); setPlaying(false); audio.current?.pause(); t.current = clamp(s, 0, tl.total); render(t.current); setClock(t.current) },
       play,
       pause,
       get time() { return t.current },
+      get muted() { return audio.current?.muted ?? true },
       total: tl.total,
     }
     return () => { delete (window as unknown as { __ichireiFilm?: unknown }).__ichireiFilm }
@@ -350,16 +403,12 @@ export function Film({ view, film, copy, giftMode = false, onEnd }: { view: Anim
         <div className="an-reading notranslate" translate="no" data-reading data-testid="film-reading">
           {readingLine(view)}
         </div>
-        <div className="an-who" data-who data-testid="film-who">
-          {phrases(view.who).map((p, i) => (
-            <span key={i}>{p}</span>
-          ))}
-        </div>
-        <div className="an-seal" data-seal data-testid="film-seal" aria-hidden="true">
-          <b>{copy.sealText.join('')}</b>
-          <small>ICHIREI</small>
-        </div>
       </div>
+      <EndCard view={view} copy={copy} poemLines={poemLines} />
+      <div className="an-black" data-black />
+      <button type="button" className="an-sound" data-testid="film-sound" aria-pressed={sound} onClick={(e) => { e.stopPropagation(); toggleSound() }}>
+        {sound ? copy.soundOff : copy.soundOn}
+      </button>
       <div className="an-progress" data-progress />
     </>
   )
@@ -367,6 +416,7 @@ export function Film({ view, film, copy, giftMode = false, onEnd }: { view: Anim
   return (
     <>
       <div className={`an-wrap${still ? ' an-wrap-still' : ''}`} ref={wrap}>
+        {!still && <audio ref={audio} src={`/music/${MUSIC_FILE[moodOf(inkOnly(view))]}`} preload="auto" muted playsInline data-testid="film-music" data-mood={moodOf(inkOnly(view))} />}
         {still ? (
           <div className={`an-still-page${inkOnly(view) ? ' an-memorial' : ''}`} data-quiet={inkOnly(view) ? 'yes' : 'no'} style={{ ['--u' as string]: '3.6px' }} data-testid="film-still">
             {film.lines.map((line, i) => (
@@ -376,10 +426,7 @@ export function Film({ view, film, copy, giftMode = false, onEnd }: { view: Anim
               </section>
             ))}
             <section className="an-still-final">
-              <div className="an-kanji an-kanji-still notranslate" translate="no" data-testid="film-kanji">{view.glyph}</div>
-              <div className="an-reading an-reading-still notranslate" translate="no">{readingLine(view)}</div>
-              <div className="an-who an-who-still">{phrases(view.who).map((p, i) => <span key={i}>{p}</span>)}</div>
-              <div className="an-seal an-seal-still"><b>{copy.sealText.join('')}</b><small>ICHIREI</small></div>
+              <EndCard view={view} copy={copy} poemLines={poemLines} still />
             </section>
           </div>
         ) : (
@@ -437,6 +484,30 @@ export function Film({ view, film, copy, giftMode = false, onEnd }: { view: Anim
         </p>
       </div>
     </>
+  )
+}
+
+/** The e-card the film ends on: a paper card with the character, its reading, a short gold rule, the "who they are" line, the poem and a small seal. Its geometry is src/order/film-card.ts (the same numbers the saved film uses). */
+function EndCard({ view, copy, poemLines, still = false }: { view: AnimationView; copy: PageCopy; poemLines: string[]; still?: boolean }) {
+  const L = cardLayout('film')
+  const vertical = isVerticalPoemType(view.poem?.type)
+  const pct = (x: number) => `${(x * 100).toFixed(2)}%`
+  const en = view.language === 'en'
+  return (
+    <div className={`an-card${still ? ' an-card-still' : ''}`} data-card data-testid="film-card" data-card-aspect={CARD_ASPECT} style={{ width: `calc(var(--u) * ${CARD_WIDTH * 100})`, height: `calc(var(--u) * ${CARD_WIDTH * 100 * CARD_ASPECT})` }}>
+      <div className="an-card-kanji notranslate" translate="no" data-testid="film-card-kanji" style={{ top: pct(L.charY), fontSize: `calc(var(--u) * ${L.charSize * CARD_WIDTH * 100})` }}>{view.glyph}</div>
+      <div className="an-card-reading notranslate" translate="no" data-card-reading data-testid="film-card-reading" style={{ top: pct(L.readingY) }}>{readingLine(view)}</div>
+      <i className="an-card-rule" data-card-rule style={{ top: pct(L.ruleY) }} />
+      <div className="an-card-who" data-card-who data-testid="film-who" style={{ top: pct(L.whoTop ?? 0.455) }}>
+        {phrases(view.who).map((p, i) => <span key={i}>{p}</span>)}
+      </div>
+      {poemLines.length > 0 && (
+        <div className={`an-card-poem ${vertical ? 'an-poem-v' : 'an-poem-h'}${en ? ' an-poem-en' : ''}`} data-testid="film-poem" data-poem-type={view.poem?.type ?? ''} data-poem-vertical={vertical ? 'yes' : 'no'} style={{ top: pct(L.poemTop) }}>
+          {poemLines.map((l, i) => <p key={i} className="notranslate" translate="no" data-card-line={i} data-testid="film-poem-line">{l}</p>)}
+        </div>
+      )}
+      <div className="an-card-seal" data-card-seal data-testid="film-seal" aria-hidden="true"><b>{copy.sealText.join('')}</b></div>
+    </div>
   )
 }
 

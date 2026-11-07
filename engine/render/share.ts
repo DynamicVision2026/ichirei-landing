@@ -8,7 +8,9 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import sharp from 'sharp'
 import { clamp } from '../../src/order/film-timeline.ts'
-import { INK, QUIET, U, VIDEO_FPS, VIDEO_H, VIDEO_W, blend, lineLayer, run, textBlock, type Layer } from './film-video.ts'
+import { INK, QUIET, U, VIDEO_FPS, VIDEO_H, VIDEO_W, blend, lineLayer, run, textBlock, type Layer } from './film-draw.ts'
+import { makeEndCard, toBlack, type CardState } from './endcard.ts'
+import { audioPlan, moodOf } from './film-audio.ts'
 import { isVerticalPoem, verticalCells } from './card.ts'
 import { fontObject, fontsFor } from './fonts.ts'
 import { textPaths, wrapText } from './text.ts'
@@ -25,17 +27,29 @@ const window = (t: number, a: number, b: number, fi: number, fo: number) => ramp
 
 export const SHARE_REL = 2.8
 export const SHARE_PIC = 3.6
-export const SHARE_CHAR = 4.8
-export const SHARE_POEM_LINE = 0.8
-export const SHARE_POEM_HOLD = 3
+/** The dark character section: the character revealed on the dark frame, leaving as the card comes. */
+export const SHARE_CHAR = 4.0
+export const SHARE_CARD_FADE = 0.8
+/** The card's parts, from the moment it starts to come: the reading, the rule, then the poem line by line over SHARE_POEM_SPAN seconds. */
+export const SHARE_CARD_READING = 0.9
+export const SHARE_CARD_RULE = 1.5
+export const SHARE_POEM_FROM = 2.1
+export const SHARE_POEM_SPAN = 4.5
+/** The finished card holds still this long before the end (the last second of it fades to black). */
+export const SHARE_HOLD = 5
+export const SHARE_FADE_OUT = 1
 
 export function shareTimeline(pictures: number, hasRelation: boolean, poemLines: number) {
   const rel = hasRelation ? SHARE_REL : 0
   const picStart = rel
   const charStart = picStart + pictures * SHARE_PIC
-  const poemStart = charStart + SHARE_CHAR
-  const total = poemLines > 0 ? poemStart + poemLines * SHARE_POEM_LINE + SHARE_POEM_HOLD : charStart + SHARE_CHAR
-  return { rel, picStart, charStart, poemStart, total }
+  /** the card starts to settle just before the character has left */
+  const cardStart = charStart + SHARE_CHAR - 0.2
+  const poemStart = cardStart + SHARE_POEM_FROM
+  const done = poemStart + SHARE_POEM_SPAN
+  const total = Math.round((done + SHARE_HOLD) * 1000) / 1000
+  void poemLines
+  return { rel, picStart, charStart, cardStart, poemStart, done, total }
 }
 
 /** Every piece of TEXT the share film and the poem card draw — and nothing else is ever drawn as text: the relationship line, the character, its reading and the poem. */
@@ -48,10 +62,12 @@ export interface ShareFilm {
   seconds: number
   frames: number
   renderMs: number
+  /** which track runs under it (null = made without sound) */
+  music: 'warm' | 'quiet' | null
 }
 
 /** Render the share film. `opts.seconds` cuts it short (tests); a washi (null) picture is drawn as plain washi. */
-export async function makeShareFilm(a: ShareArtwork, opts: { fps?: number; ffmpeg?: string; seconds?: number; onFrame?: (t: number, rgba: Buffer) => void } = {}): Promise<ShareFilm> {
+export async function makeShareFilm(a: ShareArtwork, opts: { fps?: number; ffmpeg?: string; seconds?: number; music?: boolean; onFrame?: (t: number, rgba: Buffer) => void } = {}): Promise<ShareFilm> {
   const t0 = Date.now()
   const fps = opts.fps ?? VIDEO_FPS
   const c = a.quiet ? QUIET : INK
@@ -80,26 +96,28 @@ export async function makeShareFilm(a: ShareArtwork, opts: { fps?: number; ffmpe
     pre.push({ data: await img.removeAlpha().raw().toBuffer(), w, h })
   }
 
-  // the relationship line, the character, its reading and the poem lines
+  // the relationship line (first screen), the character and its reading (dark section), and the e-card
   const relSize = (en ? 5.6 : 5.2) * U
   const rel = a.relation ? await textBlock(body, a.relation, relSize, relSize * 1.6, VIDEO_W * 0.8, VIDEO_W * 0.1, VIDEO_H * 0.46, { ...c, gold: c.ivory }, { centre: true }) : null
   const kanjiSize = 44.7 * U
   const kanjiPng = await sharp(Buffer.from(`<svg xmlns="http://www.w3.org/2000/svg" width="${Math.ceil(kanjiSize * 1.2)}" height="${Math.ceil(kanjiSize * 1.2)}">${textPaths(hero, a.glyph, kanjiSize, kanjiSize * 0.6, kanjiSize * 0.99, c.kanji, 'middle', f.stroke).svg}</svg>`)).ensureAlpha().raw().toBuffer({ resolveWithObject: true })
   const kanji: Layer = { data: kanjiPng.data, w: kanjiPng.info.width, h: kanjiPng.info.height, x: Math.round(VIDEO_W / 2 - kanjiPng.info.width / 2), y: Math.round(VIDEO_H * 0.44 - kanjiPng.info.height / 2) }
   const reading = await lineLayer(body, a.reading, 2.9 * U, VIDEO_W / 2, VIDEO_H * 0.6, c.muted, 0.3 * 2.9 * U)
-  const poemSize = (en ? 4.4 : 4.2) * U
-  const poemGap = poemSize * (en ? 1.7 : 1.95)
-  const poemLayers: Layer[] = []
-  const wrapped = poem.flatMap((l) => (en ? wrapText(body, l, poemSize, VIDEO_W * 0.8) : [l]))
-  const top = VIDEO_H / 2 - (wrapped.length * poemGap) / 2
-  for (let i = 0; i < wrapped.length; i++) poemLayers.push(await textBlock(body, wrapped[i], poemSize, poemGap, VIDEO_W * 0.84, VIDEO_W * 0.08, top + i * poemGap, { ...c, gold: c.ivory }, { centre: true }))
+  const card = await makeEndCard({ language: a.language, glyph: a.glyph, reading: a.reading, poem: a.poem, poemType: a.poemType, quiet: a.quiet, relation: a.relation }, 'share')
 
-  const base = Buffer.alloc(VIDEO_W * VIDEO_H * 4)
-  for (let i = 0; i < base.length; i += 4) { base[i] = c.frame[0]; base[i + 1] = c.frame[1]; base[i + 2] = c.frame[2]; base[i + 3] = 255 }
+  const plain = (rgb: [number, number, number]): Buffer => {
+    const b = Buffer.alloc(VIDEO_W * VIDEO_H * 4)
+    for (let i = 0; i < b.length; i += 4) { b[i] = rgb[0]; b[i + 1] = rgb[1]; b[i + 2] = rgb[2]; b[i + 3] = 255 }
+    return b
+  }
+  const base = plain(c.frame)
+  // the e-card always sits on the dark ink frame: a quiet film's light frame darkens as the card comes
+  const darkBase = a.quiet ? plain(INK.frame) : base
 
   const dir = await mkdtemp(join(tmpdir(), 'ichirei-share-'))
   const file = join(dir, 'share.mp4')
-  const ff = run(opts.ffmpeg ?? 'ffmpeg', ['-y', '-loglevel', 'error', '-f', 'rawvideo', '-pix_fmt', 'rgba', '-s', `${VIDEO_W}x${VIDEO_H}`, '-r', String(fps), '-i', 'pipe:0', '-an', '-c:v', 'libx264', '-preset', 'veryfast', '-crf', '23', '-profile:v', 'high', '-level', '4.0', '-pix_fmt', 'yuv420p', '-movflags', '+faststart', file])
+  const audio = opts.music === false ? null : audioPlan(moodOf(a.quiet), total)
+  const ff = run(opts.ffmpeg ?? 'ffmpeg', ['-y', '-loglevel', 'error', '-f', 'rawvideo', '-pix_fmt', 'rgba', '-s', `${VIDEO_W}x${VIDEO_H}`, '-r', String(fps), '-i', 'pipe:0', ...(audio ? audio.inputs : []), ...(audio ? audio.maps : ['-an']), '-c:v', 'libx264', '-preset', 'veryfast', '-crf', '23', '-profile:v', 'high', '-level', '4.0', '-pix_fmt', 'yuv420p', ...(audio ? audio.codec : []), '-movflags', '+faststart', file])
   let err = ''
   ff.stdout.resume()
   ff.stderr.on('data', (d: Buffer) => (err += String(d)))
@@ -110,7 +128,14 @@ export async function makeShareFilm(a: ShareArtwork, opts: { fps?: number; ffmpe
   const renderFrames = async (): Promise<void> => {
     for (let k = 0; k < frames; k++) {
       const t = k / fps
-      base.copy(frame)
+      // a quiet film's light frame turns dark ink over the card's coming
+      const dark = a.quiet ? ramp(t, tl.cardStart - 0.6, tl.cardStart + 0.2) : 0
+      if (dark <= 0.003) base.copy(frame)
+      else if (dark >= 0.997) darkBase.copy(frame)
+      else {
+        const r = Math.round(c.frame[0] + (INK.frame[0] - c.frame[0]) * dark), g = Math.round(c.frame[1] + (INK.frame[1] - c.frame[1]) * dark), b = Math.round(c.frame[2] + (INK.frame[2] - c.frame[2]) * dark)
+        for (let i = 0; i < frame.length; i += 4) { frame[i] = r; frame[i + 1] = g; frame[i + 2] = b; frame[i + 3] = 255 }
+      }
       if (rel && t < tl.rel + 0.01) blend(frame, rel, window(t, 0, tl.rel, 0.9, 0.7))
       for (let i = 0; i < n; i++) {
         const s0 = tl.picStart + i * SHARE_PIC
@@ -129,19 +154,31 @@ export async function makeShareFilm(a: ShareArtwork, opts: { fps?: number; ffmpe
         const cut = await sharp(p.data, { raw: { width: p.w, height: p.h, channels: 3 } }).extract({ left, top: topPx, width, height }).resize(artW, artH, { kernel: 'linear', fit: 'fill' }).ensureAlpha().raw().toBuffer()
         blend(frame, { data: cut, w: artW, h: artH, x: artX, y: artY }, op)
       }
-      // the character and its reading (the character is revealed from the top, like the personal film); they leave before the poem when there is one
-      if (t >= tl.charStart - 0.01) {
-        const hold = poem.length > 0 ? window(t, tl.charStart, tl.poemStart, 0.4, 0.7) : window(t, tl.charStart, tl.charStart + SHARE_CHAR, 0.4, 0)
+      // the character and its reading on the dark frame (revealed from the top, like the personal film); they leave as the card comes
+      if (t >= tl.charStart - 0.01 && t <= tl.charStart + SHARE_CHAR + 0.01) {
+        const hold = window(t, tl.charStart, tl.charStart + SHARE_CHAR, 0.4, 0.6)
         if (hold > 0.003) {
           blend(frame, kanji, hold, ramp(t, tl.charStart, tl.charStart + 1.8))
           blend(frame, reading, hold * ramp(t, tl.charStart + 1.3, tl.charStart + 2.2))
         }
       }
-      // the poem, line by line; it stays to the end (the film ends on the poem)
-      if (poem.length > 0 && t >= tl.poemStart - 0.01) {
-        const per = wrapped.length / Math.max(1, poem.length)
-        poemLayers.forEach((L, i) => blend(frame, L, ramp(t, tl.poemStart + (i / per) * SHARE_POEM_LINE, tl.poemStart + (i / per) * SHARE_POEM_LINE + 0.9)))
+      // the e-card: the paper, the relationship line and the character settle together; then the reading, the rule and the poem line by line; it holds still, then the last second fades to black
+      if (t >= tl.cardStart - 0.01) {
+        const n = card.poemLines.length
+        const lineFade = 0.9
+        const step = n > 1 ? (SHARE_POEM_SPAN - lineFade) / (n - 1) : 0
+        const st: CardState = {
+          opacity: ramp(t, tl.cardStart, tl.cardStart + SHARE_CARD_FADE),
+          rise: ramp(t, tl.cardStart, tl.cardStart + SHARE_CARD_FADE),
+          reading: ramp(t, tl.cardStart + SHARE_CARD_READING, tl.cardStart + SHARE_CARD_READING + 0.7),
+          rule: ramp(t, tl.cardStart + SHARE_CARD_RULE, tl.cardStart + SHARE_CARD_RULE + 0.5),
+          who: 0,
+          poem: Array.from({ length: n }, (_, i) => ramp(t, tl.poemStart + i * step, tl.poemStart + i * step + lineFade)),
+          seal: 0,
+        }
+        card.draw(frame, st)
       }
+      toBlack(frame, ramp(t, tl.total - SHARE_FADE_OUT, tl.total))
       opts.onFrame?.(t, frame)
       if (!ff.stdin.write(frame)) await new Promise<void>((res) => ff.stdin.once('drain', () => res()))
     }
@@ -151,7 +188,7 @@ export async function makeShareFilm(a: ShareArtwork, opts: { fps?: number; ffmpe
     await renderFrames()
     const code = await closed
     if (code !== 0) throw new Error(`ffmpeg failed (${code}): ${err.slice(0, 300)}`)
-    return { mp4: await readFile(file), seconds: total, frames, renderMs: Date.now() - t0 }
+    return { mp4: await readFile(file), seconds: total, frames, renderMs: Date.now() - t0, music: audio?.mood ?? null }
   } finally {
     ff.kill()
     await rm(dir, { recursive: true, force: true }).catch(() => {})

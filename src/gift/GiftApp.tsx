@@ -18,7 +18,7 @@ import { trackReceiverOpened } from '../demo/analytics'
 // The receiver's gift page /g/<token> (Part 3 of the 2026-10-31 ticket). One screen at a time:
 //   1 the sealed envelope (or, before the opening date, the same envelope with the date instead of the button)
 //   2 the opening (about 1.5 s: the seal breaks, the flap lifts onto the seasonal liner, the letter slides up; reduced motion: a fade)
-//   3 the letter   4 the 30-second film   5 the reveal   6 the poem   7 the certificate   8 what to keep, and the one thank-you
+//   3 the letter   4 the 34-second film (it ends on a paper e-card)   5 the reveal   6 the poem   7 the certificate   8 what to keep, and the one thank-you
 // The page never shows a price, an order number, the other candidate characters or the sender's story; the server sends the closed envelope
 // (names and the date) and nothing else until the day. The sender may look at any time with ?preview=<their own page id>.
 

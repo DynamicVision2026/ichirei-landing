@@ -1,5 +1,5 @@
 // Sharing the film and the poem on social media (ticket 2026-11-06, Part B): the share film and the poem card carry ONE relationship line, the character, its reading and the poem —
-// no captions, names, message, dates, order data, logo, seal, brand name, website or end card; the film starts on the relationship line (none for 「その他」) and ends on the poem; the
+// no captions, names, message, dates, order data, logo, seal, brand name or website; the film starts on the relationship line (none for 「その他」) and ends (2026-11-07) on a paper e-card with the relationship line, the character, its reading, a rule and the poem — held still, then faded to black; the
 // personal film is unchanged; the endpoints answer only after collecting, never for remembrance, never in preview mode. In-memory store, a real ffmpeg, no model, no network.
 //
 //   node --experimental-strip-types --disable-warning=ExperimentalWarning scripts/test-social-share.ts
@@ -46,15 +46,15 @@ const art = (over: Partial<ShareArtwork> = {}): ShareArtwork => ({
   check('(2) the ONLY text the share film and the card draw: the relationship line, the character (the carve form, never "same"), its reading and the poem lines — no caption, name, message, date, order data, URL, brand', texts.join('|') === '母へ|證|あかし|朝ごとに|蓋の花添え|備えたる|母の背中を|今も思へる' && !texts.join('').match(/SENTINEL|ICHIREI|一字礼|一字禮|soul-id|https?:|#|same/i))
   check('(2) with no relationship line (「その他」) nothing stands in its place', shareTexts(art({ relation: null })).join('|') === '證|あかし|朝ごとに|蓋の花添え|備えたる|母の背中を|今も思へる')
   const tl = shareTimeline(4, true, 5)
-  check('(2) the timeline: the relationship line first, then the four pictures, then the character, and it ENDS ON THE POEM (the poem is the last thing, with a hold)', tl.picStart === 2.8 && tl.charStart === tl.picStart + 4 * SHARE_PIC && tl.poemStart > tl.charStart && tl.total > tl.poemStart + 5 * 0.8 && tl.total < 40)
-  check('(2) with no relationship line the film starts on the first picture; with no poem it ends on the character', shareTimeline(4, false, 5).picStart === 0 && shareTimeline(4, true, 0).total === shareTimeline(4, true, 0).charStart + 4.8)
+  check('(2) the timeline: the relationship line first, then the four pictures, then the character on the dark frame, then the e-card — it ENDS ON THE CARD, held still for at least 4 s, and is about 33 s', tl.picStart === 2.8 && tl.charStart === tl.picStart + 4 * SHARE_PIC && tl.cardStart > tl.charStart && tl.poemStart > tl.cardStart && tl.total - tl.done >= 4 && tl.total > 31 && tl.total < 35, JSON.stringify(tl))
+  check('(2) with no relationship line the film starts on the first picture (and is 2.8 s shorter); the card is the same length with or without a poem', shareTimeline(4, false, 5).picStart === 0 && Math.abs(shareTimeline(4, false, 5).total - (tl.total - 2.8)) < 1e-6 && shareTimeline(4, true, 0).total === tl.total)
 }
 
 // ---- the film itself (a real ffmpeg render) --------------------------------------------------------------------------------------------------------
 {
   const base = Buffer.alloc(1080 * 1920 * 4)
-  const sums = new Map<number, { diff: number; red: number }>()
-  const at = [0.2, 1.2, 6.0, 20, 25, 28.9]
+  const sums = new Map<number, { diff: number; red: number; sealRed: number; lum: number }>()
+  const at = [0.2, 1.2, 6.0, 20, 27.5, 31.0, 32.5]
   const near = (t: number) => at.find((x) => Math.abs(x - t) < 1 / 48)
   const t0 = Date.now()
   const v = await makeShareFilm(art(), {
@@ -63,20 +63,26 @@ const art = (over: Partial<ShareArtwork> = {}): ShareArtwork => ({
       if (k === undefined || sums.has(k)) return
       let diff = 0
       let red = 0
+      let lum = 0
       for (let i = 0; i < rgba.length; i += 16) {
+        lum += rgba[i] + rgba[i + 1] + rgba[i + 2]
         if (Math.abs(rgba[i] - 26) + Math.abs(rgba[i + 1] - 20) + Math.abs(rgba[i + 2] - 16) > 24) diff++
         if (rgba[i] > 150 && rgba[i + 1] < 90 && rgba[i + 2] < 80) red++
       }
-      sums.set(k, { diff, red })
+      // the bottom-right corner of the card: the seal of the personal film would be here — the share film has none
+      let sealRed = 0
+      for (let y = 1500; y < 1600; y++) for (let x = 720; x < 940; x++) { const i = (y * 1080 + x) * 4; if (rgba[i] > 150 && rgba[i + 1] < 90 && rgba[i + 2] < 80) sealRed++ }
+      sums.set(k, { diff, red, sealRed, lum: lum / (rgba.length / 16) })
     },
   })
   void base
   const tl = shareTimeline(4, true, 5)
-  check(`(3) the share film renders: MP4 (ftyp), 1080×1920, about ${Math.round(tl.total)} s, no sound — in ${Math.round((Date.now() - t0) / 1000)} s`, v.mp4.subarray(4, 8).toString('latin1') === 'ftyp' && Math.abs(v.seconds - tl.total) < 0.05 && v.frames === Math.round(tl.total * 24))
-  const s = (t: number) => sums.get(t) ?? { diff: -1, red: -1 }
+  check(`(3) the share film renders: MP4 (ftyp), 1080×1920, about ${Math.round(tl.total)} s — in ${Math.round((Date.now() - t0) / 1000)} s`, v.mp4.subarray(4, 8).toString('latin1') === 'ftyp' && Math.abs(v.seconds - tl.total) < 0.05 && v.frames === Math.round(tl.total * 24))
+  const s = (t: number) => sums.get(t) ?? { diff: -1, red: -1, sealRed: -1, lum: -1 }
   check('(3) the film opens from nothing (frame at 0.2 s is the plain frame), shows the relationship line alone at 1.2 s (a little text, no picture), and the pictures fill the frame at 6 s', s(0.2).diff < 1000 && s(1.2).diff > 100 && s(1.2).diff < 20000 && s(6.0).diff > 100000, JSON.stringify([...sums]))
-  check('(3) the character is cinnabar when it shows (20 s) and is gone before the poem (25 s)', s(20).red > 500 && s(25).red === 0, JSON.stringify([s(20), s(25)]))
-  check('(3) the LAST frame holds the poem: text on the plain frame, no picture, no cinnabar, no seal or brand block', s(28.9).diff > 500 && s(28.9).diff < 60000 && s(28.9).red === 0, JSON.stringify(s(28.9)))
+  check('(3) the character is cinnabar on the dark frame when it first shows (20 s)', s(20).red > 500, JSON.stringify(s(20)))
+  check('(3) the card is up at 27.5 s: a paper card fills most of the middle (many pixels differ from the dark frame), the character on it is cinnabar, and the card has NO seal in its corner', s(27.5).diff > 200000 && s(27.5).red > 500 && s(27.5).sealRed === 0, JSON.stringify(s(27.5)))
+  check('(3) the card holds still (27.5 s = 31 s), then the last second fades to black (32.5 s is much darker)', Math.abs(s(27.5).diff - s(31.0).diff) < 3000 && s(32.5).lum < s(31.0).lum * 0.3, JSON.stringify([s(27.5), s(31.0), s(32.5)]))
 }
 {
   const q = await makeShareFilm(art({ quiet: true, relation: null }), { seconds: 1 })

@@ -115,16 +115,23 @@ async function fitProblems(page) {
     const out = []
     const frame = document.querySelector('[data-testid=film]').getBoundingClientRect()
     const near = (a, b) => a >= b - 1.5
-    const inside = (name, el) => { const r = el.getBoundingClientRect(); if (!(near(r.left, frame.left) && near(frame.right, r.right) && near(r.top, frame.top) && near(frame.bottom, r.bottom))) out.push(`${name} outside the frame: ${Math.round(r.left - frame.left)},${Math.round(r.top - frame.top)} ${Math.round(r.width)}×${Math.round(r.height)}`) }
-    document.querySelectorAll('[data-scene] .an-line').forEach((el, i) => inside(`line ${i + 1}`, el))
-    for (const s of ['[data-kanji]', '[data-reading]', '[data-who]', '[data-seal]']) inside(s, document.querySelector(s))
+    const within = (name, el, box) => { const r = el.getBoundingClientRect(); if (!(near(r.left, box.left) && near(box.right, r.right) && near(r.top, box.top) && near(box.bottom, r.bottom))) out.push(`${name} outside its box: ${Math.round(r.left - box.left)},${Math.round(r.top - box.top)} ${Math.round(r.width)}×${Math.round(r.height)}`) }
+    document.querySelectorAll('[data-scene] .an-line').forEach((el, i) => within(`line ${i + 1}`, el, frame))
+    const card = document.querySelector('[data-card]')
+    const cb = card.getBoundingClientRect()
+    within('the card', card, frame)
+    for (const s of ['[data-testid=film-card-kanji]', '[data-card-reading]', '[data-card-who]', '[data-card-seal]']) within(s, document.querySelector(s), cb)
+    const poem = document.querySelector('[data-testid=film-poem]')
+    if (poem) within('the poem', poem, cb)
     if (document.scrollingElement.scrollWidth > innerWidth + 1) out.push(`sideways scroll ${document.scrollingElement.scrollWidth} > ${innerWidth}`)
     if (frame.bottom > innerHeight + 1 || frame.top < -1) out.push(`the frame does not fit the screen: ${Math.round(frame.top)}–${Math.round(frame.bottom)} of ${innerHeight}`)
     const q = (s) => document.querySelector(s).getBoundingClientRect()
-    const k = q('[data-kanji]'), r = q('[data-reading]'), w = q('[data-who]'), s = q('[data-seal]')
+    const k = q('[data-testid=film-card-kanji]'), r = q('[data-card-reading]'), w = q('[data-card-who]'), s = q('[data-card-seal]')
     if (k.bottom > r.top + 2) out.push('the character overlaps its reading')
     if (r.bottom > w.top + 2) out.push('the reading runs into the "who they are" line')
-    if (w.bottom > s.top + 2) out.push('the "who they are" line runs into the seal')
+    if (poem && w.bottom > poem.getBoundingClientRect().top + 2) out.push('the "who they are" line runs into the poem')
+    if (poem) { const pb = poem.getBoundingClientRect(); if (!(pb.right < s.left || pb.bottom < s.top)) out.push('the poem runs into the seal') }
+    if (Math.abs((cb.width / frame.width) - 0.74) > 0.01 || Math.abs(cb.height / cb.width - 1.6) > 0.02) out.push(`the card is not 74% wide and 5:8: ${(cb.width / frame.width).toFixed(3)}, ${(cb.height / cb.width).toFixed(3)}`)
     return out
   })
 }
@@ -154,7 +161,7 @@ try {
       const n = rec.film.lines.length
       const per = rec.memorial ? 5.5 : 5
       const total = Number(await page.getAttribute('[data-testid=film]', 'data-duration'))
-      const expected = n * per + (rec.memorial ? 15.5 : 10)
+      const expected = n * per + (rec.memorial ? 19 : 14)
       check(`${label}: the film is ${expected} s (${n} scenes${rec.memorial ? ', remembrance: slower' : ''})`, total === expected && (await page.getAttribute('[data-testid=film]', 'data-pictures')).split(',').every((u, i) => u.startsWith(expectedPictures(rec)[i])), total)
       const seeIt = []
       for (let i = 0; i < n; i++) {
@@ -172,23 +179,26 @@ try {
       const cross = [await sceneOp(page, 0), await sceneOp(page, 1)]
       check(`${label}: at each scene change the two scenes cross-fade (both partly visible)`, n < 2 || (cross[0] > 0.02 && cross[0] < 0.98 && cross[1] > 0.02 && cross[1] < 0.98), JSON.stringify(cross))
       const F = per * n
-      await seek(page, F + (rec.memorial ? 3 : 2.2))
-      const mid = await page.evaluate(() => ({ scenes: [...document.querySelectorAll('[data-scene]')].map((e) => Number(getComputedStyle(e).opacity)), final: Number(getComputedStyle(document.querySelector('[data-final]')).opacity), kanji: getComputedStyle(document.querySelector('[data-kanji]')).maskPosition || getComputedStyle(document.querySelector('[data-kanji]')).webkitMaskPosition, who: Number(getComputedStyle(document.querySelector('[data-who]')).opacity), seal: Number(getComputedStyle(document.querySelector('[data-seal]')).opacity) }))
-      check(`${label}: the character is revealed in ink after the scenes (the scenes are gone, the character is partly there, "who they are" and the seal not yet)`, mid.scenes.every((o) => o < 0.01) && mid.final > 0.99 && mid.who < 0.01 && mid.seal < 0.01 && /%/.test(String(mid.kanji)), JSON.stringify(mid))
-      await seek(page, total)
-      const end = await page.evaluate(() => ({ who: Number(getComputedStyle(document.querySelector('[data-who]')).opacity), seal: Number(getComputedStyle(document.querySelector('[data-seal]')).opacity), reading: Number(getComputedStyle(document.querySelector('[data-reading]')).opacity), color: getComputedStyle(document.querySelector('[data-kanji]')).color, kanjiText: document.querySelector('[data-kanji]').textContent, tr: document.querySelector('[data-kanji]').getAttribute('translate'), readingText: document.querySelector('[data-reading]').textContent, bg: getComputedStyle(document.querySelector('[data-scene="0"] .an-art')).backgroundColor }))
-      check(`${label}: the end frame holds — the character, its reading, the "who they are" line and the seal are all on screen; the character is the carved form with translate="no"`, end.who > 0.99 && end.seal > 0.99 && end.reading > 0.99 && end.kanjiText === rec.glyph && end.tr === 'no' && end.readingText.length > 0, JSON.stringify(end))
+      await seek(page, F + (rec.memorial ? 2.5 : 1.5))
+      const mid = await page.evaluate(() => ({ scenes: [...document.querySelectorAll('[data-scene]')].map((e) => Number(getComputedStyle(e).opacity)), final: Number(getComputedStyle(document.querySelector('[data-final]')).opacity), kanji: getComputedStyle(document.querySelector('[data-kanji]')).maskPosition || getComputedStyle(document.querySelector('[data-kanji]')).webkitMaskPosition, card: Number(getComputedStyle(document.querySelector('[data-card]')).opacity) }))
+      check(`${label}: the character is revealed in ink on the dark frame after the scenes (the scenes are gone, the character is partly there, the e-card not yet)`, mid.scenes.every((o) => o < 0.01) && mid.final > 0.99 && mid.card < 0.01 && /%/.test(String(mid.kanji)), JSON.stringify(mid))
+      await seek(page, total - 2)
+      const end = await page.evaluate(() => ({ who: Number(getComputedStyle(document.querySelector('[data-card-who]')).opacity), seal: Number(getComputedStyle(document.querySelector('[data-card-seal]')).opacity), reading: Number(getComputedStyle(document.querySelector('[data-card-reading]')).opacity), card: Number(getComputedStyle(document.querySelector('[data-card]')).opacity), dark: Number(getComputedStyle(document.querySelector('[data-final]')).opacity), black: Number(getComputedStyle(document.querySelector('[data-black]')).opacity), color: getComputedStyle(document.querySelector('[data-testid=film-card-kanji]')).color, kanjiText: document.querySelector('[data-testid=film-card-kanji]').textContent, tr: document.querySelector('[data-testid=film-card-kanji]').getAttribute('translate'), readingText: document.querySelector('[data-card-reading]').textContent, frame: getComputedStyle(document.querySelector('[data-testid=film]')).backgroundColor }))
+      check(`${label}: 2 s before the end the e-card holds still — the paper card with the character, its reading, the "who they are" line and the seal all on screen, the dark character section gone, not yet black; the character is the carved form with translate="no"`, end.who > 0.99 && end.seal > 0.99 && end.reading > 0.99 && end.card > 0.99 && end.dark < 0.01 && end.black === 0 && end.kanjiText === rec.glyph && end.tr === 'no' && end.readingText.length > 0, JSON.stringify(end))
+      check(`${label}: the e-card sits on the dark ink frame (#1A1410), also for a quiet film`, /rgb\(2[0-9], 2[0-9]?, 1[0-9]\)/.test(end.frame) || end.frame === 'rgb(26, 20, 16)', end.frame)
       if (rec.language === 'en') check(`${label}: an English film shows the romanization and the meaning under the character, not the kana`, /matsu · wait/.test(end.readingText), end.readingText)
       const fit = [...(await fitProblems(page)), ...(await sceneTextProblems(page, n))]
       check(`${label}: it fits — every line inside the frame under its picture, the end frame without overlap, no sideways scroll`, fit.length === 0, fit.join(' | '))
       const m = /rgb\((\d+), (\d+), (\d+)/.exec(end.color)
       const [r, g, b] = m ? [Number(m[1]), Number(m[2]), Number(m[3])] : [0, 0, 0]
       check(`${label}: the character is ${rec.memorial ? 'ink black (remembrance)' : 'cinnabar'}`, rec.memorial ? r < 60 && g < 60 && b < 60 : r > 170 && g < 110 && b < 90, end.color)
+      const au = await page.evaluate(() => { const a = document.querySelector('[data-testid=film-music]'); return { muted: a.muted, mood: a.dataset.mood, src: a.getAttribute('src'), btn: document.querySelector('[data-testid=film-sound]').textContent } })
+      check(`${label}: the music is the ${rec.memorial ? 'quiet' : 'warm'} track (${au.src}), the film starts MUTED, and the sound button is there`, au.muted === true && au.mood === (rec.memorial ? 'quiet' : 'warm') && au.src === `/music/${rec.memorial ? 'quiet' : 'warm'}.mp3` && au.btn.length > 0, JSON.stringify(au))
       check(`${label}: no script errors, and the word AI appears nowhere on the page`, errors.length === 0 && !/\bAI\b/.test(await page.evaluate(() => document.body.innerText)), errors.join(' | '))
       if (SHOTS && deviceName.startsWith('iPhone')) {
         await seek(page, per * 1 + 3)
         await page.screenshot({ path: join(SHOTS, `film-${key}-scene2.png`) })
-        await seek(page, total)
+        await seek(page, total - 2)
         await page.screenshot({ path: join(SHOTS, `film-${key}-end.png`) })
       }
       await page.close()
@@ -247,7 +257,7 @@ try {
     await context.close()
   }
 
-  // ---- real time: the film plays by itself, to the end, in about 30 seconds ----
+  // ---- real time: the film plays by itself, to the end, in about 34 seconds ----
   {
     const context = await browser.newContext({ locale: 'ja-JP', ...DEVICES['iPhone-class (390×844, iOS UA)'] })
     const { page } = await open(context, recs.ja)
@@ -255,14 +265,22 @@ try {
     await page.waitForTimeout(3000)
     const early = await page.evaluate(() => ({ t: window.__ichireiFilm.time, s0: Number(getComputedStyle(document.querySelector('[data-scene="0"]')).opacity), ph: Number(getComputedStyle(document.querySelector('[data-scene="0"] [data-phrase="0"]')).opacity) }))
     check('real time: the film starts by itself (no tap needed): after about 3 s scene 1 and its first phrase are on screen', early.t > 2 && early.t < 4.5 && early.s0 > 0.9 && early.ph > 0.5, JSON.stringify(early))
+    const s0 = await page.evaluate(() => { const a = document.querySelector('[data-testid=film-music]'); const b = document.querySelector('[data-testid=film-sound]'); return { muted: a.muted, label: b.textContent, pressed: b.getAttribute('aria-pressed'), t: window.__ichireiFilm.time, vol: a.volume } })
+    check('sound: the film is muted until the sound button is tapped (「音を出す」), and the music fades in with the picture ', s0.muted === true && s0.label === '音を出す' && s0.pressed === 'false')
+    await page.click('[data-testid=film-sound]')
+    await page.waitForTimeout(400)
+    const s1 = await page.evaluate(() => { const a = document.querySelector('[data-testid=film-music]'); return { muted: a.muted, label: document.querySelector('[data-testid=film-sound]').textContent, t: window.__ichireiFilm.time, ct: a.currentTime, paused: a.paused, vol: a.volume, kept: sessionStorage.getItem('ichirei-film-sound') } })
+    check('sound: a tap turns the sound on (「音を消す」), the film keeps playing (the tap does not pause it), the music runs in step with the picture (±0.7 s) at a gentle volume, and the choice is kept for this session only', s1.muted === false && s1.label === '音を消す' && s1.paused === false && Math.abs(s1.ct - s1.t) < 0.7 && s1.vol > 0.9 && s1.kept === 'on', JSON.stringify(s1))
+    await page.click('[data-testid=film-sound]')
+    check('sound: tapping again turns it off (「音を出す」) — muted again', (await page.evaluate(() => document.querySelector('[data-testid=film-music]').muted)) === true && (await page.textContent('[data-testid=film-sound]')) === '音を出す')
     await page.waitForFunction(() => document.querySelector('[data-testid=film]').getAttribute('data-ended') === 'yes', null, { timeout: 40000 })
     const took = (Date.now() - tStart) / 1000 + 0
-    check('real time: it plays to the end by itself in 30 seconds and holds the last frame', took > 24 && took < 34, `${took.toFixed(1)} s`)
+    check('real time: it plays to the end by itself in 34 seconds', took > 29 && took < 38, `${took.toFixed(1)} s`)
     await page.waitForTimeout(1200)
-    check('real time: the held frame stays (seal and "who they are" line still there)', (await op(page, '[data-who]')) > 0.99 && (await op(page, '[data-seal]')) > 0.99)
+    check('real time: the film ends on black (the last second faded out) and the music has stopped', (await op(page, '[data-black]')) > 0.99 && (await page.evaluate(() => document.querySelector('[data-testid=film-music]').paused)))
     await page.click('[data-testid=animation-replay]')
     await page.waitForTimeout(700)
-    const re = await page.evaluate(() => ({ t: window.__ichireiFilm.time, ended: document.querySelector('[data-testid=film]').getAttribute('data-ended'), who: Number(getComputedStyle(document.querySelector('[data-who]')).opacity) }))
+    const re = await page.evaluate(() => ({ t: window.__ichireiFilm.time, ended: document.querySelector('[data-testid=film]').getAttribute('data-ended'), who: Number(getComputedStyle(document.querySelector('[data-card-who]')).opacity) }))
     check('replay: 「もう一度見る」 starts the film again from the beginning', re.t < 3 && re.ended === 'no' && re.who < 0.05, JSON.stringify(re))
     await page.click('[data-testid=animation-play]')
     const pausedAt = await page.evaluate(() => window.__ichireiFilm.time)
@@ -279,7 +297,7 @@ try {
     await page.click('[data-testid=animation-credits-link]')
     await page.waitForSelector('[data-testid=credits-page]')
     const credits = await page.textContent('[data-testid=credits-page]')
-    check('the credits link opens the credits page: the typefaces (SIL OFL), the one illustration line (Google\u2019s image model), no KanjiVG / Make Me a Hanzi any more, the film is silent, no "AI"', ['Zen Old Mincho', 'SIL Open Font License', 'Illustrations drawn with Google\u2019s image model'].every((x) => credits.includes(x)) && !/KanjiVG|Make Me a Hanzi/.test(credits) && !/\bAI\b/.test(credits))
+    check('the credits link opens the credits page: the typefaces (SIL OFL), the one illustration line (Google\u2019s image model), no KanjiVG / Make Me a Hanzi any more, no "AI"', ['Zen Old Mincho', 'SIL Open Font License', 'Illustrations drawn with Google\u2019s image model'].every((x) => credits.includes(x)) && !/KanjiVG|Make Me a Hanzi/.test(credits) && !/\bAI\b/.test(credits))
     await context.close()
   }
 
@@ -292,7 +310,7 @@ try {
     await page.goto(`${server.url}/a/${recs.ja.id}`, { waitUntil: 'domcontentloaded' })
     await page.waitForSelector('[data-testid=film-still]', { timeout: 10000 })
     await page.waitForTimeout(600)
-    const still = await page.evaluate(() => ({ scenes: document.querySelectorAll('.an-still-scene').length, imgs: [...document.querySelectorAll('.an-still-scene img')].every((i) => i.complete && i.naturalWidth > 100), lines: [...document.querySelectorAll('.an-line-still')].map((e) => e.textContent), kanji: document.querySelector('[data-testid=film-kanji]').textContent, film: !!document.querySelector('[data-testid=film]'), side: document.scrollingElement.scrollWidth <= innerWidth + 1 }))
+    const still = await page.evaluate(() => ({ scenes: document.querySelectorAll('.an-still-scene').length, imgs: [...document.querySelectorAll('.an-still-scene img')].every((i) => i.complete && i.naturalWidth > 100), lines: [...document.querySelectorAll('.an-line-still')].map((e) => e.textContent), kanji: document.querySelector('[data-testid=film-card-kanji]').textContent, film: !!document.querySelector('[data-testid=film]'), side: document.scrollingElement.scrollWidth <= innerWidth + 1 }))
     check('reduced motion: nothing moves — a still page of the four scenes (picture and line) and the character, with the seal', still.scenes === 4 && still.imgs && still.lines.length === 4 && still.lines[1].includes('「もういらない」') && still.kanji === '備' && !still.film && still.side && errors.length === 0, JSON.stringify(still))
     check('reduced motion: a note says why, with a button to play the film anyway', await page.isVisible('[data-testid=animation-reduced]'))
     await page.click('[data-testid=animation-reduced] button')

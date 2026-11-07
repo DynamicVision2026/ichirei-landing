@@ -11,7 +11,7 @@ import { makeFilmVideo } from './render/film-video.ts'
 import { makeShareFilm, type ShareArtwork } from './render/share.ts'
 
 /** Bump to make every film video again (a change in how the video looks). */
-export const FILM_VIDEO_REV = '1'
+export const FILM_VIDEO_REV = '2'
 export const filmVideoPath = (id: string): string => `films/${id}/film.mp4`
 export const filmVideoMetaPath = (id: string): string => `films/${id}/film.json`
 
@@ -88,7 +88,7 @@ export function serveBytes(bytes: Buffer, contentType: string, rangeHeader: stri
 // ---- the share film (2026-11-06): the film the buyer and the receiver post to their own social accounts — pictures, character, poem and one relationship line, nothing else ----
 
 /** Bump to make every share film again. */
-export const SHARE_FILM_REV = '1'
+export const SHARE_FILM_REV = '2'
 export const shareFilmPath = (id: string): string => `films/${id}/share.mp4`
 export const shareFilmMetaPath = (id: string): string => `films/${id}/share.json`
 

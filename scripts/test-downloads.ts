@@ -6,7 +6,7 @@
 
 import { execFileSync } from 'node:child_process'
 import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
-import { tmpdir } from 'node:os'
+import { cpus, tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { createGiftHandlers } from '../api/gift.ts'
 import { buildAnimationRecord, newAnimationId } from '../engine/animation.ts'
@@ -65,14 +65,16 @@ else {
   const res = await H(washi.store).filmMake(washi.token)
   const j = (await res.json()) as { state: string; seconds: number; bytes: number }
   const ms = Date.now() - t0
-  check('(2) POST film/make answers ready with the length and the size', res.status === 200 && j.state === 'ready' && j.seconds === 30 && j.bytes > 100_000, JSON.stringify(j))
+  check('(2) POST film/make answers ready with the length and the size', res.status === 200 && j.state === 'ready' && j.seconds === 34 && j.bytes > 100_000, JSON.stringify(j))
   const file = await washi.store.getObject(filmVideoPath(washi.aid))
   const dir = mkdtempSync(join(tmpdir(), 'ichirei-dl-'))
   writeFileSync(join(dir, 'film.mp4'), file!)
   const probe = JSON.parse(execFileSync('ffprobe', ['-v', 'error', '-show_streams', '-show_format', '-of', 'json', join(dir, 'film.mp4')]).toString()) as { streams: { codec_type: string; codec_name: string; width?: number; height?: number; pix_fmt?: string }[]; format: { duration: string } }
   const v = probe.streams.find((s) => s.codec_type === 'video')
-  check('(2) the file is H.264 yuv420p, 1080 × 1920, about 30 s, and has no audio track', v?.codec_name === 'h264' && v.pix_fmt === 'yuv420p' && v.width === 1080 && v.height === 1920 && Math.abs(Number(probe.format.duration) - 30) < 0.3 && !probe.streams.some((s) => s.codec_type === 'audio'), JSON.stringify(probe).slice(0, 300))
+  const aud = probe.streams.filter((s) => s.codec_type === 'audio') as { codec_name: string; channels?: number; duration?: string; bit_rate?: string }[]
+  check('(2) the file is H.264 yuv420p, 1080 × 1920, about 34 s, with ONE audio stream: stereo AAC about 128 kbps, as long as the picture (±0.1 s)', v?.codec_name === 'h264' && v.pix_fmt === 'yuv420p' && v.width === 1080 && v.height === 1920 && Math.abs(Number(probe.format.duration) - 34) < 0.3 && aud.length === 1 && aud[0].codec_name === 'aac' && aud[0].channels === 2 && Math.abs(Number(aud[0].duration) - Number((v as unknown as { duration: string }).duration)) <= 0.1 && Math.abs(Number(aud[0].bit_rate) - 128000) < 20000, JSON.stringify(probe).slice(0, 400))
   check('(2) the moov atom is at the front (faststart): it starts playing before it is all downloaded, and "Save Video" works on a phone', file!.subarray(0, 64).includes(Buffer.from('ftyp')) && file!.indexOf(Buffer.from('moov')) < file!.indexOf(Buffer.from('mdat')))
+  check(`(2) the saved film (34 s, with its music) still renders in under 60 s here (${(ms / 1000).toFixed(1)} s; this box has ${cpus().length} CPUs — see DEPLOY.md for the Cloud Run size)`, ms < 60_000)
   console.log(`      render time ${(ms / 1000).toFixed(1)} s, ${(file!.length / 1e6).toFixed(2)} MB, ${j.seconds} s of film`)
   rmSync(dir, { recursive: true, force: true })
   const meta1 = await readFilmVideoMeta(washi.store, washi.aid)
@@ -80,14 +82,14 @@ else {
   const meta2 = await readFilmVideoMeta(washi.store, washi.aid)
   check('(2) asked again, nothing is rendered again (the same file and the same record)', again.status === 200 && meta1?.made_at === meta2?.made_at && meta1?.render_ms === meta2?.render_ms)
   const tl = makeFilmTimeline(4, true)
-  check('(2) a remembrance film is 37.5 s (the same timeline as the page)', tl.total === 37.5)
+  check('(2) a remembrance film is 41 s (the same timeline as the page)', tl.total === 41)
 }
 
 // the re-render rule, with a stand-in renderer
 {
   const g = await build({}, ['ai', 'ai', 'ai', 'ai'])
   let renders = 0
-  const render = async () => { renders++; return { mp4: Buffer.from('MP4' + renders), seconds: 30, frames: 720, renderMs: 1 } }
+  const render = async () => { renders++; return { mp4: Buffer.from('MP4' + renders), seconds: 34, frames: 816, renderMs: 1 } }
   const h = H(g.store, { videoRender: render })
   await h.filmMake(g.token)
   await h.filmMake(g.token)

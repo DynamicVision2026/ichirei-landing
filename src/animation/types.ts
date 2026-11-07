@@ -9,6 +9,8 @@ export interface AnimationView {
   romanization: string
   meaning_en: string | null
   who: string
+  /** The poem of the gift (the receiver's page and the buyer's preview carry it; a sample film has none): the e-card the film ends on shows it. */
+  poem?: { type: string; lines: string[]; reading?: string } | null
   memorial: boolean
   /** v9.6: why the gift is given (absent on older gifts). */
   purpose?: string | null

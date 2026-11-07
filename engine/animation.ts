@@ -1,4 +1,4 @@
-// The story film's DATA side. One fixed 30-second film per order (the same template for everyone): it retells the customer's own story in four
+// The story film's DATA side. One fixed 34-second film per order (41 s for a remembrance) (the same template for everyone): it retells the customer's own story in four
 // short scenes and ends with the chosen character. This module keeps what the page needs under a private, unguessable id (AN-…): the carved form,
 // its reading, the "who they are" line, the memorial flag and — when it is ready — the film script (engine/film.ts: four lines and four picture descriptions; the pictures themselves are drawn on the first open, engine/film-art.ts).
 // The page `/a/<id>` plays it with the fixed template in src/animation/; no model call happens when it is played.

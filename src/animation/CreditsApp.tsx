@@ -70,7 +70,7 @@ export default function CreditsApp() {
       <h2>Illustrations</h2>
       <p data-testid="credit-illustrations">Illustrations drawn with Google&rsquo;s image model. イラストは Google の画像モデルで描いています。</p>
       <h2>Music</h2>
-      <p>The film is silent. 音楽は使用していません。</p>
+      <p data-testid="credit-music">The music under the film is original, made for ICHIREI; no other recording is used. 映像の音楽は、一字礼のために作ったオリジナルです。他の録音は使っていません。</p>
       <p>
         <a href="/">ICHIREI</a>
       </p>
