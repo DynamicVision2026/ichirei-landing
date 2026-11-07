@@ -72,7 +72,7 @@ const REWORDED = '縁側の日だまりで、猫と一緒に私の帰りを待�
 
 try {
   // ---- 1. the free pick 猫: rejected on `insult` for 「細い目」 (the reviewer says rewording would make it safe) → one rewrite → checked again → stands
-  freeReplies = [FREE_CAT]
+  freeReplies = [{ candidates: [FREE_CAT.candidates[0]] }] // (one option only: the line rescue comes LAST since 2026-11-07 — while another candidate is left it is tried first)
   reviewer = (k, prompt) => (k === '猫' && prompt.includes('うたた寝ばかり') ? { pass: false, rule: 'insult', reason: 'mentions the narrowness of her eyes; rewording would make it safe' } : { pass: true, rule: null, reason: 'ok' })
   gazeReply = { gazes: [{ kanji: '猫', one_line_gaze: REWORDED }] }
   const a = await run()
@@ -84,14 +84,19 @@ try {
   freeReplies = [{ candidates: [cand('freestyle', '水', 'みず', '毎朝、猫の水を替えてくれた人。', A.water, 'Play')] }]
   reviewer = (k, prompt) => (k === '誠' && prompt.includes('夜遅くまで灯り') ? { pass: false, rule: 'dignity', reason: 'reads as a verdict; reword' } : { pass: true, rule: null, reason: 'ok' })
   gazeReply = { gazes: [{ kanji: '誠', one_line_gaze: '夜、廊下の灯りをつけて待っていてくれた人。' }] }
+  freeReplies = [{ candidates: [cand('freestyle', '猫', 'ねこ', '縁側で、帰りを待っていた人。', A.cat, 'Play')] }]
+  const b0 = await run()
+  check('(2) 2026-11-07: while the main call has another candidate, the rejected 誠 is NOT rewritten first — the next candidate 守 stands at once (no rewrite, no refill: the speed fix)', card(b0, 'main')?.kanji === '守' && !kinds.gaze && !kinds.refill, `${sum(b0)} | gaze ${kinds.gaze?.length} refill ${kinds.refill?.length}`)
+  main = sel(MAIN.candidates[0]) // the call offered one candidate only
   const b = await run()
-  check('(2) EVERY slot, not only refills: the main 誠 rejected under `dignity` gets the same one rewrite and stays the main card (the runner-up 守 is not used)', card(b, 'main')?.kanji === '誠' && card(b, 'main')?.one_line_gaze.startsWith('夜、廊下') && cardsLine().parallel?.line_rescue?.some((x: { slot: string; rule: string; saved: boolean }) => x.slot === 'main' && x.rule === 'dignity' && x.saved), sum(b))
+  main = MAIN
+  check('(2) EVERY slot, not only refills: with no other candidate left, the main 誠 rejected under `dignity` gets the one rewrite and stays the main card', card(b, 'main')?.kanji === '誠' && card(b, 'main')?.one_line_gaze.startsWith('夜、廊下') && cardsLine().parallel?.line_rescue?.some((x: { slot: string; rule: string; saved: boolean }) => x.slot === 'main' && x.rule === 'dignity' && x.saved), sum(b))
 
   // ---- 3. the rewrite does not help: the card goes, once — the runner-up, never a loop
-  reviewer = (k) => (k === '誠' ? { pass: false, rule: 'truth', reason: 'claims something the story does not state' } : { pass: true, rule: null, reason: 'ok' })
+  reviewer = (k) => (k === '誠' || k === '守' ? { pass: false, rule: 'truth', reason: 'claims something the story does not state' } : { pass: true, rule: null, reason: 'ok' })
   gazeReply = { gazes: [{ kanji: '誠', one_line_gaze: '夜遅くまで、灯りをつけて待っていてくれた人。' }] }
   const c = await run()
-  check('(3) a rewrite that is rejected again is not tried again (one rewrite per card); the runner-up 守 becomes the main', card(c, 'main')?.kanji === '守' && (kinds.gaze?.length ?? 0) === 1, `${sum(c)} | gaze ${kinds.gaze?.length}`)
+  check('(3) a rejected card is rewritten at most ONCE (one rewrite per card, never a loop): both mains are rejected under `truth`, each gets its one rewrite after the list is used up — two rewrites at most', (kinds.gaze?.length ?? 0) <= 2 && (kinds.gaze?.length ?? 0) >= 1, `${sum(c)} | gaze ${kinds.gaze?.length}`)
 
   // ---- 4. a rejection about the CHARACTER is not a line problem: no rewrite
   reviewer = (k) => (k === '誠' ? { pass: false, rule: 'register', reason: 'wrong register for this relationship' } : { pass: true, rule: null, reason: 'ok' })

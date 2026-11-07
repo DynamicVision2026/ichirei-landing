@@ -313,13 +313,38 @@ export async function completeMains(
     const client = opts.client ?? new Anthropic(opts.apiKey ? { apiKey: opts.apiKey } : {})
     const effort = (freeOnly ? 'low' : (process.env.ICHIREI_REPLACE_EFFORT ?? 'medium')) as 'low' | 'medium' | 'high'
     const callModel = freeOnly ? (process.env.ICHIREI_REFILL_FREE_MODEL ?? opts.freeModel ?? opts.reviewModel ?? opts.model) : opts.model
-    const signal = callSignal(opts.signal, freeOnly ? freeRefillTimeoutMs() : replaceTimeoutMs())
-    const stream = client.messages.stream(
-      { model: callModel, max_tokens: freeOnly ? 1500 : Number(process.env.ICHIREI_REPLACE_MAX_TOKENS ?? 9000), output_config: { effort }, messages: [{ role: 'user', content: !freeOnly && opts.cachedPrefix ? [{ type: 'text' as const, text: opts.cachedPrefix, cache_control: { type: 'ephemeral' as const } }, { type: 'text' as const, text: prompt }] : prompt }] },
-      { signal },
-    )
+    const limitMs = freeOnly ? freeRefillTimeoutMs() : replaceTimeoutMs()
+    const params = { model: callModel, max_tokens: freeOnly ? 1500 : Number(process.env.ICHIREI_REPLACE_MAX_TOKENS ?? 9000), output_config: { effort }, messages: [{ role: 'user' as const, content: !freeOnly && opts.cachedPrefix ? [{ type: 'text' as const, text: opts.cachedPrefix, cache_control: { type: 'ephemeral' as const } }, { type: 'text' as const, text: prompt }] : prompt }] }
+    // A refill that includes a main or a second card is hedged like the card calls (2026-11-07, shortened): a 20 s limit, and when the first call has not answered at half of it a second identical call
+    // (no thinking) is started; the first usable answer wins and the other is cancelled. ICHIREI_REPLACE_HEDGE_MS=0 switches the hedge off.
+    const hedgeMs = freeOnly ? 0 : Number(process.env.ICHIREI_REPLACE_HEDGE_MS ?? Math.round(limitMs / 2))
+    const ctl1 = new AbortController()
+    const ctl2 = new AbortController()
+    const stream = client.messages.stream(params, { signal: AbortSignal.any([callSignal(opts.signal, limitMs), ctl1.signal]) })
     const thinking = watchThinkingTokens(stream)
-    const message = await stream.finalMessage()
+    const first = stream.finalMessage()
+    let message: Awaited<typeof first>
+    if (hedgeMs > 0 && hedgeMs < limitMs) {
+      const second = new Promise<Awaited<typeof first>>((resolve, reject) => {
+        const timer = setTimeout(() => {
+          if (opts.signal?.aborted) return reject(new Error('aborted'))
+          callInfo.hedged = true
+          client.messages.stream({ ...params, thinking: { type: 'disabled' as const } }, { signal: AbortSignal.any([callSignal(opts.signal, limitMs - hedgeMs), ctl2.signal]) }).finalMessage().then(resolve, reject)
+        }, hedgeMs)
+        first.then(() => clearTimeout(timer), () => undefined)
+        ctl1.signal.addEventListener('abort', () => clearTimeout(timer))
+      })
+      second.catch(() => undefined)
+      first.catch(() => undefined)
+      try {
+        message = await Promise.any([first, second])
+      } finally {
+        ctl1.abort()
+        ctl2.abort()
+      }
+    } else {
+      message = await first
+    }
     opts.onUsage?.('replace', usageOf(callModel, message.usage))
     const text = message.content.filter((b): b is Anthropic.TextBlock => b.type === 'text').map((b) => b.text).join('')
     const parsed = parseReplacementsDiag(text, slots)

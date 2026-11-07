@@ -32,6 +32,10 @@ let secondReply: any = sel(S1(), S2())
 let freeReply: any = { candidates: [F1(), F2()] }
 let gazeReply: any = { gazes: [] }
 let vetoed = new Set<string>()
+let vetoRules: Record<string, string> = {} // the rule a vetoed character is rejected under (default dignity)
+let refillReply: any = { none: true }
+let refillDelays: number[] = [10] // by request: the first refill request waits refillDelays[0], the next refillDelays[1] …
+let reviewDelay = 10
 let mainDelays: number[] = [30] // by request: the first main request waits mainDelays[0], the next mainDelays[1] …
 const counts: Record<string, number> = {}
 const bodies: Record<string, any[]> = {}
@@ -46,13 +50,15 @@ const upstream = http.createServer(async (req, res) => {
   const kind = prompt.includes('Independent Review Prompt') ? 'review' : prompt.includes('Gaze Line Rewrite Prompt') ? 'gaze' : prompt.includes('Free Pick Card Prompt') ? 'free' : prompt.includes('Replacement Prompt (v9') ? 'refill' : prompt.includes('* CARD: second.') ? 'second' : prompt.includes('* CARD: main.') ? 'main' : 'other'
   counts[kind] = (counts[kind] ?? 0) + 1
   ;(bodies[kind] ??= []).push({ thinking: body.thinking, at: Date.now() - t0 })
+  if (kind === 'main') allMainPrompt = prompt
   let reply: unknown = {}
   let ms = 10
   if (kind === 'review') {
-    const items = [...prompt.matchAll(/"slot": "(main|second|freestyle)",\s*"kanji": "([^"]+)"/g)].map((m) => ({ slot: m[1], kanji: m[2], pass: !vetoed.has(m[2]), rule: vetoed.has(m[2]) ? 'dignity' : null, reason: vetoed.has(m[2]) ? 'could read as a negative trait' : 'ok' }))
+    ms = reviewDelay
+    const items = [...prompt.matchAll(/"slot": "(main|second|freestyle)",\s*"kanji": "([^"]+)"/g)].map((m) => ({ slot: m[1], kanji: m[2], pass: !vetoed.has(m[2]), rule: vetoed.has(m[2]) ? (vetoRules[m[2]] ?? 'dignity') : null, reason: vetoed.has(m[2]) ? 'could read as a negative trait' : 'ok' }))
     reply = { verdicts: items }
   } else if (kind === 'gaze') reply = gazeReply
-  else if (kind === 'refill') reply = { none: true }
+  else if (kind === 'refill') { reply = refillReply; ms = refillDelays[Math.min(counts.refill - 1, refillDelays.length - 1)] }
   else if (kind === 'main') { reply = mainReply; ms = mainDelays[Math.min(counts.main - 1, mainDelays.length - 1)] }
   else if (kind === 'second') { reply = secondReply; ms = 20 }
   else if (kind === 'free') reply = freeReply
@@ -92,9 +98,10 @@ const run = async (ctx: any = BIRTHDAY): Promise<EngineResult> => {
   } finally { console.log = origLog }
 }
 const live = (r: EngineResult) => r.candidates.filter((c) => !c.eliminated)
-const reset = () => { mainReply = sel(M1(), M2()); secondReply = sel(S1(), S2()); freeReply = { candidates: [F1(), F2()] }; gazeReply = { gazes: [] }; vetoed = new Set(); mainDelays = [30]; delete process.env.ICHIREI_CARD_THINKING; delete process.env.ICHIREI_CARD_HEDGE_MS }
+const reset = () => { mainReply = sel(M1(), M2()); secondReply = sel(S1(), S2()); freeReply = { candidates: [F1(), F2()] }; gazeReply = { gazes: [] }; vetoed = new Set(); vetoRules = {}; refillReply = { none: true }; refillDelays = [10]; reviewDelay = 10; mainDelays = [30]; delete process.env.ICHIREI_CARD_THINKING; delete process.env.ICHIREI_CARD_HEDGE_MS }
 /** Every card shown at any moment is exactly the card of the final result (same slot, same character, same line). */
 const shownIsFinal = (r: EngineResult): boolean => events.every((e) => e.cards.every((c) => { const f = live(r).find((x) => x.slot === c.slot); return !!f && f.kanji === c.kanji && f.one_line_gaze === c.line })) && !logs.some((l) => l.includes('card_changed_after_shown'))
+let allMainPrompt = ''
 const timing = () => { const l = logs.find((x) => x.startsWith('[ichirei-card-timing]')); return l ? JSON.parse(l.slice('[ichirei-card-timing] '.length)) : null }
 
 try {
@@ -180,6 +187,57 @@ try {
   reset()
   const { inventedFacts, inventedWhy } = await import('../engine/gaze.ts')
   check('(8) the check is "in the line but not in the story": 「机」 is fine when the story has a desk; manner words, objects and family words are named in the reason; zh and en have their own lists', inventedFacts('机の前で待つ人。', '父は机の前にいた。', 'ja').length === 0 && inventedFacts('迷わず来る人。', '父は来た。', 'ja').join() === '迷わず' && inventedFacts('毫不猶豫地來的人', '他來了。', 'zh-Hant').length === 1 && inventedFacts('Someone who comes without hesitation.', 'He came.', 'en').length === 1 && /adds a detail the story does not give \(迷わず\)/.test(inventedWhy(['迷わず'])) && /about the sender or a relative/.test(inventedWhy(['娘'])))
+  // ---- (9) 2026-11-07 follow-up: the main call returns FIVE ranked candidates; a rejected one is replaced from the same call — no refill (the live round 3 took 84 s on a 43.9 s refill) -----------------
+  reset()
+  const M3 = () => cand('main', '信', 'しん', GOOD, '電話ではいつも「そっちは寒いか」', 'Role')
+  const M4 = () => cand('main', '恩', 'おん', GOOD, 'ケーキの箱', 'Hidden Cost')
+  const M5 = () => cand('main', '想', 'そう', GOOD, '台所の湯気の向こう', 'Private Symbol')
+  mainReply = sel(M1(), M2(), M3(), M4(), M5())
+  vetoed = new Set(['誠', '守'])
+  vetoRules = { 誠: 'relationship', 守: 'subject' } // (the live case: relationship, then subject)
+  reviewDelay = 120
+  const r9 = await run()
+  const m9 = live(r9).find((c) => c.slot === 'main')
+  check('(9) the first two 本命 candidates are rejected (relationship, subject): the THIRD stands — no refill call, no line rewrite spent on the subject one, both cards shown final', m9?.kanji === '信' && !counts.refill && !counts.gaze && live(r9).length === 2 && shownIsFinal(r9), JSON.stringify({ counts, main: m9?.kanji, events: events.map((e) => e.at) }))
+  check('(9) …and in time: the card is out within the main call + three reviews (here under 1.5 s, the live target is 30 s), and the main prompt asks for five ranked candidates', events[0].at < 1500 && timing()?.total_ms < 2500 && /TOP FIVE/.test(allMainPrompt), JSON.stringify({ at: events[0]?.at, total: timing()?.total_ms }))
+
+  // all five rejected for TASTE (tone): the refill gives nothing → the best remaining candidate that passed the hard rules stands instead of an empty slot
+  reset()
+  mainReply = sel(M1(), M2(), M3(), M4(), M5())
+  vetoed = new Set(['誠', '守', '信', '恩', '想'])
+  vetoRules = { 誠: 'tone', 守: 'tone', 信: 'tone', 恩: 'tone', 想: 'tone' }
+  const r10 = await run()
+  const m10 = live(r10).find((c) => c.slot === 'main')
+  check('(10) every candidate set aside only for taste (`tone`) and the refill finds nothing: the best remaining candidate (誠, the first) stands — the slot is never left empty', r10.status === 'sufficient' && m10?.kanji === '誠' && r10.primary_kanji === '誠' && logs.some((l) => l.includes('main_kept_after_soft_review')), JSON.stringify({ s: r10.status, m: m10?.kanji }))
+  // …but a candidate refused for the relationship / safety is never brought back
+  reset()
+  mainReply = sel(M1(), M2())
+  vetoed = new Set(['誠', '守'])
+  vetoRules = { 誠: 'relationship', 守: 'dignity' }
+  const r10b = await run()
+  check('(10) …a candidate refused under `relationship` or `dignity` is never brought back: with the refill empty the round has no 本命 (a question is asked), nothing unsafe is shown', !live(r10b).some((c) => c.slot === 'main') && !logs.some((l) => l.includes('main_kept_after_soft_review')), JSON.stringify({ s: r10b.status, live: live(r10b).map((c) => c.kanji) }))
+
+  // ---- (11) the refill has a 20 s limit and is hedged at half of it (shortened here by env): a stalled first refill call does not hold the round ---------------------------------------------------------------
+  reset()
+  mainReply = sel(M1())
+  vetoed = new Set(['誠'])
+  refillReply = sel(cand('main', '礼', 'れい', GOOD, 'ケーキの箱', 'Role'))
+  refillDelays = [3000, 40]
+  process.env.ICHIREI_REPLACE_TIMEOUT_MS = '1500'
+  const tStart11 = Date.now()
+  const r11 = await run()
+  delete process.env.ICHIREI_REPLACE_TIMEOUT_MS
+  check('(11) the 本命 refill: the first call stalls, the hedged second call (started at half the limit) answers — the refilled card stands, two refill calls, and the round ends well before the stalled call would have', counts.refill === 2 && live(r11).some((c) => c.slot === 'main' && c.kanji === '礼') && Date.now() - tStart11 < 2600, JSON.stringify({ counts, ms: Date.now() - tStart11, live: live(r11).map((c) => c.kanji) }))
+  reset()
+  process.env.ICHIREI_REPLACE_TIMEOUT_MS = '600'
+  refillDelays = [5000]
+  mainReply = sel(M1())
+  vetoed = new Set(['誠'])
+  refillReply = sel(cand('main', '礼', 'れい', GOOD, 'ケーキの箱', 'Role'))
+  const tStart11b = Date.now()
+  await run()
+  delete process.env.ICHIREI_REPLACE_TIMEOUT_MS
+  check('(11) a refill that never answers is cut at its limit (600 ms here; 20 s live), not at the old 75 s', Date.now() - tStart11b < 2500, String(Date.now() - tStart11b))
 } finally {
   console.log = origLog
   upstream.close()

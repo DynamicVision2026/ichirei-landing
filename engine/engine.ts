@@ -353,6 +353,24 @@ function enforceLineLanguage(result: EngineResult, language: Language): EngineRe
 }
 
 /** A reason is kept as its code ("review: truth", "palette: hard_block"): the model's own words after the second colon can quote the story. */
+/**
+ * 2026-11-07: when the 本命 call, its runner-ups and the (20 s) refill all gave nothing, the best remaining candidate that passed the HARD rules stands instead of an empty slot: a candidate the code
+ * checks (referee, palette, subject, language, invented facts) let through and that the review set aside only for taste (`register`, `tone`) — never one refused for safety, dignity or the relationship.
+ */
+export function keepBestSoftRejected(result: EngineResult, mainOk?: (c: Candidate) => boolean): EngineResult {
+  if (result.status !== 'sufficient') return result
+  if (result.candidates.some((c) => !c.eliminated && c.slot !== 'freestyle')) return result
+  const pick = result.candidates.find((c) => c.slot === 'main' && c.eliminated && /^review: (register|tone):/.test(c.eliminated_reason ?? '') && (!mainOk || mainOk(c)))
+  if (!pick) return result
+  console.log(`[ichirei-engine] main_kept_after_soft_review ${JSON.stringify({ rule: String(pick.eliminated_reason).split(':')[1]?.trim() })}`)
+  return {
+    ...result,
+    candidates: result.candidates.map((c) => (c === pick ? { ...c, eliminated: false, eliminated_reason: null, flags: [...c.flags, 'kept_after_soft_review'] } : c)),
+    primary_kanji: pick.kanji,
+    runner_up_kanji: null,
+  }
+}
+
 const reasonCode = (r: unknown): string => String(r ?? '').split(':').slice(0, 2).join(':').trim().slice(0, 60)
 
 /** The [ichirei-cards] facts as they are handed back for `?debug=1`: numbers, codes, characters of the cards — no reason text, no story. */
@@ -901,7 +919,7 @@ async function runCardsPipeline(a: PipelineArgs): Promise<PipelineOut> {
     refillFree: context.occasion !== 'memorial',
     needSecond: context.occasion === 'memorial',
     onRefill: (r) => { refill = r },
-  })
+  }).then((r) => keepBestSoftRejected(r, canBeMain))
   // Every card already had its gaze line checked when it passed; a refilled card (or any line that still fails) gets the one rewrite here. Never a reason to lose a card.
   let withGazes = completed
   const tGaze = Date.now()

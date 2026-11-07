@@ -84,6 +84,13 @@ function readEngineFile(file: string, override?: string): string {
 }
 
 /** The language prompt plus the one-card block (the block is appended: it names the card, the lens and the ranked output). */
+/** How many ranked characters each card call returns (2026-11-07): the main call five, like the free pick, so a rejected one is replaced from the same call without a refill; the second (remembrance only) two. */
+export const MAIN_OPTIONS = 5
+const OPTIONS: Record<'main' | 'second', number> = { main: MAIN_OPTIONS, second: 2 }
+const RANKED_TWO = '* Give your TOP TWO characters for this card, ranked. Candidate 1 is your best. Candidate 2 is your own runner-up: a DIFFERENT character that also passes every gate and follows the same lens. It is used only when candidate 1 is removed by a check, or when another card chose the same character as candidate 1. Both carry "slot": "{{ SLOT }}". If you honestly find only one character that passes every gate, give one; never fill the second place with a weak one.'
+const RETURN_TWO = '* Return the same shape as above, but `candidates` holds exactly those two (candidate 1 first), and `primary_kanji`, `runner_up_kanji` and `freestyle_kanji` are left out: {"status": "sufficient", "emotional_register": […], "candidates": [ <candidate 1>, <candidate 2> ], "fallback_follow_up_question": …}. Every candidate carries all of its fields (`kanji`, `reading`, `inscription_form`, `truth_type`, `one_line_gaze`, `story_anchor`, `unique_truth`). When status is "insufficient" or the goodwill check fails, answer exactly as the shape above says (no candidates).'
+const RANKED_FIVE = '* Give your TOP FIVE characters for this card, ranked from your best to your fifth. Candidate 1 is your best. Every later candidate is a DIFFERENT character that also passes every gate and follows the same lens, and is used only when the ones before it are removed by a check (a review can reject any of them) or when another card chose the same character. They are tried IN ORDER, so rank them honestly; a candidate that would fail the relationship test, the person test or the palette rules must not be among them. All carry "slot": "{{ SLOT }}". Candidates 3 to 5 may keep `unique_truth` to one short phrase: the sender is waiting. If you honestly find fewer than five characters that pass every gate, give fewer; never fill a place with a weak one.'
+const RETURN_FIVE = '* Return the same shape as above, but `candidates` holds those five (candidate 1 first), and `primary_kanji`, `runner_up_kanji` and `freestyle_kanji` are left out: {"status": "sufficient", "emotional_register": […], "candidates": [ <candidate 1>, <candidate 2>, <candidate 3>, <candidate 4>, <candidate 5> ], "fallback_follow_up_question": …}. Every candidate carries all of its fields (`kanji`, `reading`, `inscription_form`, `truth_type`, `one_line_gaze`, `story_anchor`, `unique_truth`). When status is "insufficient" or the goodwill check fails, answer exactly as the shape above says (no candidates).'
 export function cardPrompt(basePrompt: string, slot: 'main' | 'second', lexicon = false): string {
   const block = readEngineFile('card-block.md', process.env.ICHIREI_CARD_BLOCK_PATH)
   let extra = '* The `unique_truth` of each candidate is required' + (slot === 'second' ? ', as for any main-slot card.' : '.')
@@ -96,7 +103,7 @@ export function cardPrompt(basePrompt: string, slot: 'main' | 'second', lexicon 
         : ' Give the one or two listed characters that show this other side of the person best (rule 2 chooses by the person, not by the tag). Never write lexicon_miss or "insufficient": the main card decides about a miss. Only if truly none shows another side, reply exactly {"none": true}.') +
       ' The free pick is written by a third call and is not limited to the list (rule 4).'
   }
-  return basePrompt + block.replace(/\{\{ SLOT \}\}/g, slot).replace('{{ LENS }}', LENS[slot]).replace('{{ EXTRA }}', extra)
+  return basePrompt + block.replace('{{ RANKED }}', OPTIONS[slot] === 5 ? RANKED_FIVE : RANKED_TWO).replace('{{ RETURN }}', OPTIONS[slot] === 5 ? RETURN_FIVE : RETURN_TWO).replace(/\{\{ SLOT \}\}/g, slot).replace('{{ LENS }}', LENS[slot]).replace('{{ EXTRA }}', extra)
 }
 
 /** The compact free-pick prompt for the parallel call: the context, the story, the characters not to use; five ranked options. */
@@ -383,7 +390,7 @@ export function readCardReply(text: string, slot: CardSlot): ReplyRead {
       palette_status: 'ok',
       flags: Array.isArray(o.flags) ? (o.flags as unknown[]).filter((f): f is string => typeof f === 'string') : [],
     } as Candidate)
-    if (out.length === (slot === 'freestyle' ? FREE_OPTIONS : 2)) break
+    if (out.length === (slot === 'freestyle' ? FREE_OPTIONS : slot === 'main' ? MAIN_OPTIONS : 2)) break
   }
   const parse: CardCallInfo['parse'] = insufficient ? 'none' : out.length > 0 ? 'ok' : elems.length > 0 ? 'offered_unusable' : 'no_candidates'
   return { cands: insufficient ? [] : out, obj, parse, keys, offered, insufficient }
@@ -742,6 +749,25 @@ export async function runCards(a: CardsArgs): Promise<CardsOut> {
       const stampBase = ctxBase
       const taken = (): Candidate[] => (slot === 'main' ? [] : slot === 'second' ? [picked.main] : [picked.main, picked.second]).filter((x): x is Candidate => !!x)
       /** Try a list of candidates in order: referee, a higher card's character, review, the final check against the higher cards, the gaze line. The first that stands is the card. */
+      const deferred: { ref: { card: Candidate; mini: unknown }; rv: { card: Candidate } }[] = []
+      /** A good character is not dropped for its line: ONE rewrite with the reviewer's note, then every check again. Returns true when the card stands. */
+      const rescueLine = async (ref: { card: Candidate }, rv: { card: Candidate }, rule: string, from: NonNullable<LaneOut['source']>): Promise<boolean> => {
+        if (rescued.has(ref.card.kanji) || early || sig.aborted) return false
+        rescued.add(ref.card.kanji)
+        const note = (rv.card.eliminated_reason ?? '').replace(/^review:\s*[a-z_]+:\s*/i, '').slice(0, 200)
+        const fixes = await rewriteLines([{ kanji: ref.card.kanji, gaze: ref.card.one_line_gaze, why: `the reviewer rejected the line under the rule \`${rule}\`${note ? `: ${note}` : ''}. Reword ONLY the line so it says only what the story states and nothing about the person's body, looks or character that could hurt; the character and the story detail stay` }], story, context.language, { tone: toneLine(context), apiKey: opts.apiKey, signal: sig, client, log, timeoutMs: slot === 'freestyle' ? freeCallMs() : undefined })
+        const line = fixes.get(ref.card.kanji)
+        const entry = { slot, rule, rewritten: !!line, saved: false }
+        report.line_rescue.push(entry)
+        if (line) {
+          await attempt([{ ...ref.card, one_line_gaze: line, eliminated: false, eliminated_reason: null } as Candidate], from)
+          if (chosen) {
+            entry.saved = true
+            return true
+          }
+        }
+        return false
+      }
       const attempt = async (list: Candidate[], from: NonNullable<LaneOut['source']>): Promise<void> => {
         let n = 0
         for (const cand0 of list) {
@@ -813,21 +839,9 @@ export async function runCards(a: CardsArgs): Promise<CardsOut> {
             // A good character is not dropped for its line: when the review rejected the card under a LINE rule (insult, dignity, truth, subject) the line is rewritten ONCE with the reviewer's
             // own note, and the card goes through every check again (the referee, the `subject` guard, the review). Every slot. If the character was the problem, the second review says so.
             const rule = lineRuleOf(rv.card.eliminated_reason)
-            if (rule && !rescued.has(ref.card.kanji) && !early && !sig.aborted) {
-              rescued.add(ref.card.kanji)
-              const note = (rv.card.eliminated_reason ?? '').replace(/^review:\s*[a-z_]+:\s*/i, '').slice(0, 200)
-              const fixes = await rewriteLines([{ kanji: ref.card.kanji, gaze: ref.card.one_line_gaze, why: `the reviewer rejected the line under the rule \`${rule}\`${note ? `: ${note}` : ''}. Reword ONLY the line so it says only what the story states and nothing about the person's body, looks or character that could hurt; the character and the story detail stay` }], story, context.language, { tone: toneLine(context), apiKey: opts.apiKey, signal: sig, client, log, timeoutMs: slot === 'freestyle' ? freeCallMs() : undefined })
-              const line = fixes.get(ref.card.kanji)
-              const entry = { slot, rule, rewritten: !!line, saved: false }
-              report.line_rescue.push(entry)
-              if (line) {
-                await attempt([{ ...ref.card, one_line_gaze: line, eliminated: false, eliminated_reason: null } as Candidate], from)
-                if (chosen) {
-                  entry.saved = true
-                  break
-                }
-              }
-            }
+            // (2026-11-07, speed) a line rewrite + a second review costs two calls: while this call still has another candidate, that one is tried first; the rescue comes last
+            if (rule && n < list.length) deferred.push({ ref, rv })
+            else if (rule && (await rescueLine(ref, rv, rule, from))) break
             continue
           }
           const lined = await gazeOne(rv.card, sig)
@@ -868,6 +882,12 @@ export async function runCards(a: CardsArgs): Promise<CardsOut> {
           if (slot === 'freestyle') report.free_source = freeStep
           if (n > 1 && from === 'second_call') report.runner_up_used.push(slot)
           break
+        }
+        // every other candidate of this list is gone: the line rescues put off above come now, in order (each is one rewrite and one review)
+        while (!chosen && deferred.length > 0 && !early && !sig.aborted) {
+          const d = deferred.shift()!
+          const r = lineRuleOf(d.rv.card.eliminated_reason)
+          if (r && (await rescueLine(d.ref, d.rv, r, from))) break
         }
       }
       await attempt(out.cands, 'second_call')

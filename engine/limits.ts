@@ -8,7 +8,7 @@
 
 export const DEFAULT_CALL_TIMEOUT_MS = 150_000
 export const DEFAULT_REVIEW_TIMEOUT_MS = 60_000
-export const DEFAULT_REPLACE_TIMEOUT_MS = 75_000
+export const DEFAULT_REPLACE_TIMEOUT_MS = 20_000 // (2026-11-07: the live 43.9 s refill; 20 s now, with a hedged second call at half that time — see engine/replace.ts)
 export const DEFAULT_RUN_BUDGET_MS = 270_000
 
 const ms = (v: string | undefined, dflt: number): number => {

@@ -125,8 +125,9 @@ try {
   check('(1) the free-pick prompt asks for FIVE characters, ranked best to fifth, none on the avoid list, and says they are tried in order', /FIVE characters for the free pick, ranked from your best to your fifth/.test(prompt) && /<candidate 5>/.test(prompt) && /tried in order and the first one that passes the checks is used/.test(prompt) && !/TOP TWO/.test(prompt) && /not one of your five may be on this list/.test(prompt))
   check('(1) …the second ask also wants five, from different details', /SECOND ASK/.test(retryPrompt) && /Give five usable candidates now, none on the list above, from different details/.test(retryPrompt))
   const five = readCardReply(JSON.stringify({ candidates: [F_朝(), F_箱(), ...['星', '雪', '風', '月'].map((k) => F(k, 'あ', 'ケーキの箱'))] }), 'freestyle')
-  const twoOnly = readCardReply(JSON.stringify({ candidates: [M1(), M2(), cand('main', '信', 'しん', GOOD, '車の窓の霜')] }), 'main')
-  check(`(1) up to ${FREE_OPTIONS} different options are read for the free pick, two for the main and second calls`, five.cands.length === FREE_OPTIONS && twoOnly.cands.length === 2, `${five.cands.length}/${twoOnly.cands.length}`)
+  const twoOnly = readCardReply(JSON.stringify({ candidates: [S1(), S2(), cand('second', '信', 'しん', GOOD, '車の窓の霜')] }), 'second')
+  const mainFive = readCardReply(JSON.stringify({ candidates: [M1(), M2(), cand('main', '信', 'しん', GOOD, '車の窓の霜'), cand('main', '恩', 'おん', GOOD, '車の窓の霜'), cand('main', '想', 'そう', GOOD, '車の窓の霜'), cand('main', '常', 'つね', GOOD, '車の窓の霜')] }), 'main')
+  check(`(1) up to ${FREE_OPTIONS} different options are read for the free pick, five for the main call, two for the second (remembrance) call`, five.cands.length === FREE_OPTIONS && twoOnly.cands.length === 2 && mainFive.cands.length === 5, `${five.cands.length}/${twoOnly.cands.length}`)
 
   // ---- (2) the first option that is not already shown is the card -----------------------------------------------------------------------------------------------------------------------------
   reset()

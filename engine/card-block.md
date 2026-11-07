@@ -5,8 +5,8 @@ The cards of this gift are written by separate calls at the same moment, each fr
 * Skip every other slot: write no other card, no freestyle (STEP 5b) and no pair of mains. Do not write out STEP 1–4 for characters you will not use; reason only toward this one card, and keep it short: the sender is waiting.
 * CARD: {{ SLOT }}.
 * LENS: {{ LENS }}
-* Give your TOP TWO characters for this card, ranked. Candidate 1 is your best. Candidate 2 is your own runner-up: a DIFFERENT character that also passes every gate and follows the same lens. It is used only when candidate 1 is removed by a check, or when another card chose the same character as candidate 1. Both carry "slot": "{{ SLOT }}". If you honestly find only one character that passes every gate, give one; never fill the second place with a weak one.
-* Return the same shape as above, but `candidates` holds exactly those two (candidate 1 first), and `primary_kanji`, `runner_up_kanji` and `freestyle_kanji` are left out: {"status": "sufficient", "emotional_register": […], "candidates": [ <candidate 1>, <candidate 2> ], "fallback_follow_up_question": …}. Every candidate carries all of its fields (`kanji`, `reading`, `inscription_form`, `truth_type`, `one_line_gaze`, `story_anchor`, `unique_truth`). When status is "insufficient" or the goodwill check fails, answer exactly as the shape above says (no candidates).
+{{ RANKED }}
+{{ RETURN }}
 * READING (Japanese): a single character on a gift is read as a QUALITY of the person — a noun, an adjective or a verb stem (直: なお / すなお / ちょく) — never as an adverb or a conjunction (ただちに, および, すなわち, あるいは, さらに). Pick the palette reading that names the character as what the person IS.
 * RECURRING CHARACTERS: 誠, 常, 待, 信, 恩 and 想 come back in many different stories. Offer one of them only when THIS story's specific act makes it clearly the best character for this person; when a more specific character fits as well (one that comes from the object, the place, the gesture or the words of this story), prefer it. At most one of the six among your candidates.
 * Reply with the JSON object only: no prose before or after it, no code fence, no comments.
