@@ -44,11 +44,12 @@ export default function RevealPage() {
     const d = DOCUMENT[lang]
     document.title = d.title
     document.documentElement.lang = lang
-    setMeta('meta[name=description]', 'content', d.description)
+    const description = woodOnSale ? d.description : (d.descriptionS ?? d.description) // (nothing about carving while the wooden sizes are "coming soon")
+    setMeta('meta[name=description]', 'content', description)
     setMeta('meta[property="og:title"]', 'content', d.title)
-    setMeta('meta[property="og:description"]', 'content', d.description)
+    setMeta('meta[property="og:description"]', 'content', description)
     setMeta('meta[property="og:locale"]', 'content', lang === 'ja' ? 'ja_JP' : lang === 'zh-Hant' ? 'zh_TW' : 'en_US')
-  }, [lang])
+  }, [lang, woodOnSale])
 
   // The page behind and around the light design is light too (the /demo harness is not).
   useEffect(() => {
@@ -94,8 +95,8 @@ export default function RevealPage() {
       </header>
 
       <main>
-        <Hero lang={lang} currency={currency} rates={rates} />
-        <Strip t={t} />
+        <Hero lang={lang} currency={currency} rates={rates} woodOnSale={woodOnSale} />
+        <Strip t={t} woodOnSale={woodOnSale} />
         <Philosophy t={t} />
         <StoryShape t={t} />
         <Angles t={t} lang={lang} />
@@ -114,9 +115,9 @@ export default function RevealPage() {
         <Steps t={t} memorial={memorial} woodOnSale={woodOnSale} />
         <Moments t={t} memorial={memorial} />
         <Reviews t={t} />
-        <Gifts t={t} lang={lang} currency={currency} rates={rates} onCurrency={setCurrency} />
+        <Gifts t={t} lang={lang} currency={currency} rates={rates} onCurrency={setCurrency} woodOnSale={woodOnSale} />
         <Faq t={t} lang={lang} woodOnSale={woodOnSale} />
-        <Closing t={t} />
+        <Closing t={t} woodOnSale={woodOnSale} />
       </main>
       <Footer t={t} />
       <Dock t={t} />

@@ -12,7 +12,7 @@ const SWAP_MS = 350
 const EXAMPLE_WORD: Record<RevealLang, string> = { en: 'Example', ja: '例', 'zh-Hant': '範例' }
 
 /** The hero: the pitch, and a live-looking example — a short story turning into its character, six in rotation. */
-export default function Hero({ lang, currency, rates }: { lang: RevealLang; currency: Currency; rates: Rates | null }) {
+export default function Hero({ lang, currency, rates, woodOnSale = false }: { lang: RevealLang; currency: Currency; rates: Rates | null; woodOnSale?: boolean }) {
   const t = TEXT[lang]
   const examples = EXAMPLES[lang]
   const reduce = usePrefersReducedMotion()
@@ -68,7 +68,7 @@ export default function Hero({ lang, currency, rates }: { lang: RevealLang; curr
         <div className="heroCopy">
           <span className="eyebrow">{t.eyebrow}</span>
           <h1>{rich(t.h1)}</h1>
-          <p className="lead">{t.sub}</p>
+          <p className="lead">{woodOnSale ? t.sub : t.subS}</p>
           <div className="ctaRow">
             <a className="btn primary" href="#write">
               {t.ctaHero}

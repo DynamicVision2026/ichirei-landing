@@ -12,10 +12,11 @@ import { LEGAL, rowValue } from '../legal/legal-copy.ts'
 type T = (typeof TEXT)[RevealLang]
 
 /** Trust strip. (The reference's "Checked by native speakers" item is deliberately absent: no such claim yet.) */
-export function Strip({ t }: { t: T }) {
+export function Strip({ t, woodOnSale = false }: { t: T; woodOnSale?: boolean }) {
+  // (while the wooden sizes are "coming soon" the decorative glyph is not 刻, "to carve", and the second item is about the online delivery)
   const items: [string, string][] = [
-    ['刻', t.s1],
-    ['届', t.s3],
+    [woodOnSale ? '刻' : '作', t.s1],
+    ['届', woodOnSale ? t.s3 : t.s3S],
     ['選', t.s4],
   ]
   return (
@@ -298,12 +299,15 @@ export function Gifts({
   currency,
   rates,
   onCurrency,
+  woodOnSale = false,
 }: {
   t: T
   lang: RevealLang
   currency: Currency
   rates: Rates | null
   onCurrency: (c: Currency) => void
+  /** The wooden sizes are on sale (not "coming soon"): only then does the page describe them or their shipping. */
+  woodOnSale?: boolean
 }) {
   // The four sizes of the one gift (Part C), in the order ③ 木札 (recommended), ④ 版木, ② カード, ① デジタル (last, "send it now"); a size whose Shopify
   // variant is missing is not listed (useSizes).
@@ -314,7 +318,8 @@ export function Gifts({
     id,
     title: sc.names[id],
     img: id === 'simple' ? 'simple-hero' : id === 'standard' ? 'standard-hero' : 'egift-hero',
-    items: id === 'simple' ? [t.sp1, t.sp2, t.sp3, t.sp4] : id === 'standard' ? [t.dp1, t.dp2, t.dp3, t.dp4] : [sc.includes[id], sc.ship[id]],
+    // a size that is "coming soon" is listed by its name and price only: nothing about carving, printing or posting while it cannot be ordered
+    items: soon.includes(id) ? [] : id === 'simple' ? [t.sp1, t.sp2, t.sp3, t.sp4] : id === 'standard' ? [t.dp1, t.dp2, t.dp3, t.dp4] : [sc.includes[id], sc.ship[id]],
     cta: id === 'simple' ? t.buy1 : id === 'standard' ? t.buy2 : t.buy0,
     badge: soon.includes(id) ? sc.comingSoon : id === RECOMMENDED_PACKAGE ? sc.recommended : id === 'egift' ? sc.sendNow : null,
     soon: soon.includes(id),
@@ -333,7 +338,7 @@ export function Gifts({
           const approx = approxLine(PACKAGE_PRICE_JPY[c.id], currency, rates, lang)
           return (
             <article className="gift" key={c.id} data-size={c.id} data-coming-soon={c.soon ? 'yes' : undefined}>
-              <Picture name={c.img} width={1600} height={1000} alt={GIFT_ALT[c.id]} sizes="(max-width: 860px) 100vw, 380px" />
+              <Picture name={c.img} width={1600} height={1000} alt={c.soon ? c.title : GIFT_ALT[c.id]} sizes="(max-width: 860px) 100vw, 380px" />
               <div className="body">
                 {/* badge line (reserved even when there is no badge), then the name, then the price: the same stack in all three cards at every width */}
                 <div className="row">
@@ -364,8 +369,8 @@ export function Gifts({
         })}
       </div>
       <div className="wrap shipNote">
-        <span>{t.ship1}</span>
-        <span>{t.ship2}</span>
+        <span>{woodOnSale ? t.ship1 : t.ship1S}</span>
+        {woodOnSale && <span>{t.ship2}</span>}
         {rates && (
           <label>
             <span>{t.cur}</span>{' '}
@@ -390,10 +395,10 @@ export function Faq({ t, lang, woodOnSale = false }: { t: T; lang: RevealLang; w
     [t.fq2, t.fa2],
     [t.fq3, t.fa3],
     [t.fq4, fa4],
-    [t.fq5, t.fa5],
+    [woodOnSale ? t.fq5 : t.fq5S, woodOnSale ? t.fa5 : t.fa5S],
     [t.fq6, t.fa6],
     [t.fq7, t.fa7],
-    [t.fq8, t.fa8],
+    [t.fq8, woodOnSale ? t.fa8 : t.fa8S],
     [t.fq9, t.fa9],
     [t.fq10, t.fa10],
   ] as const
@@ -415,7 +420,7 @@ export function Faq({ t, lang, woodOnSale = false }: { t: T; lang: RevealLang; w
   )
 }
 
-export function Closing({ t }: { t: T }) {
+export function Closing({ t, woodOnSale = false }: { t: T; woodOnSale?: boolean }) {
   return (
     <section className="closing">
       <div className="wrap">
@@ -423,7 +428,7 @@ export function Closing({ t }: { t: T }) {
           字
         </span>
         <h2>{t.clH}</h2>
-        <p>{t.clP}</p>
+        <p>{woodOnSale ? t.clP : t.clPS}</p>
         <a className="btn primary" href="#write">
           {t.ctaClose}
         </a>

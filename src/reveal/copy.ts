@@ -27,6 +27,7 @@ const EN = {
   s1: "Designed in Tokyo. Made in Japan. Delivered worldwide.",
   slogan: "Designed in Tokyo. Made in Japan. Delivered worldwide.",
   s3: "Ships worldwide",
+  s3S: "Sent worldwide, online",
   s4: "You choose the final character",
   phEye: "Why we start with your story",
   phH: "We don't sell characters.<br>We keep relationships.",
@@ -150,6 +151,14 @@ const EN = {
   fa10: "Names are optional. Any name you enter is used only to show on the gift.",
   clH: "Some things are hard to say. One character can hold them.",
   clP: "Start with one moment. We will find the character and carve it for you.",
+  // the same lines while the wooden sizes are "coming soon": the e-gift only (2026-11-07) — nothing about carving, printing or posting
+  subS: "It all starts with your story. Tell us one true moment with someone, and we find the single character that holds how you see them. Then we seal it as a gift you can send right away.",
+  clPS: "Start with one moment. We will find the character for you.",
+  fa5S: "The e-gift is sent online, by LINE or email, so it can reach anyone, anywhere in the world.",
+  fq5S: "Can I give it to someone in another country?",
+  fa8S: "If an e-gift page doesn't display properly, we'll fix it, or refund you if we can't.",
+  ship1S: "Tax included · The e-gift is delivered online, with no shipping",
+  ship2S: "",
   ctaClose: "Tell your story",
   foot: "Order status: /track · Questions: reply to your order email",
   legal: "Legal notice and returns",
@@ -236,6 +245,7 @@ const JA: Partial<Record<CopyKey, string>> = {
   s1: "東京でデザインし、日本でつくり、世界へ届ける。",
   slogan: "東京でデザインし、日本でつくり、世界へ届ける。",
   s3: "世界へお届け",
+  s3S: "世界中へ、オンラインでお届け",
   s4: "最後の一字はあなたが選ぶ",
   stEye: "つくり方",
   stH: "三つのステップで、一字へ",
@@ -297,6 +307,13 @@ const JA: Partial<Record<CopyKey, string>> = {
   fa10: "お名前の入力は任意です。入力された呼び名は、贈りものに表示するためだけに使います。",
   clH: "言葉にしにくいことも、一字なら持てる。",
   clP: "ひとつの場面からはじめましょう。字を見つけ、刻んでお届けします。",
+  subS: "すべては、あなたの物語から。その人との本当の場面をひとつ教えてください。あなたの目に映るその人を一字にして、封をした贈りものにします。",
+  clPS: "ひとつの場面からはじめましょう。あなたのために、字を見つけます。",
+  fa5S: "eギフトはLINEやメールでお届けするので、世界中のどこにいる方にも贈れます。",
+  fq5S: "海外の方にも贈れますか？",
+  fa8S: "eギフトのページが正常に表示されない場合は修正し、修正できない場合は返金いたします。",
+  ship1S: "税込・eギフトはオンラインでお届け（送料なし）",
+  ship2S: "",
   foot: "注文状況：/track ・ お問い合わせ：ご注文確認メールへご返信",
   legal: "特定商取引法に基づく表記・返品について",
 }
@@ -379,6 +396,7 @@ const ZH: Partial<Record<CopyKey, string>> = {
   s1: "東京設計・日本製作・送達全世界。",
   slogan: "東京設計・日本製作・送達全世界。",
   s3: "寄往世界各地",
+  s3S: "線上送達世界各地",
   s4: "最後由你選定",
   stEye: "怎麼做",
   stH: "三個步驟，找到那一個字",
@@ -440,6 +458,13 @@ const ZH: Partial<Record<CopyKey, string>> = {
   fa10: "姓名為選填。你填寫的稱呼只會用來顯示在禮物上。",
   clH: "有些話很難說出口，一個字卻能裝得下。",
   clP: "從一個場景開始。我們找出那個字，為你刻好送達。",
+  subS: "一切從你的故事開始。告訴我們你和某人之間一個真實的場景，我們找出那個代表你眼中的他的字，再封成一份可以立刻送出的禮物。",
+  clPS: "從一個場景開始。我們為你找出那個字。",
+  fa5S: "e禮物透過LINE或電子郵件在線上送達，世界各地都能收到。",
+  fq5S: "可以送給在海外的人嗎？",
+  fa8S: "e禮物頁面無法正常顯示時，我們會修正；無法修正時將退款。",
+  ship1S: "含稅・e禮物線上送達（無運費）",
+  ship2S: "",
   foot: "訂單查詢：/track · 諮詢：請回覆訂單確認郵件",
   legal: "特定商取引法標示・退換貨說明",
 }
@@ -451,10 +476,11 @@ export const TEXT: Record<RevealLang, Record<CopyKey, string>> = {
 }
 
 /** <title> and meta description, per language (unchanged from the previous landing). */
-export const DOCUMENT: Record<RevealLang, { title: string; description: string }> = {
+export const DOCUMENT: Record<RevealLang, { title: string; description: string; descriptionS?: string }> = {
   en: {
     title: 'ICHIREI 一字礼 — A Gift of One Character',
     description: 'ICHIREI (一字礼) — the person you see, in a single Japanese character. A gift of one kanji for someone who matters, carved in Japan.',
+    descriptionS: 'ICHIREI (一字礼) — the person you see, in a single Japanese character. A gift of one kanji for someone who matters, sent as an e-gift.',
   },
   ja: {
     title: 'ICHIREI 一字礼 — 一字の贈りもの',

@@ -2708,6 +2708,73 @@ const SECTION_ORDER = ['.hero', '.strip', '.philo', '#shape', '#angles', '#write
   }
 }
 
+// ---------- Run 13f (2026-11-07): while wood is "coming soon" no customer-facing text promises carving, printing or posting; with wood on sale the wood wording is back ----------
+{
+  // what may stay: the names of the sizes (they are listed with 「近日公開」), and the e-gift's own words (it is not posted, it needs no shipping, its card is a PDF to print at home)
+  const NAMES = ['木札（シンプル）', '版木（スタンダード）', '木牌（簡約）', '版木（標準）', 'Wooden tag (Simple)', 'Block set (Standard)']
+  // (the example stories on the page are customers' sample stories, not promises: 「彫った木のスプーン」 / 「我九歲刻的木湯匙」 / "the wooden spoon I carved at nine")
+  const ALLOWED = ['那一刻', '這一刻', '一刻', '時刻', '此刻', '片刻', '立刻', '九歳のわたしが彫った木のスプーン', '我九歲刻的木湯匙', 'the wooden spoon I carved at nine', '免運費（以連結送出）', '送料を含む', '含運費', 'including shipping', '郵送されません', '郵送がなく', '送料はかかりません', '送料なし', '不郵寄', '無運費', '无运费', 'No shipping', 'no shipping', 'not posted', 'ご自宅で印刷できる', '可在家列印', 'print at home', 'you can print at home']
+  const PROMISE = {
+    ja: /刻|彫|木に|木の|拓本|拓墨|EMS|郵送|送料|水引|化粧箱|ギフトボックス|お届け希望日|印刷した|印刷され/,
+    'zh-Hant': /刻|木牌|木字版|版木|拓|EMS|郵寄|運費|水引|禮盒|期望送達日|印刷|印在/,
+    en: /carv|wooden|wood\b|in wood|engrav|rubbing|mizuhiki|\bEMS\b|\bship|posted|delivery date|printed card|printed on/i,
+  }
+  const scrub = (text) => { let t = text; for (const n of [...NAMES, ...ALLOWED]) t = t.split(n).join(' '); return t.replace(/\s+/g, ' ') }
+  const found = (text, lang) => { const t = scrub(text); const m = t.match(PROMISE[lang]); return m ? `[${m[0]}] …${t.slice(Math.max(0, m.index - 30), m.index + 40)}` : null }
+  const GO13 = GO
+  for (const lang of ['ja', 'zh-Hant', 'en']) {
+    for (const soonOn of [true, false]) {
+      const { page, errors } = await mockPage(browser, { result: (b) => ({ ...clone(FIXTURE), language: b.language, occasion: null, purpose: b.purpose }), order: () => ({ json: { order_ref: 'IC-20261107-NOWOOD11', checkout_url: 'http://localhost:5173/__checkout?cart=n', glyph: '証', certificate_text: 'x' } }) })
+      await page.route('**/api/sizes', (r) => r.fulfill({ json: soonOn ? { sizes: ['egift', 'simple', 'standard'], coming_soon: ['simple', 'standard'] } : { sizes: ['egift', 'simple', 'standard'] } }))
+      await page.route('**/api/poem', async (route) => {
+        const b = JSON.parse(route.request().postData() ?? '{}')
+        await route.fulfill({ json: { poem_id: 'PM-20261107-abcdefghj2', type: b.type, lines: ['朝ごとに', '蓋の花添え', '備えたる'], reading: '', aids: {}, preview: 'x' } })
+      })
+      // 1. the landing: every word on the page, the image descriptions and the meta description
+      await page.goto(`http://localhost:5173/?lang=${lang}`, { waitUntil: 'networkidle' })
+      await page.waitForSelector('#gifts article.gift')
+      await page.waitForTimeout(300)
+      const landing = await page.evaluate(() => [document.body.textContent, ...[...document.querySelectorAll('img[alt]')].map((i) => i.alt), document.querySelector('meta[name=description]')?.content ?? ''].join(' \n '))
+      const hitLanding = found(landing, lang)
+      check(`wood ${soonOn ? 'coming soon' : 'on sale'} (${lang}) — landing: ${soonOn ? 'no carving, printing or posting is promised anywhere on the page (hero, steps, gifts, FAQ, closing, meta)' : 'the wood wording is back (the hero, the gift cards and the FAQ speak of the wooden gifts)'}`, soonOn ? hitLanding === null : hitLanding !== null, String(hitLanding))
+      if (soonOn) {
+        const cards = await page.evaluate(() => [...document.querySelectorAll('#gifts article.gift')].map((a) => ({ id: a.dataset.size, items: a.querySelectorAll('li').length, soon: a.dataset.comingSoon ?? null })))
+        check(`wood coming soon (${lang}) — the two wooden gift cards list their name, price and 「近日公開」 only: no feature list; the e-gift card keeps its list`, cards.filter((c) => c.soon === 'yes').every((c) => c.items === 0) && cards.find((c) => c.id === 'egift').items > 0, JSON.stringify(cards))
+      }
+      // 2. /legal
+      await page.goto('http://localhost:5173/legal', { waitUntil: 'networkidle' })
+      await page.locator(`[data-lang=${lang}]`).click()
+      await page.waitForSelector('[data-testid=legal-rows]')
+      await page.waitForTimeout(300)
+      const legal = await page.locator('[data-testid=legal-page]').textContent()
+      const hitLegal = found(legal ?? '', lang)
+      check(`wood ${soonOn ? 'coming soon' : 'on sale'} (${lang}) — /legal: ${soonOn ? 'prices, charges, "if we made a mistake", delivery and the FAQ are about the e-gift only' : 'the wooden sizes are in the prices, the charges, the delivery and the defect rules'}`, soonOn ? hitLegal === null : hitLegal !== null, String(hitLegal))
+      // 3. the order step: the poem panel, the card preview, the sizes, the forms
+      await page.goto(`http://localhost:5173/?lang=${lang}`, { waitUntil: 'networkidle' })
+      await page.locator('#moment').fill('母は、私が何を言っても黙って台所に立っていた。あの日の言葉を、今でも悔やんでいる。')
+      await pickContext(page, { relationship: 'parent_mother', direction: 'up', occasion: 'birthday_milestone' })
+      await page.click(`#write >> text=${GO13[lang]}`)
+      await page.waitForSelector('[data-all-revealed=yes]', { timeout: 15000 })
+      const cardsText = await page.locator('#write').textContent()
+      await page.locator('article[data-slot=main]').locator(`text=${GIVE[lang]}`).click()
+      await page.locator('[data-testid=order-form]').waitFor()
+      await page.locator('[data-poem-result][data-state=ready]').waitFor({ timeout: 15000 })
+      await page.waitForTimeout(400)
+      const order = await page.locator('[data-testid=order-form]').textContent()
+      const hitOrder = found(`${order}\n${cardsText}`, lang)
+      check(`wood ${soonOn ? 'coming soon' : 'on sale'} (${lang}) — order step and card screen: ${soonOn ? 'the poem panel, the character-form line, the sizes, the card preview and the date and shipping lines say nothing about carving, printing or posting' : 'the wood wording is back (delivery date, shipping note, what each size includes)'}`, soonOn ? hitOrder === null : hitOrder !== null, String(hitOrder))
+      if (soonOn) {
+        const ctl = { date: await page.locator('#delivery_date').count(), ship: await page.locator('[data-shipping]').count(), includesWood: await page.locator('[data-includes=simple], [data-includes=standard]').count() }
+        check(`wood coming soon (${lang}) — no delivery-date field, no shipping note, no "what it includes" line under the wooden sizes`, ctl.date === 0 && ctl.ship === 0 && ctl.includesWood === 0, JSON.stringify(ctl))
+      } else {
+        check(`wood on sale (${lang}) — the delivery-date field, the shipping note and the wooden sizes' descriptions are shown`, (await page.locator('#delivery_date').count()) === 1 && (await page.locator('[data-shipping]').count()) === 1 && (await page.locator('[data-includes=simple]').count()) === 1)
+      }
+      check(`no page errors (run 13f, ${lang}, ${soonOn ? 'coming soon' : 'on sale'})`, errors.length === 0, errors.join('; '))
+      await page.close()
+    }
+  }
+}
+
 // ---------- Run 14: /track — order status, four languages ----------
 {
   let reply = { json: { ordered_on: '2026-10-20', status: 'processing', sku: ['ICHIREI-STANDARD'], carrier: null, tracking_number: null, tracking_url: null, estimated_by: '2026-11-03' } }

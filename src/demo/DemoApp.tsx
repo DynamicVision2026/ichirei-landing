@@ -15,6 +15,8 @@ import { questionSetOf, questionTextOf } from './questions'
 import { OPENER } from '../reveal/opener-copy'
 import { exportEvents, log, setCondition as logSetCondition, setStory as logSetStory } from './logging'
 import { setMemorialSelected } from '../reveal/occasion-store'
+import { egiftCopy } from './egift-copy'
+import { useWoodOnSale } from './useSizes'
 import { COPY, DEFAULT_GIFT_CONTEXT, FOLLOW_UP_COUNTER_FROM, FOLLOW_UP_MAX, clipStory, contextToPayload, occasionOf, purposeOf, storyLength, type Copy, type GiftContext } from './i18n'
 import { getLanguage, setLanguage } from '../lang-store'
 import { useLanguage } from '../useLanguage'
@@ -247,7 +249,10 @@ export default function DemoApp({ mode = 'harness', aside }: { mode?: Mode; asid
     setMemorialSelected(memorialNow)
     return () => setMemorialSelected(false)
   }, [customer, memorialNow])
-  const copy = COPY[context.language]
+  // while the wooden sizes are "coming soon" the lines about the carved form and the shipping say nothing about wood (src/demo/egift-copy.ts)
+  const woodOnSale = useWoodOnSale()
+  const baseCopy = COPY[context.language]
+  const copy = useMemo(() => (woodOnSale ? baseCopy : egiftCopy(baseCopy, context.language)), [woodOnSale, baseCopy, context.language])
   const [chosen, setChosen] = useState<Candidate | null>(null)
 
   // The nav switch on the landing page changes the shared language; follow it.

@@ -1,5 +1,5 @@
 import { useEffect } from 'react'
-import { LEGAL, rowValue } from './legal-copy.ts'
+import { legalView, rowValue } from './legal-copy.ts'
 import { useComingSoon, useSizes } from '../demo/useSizes.ts'
 import { SHIPS } from '../order/packages.ts'
 import { toRevealLang } from '../reveal/lang.ts'
@@ -19,11 +19,11 @@ const LANGS: { id: UiLanguage; label: string }[] = [
 export default function LegalApp() {
   const [language, setLanguage] = useLanguage()
   const lang = toRevealLang(language)
-  const t = LEGAL[lang]
   const sizes = useSizes()
   const soon = useComingSoon()
-  // the wooden sizes' delivery sentence shows only while they are on sale (the page asks /api/sizes once)
+  // everything about the wooden sizes shows only while they are on sale (the page asks /api/sizes once; until it answers, the e-gift version shows)
   const woodOnSale = !!sizes && sizes.some((p) => SHIPS[p] && !soon.includes(p))
+  const t = legalView(lang, woodOnSale)
   useEffect(() => {
     document.title = `${t.title} · ICHIREI`
     document.documentElement.lang = lang === 'zh-Hant' ? 'zh-Hant' : lang

@@ -60,3 +60,56 @@ export async function readFreeSourceCounts(store: OrderStore, days: string[]): P
   }
   return out
 }
+
+// ---- the main character (本命) of every run, for the owner's "which characters keep coming back" table (2026-11-07) ------------------------------------------------------------------------
+// One line per finished run in `ops/mains-<day>.jsonl`: the round, the language and the main character (and the second). Never a story, a name or a session id.
+
+export interface MainLine {
+  ts: string
+  round: 1 | 2 | 3
+  language: string
+  main: string
+  second: string | null
+}
+
+export const mainPath = (now: Date): string => `ops/mains-${analyticsDay(now)}.jsonl`
+const oneChar = (v: unknown): string | null => (typeof v === 'string' && [...v.trim()].length === 1 && /\p{Script=Han}/u.test(v.trim()) ? v.trim() : null)
+
+export async function recordMain(store: OrderStore | null, info: { round: number; language: string; main: string; second?: string | null }, now: Date = new Date()): Promise<void> {
+  if (!store) return
+  try {
+    const main = oneChar(info.main)
+    if (!main) return
+    const line: MainLine = { ts: now.toISOString(), round: info.round === 2 || info.round === 3 ? info.round : 1, language: ['ja', 'zh-Hans', 'zh-Hant', 'en'].includes(info.language) ? info.language : 'ja', main, second: oneChar(info.second) }
+    await store.appendJsonl(mainPath(now), line)
+  } catch (err) {
+    console.error('[ichirei-ops] main append failed', err instanceof Error ? err.message : err)
+  }
+}
+
+export interface MainCounts {
+  runs: number
+  /** the ten most common main characters over the days read, most common first */
+  top: { kanji: string; count: number; share: number }[]
+}
+
+export async function readMainCounts(store: OrderStore, days: string[], top = 10): Promise<MainCounts> {
+  const count = new Map<string, number>()
+  let runs = 0
+  for (const day of days) {
+    let lines: MainLine[] = []
+    try {
+      lines = await readJsonl<MainLine>(store, `ops/mains-${day}.jsonl`)
+    } catch {
+      lines = []
+    }
+    for (const l of lines) {
+      const k = oneChar(l.main)
+      if (!k) continue
+      runs++
+      count.set(k, (count.get(k) ?? 0) + 1)
+    }
+  }
+  const list = [...count.entries()].sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0])).slice(0, top).map(([kanji, n]) => ({ kanji, count: n, share: runs ? Math.round((n / runs) * 1000) / 10 : 0 }))
+  return { runs, top: list }
+}

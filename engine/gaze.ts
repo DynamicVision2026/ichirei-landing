@@ -76,18 +76,39 @@ const INVENTED_TERMS: Record<'ja' | 'zh' | 'en', RegExp> = {
   en: /\b(daughter|daughters|son|sons|grandson|granddaughter|grandchild|grandchildren|nephew|niece)\b/i,
 }
 
-/** The words in `gaze` that state a sender/relative fact the story does not state. [] = none. */
+// Details a line likes to ADD (2026-11-07): a manner of acting that makes the person sound decisive or quick (「迷わず」), and an everyday object that is not in the story (a desk, an umbrella). A line may paraphrase
+// what the story says; it may not bring in a detail the story does not give. These are the ones a model reaches for most; the review's `truth` rule covers the rest. Same handling as the family words: ONE rewrite,
+// then the card is set aside (the runner-up, then the refill).
+const INVENTED_DETAILS: Record<'ja' | 'zh' | 'en', RegExp> = {
+  ja: /迷わず|迷いなく|ためらわず|ためらいなく|躊躇なく|即座に|すかさず|真っ先に|一目散に|黙々と|決して|必ず|当たり前のように|当然のように|机|デスク|椅子|書類|電卓|帳簿|鞄|かばん|カバン|傘|手帳|ペン|鍵|パソコン|ノート|マグカップ|ネクタイ|スーツ|眼鏡|メガネ/u,
+  zh: /毫不猶豫|毫不犹豫|毫無猶豫|毫无犹豫|立刻|立即|馬上|马上|從不|从不|絕不|绝不|一定會|一定会|桌子|書桌|书桌|辦公桌|办公桌|椅子|公事包|雨傘|雨伞|筆記本|笔记本|電腦|电脑|眼鏡|眼镜|領帶|领带/u,
+  en: /\b(without hesitation|without hesitating|without a second thought|without thinking|immediately|instantly|at once|never fails|desk|chair|briefcase|umbrella|notebook|laptop|necktie|glasses)\b/i,
+}
+
+/** The words in `gaze` that state a fact about the sender or a relative, or add a detail (a manner, an object), that the story does not state. [] = none. */
 export function inventedFacts(gaze: string, story: string, language: Language): string[] {
-  const re = INVENTED_TERMS[language === 'ja' ? 'ja' : language === 'en' ? 'en' : 'zh']
+  const key = language === 'ja' ? 'ja' : language === 'en' ? 'en' : 'zh'
   const found = new Set<string>()
-  for (const m of gaze.matchAll(new RegExp(re.source, re.flags.includes('g') ? re.flags : re.flags + 'g'))) {
-    const term = m[0]
-    if (!story.toLowerCase().includes(term.toLowerCase())) found.add(term)
+  for (const re of [INVENTED_TERMS[key], INVENTED_DETAILS[key]]) {
+    for (const m of gaze.matchAll(new RegExp(re.source, re.flags.includes('g') ? re.flags : re.flags + 'g'))) {
+      const term = m[0]
+      if (!story.toLowerCase().includes(term.toLowerCase())) found.add(term)
+    }
   }
   return [...found]
 }
 
-export const inventedWhy = (terms: string[]): string => `it states a fact about the sender or a relative that the story does not give (${terms.join(', ')}): the form gives the receiver's relationship, never the sender's gender, age or family role. Use 「私」 or neutral wording`
+/** True for a detail word (not a family word): the line added a manner or an object the story does not give. */
+const isDetailTerm = (t: string): boolean => (['ja', 'zh', 'en'] as const).some((k) => new RegExp(`^(?:${INVENTED_DETAILS[k].source})$`, INVENTED_DETAILS[k].flags.replace('g', '')).test(t))
+
+export const inventedWhy = (terms: string[]): string => {
+  const details = terms.filter(isDetailTerm)
+  const family = terms.filter((t) => !isDetailTerm(t))
+  const parts: string[] = []
+  if (family.length > 0) parts.push(`it states a fact about the sender or a relative that the story does not give (${family.join(', ')}): the form gives the receiver's relationship, never the sender's gender, age or family role. Use 「私」 or neutral wording`)
+  if (details.length > 0) parts.push(`it adds a detail the story does not give (${details.join(', ')}): a manner of acting or an object that is not in the sender's words. Keep only what the story says; paraphrase it, never add to it`)
+  return parts.join('; ')
+}
 
 // ---- the narrator as the acting subject (`subject`, v9.6 follow-up) -----------------------------------------------------------------------------------
 // A card is about the RECEIVER. A card whose quoted act (the story_anchor) is something the NARRATOR did — 「俺はそれをひとつひとつ計測して、削って、加えていった」 — is about the sender, and

@@ -249,6 +249,8 @@ export interface RunEngineOptions {
    * calls) — or null when none is shown, and the reasons in codes why a later step was needed or the card was lost. Codes only; the API turns it into the /ops count. Not called for remembrance (two cards).
    */
   onFreeSource?: (info: { round: number; source: 'first' | 'retry' | 'runner_up' | null; reasons: string[] }) => void
+  /** Called once per finished run with the main character that stands (and the second), for the owner's top-10 of recurring characters. Never story text. */
+  onMain?: (info: { round: number; language: string; main: string; second: string | null }) => void
   /** How many follow-up answers the sender has already given (the API layer passes it). Lexicon mode: after one, a second "no lexicon character fits" falls back to the palette engine. */
   followUpsUsed?: number
   /** ICHIREI_LEXICON_MODE for this run (tests); default: the environment. */
@@ -367,7 +369,7 @@ function logCards(story: string, context: EngineContext, before: EngineResult, a
   try {
     const live = (r: EngineResult, slot: string) => r.candidates.filter((c) => !c.eliminated && c.slot === slot).length
     const removed = after.candidates.filter((c) => c.eliminated).map((c) => ({ slot: c.slot, reason: (c.eliminated_reason ?? 'unknown').slice(0, 80) }))
-    const payload = { cards_mode: parallel ? 'parallel' : 'single', purpose: purposeCodeOf(context), state: effectiveState(context), ...(otherTextMapped(context) ? { other_text_mapped: otherTextMapped(context) } : {}), ...(parallel ? { second_source: parallel.second_source } : {}), story_chars: [...story].length, language: context.language, occasion: context.occasion, status: after.status, live: { main: live(after, 'main'), second: live(after, 'second'), freestyle: live(after, 'freestyle') }, before_final: before.candidates.filter((c) => !c.eliminated).length, freestyle: context.occasion === 'memorial' ? 'not_offered' : undefined, ms, select: select ?? undefined, ...(parallel ? { parallel: { first_card_ms: parallel.first_card_ms, all_cards_ms: parallel.all_cards_ms, calls: parallel.calls, reviews: parallel.reviews, collisions: parallel.collisions, runner_up_used: parallel.runner_up_used, free_dropped: parallel.free_dropped, second_source: parallel.second_source, subject_removed: parallel.subject_removed, subject_rewritten: parallel.subject_rewritten, looks_rewritten: parallel.looks_rewritten, line_rescue: parallel.line_rescue, language: parallel.language, free_retry: parallel.free_retry, free_source: parallel.free_source, free_fallbacks: parallel.free_fallbacks, free_set_aside: parallel.free_set_aside } } : {}), calls: parallel ? { select: parallel.calls.reduce((n, c) => n + c.attempts, 0), review: parallel.reviews.length, refill: refill ? 1 : 0, gaze: ms.gaze_failing > 0 ? 1 : 0 } : { select: ms.select_attempts, review: ms.review > 0 ? 1 : 0, refill: refill ? 1 : 0, gaze: ms.gaze_failing > 0 ? 1 : 0 }, removed, refill: refill ? { asked: refill.asked, filled: refill.filled.map((f) => f.slot), rejected: refill.rejected, rescued: refill.rescued.map((f) => f.slot), ms: refill.ms } : null }
+    const payload = { cards_mode: parallel ? 'parallel' : 'single', purpose: purposeCodeOf(context), state: effectiveState(context), ...(otherTextMapped(context) ? { other_text_mapped: otherTextMapped(context) } : {}), ...(parallel ? { second_source: parallel.second_source } : {}), story_chars: [...story].length, language: context.language, occasion: context.occasion, status: after.status, live: { main: live(after, 'main'), second: live(after, 'second'), freestyle: live(after, 'freestyle') }, before_final: before.candidates.filter((c) => !c.eliminated).length, freestyle: context.occasion === 'memorial' ? 'not_offered' : undefined, ms, select: select ?? undefined, ...(parallel ? { parallel: { first_card_ms: parallel.first_card_ms, all_cards_ms: parallel.all_cards_ms, calls: parallel.calls, reviews: parallel.reviews, collisions: parallel.collisions, runner_up_used: parallel.runner_up_used, free_dropped: parallel.free_dropped, second_source: parallel.second_source, subject_removed: parallel.subject_removed, subject_rewritten: parallel.subject_rewritten, looks_rewritten: parallel.looks_rewritten, line_rescue: parallel.line_rescue, language: parallel.language, free_retry: parallel.free_retry, free_source: parallel.free_source, free_fallbacks: parallel.free_fallbacks, free_set_aside: parallel.free_set_aside, shown_changed: (parallel as { shown_changed?: unknown }).shown_changed ?? [] } } : {}), calls: parallel ? { select: parallel.calls.reduce((n, c) => n + c.attempts, 0), review: parallel.reviews.length, refill: refill ? 1 : 0, gaze: ms.gaze_failing > 0 ? 1 : 0 } : { select: ms.select_attempts, review: ms.review > 0 ? 1 : 0, refill: refill ? 1 : 0, gaze: ms.gaze_failing > 0 ? 1 : 0 }, removed, refill: refill ? { asked: refill.asked, filled: refill.filled.map((f) => f.slot), rejected: refill.rejected, rescued: refill.rescued.map((f) => f.slot), ms: refill.ms } : null }
     console.log(`[ichirei-cards] ${JSON.stringify(payload)}`)
     onDebug?.(debugOf(payload))
   } catch {
@@ -802,6 +804,29 @@ async function runCardsPipeline(a: PipelineArgs): Promise<PipelineOut> {
     const withLine: EngineResult = { ...r, candidates: r.candidates.map((c) => ({ ...c, classical_echo: c.slot !== 'freestyle' && !c.eliminated ? lexiconEchoOf(view.set, c) : null })) }
     return { ...withLine, lexicon: { mode: 'on', outcome: r.status === 'sufficient' ? 'chosen' : 'question', eligible: view.set.chars.length } }
   }
+  // A card is shown only when it is final (2026-11-07). The steps the result used to go through AFTER all cards were in — the shape gate (a line that still fails after its first rewrite), the line's language and
+  // script, invented facts and the narrator as subject, the main's eligibility, the display reading — are run on each card as it is accepted, so what is streamed is what the result carries.
+  const settle = async (card: Candidate, slot: 'main' | 'second' | 'freestyle'): Promise<{ card: Candidate } | { reject: string }> => {
+    try {
+      let mini = stampResult({ status: 'sufficient', candidates: [card], primary_kanji: slot === 'freestyle' ? null : card.kanji, runner_up_kanji: null, freestyle_kanji: slot === 'freestyle' ? card.kanji : null } as unknown as EngineResult, context)
+      const gazeOpts = { tone: toneLine(context), apiKey: opts.apiKey, signal: opts.signal, onUsage: opts.onUsage ? (u: { model: string; input_tokens: number; output_tokens: number }) => opts.onUsage!('review', u) : undefined }
+      try {
+        mini = (await shapeGate(mini, story, context.language, gazeOpts)).result
+      } catch {
+        // (the gate never fails a card)
+      }
+      mini = dropInvented(enforceLineLanguage(mini, context.language), story, context.language)
+      const c = mini.candidates[0]
+      if (!c) return { reject: 'other' }
+      if (c.eliminated) return { reject: c.eliminated_reason === SUBJECT_REASON ? 'subject' : c.eliminated_reason === INVENTED_FACT_REASON ? 'invented_fact' : 'language' }
+      if (slot === 'main' && !mainEligibility(mini, palette, story, canBeMain)(c)) return { reject: 'main_not_eligible' }
+      return { card: withDisplayReadings(mini, palette).candidates[0] ?? c }
+    } catch {
+      return { card } // (a gate that cannot run never costs a card)
+    }
+  }
+  // what the page was shown, per slot (the card's character and line) — compared with the final result below; they must be the same
+  const streamed: Record<string, { kanji: string; line: string }> = {}
   const out = await runCards({
     story,
     context,
@@ -809,8 +834,9 @@ async function runCardsPipeline(a: PipelineArgs): Promise<PipelineOut> {
     client,
     prompt,
     tStart,
+    settle,
     models: { select: MODEL, review: REVIEW_MODEL, free: process.env.ICHIREI_FREE_MODEL ?? process.env.ICHIREI_REFILL_FREE_MODEL ?? REVIEW_MODEL },
-    opts: { apiKey: opts.apiKey, signal: opts.signal, onUsage: opts.onUsage, onStage: opts.onStage, onDelta: opts.onDelta, onCard: opts.onCard, exclude: opts.exclude, round: opts.round },
+    opts: { apiKey: opts.apiKey, signal: opts.signal, onUsage: opts.onUsage, onStage: opts.onStage, onDelta: opts.onDelta, onCard: (p) => { for (const c of p.candidates) if (!c.eliminated) streamed[c.slot] = { kanji: c.kanji, line: c.one_line_gaze }; opts.onCard?.(p) }, exclude: opts.exclude, round: opts.round },
     deps: { extractJson, stamp: (r) => stampResult(r, context) },
     canBeMain,
     excluded,
@@ -895,6 +921,50 @@ async function runCardsPipeline(a: PipelineArgs): Promise<PipelineOut> {
   const final = withDisplayReadings(finalizeResult(ensureMain(enforceLineLanguage(dropInvented(withGazes, story, context.language), context.language), undefined, canBeMain)), palette)
   const refillMs = tGaze - tReplace
   out.report.all_cards_ms = Math.max(out.report.all_cards_ms, Date.now() - tStart)
+  // Where the time went, in one line (2026-11-07): each call (model, ms, tries, the hedge, tokens, thinking), the first and last card, the longest review, the refill and the line fixes — and, past 30 s, the likely causes.
+  {
+    const total = Date.now() - tStart
+    const calls = out.report.calls.filter((c) => c.slot !== 'freestyle')
+    const reviewMax = out.report.reviews.reduce((m, r) => Math.max(m, r.ms), 0)
+    const cardsMs = Math.max(out.report.main_call_ms, ...calls.filter((c) => c.slot === 'second').map((c) => c.ms))
+    const slow: string[] = []
+    if (total >= 30_000) {
+      if (out.report.main_call_ms >= 25_000) slow.push('main_call')
+      if (calls.some((c) => c.attempts > 1)) slow.push('call_retried')
+      if (calls.some((c) => c.stop_reason === 'max_tokens')) slow.push('max_tokens')
+      if (calls.some((c) => (c.thinking_tokens ?? 0) >= 3000)) slow.push('thinking')
+      if (calls.some((c) => c.hedge === 2)) slow.push('hedged')
+      if (reviewMax >= 8_000) slow.push('review')
+      if (refillMs >= 8_000) slow.push('refill')
+      if (gazeMs >= 8_000) slow.push('gaze')
+      if (out.report.all_cards_ms - cardsMs >= 8_000) slow.push('free_wait')
+      if (slow.length === 0) slow.push('unknown')
+    }
+    console.log(`[ichirei-card-timing] ${JSON.stringify({ round: opts.round ?? 1, total_ms: total, first_card_ms: out.report.first_card_ms, all_cards_ms: out.report.all_cards_ms, calls: out.report.calls.map((c) => ({ slot: c.slot, model: c.model, ms: c.ms, attempts: c.attempts, ...(c.hedge ? { hedge: c.hedge, won: c.won ?? null } : {}), output_tokens: c.output_tokens, thinking_tokens: c.thinking_tokens, stop_reason: c.stop_reason })), review_ms: reviewMax, refill_asked: refill !== null, refill_ms: refillMs, gaze_ms: gazeMs, slow })}`)
+  }
+  {
+    const m = final.candidates.find((c) => !c.eliminated && c.slot === 'main')
+    const s2 = final.candidates.find((c) => !c.eliminated && c.slot === 'second')
+    if (final.status === 'sufficient' && m) {
+      console.log(`[ichirei-engine] main_character ${JSON.stringify({ round: opts.round ?? 1, language: context.language, main: m.kanji, second: s2?.kanji ?? null })}`)
+      try {
+        opts.onMain?.({ round: opts.round ?? 1, language: context.language, main: m.kanji, second: s2?.kanji ?? null })
+      } catch {
+        // (a count is never a reason to lose a result)
+      }
+    }
+  }
+  // Every card that was shown must be the card that stands (2026-11-07): a mismatch is logged with the slot and what changed (codes, no text).
+  {
+    const changed = (['main', 'second', 'freestyle'] as const).flatMap((slot) => {
+      const s = streamed[slot]
+      const f = final.candidates.find((c) => !c.eliminated && c.slot === slot)
+      if (!s) return []
+      return !f ? [{ slot, what: 'removed' }] : f.kanji !== s.kanji ? [{ slot, what: 'character' }] : f.one_line_gaze !== s.line ? [{ slot, what: 'line' }] : []
+    })
+    if (changed.length > 0) console.log(`[ichirei-engine] card_changed_after_shown ${JSON.stringify({ changed })}`)
+    ;(out.report as { shown_changed?: unknown }).shown_changed = changed
+  }
   // The free card (2026-11-07): where it came from, and why a later step was needed — one log line, and the /ops count. A free card the lane chose but the last gates removed counts as lost.
   if (context.occasion !== 'memorial') {
     const freeLive = final.candidates.some((c) => !c.eliminated && c.slot === 'freestyle')

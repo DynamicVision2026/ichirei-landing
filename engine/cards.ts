@@ -38,6 +38,15 @@ export const cardsMode = (env: NodeJS.ProcessEnv = process.env): 'parallel' | 's
 
 // ---- settings (all overridable; what was chosen is reported in DEPLOY.md) ---------------------------------------------------------------------------------------------------------
 export const CARD_EFFORT = (): 'low' | 'medium' | 'high' => (process.env.ICHIREI_CARD_EFFORT ?? 'low') as 'low' | 'medium' | 'high'
+/**
+ * Extended thinking on the main and second calls is OFF (2026-11-07): the prompts already make the model write its reasoning as visible fields (lexicon mode: `truth`, `ideal_character` first), and a live
+ * request (a son's story, ~110 s) shows the cost of leaving it on — thinking can use the whole 6,000-token budget (about 85 s at a Sonnet's speed), the answer is then cut off, and the call is repeated
+ * with 14,000. ICHIREI_CARD_THINKING=on puts it back.
+ */
+export const CARD_THINKING = (): boolean => /^(on|1|true|yes)$/i.test((process.env.ICHIREI_CARD_THINKING ?? '').trim())
+/** A main or second call that has not answered after this long is asked a second time (the same prompt, no thinking); the first readable answer wins. 0 = off. */
+export const CARD_HEDGE_MS_DEFAULT = 40_000
+const cardHedgeMs = (): number => (process.env.ICHIREI_CARD_HEDGE_MS === undefined || process.env.ICHIREI_CARD_HEDGE_MS === '' ? CARD_HEDGE_MS_DEFAULT : Math.max(0, Number(process.env.ICHIREI_CARD_HEDGE_MS) || 0))
 export const CARD_MAX_TOKENS = (): number => Number(process.env.ICHIREI_CARD_MAX_TOKENS ?? 6000)
 export const CARD_MAX_TOKENS_RETRY = (): number => Number(process.env.ICHIREI_CARD_MAX_TOKENS_RETRY ?? 14000)
 const num = (v: string | undefined, d: number): number => (Number.isFinite(Number(v)) && Number(v) > 0 ? Number(v) : d)
@@ -219,6 +228,12 @@ export interface CardsArgs {
   lexicon?: { staticBlock: string; dynamicBlock: string; inList: (c: Candidate) => boolean } | null
   /** Applied to every result this module hands out while it works (the cards shown early): lexicon mode puts the lexicon's classical line on a card here. */
   finish?: (r: EngineResult) => EngineResult
+  /**
+   * The last per-card steps of the pipeline (shape gate, line language and script, invented facts, the main's eligibility, display reading), run on ONE card as it is accepted. A card is shown only when it
+   * is final (2026-11-07): what is streamed is exactly what the result carries — never a provisional 本命 that the later gates change on screen. `{ reject }` = a code, the card is set aside like any other
+   * (the runner-up is tried). Absent = the card is accepted as it is (tests of the lane alone).
+   */
+  settle?: (card: Candidate, slot: CardSlot) => Promise<{ card: Candidate } | { reject: string }>
 }
 
 export interface CardsOut {
@@ -390,7 +405,7 @@ export const lineRuleOf = (reason: string | null | undefined): string | null => 
 
 /** A card that stands on something the NARRATOR did (the quoted act's subject is the narrator): set aside before the review; the runner-up, one line rewrite, then the refill. */
 export const SUBJECT_REASON = 'subject: the quoted act is the narrator\'s own, not the receiver\'s'
-export const INVENTED_FACT_REASON = 'review: truth: states a fact about the sender or a relative that the story does not give'
+export const INVENTED_FACT_REASON = 'review: truth: states a fact about the sender or a relative, or adds a detail, that the story does not give'
 
 const plain = (s: string): string => s.replace(/\s+/g, '').replace(/[「」『』“”"'、，,。.！!？?…・]/g, '')
 
@@ -422,6 +437,7 @@ export function setAsideCode(reason: string | null | undefined): string {
   const rule = /^review:\s*([a-z_]+):/i.exec(r)
   if (rule) return `review:${rule[1].toLowerCase()}`
   if (/^review/i.test(r)) return 'review'
+  if (/^final:/i.test(r)) return `final_gate:${r.replace(/^final:\s*/i, '').replace(/[^a-z_]/gi, '').slice(0, 24) || 'other'}`
   if (/^palette/i.test(r)) return 'palette'
   return 'other'
 }
@@ -564,8 +580,49 @@ export async function runCards(a: CardsArgs): Promise<CardsOut> {
           { type: 'text', text: `${p}\n\n${a.lexicon.dynamicBlock}` },
         ]
       : p
-  const callMain = modelCall('main', contentOf(cardPrompt(a.prompt, 'main', !!a.lexicon)), models.select, CARD_EFFORT(), CARD_MAX_TOKENS(), callTimeoutMs(), true, signal)
-  const callSecond = modelCall('second', contentOf(cardPrompt(a.prompt, 'second', !!a.lexicon)), models.select, CARD_EFFORT(), CARD_MAX_TOKENS(), callTimeoutMs(), true, signal)
+  // The main and second calls: no extended thinking (CARD_THINKING), and a stalled call is hedged — asked again after `cardHedgeMs()`, first readable answer wins, the other is cancelled.
+  const cardCall = (slot: 'main' | 'second'): Promise<CallOut> => {
+    const content = contentOf(cardPrompt(a.prompt, slot, !!a.lexicon))
+    const think = CARD_THINKING()
+    const ask = (sig: AbortSignal, hedge?: 1 | 2) => modelCall(slot, content, models.select, CARD_EFFORT(), CARD_MAX_TOKENS(), callTimeoutMs(), true, sig, { noThinking: !think || hedge === 2, ...(hedge ? { hedge } : {}) })
+    const hedgeMs = cardHedgeMs()
+    if (!hedgeMs) return ask(signal)
+    const stopSecond = new AbortController()
+    const stopFirst = new AbortController()
+    return new Promise<CallOut>((resolve) => {
+      let settled = false
+      let secondStarted = false
+      let firstOut: CallOut | null = null
+      let secondOut: CallOut | null = null
+      const usable = (o: CallOut | null): boolean => !!o && !o.err && (o.cands.length > 0 || o.raw?.status === 'insufficient' || o.declined === true || o.miss === true)
+      const done = (o: CallOut, winner: 1 | 2) => {
+        if (settled) return
+        settled = true
+        clearTimeout(timer)
+        ;(winner === 1 ? stopSecond : stopFirst).abort()
+        for (const c of report.calls) if (c.slot === slot && c.hedge === 2) c.won = winner === 2
+        resolve(o)
+      }
+      const timer = setTimeout(() => {
+        if (settled) return
+        secondStarted = true
+        log(`[ichirei-engine] card_hedge ${JSON.stringify({ slot, after_ms: at() })}`)
+        void ask(AbortSignal.any([signal, stopSecond.signal]), 2).then((o) => {
+          secondOut = o
+          if (usable(o)) done(o, 2)
+          else if (firstOut) done(firstOut, 1)
+        })
+      }, hedgeMs)
+      timer.unref?.()
+      void ask(AbortSignal.any([signal, stopFirst.signal])).then((o) => {
+        firstOut = o
+        if (usable(o) || !secondStarted) done(o, 1)
+        else if (secondOut) done(secondOut.err && !o.err ? o : secondOut, secondOut.err && !o.err ? 1 : 2)
+      })
+    })
+  }
+  const callMain = cardCall('main')
+  const callSecond = cardCall('second')
   // The free pick is asked TWICE at the same moment (the same prompt, the small model, low effort, no extended thinking, five options, the same ceiling): the first answer that is
   // readable and offers a card wins and the other call is cancelled. If both fail or time out, the sender sees two cards, as before.
   const hedgedFree = (round: 1 | 2 = 1, avoid: { kanji: string; reason: string }[] = []): Promise<CallOut> => {
@@ -803,7 +860,14 @@ export async function runCards(a: CardsArgs): Promise<CardsOut> {
             if (picked[slot] === ref.card) delete picked[slot]
             continue
           }
-          chosen = context.language === 'ja' ? withDisplayReading(lined, palette) : lined
+          // the last steps of the pipeline, for this card, BEFORE it can be shown (no provisional card that a later gate changes or removes)
+          const fin = a.settle ? await a.settle(lined, slot) : { card: lined }
+          if ('reject' in fin) {
+            tried.push(eliminate(lined, `final: ${fin.reject}`, 'final_gate'))
+            if (picked[slot] === ref.card) delete picked[slot]
+            continue
+          }
+          chosen = context.language === 'ja' ? withDisplayReading(fin.card, palette) : fin.card
           picked[slot] = chosen
           tried.push(chosen)
           source = from

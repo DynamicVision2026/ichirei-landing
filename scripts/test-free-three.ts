@@ -10,7 +10,7 @@ import type { EngineResult } from '../engine/contract.ts'
 import { FREE_OPTIONS, freeCardPrompt, readCardReply, setAsideCode } from '../engine/cards.ts'
 import { MemoryOrderStore } from '../engine/order-store.ts'
 import { analyticsDay } from '../engine/analytics.ts'
-import { readFreeSourceCounts, recordFreeSource } from '../engine/free-source.ts'
+import { readFreeSourceCounts, readMainCounts, recordFreeSource, recordMain } from '../engine/free-source.ts'
 import { createOpsHandlers, type OpsDeps } from '../api/ops.ts'
 
 let failures = 0
@@ -224,6 +224,18 @@ try {
   const part = page.slice(page.indexOf('三枚目の字（趣字）の出どころ'))
   check('(13) /ops shows the free card\'s sources for the last 8 days — per round: first, retry, runner_up, none — and the reasons with their counts', part.includes('class="freeT"') && /<td>2回目<\/td><td>0<\/td><td>0<\/td><td>1<\/td><td>0<\/td>/.test(part) && /<td>3回目<\/td><td>0<\/td><td>0<\/td><td>0<\/td><td>1<\/td>/.test(part) && /合計（3回）/.test(part) && part.includes('already_shown 1') && part.includes('late 1'), part.slice(0, 700))
   check('(13) …only codes and counts are on the page: no story, no character', !/父|朝|誠/.test(part))
+
+  // ---- (14) the main character of every run, and the owner's top 10 over 30 days ------------------------------------------------------------------------------------------------------------------
+  const day = (n: number) => new Date(now.getTime() - n * 86_400_000)
+  const mains = [['誠', 0], ['誠', 0], ['誠', 3], ['常', 5], ['守', 9], ['灯', 12], ['待', 20], ['信', 25], ['恩', 27], ['想', 28], ['箱', 29], ['朝', 29], ['雪', 40]] as const
+  for (const [k, d] of mains) await recordMain(store, { round: 1, language: 'ja', main: k }, day(d))
+  await recordMain(store, { round: 2, language: 'ja', main: 'ab' }, now) // not one character → not recorded
+  const days30 = Array.from({ length: 30 }, (_, i) => analyticsDay(day(i)))
+  const mc = await readMainCounts(store, days30)
+  check('(14) the main characters of the last 30 days are counted, most common first (誠 3, then the rest), at most ten, older than 30 days left out, junk not recorded', mc.runs === 12 && mc.top.length === 10 && mc.top[0].kanji === '誠' && mc.top[0].count === 3 && mc.top[0].share === 25 && !mc.top.some((t) => t.kanji === '雪'), JSON.stringify(mc))
+  const page2 = await (await O.page(new Request('https://ichirei.example/ops', { headers: { authorization: `Basic ${Buffer.from('owner:correct horse').toString('base64')}` } }))).text()
+  const mpart = page2.slice(page2.indexOf('本命（メインの字）上位10（直近30日）'))
+  check('(14) /ops shows the top 10 table with the character, the count and the share', mpart.includes('class="mainT"') && /<td>1<\/td><td class="k">誠<\/td><td>3<\/td><td>25%<\/td>/.test(mpart) && mpart.includes('全12回'), mpart.slice(0, 400))
 } finally {
   console.log = origLog
   upstream.close()

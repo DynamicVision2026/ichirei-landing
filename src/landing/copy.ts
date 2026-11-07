@@ -136,7 +136,7 @@ const zhHant: LandingCopy = {
 const en: LandingCopy = {
   documentTitle: 'ICHIREI 一字礼 — A Gift of One Character',
   documentDescription:
-    'ICHIREI (一字礼) — the person you see, in a single Japanese character. A gift of one kanji for someone who matters, carved in Japan.',
+    'ICHIREI (一字礼) — the person you see, in a single Japanese character. A gift of one kanji for someone who matters.',
   brand: '一字礼',
   nav: {
     languageLabel: 'Language',
@@ -146,7 +146,7 @@ const en: LandingCopy = {
   hero: {
     eyebrow: 'A Gift of One Character',
     title: 'One character, as a gift',
-    subtitle: 'The person you see, in a single Japanese character, carved in Japan.',
+    subtitle: 'The person you see, in a single Japanese character.',
     cta: 'Find the character',
   },
   marquee: { phrase: '一字礼 ・ ICHIREI ・ A Gift of One Character ・ ', label: '一字礼 ICHIREI A Gift of One Character' },

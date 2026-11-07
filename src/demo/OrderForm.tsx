@@ -274,7 +274,7 @@ export default function OrderForm({ result, story, followUps = [], promptQuestio
             />
           </div>
           <p className="sent nameHelp" data-testid="name-help">{o.nameHelp}</p>
-          {pkg !== 'egift' && (
+          {pkg !== 'egift' && (woodOnSale || (pkg !== '' && WOODEN[pkg])) && (
           <div>
             <label className="clab" htmlFor="delivery_date">{o.dateLabel}</label>
             <input
@@ -307,9 +307,10 @@ export default function OrderForm({ result, story, followUps = [], promptQuestio
                     {formatYen(PACKAGE_PRICE_JPY[id])}
                   </span>
                   {approx && <span className="sent" data-approx>{approx}</span>}
-                  <span className="sent pkgIncludes" data-includes={id}>{memorial ? sc.includesMemorial[id] : sc.includes[id]}</span>
-                  <span className="sent pkgShip" data-ship-line={id}>{sc.ship[id]}</span>
-                  {id === 'simple' && !simpleOk && <span className="sent" data-stroke-note>{o.simpleUnavailable(maxStrokes)}</span>}
+                  {/* a size that is "coming soon" says nothing about what it includes or how it is sent */}
+                  {!soon.includes(id) && <span className="sent pkgIncludes" data-includes={id}>{memorial ? sc.includesMemorial[id] : sc.includes[id]}</span>}
+                  {!soon.includes(id) && <span className="sent pkgShip" data-ship-line={id}>{sc.ship[id]}</span>}
+                  {id === 'simple' && !simpleOk && !soon.includes(id) && <span className="sent" data-stroke-note>{o.simpleUnavailable(maxStrokes)}</span>}
                 </label>
               )
             })}
@@ -317,7 +318,7 @@ export default function OrderForm({ result, story, followUps = [], promptQuestio
           {memorial && <p className="sent" data-memorial-sizes>{sc.memorialNote}</p>}
           {pkg === 'egift' && <p className="sent" data-egift-note>{memorial ? sc.egiftNoteMemorial : sc.egiftNote}</p>}
           {pkg !== '' && WOODEN[pkg] && !soon.includes(pkg) && <p className="sent" data-testid="order-delivery-wood">{LEGAL[toRevealLang(language)].deliveryWood}</p>}
-          {(pkg === '' || WOODEN[pkg]) && (
+          {(pkg === '' || WOODEN[pkg]) && o.shippingNote !== '' && (
             <p data-shipping className="sent">
               {o.shippingNote}
             </p>

@@ -17,6 +17,7 @@ import { ENGINE_CONFIG, DEFAULT_REVIEW_MODEL } from './engine.ts'
 import { REVIEW_VETO_RULES, familyOf, type Language, type Occasion, type Relationship, type Direction } from './contract.ts'
 import { plainMeaning, type Palette } from './palette.ts'
 import { reviewEnabled } from './review.ts'
+import { kanjiNote, wrongKanji } from './homophone.ts'
 import { blockedCharacters, checkCharacterOnce, checkContainsCharacter, checkCraft, checkForcedLabel, checkForm, checkPalette, meaningWords, type PoemDraft } from './poem-check.ts'
 import { poemLinesForLanguage } from './script.ts'
 
@@ -187,7 +188,7 @@ export interface GenerateOptions {
   log?: (line: string) => void
   onUsage?: (stage: 'poem' | 'review', usage: { model: string; input_tokens: number; output_tokens: number }) => void
   /** The quality notes of the story-image rule, as codes: the poem was rewritten once for it, or kept after the rewrite (the post-deploy self-test reads them). */
-  onNote?: (code: 'story_image_rewritten' | 'story_image_kept' | 'character_rewritten') => void
+  onNote?: (code: 'story_image_rewritten' | 'story_image_kept' | 'character_rewritten' | 'kanji_rewritten' | 'kanji_kept') => void
 }
 
 export async function generatePoem(input: PoemInput, palette: Palette, opts: GenerateOptions = {}): Promise<PoemResult> {
@@ -271,21 +272,33 @@ export async function generatePoem(input: PoemInput, palette: Palette, opts: Gen
         ...checkPalette(draft, palette, input.occasion ?? (input.quiet ? 'memorial' : null), families, [...exempt, ...forms.flatMap((f) => [...f])]),
         ...(wantsG && !freeText(raw.gendaigo) ? ['gendaigo is missing: add a short modern Japanese 現代語訳 of the whole poem'] : []),
       ]
-      let imageNote: string | null = null // the one quality rule (story_image): one rewrite is asked for, then the poem in hand is kept
+      let imageNote: string | null = null // the quality rules (story_image, character, kanji): one rewrite is asked for, then the better poem is kept
+      // a wrong kanji (same sound, wrong meaning: 侘び for 詫び) — certain cases are found in code, the rest by the second reader (rule `kanji`)
+      const builtAids = aidsText(build(raw, draft).aids)
+      const mistakes = problems.length === 0 ? wrongKanji([...lines, builtAids].join('\n'), input.story, input.tone) : []
       if (problems.length === 0 && reviewEnabled()) {
-        const verdict = await review(draft, input, callText, aidsText(build(raw, draft).aids))
-        if (verdict && (verdict.startsWith('review (story_image)') || verdict.startsWith('review (character)'))) imageNote = verdict
+        const verdict = await review(draft, input, callText, builtAids)
+        if (verdict && (verdict.startsWith('review (story_image)') || verdict.startsWith('review (character)') || verdict.startsWith('review (kanji)'))) imageNote = verdict
         else if (verdict) problems.push(verdict)
       }
+      if (!imageNote && problems.length === 0 && mistakes.length > 0) imageNote = `review (kanji): ${kanjiNote(mistakes)}`
+      const kanjiIssue = imageNote?.startsWith('review (kanji)') === true
       if (imageNote && problems.length === 0) {
         if (attempt === 2) {
-          log(`[ichirei-poem] ${JSON.stringify({ type: input.type, event: 'story_image_kept', language: input.language })}`)
-          opts.onNote?.('story_image_kept')
+          log(`[ichirei-poem] ${JSON.stringify({ type: input.type, event: kanjiIssue ? 'kanji_kept' : 'story_image_kept', language: input.language })}`)
+          opts.onNote?.(kanjiIssue ? 'kanji_kept' : 'story_image_kept')
+          // keep the BETTER poem: the first one stays when the rewrite still has a wrong kanji that the first did not have
+          if (kanjiIssue && spare && mistakes.length > 0 && wrongKanji([...spare.lines, spare.reading ?? ''].join('\n'), input.story, input.tone).length < mistakes.length) {
+            logOk(attempt, spareSoft, spare)
+            return { ok: true, poem: spare }
+          }
         } else {
           spare = build(raw, draft)
           spareSoft = []
-          opts.onNote?.(imageNote.startsWith('review (character)') ? 'character_rewritten' : 'story_image_rewritten')
-          feedback = imageNote.startsWith('review (character)')
+          opts.onNote?.(kanjiIssue ? 'kanji_rewritten' : imageNote.startsWith('review (character)') ? 'character_rewritten' : 'story_image_rewritten')
+          feedback = kanjiIssue
+            ? `\nA CHECK FOUND A WRONG KANJI (a character with the right sound and the wrong meaning) IN YOUR POEM: ${imageNote.slice('review (kanji): '.length)}. Write a new poem that keeps the story's images and writes every word with the kanji that means what you mean (詫び for an apology, never 侘び; 会う for meeting, 合う for fitting; 贈る for a gift, 送る for sending; 思い / 想い as the word needs).\n`
+            : imageNote.startsWith('review (character)')
             ? `\nA SECOND READER FOUND THAT THE CHOSEN CHARACTER IS NOT USED NATURALLY (it is missing, or it is only a label that announces it) — write a new poem that keeps the story's image and puts the character, once, inside a real word of that image:\n- ${imageNote}\n`
             : `\nA SECOND READER FOUND THAT YOUR POEM'S IMAGERY DOES NOT COME FROM THIS STORY (the same goes for its reading aids — the 書き下し文 and the summary / translation) — write a new poem with new aids (read the whole story again; carry its turning point through one concrete image the story itself gives; no scenery, object or feeling the story does not give):\n- ${imageNote}\n`
           if (Date.now() - t0 > poemTimeoutMs() * 0.55) break
@@ -369,7 +382,7 @@ async function review(
     const raw = parseJson(await callText('review', process.env.ICHIREI_REVIEW_MODEL ?? DEFAULT_REVIEW_MODEL, prompt, Number(process.env.ICHIREI_REVIEW_MAX_TOKENS ?? 4000), 'low'))
     if (!raw || typeof raw.pass !== 'boolean' || raw.pass) return null
     const rule = typeof raw.rule === 'string' ? raw.rule.toLowerCase() : ''
-    if (!(REVIEW_VETO_RULES as readonly string[]).includes(rule) && rule !== 'attribution' && rule !== 'story_image' && rule !== 'character') return null // not a rule: a concern, not a veto (story_image is the one quality rule: the imagery must come from the story)
+    if (!(REVIEW_VETO_RULES as readonly string[]).includes(rule) && rule !== 'attribution' && rule !== 'story_image' && rule !== 'character' && rule !== 'kanji') return null // not a rule: a concern, not a veto (story_image is the one quality rule: the imagery must come from the story)
     return `review (${rule}): ${typeof raw.reason === 'string' ? raw.reason.slice(0, 120) : 'did not pass'}`
   } catch {
     return null

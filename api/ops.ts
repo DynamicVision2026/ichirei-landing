@@ -15,7 +15,7 @@
 
 import { createHash, timingSafeEqual } from 'node:crypto'
 import { analyticsDay } from '../engine/analytics.ts'
-import { readFreeSourceCounts, type FreeSourceCounts } from '../engine/free-source.ts'
+import { readFreeSourceCounts, readMainCounts, type FreeSourceCounts, type MainCounts } from '../engine/free-source.ts'
 import { isAnimationRecord } from '../engine/animation.ts'
 import { flaggedEgifts, mailerFromEnv, purgeExpiredAddresses, readJsonl, runEgiftReminders, type Mailer, type OrderIndexEntry } from '../engine/egift-ops.ts'
 import { readArt } from '../engine/film-art.ts'
@@ -220,6 +220,7 @@ export function createOpsHandlers(deps: () => OpsDeps) {
       const { rows, verified } = await classify(await loadRows(store, days), d, env, now)
       const flagged = await flaggedEgifts(store, now)
       const freeCounts = await readFreeSourceCounts(store, days).catch(() => null)
+      const mainCounts = await readMainCounts(store, lastDays(now, 30)).catch(() => null)
       const common = (r: Classified) => {
         const e = r.entry
         return `<td>${esc(e.order_ref)}</td><td>${esc(SIZE_LABEL[e.size_code] ?? e.size_code)}</td><td>${e.memorial ? '偲ぶ' : ''}</td><td>${esc(SHIP_LABEL[e.ship_to] ?? e.ship_to)}</td>`
@@ -270,6 +271,9 @@ export function createOpsHandlers(deps: () => OpsDeps) {
         const reasons = Object.entries(c.reasons).sort((a, b) => b[1] - a[1]).map(([k, n]) => `${esc(k)} ${n}`).join(' / ')
         return `<div class="wide"><table class="freeT"><thead><tr><th>ラウンド</th><th>最初の五候補から (first)</th><th>やり直し (retry)</th><th>他のカードの予備 (runner_up)</th><th>出なかった</th></tr></thead><tbody>${row('1回目', c.by_round[1])}${row('2回目', c.by_round[2])}${row('3回目', c.by_round[3])}${row(`合計（${c.runs}回）`, c.by_source)}</tbody></table></div><p class="log">理由（やり直しが必要だった・出なかった）: ${reasons || 'なし'}</p>`
       }
+      // 本命（メインの字）上位10・直近30日: 同じ字ばかりになっていないかを見るための表（字と件数だけ）
+      const mainTable = (c: MainCounts | null) =>
+        !c ? '<p>集計を読み込めませんでした。</p>' : c.top.length === 0 ? '<p>まだ記録がありません。</p>' : `<div class="wide"><table class="mainT"><thead><tr><th>順位</th><th>字</th><th>回数</th><th>割合</th></tr></thead><tbody>${c.top.map((t, i) => `<tr><td>${i + 1}</td><td class="k">${esc(t.kanji)}</td><td>${t.count}</td><td>${t.share}%</td></tr>`).join('')}</tbody></table></div><p class="log">全${c.runs}回のうち。</p>`
       const readyRows = rows.filter((r) => ready(r) && isCardSize(r))
       const openRows = rows.filter((r) => r.win.phase === 'open')
       const otherRows = rows.filter((r) => r.win.phase === 'cancelled' || r.win.phase === 'unpaid' || (ready(r) && !isCardSize(r)))
@@ -283,6 +287,7 @@ export function createOpsHandlers(deps: () => OpsDeps) {
         `<h2>キャンセル受付中（${openRows.length}）</h2>${openTable(openRows)}` +
         `<h2>そのほか（キャンセル・入金未確認・製作なし ${otherRows.length}）</h2>${otherTable(otherRows)}` +
         `<h2>三枚目の字（趣字）の出どころ（直近8日）</h2>${freeTable(freeCounts)}` +
+        `<h2>本命（メインの字）上位10（直近30日）</h2>${mainTable(mainCounts)}` +
         `<p>${flagged.length ? `⚠ 住所が30日たっても入力されていないeギフト: ${flagged.length}件（自動の返金はしません。ご判断ください）` : ''}</p>` +
         `<script>document.addEventListener('click',async(e)=>{const b=e.target.closest('button');if(!b)return;if(b.id==='egift-run'){const r=await fetch('/ops/egift/run',{method:'POST'});alert(await r.text());return}` +
         `const act=b.dataset.act;if(act==='cancel'){let override=false;if(b.dataset.collected==='1'){if(!confirm('お客様はすでに「贈りものを受け取る」を押しています（キャンセルの権利は終了しています）。当方の不備などで、それでもキャンセルとして記録しますか？'))return;override=true}else{if(b.dataset.closed==='1'&&!confirm('24時間を過ぎています。期限内に受信したキャンセルのメールがある場合だけ、続けてください。'))return;if(!confirm('この注文をキャンセルとして記録します。製作の対象から外れ、贈りものは表示されなくなります。返金はShopifyで行ってください。よろしいですか？'))return}b.disabled=true;const r=await fetch('/ops/change',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({order_ref:b.dataset.ref,action:'cancel',override})});const j=await r.json().catch(()=>({}));alert(r.ok?'キャンセルとして記録しました':'できませんでした: '+(j.error||r.status));location.reload();return}` +

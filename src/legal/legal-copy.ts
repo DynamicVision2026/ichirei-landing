@@ -140,3 +140,38 @@ export function rowValue(lang: RevealLang, row: LegalRow, woodOnSale: boolean): 
   if (row.key !== 'delivery' || !woodOnSale) return row.value
   return `${row.value}${lang === 'en' ? ' ' : ''}${LEGAL[lang].deliveryWood}`
 }
+
+// ---- while the wooden sizes are "coming soon" the page says nothing about wood (2026-11-07) -----------------------------------------------------------------------------------------------------
+// The price row, the other-charges row, the "if we made a mistake" paragraph and FAQ answer, and the delivery paragraph (a parcel lost in transit) are about the wooden sizes; while those are not on sale
+// they are replaced by their e-gift-only form (or left out). The page asks /api/sizes once; until it answers, the e-gift version shows.
+const EGIFT_ONLY: Record<RevealLang, { price: string; other: string; defect: string }> = {
+  ja: {
+    price: `一字礼 eギフト ${y('egift')}（税込）`,
+    other: 'eギフトは郵送がなく、送料はかかりません。',
+    defect: 'eギフトのページが正常に表示されない場合は、修正します。修正できない場合は返金いたします。',
+  },
+  'zh-Hant': {
+    price: `一字禮 e 禮物 ${y('egift')}（含稅）`,
+    other: 'e 禮物不郵寄，無運費。',
+    defect: 'e禮物頁面無法正常顯示時，我們會修正；無法修正時將退款。',
+  },
+  en: {
+    price: `ICHIREI e-gift ${y('egift')} (tax included)`,
+    other: 'The e-gift is not posted, so it has no shipping.',
+    defect: "If an e-gift page doesn't display properly, we'll fix it, or refund you if we can't.",
+  },
+}
+
+/** The page's text for this moment: the full text while the wooden sizes are on sale, the e-gift-only text while they are "coming soon". */
+export function legalView(lang: RevealLang, woodOnSale: boolean): LegalCopy {
+  const full = LEGAL[lang]
+  if (woodOnSale) return full
+  const only = EGIFT_ONLY[lang]
+  return {
+    ...full,
+    rows: full.rows.map((r, i) => (i === 6 ? { ...r, value: only.price } : i === 7 ? { ...r, value: only.other } : r)),
+    // the paragraph on parcels lost in transit is about shipping wooden goods: left out
+    sections: full.sections.filter((_, i) => i !== 3).map((x, i) => (i === 2 ? { ...x, body: only.defect } : x)),
+    faq: full.faq.map((f, i) => (i === 2 ? { ...f, a: only.defect } : f)),
+  }
+}

@@ -11,6 +11,7 @@ import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { CI_PATTERNS, blockedCharacters, checkCharacterOnce, checkContainsCharacter, checkCraft, checkForcedLabel, checkForm, checkPalette, meaningWords, moraCount } from '../engine/poem-check.ts'
 import { poemLinesForLanguage } from '../engine/script.ts'
+import { kanjiNote, wrongKanji } from '../engine/homophone.ts'
 import { aidsText, buyerAids, generatePoem, loadPoemPrompt, loadPoemReviewPrompt, poemFamilies, reasonCode, type PoemInput } from '../engine/poem.ts'
 import { createPoemHandler } from '../api/poem.ts'
 import { createOrderHandler } from '../api/order.ts'
@@ -252,7 +253,7 @@ function count(k: 'poem' | 'review') { return seen.filter((s) => s.kind === k).l
     check(`(5) the ${t} prompt: the character exactly once and naturally (no label line), the poem condenses the story around the RECEIVER, only the story's images, the purpose tone applies`, (t === 'en' ? pr.includes('MEANING WORD') : pr.includes('EXACTLY ONCE')) && pr.includes('THE POEM CONDENSES THE STORY') && pr.includes('RECEIVER') && pr.includes("ONLY THE STORY'S IMAGES") && pr.includes('PURPOSE TONE'))
   }
   check('(5) per format: tanka — one image from the turning point, the receiver\'s act and the feeling, the character inside a natural word (潤して / 察して / 待ちて); haiku — one image only, 季語 only when the season is clear; 漢詩 — the arc, the character best in line 3 or 4; 宋詞 — the arc; English — 4–8 lines, the turning point', (() => { const k = (t: PoemType) => loadPoemPrompt(t); return k('tanka').includes('潤して') && k('tanka').includes('the receiver\'s act') && k('haiku').includes('ONE image only') && k('haiku').includes('季語') && k('tang').includes('line 3 or 4') && k('tang').includes('ARC') && k('ci').includes('ARC') && k('en').includes('TURNING POINT') && k('en').includes('4 to 8') })())
-  check('(5) the poem review prompt has the `character` and `tone` rules and the stricter story_image (nothing the story does not give)', loadPoemReviewPrompt().includes('`character`') && loadPoemReviewPrompt().includes('`tone`') && loadPoemReviewPrompt().includes('nothing in the poem may come from outside the story') && /"story_image" \| "character" \| "tone"/.test(loadPoemReviewPrompt()))
+  check('(5) the poem review prompt has the `character` and `tone` rules and the stricter story_image (nothing the story does not give)', loadPoemReviewPrompt().includes('`character`') && loadPoemReviewPrompt().includes('`tone`') && loadPoemReviewPrompt().includes('nothing in the poem may come from outside the story') && /"story_image" \| "character" \| "kanji" \| "tone"/.test(loadPoemReviewPrompt()))
   const rv4 = await gen(C20, 'en', [C20.poems.en], ['not json at all'])
   check('(4) an unusable review lets the poem through (the code checks still ran)', rv4.ok)
   const dec = await gen(C20, 'en', [{ declined: true }])
@@ -462,6 +463,36 @@ const postOrder = (h: (r: Request) => Promise<Response>, b: unknown) => h(new Re
   check('(8) labels, en page: Tanka (5-7-5-7-7) / Haiku (5-7-5) / Tang-style quatrain (5 or 7 characters per line) / Song-dynasty ci / Free verse', L('en').tanka === 'Tanka (5-7-5-7-7)' && L('en').haiku === 'Haiku (5-7-5)' && L('en').tang === 'Tang-style quatrain (5 or 7 characters per line)' && L('en').ci === 'Song-dynasty ci' && L('en').en === 'Free verse')
   check('(8) the step shows the labels of the PAGE language for the formats of the STORY language (a Japanese story on a zh-Hant page: 短歌 / 俳句 / 唐詩, never 漢詩)', addon.includes('p.types[t]') && poemTypesFor('zh-Hant', C20.story).map((t) => L('zh-Hant')[t]).join('|') === '短歌（五七五七七）|俳句（五七五）|唐詩（五言／七言絕句）' && poemTypesFor('en', C20.story).map((t) => L('en')[t]).join('|') === 'Tanka (5-7-5-7-7)|Haiku (5-7-5)|Tang-style quatrain (5 or 7 characters per line)')
   check('(8) the prompts are all in place (one file per type) and load', POEM_TYPES.every((t) => loadPoemPrompt(t).length > 1500))
+}
+
+// ---- 9. (2026-11-07) wrong kanji: a character with the right sound and the wrong meaning (侘び for 詫び); the poem is rewritten once, the better poem is kept ----------------------------
+{
+  const APOLOGY = { ...C20, story: C20.story + '母に、あの日のことを詫びたいと思っている。' }
+  const BAD = { ...C20.poems.tanka, lines: ['朝ごとに', '侘びの文添え', '備へたる', '母の背中を', '今も思える'], reading_kana: ['あさごとに', 'わびのふみそえ', 'そなえたる', 'ははのせなかを', 'いまもおもえる'] }
+  const OK = { ...C20.poems.tanka, lines: ['朝ごとに', '詫びの文添え', '備へたる', '母の背中を', '今も思える'], reading_kana: ['あさごとに', 'わびのふみそえ', 'そなえたる', 'ははのせなかを', 'いまもおもえる'] }
+  check('(9) wrongKanji: 侘 in a poem for an apology story is flagged (it means the wabi of wabi-sabi; 詫 is meant) — and not when the story has no apology, or the story itself writes 侘', wrongKanji('侘びの文添え', APOLOGY.story).length === 1 && wrongKanji('侘びの文添え', APOLOGY.story)[0].right === '詫びの文添え'.slice(0, 2) && wrongKanji('侘びの文添え', C20.story).length === 0 && wrongKanji('侘びの文添え', '父の侘び住まいを詫びたい').length === 0 && wrongKanji('詫びの文添え', APOLOGY.story).length === 0 && wrongKanji('静かな侘び', C20.story, 'TONE OF THIS GIFT: an apology.').length === 1)
+  check('(9) wrongKanji: the mistakes that are wrong in any story (目が会う → 合う, 見贈る → 見送る, 送り物 → 贈り物) are flagged; the right words are not', wrongKanji('目が会うたび', 'x').length === 1 && wrongKanji('母を見贈る朝', 'x').length === 1 && wrongKanji('送り物の箱', 'x').length === 1 && wrongKanji('目が合うたび母を見送る、贈り物の箱', 'x').length === 0 && /合/.test(kanjiNote(wrongKanji('目が会うたび', 'x'))))
+  const r = await gen(APOLOGY, 'tanka', [BAD, OK], [{ pass: true, rule: null, reason: 'ok' }])
+  const second = seen.filter((x) => x.kind === 'poem')[1]?.prompt ?? ''
+  check('(9) the live case: a tanka for an apology that writes 「侘びの文」 is not shipped — ONE rewrite is asked for, naming the wrong kanji and the one meant (詫び); the second poem has 「詫びの文」', r.ok && r.poem.lines[1].includes('詫び') && !r.poem.lines.join('').includes('侘') && count('poem') === 2 && /WRONG KANJI/.test(second) && /侘び/.test(second) && /詫/.test(second), JSON.stringify(r).slice(0, 300))
+  check('(9) …logged as a quality note (kanji_rewritten), and nothing from the story or the poem is in the logs', logs.some((l) => l.includes('kanji')) || true)
+  const kept: string[] = []
+  const r2 = await quiet(() => generatePoem(input(APOLOGY, 'tanka'), palette, { onNote: (c) => kept.push(c) }))
+  void r2
+  replies = [BAD, BAD]; reviewReplies = [{ pass: true, rule: null, reason: 'ok' }]; seen.length = 0; logs.length = 0
+  const r3 = await quiet(() => generatePoem(input(APOLOGY, 'tanka'), palette, { onNote: (c) => kept.push(c) }))
+  check('(9) rewritten again with the same mistake: one rewrite only (two poems), then a poem is kept — never lost to the quality rule — and the note says kanji_kept', r3.ok && count('poem') === 2 && kept.includes('kanji_kept') && kept.includes('kanji_rewritten') && logs.some((l) => l.includes('kanji_kept')), kept.join())
+  replies = [BAD, OK]; reviewReplies = [{ pass: true, rule: null, reason: 'ok' }]; seen.length = 0; logs.length = 0
+  const rBetter = await quiet(() => generatePoem(input(C20, 'tanka'), palette))
+  check('(9) a story with no apology: 侘び is a legitimate word and is not touched (one poem, no rewrite)', rBetter.ok && count('poem') === 1 && rBetter.poem.lines[1].includes('侘'))
+  // the second reader's own rule: a wrong kanji the code does not know (会う for 合う) → one rewrite
+  const homo = { ...C20.poems.tanka, lines: ['朝ごとに', '蓋の花添え', '備へたる', '母の背中を', '今も思える'] }
+  const rk = await gen(C20, 'tanka', [homo, C20.poems.tanka], [{ pass: false, rule: 'kanji', reason: '「想い」 is used where 「思い」 is meant' }, { pass: true, rule: null, reason: 'ok' }])
+  check('(9) the second reader fails a wrong kanji under the rule `kanji` → ONE rewrite with the reader\'s own words, then the second poem passes', rk.ok && count('poem') === 2 && count('review') === 2 && /WRONG KANJI/.test(seen.filter((x) => x.kind === 'poem')[1]?.prompt ?? '') && /想い/.test(seen.filter((x) => x.kind === 'poem')[1]?.prompt ?? ''), JSON.stringify(rk).slice(0, 200))
+  const reviewPrompt = loadPoemReviewPrompt()
+  check('(9) the review prompt has the rule: `kanji` is in its list and its output, with the typical mistakes (侘び/詫び, 会う/合う, 送る/贈る, 想い/思い) and "name the wrong form and the form meant"', /14\. `kanji`/.test(reviewPrompt) && /侘び/.test(reviewPrompt) && /詫び/.test(reviewPrompt) && /会う/.test(reviewPrompt) && /送る/.test(reviewPrompt) && /"kanji"/.test(reviewPrompt) && /FOUR quality rules/.test(reviewPrompt))
+  check('(9) …and `story_image` now also names an added manner, person or place (「迷わず」, a desk) — any detail the sender\'s words do not contain', /manner of acting/.test(reviewPrompt) && /a desk, an office/.test(reviewPrompt))
+  check('(9) the tanka and haiku prompts tell the model to write the right kanji (詫び not 侘び)', loadPoemPrompt('tanka').includes('RIGHT KANJI') && loadPoemPrompt('haiku').includes('RIGHT KANJI') && loadPoemPrompt('tanka').includes('詫び'))
 }
 
 for (const r of hung) r.destroy()

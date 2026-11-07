@@ -3,7 +3,7 @@
 // the two sizes that always exist are assumed (the server still refuses anything that is not on sale).
 
 import { useEffect, useState } from 'react'
-import { PACKAGES, PACKAGE_DISPLAY_ORDER, type PackageId } from '../order/packages.ts'
+import { PACKAGES, PACKAGE_DISPLAY_ORDER, SHIPS, type PackageId } from '../order/packages.ts'
 
 const FALLBACK: PackageId[] = ['simple', 'standard']
 let cache: PackageId[] | null = null
@@ -62,4 +62,11 @@ export function useComingSoon(): PackageId[] {
     }
   }, [])
   return list
+}
+
+/** True only when a wooden size can be ordered right now (on sale, not "coming soon"). Until /api/sizes answers it is false: the e-gift wording shows. */
+export function useWoodOnSale(): boolean {
+  const sizes = useSizes()
+  const soon = useComingSoon()
+  return !!sizes && sizes.some((p) => SHIPS[p] && !soon.includes(p))
 }

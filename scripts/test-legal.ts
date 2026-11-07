@@ -3,7 +3,7 @@
 //   node --experimental-strip-types --disable-warning=ExperimentalWarning scripts/test-legal.ts
 
 import { readFileSync } from 'node:fs'
-import { LEGAL } from '../src/legal/legal-copy.ts'
+import { LEGAL, legalView } from '../src/legal/legal-copy.ts'
 
 let failures = 0
 function check(name: string, cond: boolean, detail?: string) {
@@ -25,5 +25,15 @@ const WANT: Record<'ja' | 'zh-Hant' | 'en', [string, string][]> = {
 for (const lang of ['ja', 'zh-Hant', 'en'] as const) for (const [label, value] of WANT[lang]) check(`${lang}: ${label} — word for word`, row(lang, label) === value, `${row(lang, label)}`)
 check('the delivery line has no leftover "days to make and ship" blank', !/製作・発送にかかる日数|製作與寄送所需天數|Days to make and ship/.test(all))
 check('prices and shipping are unchanged (¥3,980 / ¥9,800 / ¥18,850; EMS ¥6,000)', ['3,980', '9,800', '18,850', '6,000'].every((x) => LEGAL.ja.rows.some((r) => r.value.includes(x))))
+// 2026-11-07: while the wooden sizes are "coming soon" the page speaks of the e-gift only; with wood on sale it is the full page
+const WOOD = { ja: /木札|版木|刻|EMS|配送|拓/, 'zh-Hant': /木牌|版木|刻|EMS|配送|拓/, en: /wooden|block|carved|EMS|parcel/ } as const
+for (const lang of ['ja', 'zh-Hant', 'en'] as const) {
+  const soon = legalView(lang, false)
+  const text = JSON.stringify({ ...soon, deliveryWood: '' }) // (deliveryWood is added to the delivery row only while wood is on sale: legal-copy rowValue)
+  // (the 24-hour refund rule is the owner's own text and says 「送料を含む」 / "including shipping": kept word for word)
+  check(`${lang}: while wood is coming soon the legal page says nothing about the wooden sizes (prices, charges, mistakes, delivery, FAQ)`, !WOOD[lang].test(text.replace(/送料を含む|含運費|including shipping/g, '')), text.match(WOOD[lang]) ? text.slice(Math.max(0, (text.match(WOOD[lang])!.index ?? 0) - 30), (text.match(WOOD[lang])!.index ?? 0) + 40) : '')
+  check(`${lang}: …the e-gift's price stays, the refund rules stay (all four paragraphs but the parcel one), the seller rows are untouched`, soon.rows.some((r) => r.value.includes('3,980')) && !soon.rows.some((r) => r.value.includes('9,800')) && soon.sections.length === LEGAL[lang].sections.length - 1 && soon.rows.slice(0, 6).every((r, i) => r.value === LEGAL[lang].rows[i].value) && soon.faq.length === LEGAL[lang].faq.length)
+  check(`${lang}: …with wood on sale it is the full page, unchanged`, JSON.stringify(legalView(lang, true)) === JSON.stringify(LEGAL[lang]))
+}
 console.log(failures ? `\n${failures} legal check(s) FAILED` : '\nAll legal checks passed.')
 process.exit(failures ? 1 : 0)
