@@ -1,49 +1,119 @@
 {
   "target_lufs": -18,
+  "gap_rule_db": 8,
   "tracks": {
+    "celebrate": {
+      "file": "celebrate.ogg",
+      "source_duration": 89.94,
+      "source_trimmed": 89.939,
+      "tail_silence_s": 0,
+      "excerpt_s": 60.001,
+      "trimmed": 60.001,
+      "raw_window_lufs": -20.7,
+      "g1_db": 2.7,
+      "g2_db": -5.7,
+      "lift_db": 0,
+      "film_lufs": -18,
+      "ending_gap_db": {
+        "34": 0.5,
+        "41": 0.3,
+        "32.6": 0.6
+      },
+      "page_excerpt_s": 45
+    },
     "thanks": {
       "file": "thanks.ogg",
-      "duration": 202.998,
-      "trimmed": 197.442,
-      "tail_silence_s": 5.56,
-      "window_lufs": -31.8,
-      "gain_db": 13.8,
+      "source_duration": 202.998,
+      "source_trimmed": 197.442,
+      "tail_silence_s": 5.556,
+      "excerpt_s": 60.013,
+      "trimmed": 60.013,
+      "raw_window_lufs": -31.8,
+      "g1_db": 13.8,
+      "g2_db": -5.6,
+      "lift_db": 0,
+      "film_lufs": -18.1,
+      "ending_gap_db": {
+        "34": 4.9,
+        "41": 5.4,
+        "32.6": 5.1
+      },
       "page_excerpt_s": 45
     },
     "apology": {
       "file": "apology.ogg",
-      "duration": 183.589,
-      "trimmed": 181.774,
-      "tail_silence_s": 1.81,
-      "window_lufs": -24.6,
-      "gain_db": 6.6,
+      "source_duration": 183.589,
+      "source_trimmed": 181.774,
+      "tail_silence_s": 1.815,
+      "excerpt_s": 60.022,
+      "trimmed": 60.022,
+      "raw_window_lufs": -24.6,
+      "g1_db": 6.6,
+      "g2_db": -5.6,
+      "lift_db": 0,
+      "film_lufs": -18,
+      "ending_gap_db": {
+        "34": 3.6,
+        "41": 3.4,
+        "32.6": 3.3
+      },
       "page_excerpt_s": 45
     },
     "encourage": {
       "file": "encourage.ogg",
-      "duration": 381.168,
-      "trimmed": 381.168,
+      "source_duration": 381.168,
+      "source_trimmed": 381.168,
       "tail_silence_s": 0,
-      "window_lufs": -37.8,
-      "gain_db": 19.8,
+      "excerpt_s": 60,
+      "trimmed": 60,
+      "raw_window_lufs": -37.8,
+      "g1_db": 19.8,
+      "g2_db": -4.5,
+      "lift_db": 11,
+      "film_lufs": -18,
+      "ending_gap_db": {
+        "34": 6.7,
+        "41": 6.9,
+        "32.6": 6.8
+      },
       "page_excerpt_s": 45
     },
     "confess": {
       "file": "confess.ogg",
-      "duration": 494.068,
-      "trimmed": 488.633,
-      "tail_silence_s": 5.44,
-      "window_lufs": -37.1,
-      "gain_db": 19.1,
+      "source_duration": 494.068,
+      "source_trimmed": 488.633,
+      "tail_silence_s": 5.435,
+      "excerpt_s": 60.021,
+      "trimmed": 60.021,
+      "raw_window_lufs": -37.1,
+      "g1_db": 19.1,
+      "g2_db": -3.7,
+      "lift_db": 6,
+      "film_lufs": -18.5,
+      "ending_gap_db": {
+        "34": 6.1,
+        "41": 5.7,
+        "32.6": 6.1
+      },
       "page_excerpt_s": 45
     },
     "memorial": {
       "file": "memorial.ogg",
-      "duration": 335.769,
-      "trimmed": 335.769,
+      "source_duration": 335.769,
+      "source_trimmed": 335.769,
       "tail_silence_s": 0,
-      "window_lufs": -32,
-      "gain_db": 14,
+      "excerpt_s": 60,
+      "trimmed": 60,
+      "raw_window_lufs": -32,
+      "g1_db": 14,
+      "g2_db": -4.6,
+      "lift_db": 6,
+      "film_lufs": -18,
+      "ending_gap_db": {
+        "34": 6.3,
+        "41": 7,
+        "32.6": 6.1
+      },
       "page_excerpt_s": 45
     }
   }

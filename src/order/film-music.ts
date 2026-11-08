@@ -44,7 +44,44 @@ export const MAX_TAIL_SILENCE_S = 1.5
 export const PAGE_EXCERPT_S = 45
 /** Every piece is levelled to about this loudness, and a limiter keeps a loud peak from clipping. */
 export const TARGET_LUFS = -18
-export const LIMITER = 'alimiter=limit=0.84:attack=5:release=60:level=disabled'
+export const LIMITER = 'alimiter=limit=0.71:attack=5:release=60:level=disabled'
+/** Only the end of a piece is ever used, so the repo keeps just the last 60 s of each trimmed recording (the 41 s film + the 2 s fade-in + margin). */
+export const EXCERPT_STORE_S = 60
+
+// ---- the ending must be HEARD ----------------------------------------------------------------------------------------------------------------------------------------------------
+// The recordings die away: the last seconds are 20–30 dB under the rest, which on a phone speaker is silence just when the card arrives. So the excerpt is (1) gently compressed upward — quiet passages
+// are lifted — and (2) given a lift of its last seconds, as an engineer would ride the fader up during the decay. The lift is found per piece (scripts/prepare-music.ts) as the smallest one that makes
+// the 6 s before the final 0.5 s fade at most GAP_RULE_DB under the loudness of the film's music as a whole; the final chord still rings and decays, audibly.
+export const GAP_RULE_DB = 8
+/** What prepare-music aims for (a margin under the rule). */
+export const GAP_AIM_DB = 7
+/** The stretch before the final fade that is checked: [end − 6.5 s, end − 0.5 s]. */
+export const ENDING_CHECK_S = 6
+/** The lift grows (smoothly) over this many seconds before the end of the excerpt. */
+export const LIFT_RAMP_S = 14
+/** A static upward-compression curve (dB in → dB out): quiet passages come up, loud ones stay. */
+export const COMPAND = 'compand=attacks=0.8:decays=3:points=-90/-90|-75/-52|-60/-40|-50/-32|-40/-25|-30/-19|-20/-14|-10/-8|0/-3:soft-knee=8'
+
+export interface LevelParams {
+  /** gain before the compressor (dB) */
+  g1_db: number
+  /** gain after the lift (dB), to bring the film's stretch to −18 LUFS */
+  g2_db: number
+  /** how much louder the very end is made (dB) */
+  lift_db: number
+  /** length of the stored excerpt (s): the lift is counted back from its end */
+  excerpt_s: number
+}
+
+/**
+ * The whole processing of a stored excerpt, as an ffmpeg filter chain: gain → upward compression → gain → the ending's lift → limiter. Run over the WHOLE excerpt (the film takes the last part of it
+ * afterwards), so the page's mp3 and the MP4's audio come out the same.
+ */
+export function levelChain(p: LevelParams): string {
+  const x = `clip(1-(${p.excerpt_s}-t)/${LIFT_RAMP_S},0,1)`
+  const lift = p.lift_db > 0 ? `,volume=volume='pow(10,${p.lift_db}/20*(${x}*${x}*(3-2*${x})))':eval=frame` : ''
+  return `volume=${p.g1_db}dB,${COMPAND},volume=${p.g2_db}dB${lift},${LIMITER}`
+}
 
 /** Where in the piece the film starts: the piece's (trimmed) length minus the film's. */
 export const startOf = (trimmed: number, film: number): number => Math.round((trimmed - film) * 1000) / 1000

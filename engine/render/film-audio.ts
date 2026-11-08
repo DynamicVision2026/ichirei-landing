@@ -1,12 +1,13 @@
-// The music under the saved film and the share film (2026-11-08): six public-domain recordings in assets/music/ (see LICENSES.md), one per purpose; `assets/music/music.json` (made by
-// scripts/prepare-music.ts) holds each piece's length after its silent tail is trimmed and the gain that levels it to about −18 LUFS. The mix ALIGNS THE END of the piece to the END of the film:
-// it starts at (trimmed length − film length) seconds into the recording, so the piece's real last phrase and final chord play under the e-card and the film finishes where the piece finishes.
+// The music under the saved film and the share film (2026-11-08): six public-domain recordings in assets/music/ (see LICENSES.md), one per purpose. Each file is the LAST 60 s of the recording after its
+// silent tail is trimmed (an excerpt; the full recordings stay on Wikimedia Commons); `assets/music/music.json` (made by scripts/prepare-music.ts) holds the excerpt's length and the level parameters.
+// The whole excerpt is levelled (gain, gentle upward compression, gain, a lift of the ending so it can be heard on a phone speaker, limiter: src/order/film-music.ts levelChain), then the mix ALIGNS THE END of
+// the piece to the END of the film: it starts at (excerpt length − film length) seconds, so the piece's real last phrase and final chord play under the e-card and the film finishes where the piece finishes.
 // Fade in over 2 s; no fade-out of the music itself, only the very last 0.5 s (against a click). Stereo AAC 128 kbps. A missing file never stops a film (it is made silent).
 
 import { existsSync, readFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { FADE_IN_S, FADE_OUT_S, LIMITER, MIN_SPARE_S, MUSIC_FILE, startOf, trackFor, type Track } from '../../src/order/film-music.ts'
+import { FADE_IN_S, FADE_OUT_S, MIN_SPARE_S, MUSIC_FILE, levelChain, startOf, trackFor, type Track } from '../../src/order/film-music.ts'
 
 export { trackFor }
 export type { Track }
@@ -19,12 +20,22 @@ export function musicDir(env: NodeJS.ProcessEnv = process.env): string {
 
 export interface TrackMeta {
   file: string
-  duration: number
-  /** the length after the silent tail is trimmed */
-  trimmed: number
+  /** the length of the full recording and of its trimmed version (the excerpt is the last `excerpt_s` of the latter) */
+  source_duration: number
+  source_trimmed: number
   tail_silence_s: number
-  window_lufs: number
-  gain_db: number
+  /** the length of the stored excerpt; it ends where the trimmed recording ends */
+  excerpt_s: number
+  /** = excerpt_s: the length the mix counts back from */
+  trimmed: number
+  raw_window_lufs: number
+  g1_db: number
+  g2_db: number
+  lift_db: number
+  /** the loudness of the last 41 s of the processed excerpt */
+  film_lufs: number
+  /** per film length (s): how many dB the 6 s before the final fade are under the music as a whole */
+  ending_gap_db: Record<string, number>
   page_excerpt_s: number
 }
 
@@ -85,7 +96,7 @@ export function audioPlan(track: Track | null, seconds: number, env: NodeJS.Proc
   const fin = Math.min(FADE_IN_S, T / 2)
   const fout = Math.min(FADE_OUT_S, T / 2)
   const filter =
-    `[1:a]atrim=start=${start}:duration=${T},asetpts=PTS-STARTPTS,aformat=sample_rates=44100:channel_layouts=stereo,volume=${meta.gain_db}dB,${LIMITER},` +
+    `[1:a]aformat=sample_rates=44100:channel_layouts=stereo,${levelChain({ g1_db: meta.g1_db, g2_db: meta.g2_db, lift_db: meta.lift_db, excerpt_s: meta.trimmed })},atrim=start=${start}:duration=${T},asetpts=PTS-STARTPTS,` +
     `afade=t=in:st=0:d=${fin},afade=t=out:st=${Math.max(0, Math.round((T - fout) * 1000) / 1000)}:d=${fout},apad=whole_dur=${T},atrim=0:${T}[a]`
   return { inputs: ['-i', file], maps: ['-filter_complex', filter, '-map', '0:v', '-map', '[a]', '-t', String(T)], codec: ['-c:a', 'aac', '-b:a', '128k', '-ar', '44100', '-ac', '2'], track, start, trimmed: meta.trimmed }
 }
