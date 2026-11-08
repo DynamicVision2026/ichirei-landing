@@ -14,6 +14,8 @@ export interface AnimationView {
   memorial: boolean
   /** v9.6: why the gift is given (absent on older gifts). */
   purpose?: string | null
+  /** The piece of music under the film (the server picked it from the purpose; `thanks` when the purpose's own recording is not there). Absent = no music. */
+  music?: 'celebrate' | 'thanks' | 'apology' | 'encourage' | 'confess' | 'memorial' | null
   /** null = the script is still being written; pictures null = drawn on the first open (the page asks POST /api/film/<id>/render); deferred = the daily limit. */
   film: { status: 'ready' | 'fallback'; lines: string[]; pictures: string[] | null; deferred?: boolean; incomplete?: boolean } | null
   /** The sender's page only: what to share with the receiver and where the order stands. */

@@ -10,7 +10,7 @@ import sharp from 'sharp'
 import { clamp } from '../../src/order/film-timeline.ts'
 import { INK, QUIET, U, VIDEO_FPS, VIDEO_H, VIDEO_W, blend, lineLayer, run, textBlock, type Layer } from './film-draw.ts'
 import { makeEndCard, toBlack, type CardState } from './endcard.ts'
-import { audioPlan, moodOf } from './film-audio.ts'
+import { audioPlan, chooseTrack } from './film-audio.ts'
 import { isVerticalPoem, verticalCells } from './card.ts'
 import { fontObject, fontsFor } from './fonts.ts'
 import { textPaths, wrapText } from './text.ts'
@@ -62,8 +62,9 @@ export interface ShareFilm {
   seconds: number
   frames: number
   renderMs: number
-  /** which track runs under it (null = made without sound) */
-  music: 'warm' | 'quiet' | null
+  /** which piece runs under it (null = made without sound) and where in the recording the film starts */
+  music: string | null
+  musicStart: number | null
 }
 
 /** Render the share film. `opts.seconds` cuts it short (tests); a washi (null) picture is drawn as plain washi. */
@@ -116,7 +117,7 @@ export async function makeShareFilm(a: ShareArtwork, opts: { fps?: number; ffmpe
 
   const dir = await mkdtemp(join(tmpdir(), 'ichirei-share-'))
   const file = join(dir, 'share.mp4')
-  const audio = opts.music === false ? null : audioPlan(moodOf(a.quiet), total)
+  const audio = opts.music === false ? null : audioPlan(chooseTrack({ purpose: a.purpose, memorial: a.memorial, state: a.state }, total), total)
   const ff = run(opts.ffmpeg ?? 'ffmpeg', ['-y', '-loglevel', 'error', '-f', 'rawvideo', '-pix_fmt', 'rgba', '-s', `${VIDEO_W}x${VIDEO_H}`, '-r', String(fps), '-i', 'pipe:0', ...(audio ? audio.inputs : []), ...(audio ? audio.maps : ['-an']), '-c:v', 'libx264', '-preset', 'veryfast', '-crf', '23', '-profile:v', 'high', '-level', '4.0', '-pix_fmt', 'yuv420p', ...(audio ? audio.codec : []), '-movflags', '+faststart', file])
   let err = ''
   ff.stdout.resume()
@@ -188,7 +189,7 @@ export async function makeShareFilm(a: ShareArtwork, opts: { fps?: number; ffmpe
     await renderFrames()
     const code = await closed
     if (code !== 0) throw new Error(`ffmpeg failed (${code}): ${err.slice(0, 300)}`)
-    return { mp4: await readFile(file), seconds: total, frames, renderMs: Date.now() - t0, music: audio?.mood ?? null }
+    return { mp4: await readFile(file), seconds: total, frames, renderMs: Date.now() - t0, music: audio?.track ?? null, musicStart: audio?.start ?? null }
   } finally {
     ff.kill()
     await rm(dir, { recursive: true, force: true }).catch(() => {})

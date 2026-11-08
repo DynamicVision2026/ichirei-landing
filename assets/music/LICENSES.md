@@ -1,26 +1,22 @@
-# Music under the ICHIREI film (2026-11-07)
+# Music under the ICHIREI film (2026-11-08)
 
-Two tracks, chosen by the gift's mood (`src/order/film-music.ts`): `warm` for thanks, birthdays, Kanreki and the other celebrations; `quiet` for a remembrance and every quiet purpose.
-The server mixes `assets/music/*.mp3` under the saved film and the share film (`engine/render/film-audio.ts`); the film page plays the same bytes from `public/music/` (kept identical by the test suite).
+Six public-domain recordings by **Musopen**, one per purpose of the gift (the order's purpose decides — `src/order/film-music.ts`; no model call). The licence of every recording is the
+**Public Domain Mark 1.0** shown on its Wikimedia Commons page. Each piece is **aligned to the end of the film**: it starts `(its length after the silent tail is trimmed) − (the film's length)` seconds in,
+so its real last chord plays under the e-card (`engine/render/film-audio.ts`). The recordings in this folder are never edited; `music.json` (from `scripts/prepare-music.ts`) holds each piece's trimmed length and the gain that
+levels it to about −18 LUFS, and the page plays `public/music/<name>.mp3`, the last 45 s of the same piece, levelled the same way (Safari does not play `.ogg`).
 
-| File | Title | Author | Source | Licence |
-|---|---|---|---|---|
-| `warm.mp3` | ICHIREI — warm (soft felt piano with a slow string pad, 66 bpm, D major) | written and rendered for ICHIREI by `scripts/make-music.mjs` | this repository (`scripts/make-music.mjs`; deterministic — the same script writes the same notes) | Original work made for ICHIREI. No third-party recording, sample, loop or melody is used. Free to use commercially, including inside videos that customers post on their own accounts. No attribution is required or shown. |
-| `quiet.mp3` | ICHIREI — quiet (a few plucked strings over a very low drone, 48 bpm, Japanese pentatonic on A) | written and rendered for ICHIREI by `scripts/make-music.mjs` | this repository (`scripts/make-music.mjs`) | Same as above. |
+| File | Purposes | Piece | Performer | Commons page | Licence |
+|---|---|---|---|---|---|
+| `celebrate.ogg` | `celebrate` (birthday, Kanreki, wedding, new baby, school / career) | Schumann, *Kinderszenen* Op. 15 No. 5 「Glückes genug」 | Musopen | https://commons.wikimedia.org/wiki/File:Robert_Schumann_-_scenes_from_childhood,_op._15_-_v._happiness.ogg | Public Domain Mark 1.0 — **file not delivered yet: films for this purpose use `thanks.ogg` until it is added** |
+| `thanks.ogg` | `thanks`, `reconnect`, `other`, and any order without a purpose | Schumann, *Kinderszenen* Op. 15 No. 7 「Träumerei」 | Musopen | https://commons.wikimedia.org/wiki/File:Robert_Schumann_-_scenes_from_childhood,_op._15_-_vii._dreaming.ogg | Public Domain Mark 1.0 |
+| `apology.ogg` | `apology` | Satie, Gymnopédie No. 1 | Musopen | https://commons.wikimedia.org/wiki/File:Erik_Satie_-_gymnopedies_-_la_1_ere._lent_et_douloureux.ogg | Public Domain Mark 1.0 |
+| `encourage.ogg` | `encourage`, `farewell` | Grieg, Piano Concerto Op. 16, II. Adagio | Musopen | https://commons.wikimedia.org/wiki/File:Edvard_Grieg_-_piano_concerto_in_a_minor,_op._16_-_ii._adagio.ogg | Public Domain Mark 1.0 |
+| `confess.ogg` | `confess` | Chopin, Nocturne Op. 62 No. 2 | Musopen | https://commons.wikimedia.org/wiki/File:Frederic_Chopin_-_nocturne_no._2_in_e_flat_major,_op._62.ogg | Public Domain Mark 1.0 |
+| `memorial.ogg` | `memorial`, and any order with state `lost` | Beethoven, Piano Sonata No. 14 「Moonlight」, I. Adagio sostenuto | Musopen | https://commons.wikimedia.org/wiki/File:Ludwig_van_Beethoven_-_sonata_no._14_in_c_sharp_minor_%27moonlight%27,_op._27_no._2_-_i._adagio_sostenuto.ogg | Public Domain Mark 1.0 |
 
-## The three conditions of the owner's decision
+The films themselves carry **no credit** for the music; the credits page (`/credits`) names the composers and Musopen. The three conditions of the owner's decision (commercial use including customers' own posts; no attribution in a post; not registered
+with Content ID) were the owner's to confirm for these Musopen recordings; this file records the sources and the licence mark the owner relied on.
 
-1. **Commercial use, including customers' own social posts:** allowed — the tracks are original to this repository, so there is no third party whose terms apply.
-2. **No attribution on screen or in a post:** none is needed. The share film carries no credits and none is added for the music.
-3. **Not registered with YouTube Content ID or any audio fingerprinting:** these files were made here and have never been submitted to any rights-management or fingerprinting service. Do not register them (or a film that uses them) with one; that would claim customers' posts.
-
-## Honest note
-
-The tracks are synthesised (a plain piano / string / plucked-string model with a small room reverb), not recordings of musicians, and they have not been auditioned by a person yet. They are meant to sit quietly under the film at about −18 LUFS. If you
-prefer a recorded track, replace the file with another that meets the three conditions above **under the same file name and format** (MP3, stereo, 60 s or longer, about −18 LUFS), copy it to `public/music/` too, and update this table with the title, author, source URL and licence.
-Candidates found by a web search on 2026-11-07 (licence tags read from the search results only — open each page and check the licence and Content ID yourself before using any): OpenGameArt's CC0 calm-music collection with "Calm Piano 1" (https://opengameart.org/node/73274); OpenGameArt "jaoan", a CC0 koto piece (https://opengameart.org/content/jaoan — the search noted poor audio quality). Free Music Archive's "Free Soft Piano Music" is CC BY, so it needs attribution and is NOT usable here.
-Public-domain / CC0 sources worth checking (nothing from them is included here): FreePD (freepd.com, CC0), the CC0 filter of the Free Music Archive, and Musopen's public-domain recordings (note: some public-domain *recordings* are nevertheless registered with Content ID, which would break condition 3 — check each one).
-
-## Levels
-
-Both files are 60 s, 44.1 kHz stereo MP3 (192 kbps master), levelled to −18 LUFS integrated by `scripts/make-music.mjs` (ffmpeg `loudnorm`, true peak −1.5 dB). The film mix fades the track in over 1.5 s and out over the last 2 s and re-encodes it as stereo AAC 128 kbps.
+## Adding or replacing a recording
+Put the file in this folder under the name above, run `node --experimental-strip-types --disable-warning=ExperimentalWarning scripts/prepare-music.ts` (it updates `music.json` and `public/music/<name>.mp3`), commit both, and update the table.
+A piece that, once its silent tail is trimmed, is shorter than the film + 2 s is not used: that film gets `thanks.ogg`.

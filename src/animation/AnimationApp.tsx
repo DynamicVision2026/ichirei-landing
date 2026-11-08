@@ -4,7 +4,7 @@ import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } fr
 import { COPY, pageLang, type PageCopy } from './copy.ts'
 import { clamp, frameAt, makeFilmTimeline, phrases, type FilmTimeline } from '../order/film-timeline.ts'
 import { CARD_ASPECT, CARD_RISE_U, CARD_WIDTH, cardLayout, isVerticalPoemType } from '../order/film-card.ts'
-import { MUSIC_FILE, moodOf, musicGain } from '../order/film-music.ts'
+import { musicGain } from '../order/film-music.ts'
 import type { AnimationView } from './types.ts'
 import BuyerPage from './BuyerPage.tsx'
 import { BUYER_COPY } from './buyer-copy.ts'
@@ -145,6 +145,9 @@ export default function AnimationApp() {
   )
 }
 
+/** The page plays the last 45 s (or less) of the piece, so the film starts that far in: the piece ENDS where the film ends (its last chord under the e-card). */
+const musicOffset = (au: HTMLAudioElement, total: number): number => (Number.isFinite(au.duration) ? Math.max(0, au.duration - total) : 0)
+
 /** The character's reading under it: the kana reading (ja), the pinyin (zh), the romanization and meaning (en: a reader of English cannot read kana). */
 function readingLine(view: AnimationView): string {
   if (view.language === 'en') return [cleanReading(view.romanization.split(' / ')[0]), view.meaning_en].filter(Boolean).join(' · ')
@@ -261,7 +264,7 @@ export function Film({ view, film, copy, giftMode = false, onEnd }: { view: Anim
       const au = audio.current
       if (au) {
         au.volume = clamp(musicGain(sec, tl.total))
-        if (!au.paused && Math.abs(au.currentTime - sec) > 0.35) au.currentTime = Math.min(sec, Math.max(0, (au.duration || tl.total) - 0.05))
+        if (!au.paused && Math.abs(au.currentTime - (musicOffset(au, tl.total) + sec)) > 0.35) au.currentTime = Math.min(musicOffset(au, tl.total) + sec, Math.max(0, (au.duration || tl.total) - 0.02))
       }
       const bar = root.querySelector<HTMLElement>('[data-progress]')
       if (bar) bar.style.width = `${f.progress * 100}%`
@@ -292,7 +295,7 @@ export function Film({ view, film, copy, giftMode = false, onEnd }: { view: Anim
     raf.current = requestAnimationFrame(tick)
     const au = audio.current
     if (au) {
-      try { au.currentTime = Math.min(t.current, Math.max(0, (au.duration || tl.total) - 0.05)) } catch { /* not loaded yet: it starts from the top */ }
+      try { au.currentTime = Math.min(musicOffset(au, tl.total) + t.current, Math.max(0, (au.duration || tl.total) - 0.02)) } catch { /* not loaded yet: it is set when the file's length is known */ }
       au.muted = !soundWanted.current
       // a muted film may start by itself; if the phone refuses sound without a tap it simply stays muted
       void au.play().catch(() => { au.muted = true; soundWanted.current = false; setSound(false) })
@@ -406,9 +409,9 @@ export function Film({ view, film, copy, giftMode = false, onEnd }: { view: Anim
       </div>
       <EndCard view={view} copy={copy} poemLines={poemLines} />
       <div className="an-black" data-black />
-      <button type="button" className="an-sound" data-testid="film-sound" aria-pressed={sound} onClick={(e) => { e.stopPropagation(); toggleSound() }}>
+      {view.music && <button type="button" className="an-sound" data-testid="film-sound" aria-pressed={sound} onClick={(e) => { e.stopPropagation(); toggleSound() }}>
         {sound ? copy.soundOff : copy.soundOn}
-      </button>
+      </button>}
       <div className="an-progress" data-progress />
     </>
   )
@@ -416,7 +419,7 @@ export function Film({ view, film, copy, giftMode = false, onEnd }: { view: Anim
   return (
     <>
       <div className={`an-wrap${still ? ' an-wrap-still' : ''}`} ref={wrap}>
-        {!still && <audio ref={audio} src={`/music/${MUSIC_FILE[moodOf(inkOnly(view))]}`} preload="auto" muted playsInline data-testid="film-music" data-mood={moodOf(inkOnly(view))} />}
+        {!still && view.music && <audio ref={audio} src={`/music/${view.music}.mp3`} preload="auto" muted playsInline data-testid="film-music" data-track={view.music} onLoadedMetadata={(e) => { const au = e.currentTarget; if (!au.paused) au.currentTime = Math.min(musicOffset(au, tl.total) + t.current, Math.max(0, au.duration - 0.02)) }} />}
         {still ? (
           <div className={`an-still-page${inkOnly(view) ? ' an-memorial' : ''}`} data-quiet={inkOnly(view) ? 'yes' : 'no'} style={{ ['--u' as string]: '3.6px' }} data-testid="film-still">
             {film.lines.map((line, i) => (

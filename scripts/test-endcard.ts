@@ -12,8 +12,8 @@ import sharp from 'sharp'
 import { CARD_H, CARD_W, CARD_X, CARD_Y, makeEndCard, type CardState } from '../engine/render/endcard.ts'
 import { VIDEO_H, VIDEO_W, INK, makeFilmVideo } from '../engine/render/film-video.ts'
 import { makeShareFilm, shareTimeline, type ShareArtwork } from '../engine/render/share.ts'
-import { audioPlan, musicPath } from '../engine/render/film-audio.ts'
-import { FADE_IN_S, FADE_OUT_S, MUSIC_FILE, moodOf, musicGain } from '../src/order/film-music.ts'
+import { audioPlan, chooseTrack, musicPath, musicTable } from '../engine/render/film-audio.ts'
+import { FADE_IN_S, FADE_OUT_S, MUSIC_FILE, TRACKS, musicGain, startOf, trackFor } from '../src/order/film-music.ts'
 import { CARD_ASPECT, CARD_WIDTH, POEM_MIN_U, isVerticalPoemType } from '../src/order/film-card.ts'
 
 let failures = 0
@@ -151,7 +151,7 @@ for (const [name, art, expectCols] of [['ja-tanka', JA, 5], ['zh-tang', ZH, 0]] 
   const p = probe(file)
   const vs = p.streams.find((s) => s.codec_type === 'video')!
   const as = p.streams.filter((s) => s.codec_type === 'audio')
-  check(`(5) saved film ${name}: ${v.seconds} s, one stereo AAC stream as long as the picture (±0.1 s), made with the ${v.music} track`, v.seconds === 34 && as.length === 1 && as[0].codec_name === 'aac' && as[0].channels === 2 && Math.abs(Number(as[0].duration) - Number(vs.duration)) <= 0.1 && Math.abs(Number(as[0].bit_rate) - 128000) < 20000 && v.music === 'warm', JSON.stringify(as))
+  check(`(5) saved film ${name}: ${v.seconds} s, one stereo AAC stream as long as the picture (±0.1 s), made with the ${v.music} piece, entering ${v.musicStart} s in`, v.seconds === 34 && as.length === 1 && as[0].codec_name === 'aac' && as[0].channels === 2 && Math.abs(Number(as[0].duration) - Number(vs.duration)) <= 0.1 && Math.abs(Number(as[0].bit_rate) - 128000) < 20000 && v.music === 'thanks', JSON.stringify(as))
   for (const back of [4, 3, 2]) {
     const f = frameAt(file, v.seconds - back)
     const card = await makeEndCard(input(art), 'film')
@@ -177,7 +177,7 @@ for (const [name, art, expectCols] of [['ja-tanka', JA, 5], ['zh-tang', ZH, 0]] 
     const p = probe(file)
     const vs = p.streams.find((s) => s.codec_type === 'video')!
     const as = p.streams.filter((s) => s.codec_type === 'audio')
-    check(`(5) share film ${name}: ${v.seconds} s (about 33), one stereo AAC stream as long as the picture (±0.1 s), the ${v.music} track`, Math.abs(v.seconds - tl.total) < 0.01 && as.length === 1 && as[0].codec_name === 'aac' && Math.abs(Number(as[0].duration) - Number(vs.duration)) <= 0.1 && v.music === 'warm', JSON.stringify(as))
+    check(`(5) share film ${name}: ${v.seconds} s (about 33), one stereo AAC stream as long as the picture (±0.1 s), the ${v.music} piece`, Math.abs(v.seconds - tl.total) < 0.01 && as.length === 1 && as[0].codec_name === 'aac' && Math.abs(Number(as[0].duration) - Number(vs.duration)) <= 0.1 && v.music === 'thanks', JSON.stringify(as))
     for (const back of [4, 3, 2]) {
       const f = frameAt(file, v.seconds - back)
       const card = await makeEndCard(input(art), 'share')
@@ -199,28 +199,80 @@ for (const [name, art, expectCols] of [['ja-tanka', JA, 5], ['zh-tang', ZH, 0]] 
   const p = probe(file)
   const vs = p.streams.find((s) => s.codec_type === 'video')!
   const as = p.streams.filter((s) => s.codec_type === 'audio')
-  check(`(5) remembrance film: ${v.seconds} s, no red pixel in any of its ${frames} frames, the QUIET track, one AAC stream as long as the picture`, v.seconds === 41 && redFrames === 0 && v.music === 'quiet' && as.length === 1 && Math.abs(Number(as[0].duration) - Number(vs.duration)) <= 0.1, JSON.stringify({ redFrames, music: v.music }))
+  check(`(5) remembrance film: ${v.seconds} s, no red pixel in any of its ${frames} frames, the MEMORIAL piece, one AAC stream as long as the picture`, v.seconds === 41 && redFrames === 0 && v.music === 'memorial' && as.length === 1 && Math.abs(Number(as[0].duration) - Number(vs.duration)) <= 0.1, JSON.stringify({ redFrames, music: v.music }))
   const last = frameAt(file, v.seconds - 3)
   const card = await makeEndCard(input(QUIET), 'film')
   check('(5) remembrance film: the last 4 s show the same card (5 columns), in ink', countRed(last, 1) === 0 && runs(last, card.poemBox, 'x', 14).length === 5 && px(last, CARD_X + 30, CARD_Y + 30)[0] > 200)
-  const q2 = await makeShareFilm({ ...JA, quiet: true, relation: null }, { fps: 6, seconds: 3 })
-  check('(5) a quiet share film (an apology / an encouragement, not remembrance) uses the quiet track', q2.music === 'quiet')
+  const q2 = await makeShareFilm({ ...JA, quiet: true, purpose: 'apology', relation: null }, { fps: 6, seconds: 3 })
+  check('(5) a quiet share film for an apology uses the apology piece', q2.music === 'apology')
 }
 rmSync(dir, { recursive: true, force: true })
 
-// ---- 6. the music: the choice, the mix, the licences ------------------------------------------------------------------------------------------------------------
+// ---- 6. the music: the choice, the end alignment, the mix, the licences ------------------------------------------------------------------------------------------
 {
-  check('(6) the mood: a quiet or remembrance gift gets the quiet track, everything else the warm one', moodOf(false) === 'warm' && moodOf(true) === 'quiet' && MUSIC_FILE.warm !== MUSIC_FILE.quiet)
-  const wp = audioPlan('warm', 34)
-  const qp = audioPlan('quiet', 41)
-  check('(6) the mix: the track is trimmed to the film (34 s / 41 s), fades in over 1.5 s and out over the last 2 s, never looped, stereo AAC 128 kbps', !!wp && !!qp && wp.maps.join(' ').includes('atrim=0:34') && wp.maps.join(' ').includes(`afade=t=in:st=0:d=${FADE_IN_S}`) && wp.maps.join(' ').includes(`afade=t=out:st=${34 - FADE_OUT_S}:d=${FADE_OUT_S}`) && qp.maps.join(' ').includes('atrim=0:41') && !wp.maps.join(' ').includes('aloop') && wp.codec.join(' ') === '-c:a aac -b:a 128k -ar 44100 -ac 2' && wp.inputs[1] === musicPath('warm') && qp.inputs[1] === musicPath('quiet'))
-  check('(6) the page\'s volume follows the same fades: 0 at the start, 1 in the middle, 0 at the end', musicGain(0, 34) === 0 && musicGain(20, 34) === 1 && musicGain(34, 34) === 0 && Math.abs(musicGain(0.75, 34) - 0.5) < 1e-9 && Math.abs(musicGain(33, 34) - 0.5) < 1e-9)
-  const files = readdirSync('assets/music').filter((f) => f !== 'LICENSES.md')
+  const table = musicTable()
+  const want: [string | null, string, string][] = [['celebrate', 'celebrate', 'celebrate'], ['thanks', 'thanks', 'thanks'], ['reconnect', 'thanks', 'thanks'], ['other', 'thanks', 'thanks'], ['apology', 'apology', 'apology'], ['encourage', 'encourage', 'encourage'], ['farewell', 'encourage', 'encourage'], ['confess', 'confess', 'confess'], ['memorial', 'memorial', 'memorial']]
+  check('(6) every purpose maps to its piece (celebrate · thanks+reconnect+other · apology · encourage+farewell · confess · memorial); the state `lost` and the memorial flag always get the memorial piece; no purpose / an unknown one is thanks', want.every(([p, t]) => trackFor({ purpose: p }) === t) && trackFor({ purpose: 'celebrate', state: 'lost' }) === 'memorial' && trackFor({ purpose: 'thanks', memorial: true }) === 'memorial' && trackFor({}) === 'thanks' && trackFor({ purpose: 'nonsense' }) === 'thanks' && trackFor({ purpose: null, occasion: 'birthday_milestone' }) === 'celebrate' && trackFor({ purpose: null, occasion: 'memorial' }) === 'memorial')
+  const have = TRACKS.filter((t) => existsSync(musicPath(t)))
+  const files = readdirSync('assets/music').filter((f) => f !== 'LICENSES.md' && f !== 'music.json')
   const lic = readFileSync('assets/music/LICENSES.md', 'utf8')
-  check(`(6) assets/music/LICENSES.md exists and names every file in assets/music/ (${files.join(', ')}) with its title, author, source and licence`, existsSync('assets/music/LICENSES.md') && files.length >= 2 && files.every((f) => lic.includes('`' + f + '`')) && /commercial/i.test(lic) && /attribution/i.test(lic) && /Content ID/i.test(lic))
-  check('(6) the page plays the same bytes: public/music/ holds an identical copy of every track', files.every((f) => existsSync(`public/music/${f}`) && Buffer.compare(readFileSync(`assets/music/${f}`), readFileSync(`public/music/${f}`)) === 0))
-  const lufs = (f: string) => Number(/I:\s+(-?\d+\.?\d*) LUFS/.exec(execFileSync('sh', ['-c', `ffmpeg -hide_banner -nostats -i "${f}" -af ebur128 -f null - 2>&1 | grep -E "^\\s+I:" | tail -1`]).toString())?.[1])
-  check('(6) both tracks are stereo MP3, at least 60 s, at about −18 LUFS', files.every((f) => { const p = probe(`assets/music/${f}`); const a = p.streams[0]; return a.codec_name === 'mp3' && a.channels === 2 && Number(p.format.duration) >= 59.9 && Math.abs(lufs(`assets/music/${f}`) + 18) < 1.5 }))
+  check(`(6) assets/music/LICENSES.md names every recording in assets/music/ (${files.join(', ')}) and all six pieces, each with performer, Commons page and licence; the synthesised tracks and their script are gone`, files.length >= 5 && files.every((f) => f.endsWith('.ogg') && lic.includes('`' + f + '`')) && TRACKS.every((t) => lic.includes('`' + MUSIC_FILE[t] + '`')) && (lic.match(/Public Domain Mark 1\.0/g) ?? []).length >= 6 && (lic.match(/https:\/\/commons\.wikimedia\.org\/wiki\/File:/g) ?? []).length >= 6 && lic.includes('Musopen') && !existsSync('assets/music/warm.mp3') && !existsSync('assets/music/quiet.mp3') && !existsSync('scripts/make-music.mjs'))
+  check('(6) a purpose whose recording is not there yet (celebrate.ogg is not delivered) falls back to thanks; with every file there it would not', (existsSync(musicPath('celebrate')) ? chooseTrack({ purpose: 'celebrate' }, 34) === 'celebrate' : chooseTrack({ purpose: 'celebrate' }, 34) === 'thanks') && chooseTrack({ purpose: 'apology' }, 34) === 'apology' && chooseTrack({ purpose: 'celebrate', memorial: true }, 41) === 'memorial')
+  // a recording shorter than the film + 2 s (after its tail is trimmed) is not used: thanks is
+  const emptyDir = mkdtempSync(join(tmpdir(), 'ichirei-nomusic-'))
+  writeFileSync(join(emptyDir, 'music.json'), JSON.stringify({ tracks: {} }))
+  const shortEnv = { ...process.env, ICHIREI_MUSIC_DIR: emptyDir } as NodeJS.ProcessEnv
+  check('(6) with no music folder at all a film is made without music (null), never a failure', chooseTrack({ purpose: 'apology' }, 34, shortEnv) === null && audioPlan(null, 34, shortEnv) === null)
+  rmSync(emptyDir, { recursive: true, force: true })
+  const tooLong = (table.apology?.trimmed ?? 0) - 1
+  check('(6) a piece shorter than the film + 2 s is not used: the film gets thanks instead', tooLong > 0 && chooseTrack({ purpose: 'apology' }, tooLong) === 'thanks')
+  for (const t of have) {
+    const meta = table[t]
+    check(`(6) ${t}: the file has a length, a trimmed length (the silent tail after the last chord cut: ${meta.tail_silence_s} s) and a gain that brings the last 41 s to −18 LUFS (${meta.gain_db} dB)`, !!meta && meta.trimmed <= meta.duration && meta.trimmed > 41 && (meta.tail_silence_s === 0 || meta.tail_silence_s > 1.5 - 0.3) && Math.abs(meta.window_lufs + meta.gain_db + 18) < 0.05)
+    for (const film of [34, 41, 32.6]) {
+      const plan = audioPlan(t, film)
+      check(`(6) ${t}, film ${film} s: the piece starts ${plan?.start} s in = trimmed length ${meta.trimmed} − ${film} (±0.05 s), fades in over ${FADE_IN_S} s and out over the last ${FADE_OUT_S} s only`, !!plan && Math.abs(plan.start - (meta.trimmed - film)) <= 0.05 && Math.abs(plan.start - startOf(meta.trimmed, film)) < 1e-9 && plan.maps.join(' ').includes(`afade=t=in:st=0:d=${FADE_IN_S}`) && plan.maps.join(' ').includes(`afade=t=out:st=${Math.round((film - FADE_OUT_S) * 1000) / 1000}:d=${FADE_OUT_S}`) && !plan.maps.join(' ').includes('aloop') && plan.codec.join(' ') === '-c:a aac -b:a 128k -ar 44100 -ac 2')
+    }
+  }
+  check('(6) the page\'s volume follows the same fades: 0 at the start, up by 2 s, then NOT lowered until the last 0.5 s, 0 at the end', musicGain(0, 34) === 0 && musicGain(2, 34) === 1 && musicGain(30, 34) === 1 && musicGain(33.4, 34) === 1 && Math.abs(musicGain(33.75, 34) - 0.5) < 1e-9 && musicGain(34, 34) === 0)
+  check('(6) the page plays an mp3 excerpt of every piece that has a recording: public/music/<name>.mp3, at most 45 s, ending where the trimmed piece ends', have.every((t) => existsSync(`public/music/${t}.mp3`) && probe(`public/music/${t}.mp3`).streams[0].codec_name === 'mp3' && Math.abs(Number(probe(`public/music/${t}.mp3`).format.duration) - table[t].page_excerpt_s) < 0.15 && table[t].page_excerpt_s <= 45.01))
+}
+
+// the real mix: the MP4's audio is as long as the picture, is levelled, and its last 3 s before the final 0.5 s are not faded (no early fade-out)
+{
+  const pcm = (file: string, from: number, dur: number, filter = ''): Float32Array => {
+    const buf = execFileSync('ffmpeg', ['-v', 'error', '-ss', String(from), '-t', String(dur), '-i', file, ...(filter ? ['-af', filter] : []), '-f', 'f32le', '-ac', '1', '-ar', '22050', 'pipe:1'], { maxBuffer: 1 << 28 })
+    return new Float32Array(buf.buffer, buf.byteOffset, Math.floor(buf.byteLength / 4))
+  }
+  const rms = (a: Float32Array): number => Math.sqrt(a.reduce((s, x) => s + x * x, 0) / Math.max(1, a.length))
+  const db = (x: number): number => 20 * Math.log10(Math.max(1e-9, x))
+  const lufs = (file: string): number => Number(/I:\s+(-?\d+\.?\d*) LUFS/.exec(execFileSync('sh', ['-c', `ffmpeg -hide_banner -nostats -i "${file}" -af ebur128 -f null - 2>&1 | grep -E "^\\s+I:" | tail -1`]).toString())?.[1])
+  const table = musicTable()
+  const tmp = mkdtempSync(join(tmpdir(), 'ichirei-mix-'))
+  for (const t of TRACKS.filter((x) => existsSync(musicPath(x)))) {
+    const mem = t === 'memorial'
+    const film = mem ? 41 : 34
+    const v = await makeFilmVideo({ ...JA, purpose: t === 'memorial' ? 'memorial' : t, memorial: mem, quiet: mem || t === 'apology' || t === 'encourage' }, { fps: 4 })
+    const file = join(tmp, `${t}.mp4`)
+    writeFileSync(file, v.mp4)
+    const p = probe(file)
+    const vs = p.streams.find((s) => s.codec_type === 'video')!
+    const as = p.streams.filter((s) => s.codec_type === 'audio')
+    const meta = table[t]
+    // the reference: the same stretch of the recording with the same gain and limiter, no fades
+    const ref = pcm(musicPath(t), meta.trimmed - film, film, `volume=${meta.gain_db}dB,alimiter=limit=0.84:attack=5:release=60:level=disabled`)
+    const mix = pcm(file, 0, film)
+    const seg = (a: Float32Array, from: number, to: number) => a.subarray(Math.round(from * 22050), Math.round(to * 22050))
+    const lateRef = db(rms(seg(ref, film - 3.5, film - 0.5)))
+    const lateMix = db(rms(seg(mix, film - 3.5, film - 0.5)))
+    const midRef = db(rms(seg(ref, film / 2 - 1.5, film / 2 + 1.5)))
+    const midMix = db(rms(seg(mix, film / 2 - 1.5, film / 2 + 1.5)))
+    const lastMix = db(rms(seg(mix, film - 0.2, film)))
+    const firstMix = db(rms(seg(mix, 0, 0.4)))
+    check(`(6) ${t}: the ${film} s film's audio is one stream as long as the picture (±0.1 s), the music enters ${v.musicStart} s in, the integrated loudness is ${lufs(file).toFixed(1)} LUFS`, as.length === 1 && Math.abs(Number(as[0].duration) - Number(vs.duration)) <= 0.1 && v.music === t && Math.abs((v.musicStart ?? -1) - (meta.trimmed - film)) <= 0.05, JSON.stringify(as))
+    check(`(6) ${t}: no early fade-out — the 3 s before the last 0.5 s are as loud as the recording itself (${lateMix.toFixed(1)} vs ${lateRef.toFixed(1)} dB; middle ${midMix.toFixed(1)} vs ${midRef.toFixed(1)} dB), the entrance is faded in, the very last 0.2 s is quieter`, Math.abs(lateMix - lateRef) < 1.5 && Math.abs(midMix - midRef) < 1.5 && firstMix < midMix - 10 && lastMix < lateMix - 3, JSON.stringify({ lateMix, lateRef, midMix, midRef, firstMix, lastMix }))
+  }
+  rmSync(tmp, { recursive: true, force: true })
 }
 
 console.log(failures === 0 ? '\nALL PASS' : `\n${failures} FAILED`)

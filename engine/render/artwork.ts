@@ -24,6 +24,10 @@ export interface Artwork {
   /** The poem's format code (tanka, haiku, tang, ci, en): 短歌 and 俳句 are set vertically (縦書き) on the card, the others stay horizontal. */
   poemType?: string
   memorial: boolean
+  /** Why the gift is given (the purpose code), which decides the music; absent on older gifts. */
+  purpose?: string | null
+  /** The state chip (`lost` always gets the remembrance piece); not kept on orders, so usually absent. */
+  state?: string | null
   /** v9.6: no red, no celebration colour — remembrance, an apology and an encouragement. The main character is ink. */
   quiet: boolean
   /** Names printed on the card. Empty strings mean the line stays blank, for handwriting (the sender hands it over). */
@@ -67,6 +71,7 @@ export async function loadArtwork(store: OrderStore, gift: GiftRecord, anim: Ani
     poem: gift.poem?.lines ?? [],
     poemType: gift.poem?.type ?? '',
     memorial: gift.memorial,
+    purpose: gift.purpose ?? null,
     quiet: gift.memorial || isQuietPurpose(gift.purpose),
     handwrite: blank,
     from: blank ? '' : gift.from,

@@ -8,6 +8,9 @@ import type { Language } from './contract.ts'
 import type { OrderRecord } from './order.ts'
 import type { FilmRecord } from './film.ts'
 import type { ArtRecord } from './film-art.ts'
+import { chooseTrack } from './render/film-audio.ts'
+import { makeFilmTimeline } from '../src/order/film-timeline.ts'
+import { purposeFromOccasion } from '../src/order/purpose.ts'
 
 export const ANIMATION_ID_PATTERN = /^AN-[a-z2-9]{20}$/
 const ALPHABET = 'abcdefghijkmnpqrstuvwxyz23456789' // 32 symbols → 100 bits in 20 characters; no look-alikes (l, o, 0, 1)
@@ -66,7 +69,7 @@ export function buildAnimationRecord(record: OrderRecord, id: string, now: Date 
     moment: p.story_anchor,
     who: p.gaze_line,
     memorial: p.certificate.memorial === true,
-    ...(p.certificate.purpose ? { purpose: p.certificate.purpose } : {}),
+    ...((p.certificate.purpose ?? purposeFromOccasion((record.engine_result as { occasion?: string | null } | undefined)?.occasion ?? null)) ? { purpose: (p.certificate.purpose ?? purposeFromOccasion((record.engine_result as { occasion?: string | null } | undefined)?.occasion ?? null)) as string } : {}),
     film: null,
   }
 }
@@ -115,7 +118,7 @@ export function animationView(r: AnimationRecord, art: ArtRecord | null = null):
       film = { status: 'ready', lines: f.lines, pictures: f.lines.map((_, i) => (art.slots[i] === 'ai' ? pictureUrl(r.id, i + 1, art.made_at) : washiPictureUrl(i))), ...(art.slots.includes('pending') || art.slots.includes('unchecked') ? { incomplete: true } : {}) }
     } else film = { status: 'ready', lines: f.lines, pictures: null, ...(art?.status === 'deferred' ? { deferred: true } : {}) }
   }
-  return { id: r.id, language: r.language, glyph: r.glyph, reading: r.reading, romanization: r.romanization, meaning_en: r.meaning_en, who: r.who, memorial: r.memorial, ...(r.purpose ? { purpose: r.purpose } : {}), film }
+  return { id: r.id, language: r.language, glyph: r.glyph, reading: r.reading, romanization: r.romanization, meaning_en: r.meaning_en, who: r.who, memorial: r.memorial, ...(r.purpose ? { purpose: r.purpose } : {}), ...(film ? { music: chooseTrack({ purpose: r.purpose, memorial: r.memorial }, makeFilmTimeline(f ? f.lines.length : 4, r.memorial).total) } : {}), film }
 }
 
 export function isAnimationRecord(x: unknown): x is AnimationRecord {

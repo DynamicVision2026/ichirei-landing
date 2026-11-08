@@ -1020,6 +1020,7 @@ const mockPage = async (browser, { onExplain, result, order, track } = {}) => {
   const SENDER_ID = 'AN-testtesttesttesttest'
   const year = new Date().getFullYear()
   const mk = (over = {}) => ({
+    music: 'thanks',
     locked: false, id: TOKEN, token: TOKEN, language: 'ja', glyph: '備', reading: 'そな-える', romanization: 'sonaeru', meaning_en: 'to be ready', who: 'いつも、頼まれる前に備えている人。', memorial: false,
     film: { status: 'fallback', lines: ['「ちょうど今詰めてたところ」', 'いつも、頼まれる前に備えている人。'], pictures: ['/film/washi-1.webp', '/film/washi-2.webp'] },
     certificate_line: 'この字は、あなたの目に映る、その人です。', poem: { type: 'tanka', lines: ['朝ごとに', '蓋の花添え', '備えたる', '母の背中を', '今も思へる'], reading: 'あさごとに' },

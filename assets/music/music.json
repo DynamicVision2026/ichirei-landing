@@ -1,0 +1,50 @@
+{
+  "target_lufs": -18,
+  "tracks": {
+    "thanks": {
+      "file": "thanks.ogg",
+      "duration": 202.998,
+      "trimmed": 197.442,
+      "tail_silence_s": 5.56,
+      "window_lufs": -31.8,
+      "gain_db": 13.8,
+      "page_excerpt_s": 45
+    },
+    "apology": {
+      "file": "apology.ogg",
+      "duration": 183.589,
+      "trimmed": 181.774,
+      "tail_silence_s": 1.81,
+      "window_lufs": -24.6,
+      "gain_db": 6.6,
+      "page_excerpt_s": 45
+    },
+    "encourage": {
+      "file": "encourage.ogg",
+      "duration": 381.168,
+      "trimmed": 381.168,
+      "tail_silence_s": 0,
+      "window_lufs": -37.8,
+      "gain_db": 19.8,
+      "page_excerpt_s": 45
+    },
+    "confess": {
+      "file": "confess.ogg",
+      "duration": 494.068,
+      "trimmed": 488.633,
+      "tail_silence_s": 5.44,
+      "window_lufs": -37.1,
+      "gain_db": 19.1,
+      "page_excerpt_s": 45
+    },
+    "memorial": {
+      "file": "memorial.ogg",
+      "duration": 335.769,
+      "trimmed": 335.769,
+      "tail_silence_s": 0,
+      "window_lufs": -32,
+      "gain_db": 14,
+      "page_excerpt_s": 45
+    }
+  }
+}

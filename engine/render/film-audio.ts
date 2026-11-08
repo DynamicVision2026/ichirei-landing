@@ -1,22 +1,59 @@
-// The music under the saved film and the share film (2026-11-07). Two tracks in assets/music/ — `warm` (soft, slow, a little brighter: thanks, birthdays, Kanreki and the other
-// celebrations) and `quiet` (sparse, slower, lower: remembrance and every quiet purpose) — both already levelled to about −18 LUFS when they were made (scripts/make-music.mjs). The
-// mix only trims the track to the film's length and fades it: in over 1.5 s, out with the picture over the last 2 s. Stereo AAC 128 kbps. A missing file never stops a film (it is made silent).
+// The music under the saved film and the share film (2026-11-08): six public-domain recordings in assets/music/ (see LICENSES.md), one per purpose; `assets/music/music.json` (made by
+// scripts/prepare-music.ts) holds each piece's length after its silent tail is trimmed and the gain that levels it to about −18 LUFS. The mix ALIGNS THE END of the piece to the END of the film:
+// it starts at (trimmed length − film length) seconds into the recording, so the piece's real last phrase and final chord play under the e-card and the film finishes where the piece finishes.
+// Fade in over 2 s; no fade-out of the music itself, only the very last 0.5 s (against a click). Stereo AAC 128 kbps. A missing file never stops a film (it is made silent).
 
-import { existsSync } from 'node:fs'
+import { existsSync, readFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { FADE_IN_S, FADE_OUT_S, moodOf, MUSIC_FILE, type Mood } from '../../src/order/film-music.ts'
+import { FADE_IN_S, FADE_OUT_S, LIMITER, MIN_SPARE_S, MUSIC_FILE, startOf, trackFor, type Track } from '../../src/order/film-music.ts'
 
-export { moodOf }
-export type { Mood }
+export { trackFor }
+export type { Track }
 
 export function musicDir(env: NodeJS.ProcessEnv = process.env): string {
   const here = dirname(fileURLToPath(import.meta.url))
   const candidates = [env.ICHIREI_MUSIC_DIR?.trim(), join(here, '..', '..', 'assets', 'music'), join(process.cwd(), 'assets', 'music')].filter((x): x is string => !!x)
-  return candidates.find((d) => existsSync(join(d, MUSIC_FILE.warm))) ?? candidates[0]
+  return candidates.find((d) => existsSync(join(d, 'music.json'))) ?? candidates[0]
 }
 
-export const musicPath = (mood: Mood, env: NodeJS.ProcessEnv = process.env): string => join(musicDir(env), MUSIC_FILE[mood])
+export interface TrackMeta {
+  file: string
+  duration: number
+  /** the length after the silent tail is trimmed */
+  trimmed: number
+  tail_silence_s: number
+  window_lufs: number
+  gain_db: number
+  page_excerpt_s: number
+}
+
+const cache = new Map<string, Record<string, TrackMeta>>()
+/** What scripts/prepare-music.ts measured; a piece that has no recording yet is simply not in it. */
+export function musicTable(env: NodeJS.ProcessEnv = process.env): Record<string, TrackMeta> {
+  const dir = musicDir(env)
+  let t = cache.get(dir)
+  if (!t) {
+    try {
+      t = (JSON.parse(readFileSync(join(dir, 'music.json'), 'utf8')) as { tracks: Record<string, TrackMeta> }).tracks
+    } catch {
+      t = {}
+    }
+    cache.set(dir, t)
+  }
+  return t
+}
+
+export const musicPath = (track: Track, env: NodeJS.ProcessEnv = process.env): string => join(musicDir(env), MUSIC_FILE[track])
+
+/** The piece a film of `seconds` really gets: the purpose's own, or `thanks` when that recording is not there yet or (trimmed) is shorter than the film + 2 s. null = no music at all. */
+export function chooseTrack(f: { purpose?: string | null; state?: string | null; memorial?: boolean; occasion?: string | null }, seconds: number, env: NodeJS.ProcessEnv = process.env): Track | null {
+  const table = musicTable(env)
+  const fits = (t: Track): boolean => !!table[t] && existsSync(musicPath(t, env)) && table[t].trimmed >= seconds + MIN_SPARE_S
+  const want = trackFor(f)
+  if (fits(want)) return want
+  return fits('thanks') ? 'thanks' : null
+}
 
 export interface AudioPlan {
   /** ffmpeg input arguments (after the video input) */
@@ -25,19 +62,30 @@ export interface AudioPlan {
   maps: string[]
   /** audio codec arguments */
   codec: string[]
-  mood: Mood
+  track: Track
+  /** where in the recording the film starts (seconds): trimmed length − film length */
+  start: number
+  trimmed: number
 }
 
-/** The ffmpeg pieces that put the music under a film of `seconds`; null = no file (silent). The audio is exactly as long as the picture (padded with silence if a track were shorter). */
-export function audioPlan(mood: Mood, seconds: number, env: NodeJS.ProcessEnv = process.env): AudioPlan | null {
-  const file = musicPath(mood, env)
-  if (!existsSync(file)) {
-    console.error(`[ichirei-film] music file missing (${mood}); the film is made without sound`)
+/** The ffmpeg pieces that put `track` under a film of `seconds`; null = no file (silent). The audio is exactly as long as the picture. */
+export function audioPlan(track: Track | null, seconds: number, env: NodeJS.ProcessEnv = process.env): AudioPlan | null {
+  if (!track) {
+    console.error('[ichirei-film] no music is available; the film is made without sound')
+    return null
+  }
+  const meta = musicTable(env)[track]
+  const file = musicPath(track, env)
+  if (!meta || !existsSync(file)) {
+    console.error(`[ichirei-film] music file missing (${track}); the film is made without sound`)
     return null
   }
   const T = Math.round(seconds * 1000) / 1000
+  const start = Math.max(0, startOf(meta.trimmed, T))
   const fin = Math.min(FADE_IN_S, T / 2)
   const fout = Math.min(FADE_OUT_S, T / 2)
-  const filter = `[1:a]atrim=0:${T},asetpts=PTS-STARTPTS,aformat=sample_rates=44100:channel_layouts=stereo,afade=t=in:st=0:d=${fin},afade=t=out:st=${Math.max(0, T - fout)}:d=${fout},apad=whole_dur=${T},atrim=0:${T}[a]`
-  return { inputs: ['-i', file], maps: ['-filter_complex', filter, '-map', '0:v', '-map', '[a]', '-t', String(T)], codec: ['-c:a', 'aac', '-b:a', '128k', '-ar', '44100', '-ac', '2'], mood }
+  const filter =
+    `[1:a]atrim=start=${start}:duration=${T},asetpts=PTS-STARTPTS,aformat=sample_rates=44100:channel_layouts=stereo,volume=${meta.gain_db}dB,${LIMITER},` +
+    `afade=t=in:st=0:d=${fin},afade=t=out:st=${Math.max(0, Math.round((T - fout) * 1000) / 1000)}:d=${fout},apad=whole_dur=${T},atrim=0:${T}[a]`
+  return { inputs: ['-i', file], maps: ['-filter_complex', filter, '-map', '0:v', '-map', '[a]', '-t', String(T)], codec: ['-c:a', 'aac', '-b:a', '128k', '-ar', '44100', '-ac', '2'], track, start, trimmed: meta.trimmed }
 }

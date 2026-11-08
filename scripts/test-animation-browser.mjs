@@ -192,8 +192,8 @@ try {
       const m = /rgb\((\d+), (\d+), (\d+)/.exec(end.color)
       const [r, g, b] = m ? [Number(m[1]), Number(m[2]), Number(m[3])] : [0, 0, 0]
       check(`${label}: the character is ${rec.memorial ? 'ink black (remembrance)' : 'cinnabar'}`, rec.memorial ? r < 60 && g < 60 && b < 60 : r > 170 && g < 110 && b < 90, end.color)
-      const au = await page.evaluate(() => { const a = document.querySelector('[data-testid=film-music]'); return { muted: a.muted, mood: a.dataset.mood, src: a.getAttribute('src'), btn: document.querySelector('[data-testid=film-sound]').textContent } })
-      check(`${label}: the music is the ${rec.memorial ? 'quiet' : 'warm'} track (${au.src}), the film starts MUTED, and the sound button is there`, au.muted === true && au.mood === (rec.memorial ? 'quiet' : 'warm') && au.src === `/music/${rec.memorial ? 'quiet' : 'warm'}.mp3` && au.btn.length > 0, JSON.stringify(au))
+      const au = await page.evaluate(() => { const a = document.querySelector('[data-testid=film-music]'); return { muted: a.muted, track: a.dataset.track, src: a.getAttribute('src'), btn: document.querySelector('[data-testid=film-sound]').textContent } })
+      check(`${label}: the music is the ${rec.memorial ? 'memorial' : 'thanks'} piece (${au.src}), the film starts MUTED, and the sound button is there`, au.muted === true && au.track === (rec.memorial ? 'memorial' : 'thanks') && au.src === `/music/${rec.memorial ? 'memorial' : 'thanks'}.mp3` && au.btn.length > 0, JSON.stringify(au))
       check(`${label}: no script errors, and the word AI appears nowhere on the page`, errors.length === 0 && !/\bAI\b/.test(await page.evaluate(() => document.body.innerText)), errors.join(' | '))
       if (SHOTS && deviceName.startsWith('iPhone')) {
         await seek(page, per * 1 + 3)
@@ -269,7 +269,7 @@ try {
     check('sound: the film is muted until the sound button is tapped (「音を出す」), and the music fades in with the picture ', s0.muted === true && s0.label === '音を出す' && s0.pressed === 'false')
     await page.click('[data-testid=film-sound]')
     await page.waitForTimeout(400)
-    const s1 = await page.evaluate(() => { const a = document.querySelector('[data-testid=film-music]'); return { muted: a.muted, label: document.querySelector('[data-testid=film-sound]').textContent, t: window.__ichireiFilm.time, ct: a.currentTime, paused: a.paused, vol: a.volume, kept: sessionStorage.getItem('ichirei-film-sound') } })
+    const s1 = await page.evaluate(() => { const a = document.querySelector('[data-testid=film-music]'); return { muted: a.muted, label: document.querySelector('[data-testid=film-sound]').textContent, t: window.__ichireiFilm.time, ct: a.currentTime - Math.max(0, a.duration - window.__ichireiFilm.total), off: a.duration - window.__ichireiFilm.total, paused: a.paused, vol: a.volume, kept: sessionStorage.getItem('ichirei-film-sound') } })
     check('sound: a tap turns the sound on (「音を消す」), the film keeps playing (the tap does not pause it), the music runs in step with the picture (±0.7 s) at a gentle volume, and the choice is kept for this session only', s1.muted === false && s1.label === '音を消す' && s1.paused === false && Math.abs(s1.ct - s1.t) < 0.7 && s1.vol > 0.9 && s1.kept === 'on', JSON.stringify(s1))
     await page.click('[data-testid=film-sound]')
     check('sound: tapping again turns it off (「音を出す」) — muted again', (await page.evaluate(() => document.querySelector('[data-testid=film-music]').muted)) === true && (await page.textContent('[data-testid=film-sound]')) === '音を出す')
@@ -297,7 +297,7 @@ try {
     await page.click('[data-testid=animation-credits-link]')
     await page.waitForSelector('[data-testid=credits-page]')
     const credits = await page.textContent('[data-testid=credits-page]')
-    check('the credits link opens the credits page: the typefaces (SIL OFL), the one illustration line (Google\u2019s image model), no KanjiVG / Make Me a Hanzi any more, no "AI"', ['Zen Old Mincho', 'SIL Open Font License', 'Illustrations drawn with Google\u2019s image model'].every((x) => credits.includes(x)) && !/KanjiVG|Make Me a Hanzi/.test(credits) && !/\bAI\b/.test(credits))
+    check('the credits link opens the credits page: the typefaces (SIL OFL), the one illustration line (Google\u2019s image model), the music line (Schumann, Satie, Grieg, Chopin, Beethoven; Musopen, public domain, in ja / zh-Hant / en), no KanjiVG / Make Me a Hanzi any more, no "AI"', ['Zen Old Mincho', 'SIL Open Font License', 'Illustrations drawn with Google\u2019s image model', 'Music: Schumann, Satie, Grieg, Chopin, Beethoven (Musopen recordings, public domain)', '音楽：シューマン、サティ、グリーグ、ショパン、ベートーヴェン（Musopen録音、パブリックドメイン）', '音樂：舒曼、薩提、葛利格、蕭邦、貝多芬（Musopen錄音，公有領域）'].every((x) => credits.includes(x)) && !/KanjiVG|Make Me a Hanzi/.test(credits) && !/\bAI\b/.test(credits))
     await context.close()
   }
 

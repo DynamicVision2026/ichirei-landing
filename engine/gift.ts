@@ -17,6 +17,7 @@ import { EGIFT_JAPAN_ONLY, PACKAGE_SKU, type PackageId } from '../src/order/pack
 import type { OrderRecord } from './order.ts'
 import type { ArtRecord } from './film-art.ts'
 import type { Language } from './contract.ts'
+import { purposeFromOccasion } from '../src/order/purpose.ts'
 import { convertLineScript, fullWidthPunctuation } from './script.ts'
 
 export const GIFT_TOKEN_PATTERN = /^RG-[a-z2-9]{20}$/
@@ -107,7 +108,7 @@ export function buildGiftRecord(record: OrderRecord, animationId: string, token:
     meaning_en: p.certificate.meaning_en,
     who: fullWidthPunctuation(convertLineScript(p.gaze_line, p.language) ?? p.gaze_line, p.language), // (an older order whose line is in the wrong Chinese script is shown in the right one)
     memorial: p.certificate.memorial === true,
-    ...(p.certificate.purpose ? { purpose: p.certificate.purpose } : {}),
+    ...((p.certificate.purpose ?? purposeFromOccasion((record.engine_result as { occasion?: string | null } | undefined)?.occasion ?? null)) ? { purpose: (p.certificate.purpose ?? purposeFromOccasion((record.engine_result as { occasion?: string | null } | undefined)?.occasion ?? null)) as string } : {}),
     certificate_line: certificateText(p.language),
     poem: poem ? { type: String((poem as { type?: unknown }).type ?? ''), lines: [...((poem as { lines?: string[] }).lines ?? [])], reading: String((poem as { reading?: unknown }).reading ?? '') } : null,
     from: p.sender_name,
