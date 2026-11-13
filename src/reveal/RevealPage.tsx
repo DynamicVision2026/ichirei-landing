@@ -4,6 +4,7 @@ import { trackPageView } from '../demo/analytics'
 import { DOCUMENT, REVEAL_LANGS, TEXT, type RevealLang } from './copy'
 import { Angles, Closing, Dock, Faq, Footer, Gifts, Moments, Philosophy, Reviews, Steps, StoryShape, Strip } from './Sections'
 import Hero from './Hero'
+import { UsBanner, UsReceive } from './UsSections'
 import { useCurrency } from './useCurrency'
 import { toRevealLang } from './lang'
 import { useMemorialSelected } from './occasion-store'
@@ -103,6 +104,7 @@ export default function RevealPage() {
 
       <main>
         <Hero lang={lang} currency={currency} rates={rates} woodOnSale={woodOnSale} />
+        {lang === 'en' && <UsBanner />}
         <Strip t={t} woodOnSale={woodOnSale} />
         <Philosophy t={t} />
         <StoryShape t={t} />
@@ -120,8 +122,9 @@ export default function RevealPage() {
           <DemoApp mode="customer" aside={aside} />
         </Suspense>
         <Steps t={t} memorial={memorial} woodOnSale={woodOnSale} />
-        <Moments t={t} memorial={memorial} />
+        <Moments t={t} memorial={memorial} lang={lang} />
         <Reviews t={t} />
+        {lang === 'en' && <UsReceive />}
         <Gifts t={t} lang={lang} currency={currency} rates={rates} onCurrency={setCurrency} woodOnSale={woodOnSale} />
         <Faq t={t} lang={lang} woodOnSale={woodOnSale} />
         <Closing t={t} woodOnSale={woodOnSale} />

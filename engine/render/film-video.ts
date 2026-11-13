@@ -77,7 +77,7 @@ export async function makeFilmVideo(a: Artwork, opts: { fps?: number; ffmpeg?: s
   const kanjiCentreY = VIDEO_H / 2 - VIDEO_W * 0.09
   const kanji: Layer = { data: kanjiPng.data, w: kanjiPng.info.width, h: kanjiPng.info.height, x: Math.round(VIDEO_W / 2 - kanjiPng.info.width / 2), y: Math.round(kanjiCentreY - kanjiPng.info.height / 2) }
   const reading = await lineLayer(body, a.reading, 2.9 * U, VIDEO_W / 2, VIDEO_H * 0.61, c.muted, 0.3 * 2.9 * U)
-  const card = await makeEndCard({ language: a.language, glyph: a.glyph, reading: a.reading, who: a.who, poem: a.poem, poemType: a.poemType, quiet: a.quiet }, 'film')
+  const card = await makeEndCard({ language: a.language, glyph: a.glyph, reading: a.reading, who: a.who, ...(a.language === 'en' && a.en ? { word: a.en.word, line: a.en.line } : {}), poem: a.poem, poemType: a.poemType, quiet: a.quiet }, 'film')
   const credits = await lineLayer(body, credit(a.language), 1.9 * U, VIDEO_W / 2, VIDEO_H * 0.965, INK.muted)
 
   // the plain frame

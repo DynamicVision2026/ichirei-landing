@@ -3,6 +3,7 @@
 // its reading, the "who they are" line, the memorial flag and — when it is ready — the film script (engine/film.ts: four lines and four picture descriptions; the pictures themselves are drawn on the first open, engine/film-art.ts).
 // The page `/a/<id>` plays it with the fixed template in src/animation/; no model call happens when it is played.
 
+import type { EnBridge } from '../src/order/en-bridge.ts'
 import { randomBytes } from 'node:crypto'
 import type { Language } from './contract.ts'
 import type { OrderRecord } from './order.ts'
@@ -37,6 +38,8 @@ export interface AnimationRecord {
   reading: string
   romanization: string
   meaning_en: string | null
+  /** en only (2026-11-12): the English bridge — word, line, reviewed echo and classical line. */
+  en?: EnBridge | null
   /** "Your moment": the sender's own words as the card quotes them (used only by the fallback script). */
   moment: string
   /** "Who they are": the card's one line (shown near the end of the film). */
@@ -66,6 +69,7 @@ export function buildAnimationRecord(record: OrderRecord, id: string, now: Date 
     reading: p.certificate.reading,
     romanization: p.certificate.romanization,
     meaning_en: p.certificate.meaning_en,
+    ...(p.language === 'en' && p.certificate.en ? { en: p.certificate.en } : {}),
     moment: p.story_anchor,
     who: p.gaze_line,
     memorial: p.certificate.memorial === true,
@@ -81,6 +85,8 @@ export interface AnimationView {
   reading: string
   romanization: string
   meaning_en: string | null
+  /** en only: the English bridge (see AnimationRecord.en). */
+  en?: EnBridge | null
   who: string
   memorial: boolean
   /** v9.6: why the gift is given: decides the opening words of the gift page and whether red is used. */
@@ -118,7 +124,7 @@ export function animationView(r: AnimationRecord, art: ArtRecord | null = null):
       film = { status: 'ready', lines: f.lines, pictures: f.lines.map((_, i) => (art.slots[i] === 'ai' ? pictureUrl(r.id, i + 1, art.made_at) : washiPictureUrl(i))), ...(art.slots.includes('pending') || art.slots.includes('unchecked') ? { incomplete: true } : {}) }
     } else film = { status: 'ready', lines: f.lines, pictures: null, ...(art?.status === 'deferred' ? { deferred: true } : {}) }
   }
-  return { id: r.id, language: r.language, glyph: r.glyph, reading: r.reading, romanization: r.romanization, meaning_en: r.meaning_en, who: r.who, memorial: r.memorial, ...(r.purpose ? { purpose: r.purpose } : {}), ...(film ? { music: chooseTrack({ purpose: r.purpose, memorial: r.memorial }, makeFilmTimeline(f ? f.lines.length : 4, r.memorial).total) } : {}), film }
+  return { id: r.id, language: r.language, glyph: r.glyph, reading: r.reading, romanization: r.romanization, meaning_en: r.meaning_en, ...(r.language === 'en' && r.en ? { en: r.en } : {}), who: r.who, memorial: r.memorial, ...(r.purpose ? { purpose: r.purpose } : {}), ...(film ? { music: chooseTrack({ purpose: r.purpose, memorial: r.memorial }, makeFilmTimeline(f ? f.lines.length : 4, r.memorial).total) } : {}), film }
 }
 
 export function isAnimationRecord(x: unknown): x is AnimationRecord {
@@ -163,7 +169,7 @@ export const SAMPLE_RECORDS: Record<string, AnimationRecord> = {
     film: { status: 'ready', turning_point: '母が、頼む前から帰る日のお弁当を詰めていたこと', made_at: madeAt, pictures: ['a mother\'s hand placing one spring flower on an open bento box on a wooden kitchen counter, soft morning window light', 'a young woman seen from behind at a kitchen doorway, her mother a small silhouette at the stove beyond, pale morning light', 'two hands passing a wrapped lunch box across a classroom desk, a teacher seen from behind among empty desks, afternoon light through a window', 'a woman seen from behind holding a telephone receiver beside a window at dusk, warm lamp light and a quiet room'], lines: ['春には、お弁当に\n庭の花を一輪のせてくれた母。', '「もういらない」と断った日も、\n母は静かに台所へ戻った。', '教師になり、生徒に\n自分のお弁当を分けた日、母を思った。', '帰る日の弁当を頼むと、「ちょうど今詰めてたところ」。'] } },
   [SAMPLE_IDS.zh]: { ...sampleBase, id: SAMPLE_IDS.zh, language: 'zh-Hant', glyph: '待', reading: 'dài', romanization: 'dài', meaning_en: 'wait', moment: '你總是在門口等我', who: '總是點著燈、在門口等我回家的人。', memorial: false,
     film: { status: 'ready', turning_point: '她在電話裡說，家裡的燈還亮著', made_at: madeAt, pictures: ['a lit lamp glowing beside a front door at night, a pair of shoes on the entrance step, a quiet apartment street in autumn', 'a mother seen from behind holding an umbrella at a doorway in evening rain, soft reflections on the wet ground', 'a mother\'s silhouette waving on a train platform as a train pulls away, early morning mist', 'a hand holding an old telephone receiver beside a warm lamp in a small room at night'], lines: ['每次晚歸，玄關總有一盞燈亮著。', '下雨的夜裡，媽媽撐著傘在門口等。', '我去外地讀書，她在月台上揮著手。', '電話裡她只說：「家裡燈還亮著。」'] } },
-  [SAMPLE_IDS.en]: { ...sampleBase, id: SAMPLE_IDS.en, language: 'en', glyph: '待', reading: 'まつ', romanization: 'matsu', meaning_en: 'wait', moment: 'She was always waiting at the station', who: 'The one who waited, every single time, without ever being asked.', memorial: false,
+  [SAMPLE_IDS.en]: { ...sampleBase, id: SAMPLE_IDS.en, language: 'en', glyph: '待', reading: 'まつ', romanization: 'matsu', meaning_en: 'wait', en: { word: 'vigil', word_source: 'lexicon', line: 'The one who is still waiting when everyone else has gone home.', echo: null }, moment: 'She was always waiting at the station', who: 'The one who waited, every single time, without ever being asked.', memorial: false,
     film: { status: 'ready', turning_point: 'She had the tea ready before I asked', made_at: madeAt, pictures: ['a silhouette of a mother standing on a small railway station platform waving, morning light, a simple wooden bench', 'a woman seen from behind holding an umbrella at a station exit in steady rain, wet paving stones', 'a pair of shoes set neatly by a doorway at night, warm light from inside a home', 'two cups of tea on a low wooden table in a quiet room, steam rising, soft evening light'], lines: ['Every time I left, she stood\nat the station and waved.', 'When it rained, she was there\nwith an umbrella, before I asked.', 'I came home late, and the shoes\nwere already set by the door.', 'She only said, \u201cThe tea is ready.\u201d'] } },
   [SAMPLE_IDS.memorial]: { ...sampleBase, id: SAMPLE_IDS.memorial, language: 'ja', glyph: '綴', reading: 'つづる', romanization: 'tsuzuru', meaning_en: 'stitch', moment: '私の名前で、何十通も手紙を書き続けてくれた', who: '私の名前で、何十通も手紙を書き続けてくれた人。', memorial: true,
     film: { status: 'ready', turning_point: '母が私の名前で、何通も手紙を書き続けてくれていたこと', made_at: madeAt, pictures: ['a mother\'s hand holding a brush over a sheet of folded paper at a low desk, soft grey window light', 'a stack of folded paper tied with string on a quiet shelf, a single window, still afternoon', 'a small wooden desk by a sunlit window with folded paper stacked on one corner and an empty chair', 'a pair of hands resting on a folded sheet of paper in soft light, a window beyond'], lines: ['母は、私の名前で\n何通も手紙を書いてくれた。', '遠くの先生への礼状も、\n祖母への便りも、母の字だった。', '机の上には、あの日の便箋が\n今も重ねてある。', '母の字を読むと、\n私の名前が少し誇らしい。'] } },

@@ -1,6 +1,8 @@
 import { inkOnly } from '../order/memorial.ts'
 import { isQuietPurpose } from '../order/purpose.ts'
 import { cleanReading } from '../order/reading.ts'
+import EnBridgeStack from '../order/EnBridgeStack.tsx'
+import { poemWrittenFrom } from '../order/en-bridge.ts'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { COPY as FILM_COPY, pageLang, type PageLang } from '../animation/copy.ts'
 import { Film } from '../animation/AnimationApp.tsx'
@@ -13,7 +15,7 @@ import { linerFor } from './liner.ts'
 import '../animation/animation.css'
 import '../fonts.css'
 import './gift.css'
-import { trackReceiverOpened } from '../demo/analytics'
+import { trackReceiverOpened, trackUs } from '../demo/analytics'
 
 // The receiver's gift page /g/<token> (Part 3 of the 2026-10-31 ticket). One screen at a time:
 //   1 the sealed envelope (or, before the opening date, the same envelope with the date instead of the button)
@@ -200,7 +202,11 @@ export default function GiftApp() {
     return stage(
       <section className="gf-reveal" data-testid="gift-reveal">
         <p className="gf-char notranslate" translate="no" data-testid="gift-glyph" aria-label={view.glyph}>{view.glyph}</p>
-        <p className="gf-reading notranslate" translate="no" data-testid="gift-reading">{readingLine(view)}</p>
+        {view.language === 'en' && view.en ? (
+          <EnBridgeStack className="gf-en" reading={cleanReading(view.romanization.split(' / ')[0])} word={view.en.word} line={view.en.line} echo={view.en.echo} classical={view.en.classical} />
+        ) : (
+          <p className="gf-reading notranslate" translate="no" data-testid="gift-reading">{readingLine(view)}</p>
+        )}
         {view.from && <p className="gf-gold" data-testid="gift-gold">{copy.revealGold(view.from)}</p>}
         <p className="gf-who" data-testid="gift-who">{view.who}</p>
         <button type="button" className="gf-btn" data-testid="gift-to-poem" onClick={() => setStep(view.poem ? 'poem' : 'cert')}>{view.poem ? copy.poemButton : copy.certButton}</button>
@@ -219,6 +225,7 @@ export default function GiftApp() {
           )}
         </div>
         {view.poem.reading && <p className="gf-poem-reading" data-testid="gift-poem-reading">{view.poem.reading}</p>}
+        {view.language === 'en' && <p className="gf-poem-from" data-testid="gift-poem-from">{poemWrittenFrom(view.from)}</p>}
         <button type="button" className="gf-btn" data-testid="gift-to-cert" onClick={() => setStep('cert')}>{copy.certButton}</button>
       </section>,
     )
@@ -228,6 +235,7 @@ export default function GiftApp() {
       <section className="gf-paper gf-cert" data-testid="gift-cert" data-cert-no={view.certificate_no ?? ''}>
         <h2 className="gf-cert-title" data-testid="gift-cert-title">{copy.certTitle(view.certificate_no ? String(view.certificate_no).padStart(4, '0') : null)}</h2>
         <p className="gf-cert-glyph notranslate" translate="no" data-testid="gift-cert-glyph">{view.glyph}</p>
+        {view.language === 'en' && view.en && <EnBridgeStack className="gf-en gf-en-cert" reading={cleanReading(view.romanization.split(' / ')[0])} word={view.en.word} line={view.en.line} echo={view.en.echo} classical={view.en.classical} />}
         {view.to && <p className="gf-cert-to" data-testid="gift-cert-to">{copy.certTo(view.to)}</p>}
         {view.from && <p className="gf-cert-line" data-testid="gift-cert-line">{copy.certLine(view.from)}</p>}
         {view.from && <p className="gf-cert-from" data-testid="gift-cert-from">{copy.certFrom(view.from)}</p>}
@@ -240,7 +248,7 @@ export default function GiftApp() {
   // 8. what to keep, and the one thank-you
   return stage(
     <section className="gf-keep" data-testid="gift-keep">
-      {!preview && <Keepsakes lang={lang} base={`/api/gift/${view.token}`} q={q} complete={filmComplete(view)} scroll={scrollAvailable(view)} egift={view.package === 'egift'} />}
+      {!preview && <Keepsakes lang={lang} base={`/api/gift/${view.token}`} q={q} complete={filmComplete(view)} scroll={scrollAvailable(view)} egift={view.package === 'egift'} enCard={view.language === 'en' && !!view.en} track />}
       {!preview && !view.memorial && filmComplete(view) && <ShareSection lang={lang} base={`/api/gift/${view.token}`} role="receiver" />}
       {view.egift && !preview && <EgiftReceive view={view} lang={lang} />}
       {!preview && <ReplyBox token={view.token} copy={copy} from={view.from} replied={view.replied} />}
@@ -280,7 +288,7 @@ function Envelope({ copy, lang, to, from, memorial, purpose, date, reduced, stat
   return (
     <section className="gf-env-screen" data-testid="gift-envelope-screen">
       <p className="gf-label" data-testid="gift-env-label">{memorial || letterLike ? copy.envLabelMemorial : copy.envLabel}</p>
-      <p className="gf-env-line" data-testid="gift-env-line">{memorial || letterLike ? copy.envLineMemorial : purpose === 'celebrate' ? copy.envLineCelebrate : purpose === 'thanks' ? copy.envLineThanks : copy.envLine}</p>
+      <p className="gf-env-line" data-testid="gift-env-line">{memorial || letterLike ? copy.envLineMemorial : copy.envChose ? copy.envChose(from) : purpose === 'celebrate' ? copy.envLineCelebrate : purpose === 'thanks' ? copy.envLineThanks : copy.envLine}</p>
       <div
         ref={ref}
         className={`gf-env gf-env-${state}`}
@@ -307,7 +315,7 @@ function Envelope({ copy, lang, to, from, memorial, purpose, date, reduced, stat
           <p className="gf-locked-note" data-testid="gift-locked-note">{copy.daysLeft(locked.days_left)}</p>
         </>
       ) : (
-        <button type="button" className="gf-btn gf-btn-hot" data-testid="gift-open" onClick={onOpen} disabled={state === 'opening'}>{copy.open}</button>
+        <button type="button" className="gf-btn gf-btn-hot" data-testid="gift-open" onClick={onOpen} disabled={state === 'opening'}>{copy.openShort && !memorial && !letterLike ? copy.openShort : copy.open}</button>
       )}
     </section>
   )
@@ -316,17 +324,22 @@ function Envelope({ copy, lang, to, from, memorial, purpose, date, reduced, stat
 function ReplyBox({ token, copy, from, replied }: { token: string; copy: GiftCopy; from: string; replied: boolean }) {
   const [text, setText] = useState('')
   const [phase, setPhase] = useState<'idle' | 'sending' | 'sent' | 'error'>(replied ? 'sent' : 'idle')
+  // English: the reply is one button, "Send a reply to <name>", that opens the form
+  const [opened, setOpened] = useState(!copy.replyOpen)
   const send = async () => {
     setPhase('sending')
     try {
       const res = await fetch(`/api/gift/${token}/reply`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ text }) })
       setPhase(res.ok || res.status === 409 ? 'sent' : 'error')
+      if (res.ok) trackUs('receiver_replied')
     } catch {
       setPhase('error')
     }
   }
   if (phase === 'sent') return <p className="gf-sent" role="status" data-testid="gift-reply-sent">{copy.replySent(from)}</p>
   const left = 200 - [...text].length
+  if (!opened && copy.replyOpen)
+    return <button type="button" className="gf-btn gf-btn-hot" data-testid="gift-reply-open" onClick={() => setOpened(true)}>{copy.replyOpen(from)}</button>
   return (
     <form className="gf-reply" data-testid="gift-reply" onSubmit={(e) => { e.preventDefault(); if (text.trim()) void send() }}>
       <h3 className="gf-label">{copy.replyTitle}</h3>

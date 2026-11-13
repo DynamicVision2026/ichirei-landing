@@ -95,7 +95,7 @@ const en: SizeCopy = {
     simple: 'Everything in the e-gift + a printed story card + a wooden tag with the character in ink black, a plain cord and gift box',
     standard: 'Everything in the e-gift + a printed story card + a wooden block with the character, a rubbing set (ink, tampo, washi) and a cloth pouch',
   },
-  ship: { egift: 'No shipping (sent as a link)', simple: 'Free in Japan · overseas EMS ¥6,000', standard: 'Free in Japan · overseas EMS ¥6,000' },
+  ship: { egift: 'Nothing to post (sent as a link)', simple: 'Free in Japan · overseas EMS ¥6,000', standard: 'Free in Japan · overseas EMS ¥6,000' },
   recommended: 'Recommended',
   sendNow: 'Send it now',
   comingSoon: 'Coming soon',

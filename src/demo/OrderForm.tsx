@@ -3,7 +3,7 @@ import { motion, useReducedMotion } from 'framer-motion'
 import type { Candidate, EngineResult } from './types'
 import type { Copy, InscriptionStyle, OrderField, PackageId, UiLanguage } from './i18n'
 import { log } from './logging'
-import { sessionId } from './analytics'
+import { sessionId, trackUs } from './analytics'
 import { clearDraft } from './draft'
 import { EGIFT_JAPAN_ONLY, GIFT_MESSAGE_MAX, OPEN_DATE_MAX_DAYS, PACKAGE_DISPLAY_ORDER, PACKAGE_PRICE_JPY, RECOMMENDED_PACKAGE, SHIPS, SHIP_TO, WOODEN, formatYen, type ShipTo } from '../order/packages.ts'
 import { SIZE_COPY } from './sizes-copy.ts'
@@ -23,6 +23,9 @@ import { useCurrency } from '../reveal/useCurrency.ts'
 import { approxLine } from '../reveal/currency.ts'
 import { toRevealLang } from '../reveal/lang.ts'
 import { cleanInscriptionForm } from '../order/inscription'
+import EnBridgeStack from '../order/EnBridgeStack.tsx'
+import { getUtm } from './utm-store.ts'
+import { cleanReading } from '../order/reading.ts'
 
 // The purchase step of the customer flow: after the sender has chosen a character, collect
 // sender name, receiver name, delivery date, inscription form and package, show the paper slip
@@ -154,6 +157,7 @@ export default function OrderForm({ result, story, followUps = [], promptQuestio
           ...(openDate ? { open_date: openDate } : {}),
           ...(poemIds.length ? { poems: poemIds.map((poem_id) => ({ poem_id })) } : {}),
           ...(refundAckAt ? { refund_ack_at: refundAckAt } : {}),
+          ...(language === 'en' && Object.keys(getUtm()).length > 0 ? { utm: getUtm() } : {}),
           session: sessionId,
           source: 'customer',
         }),
@@ -164,6 +168,7 @@ export default function OrderForm({ result, story, followUps = [], promptQuestio
       } catch {
         data = null
       }
+      if (res.ok && data?.checkout_url && language === 'en' && openDate) trackUs('egift_scheduled') // (English launch: the buyer scheduled the opening day)
       if (!res.ok || !data?.checkout_url) {
         const field = FIELD_KEYS.find((f) => f === data?.field)
         const message = field
@@ -215,7 +220,11 @@ export default function OrderForm({ result, story, followUps = [], promptQuestio
         <span data-order-glyph className="k slipGlyph notranslate">
           {glyph}
         </span>
-        <span className="slipReading">{copy.glyphReading(candidate, glyph)}</span>
+        {language === 'en' && candidate.slot !== 'freestyle' && candidate.en_word ? (
+          <EnBridgeStack className="slipStack" reading={cleanReading(candidate.reading)} word={candidate.en_word} line={candidate.en_line} echo={candidate.en_echo} classical={candidate.classical_echo ?? null} />
+        ) : (
+          <span className="slipReading">{copy.glyphReading(candidate, glyph)}</span>
+        )}
         <p className="slipLabel">{o.certificateLabel}</p>
         <p data-certificate className="slipLine">
           {cert}
@@ -245,7 +254,7 @@ export default function OrderForm({ result, story, followUps = [], promptQuestio
         </fieldset>
 
         {/* The free card preview: the character, who they are, the poem and the four scenes of the story (drawn once per story) */}
-        <CardPreview egift={egiftCopy} copy={pc} glyph={glyph} reading={copy.glyphReading(candidate, glyph)} who={candidate.one_line_gaze} poem={poemShown} certificateLine={cert} memorial={memorial} quiet={quiet} language={language} preview={preview} />
+        <CardPreview egift={egiftCopy} copy={pc} glyph={glyph} reading={language === 'en' && candidate.slot !== 'freestyle' && candidate.en_word ? cleanReading(candidate.reading) : copy.glyphReading(candidate, glyph)} enWord={language === 'en' && candidate.slot !== 'freestyle' ? candidate.en_word ?? null : null} enLine={language === 'en' && candidate.slot !== 'freestyle' ? candidate.en_line ?? null : null} who={candidate.one_line_gaze} poem={poemShown} certificateLine={cert} memorial={memorial} quiet={quiet} language={language} preview={preview} />
 
         <div className="orderGrid">
           <div>
@@ -365,6 +374,7 @@ export default function OrderForm({ result, story, followUps = [], promptQuestio
                 <button type="button" className="backLink" data-testid="open-date-clear" onClick={() => setOpenDate('')}>{sc.openDateClear}</button>
               )}
               <span className="sent block">{sc.openDateNote}</span>
+              {language === 'en' && <span className="sent block" data-testid="open-date-hint">Set it to open on Christmas morning.</span>}
             </div>
           </fieldset>
         )}

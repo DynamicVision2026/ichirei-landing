@@ -9,6 +9,7 @@
 // receiver types their address here: it is kept on our side only (this record), goes onto the owner's daily list, and is never shown to the sender or
 // to anyone else; it is deleted 90 days after the order ships.
 
+import type { EnBridge } from '../src/order/en-bridge.ts'
 import { cleanReading } from '../src/order/reading.ts'
 import { randomBytes } from 'node:crypto'
 import { animationView, publicUrl, type AnimationRecord, type AnimationView } from './animation.ts'
@@ -65,6 +66,8 @@ export interface GiftRecord {
   reading: string
   romanization: string
   meaning_en: string | null
+  /** en only (2026-11-12): the English bridge printed with the character. */
+  en?: EnBridge | null
   who: string
   memorial: boolean
   /** v9.6: why the gift is given; absent on older gifts. */
@@ -106,6 +109,7 @@ export function buildGiftRecord(record: OrderRecord, animationId: string, token:
     reading: cleanReading(p.certificate.reading),
     romanization: cleanReading(p.certificate.romanization),
     meaning_en: p.certificate.meaning_en,
+    ...(p.language === 'en' && p.certificate.en ? { en: p.certificate.en } : {}),
     who: fullWidthPunctuation(convertLineScript(p.gaze_line, p.language) ?? p.gaze_line, p.language), // (an older order whose line is in the wrong Chinese script is shown in the right one)
     memorial: p.certificate.memorial === true,
     ...((p.certificate.purpose ?? purposeFromOccasion((record.engine_result as { occasion?: string | null } | undefined)?.occasion ?? null)) ? { purpose: (p.certificate.purpose ?? purposeFromOccasion((record.engine_result as { occasion?: string | null } | undefined)?.occasion ?? null)) as string } : {}),

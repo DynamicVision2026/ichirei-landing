@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
-import { trackFlow } from '../demo/analytics'
+import { trackFlow, trackUs } from '../demo/analytics'
+import { OCCASION_CHIPS, RELATIONSHIP_CHIPS, occasionChipOf, relationshipChipOf } from '../order/en-chips.ts'
 import { nextQuestionId, questionSetOf, questionsOf, randomFirst, setOfQuestionId } from '../demo/questions'
 import { OPENER, STORY_MIN } from './opener-copy'
 import {
@@ -90,6 +91,25 @@ function Chips<T extends string>({
   )
 }
 
+/** English (2026-11-12): chips whose label is not the code — Wife and Husband are both `spouse`, so the pressed one is the chip the sender chose (or, for a restored draft, the first of its code). */
+function ChipRow({ label, name, chips, pressed, onPick, base }: { label: string; name: string; chips: readonly { code: string; label: string }[]; pressed: string; onPick: (code: string) => void; base: (code: string) => string }) {
+  // data-chip keeps the code the chip stands for (relationship:spouse, purpose:thanks) on the FIRST chip of that code, as every test and the dashboard know it; the others carry their own code
+  return (
+    <div className="cgroup" role="group" aria-labelledby={`cg-${name}`}>
+      <span className="clab" id={`cg-${name}`}>
+        {label}
+      </span>
+      <div className="cchips">
+        {chips.map((c, i) => (
+          <button key={c.code} type="button" className="cchip" data-chip={`${name}:${chips.findIndex((x) => base(x.code) === base(c.code)) === i ? base(c.code) : c.code}`} data-chip-code={c.code} aria-pressed={pressed === c.code} onClick={() => onPick(c.code)}>
+            {c.label}
+          </button>
+        ))}
+      </div>
+    </div>
+  )
+}
+
 type Props = {
   story: string
   onStoryChange: (s: string) => void
@@ -121,6 +141,9 @@ export default function Composer({ story, onStoryChange, onSubmit, copy, lang, c
       setCtx({ relationship: c as GiftContext['relationship'], direction: want as GiftContext['direction'] })
     } else setCtx({ relationship: c as GiftContext['relationship'] })
   }
+  // English chips: which relationship chip and which occasion chip the sender pressed (the codes behind them are shared)
+  const [relChip, setRelChip] = useState<string>('')
+  const [occChip, setOccChip] = useState<string>('')
   const n = storyLength(story)
   // A short sentence is enough, but not an empty or junk try: every submit costs real AI money (Part A3).
   const longEnough = storyLength(story.trim()) >= STORY_MIN
@@ -308,10 +331,43 @@ export default function Composer({ story, onStoryChange, onSubmit, copy, lang, c
         if (ready) onSubmit()
       }}
     >
-      <Chips name="relationship" label={copy.relationshipLabel} codes={[...RELATIONSHIP_CODES, 'other'] as const} labels={{ ...copy.relationships, other: pc.other }} value={context.relationship} onPick={(c) => pickRelationship(c)} />
+      {lang === 'en' ? (
+        <ChipRow
+          name="relationship"
+          label={copy.relationshipLabel}
+          chips={RELATIONSHIP_CHIPS}
+          base={(code) => RELATIONSHIP_CHIPS.find((c) => c.code === code)?.relationship ?? code}
+          pressed={context.relationship ? (RELATIONSHIP_CHIPS.find((c) => c.code === relChip && c.relationship === context.relationship)?.code ?? relationshipChipOf(context.relationship)?.code ?? '') : ''}
+          onPick={(code) => {
+            const chip = RELATIONSHIP_CHIPS.find((c) => c.code === code)
+            if (!chip) return
+            setRelChip(code)
+            pickRelationship(chip.relationship)
+          }}
+        />
+      ) : (
+        <Chips name="relationship" label={copy.relationshipLabel} codes={[...RELATIONSHIP_CODES, 'other'] as const} labels={{ ...copy.relationships, other: pc.other }} value={context.relationship} onPick={(c) => pickRelationship(c)} />
+      )}
       {context.relationship === 'other' && <OtherText name="relationship_other" value={context.relationshipOther ?? ''} max={RELATIONSHIP_OTHER_MAX} placeholder={pc.relationshipOtherPlaceholder} onChange={(v) => setCtx({ relationshipOther: v })} />}
       <Chips name="direction" label={memorial ? copy.memorial.directionLabel : copy.directionLabel} codes={DIRECTION_CODES} labels={memorial ? copy.memorial.directions : copy.directions} value={context.direction} onPick={(c) => setCtx({ direction: c })} />
-      <Chips name="purpose" label={pc.purposeLabel} codes={PURPOSE_CODES} labels={pc.purposes} value={purpose} onPick={(c) => setCtx({ purpose: c, occasion: '' })} />
+      {lang === 'en' ? (
+        <ChipRow
+          name="purpose"
+          label={pc.purposeLabel}
+          chips={OCCASION_CHIPS}
+          base={(code) => OCCASION_CHIPS.find((c) => c.code === code)?.purpose ?? code}
+          pressed={purpose ? (OCCASION_CHIPS.find((c) => c.code === occChip && c.purpose === purpose)?.code ?? occasionChipOf(purpose)?.code ?? '') : ''}
+          onPick={(code) => {
+            const chip = OCCASION_CHIPS.find((c) => c.code === code)
+            if (!chip) return
+            setOccChip(code)
+            trackUs('occasion_chip', code)
+            setCtx({ purpose: chip.purpose, occasion: '', occasionDetail: chip.detail })
+          }}
+        />
+      ) : (
+        <Chips name="purpose" label={pc.purposeLabel} codes={PURPOSE_CODES} labels={pc.purposes} value={purpose} onPick={(c) => setCtx({ purpose: c, occasion: '' })} />
+      )}
       {purpose === 'other' && <OtherText name="purpose_other" value={context.purposeOther ?? ''} max={PURPOSE_OTHER_MAX} placeholder={pc.purposeOtherPlaceholder} onChange={(v) => setCtx({ purposeOther: v })} />}
       <Chips name="state" label={pc.stateLabel} codes={STATE_CODES} labels={pc.states} value={context.state ?? ''} optional onPick={(c) => setCtx({ state: c })} />
       {context.state === 'other' && <OtherText name="state_other" value={context.stateOther ?? ''} max={STATE_OTHER_MAX} placeholder={pc.stateOtherPlaceholder} onChange={(v) => setCtx({ stateOther: v })} />}

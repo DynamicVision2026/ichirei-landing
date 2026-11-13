@@ -21,6 +21,9 @@ export interface EndCardInput {
   glyph: string
   reading: string
   who?: string
+  /** English bridge (film variant only): the word under the reading and the line in the "who" slot. Absent = the card as it was. */
+  word?: string | null
+  line?: string | null
   poem: string[]
   poemType?: string
   quiet: boolean
@@ -73,7 +76,8 @@ async function paperLayer(): Promise<Layer> {
 }
 
 export async function makeEndCard(a: EndCardInput, variant: CardVariant): Promise<EndCard> {
-  const L = cardLayout(variant)
+  const bridge = variant === 'film' && a.language === 'en' && !!a.word
+  const L = cardLayout(variant, bridge)
   const f = fontsFor(a.language)
   const body = fontObject(f.body)
   const hero = fontObject(f.character)
@@ -103,6 +107,13 @@ export async function makeEndCard(a: EndCardInput, variant: CardVariant): Promis
   if (natural + spacing * (chars.length - 1) > maxW) spacing = Math.max(0, (maxW - natural) / Math.max(1, chars.length - 1))
   const reading = await lineLayer(body, a.reading, readSize, VIDEO_W / 2, cy(L.readingY) - readSize * 0.8, CARD_COLOURS.reading, spacing)
 
+  // the word (English bridge): bold, under the reading
+  let word: Layer | null = null
+  if (bridge && L.wordY !== null && a.word) {
+    const wordSize = 5.2 * U
+    word = await lineLayer(body, a.word, wordSize, VIDEO_W / 2, cy(L.wordY) - wordSize * 0.8, CARD_COLOURS.text, 0.02 * wordSize, wordSize * 0.035)
+  }
+
   // the short gold rule
   const ruleW = Math.round(CARD_W * 0.14)
   const rule = await svgLayer(`<rect x="0" y="0" width="${ruleW}" height="3" fill="${CARD_COLOURS.rule}"/>`, ruleW, 3, VIDEO_W / 2 - ruleW / 2, cy(L.ruleY))
@@ -111,9 +122,10 @@ export async function makeEndCard(a: EndCardInput, variant: CardVariant): Promis
   const whoSize = (en ? 3.7 : 3.4) * U
   const who: Layer[] = []
   let whoBottom = cy(L.whoTop ?? L.ruleY)
-  if (L.whoTop !== null && a.who) {
+  const whoText = bridge ? a.line : a.who
+  if (L.whoTop !== null && whoText) {
     let y = cy(L.whoTop)
-    for (const p of a.who.split('\n').map((s) => s.trim()).filter(Boolean)) {
+    for (const p of whoText.split('\n').map((s) => s.trim()).filter(Boolean)) {
       const b = await textBlock(body, p, whoSize, whoSize * (en ? 1.5 : 1.7), CARD_W * 0.8, CARD_X + CARD_W * 0.1, y, textColours, { centre: true })
       who.push(b)
       y += b.h - whoSize * 0.4
@@ -197,6 +209,7 @@ export async function makeEndCard(a: EndCardInput, variant: CardVariant): Promis
       blend(frame, kanji, st.opacity, 1, dy)
       if (relation) blend(frame, relation, st.opacity, 1, dy)
       blend(frame, reading, st.opacity * st.reading, 1, dy)
+      if (word) blend(frame, word, st.opacity * st.reading, 1, dy)
       blend(frame, rule, st.opacity * st.rule, 1, dy)
       for (const b of who) blend(frame, b, st.opacity * st.who, 1, dy)
       poemLayers.forEach((group, i) => group.forEach((b) => blend(frame, b, st.opacity * (st.poem[i] ?? 0), 1, dy)))

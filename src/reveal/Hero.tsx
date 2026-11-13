@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState, type KeyboardEvent } from 're
 import { CATS, EXAMPLES, SCENE, TEXT, type RevealLang } from './copy.ts'
 import { rich } from './rich.tsx'
 import Picture from './Picture.tsx'
+import { sceneName } from './scenes.ts'
 import { usePrefersReducedMotion } from './usePrefersReducedMotion.ts'
 import { approxShort, type Currency, type Rates } from './currency.ts'
 import { PACKAGE_PRICE_JPY } from '../order/packages.ts'
@@ -60,7 +61,7 @@ export default function Hero({ lang, currency, rates, woodOnSale = false }: { la
     pick(next)
     ;(event.currentTarget.querySelectorAll('button')[next] as HTMLElement | undefined)?.focus()
   }
-  const approx = approxShort(PACKAGE_PRICE_JPY.simple, currency, rates, lang)
+  const approx = approxShort(lang === 'en' ? PACKAGE_PRICE_JPY.egift : PACKAGE_PRICE_JPY.simple, currency, rates, lang)
 
   return (
     <section className="hero">
@@ -69,6 +70,7 @@ export default function Hero({ lang, currency, rates, woodOnSale = false }: { la
           <span className="eyebrow">{t.eyebrow}</span>
           <h1>{rich(t.h1)}</h1>
           <p className="lead">{woodOnSale ? t.sub : t.subS}</p>
+          {lang === 'en' && <p className="heroTokyo" data-testid="hero-tokyo">Designed in Tokyo. Delivered worldwide.</p>}
           <div className="ctaRow">
             <a className="btn primary" href="#write">
               {t.ctaHero}
@@ -89,7 +91,7 @@ export default function Hero({ lang, currency, rates, woodOnSale = false }: { la
               {e.k}
             </span>
             <span className="phc">{SCENE[e.c][lang]}</span>
-            <Picture key={e.c} name={`scenes/${e.c}`} width={4} height={5} eager={ex === 0} sizes="(max-width: 860px) 100vw, 480px" />
+            <Picture key={e.c} name={sceneName(lang, e.c)} width={4} height={5} eager={ex === 0} sizes="(max-width: 860px) 100vw, 480px" />
           </figure>
           <div
             className={`reveal${swap ? ' swap' : ''}${auto ? ' run' : ''}`}

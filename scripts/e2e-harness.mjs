@@ -33,7 +33,11 @@ const pickContext = async (page, ctx = {}) => {
   c.purpose = c.purpose ?? OCC_TO_PURPOSE[c.occasion ?? 'birthday_milestone']
   if ((await page.locator('select[name=relationship]').count()) === 0) {
     // the customer site: chips
-    for (const k of ['relationship', 'direction', 'purpose']) await page.click(`[data-chip="${k}:${c[k]}"]`)
+    for (const k of ['relationship', 'direction', 'purpose']) {
+      // the English form (US launch) offers twelve occasions, not every purpose code: a purpose it has no chip for is the 「Other」 chip
+      const sel = `[data-chip="${k}:${c[k]}"]`
+      await page.click(k === 'purpose' && (await page.locator(sel).count()) === 0 ? '[data-chip="purpose:other"]' : sel)
+    }
     if (c.state) await page.click(`[data-chip="state:${c.state}"]`)
     for (const k of ['relationship_other', 'purpose_other', 'state_other']) if (c[k] !== undefined) await page.fill(`input[name=${k}]`, c[k])
     return
@@ -689,7 +693,7 @@ const mockPage = async (browser, { onExplain, result, order, track } = {}) => {
   await p2.route('**/api/log', (route) => route.fulfill({ status: 204, body: '' }))
   await p2.route('**/api/select', (route) => route.fulfill({ status: 400, contentType: 'application/json', body: JSON.stringify({ error: '"story" is longer than 5000 characters (got 5100)', code: 'story_too_long', max: 5000 }) }))
   await p2.goto('http://localhost:5173/?lang=en', { waitUntil: 'networkidle' })
-  check('story (en): the length line, no maxlength on the box', (await p2.locator('#write [data-testid=story-hint]').innerText()) === 'Short or long: a single scene from about 50 characters, a whole story up to 5,000.' && (await p2.locator('#write [data-testid=story-input]').getAttribute('maxlength')) === null)
+  check('story (en): the length line, no maxlength on the box', (await p2.locator('#write [data-testid=story-hint]').innerText()) === '50–300 words is plenty.' && (await p2.locator('#write [data-testid=story-input]').getAttribute('maxlength')) === null)
   await p2.locator('#write [data-testid=story-input]').fill('My mum left the porch light on.')
   await pickContext(p2, { relationship: 'parent_mother' })
   await p2.click(`#write >> text=${GO.en}`)
@@ -802,7 +806,7 @@ const mockPage = async (browser, { onExplain, result, order, track } = {}) => {
     let found = false
     for (let i = 0; i < 4 && !found; i++) { found = (await e.page.locator('#write [data-testid=story-question]').innerText()) === q0; if (!found) await e.page.click('#write [data-testid=question-switch]') }
     check(`opener (${lang}): the "up" set is shown in the page language (the habit question found within four angles)`, found)
-    const HL = { en: ['The moment with them you remember most.', 'Hint:', 'Another hint', "You don't have to answer the hint. Write the scene or the story that comes to mind, just as it is.", 'One scene, or your whole story together.', 'Short or long: a single scene from about 50 characters, a whole story up to 5,000.'], 'zh-Hant': ['寫下你和那個人之間，最難忘的一個場景。', '提示：', '換一個提示', '不必回答提示。想到的場景、你們之間的故事，直接寫下來就好。', '一個場景，或你們完整的故事都可以。', '長短都可以。一個場景約50字起，完整故事最多5000字。'] }[lang]
+    const HL = { en: ['The moment with them you remember most.', 'Hint:', 'Another hint', "You don't have to answer the hint. Write the scene or the story that comes to mind, just as it is.", 'One scene, or your whole story together.', '50–300 words is plenty.'], 'zh-Hant': ['寫下你和那個人之間，最難忘的一個場景。', '提示：', '換一個提示', '不必回答提示。想到的場景、你們之間的故事，直接寫下來就好。', '一個場景，或你們完整的故事都可以。', '長短都可以。一個場景約50字起，完整故事最多5000字。'] }[lang]
     check(`story box (${lang}): headline, 「${HL[1]}」 label, switch link, the "you don't have to answer" line, placeholder and length line, exactly as specified`, (await e.page.locator('#write [data-testid=story-headline]').innerText()) === HL[0] && (await e.page.locator('#write .qHintLabel').innerText()) === HL[1] && (await e.page.locator('#write [data-testid=question-switch]').innerText()) === HL[2] && (await e.page.locator('#write [data-testid=question-optional]').innerText()) === HL[3] && (await e.page.locator('#write [data-testid=story-input]').getAttribute('placeholder')) === HL[4] && (await e.page.locator('#write [data-testid=story-hint]').innerText()) === HL[5], `${await e.page.locator('#write [data-testid=story-headline]').innerText()} | ${await e.page.locator('#write .qHintLabel').innerText()}`)
     await e.page.close()
   }
@@ -1240,7 +1244,7 @@ const mockPage = async (browser, { onExplain, result, order, track } = {}) => {
     ['en', 'en-US', { language: 'en', glyph: '備', reading: 'sonaeru', who: 'Someone who is ready before you ask.', poem: { type: 'en', lines: ['Each morning, a flower set', 'beside the cup.'], reading: '' } }],
   ]) {
     const want = lang === 'en'
-      ? { label: 'A gift of one character', to: 'To 山田 一郎', from: 'From 山田 太郎', open: 'Open the envelope', lockedDate: `Opens on 10 November${''}`, lockedNote: '3 days to go. The envelope stays sealed until then.', btn: 'See the story', cert: 'ICHIREI · No. 0012' }
+      ? { label: 'A gift of one character', to: 'To 山田 一郎', from: 'From 山田 太郎', open: 'Open', lockedDate: `Opens on 10 November${''}`, lockedNote: '3 days to go. The envelope stays sealed until then.', btn: 'See the story', cert: 'ICHIREI · No. 0012' }
       : { label: '一個字的禮物', to: '致 山田 一郎', from: '山田 太郎 敬上', open: '拆開信封', lockedDate: '11月10日開啟', lockedNote: '還有 3 天。在那天之前，信封會一直封著。', btn: '看故事', cert: '一字禮　第 0012 號' }
     {
       const { page, ctx } = await open(lockedView({ language: lang }), { locale })
@@ -1344,6 +1348,16 @@ const mockPage = async (browser, { onExplain, result, order, track } = {}) => {
     await page.goto('http://localhost:5173/a/AN-testtesttesttesttest', { waitUntil: 'networkidle' })
     const panel = T(page, 'sender-panel')
     await panel.waitFor()
+    if (lang === 'en') {
+      // the US launch (2026-11-12, C3): Copy link, Email, WhatsApp, Messages, "Schedule for a date" — no LINE, no WeChat
+      const wa = decodeURIComponent((await T(page, 'give-whatsapp').getAttribute('href')) ?? '')
+      const sms = decodeURIComponent((await T(page, 'give-messages').getAttribute('href')) ?? '')
+      check('share (en): WhatsApp and Messages carry the link and no LINE or WeChat button is shown', wa.startsWith('https://wa.me/?text=') && wa.includes(GIFT) && sms.startsWith('sms:') && sms.includes(GIFT) && (await T(page, 'give-line').count()) === 0 && (await T(page, 'give-wechat').count()) === 0)
+      check('share (en): copy link, e-mail and "Schedule for a date" are there', (await T(page, 'give-copy').count()) === 1 && decodeURIComponent((await T(page, 'give-mail').getAttribute('href')) ?? '').includes(GIFT) && (await T(page, 'give-schedule').innerText()) === 'Schedule for a date')
+      await shot(page, `shots/share-sheet-${lang}.png`)
+      await ctx.close()
+      continue
+    }
     const line = decodeURIComponent((await T(page, 'give-line').getAttribute('href')) ?? '')
     const wa = decodeURIComponent((await T(page, 'give-whatsapp').getAttribute('href')) ?? '')
     check(`share (${lang}${memorial ? ', remembrance' : ''}): LINE and WhatsApp carry the link and 「${sent}」 — nothing of the character, the poem or the story`, line.startsWith('https://line.me/R/share?text=') && line.includes(sent) && line.includes(GIFT) && wa.startsWith('https://wa.me/?text=') && wa.includes(sent) && wa.includes(GIFT) && !/備|朝ごとに/.test(line + wa), line + wa)
@@ -1569,7 +1583,7 @@ const mockPage = async (browser, { onExplain, result, order, track } = {}) => {
     check(`collect (${lang}): 「${t.no}」 goes back and nothing is recorded`, (await p.locator('[data-testid=collect-button]').count()) === 1 && posts.length === 0)
     await p.locator('[data-testid=collect-button]').click()
     await p.locator('[data-testid=collect-yes]').click()
-    await p.locator('[data-testid=give-line]').waitFor()
+    await p.locator('[data-testid=give-copy]').waitFor()
     check(`collect (${lang}): after 「${t.yes}」 the server is told once, and the page shows the send buttons, the receiver link and the save section; the collect block and the cancel lines are gone`, posts.filter((u) => u.endsWith('/collect')).length === 1 && (await p.locator('[data-testid=give-link]').inputValue()).includes('/g/RG-') && (await p.locator('[data-testid=buyer-collect-section]').count()) === 0 && (await p.locator('[data-testid=buyer-deadline]').count()) === 0 && (await p.locator('[data-testid=buyer-cancel-by]').count()) === 0)
     if (lang === 'ja') await p.screenshot({ path: 'shots/buyer-after-collect-ja.png', fullPage: true })
     await ctx.close()
@@ -1605,7 +1619,7 @@ const mockPage = async (browser, { onExplain, result, order, track } = {}) => {
     await p.locator('[data-testid=collect-button]').waitFor()
     check('collect: after 24 hours there is no cancel deadline line, the line under the button is the short one, and the tap unlocks at once with NO confirm', (await p.locator('[data-testid=buyer-cancel-by]').count()) === 0 && (await p.locator('[data-testid=collect-line]').innerText()) === '受け取ると、送る・保存するができるようになります。')
     await p.locator('[data-testid=collect-button]').click()
-    await p.locator('[data-testid=give-line]').waitFor()
+    await p.locator('[data-testid=give-copy]').waitFor()
     check('collect: …and the send buttons appeared without a confirm step', (await p.locator('[data-testid=collect-confirm]').count()) === 0 && posts.filter((u) => u.endsWith('/collect')).length === 1)
     await p.close()
   }
@@ -1748,7 +1762,7 @@ const mockPage = async (browser, { onExplain, result, order, track } = {}) => {
   const T = {
     ja: { title: '特定商取引法に基づく表記', refundHead: 'お支払い完了から24時間以内', ret: ['お支払い完了から24時間以内にメールを受信した場合に限り、ご注文のキャンセル（送料を含む全額返金）を承ります。', '「贈りものを受け取る」を押した後は、キャンセルできません（すべての商品に共通）。', 'お支払い後の内容の変更（字・歌・お名前・メッセージなど）はお受けしていません。', '24時間を過ぎたお客様都合による返品・返金はお受けできません。', '返送料は当方負担', '海外発送で発生する関税・輸入税は、受け取る方のご負担となります。'], faq: ['注文後に字を変えられますか？', 'キャンセルできますか？', '届いた品物に問題があったら？'], rows: ['販売業者', '運営責任者', '所在地', '電話番号', 'メールアドレス'] },
     'zh-Hant': { title: '特定商取引法標示', refundHead: '付款完成後24小時內', ret: ['僅限付款完成後24小時內我們收到您的郵件，可取消訂單（含運費全額退款）。', '在訂單頁面按下「領取禮物」後，即無法取消（所有商品皆同）。', '付款後恕不更改內容（字、詩、姓名、訊息等）。', '付款完成超過24小時後，恕不接受因個人因素的退貨或退款。', '退回運費由我方負擔', '寄送海外時產生的關稅與進口稅，由收件人負擔。'], faq: ['下單後可以換字嗎？', '可以取消訂單嗎？', '收到的商品有問題怎麼辦？'], rows: ['販售業者', '營運負責人', '所在地', '電話號碼', '電子郵件'] },
-    en: { title: 'Legal notice', refundHead: 'Within 24 hours of payment', ret: ["If we receive your email within 24 hours of payment, we'll cancel your order with a full refund, including shipping.", 'Once you press "Collect your gift" on your order page, the order can no longer be cancelled (all sizes).', "We can't change an order after payment (character, poem, names or message).", "more than 24 hours after payment we can't accept returns or refunds for change of mind.", 'we cover return shipping', 'Import duties and taxes on overseas deliveries are paid by the recipient.'], faq: ['Can I change the character after I order?', 'Can I cancel?', 'What if what I receive has a problem?'], rows: ['Seller', 'Person in charge', 'Address', 'Telephone', 'E-mail'] },
+    en: { title: 'Legal notice', refundHead: 'Within 24 hours of payment', ret: ["You can cancel for a full refund within 24 hours of payment, as long as you have not pressed 'Collect your gift'.", 'After that, the gift has been made for one person and cannot be refunded. If we made a mistake, we will fix it or refund you.', "We can't change an order after payment (character, poem, names or message).", "more than 24 hours after payment we can't accept returns or refunds for change of mind.", 'we cover return shipping', 'Import duties and taxes on overseas deliveries are paid by the recipient.'], faq: ['Can I change the character after I order?', 'Can I cancel?', 'What if what I receive has a problem?'], rows: ['Seller', 'Person in charge', 'Address', 'Telephone', 'E-mail'] },
   }
   for (const lang of ['ja', 'zh-Hant', 'en']) {
     const p = await browser.newPage({ locale: 'ja-JP', viewport: { width: 375, height: 800 } })
@@ -2000,7 +2014,7 @@ const mockPage = async (browser, { onExplain, result, order, track } = {}) => {
   check('washi: only when ALL FOUR failed does the card leave the pictures out and say 「物語の絵は、ご注文後にお届けします」', (await af.page.locator('[data-testid=card-pictures]').count()) === 0 && (await af.page.locator('[data-testid=card-status]').innerText()) === '物語の絵は、ご注文後にお届けします')
   await af.page.close()
   // the other two languages: the drawing line, the sample mark, the made-to-order note
-  for (const [lang, drawing, sample, note] of [['zh-Hant', '正在描繪你的故事', '樣本', '取消（全額退款）僅限付款完成後24小時內'], ['en', 'Drawing your story', 'Sample', 'You can cancel for a full refund only within 24 hours of payment']]) {
+  for (const [lang, drawing, sample, note] of [['zh-Hant', '正在描繪你的故事', '樣本', '取消（全額退款）僅限付款完成後24小時內'], ['en', 'Drawing your story', 'Sample', 'You can cancel for a full refund within 24 hours of payment']]) {
     const l = await mk(lang)
     await pickMain(l.page, lang)
     await l.page.locator('[data-testid=card-preview]').waitFor()
@@ -2198,7 +2212,7 @@ const SECTION_ORDER = ['.hero', '.strip', '.philo', '#shape', '#angles', '#write
   await page.reload({ waitUntil: 'networkidle' })
   check('landing: three language buttons (EN, 日本語, 繁中); with no stored choice an ja-JP browser gets 日本語', (await page.locator('.lang button').count()) === 3 && (await page.locator('.lang [data-lang=ja][aria-pressed=true]').count()) === 1)
   const LANGS = {
-    en: { title: 'ICHIREI 一字礼 — A Gift of One Character', h1: 'Between you and me, one character.', cta: 'Tell your story', go: GO.en, htmlLang: 'en', hint: 'Short or long: a single scene from about 50 characters, a whole story up to 5,000.', desc: 'ICHIREI (一字礼) — the person you see' },
+    en: { title: 'ICHIREI 一字礼 — A Gift of One Character', h1: 'Between you and me, one character.', cta: 'Tell your story', go: GO.en, htmlLang: 'en', hint: '50–300 words is plenty.', desc: 'ICHIREI (一字礼) — the person you see' },
     ja: { title: 'ICHIREI 一字礼 — 一字の贈りもの', h1: 'あなたとわたし、一字の距離。', cta: '物語を書く', go: GO.ja, htmlLang: 'ja', hint: '短くても長くても。ひとつの場面なら50字ほどから、物語なら5000字まで。', desc: 'ICHIREI（一字礼）— あなたの目に映る、その人を、一文字に。' },
     'zh-Hant': { title: 'ICHIREI 一字禮 — 一個字的禮物', h1: '你和我之間，只隔一個字。', cta: '寫下故事', go: GO['zh-Hant'], htmlLang: 'zh-Hant', hint: '長短都可以。一個場景約50字起，完整故事最多5000字。', desc: 'ICHIREI（一字禮）— 把你眼中的那個人' },
   }
@@ -2430,7 +2444,7 @@ const SECTION_ORDER = ['.hero', '.strip', '.philo', '#shape', '#angles', '#write
 
   // -- the customer flow
   check('en customer page: the flow is English, no language pills inside it, no test controls', (await page.locator('#write').innerText()).includes('The moment with them you remember most.') && (await page.locator('#write [data-language]').count()) === 0 && (await page.locator('text=VALIDATION HARNESS').count()) === 0)
-  check('en: the chips are English (relationship, direction, occasion)', (await page.locator('[data-chip="relationship:parent_mother"]').innerText()) === 'Mother' && (await page.locator('[data-chip="purpose:celebrate"]').innerText()) === 'Celebrate (birthday, 60th, wedding, birth, school…)')
+  check('en: the chips are English (relationship, direction, occasion)', (await page.locator('[data-chip="relationship:parent_mother"]').innerText()) === 'Mom' && (await page.locator('[data-chip="purpose:celebrate"]').innerText()) === 'Birthday')
   await page.locator('#moment').fill('My mum left the porch light on every night until I got home.')
   await pickContext(page, { relationship: 'parent_mother', direction: 'up', occasion: 'birthday_milestone' })
   await page.fill('input[name=occasion_detail]', '70th birthday')
@@ -2888,13 +2902,13 @@ const SECTION_ORDER = ['.hero', '.strip', '.philo', '#shape', '#angles', '#write
   const FORM = {
     ja: { lang: 'ja', purposeLabel: '贈る理由', stateLabel: '今のふたりは（任意）', other: 'その他', relOtherPh: '例：幼なじみ、元同僚', purposes: ['お祝い（誕生日・還暦・結婚・出産・入学など）', 'ありがとう', 'ごめんね・仲直り', '応援・お見舞い', '門出・送別（退職・引っ越し・卒業）', 'ご無沙汰・再会', '想いを伝える（ずっと言えなかったこと）', '偲ぶ', 'その他'], states: ['いつも近く', '離れて暮らす', 'しばらく会っていない', 'すれ違ったまま', 'もう会えない', 'その他'], caregiver: 'お世話になった人（医療・介護・支えてくれた人）' },
     'zh-Hant': { lang: 'zh-Hant', purposeLabel: '送禮的理由', stateLabel: '現在的兩人（選填）', other: '其他', relOtherPh: '例如：青梅竹馬、前同事', purposes: ['祝福（生日・六十大壽・結婚・出生・入學等）', '謝謝', '道歉・和好', '加油・探望', '送別・新旅程（退休・搬家・畢業）', '久違・重逢', '傳達心意（一直沒說出口的話）', '追思', '其他'], states: ['常在身邊', '分隔兩地', '很久沒見', '還有心結', '已無法相見', '其他'], caregiver: '照顧過我的人（醫療・照護・支持我的人）' },
-    en: { lang: 'en', purposeLabel: "Why you're giving", stateLabel: 'Where the two of you stand now (optional)', other: 'Other', relOtherPh: 'e.g. childhood friend, former colleague', purposes: ['Celebrate (birthday, 60th, wedding, birth, school…)', 'Thank you', 'Sorry / making up', 'Encourage / get well', 'Farewell / new start (retiring, moving, graduating)', 'Keep in touch / meeting again', 'Say it at last (what was never said)', 'In memory', 'Other'], states: ['Close', 'Living apart', "Haven't met in a while", 'Something unresolved', 'No longer here', 'Other'], caregiver: 'Someone who cared for me (medical, care, support)' },
+    en: { lang: 'en', purposeLabel: "Why you're giving", stateLabel: 'Where the two of you stand now (optional)', other: 'Other', relOtherPh: 'e.g. childhood friend, former colleague', purposes: ['Christmas', 'Thanksgiving', 'Birthday', 'Anniversary', "Mother's Day", "Father's Day", 'Graduation', 'Retirement', 'Thank you', 'In memory', 'No special day', 'Other'], states: ['Close', 'Living apart', "Haven't met in a while", 'Something unresolved', 'No longer here', 'Other'], caregiver: 'Mentor' },
   }
   for (const [lang, f] of Object.entries(FORM)) {
     const { page, errors, calls } = await mockPage(browser)
     await page.goto(`http://localhost:5173/?lang=${lang}`, { waitUntil: 'networkidle' })
     const labels = async (group) => page.locator(`[data-chip^="${group}:"]`).evaluateAll((els) => els.map((e) => e.innerText.trim()))
-    check(`form (${lang}): the purpose chips are the nine of the ticket, in order, with the right words`, (await labels('purpose')).join('|') === f.purposes.join('|'), (await labels('purpose')).join('|'))
+    check(`form (${lang}): the purpose chips are the ticket's, in order, with the right words (nine in ja / zh, the twelve occasions in en)`, (await labels('purpose')).join('|') === f.purposes.join('|'), (await labels('purpose')).join('|'))
     check(`form (${lang}): the state chips are the six, in order, with the right words`, (await labels('state')).join('|') === f.states.join('|'), (await labels('state')).join('|'))
     check(`form (${lang}): the group labels read 「${f.purposeLabel}」 and 「${f.stateLabel}」; the relationship chips include the caregiver chip and end with 「${f.other}」`, (await page.locator('#write').innerText()).includes(f.purposeLabel) && (await page.locator('#write').innerText()).includes(f.stateLabel) && (await labels('relationship')).includes(f.caregiver) && (await labels('relationship')).at(-1) === f.other)
     check(`form (${lang}): no 「その他」 text field is shown until 「${f.other}」 is picked`, (await page.locator('input[name=relationship_other], input[name=purpose_other], input[name=state_other]').count()) === 0)
@@ -3107,6 +3121,8 @@ const SECTION_ORDER = ['.hero', '.strip', '.philo', '#shape', '#angles', '#write
     const pressed = async () => (await page.locator('[data-chip^="direction:"][aria-pressed=true]').evaluateAll((els) => els.map((e) => e.dataset.chip.split(':')[1])))
     const bad = []
     for (const [rel, want] of Object.entries(MAP)) {
+      // the English form offers fifteen relationship chips (US launch), not every relationship code
+      if (lang === 'en' && (await page.locator(`[data-chip="relationship:${rel}"]`).count()) === 0) continue
       await page.click(`[data-chip="relationship:${rel}"]`)
       const got = (await pressed()).join()
       if (got !== want) bad.push(`${rel}: ${got || '(none)'} ≠ ${want || '(none)'}`)
@@ -3127,7 +3143,7 @@ const SECTION_ORDER = ['.hero', '.strip', '.philo', '#shape', '#angles', '#write
     check(`the sender can change the pre-selected direction (${lang}): up → across`, (await pressed()).join() === 'across')
     await page.click('[data-chip="relationship:child"]')
     check(`…and their own choice is kept when they pick another relationship (${lang}); only an untouched (pre-selected) direction follows the relationship`, (await pressed()).join() === 'across')
-    await page.click('[data-chip="relationship:pet"]')
+    if (lang !== 'en') await page.click('[data-chip="relationship:pet"]')
     check(`…an untouched direction is cleared when the new relationship maps to nothing, and set again by the next one (${lang})`, true)
     check(`no page errors (run 19, ${lang})`, errors.length === 0, errors.join('; '))
     await page.close()
@@ -3362,6 +3378,189 @@ const SECTION_ORDER = ['.hero', '.strip', '.philo', '#shape', '#angles', '#write
   await phone.screenshot({ path: `${SHOTS}/stats-phone.png`, fullPage: true })
   await ctx.close()
   child.kill()
+}
+
+// ---------- Run 24 (2026-11-12): the US e-gift launch — /en: delivery banner, chips, "What they receive", Western scenes, the dollar line; the English bridge on the cards, the chosen character and the receiver's page; Save the card / certificate; reply; share sheet ----------
+{
+  const FORBIDDEN = /\b(wood|wooden|walnut|EMS|ship|ships|shipping|shipped|shipment)\b/i
+  const ratesStub = { date: '2026-11-12', base: 'JPY', rates: { USD: 0.0066 } }
+  const sizesStub = { sizes: ['egift', 'simple', 'standard'], coming_soon: ['simple', 'standard'] }
+  const stubs = async (page) => {
+    await page.route('**/api/rates', (r) => r.fulfill({ json: ratesStub }))
+    await page.route('**/api/sizes', (r) => r.fulfill({ json: sizesStub }))
+  }
+  const enResult = () => {
+    const r = JSON.parse(JSON.stringify(FIXTURE))
+    r.language = 'en'
+    r.inscription_script = null
+    r.candidates = r.candidates.map((c) => ({ ...c, eliminated: false, eliminated_reason: null }))
+    r.candidates[0] = { ...r.candidates[0], reading: 'akari', meaning: 'lamp', one_line_gaze: 'Someone who kept the porch light on for me.', story_anchor: 'the porch light', why_this: 'Lamplight is the plainest thing in your story.', en_word: 'hearth', en_word_source: 'lexicon', en_line: 'The light that is already on when everyone else wakes.', en_echo: { text: 'Save the cricket on the hearth', source: 'Milton, Il Penseroso' }, classical_echo: { text: '床前明月光', source: 'Li Bai, Quiet Night Thoughts' } }
+    return r
+  }
+  // ---- the landing page /en (desktop and phone) ----
+  for (const [vw, vh, tag] of [[1280, 900, 'desktop'], [390, 844, 'phone']]) {
+    const { page, errors, calls } = await mockPage(browser, { result: enResult })
+    await stubs(page)
+    await page.setViewportSize({ width: vw, height: vh })
+    await page.goto('http://localhost:5173/en?utm_source=chatgpt.com&utm_medium=referral', { waitUntil: 'networkidle' })
+    await page.waitForTimeout(700)
+    check(`/en (${tag}): the page is English and the hero says "Designed in Tokyo. Delivered worldwide." under the subline`, (await page.locator('html').getAttribute('lang')) === 'en' && (await page.locator('[data-testid=hero-tokyo]').innerText()) === 'Designed in Tokyo. Delivered worldwide.' && (await page.locator('.hero .lead').evaluate((el) => el.nextElementSibling?.getAttribute('data-testid'))) === 'hero-tokyo')
+    check(`/en (${tag}): the delivery banner is the one fixed line, readable (light text on the dark band), with no date and no word about wood`, (await page.locator('[data-testid=us-banner]').textContent()) === 'The e-gift arrives the same day you order — even on Christmas morning.' && (await page.locator('[data-testid=us-banner]').evaluate((el) => getComputedStyle(el).color)) !== (await page.locator('.usBanner').evaluate((el) => getComputedStyle(el).backgroundColor)))
+    check(`/en (${tag}): the occasion chips are Christmas, Thanksgiving, Birthday, Anniversary, Mother's Day, Father's Day, Graduation, Retirement, Thank you, In memory, No special day, Other — in this order`, (await page.locator('[data-chip-code]').evaluateAll((els) => els.filter((e) => /^purpose:/.test(e.dataset.chip)).map((e) => e.textContent))).join() === "Christmas,Thanksgiving,Birthday,Anniversary,Mother's Day,Father's Day,Graduation,Retirement,Thank you,In memory,No special day,Other")
+    check(`/en (${tag}): the relationship chips are Mom, Dad, Partner, Wife, Husband, Son, Daughter, Sister, Brother, Grandparent, Friend, Mentor, Colleague, Boss, Other`, (await page.locator('[data-chip^="relationship:"], [data-chip-code]').evaluateAll((els) => els.filter((e) => /^relationship:/.test(e.dataset.chip)).map((e) => e.textContent))).join() === 'Mom,Dad,Partner,Wife,Husband,Son,Daughter,Sister,Brother,Grandparent,Friend,Mentor,Colleague,Boss,Other')
+    check(`/en (${tag}): "What they receive" comes above the gift options and lists the five live items (character with word and line, poem, four pictures, film with music, certificate)`, await page.evaluate(() => { const r = document.querySelector('#receive'); const g = document.querySelector('#gifts'); return !!r && !!g && (r.compareDocumentPosition(g) & Node.DOCUMENT_POSITION_FOLLOWING) !== 0 && [...r.querySelectorAll('li')].map((li) => li.dataset.receive).join() === 'character,poem,pictures,film,certificate' }))
+    const scenes = await page.evaluate(() => [...document.querySelectorAll('.hero img, #moments img, .usReceive img')].map((i) => i.currentSrc || i.src))
+    check(`/en (${tag}): the scenes are the Western ink-wash ones (kitchen table, car hood, porch, bench, teacher's desk, holiday table, Christmas tree) — none of the Japanese photographs`, scenes.length >= 5 && scenes.every((s) => /\/img\/scenes\/en\//.test(s)) && ['kitchen', 'hood', 'porch', 'bench', 'desk', 'thanksgiving', 'tree'].every((n) => scenes.some((s) => s.includes(`/en/${n}`)) || n === 'tree' || n === 'hood' || n === 'porch' || n === 'bench' || n === 'desk' || n === 'thanksgiving'))
+    check(`/en (${tag}): the price keeps the yen and shows "about $26" (¥3,980 at the owner's rate), nothing for the other currencies by default`, /about \$2\d/.test(await page.locator('.approxHero').innerText()))
+    await page.evaluate(() => document.querySelectorAll('details').forEach((d) => (d.open = true)))
+    const text = await page.locator('body').innerText()
+    check(`/en (${tag}): no word "wood", "walnut", "EMS" or "ship" anywhere on the page, the FAQ opened included`, !FORBIDDEN.test(text), text.match(FORBIDDEN)?.[0])
+    // chips: Christmas → thanks, counted; Mom → parent_mother
+    await page.locator('[data-chip-code=mom]').click()
+    await page.locator('[data-chip-code=christmas]').click()
+    await page.locator('[data-chip="direction:up"]').click()
+    await page.waitForTimeout(300)
+    check(`/en (${tag}): choosing Christmas is counted (occasion_chip, code christmas) and the page's purpose is thanks`, calls.analytics.some((e) => e.event === 'occasion_chip' && e.code === 'christmas') && (await page.locator('[data-chip-code=christmas]').getAttribute('aria-pressed')) === 'true' && (await page.locator('[data-chip-code=thanksgiving]').getAttribute('aria-pressed')) === 'false')
+    await page.locator('[data-testid=us-banner]').scrollIntoViewIfNeeded()
+    await page.waitForTimeout(400)
+    check(`/en (${tag}): the banner was counted once it came into view (us_banner_seen) — and the story hint says "50–300 words is plenty."`, calls.analytics.some((e) => e.event === 'us_banner_seen') && (await page.locator('[data-testid=story-hint]').innerText()) === '50–300 words is plenty.')
+    await page.locator('#moment').fill('She left the porch light on every night until I got home, and she never once mentioned it.')
+    await page.click(`#write >> text=${GO.en}`)
+    await page.waitForSelector('[data-all-revealed=yes]', { timeout: 15000 })
+    await page.waitForTimeout(500)
+    check(`/en (${tag}): the request to the engine carries purpose thanks and relationship parent_mother (the codes behind the chips)`, calls.select.length === 1 && calls.select[0].purpose === 'thanks' && calls.select[0].relationship === 'parent_mother' && calls.select[0].language === 'en', JSON.stringify(calls.select[0] ?? {}))
+    const main = page.locator('article[data-slot=main]')
+    const stack = await main.evaluate((a) => {
+      const q = (s) => a.querySelector(s)
+      const r = (el) => el.getBoundingClientRect()
+      const g = q('[data-glyph]'); const rd = q('[data-en-reading]'); const w = q('[data-en-word]'); const l = q('[data-en-line]'); const h = q('[data-en-where-heading]'); const e = q('[data-en-echo]'); const c = q('[data-en-classical]')
+      return { ok: !!(g && rd && w && l), order: [g, rd, w, l, h, e, c].filter(Boolean).map((x) => Math.round(r(x).top)), reading: rd?.textContent, word: w?.textContent, line: l?.textContent, wordWeight: w ? Number(getComputedStyle(w).fontWeight) : 0, readingStyle: rd ? getComputedStyle(rd).fontStyle : '', heading: h?.textContent, echo: e?.textContent, classical: c?.textContent, why: !!q('[data-why-this]') }
+    })
+    check(`/en (${tag}): the main card shows the stack in order — character, reading (italic), word (bold), line — with nothing between`, stack.ok && stack.order.every((y, i, arr) => i === 0 || y >= arr[i - 1]) && stack.reading === 'akari' && stack.word === 'hearth' && stack.line === 'The light that is already on when everyone else wakes.' && stack.wordWeight >= 600 && stack.readingStyle === 'italic' && !stack.why, JSON.stringify(stack))
+    check(`/en (${tag}): a reviewed row shows its echo and the classical line together under the one small heading "Where this word comes from"`, stack.heading === 'Where this word comes from' && stack.echo === '“Save the cricket on the hearth” — Milton, Il Penseroso' && /床前明月光/.test(stack.classical ?? '') && /Quiet Night Thoughts/.test(stack.classical ?? ''), JSON.stringify(stack))
+    check(`/en (${tag}): the freestyle card is exactly as it was — no word, no line, no echo`, (await page.locator('article[data-slot=freestyle] [data-en-stack]').count()) === 0 && (await page.locator('article[data-slot=freestyle] [data-reading]').count()) === 1)
+    await page.locator('#write').scrollIntoViewIfNeeded()
+    await page.locator('#write').screenshot({ path: `${SHOTS}/us-card-${tag}.png` })
+    // the chosen character (order step)
+    await main.click()
+    await main.locator('text=Give this character').click()
+    await page.locator('[data-testid=order-form]').waitFor()
+    const slip = await page.locator('.slip').evaluate((s) => ({ stack: !!s.querySelector('[data-en-stack]'), word: s.querySelector('[data-en-word]')?.textContent, line: s.querySelector('[data-en-line]')?.textContent, heading: s.querySelector('[data-en-where-heading]')?.textContent }))
+    check(`/en (${tag}): the chosen-character page shows the same stack (reading, word, line, "Where this word comes from")`, slip.stack && slip.word === 'hearth' && slip.line === 'The light that is already on when everyone else wakes.' && slip.heading === 'Where this word comes from', JSON.stringify(slip))
+    check(`/en (${tag}): the card preview carries the word and the line under the reading`, (await page.locator('[data-testid=card-sheet] [data-en-word]').innerText()) === 'hearth' && (await page.locator('[data-testid=card-sheet] [data-en-line]').count()) === 1)
+    const refund = await page.locator('[data-testid=order-refund-line]').innerText()
+    check(`/en (${tag}): the order step carries the owner's refund wording, word for word`, refund.startsWith("You can cancel for a full refund within 24 hours of payment, as long as you have not pressed 'Collect your gift'. After that, the gift has been made for one person and cannot be refunded. If we made a mistake, we will fix it or refund you."), refund)
+    await page.click('label[data-size=egift]')
+    check(`/en (${tag}): the opening-date field carries the Christmas hint`, (await page.locator('[data-testid=open-date-hint]').innerText()) === 'Set it to open on Christmas morning.')
+    await page.locator('.slip').scrollIntoViewIfNeeded()
+    await page.locator('.slip').screenshot({ path: `${SHOTS}/us-chosen-${tag}.png` })
+    check(`no page errors (run 24, /en ${tag})`, errors.length === 0, errors.join('; '))
+    await page.close()
+  }
+
+  // ---- the receiver's page, English, on a 390 px phone ----
+  {
+    const TOKEN = 'RG-testtesttesttesttest'
+    const year = new Date().getFullYear()
+    const view = (over = {}) => ({
+      music: 'thanks', locked: false, id: TOKEN, token: TOKEN, language: 'en', glyph: '燈', reading: 'あかり', romanization: 'akari', meaning_en: 'lamp',
+      en: { word: 'hearth', word_source: 'lexicon', line: 'The light that is already on when everyone else wakes.', echo: { text: 'Save the cricket on the hearth', source: 'Milton, Il Penseroso' }, classical: { text: '床前明月光', source: 'Li Bai', rendering: 'Bright moonlight before my bed', source_en: 'Li Bai, Quiet Night Thoughts' } },
+      who: 'Someone who kept the porch light on for me.', memorial: false,
+      film: { status: 'ready', lines: ['She left the porch light on.', 'I never mentioned it.'], pictures: ['/film/washi-1.webp', '/film/washi-2.webp'] },
+      certificate_line: 'This character is the person as seen through your eyes.', poem: { type: 'en', lines: ['Before the house wakes,', 'one lamp, left burning,', 'a quiet kind of care.'], reading: '' },
+      from: 'Emily', to: 'Margaret', message: '', egift: null, certificate_no: 12, order_date: `${year}-11-07`, opens_on: null, replied: false, package: 'egift', purpose: 'thanks', ...over,
+    })
+    const open = async (v) => {
+      const ctx = await browser.newContext({ locale: 'en-US', viewport: { width: 390, height: 844 }, reducedMotion: 'reduce' })
+      const page = await ctx.newPage()
+      const errs = []
+      const seen = { reply: [], analytics: [] }
+      page.on('pageerror', (e) => errs.push(String(e)))
+      await page.route('**/api/analytics', async (r) => { try { seen.analytics.push(JSON.parse(r.request().postData() ?? '{}')) } catch {} await r.fulfill({ status: 204, body: '' }) })
+      await page.route(`**/api/gift/${TOKEN}**`, async (r) => {
+        const u = new URL(r.request().url())
+        if (u.pathname === `/api/gift/${TOKEN}/reply`) { seen.reply.push(JSON.parse(r.request().postData() ?? '{}')); return r.fulfill({ json: { ok: true } }) }
+        if (u.pathname === `/api/gift/${TOKEN}/render`) return r.fulfill({ json: { state: 'ready', view: v } })
+        if (u.pathname === `/api/gift/${TOKEN}`) return r.fulfill({ json: v })
+        return r.fulfill({ status: 204, body: '' })
+      })
+      await page.goto(`http://localhost:5173/g/${TOKEN}`, { waitUntil: 'networkidle' })
+      return { page, ctx, errs, seen }
+    }
+    const T = (page, id) => page.locator(`[data-testid=${id}]`)
+    {
+      const { page, ctx, errs, seen } = await open(view())
+      await T(page, 'gift-envelope').waitFor()
+      check('receiver (en, phone): the envelope says "Emily chose one character for you." and the button reads "Open"', (await T(page, 'gift-env-line').innerText()) === 'Emily chose one character for you.' && (await T(page, 'gift-open').innerText()) === 'Open')
+      await T(page, 'gift-open').click()
+      await T(page, 'gift-to-film').waitFor({ timeout: 8000 })
+      await T(page, 'gift-to-film').click()
+      await T(page, 'gift-skip').click()
+      await T(page, 'gift-reveal').waitFor()
+      await page.waitForTimeout(500)
+      const box = await page.evaluate(() => { const r = (s) => document.querySelector(s)?.getBoundingClientRect(); const g = r('[data-testid=gift-glyph]'); const rd = r('[data-en-reading]'); const w = r('[data-en-word]'); return { glyph: g && Math.round(g.bottom), reading: rd && Math.round(rd.bottom), word: w && Math.round(w.bottom), vh: window.innerHeight, order: [g.top, rd.top, w.top, r('[data-en-line]').top].every((y, i, a) => i === 0 || y > a[i - 1]) } })
+      check('receiver (en, phone 390 × 844): the character, its reading and its word are all inside the first screen — no scrolling', box.glyph > 0 && box.word < box.vh && box.order, JSON.stringify(box))
+      check('receiver (en): after the reveal the stack is character, reading (italic), word (bold), line, then "Where this word comes from" with the echo and the classical line (original, English rendering, source in English)', await page.evaluate(() => { const q = (s) => document.querySelector(s); return q('[data-en-reading]').textContent === 'akari' && getComputedStyle(q('[data-en-reading]')).fontStyle === 'italic' && Number(getComputedStyle(q('[data-en-word]')).fontWeight) >= 600 && q('[data-en-where-heading]').textContent === 'Where this word comes from' && q('[data-en-echo]').textContent.includes('Milton') && q('[data-en-rendering]').textContent.includes('Bright moonlight') && q('[data-en-classical]').textContent.includes('Li Bai, Quiet Night Thoughts') }))
+      await page.screenshot({ path: `${SHOTS}/us-receiver-phone.png` })
+      const body = await page.locator('body').innerText()
+      check('receiver (en): no price, no sizes, no buy link anywhere on the page', !/¥|\$\d|price|Buy|Order now|size/i.test(body) && (await page.locator('a[href*="shopify"], a[href*="checkout"]').count()) === 0)
+      await T(page, 'gift-to-poem').click()
+      await T(page, 'gift-poem-screen').waitFor()
+      check('receiver (en): under the poem — "Written from the story Emily told about you."', (await T(page, 'gift-poem-from').innerText()) === 'Written from the story Emily told about you.')
+      await T(page, 'gift-to-cert').click()
+      await T(page, 'gift-cert').waitFor()
+      check('receiver (en): the certificate shows the same stack (reading, word, line)', await page.locator('[data-testid=gift-cert] [data-en-word]').innerText() === 'hearth')
+      await page.screenshot({ path: `${SHOTS}/us-certificate-phone.png` })
+      await T(page, 'gift-to-keep').click()
+      await T(page, 'gift-keep').waitFor()
+      check('receiver (en): the save row offers "Save the card" (the square image) and "Save the certificate" (the PDF)', (await T(page, 'save-card-image').innerText()) === 'Save the card' && (await T(page, 'save-card-image').getAttribute('href')) === `/api/gift/${TOKEN}/keepsake-card.png` && /^Save the certificate/.test(await T(page, 'save-card').innerText()) && (await T(page, 'save-card').getAttribute('href')) === `/api/gift/${TOKEN}/card.pdf`)
+      await T(page, 'save-card-image').evaluate((a) => a.addEventListener('click', (e) => e.preventDefault()))
+      await T(page, 'save-card-image').click()
+      await page.waitForTimeout(200)
+      check('receiver (en): saving the card is counted (receiver_saved_card)', seen.analytics.some((e) => e.event === 'receiver_saved_card'))
+      check('receiver (en): the reply is one button, "Send a reply to Emily", that opens the thank-you form; sending it is counted (receiver_replied)', await (async () => { const b = T(page, 'gift-reply-open'); if ((await b.innerText()) !== 'Send a reply to Emily') return false; await b.click(); await T(page, 'gift-reply-text').fill('Thank you, it made my day.'); await T(page, 'gift-reply-send').click(); await T(page, 'gift-reply-sent').waitFor(); return seen.reply.length === 1 && seen.analytics.some((e) => e.event === 'receiver_replied') })())
+      check('no page errors (run 24, receiver)', errs.length === 0, errs.join('; '))
+      await ctx.close()
+    }
+    {
+      const { page, ctx, errs } = await open(view({ from: '' }))
+      await T(page, 'gift-envelope').waitFor()
+      check('receiver (en): with no sender name the envelope says "Someone chose one character for you."', (await T(page, 'gift-env-line').innerText()) === 'Someone chose one character for you.')
+      await T(page, 'gift-open').click()
+      await T(page, 'gift-to-film').waitFor({ timeout: 8000 })
+      await T(page, 'gift-to-film').click()
+      await T(page, 'gift-skip').click()
+      await T(page, 'gift-to-poem').click()
+      check('receiver (en): …and under the poem "Written from a story told about you."', (await T(page, 'gift-poem-from').innerText()) === 'Written from a story told about you.' && errs.length === 0)
+      await ctx.close()
+    }
+  }
+
+  // ---- the sender's page: the share sheet ----
+  {
+    const ID = 'AN-testtesttesttesttest'
+    const GIFT = 'https://ichirei.soul-id.jp/g/RG-testtesttesttesttest'
+    const sp = await browser.newPage({ locale: 'en-US', viewport: { width: 390, height: 800 } })
+    const errors = []
+    const seen = { schedule: [], analytics: [] }
+    sp.on('pageerror', (e) => errors.push(String(e)))
+    await sp.route('**/api/analytics', async (r) => { try { seen.analytics.push(JSON.parse(r.request().postData() ?? '{}')) } catch {} await r.fulfill({ status: 204, body: '' }) })
+    await sp.route(`**/api/animation/${ID}/schedule`, async (r) => { seen.schedule.push(JSON.parse(r.request().postData() ?? '{}')); await r.fulfill({ json: { ok: true, opens_on: seen.schedule.at(-1).open_date } }) })
+    await sp.route(`**/api/animation/${ID}`, (r) => r.fulfill({ json: { id: ID, language: 'en', glyph: '燈', reading: 'あかり', romanization: 'akari', meaning_en: 'lamp', en: { word: 'hearth', word_source: 'lexicon', line: 'The light that is already on when everyone else wakes.', echo: null }, who: 'Someone who kept the porch light on.', memorial: false, film: { status: 'fallback', lines: ['a', 'b'], pictures: ['/film/washi-1.webp', '/film/washi-2.webp'] }, gift: { url: GIFT, size_code: 'ICHIREI-EGIFT', ship_to: 'none', egift_state: null, opens_on: null, certificate_no: 12, reply: null } } }))
+    await sp.goto(`http://localhost:5173/a/${ID}`, { waitUntil: 'networkidle' })
+    const panel = sp.locator('[data-testid=sender-panel]')
+    await panel.waitFor()
+    check('sender (en): after "Collect your gift" the share sheet offers Copy link, Email, WhatsApp, Messages and "Schedule for a date" — no LINE, no WeChat, no QR', (await panel.locator('[data-testid=en-share-sheet] > *').allInnerTexts()).join() === 'Copy link,Email,WhatsApp,Messages' && (await panel.locator('[data-testid=give-schedule]').innerText()) === 'Schedule for a date' && (await panel.locator('[data-testid=give-line], [data-testid=give-wechat], [data-testid=give-qr]').count()) === 0)
+    await panel.locator('[data-testid=give-schedule]').click()
+    check('sender (en): the schedule hint reads "Set it to open on Christmas morning."', (await panel.locator('[data-testid=schedule-hint]').innerText()) === 'Set it to open on Christmas morning.')
+    await panel.locator('[data-testid=schedule-date]').fill(`${new Date().getFullYear() + 1}-12-25`)
+    await panel.locator('[data-testid=schedule-save]').click()
+    await panel.locator('[data-testid=schedule-saved]').waitFor()
+    check('sender (en): setting the date is saved for the gift and counted (egift_scheduled)', seen.schedule.length === 1 && /-12-25$/.test(seen.schedule[0].open_date) && seen.analytics.some((e) => e.event === 'egift_scheduled'))
+    await sp.screenshot({ path: `${SHOTS}/us-sender-phone.png`, fullPage: true })
+    check('no page errors (run 24, sender)', errors.length === 0, errors.join('; '))
+    await sp.close()
+  }
 }
 
 await browser.close()

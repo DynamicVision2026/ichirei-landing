@@ -3,6 +3,7 @@
 // are" line, the poem, the certificate line, 「○○より」 / 「＿＿さんへ」, the short message, and the receiver page's address for the QR code.
 
 import { cleanReading } from '../../src/order/reading.ts'
+import type { EnBridge } from '../../src/order/en-bridge.ts'
 import { isQuietPurpose } from '../../src/order/purpose.ts'
 import sharp from 'sharp'
 import type { AnimationRecord } from '../animation.ts'
@@ -15,6 +16,8 @@ export interface Artwork {
   language: 'ja' | 'zh-Hans' | 'zh-Hant' | 'en'
   glyph: string
   reading: string
+  /** en only (2026-11-12): the English bridge — the word and the line printed under the character (and the reviewed echo / classical line on the certificate). */
+  en?: EnBridge | null
   who: string
   certificateLine: string
   lines: string[]
@@ -63,7 +66,9 @@ export async function loadArtwork(store: OrderStore, gift: GiftRecord, anim: Ani
   return {
     language: gift.language,
     glyph: gift.glyph,
-    reading: cleanReading(gift.reading),
+    // English with the bridge: the Latin reading (an English reader cannot read kana)
+    reading: gift.language === 'en' && gift.en ? cleanReading(gift.romanization.split(' / ')[0]) : cleanReading(gift.reading),
+    ...(gift.language === 'en' && gift.en ? { en: gift.en } : {}),
     who: gift.who,
     certificateLine: gift.certificate_line,
     lines,

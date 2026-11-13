@@ -5,6 +5,7 @@ import { useEffect, useId, useRef, useState, type KeyboardEvent, type ReactNode 
 import { ANGLES, TEXT, type RevealLang } from './copy.ts'
 import { rich } from './rich.tsx'
 import Picture from './Picture.tsx'
+import { sceneName } from './scenes.ts'
 import { CURRENCIES, approxLine, type Currency, type Rates } from './currency.ts'
 import { PACKAGE_PRICE_JPY, formatYen } from '../order/packages.ts'
 import { LEGAL, rowValue } from '../legal/legal-copy.ts'
@@ -219,7 +220,7 @@ const MOMENTS = [
 ] as const
 
 /** Everyday moments mosaic: photo frames with a caption; a missing photo leaves the coloured frame. */
-export function Moments({ t, memorial = false }: { t: T; memorial?: boolean }) {
+export function Moments({ t, memorial = false, lang = 'ja' }: { t: T; memorial?: boolean; lang?: RevealLang }) {
   return (
     <section id="moments">
       <div className="wrap center">
@@ -236,7 +237,7 @@ export function Moments({ t, memorial = false }: { t: T; memorial?: boolean }) {
               {m.k}
             </span>
             <Picture
-              name={`scenes/${m.n}`}
+              name={lang === 'en' ? sceneName('en', m.cat) : `scenes/${m.n}`}
               width={m.n === 'm4' || m.n === 'm6' ? 2 : 1}
               height={1}
               sizes={m.n === 'm1' || m.n === 'm4' || m.n === 'm6' ? '(max-width: 860px) 100vw, 560px' : '(max-width: 860px) 50vw, 280px'}

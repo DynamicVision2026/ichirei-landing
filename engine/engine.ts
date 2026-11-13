@@ -22,6 +22,7 @@ import { callSignal, callTimeoutMs, ModelTimeoutError, reviewTimeoutMs, runBudge
 import { ensureMain, finalizeResult } from './slots.ts'
 import { logMainCharacter, logSafetyRemovals } from './main-count.ts'
 import { attachStrokes } from './strokes.ts'
+import { attachEnBridge, type GeneratedWord } from './en-bridge.ts'
 import { isJoyo } from './joyo.ts'
 import { buildLexiconPrompt, eligibleFor, inEligible, inLexicon, lexiconEchoOf, lexiconModeFromEnv, loadLexicon, type EligibleSet, type Lexicon, type LexiconPromptParts } from './lexicon.ts'
 import { readFileSync } from 'node:fs'
@@ -249,6 +250,8 @@ export interface RunEngineOptions {
    * calls) — or null when none is shown, and the reasons in codes why a later step was needed or the card was lost. Codes only; the API turns it into the /ops count. Not called for remembrance (two cards).
    */
   onFreeSource?: (info: { round: number; source: 'first' | 'retry' | 'runner_up' | null; reasons: string[] }) => void
+  /** English only: called once per word the model had to supply (no reviewed lexicon word) — the kanji and the word, for the reviewer. `used` says whether the word was acceptable. Never story text. */
+  onEnWord?: (info: GeneratedWord) => void
   /** Called once per finished run with the main character that stands (and the second), for the owner's top-10 of recurring characters. Never story text. */
   onMain?: (info: { round: number; language: string; main: string; second: string | null }) => void
   /** How many follow-up answers the sender has already given (the API layer passes it). Lexicon mode: after one, a second "no lexicon character fits" falls back to the palette engine. */
@@ -417,8 +420,23 @@ function logOtherTexts(context: EngineContext): void {
 
 export async function runEngine(story: string, condition: 'A' | 'B' | 'C', opts: RunEngineOptions = {}): Promise<EngineResult> {
   const onCard = opts.onCard
-  if (onCard) opts = { ...opts, onCard: (partial) => onCard(attachStrokes(partial)) } // (a card shown early carries its stroke counts like the final one)
-  const result = attachStrokes(await runEngineInner(story, condition, opts)) // the carving check's stroke counts (engine/strokes.ts)
+  // English only (2026-11-12): the word, line and echo of the English bridge are put on the main and second cards by code (engine/en-bridge.ts); ja and zh results pass through untouched.
+  let enContext: { lexicon: Lexicon | null; palette: ReturnType<typeof loadPalette> | null } | null = null
+  const withBridge = (r: EngineResult): { result: EngineResult; generated: GeneratedWord[] } => {
+    if (r.language !== 'en') return { result: r, generated: [] }
+    if (!enContext) {
+      try {
+        enContext = { lexicon: opts.lexicon ?? loadLexicon(), palette: loadPalette() }
+      } catch {
+        enContext = { lexicon: null, palette: null } // the bridge then falls back to the model's word and the plain meaning; the lexicon is a helper, never a single point of failure
+      }
+    }
+    return attachEnBridge(r, story, enContext.lexicon, enContext.palette)
+  }
+  if (onCard) opts = { ...opts, onCard: (partial) => onCard(attachStrokes(withBridge(partial).result)) } // (a card shown early carries its stroke counts and its English bridge like the final one)
+  const bridged = withBridge(await runEngineInner(story, condition, opts))
+  for (const g of bridged.generated) opts.onEnWord?.(g)
+  const result = attachStrokes(bridged.result) // the carving check's stroke counts (engine/strokes.ts)
   logMainCharacter(result) // the day's repeats, visible in the logs (engine/main-count.ts)
   logSafetyRemovals(result) // every card removed for safety, with the reason (no story text)
   return result

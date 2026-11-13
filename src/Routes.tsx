@@ -1,5 +1,7 @@
 import { Suspense, lazy } from 'react'
 import RevealPage from './reveal/RevealPage.tsx'
+import { setLanguage } from './lang-store.ts'
+import { captureUtm } from './demo/utm-store.ts'
 
 // Minimal path-based routing (thin, per the harness's "choose thinner" rule):
 // /demo renders the validation harness; /track the order-status page; /a/<id> the private story animation of one order (the sender's page), /g/<token> the receiver's gift page; /credits its attributions; /legal the legal notice (特定商取引法), the return rules and three short questions; everything else the landing page
@@ -14,6 +16,7 @@ const LegalApp = lazy(() => import('./legal/LegalApp.tsx'))
 
 export default function Routes() {
   const path = window.location.pathname
+  captureUtm() // (the arrival's utm_* parameters, kept for the tab: they travel with an English order)
   if (path === '/track' || path.startsWith('/track/')) {
     return (
       <Suspense fallback={null}>
@@ -56,5 +59,7 @@ export default function Routes() {
       </Suspense>
     )
   }
+  // /en (2026-11-12): the English page for the US launch — the same page with the language set to English (a link from search or an ad keeps its ?utm_… parameters)
+  if (path === '/en' || path === '/en/') setLanguage('en')
   return <RevealPage />
 }

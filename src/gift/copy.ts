@@ -20,6 +20,10 @@ export interface GiftCopy {
   envLineMemorial: string
   to: (name: string) => string
   from: (name: string) => string
+  /** en only (2026-11-12): the envelope line that names the sender, the short open button, and the reply button. */
+  envChose?: (name: string) => string
+  openShort?: string
+  replyOpen?: (name: string) => string
   open: string
   opensOn: (date: string) => string
   daysLeft: (n: number) => string
@@ -203,6 +207,9 @@ export const GIFT_COPY: Record<PageLang, GiftCopy> = {
     envLineMemorial: 'A letter of one character, arrived for you',
     to: (n) => (n ? `To ${n}` : ''),
     from: (n) => (n ? `From ${n}` : ''),
+    envChose: (n) => (n ? `${n} chose one character for you.` : 'Someone chose one character for you.'),
+    openShort: 'Open',
+    replyOpen: (n) => (n ? `Send a reply to ${n}` : 'Send a reply'),
     open: 'Open the envelope',
     opensOn: (d) => `Opens on ${d}`,
     daysLeft: (n) => `${n} ${n === 1 ? 'day' : 'days'} to go. The envelope stays sealed until then.`,

@@ -31,6 +31,13 @@ export const LEXICON_COLUMNS = [
   'reviewed_on',
 ] as const
 
+/**
+ * The English layer (2026-11-12): columns that come AFTER the 17 above. `en_word`, `en_echo` and `en_reviewed_by` are the reviewer's three (Part A of the ticket); `en_rendering` and `en_source` are the optional English rendering of the
+ * row's classical line and its source named in English ("Li Bai, Quiet Night Thoughts"), shown with the line on the English pages once that row has been reviewed. They are filled only for English and read only by the English prompt and the
+ * English pages; the Japanese and Chinese engines never look at them. A file with just the 17 columns still loads (the English ones are then empty).
+ */
+export const LEXICON_EN_COLUMNS = ['en_word', 'en_echo', 'en_reviewed_by', 'en_rendering', 'en_source'] as const
+
 export const LEXICON_MODES = ['off', 'shadow', 'on'] as const
 export type LexiconMode = (typeof LEXICON_MODES)[number]
 
@@ -66,7 +73,7 @@ const PARTNER_RELATIONSHIPS: readonly Relationship[] = ['spouse', 'romance']
 export interface LexiconRow {
   /** The lexicon's own form of the character (may be a traditional or variant form; the palette finds it by either form). */
   kanji: string
-  raw: Record<(typeof LEXICON_COLUMNS)[number], string>
+  raw: Record<(typeof LEXICON_COLUMNS)[number] | (typeof LEXICON_EN_COLUMNS)[number], string>
   tags: Set<FitTag>
   /** "(JP only)" in fits_relationships: the character is not offered where the Chinese palette judges it (zh, and en). */
   japanOnly: boolean
@@ -79,8 +86,9 @@ export interface LexiconRow {
 const trim = (s: string) => s.trim()
 
 function parseRow(cells: string[], at: string): LexiconRow {
-  if (cells.length !== LEXICON_COLUMNS.length) throw new Error(`${at}: expected ${LEXICON_COLUMNS.length} columns, got ${cells.length}`)
-  const raw = Object.fromEntries(LEXICON_COLUMNS.map((c, i) => [c, trim(cells[i])])) as LexiconRow['raw']
+  const names: readonly string[] = cells.length === LEXICON_COLUMNS.length ? LEXICON_COLUMNS : [...LEXICON_COLUMNS, ...LEXICON_EN_COLUMNS]
+  if (cells.length !== names.length) throw new Error(`${at}: expected ${LEXICON_COLUMNS.length} or ${LEXICON_COLUMNS.length + LEXICON_EN_COLUMNS.length} columns, got ${cells.length}`)
+  const raw = Object.fromEntries([...LEXICON_COLUMNS, ...LEXICON_EN_COLUMNS].map((c, i) => [c, i < names.length ? trim(cells[i]) : ''])) as LexiconRow['raw']
   if (!raw.kanji) throw new Error(`${at}: kanji is empty`)
   if (!['yes', 'no'].includes(raw.kana_only)) throw new Error(`${at}: kana_only must be yes or no`)
   if (!['high', 'medium', 'low'].includes(raw.card_fit)) throw new Error(`${at}: card_fit must be high, medium or low`)
@@ -119,7 +127,8 @@ export class Lexicon {
 /** Parse and validate lexicon.csv text. Throws on anything malformed. */
 export function parseLexicon(text: string): Lexicon {
   const [header, ...body] = parseCsv(text)
-  if (!header || header.join(',') !== LEXICON_COLUMNS.join(',')) throw new Error(`lexicon.csv: header must be exactly ${LEXICON_COLUMNS.join(',')}`)
+  const base = LEXICON_COLUMNS.join(',')
+  if (!header || (header.join(',') !== base && header.join(',') !== `${base},${LEXICON_EN_COLUMNS.join(',')}`)) throw new Error(`lexicon.csv: header must be exactly ${base} (optionally followed by ${LEXICON_EN_COLUMNS.join(',')})`)
   return new Lexicon(body.map((cells, i) => parseRow(cells, `lexicon.csv row ${i + 2}`)))
 }
 

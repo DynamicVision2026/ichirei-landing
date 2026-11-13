@@ -36,7 +36,15 @@ export type ShareRole = (typeof SHARE_ROLES)[number]
 /** The owner dashboard (/ops/stats, 2026-11-07): a page view (once per tab session; the referrer's HOST is turned into a bucket on arrival and never stored) and the receiver opening the envelope (a short hash of the gift link, never the link itself). */
 export const SOURCE_BUCKETS = ['direct', 'instagram', 'facebook', 'x', 'line', 'xhs', 'other'] as const
 export type SourceBucket = (typeof SOURCE_BUCKETS)[number]
-export const CLIENT_EVENTS = ['chosen', 'explain_opened', 'page_view', 'receiver_opened', ...FLOW_EVENTS, ...PREVIEW_EVENTS, ...SHARE_EVENTS] as const
+/**
+ * The US e-gift launch (2026-11-12, English pages only): codes only. `us_banner_seen` = the delivery banner scrolled into view on /en; `occasion_chip` = which occasion chip was chosen (a code from US_CHIPS);
+ * `egift_scheduled` = the buyer set an opening date; `receiver_saved_card` = the receiver saved the card image; `receiver_replied` = the receiver sent the one thank-you.
+ */
+export const US_EVENTS = ['us_banner_seen', 'occasion_chip', 'egift_scheduled', 'receiver_saved_card', 'receiver_replied'] as const
+export type UsEvent = (typeof US_EVENTS)[number]
+/** The English occasion chips (src/order/en-chips.ts): the codes the dashboard may count. */
+export const US_CHIP_CODES = ['christmas', 'thanksgiving', 'birthday', 'anniversary', 'mothers_day', 'fathers_day', 'graduation', 'retirement', 'thank_you', 'in_memory', 'no_special_day', 'other'] as const
+export const CLIENT_EVENTS = ['chosen', 'explain_opened', 'page_view', 'receiver_opened', ...FLOW_EVENTS, ...PREVIEW_EVENTS, ...SHARE_EVENTS, ...US_EVENTS] as const
 
 /** The referrer's host → a bucket (the dashboard's 「どこから」). Search engines and no referrer are `direct`; a shared post carries no tag, so it shows under the platform it came from. */
 export function sourceBucket(host: unknown, ownHost?: string): SourceBucket {
@@ -61,6 +69,10 @@ export type AnalyticsEvent =
   | { ts: string; session: string; source: Source; event: ShareEvent; role: ShareRole }
   | { ts: string; session: string; source: Source; event: 'page_view'; language: Language | null; src: SourceBucket }
   | { ts: string; session: string; source: Source; event: 'receiver_opened'; gift: string | null }
+  | { ts: string; session: string; source: Source; event: Exclude<UsEvent, 'occasion_chip'> }
+  | { ts: string; session: string; source: Source; event: 'occasion_chip'; code: (typeof US_CHIP_CODES)[number] | null }
+  /** English only (written by the server): a word the model had to supply because the lexicon row is not reviewed — the kanji and the word, for the reviewer. `used` = whether the word was acceptable (else the plain meaning stands). */
+  | { ts: string; session?: string; source: Source; event: 'en_word_generated'; kanji: string; word: string; used: 'generated' | 'meaning'; problem: string | null }
   /** What the model and picture calls of one request cost to run (tokens only; the dashboard prices them with engine/ops-costs.ts). No story, no session needed. */
   | { ts: string; session?: string; source: Source; event: 'ai_cost'; kind: string; model: string; in: number; out: number; cr: number; cw: number }
   | { ts: string; session: string; source: Source; event: 'chosen'; choice: Choice }
@@ -103,6 +115,8 @@ export function parseClientEvent(body: unknown, now: Date): AnalyticsEvent | nul
     const secs = typeof b.secs === 'number' && Number.isFinite(b.secs) && b.secs >= 0 && b.secs < 3600 ? Math.round(b.secs) : null
     return { ts, session, source, event: b.event as PreviewEvent, language, n, state, secs }
   }
+  if (b.event === 'occasion_chip') return { ts, session, source, event: 'occasion_chip', code: (US_CHIP_CODES as readonly string[]).includes(b.code as string) ? (b.code as (typeof US_CHIP_CODES)[number]) : null }
+  if ((US_EVENTS as readonly string[]).includes(b.event as string)) return { ts, session, source, event: b.event as Exclude<UsEvent, 'occasion_chip'> }
   if ((SHARE_EVENTS as readonly string[]).includes(b.event as string)) return (SHARE_ROLES as readonly string[]).includes(b.role as string) ? { ts, session, source, event: b.event as ShareEvent, role: b.role as ShareRole } : null
   if (b.event === 'chosen') return choice ? { ts, session, source, event: 'chosen', choice } : null
   return { ts, session, source, event: 'explain_opened', choice }

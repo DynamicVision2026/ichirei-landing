@@ -17,7 +17,7 @@ export interface Candidate {
   /** v6: main = the primary, second = its backup, freestyle = 遊び字 (never the primary). */
   slot: 'main' | 'second' | 'freestyle'
   /** v6: attached by the server from a reviewed palette row; null/absent otherwise. */
-  classical_echo?: { text: string; source: string } | null
+  classical_echo?: { text: string; source: string; rendering?: string; source_en?: string } | null
   kanji: string
   reading: string
   /** en only: the character's core meaning in English (one plain phrase), attached by the server from the palette. */
@@ -26,6 +26,11 @@ export interface Candidate {
   reading_zh?: string | null
   /** en only: one plain-English sentence tying the character's meaning to the quoted story moment. */
   why_this?: string | null
+  /** en only (2026-11-12), main and second cards: the English bridge — one word with literary weight (fixed per kanji by the reviewed lexicon), one plain line from this story, and the reviewed echo. */
+  en_word?: string | null
+  en_word_source?: 'lexicon' | 'generated' | 'meaning'
+  en_line?: string | null
+  en_echo?: { text: string; source: string } | null
   inscription_form: string | null
   truth_type: TruthType
   one_line_gaze: string

@@ -3,6 +3,8 @@
 
 import type { RevealLang } from '../reveal/copy.ts'
 
+import { REFUND_EN, REFUND_EN_MEMORIAL } from '../order/refund-en.ts'
+
 export interface PreviewCopy {
   /** The heading of the preview step. */
   heading: string
@@ -112,8 +114,8 @@ export const PREVIEW_COPY: Record<RevealLang, PreviewCopy> = {
     editStory: 'Edit your story',
     retry: 'Try again',
     chooseOther: 'Choose a different character',
-    refundLine: 'You can cancel for a full refund only within 24 hours of payment and before you press "Collect your gift" on your order page. After 24 hours, there are no refunds for change of mind. Orders can\'t be changed after payment.',
-    refundLineMemorial: 'You can cancel for a full refund only within 24 hours of payment and before you press "Collect it" on your order page. After 24 hours, there are no refunds for change of mind. Orders can\'t be changed after payment.',
+    refundLine: REFUND_EN,
+    refundLineMemorial: REFUND_EN_MEMORIAL,
     refundDetails: 'Details',
     refundCheck: "I've read the cancellation and refund terms (within 24 hours of payment, before collecting).",
     legalLink: 'Legal notice (特定商取引法) and returns',

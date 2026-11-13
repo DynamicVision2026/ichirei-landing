@@ -396,3 +396,25 @@
 .rv .voiceRow{display:flex;flex-wrap:wrap;align-items:center;gap:.6rem}
 .rv .voiceLang{padding:.5rem .6rem;border:1px solid var(--line,#cdbf9f);background:transparent;color:inherit;font:inherit;border-radius:2px}
 .rv .voiceInterim{margin:.2rem 0 0;min-height:1.6em;color:var(--mute,#8a7f6c);opacity:.65;font-size:.95rem;line-height:1.7}
+
+/* The English bridge on the chosen-character slip and on the card preview (2026-11-12) */
+.rv .slipStack{margin:.2rem 0 .4rem;color:var(--ink)}
+.rv .slipStack .en-reading{color:var(--gold)}
+.rv .slipStack .en-word{color:inherit}
+.rv .slipStack .en-line{color:inherit;opacity:.92}
+.rv .cardStack{gap:.15rem;margin:.15rem 0 .35rem}
+.rv .cardStack .en-reading{font-size:.95rem;color:#4A4034}
+.rv .cardStack .en-word{font-size:1.25rem;color:#2A221B}
+.rv .cardStack .en-line{font-size:.78rem;color:#4A4034}
+
+/* English landing: the delivery banner and "What they receive" (2026-11-12) */
+.rv .usBanner{background:var(--ink);color:#f4ecd8;text-align:center;padding:.85rem 0}
+.rv .usBanner p{margin:0;color:#f4ecd8;font-family:var(--display);font-weight:600;font-size:clamp(.95rem,2.6vw,1.1rem);letter-spacing:.02em;text-wrap:balance}
+.rv .usReceive{padding:clamp(2.5rem,6vw,4.5rem) 0}
+.rv .usReceiveList{list-style:none;margin:2rem auto 1.5rem;padding:0;display:grid;gap:.9rem;max-width:44rem;text-align:left;counter-reset:none}
+.rv .usReceiveList li{display:grid;grid-template-columns:2rem 1fr;column-gap:.9rem;align-items:baseline;padding:.9rem 1.1rem;background:var(--card);border:1px solid var(--line);border-radius:14px}
+.rv .usReceiveN{grid-row:span 2;font-family:var(--display);font-weight:700;color:var(--seal);font-size:1.3rem}
+.rv .usReceiveList b{font-family:var(--display);font-size:1.02rem}
+.rv .usReceiveList small{grid-column:2;color:var(--mute);font-size:.9rem;line-height:1.5}
+.rv .usReceiveArt{width:min(15rem,60%);margin:1rem auto 0;border-radius:14px;overflow:hidden}
+.rv .heroTokyo{margin:.4rem 0 0;font-family:var(--display);font-style:italic;color:var(--gold);letter-spacing:.03em}

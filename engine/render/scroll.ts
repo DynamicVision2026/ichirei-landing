@@ -50,10 +50,26 @@ export async function makeScroll(a: Artwork, env: NodeJS.ProcessEnv = process.en
   y += cs + 120
   svg += textPaths(body, a.reading, 76, WIDTH / 2, y, MUTED, 'middle').svg
   y += 150
-  for (const line of wrapText(body, a.who, 68, 1600)) {
-    svg += textPaths(body, line, 68, WIDTH / 2, y, INK, 'middle').svg
-    y += 110
-  }
+  if (a.language === 'en' && a.en) {
+    // English (2026-11-12): the bridge under the character — the word (bold), the line, and the reviewed echo when there is one
+    svg += textPaths(body, a.en.word, 128, WIDTH / 2, y, INK, 'middle', 4.4).svg
+    y += 170
+    for (const line of wrapText(body, a.en.line, 68, 1600)) {
+      svg += textPaths(body, line, 68, WIDTH / 2, y, INK, 'middle').svg
+      y += 110
+    }
+    if (a.en.echo) {
+      y += 30
+      for (const line of wrapText(body, `“${a.en.echo.text}” — ${a.en.echo.source}`, 52, 1500)) {
+        svg += textPaths(body, line, 52, WIDTH / 2, y, MUTED, 'middle').svg
+        y += 80
+      }
+    }
+  } else
+    for (const line of wrapText(body, a.who, 68, 1600)) {
+      svg += textPaths(body, line, 68, WIDTH / 2, y, INK, 'middle').svg
+      y += 110
+    }
   y += 170
   // the seal: a small square with 一字礼 (ink for remembrance)
   const seal = 150

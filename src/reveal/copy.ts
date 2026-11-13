@@ -6,6 +6,8 @@
 // "checked by native speakers" claim, no "no AI" claim, no list of payment methods. The reference's
 // trust-strip item "Checked by native speakers" is therefore NOT here.
 
+import { REFUND_EN } from '../order/refund-en.ts'
+
 export type RevealLang = 'en' | 'ja' | 'zh-Hant'
 export const REVEAL_LANGS: readonly RevealLang[] = ['en', 'ja', 'zh-Hant']
 
@@ -64,7 +66,7 @@ const EN = {
   tp1: "One real moment beats a whole biography.",
   tp2: "Honest is better than beautiful. Plain words are perfect.",
   tp3: "Funny is welcome. Inside jokes often hold the most truth.",
-  tp4: "Write or speak, in English, Japanese or Chinese. Short or long: a single scene from about 50 characters, a whole story up to 5,000.",
+  tp4: "Write or speak, in English, Japanese or Chinese. 50–300 words is plenty.",
   tp5: "Your story is used only to find the character.",
   cWho: "Who is it for?",
   cMom: "One moment with them",
@@ -142,7 +144,7 @@ const EN = {
   fq6: "Can I change the character after I order?",
   fa6: "We can't change an order after payment (character, poem, names or message). If you'd like something different, cancel and place a new order.",
   fq7: "Can I cancel?",
-  fa7: "If we receive your email within 24 hours of payment, we'll cancel your order with a full refund, including shipping. Once you press \"Collect your gift\" on your order page, the order can no longer be cancelled (all sizes).",
+  fa7: REFUND_EN,
   fq8: "What if what I receive has a problem?",
   fa8: "If a wooden tag or block arrives damaged, with the wrong character or a misprint, email us a photo within 14 days of delivery and we'll remake it or refund you (we cover return shipping). If an e-gift page doesn't display properly, we'll fix it, or refund you if we can't.",
   fq9: "How long does the gift page stay online?",
@@ -157,7 +159,7 @@ const EN = {
   fa5S: "The e-gift is sent online, by LINE or email, so it can reach anyone, anywhere in the world.",
   fq5S: "Can I give it to someone in another country?",
   fa8S: "If an e-gift page doesn't display properly, we'll fix it, or refund you if we can't.",
-  ship1S: "Tax included · The e-gift is delivered online, with no shipping",
+  ship1S: "Tax included · The e-gift is delivered online, as a link",
   ship2S: "",
   ctaClose: "Tell your story",
   foot: "Order status: /track · Questions: reply to your order email",
@@ -527,32 +529,32 @@ export const CATS: Record<Category, Record<RevealLang, string>> = {
 
 export const SCENE: Record<Category, Record<RevealLang, string>> = {
   "parents": {
-    "en": "Photo · a mother in the kitchen at dawn",
+    "en": "Illustration · a mother and her grown daughter at the kitchen table",
     "ja": "写真・夜明けの台所に立つ母",
     "zh-Hant": "照片・清晨廚房裡的母親"
   },
   "partner": {
-    "en": "Photo · flowers on a kitchen table",
+    "en": "Illustration · an older couple on a park bench",
     "ja": "写真・食卓の季節の花",
     "zh-Hant": "照片・餐桌上的當季花"
   },
   "friends": {
-    "en": "Photo · a friend arriving late, both laughing",
+    "en": "Illustration · two friends on a porch at dusk",
     "ja": "写真・遅れて来た友と笑い合う",
     "zh-Hant": "照片・遲到的朋友，兩人相視而笑"
   },
   "children": {
-    "en": "Photo · a child getting back up on a bike",
+    "en": "Illustration · a father and his son at the open hood of a car",
     "ja": "写真・自転車から立ち上がる子",
     "zh-Hant": "照片・從腳踏車上站起來的孩子"
   },
   "mentor": {
-    "en": "Photo · a teacher and student at a desk",
+    "en": "Illustration · a teacher's desk with a card on it",
     "ja": "写真・机をはさむ先生と生徒",
     "zh-Hant": "照片・書桌兩側的老師與學生"
   },
   "work": {
-    "en": "Photo · a manager standing beside her team",
+    "en": "Illustration · a holiday table set for the whole team",
     "ja": "写真・チームの前に立つ上司",
     "zh-Hant": "照片・站在團隊前的上司"
   }

@@ -11,7 +11,8 @@ import { isQuietPurpose } from '../src/order/purpose.ts'
 import QRCode from 'qrcode'
 import { ANIMATION_ID_PATTERN, isAnimationRecord, type AnimationRecord } from '../engine/animation.ts'
 import { orderGate, type OrderGate } from '../engine/buyer.ts'
-import { GIFT_TOKEN_PATTERN, arrivingView, checkAddress, checkReply, giftUrl, giftView, isGiftRecord, isLocked, lockedView, type GiftRecord } from '../engine/gift.ts'
+import { GIFT_TOKEN_PATTERN, arrivingView, checkAddress, checkReply, giftUrl, giftView, isGiftRecord, isLocked, lockedView, todayJst, type GiftRecord } from '../engine/gift.ts'
+import { OPEN_DATE_MAX_DAYS } from '../src/order/packages.ts'
 import { readArt, picturePath, type ArtRecord } from '../engine/film-art.ts'
 import { createOrderStore, type OrderStore } from '../engine/order-store.ts'
 import { createAnimationHandlers, type AnimationDeps } from './animation.ts'
@@ -19,6 +20,8 @@ import { filmUsable } from '../engine/animation.ts'
 import { loadArtwork, scrollReady } from '../engine/render/artwork.ts'
 import { makeScroll, scrollPdf } from '../engine/render/scroll.ts'
 import { makeOgImage } from '../engine/render/og.ts'
+import { makeKeepsakeCard } from '../engine/render/keepsake.ts'
+import { cleanReading } from '../src/order/reading.ts'
 import { injectOg, ogKey, ogMeta } from '../engine/gift-share.ts'
 import { ensureFilmVideo, ensureShareFilm, filmComplete, filmVideoPath, serveBytes, shareFilmPath } from '../engine/film-video-store.ts'
 import { makeShareCard, type ShareArtwork } from '../engine/render/share.ts'
@@ -192,6 +195,19 @@ async function shareCardGet(f: Found, d: GiftDeps): Promise<Response> {
   }
 }
 
+/** English only (2026-11-12): the square card — the character with its reading, word and line. Needs no film. */
+async function keepsakeCardResponse(f: Found): Promise<Response> {
+  const g = f.gift
+  if (g.language !== 'en' || !g.en) return json(404, { error: 'not_offered' }, { 'cache-control': 'no-store' })
+  try {
+    const png = await makeKeepsakeCard({ glyph: g.glyph, reading: cleanReading(g.romanization.split(' / ')[0]), bridge: g.en, quiet: g.memorial || isQuietPurpose(g.purpose) })
+    return new Response(new Uint8Array(png), { status: 200, headers: headers({ 'content-type': 'image/png', 'content-disposition': 'attachment; filename="ichirei-card.png"', 'cache-control': 'private, no-store' }) })
+  } catch (err) {
+    console.error('[ichirei-keepsake-card] failed', err instanceof Error ? err.message : err)
+    return json(500, { error: 'card_failed' }, { 'cache-control': 'no-store' })
+  }
+}
+
 async function bySender(animationId: string, d: GiftDeps): Promise<Found | Response> {
   if (!ANIMATION_ID_PATTERN.test(animationId) || !d.store) return json(404, { error: 'not_found' }, { 'cache-control': 'no-store' })
   try {
@@ -351,6 +367,44 @@ export function createGiftHandlers(deps: () => GiftDeps) {
       if (f instanceof Response) return f
       { const gate = await gateOf(f.gift, d); if (gate === 'cancelled') return gone(f.gift); if (gate === 'pending') return notCollected() }
       return videoGet(f, d, req)
+    },
+    /** The sender sets (or clears) the day the envelope opens, after paying and collecting (English share sheet, 2026-11-12). Only while the gift is not cancelled; the day is today or later, at most OPEN_DATE_MAX_DAYS ahead. */
+    async scheduleForSender(animationId: string, body: unknown): Promise<Response> {
+      const d = deps()
+      const f = await bySender(animationId, d)
+      if (f instanceof Response) return f
+      { const gate = await gateOf(f.gift, d); if (gate === 'cancelled') return gone(f.gift); if (gate === 'pending') return notCollected() }
+      const raw = (body as { open_date?: unknown } | null)?.open_date
+      const now = d.now?.() ?? new Date()
+      let opens: string | null = null
+      if (raw !== null && raw !== undefined && raw !== '') {
+        if (typeof raw !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(raw)) return json(400, { error: 'open_date must be YYYY-MM-DD' }, noStore)
+        const today = todayJst(now)
+        const last = todayJst(new Date(now.getTime() + OPEN_DATE_MAX_DAYS * 86_400_000))
+        if (raw < today || raw > last || Number.isNaN(Date.parse(raw))) return json(400, { error: 'open_date is out of range' }, noStore)
+        opens = raw
+      }
+      try {
+        await d.store!.put(f.gift.token, { ...f.gift, opens_on: opens })
+      } catch {
+        return json(503, { error: 'unavailable' }, { 'cache-control': 'no-store' })
+      }
+      return json(200, { ok: true, opens_on: opens }, noStore)
+    },
+    async keepsakeCard(token: string, preview?: string | null): Promise<Response> {
+      const d = deps()
+      const r = await loadGift(token, d)
+      if (r.status !== 200) return json(r.status, { error: r.status === 404 ? 'not_found' : 'unavailable' }, { 'cache-control': 'no-store' })
+      if (closed(r.gift, d, preview)) return json(403, { error: 'locked' }, { 'cache-control': 'no-store' })
+      { const gate = await gateOf(r.gift, d); if (gate === 'cancelled') return gone(r.gift); if (gate === 'pending') return notCollected() }
+      return keepsakeCardResponse(r)
+    },
+    async keepsakeCardForSender(animationId: string): Promise<Response> {
+      const d = deps()
+      const f = await bySender(animationId, d)
+      if (f instanceof Response) return f
+      { const gate = await gateOf(f.gift, d); if (gate === 'cancelled') return gone(f.gift); if (gate === 'pending') return notCollected() }
+      return keepsakeCardResponse(f)
     },
     async cardPdfForSender(animationId: string): Promise<Response> {
       const d = deps()

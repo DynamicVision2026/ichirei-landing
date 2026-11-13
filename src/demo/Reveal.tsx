@@ -9,6 +9,7 @@ import { log } from './logging'
 import { choiceOf, track } from './analytics'
 import { isMemorial } from '../order/memorial.ts'
 import { isQuietPurpose } from '../order/purpose.ts'
+import EnBridgeStack from '../order/EnBridgeStack.tsx'
 import { carvedGlyph, contextToPayload, isChineseUi, occasionOf, purposeOf, type Copy, type GiftContext, type InscriptionScript, type UiLanguage } from './i18n'
 
 // Progressive reveal (build spec §8) + condition presentation (§5) + the
@@ -64,6 +65,24 @@ function InscriptionGlyph({
 }) {
   const glyph = carvedGlyph(candidate, language, script)
   const note = copy.inscriptionNote(candidate, script)
+  // English (2026-11-12): the bridge — the character, its reading (italic), the word (bold), the line from this story and, when reviewed, the echo. Main and second cards only; the freestyle stays as it was.
+  if (language === 'en' && candidate.slot !== 'freestyle' && candidate.en_word) {
+    return (
+      <div className="flex flex-col items-center text-center" data-en-bridge>
+        <span className={`font-mincho notranslate leading-none ${customerGlyph ? 'font-black' : ''} ${size} ${color}`} data-glyph translate="no">{glyph}</span>
+        <EnBridgeStack
+          className="mt-3"
+          reading={cleanReading(candidate.reading)}
+          word={candidate.en_word}
+          line={candidate.en_line}
+          echo={candidate.en_echo}
+          classical={candidate.classical_echo ?? null}
+          classes={{ reading: 'text-accent', word: 'text-fg', line: 'text-fg', where: 'text-mute' }}
+          after={note ? <span className="font-serif-jp mt-1 text-[12px] text-mute">{note}</span> : undefined}
+        />
+      </div>
+    )
+  }
   return (
     <div className="flex flex-col items-center text-center">
       <span className={`font-mincho notranslate leading-none ${customerGlyph ? 'font-black' : ''} ${size} ${color}`} data-glyph translate="no">{glyph}</span>
@@ -272,8 +291,8 @@ export default function Reveal({ result, story, followUps = [], condition, copy,
               >
                 {slotLabel}
               </p>
-              <div className={`flex flex-col items-center gap-6 ${pairLayout ? '' : 'sm:flex-row sm:items-center'}`}>
-                <div className={pairLayout ? '' : 'sm:w-44 sm:shrink-0'}>
+              <div className={`flex flex-col items-center gap-6 ${pairLayout || (language === 'en' && !isFreestyle && c.en_word) ? '' : 'sm:flex-row sm:items-center'}`}>
+                <div className={pairLayout || (language === 'en' && !isFreestyle && c.en_word) ? '' : 'sm:w-44 sm:shrink-0'}>
                   <InscriptionGlyph
                     candidate={c}
                     copy={copy}
@@ -309,12 +328,12 @@ export default function Reveal({ result, story, followUps = [], condition, copy,
                       </div>
                     )}
                   </dl>
-                  {c.why_this && (
+                  {c.why_this && !(language === 'en' && !isFreestyle && c.en_line) && (
                     <p className="font-serif-jp mt-3 text-sm leading-relaxed text-fg" data-why-this>
                       {c.why_this}
                     </p>
                   )}
-                  {!isFreestyle && c.classical_echo && (
+                  {!isFreestyle && c.classical_echo && !(language === 'en' && c.en_word) && (
                     <p className="font-serif-jp mt-3 text-xs leading-relaxed text-mute" data-classical>
                       「{c.classical_echo.text}」 — {c.classical_echo.source}
                     </p>

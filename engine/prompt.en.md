@@ -142,6 +142,8 @@ Span several types; do not mechanically force exactly one per type. For each can
 kanji:            
 reading:          (romaji — pick the ONE Japanese reading that fits the character's meaning in THIS story, e.g. "tomoshibi" or "akari" for 灯 — a single word, not a list. The system checks it is a real reading of the character and replaces it with the first kun reading if not.)
 meaning:          (do NOT write this for the main candidates — the system attaches the one-phrase English meaning, and the Mandarin pinyin when it has one, from its verified list)
+en_word:          (main and second candidates only: ONE English word with literary weight for the character — see THE ENGLISH BRIDGE below)
+en_line:          (main and second candidates only: ONE plain sentence of at most 14 words that explains the character to someone who has never seen kanji, from this story — see THE ENGLISH BRIDGE below)
 why_this:         (ONE plain-English sentence that connects what the character means to the quoted story moment — no kanji jargon: no on/kun, radicals or stroke talk. Example: "Lamplight is the plainest thing in your story — the light you left on for me.")
 truth_type:       
 scarce_asset_it_preserves:
@@ -162,6 +164,13 @@ The scene is the evidence, never the answer. The character in slot 1 and in slot
 Quarantine rule: the generic virtue characters — 愛 (love), 優 (gentle), 健 (healthy), 強 (strong), 光 (light), 絆 (bond), 感 (feeling), 守 (protect) and their kin — are forbidden unless re-bound to a specific particular from the story. The "tattoo kanji" set is quarantined on the same terms: 勇 (courage), 夢 (dream), 命 (life), 魂 (soul), 力 (power), 心 (heart), 和 (peace/harmony), 平 (peace), 幸 (happiness), 福 (fortune), 武 and 侍 (warrior, samurai), 龍 (dragon), 忍 (endure; ninja), 真 (truth), 禅 (Zen) and any character whose appeal is mostly that it looks impressive to a reader who cannot read it. 灯 as "warmth" is banned; 灯 as "warmth" is banned, and 灯 for "the light you left on every night I came home late" fails the person test below as a main candidate, because it names the lamp, not her; it is a freestyle at most. What the lamp proves — someone who waits up and keeps a place for you — is what a main character has to name. If the only character you can reach is an un-bound generic, that is a signal the extraction was too shallow — go back, don't ship the generic.
 
 Recurring characters rule (2026-11-07): some characters come back in many different stories — 誠, 常, 待, 信, 恩, 想. Offer one of them only when THIS story's specific act makes it clearly the best character for this person, and name that act in `why_not_generic`. When a more specific character fits as well — one that comes from the object, the place, the gesture or the words of this story — prefer the specific one. These six are not a safe default for "a sincere, constant, patient person". Never use more than one of them across your candidates.
+THE ENGLISH BRIDGE — the word and the line (main and second candidates only; never the freestyle)
+The sender and the receiver read English and cannot read a kanji, so the card has to carry the meaning beside the character. Every MAIN and SECOND candidate carries two more fields, in English:
+
+* `en_word` — ONE English word, two at most, for the character. Choose an English word with literary weight (hearth, haven, keeper, steadfast, kindred, abide), never a plain word (light, warm, protect, honest). Old and still spoken; never archaic (no thou, hath, verily). American spelling. Never a brand or self-help word (journey, resilience, empower, mindful). It names the CHARACTER, not this one story: the same character always gets the same word, so choose the word you would give that character in any story (守 is "keeper" whether the receiver is a husband or a nurse). The system replaces your word with the reviewed one when the character already has one, and it logs yours otherwise.
+* `en_line` — ONE plain sentence of at most 14 words that explains the character to someone who has never seen kanji. It is in the sender's register (the direction register and the story's emotion above) and is drawn from THIS story. Example, for 燈 to a mother: "The light that is already on when everyone else wakes." It is not a definition ("a lamp"), and it is not praise of the receiver ("you are wonderful"). The same story-truth rules as the one_line_gaze apply (HARD PROCESS RULES 5 and 6): it uses only what the story states, adds no fact, and says nothing about the sender's gender, age or family role. A line that would read as well under a different story is generic: rewrite it from this story. In a remembrance it speaks of who they were, and still are, to the sender.
+* The freestyle candidate has neither field.
+
 STEP 4 — Gates (apply to every candidate; eliminate any that fail gates 1–5; gate 6 decides who may be the primary; gate 7 decides who may be a main candidate at all)
 
 1. Substitution Test. Mentally swap the names and surface details for another family, couple, friendship or team. Does the `one_line_gaze` still fit? If yes → generic → eliminate.
@@ -274,6 +283,8 @@ Return this exact shape:
       "kanji": string,                    // modern Japanese form
       "reading": string,                  // romaji, ONE reading only — the one that fits the meaning and the story, e.g. "tomoshibi". The system checks it against the character's real readings.
       "meaning": string,                  // FREESTYLE ONLY: one short plain English phrase, e.g. "lamplight". Omit for main and second.
+      "en_word": string,                  // MAIN AND SECOND ONLY: ONE English word (two at most) with literary weight, e.g. "hearth" — see THE ENGLISH BRIDGE. Omit for the freestyle.
+      "en_line": string,                  // MAIN AND SECOND ONLY: ONE plain sentence, at most 14 words, from this story, e.g. "The light that is already on when everyone else wakes." Omit for the freestyle.
       "why_this": string,                 // ONE short plain-English sentence tying the character's meaning to the quoted story moment; no kanji jargon
       "inscription_form": string | null,     // old-form variant, or null if none exists
       "truth_type": "Essence" | "Turning Point" | "Role" | "Hidden Cost" | "Private Symbol" | "Forward Blessing" | "Play",  // "Play" for the freestyle only

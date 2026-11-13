@@ -3,6 +3,7 @@ import type { PreviewCopy } from './preview-copy.ts'
 import type { PreviewState } from './usePreview.ts'
 import { trackPreview } from './analytics.ts'
 import { whoLine } from '../order/who-line.ts'
+import EnBridgeStack from '../order/EnBridgeStack.tsx'
 
 // The free card preview: an on-screen image of the card's inside (the four scenes of the story with their lines, the character, who they are, the poem), lightly marked
 // 見本. It has no download: the story scroll and the print file come after payment only. In remembrance the character is ink black, never red, as on the printed card.
@@ -18,12 +19,15 @@ type Props = {
   /** Ink instead of cinnabar (remembrance, apology, encouragement). */
   quiet?: boolean
   language: string
+  /** en only: the word and the line of the English bridge, shown right under the reading. */
+  enWord?: string | null
+  enLine?: string | null
   preview: PreviewState
   /** The e-gift has no printed card: the lead says it comes as a PDF to print at home. */
   egift?: boolean
 }
 
-export default function CardPreview({ copy: c, glyph, reading, who, poem, certificateLine, memorial, quiet = memorial, language, preview, egift = false }: Props) {
+export default function CardPreview({ copy: c, glyph, reading, who, poem, certificateLine, memorial, quiet = memorial, language, preview, egift = false, enWord = null, enLine = null }: Props) {
   useEffect(() => {
     trackPreview('card_preview_shown', { language })
   }, [language])
@@ -57,7 +61,11 @@ export default function CardPreview({ copy: c, glyph, reading, who, poem, certif
         )}
         <div className="cardText">
           <span className="cardGlyph k notranslate" data-testid="card-glyph">{glyph}</span>
-          <span className="cardReading notranslate">{reading}</span>
+          {enWord ? (
+            <EnBridgeStack className="cardStack" reading={reading} word={enWord} line={enLine} noWhere />
+          ) : (
+            <span className="cardReading notranslate">{reading}</span>
+          )}
           <p className="cardWho notranslate"><span className="cardWhoLabel">{c.who}</span> {whoLine(who, language, true)}</p>
           {poem && (poem.type === 'tanka' || poem.type === 'haiku' ? (
             // 短歌 / 俳句: vertical (縦書き), the first line on the right — the same as the gift page and the printed card

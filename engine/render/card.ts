@@ -121,6 +121,43 @@ function centred(doc: Doc, text: string, cx: number, y: number, width: number, s
   doc.text(text, cx - width / 2, y, { width, align: 'center', lineGap: opts.lineGap ?? 2 })
 }
 
+/** A slanted line (the embedded Japanese serif has no italic): the reading of the English bridge. */
+function slanted(doc: Doc, text: string, cx: number, y: number, width: number, size: number, color: string) {
+  doc.save()
+  doc.transform(1, 0, -0.2, 1, 0.2 * (y + size * 0.8), 0)
+  centred(doc, text, cx, y, width, size, color)
+  doc.restore()
+}
+
+/** A thickened line (no bold weight is embedded): the word of the English bridge. */
+function heavy(doc: Doc, text: string, cx: number, y: number, size: number, color: string) {
+  doc.font(names.body).fontSize(size)
+  const w = doc.widthOfString(text)
+  doc.fillColor(color).lineWidth(size * 0.035).strokeColor(color).text(text, cx - w / 2, y, { lineBreak: false, fill: true, stroke: true })
+}
+
+/** The block under "Where this word comes from": the echo and the classical line (original, its English rendering, its source). Returns the height used. */
+function whereBlock(doc: Doc, a: Artwork, cx: number, y: number, width: number): number {
+  const en = a.en
+  if (!en || (!en.echo && !en.classical)) return 0
+  const top = y
+  centred(doc, 'WHERE THIS WORD COMES FROM', cx, y, width, 5.2, MUTED)
+  y += 9
+  if (en.echo) {
+    const t = `“${en.echo.text}” — ${en.echo.source}`
+    doc.font(names.body).fontSize(6.4)
+    centred(doc, t, cx, y, width, 6.4, INK)
+    y += doc.heightOfString(t, { width, align: 'center', lineGap: 2 }) + 4
+  }
+  if (en.classical) {
+    const t = `「${en.classical.text}」${en.classical.rendering ? ` ${en.classical.rendering}` : ''} — ${en.classical.source_en ?? en.classical.source}`
+    doc.font(names.body).fontSize(6.2)
+    centred(doc, t, cx, y, width, 6.2, INK)
+    y += doc.heightOfString(t, { width, align: 'center', lineGap: 2 }) + 4
+  }
+  return y - top
+}
+
 function drawOutside(doc: Doc, a: Artwork) {
   paper(doc)
   const half = TRIM_W / 2
@@ -133,7 +170,10 @@ function drawOutside(doc: Doc, a: Artwork) {
   centred(doc, credit(a.language), leftCx, BLEED + TRIM_H - 14 * MM, half - 24 * MM, 7, MUTED)
   // the front (right): the character and its reading
   glyph(doc, a, rightCx, BLEED + 28 * MM, 150)
-  centred(doc, a.reading, rightCx, BLEED + 28 * MM + 214, half - 20 * MM, 13, INK)
+  if (a.en) {
+    slanted(doc, a.reading, rightCx, BLEED + 28 * MM + 208, half - 20 * MM, 13, INK)
+    heavy(doc, a.en.word, rightCx, BLEED + 28 * MM + 232, 22, INK)
+  } else centred(doc, a.reading, rightCx, BLEED + 28 * MM + 214, half - 20 * MM, 13, INK)
   doc.font(names.mark).fontSize(8).fillColor(MUTED)
   const mark = 'ICHIREI 一字礼'
   doc.text(mark, rightCx - doc.widthOfString(mark) / 2, BLEED + TRIM_H - 14 * MM, { lineBreak: false })
@@ -163,12 +203,25 @@ function drawInside(doc: Doc, a: Artwork) {
   const rcx = rx + rw / 2
   glyph(doc, a, rcx, BLEED + 6 * MM, 62)
   let y = BLEED + 6 * MM + 92
-  centred(doc, a.reading, rcx, y, rw, 9, MUTED)
-  y += 18
-  doc.font(names.body).fontSize(8.6)
-  const whoH = doc.heightOfString(a.who, { width: rw, align: 'center', lineGap: 2 })
-  centred(doc, a.who, rcx, y, rw, 8.6, INK)
-  y += whoH + 10
+  if (a.en) {
+    // English (2026-11-12): the bridge under the character — reading (slanted), word (heavy), the line, and "Where this word comes from"
+    slanted(doc, a.reading, rcx, y - 4, rw, 9, MUTED)
+    y += 10
+    heavy(doc, a.en.word, rcx, y, 15, INK)
+    y += 21
+    doc.font(names.body).fontSize(8.2)
+    const lh = doc.heightOfString(a.en.line, { width: rw, align: 'center', lineGap: 2 })
+    centred(doc, a.en.line, rcx, y, rw, 8.2, INK)
+    y += lh + 6
+    y += whereBlock(doc, a, rcx, y, rw) + 4
+  } else {
+    centred(doc, a.reading, rcx, y, rw, 9, MUTED)
+    y += 18
+    doc.font(names.body).fontSize(8.6)
+    const whoH = doc.heightOfString(a.who, { width: rw, align: 'center', lineGap: 2 })
+    centred(doc, a.who, rcx, y, rw, 8.6, INK)
+    y += whoH + 10
+  }
   if (a.poem.length) {
     if (isVerticalPoem(a.poemType)) {
       // 短歌 / 俳句: vertical, the first line on the right

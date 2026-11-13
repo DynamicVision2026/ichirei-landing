@@ -66,7 +66,7 @@ export async function textBlock(font: unknown, text: string, size: number, lineH
 }
 
 /** One line of text, centred on `cx`, as a transparent layer. */
-export async function lineLayer(font: unknown, text: string, size: number, cx: number, top: number, fill: string, letterSpacing = 0): Promise<Layer> {
+export async function lineLayer(font: unknown, text: string, size: number, cx: number, top: number, fill: string, letterSpacing = 0, stroke = 0): Promise<Layer> {
   const chars = Array.from(text)
   const widths = chars.map((ch) => textWidth(font, ch, size))
   const total = widths.reduce((a, b) => a + b, 0) + letterSpacing * (chars.length - 1)
@@ -75,7 +75,7 @@ export async function lineLayer(font: unknown, text: string, size: number, cx: n
   let svg = ''
   let pen = size / 2
   chars.forEach((ch, i) => {
-    svg += textPaths(font, ch, size, pen, size * 1.1, fill, 'start').svg
+    svg += textPaths(font, ch, size, pen, size * 1.1, fill, 'start', stroke).svg
     pen += widths[i] + letterSpacing
   })
   const png = await sharp(Buffer.from(`<svg xmlns="http://www.w3.org/2000/svg" width="${w}" height="${h}">${svg}</svg>`)).ensureAlpha().raw().toBuffer({ resolveWithObject: true })

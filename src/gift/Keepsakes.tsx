@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import type { PageLang } from '../animation/copy.ts'
+import { trackUs } from '../demo/analytics.ts'
 
 // 「ギフトを保存する」 (Part 5): what the gift keeps — the film as a video (MP4), the story scroll (PNG / PDF) and the card (PDF). On the receiver's page after the
 // certificate and on the sender's page; only when the film is complete (a washi slot is allowed). The video is made once on the server, the first time it is
@@ -18,6 +19,8 @@ interface KeepCopy {
   cardHome: string
   cardHomeNote: string
   cardKeep: string
+  /** en only: the square image of the character with its word and line. */
+  cardImage?: string
   forever: string
 }
 
@@ -62,9 +65,10 @@ const COPY: Record<PageLang, KeepCopy> = {
     scroll: 'Save the story scroll',
     png: 'Image (PNG)',
     pdf: 'PDF',
-    cardHome: 'Save the card (an A4 PDF to print at home)',
+    cardHome: 'Save the certificate (an A4 PDF to print at home)',
     cardHomeNote: 'Cut along the corner marks, glue the two sheets back to back and fold on the dashed line: an A6 card.',
-    cardKeep: 'Save the card (a PDF to keep)',
+    cardKeep: 'Save the certificate (a PDF to keep)',
+    cardImage: 'Save the card',
     forever: 'The gift page stays online for at least ten years. The film, the scroll and the card can be saved to your phone at any time.',
   },
 }
@@ -83,11 +87,14 @@ export interface KeepsakesProps {
   egift: boolean
   /** Another title (the buyer's page says 「保存する」). */
   title?: string
+  /** English: the square card image is offered too (it needs no film). `track` = this is the receiver (the save is counted). */
+  enCard?: boolean
+  track?: boolean
 }
 
 type Phase = 'idle' | 'making' | 'ready' | 'failed'
 
-export default function Keepsakes({ lang, base, q = '', complete, scroll, egift, title }: KeepsakesProps) {
+export default function Keepsakes({ lang, base, q = '', complete, scroll, egift, title, enCard = false, track = false }: KeepsakesProps) {
   const c = COPY[lang]
   const [phase, setPhase] = useState<Phase>('idle')
   const [saved, setSaved] = useState(false)
@@ -96,7 +103,8 @@ export default function Keepsakes({ lang, base, q = '', complete, scroll, egift,
     alive.current = true
     return () => { alive.current = false }
   }, [])
-  if (!complete && !scroll) return null
+  const showCard = lang === 'en' && enCard
+  if (!complete && !scroll && !showCard) return null
   const sep = q ? '&' : '?'
   const filmUrl = `${base}/film.mp4${q}`
 
@@ -131,6 +139,9 @@ export default function Keepsakes({ lang, base, q = '', complete, scroll, egift,
     <section className="gf-save" data-testid="keepsakes">
       <h3 className="gf-label" data-testid="keepsakes-title">{title ?? c.title}</h3>
       <div className="gf-save-list">
+        {showCard && (
+          <a className="gf-btn gf-btn-quiet" data-testid="save-card-image" href={`${base}/keepsake-card.png${q}`} download onClick={() => { if (track) trackUs('receiver_saved_card') }}>{c.cardImage}</a>
+        )}
         {complete && (
           <>
             <button type="button" className="gf-btn gf-btn-quiet" data-testid="save-film" onClick={save} disabled={phase === 'making'}>

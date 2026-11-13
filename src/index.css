@@ -137,3 +137,14 @@ html.rv-page body {
   background-repeat: repeat, repeat;
   background-color: var(--color-paper);
 }
+
+/* The English bridge (2026-11-12): reading (italic), word (bold), line, and "Where this word comes from" — English pages only. */
+.en-stack { display: flex; flex-direction: column; align-items: center; text-align: center; gap: 0.35rem; }
+.en-reading { font-family: 'Cormorant Garamond', 'Noto Serif JP', serif; font-style: italic; font-size: 1.15rem; letter-spacing: 0.04em; }
+.en-word { font-family: 'Cormorant Garamond', 'Noto Serif JP', serif; font-weight: 700; font-size: 1.6rem; line-height: 1.15; letter-spacing: 0.01em; }
+.en-line { margin: 0; max-width: 22em; font-family: 'Noto Serif JP', serif; font-size: 0.95rem; line-height: 1.55; text-wrap: balance; }
+.en-where { margin-top: 0.5rem; max-width: 24em; opacity: 0.85; }
+.en-where-h { margin: 0 0 0.2rem; font-size: 0.68rem; letter-spacing: 0.14em; text-transform: uppercase; opacity: 0.7; }
+.en-echo, .en-classical { margin: 0.15rem 0 0; font-size: 0.8rem; line-height: 1.5; font-family: 'Cormorant Garamond', 'Noto Serif JP', serif; font-style: italic; }
+.en-classical { font-style: normal; }
+.en-classical-render { font-style: italic; }

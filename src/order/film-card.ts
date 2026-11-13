@@ -23,6 +23,8 @@ export interface CardLayout {
   charY: number
   charSize: number
   readingY: number
+  /** English bridge only: the word (bold) under the reading; null everywhere else */
+  wordY: number | null
   ruleY: number
   /** the "who they are" line (the film the buyer keeps only): top y */
   whoTop: number | null
@@ -35,10 +37,13 @@ export interface CardLayout {
   seal: { size: number; margin: number } | null
 }
 
-export const cardLayout = (variant: CardVariant): CardLayout =>
+export const cardLayout = (variant: CardVariant, bridge = false): CardLayout =>
   variant === 'film'
-    ? { charY: 0.205, charSize: 0.45, readingY: 0.385, ruleY: 0.425, whoTop: 0.455, relationY: null, poemTop: 0.595, poemBottom: 0.91, seal: { size: 0.09, margin: 0.055 } }
-    : { charY: 0.27, charSize: 0.45, readingY: 0.445, ruleY: 0.487, whoTop: null, relationY: 0.085, poemTop: 0.575, poemBottom: 0.93, seal: null }
+    ? bridge
+      ? // English with the bridge (2026-11-12): the character, its reading, the WORD, a rule, the LINE (in the "who" slot) and the poem; items 1–4 of the bridge, no echo
+        { charY: 0.185, charSize: 0.42, readingY: 0.35, wordY: 0.405, ruleY: 0.447, whoTop: 0.465, relationY: null, poemTop: 0.615, poemBottom: 0.91, seal: { size: 0.09, margin: 0.055 } }
+      : { charY: 0.205, charSize: 0.45, readingY: 0.385, wordY: null, ruleY: 0.425, whoTop: 0.455, relationY: null, poemTop: 0.595, poemBottom: 0.91, seal: { size: 0.09, margin: 0.055 } }
+    : { charY: 0.27, charSize: 0.45, readingY: 0.445, wordY: null, ruleY: 0.487, whoTop: null, relationY: 0.085, poemTop: 0.575, poemBottom: 0.93, seal: null }
 
 /** Poems set vertically (縦書き): 短歌 and 俳句 — one line per column, read right to left. The others (tang, ci, en) are horizontal and centred. */
 export const isVerticalPoemType = (type: string | undefined | null): boolean => type === 'tanka' || type === 'haiku'

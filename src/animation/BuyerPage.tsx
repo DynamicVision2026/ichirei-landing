@@ -6,6 +6,7 @@ import { BUYER_COPY, dayText, deadlineText, orderedText } from './buyer-copy.ts'
 import type { AnimationView } from './types.ts'
 import Keepsakes from '../gift/Keepsakes.tsx'
 import ShareSection from '../gift/ShareSection.tsx'
+import Schedule from './Schedule.tsx'
 import { SENDER_COPY } from './sender-copy.ts'
 
 // The buyer's own page /a/<id> (2026-11-06): opened from the one link in the confirmation e-mail. The person who pays is the only person we deal with. Top to bottom:
@@ -17,7 +18,7 @@ const SKU_SIZE: Record<string, 'egift' | 'simple' | 'standard'> = { 'ICHIREI-EGI
 
 /** The character's reading under it: the kana reading (ja), the pinyin (zh), the romanization and meaning (en: a reader of English cannot read kana). */
 function readingOf(view: AnimationView): string {
-  if (view.language === 'en') return [cleanReading(view.romanization.split(' / ')[0]), view.meaning_en].filter(Boolean).join(' · ')
+  if (view.language === 'en') return [cleanReading(view.romanization.split(' / ')[0]), view.en ? view.en.word : view.meaning_en].filter(Boolean).join(' · ')
   return cleanReading(view.reading)
 }
 
@@ -124,6 +125,17 @@ export default function BuyerPage({ view, lang, preparing, onCollected }: { view
       <section className="an-panel by-send" data-testid="sender-panel" aria-label={view.memorial ? c.sendTitleMemorial : c.sendTitle}>
         <h2 data-testid="buyer-send-title">{view.memorial ? c.sendTitleMemorial : c.sendTitle}</h2>
         <p data-testid="buyer-send-line">{c.sendLine}</p>
+        {lang === 'en' && !view.memorial ? (
+          <>
+            <p className="an-buttons" data-testid="en-share-sheet">
+              <button type="button" className="an-btn an-btn-hot" data-testid="give-copy" onClick={copyLink}>{copied ? s.copied : 'Copy link'}</button>
+              <a className="an-btn" data-testid="give-mail" href={`mailto:?subject=${encodeURIComponent(s.mailSubject)}&body=${encodeURIComponent(message)}`}>Email</a>
+              <a className="an-btn" data-testid="give-whatsapp" href={`https://wa.me/?text=${encodeURIComponent(message)}`} target="_blank" rel="noopener noreferrer">WhatsApp</a>
+              <a className="an-btn" data-testid="give-messages" href={`sms:?&body=${encodeURIComponent(message)}`}>Messages</a>
+            </p>
+            <Schedule animationId={view.id} opensOn={g.opens_on} />
+          </>
+        ) : (
         <p className="an-buttons">
           <a className="an-btn an-btn-hot" data-testid="give-line" href={`https://line.me/R/share?text=${encodeURIComponent(message)}`} target="_blank" rel="noopener noreferrer">{s.line}</a>
           <a className="an-btn" data-testid="give-whatsapp" href={`https://wa.me/?text=${encodeURIComponent(message)}`} target="_blank" rel="noopener noreferrer">{s.whatsapp}</a>
@@ -132,6 +144,7 @@ export default function BuyerPage({ view, lang, preparing, onCollected }: { view
           <button type="button" className="an-btn" data-testid="give-qr" onClick={() => setQr((v) => !v)} aria-expanded={qr}>{s.qr}</button>
           <a className="an-btn" data-testid="give-mail" href={`mailto:?subject=${encodeURIComponent(s.mailSubject)}&body=${encodeURIComponent(message)}`}>{s.email}</a>
         </p>
+        )}
         <label className="an-field">
           <span>{s.linkLabel}</span>
           <input readOnly value={g.url} onFocus={(e) => e.currentTarget.select()} data-testid="give-link" />
@@ -190,7 +203,7 @@ export default function BuyerPage({ view, lang, preparing, onCollected }: { view
               <p className="an-small an-preparing" role="status" data-testid="animation-preparing">{preparing}<span className="an-dots" aria-hidden="true" /></p>
             </>
           ) : (
-            <Keepsakes lang={lang} base={`/api/animation/${view.id}`} complete={filmComplete(view)} scroll={scrollAvailable(view)} egift={g.size_code === 'ICHIREI-EGIFT'} title={c.saveTitle} />
+            <Keepsakes lang={lang} base={`/api/animation/${view.id}`} complete={filmComplete(view)} scroll={scrollAvailable(view)} egift={g.size_code === 'ICHIREI-EGIFT'} title={c.saveTitle} enCard={lang === 'en' && !!view.en} />
           )}
           {!waiting && !view.memorial && filmComplete(view) && <ShareSection lang={lang} base={`/api/animation/${view.id}`} role="sender" />}
         </section>

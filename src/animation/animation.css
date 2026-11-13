@@ -82,7 +82,9 @@
 .an-card-kanji { position: absolute; left: 0; right: 0; transform: translateY(-50%); text-align: center; font-family: var(--f-hero); font-weight: 900; line-height: 1; color: var(--kanji); text-shadow: 0 0 1px rgba(192, 57, 43, 0.5); }
 .an-memorial .an-card-kanji { text-shadow: 0 0 1px rgba(20, 17, 13, 0.5); }
 .an-card-reading { position: absolute; left: 4%; right: 4%; transform: translateY(-50%); text-align: center; font-family: var(--f-label); font-weight: 300; font-size: calc(var(--u) * 3.1); letter-spacing: 0.3em; color: var(--card-reading); white-space: nowrap; opacity: 0; }
-.an-page[lang='en'] .an-card-reading { letter-spacing: 0.1em; }
+.an-page[lang='en'] .an-card-reading { letter-spacing: 0.1em; font-style: italic; }
+/* the English bridge on the e-card (2026-11-12): the word, bold, under the reading */
+.an-card-word { position: absolute; left: 4%; right: 4%; transform: translateY(-50%); text-align: center; font-family: var(--f-body); font-weight: 700; font-size: calc(var(--u) * 5.2); letter-spacing: 0.02em; color: var(--card-ink); white-space: nowrap; opacity: 0; }
 .an-card-rule { position: absolute; left: 43%; width: 14%; height: max(2px, calc(var(--u) * 0.28)); background: var(--card-rule); opacity: 0; }
 .an-card-who { position: absolute; left: 10%; right: 10%; text-align: center; font-family: var(--f-body); font-size: calc(var(--u) * 3.4); line-height: 1.7; color: var(--card-ink); text-wrap: balance; opacity: 0; }
 .an-page[lang='en'] .an-card-who { font-size: calc(var(--u) * 3.7); line-height: 1.5; }
@@ -115,7 +117,7 @@
 .an-line-still > span { opacity: 1; transform: none; }
 .an-still-final { display: grid; justify-items: center; padding: 8px 0 0; }
 .an-card-still { position: relative; left: auto; top: auto; opacity: 1; margin: 0 auto; }
-.an-card-still .an-card-reading, .an-card-still .an-card-rule, .an-card-still .an-card-who, .an-card-still .an-card-seal, .an-card-still .an-card-poem p { opacity: 1; }
+.an-card-still .an-card-word, .an-card-still .an-card-reading, .an-card-still .an-card-rule, .an-card-still .an-card-who, .an-card-still .an-card-seal, .an-card-still .an-card-poem p { opacity: 1; }
 
 .an-controls { flex: none; width: 100%; max-width: 480px; padding: 8px 0 4px; text-align: center; }
 .an-buttons { display: flex; gap: 10px; justify-content: center; flex-wrap: wrap; }

@@ -801,7 +801,7 @@ const en: Copy = {
   voiceLimit: 'Stories can be up to 5,000 characters; voice input stopped (everything you said is kept).',
   voiceUnsupported: 'This browser does not support voice input — please write below',
   storyPlaceholder: 'For example — they always sat in the same spot and drank tea from the same cup…',
-  storyHint: 'Short or long: a single scene from about 50 characters, a whole story up to 5,000.',
+  storyHint: '50–300 words is plenty.',
   storyCounter: (n, max) => `${n} / ${max} characters`,
   storyTooLong: 'Stories can be up to 5,000 characters. Please shorten it a little and try again.',
   storyOver: 'This is over 5,000 characters. Please shorten it a little so the most important scene stays.',

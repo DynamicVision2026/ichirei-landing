@@ -32,6 +32,7 @@ export function formatApprox(yen: number, currency: Currency, rates: Rates | nul
 export function approxLine(yen: number, currency: Currency, rates: Rates | null, lang: RevealLang): string | null {
   const amount = formatApprox(yen, currency, rates)
   if (amount === null) return null
+  if (lang === 'en' && currency === 'USD') return `about ${amount.replace('US$', '$')}` // English (2026-11-12): "about $27", to the whole dollar
   return lang === 'ja' ? `目安 ${amount}` : lang === 'zh-Hant' ? `約 ${amount}` : `≈ ${amount} approx.`
 }
 
@@ -39,6 +40,7 @@ export function approxLine(yen: number, currency: Currency, rates: Rates | null,
 export function approxShort(yen: number, currency: Currency, rates: Rates | null, lang: RevealLang): string | null {
   const amount = formatApprox(yen, currency, rates)
   if (amount === null) return null
+  if (lang === 'en' && currency === 'USD') return `(about ${amount.replace('US$', '$')})`
   return lang === 'ja' ? `(目安 ${amount})` : lang === 'zh-Hant' ? `(約 ${amount})` : `(≈ ${amount})`
 }
 

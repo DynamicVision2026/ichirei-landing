@@ -178,3 +178,14 @@
 .gf-video { width: min(100%, 240px); aspect-ratio: 9 / 16; background: #000; border-radius: 3px; }
 .an-panel .gf-save { margin-top: 1.4rem; }
 .an-panel .gf-btn { color: inherit; }
+
+/* The English bridge on the receiver's page (2026-11-12): reading (italic), word (bold), line, "Where this word comes from" */
+.gf-en { gap: 6px; color: var(--ivory); }
+.gf-en .en-reading { font-size: 20px; letter-spacing: 0.06em; color: var(--ivory); }
+.gf-en .en-word { font-size: 30px; color: var(--gold); letter-spacing: 0.02em; }
+.gf-en .en-line { font-size: 16px; line-height: 1.6; color: var(--ivory); opacity: 0.92; }
+.gf-en .en-where { margin-top: 10px; color: var(--ivory); }
+.gf-en-cert { color: inherit; }
+.gf-en-cert .en-reading, .gf-en-cert .en-line, .gf-en-cert .en-where { color: inherit; }
+.gf-en-cert .en-word { color: inherit; }
+.gf-poem-from { margin: 8px 0 0; font-size: 14px; opacity: 0.85; font-style: italic; }

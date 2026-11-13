@@ -287,6 +287,9 @@ export type Slot = (typeof SLOTS)[number]
 export interface ClassicalEcho {
   text: string
   source: string
+  /** en pages only (2026-11-12): the English rendering of the line and its source named in English, from the reviewed lexicon row; absent when it has none. */
+  rendering?: string
+  source_en?: string
 }
 
 /**
@@ -412,6 +415,16 @@ export interface Candidate {
    * model's own value is overwritten); only a freestyle with no palette row keeps the model's. Absent/null for ja and zh.
    */
   meaning?: string | null
+  /**
+   * en only (2026-11-12, the English bridge), main and second cards only — never the freestyle: ONE English word with literary weight, fixed per kanji by the reviewed lexicon (`en_word_source` 'lexicon'),
+   * else written by the model under the prompt's rule ('generated'), else the plain palette meaning ('meaning'). Attached by CODE (engine/en-bridge.ts).
+   */
+  en_word?: string | null
+  en_word_source?: 'lexicon' | 'generated' | 'meaning'
+  /** en only, main and second: ONE plain sentence (at most 14 words) that explains the character to someone who has never seen kanji, from THIS story. Written by the model, checked by code. */
+  en_line?: string | null
+  /** en only: the reviewed echo of `en_word` from English literature — shown only when the lexicon row is reviewed. */
+  en_echo?: { text: string; source: string } | null
   /** en only, internal (never shown): every romaji reading of the palette row; `reading` is the ONE shown. */
   reading_options?: string[]
   /** en only: the Mandarin reading (pinyin) when the zh palette has a row for the character; attached by code. */

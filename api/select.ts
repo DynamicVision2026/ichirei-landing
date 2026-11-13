@@ -130,6 +130,11 @@ export async function POST(req: Request): Promise<Response> {
           // The /ops count of where the third card (趣字) came from (codes only; best effort)
           onFreeSource: (info) => void recordFreeSource(createOrderStore(), info),
           onMain: (info) => void recordMain(createOrderStore(), info),
+          // English: a word the model had to supply because the lexicon row is not reviewed — logged with its kanji for the reviewer (no story text)
+          onEnWord: (info) => {
+            console.log(`[ichirei-en] en_word_generated ${JSON.stringify(info)}`)
+            void recordEvent({ ts: new Date().toISOString(), source: cleanSource(source), event: 'en_word_generated', kanji: info.kanji, word: info.word, used: info.used, problem: info.problem }, createOrderStore())
+          },
           ...(wantsDebug ? { onDebug: (d: Record<string, unknown>) => { debug = d } } : {}),
           onDelta: (text) => {
             received += text.length

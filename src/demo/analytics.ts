@@ -131,3 +131,17 @@ export function trackReceiverOpened(token: string): void {
     // analytics must never get in the way
   }
 }
+
+/** The US e-gift launch's events (2026-11-12, English pages): codes only. `code` is an occasion chip code (src/order/en-chips.ts). */
+export function trackUs(event: 'us_banner_seen' | 'occasion_chip' | 'egift_scheduled' | 'receiver_saved_card' | 'receiver_replied', code?: string): void {
+  try {
+    void fetch('/api/analytics', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ session: sessionId, source: 'customer', event, ...(code ? { code } : {}) }),
+      keepalive: true,
+    }).catch(() => {})
+  } catch {
+    // analytics must never get in the way
+  }
+}

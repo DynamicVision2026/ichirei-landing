@@ -1,3 +1,4 @@
+import type { EnBridge } from '../order/en-bridge.ts'
 import type { OrderLanguage } from './copy.ts'
 
 /** What GET /api/animation/<id> answers (engine/animation.ts → animationView). `film: null` = the script is still being written. */
@@ -8,6 +9,8 @@ export interface AnimationView {
   reading: string
   romanization: string
   meaning_en: string | null
+  /** en only: the English bridge — word, line, reviewed echo and classical line (absent for ja and zh). */
+  en?: EnBridge | null
   who: string
   /** The poem of the gift (the receiver's page and the buyer's preview carry it; a sample film has none): the e-card the film ends on shows it. */
   poem?: { type: string; lines: string[]; reading?: string } | null

@@ -16,6 +16,10 @@ import { chooseReading, kanaToRomaji, romanizeReadings } from './romaji.ts'
 import { STYLES_BY_LANGUAGE, cleanInscriptionForm, glyphFor, normalizeStyle, type InscriptionStyle } from '../src/order/inscription.ts'
 import { carvedStrokes, simpleAvailable } from '../src/order/strokes.ts'
 import { simpleMaxStrokes, strokeInfo } from './strokes.ts'
+import { bridgeForOrder } from './en-bridge.ts'
+import { cleanUtm, type Utm } from '../src/order/utm.ts'
+import { loadLexicon } from './lexicon.ts'
+import type { EnBridge } from '../src/order/en-bridge.ts'
 
 /** Names are optional nicknames (2026-11-05): at most 20 characters, plain text. */
 export const NAME_MAX = 20
@@ -37,6 +41,11 @@ export interface Certificate {
   romanization: string
   /** The plain-English meaning (palette), else the candidate's own; null if neither exists. */
   meaning_en: string | null
+  /**
+   * en orders only (2026-11-12): the English bridge printed with the character — the word, the line from this story, the reviewed echo and the reviewed classical line. Built by code from the lexicon at the time of the order.
+   * Absent for ja and zh and on older orders.
+   */
+  en?: EnBridge | null
   /** The certificate line in the buyer's language. */
   line: string
   /** Always the English line. */
@@ -52,7 +61,7 @@ export interface Certificate {
   poems: { type: PoemType; lines: string[]; reading: string }[]
 }
 
-export function buildCertificate(candidate: Candidate, glyph: string, language: Language, palette: Palette, memorial = false, purpose: string | null = null): Certificate {
+export function buildCertificate(candidate: Candidate, glyph: string, language: Language, palette: Palette, memorial = false, purpose: string | null = null, bridge: EnBridge | null = null): Certificate {
   const find = (family: 'ja' | 'zh') => palette.lookup(family, candidate.kanji) ?? (candidate.inscription_form ? palette.lookup(family, candidate.inscription_form) : undefined)
   const zhBuyer = language === 'zh-Hans' || language === 'zh-Hant'
   const row = zhBuyer ? find('zh') : find('ja')
@@ -73,6 +82,7 @@ export function buildCertificate(candidate: Candidate, glyph: string, language: 
     reading: cleanReading(reading),
     romanization: cleanReading(romanization),
     meaning_en: meaning || candidate.meaning?.trim() || null,
+    ...(language === 'en' && bridge ? { en: bridge } : {}),
     line: certificateText(language),
     line_en: CERTIFICATE_LINE_EN,
     memorial,
@@ -148,6 +158,8 @@ export interface ValidOrder {
   open_date: string | null
   /** When the buyer ticked the refund terms on the order step (ISO); null when the request carried none (e.g. a direct API call). */
   refund_ack_at: string | null
+  /** English orders only (2026-11-12): the utm_* parameters of the landing link, cleaned; passed to the cart line as hidden `_utm_…` attributes. */
+  utm?: Utm
   /** Every character shown for this story, with its slot (see ShownCharacter); always contains the chosen one. */
   shown: ShownCharacter[]
 }
@@ -308,7 +320,20 @@ export function parseOrderRequest(body: unknown, now: Date = new Date(), palette
       language: lang,
       candidate,
       glyph,
-      certificate: buildCertificate(candidate, glyph, lang, palette ?? loadPalette(), isMemorial(result.occasion as string | null), (result.purpose as string | null | undefined) ?? null),
+      certificate: (() => {
+        const pal = palette ?? loadPalette()
+        let bridge: EnBridge | null = null
+        if (lang === 'en') {
+          let lex = null
+          try {
+            lex = loadLexicon()
+          } catch {
+            // the lexicon is a helper: without it the word is the model's (checked) or the plain meaning
+          }
+          bridge = bridgeForOrder(candidate, story, lex, pal)
+        }
+        return buildCertificate(candidate, glyph, lang, pal, isMemorial(result.occasion as string | null), (result.purpose as string | null | undefined) ?? null, bridge)
+      })(),
       sender_name: sender,
       receiver_name: receiver,
       delivery_date: date,
@@ -320,6 +345,7 @@ export function parseOrderRequest(body: unknown, now: Date = new Date(), palette
       refund_ack_at: (() => { const t = typeof body.refund_ack_at === 'string' ? Date.parse(body.refund_ack_at) : NaN; return Number.isFinite(t) && t <= now.getTime() + 5 * 60_000 && t >= now.getTime() - 24 * 3_600_000 ? new Date(t).toISOString() : null })(),
       sender_email,
       shown: withChosen(parseShown(body.shown_characters), candidate),
+      ...(lang === 'en' && Object.keys(cleanUtm(body.utm)).length > 0 ? { utm: cleanUtm(body.utm) } : {}),
     },
   }
 }
@@ -388,6 +414,8 @@ export function lineAttributes(order: ValidOrder, orderRef: string, animationLin
     ...(order.certificate.poems[0] ? poemAttributes(order.certificate.poems[0]) : []),
     // The private address of the story animation (/a/<id>): for the confirmation e-mail and the QR code on the printed card.
     // The receiver's page (/g/<token>): the QR code on the printed card points here; and the sender's own private page.
+    // English orders: where the buyer came from (utm_source=chatgpt.com when ChatGPT sent them) — hidden, for the order report
+    ...(order.language === 'en' && order.utm ? Object.entries(order.utm).map(([k, v]) => ({ key: `_${k}`, value: v as string })) : []),
     ...(giftLink ? [{ key: '_ichirei_gift_url', value: giftLink }] : []),
     ...(animationLink ? [{ key: '_ichirei_animation_url', value: animationLink }] : []),
   ]

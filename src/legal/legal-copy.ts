@@ -6,6 +6,8 @@
 import { PACKAGE_PRICE_JPY, formatYen } from '../order/packages.ts'
 import type { RevealLang } from '../reveal/copy.ts'
 
+import { REFUND_EN } from '../order/refund-en.ts'
+
 export interface LegalRow {
   label: string
   /** The delivery row is the one that grows a wooden-sizes sentence while they are on sale. */
@@ -119,7 +121,7 @@ export const LEGAL: Record<RevealLang, LegalCopy> = {
     returnsTitle: 'Returns, changes and cancellation',
     deliveryWood: 'Wooden tag and carved block: made after the 24-hour cancellation period, delivered in about 2–3 weeks in Japan (1–2 weeks more overseas).',
     sections: [
-      { heading: 'Within 24 hours of payment', body: 'If we receive your email within 24 hours of payment, we\'ll cancel your order with a full refund, including shipping. Once you press "Collect your gift" on your order page, the order can no longer be cancelled (all sizes). Please reply to your order confirmation email. Requests received in time are honoured even if we handle them later. We can\'t change an order after payment (character, poem, names or message). If you\'d like something different, cancel and place a new order.' },
+      { heading: 'Within 24 hours of payment', body: REFUND_EN + ' Please reply to your order confirmation email. Requests received in time are honoured even if we handle them later. We can\'t change an order after payment (character, poem, names or message). If you\'d like something different, cancel and place a new order.' },
       { heading: 'After 24 hours', body: 'Every gift is made to order, so more than 24 hours after payment we can\'t accept returns or refunds for change of mind. The character, poem and pictures you reviewed before paying are not considered a defect.' },
       { heading: 'If we made a mistake', body: 'If a wooden tag or block arrives damaged, with the wrong character or a misprint, email us a photo within 14 days of delivery and we\'ll remake it or refund you (we cover return shipping). If an e-gift page doesn\'t display properly, we\'ll fix it, or refund you if we can\'t.' },
       { heading: 'Delivery', body: 'If a parcel is lost in transit, we\'ll check the tracking and reship or refund. If it\'s returned because of an incorrect address you entered or because no one collected it, reshipping is at your cost. Import duties and taxes on overseas deliveries are paid by the recipient.' },
@@ -127,7 +129,7 @@ export const LEGAL: Record<RevealLang, LegalCopy> = {
     faqTitle: 'Questions',
     faq: [
       { q: 'Can I change the character after I order?', a: 'We can\'t change an order after payment (character, poem, names or message). If you\'d like something different, cancel and place a new order.' },
-      { q: 'Can I cancel?', a: 'If we receive your email within 24 hours of payment, we\'ll cancel your order with a full refund, including shipping. Once you press "Collect your gift" on your order page, the order can no longer be cancelled (all sizes).' },
+      { q: 'Can I cancel?', a: REFUND_EN },
       { q: 'What if what I receive has a problem?', a: 'If a wooden tag or block arrives damaged, with the wrong character or a misprint, email us a photo within 14 days of delivery and we\'ll remake it or refund you (we cover return shipping). If an e-gift page doesn\'t display properly, we\'ll fix it, or refund you if we can\'t.' },
       { q: 'Do I have to enter a name?', a: 'Names are optional. Any name you enter is used only to show on the gift.' },
     ],
@@ -157,7 +159,7 @@ const EGIFT_ONLY: Record<RevealLang, { price: string; other: string; defect: str
   },
   en: {
     price: `ICHIREI e-gift ${y('egift')} (tax included)`,
-    other: 'The e-gift is not posted, so it has no shipping.',
+    other: 'The e-gift is sent as a link, so there is nothing to post and no delivery charge.',
     defect: "If an e-gift page doesn't display properly, we'll fix it, or refund you if we can't.",
   },
 }
