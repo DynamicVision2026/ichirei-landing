@@ -67,6 +67,7 @@ const PAYMENT_QUERY = `query Paid($q: String!, $after: String) {
       cancelledAt
       displayFinancialStatus
       customAttributes { key value }
+      currentTotalPriceSet { shopMoney { amount currencyCode } }
       lineItems(first: 5) { nodes { customAttributes { key value } } }
       transactions(first: 10) { kind status processedAt }
     }
@@ -170,6 +171,8 @@ export interface PaymentInfo {
   state: 'paid' | 'unpaid' | 'cancelled' | 'refunded'
   /** When the payment went through (the 24-hour change window starts here). null while unpaid. */
   paid_at: string | null
+  /** What the order actually cost (the order's total after discounts, whole yen; null when Shopify did not say or the currency is not JPY). The dashboard's revenue uses this, never the package price. */
+  amount_jpy?: number | null
 }
 export interface PaymentResult {
   found: Map<string, PaymentInfo>
@@ -183,6 +186,7 @@ interface AdminOrderPay {
   customAttributes?: Attr[] | null
   lineItems?: { nodes?: { customAttributes?: Attr[] | null }[] } | null
   transactions?: { kind?: string | null; status?: string | null; processedAt?: string | null }[] | null
+  currentTotalPriceSet?: { shopMoney?: { amount?: string | null; currencyCode?: string | null } | null } | null
 }
 
 const PAID_STATES = new Set(['PAID', 'PARTIALLY_PAID', 'AUTHORIZED', 'PARTIALLY_REFUNDED'])
@@ -195,7 +199,9 @@ export function paymentOf(o: AdminOrderPay): PaymentInfo {
   if (!PAID_STATES.has(status)) return { state: 'unpaid', paid_at: null }
   const ok = (o.transactions ?? []).filter((t) => (t.status ?? '').toUpperCase() === 'SUCCESS' && t.processedAt)
   const pick = (kinds: string[]) => ok.filter((t) => kinds.includes((t.kind ?? '').toUpperCase())).map((t) => t.processedAt as string).sort()[0]
-  return { state: 'paid', paid_at: pick(['SALE', 'CAPTURE']) ?? pick(['AUTHORIZATION']) ?? o.createdAt ?? null }
+  const money = o.currentTotalPriceSet?.shopMoney
+  const amount = money?.amount !== undefined && money.amount !== null && (!money.currencyCode || money.currencyCode.toUpperCase() === 'JPY') && Number.isFinite(Number(money.amount)) ? Math.round(Number(money.amount)) : null
+  return { state: 'paid', paid_at: pick(['SALE', 'CAPTURE']) ?? pick(['AUTHORIZATION']) ?? o.createdAt ?? null, amount_jpy: amount }
 }
 
 export async function readPayments(refs: string[], d: TrackDeps | null, tokens: AdminTokenCache): Promise<PaymentResult> {

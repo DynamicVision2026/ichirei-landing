@@ -25,6 +25,7 @@ import { POEM_ID_PATTERN, buildRecord, lineAttributes, newOrderRef, parseOrderRe
 import { createOrderStore, type OrderStore } from '../engine/order-store.ts'
 import type { Palette } from '../engine/palette.ts'
 import { ShopifyError, createCart, loadShopifyConfig, type ShopifyConfig } from '../engine/shopify.ts'
+import { checkClaimSession, claimOf, readWaiting, normalizeOrderNumber } from '../engine/waiting.ts'
 import { MAX_POEMS, POEM_TYPES, comingSoonSizes, poemTypeAllowed } from '../src/order/packages.ts'
 
 const MAX_BODY_BYTES = 300_000
@@ -96,21 +97,46 @@ export function createOrderHandler(deps: () => OrderDeps) {
     if (!d.store) {
       return json(503, { error: 'Order storage is not configured on the server (set ORDER_BUCKET — see DEPLOY.md).', code: 'store_not_configured' })
     }
-    if (!d.shopify) {
+    // A waiting order (paid without going through our site): the buyer passed /claim and holds a claim token. The chosen character is attached to the EXISTING order — no cart,
+    // no second payment. Nothing else about the flow changes.
+    const claimBody = (body as { claim?: { order?: unknown; token?: unknown } } | null)?.claim
+    let waitingId: string | null = null
+    let claim: ReturnType<typeof claimOf> | null = null
+    if (claimBody !== undefined && claimBody !== null) {
+      const number = normalizeOrderNumber(typeof claimBody.order === 'string' ? claimBody.order : '')
+      const token = typeof claimBody.token === 'string' ? claimBody.token : ''
+      const w = number && token ? await checkClaimSession(d.store, number, token, now).catch(() => null) : null
+      if (!w) return json(403, { error: 'This claim is not valid any more. Please enter the order number and e-mail again.', code: 'claim_invalid' })
+      if (parsed.order.package !== 'egift') return json(400, { error: 'A claimed order makes the e-gift.', code: 'claim_egift_only', field: 'package' })
+      // taken now, before anything is made, so a second tap or a second tab cannot make a second gift
+      w.status = 'claimed'
+      w.claimed_at = now.toISOString()
+      delete w.session
+      await d.store.put(w.id, w)
+      waitingId = w.id
+      claim = claimOf(w, now)
+    }
+    const releaseClaim = async () => {
+      if (!waitingId || !d.store) return
+      const w = (await readWaiting(d.store, waitingId.replace(/^WO-/, '')).catch(() => null))
+      if (w && w.status === 'claimed' && !w.order_ref) await d.store.put(w.id, { ...w, status: 'waiting', claimed_at: undefined }).catch(() => {})
+    }
+    if (!claim && !d.shopify) {
       return json(503, { error: `Shopify is not configured on the server (missing: ${d.shopifyMissing.join(', ')}).`, code: 'shopify_not_configured', missing: d.shopifyMissing })
     }
 
     const order = parsed.order
     // E-gift-first launch: with ICHIREI_WOOD_SIZES=coming_soon the wooden sizes are shown as 「近日公開」 and cannot be ordered (whatever the page sent).
-    if (comingSoonSizes((d.env ?? process.env).ICHIREI_WOOD_SIZES).includes(order.package)) return json(400, { error: `The size "${order.package}" is coming soon.`, code: 'size_coming_soon', field: 'package' })
-    // A size whose Shopify variant is not configured (① and ② until the owner creates them) cannot be ordered.
-    if (!d.shopify.variants[order.package]) return json(400, { error: `The size "${order.package}" is not on sale yet.`, code: 'size_unavailable', field: 'package' })
+    if (comingSoonSizes((d.env ?? process.env).ICHIREI_WOOD_SIZES).includes(order.package)) { await releaseClaim(); return json(400, { error: `The size "${order.package}" is coming soon.`, code: 'size_coming_soon', field: 'package' }) }
+    // A size whose Shopify variant is not configured cannot be ordered (a claimed order has its payment already: it needs no variant).
+    if (!claim && !d.shopify!.variants[order.package]) return json(400, { error: `The size "${order.package}" is not on sale yet.`, code: 'size_unavailable', field: 'package' })
     const resolved = await resolvePoems((body as { poems?: unknown } | null)?.poems, d.store, order)
-    if (!resolved.ok) return json(400, { error: resolved.error, code: resolved.code, field: 'poems' })
+    if (!resolved.ok) { await releaseClaim(); return json(400, { error: resolved.error, code: resolved.code, field: 'poems' }) }
     const poems = resolved.poems
     order.certificate.poems = poems.map((p) => ({ type: p.type, lines: p.lines, reading: p.reading }))
     const orderRef = newOrderRef(now)
     const record: OrderRecord = buildRecord(order, orderRef, now, poems)
+    if (claim) record.claim = claim
 
     // Writes of the order record go one after the other, so a film that finishes late can never be overwritten by an older write.
     let chain: Promise<unknown> = Promise.resolve()
@@ -177,14 +203,41 @@ export function createOrderHandler(deps: () => OrderDeps) {
       await putOrder()
     } catch (err) {
       console.error('[ichirei-order] store failed', orderRef, err instanceof Error ? err.message : err)
+      await releaseClaim()
       return json(503, { error: 'Could not save the order. Nothing was charged; please try again.', code: 'store_failed' })
     }
     // The owner's list (/ops) and the e-gift reminders read this small index: codes only, no story, no names, no address.
     await recordOrderIndex(d.store, record, now, cleanSession((body as { session?: unknown } | null)?.session))
 
+    // 3a. A claimed order: no cart. The gift is made exactly as for a normal order; the 24-hour clock starts now (record.claim.claimed_at).
+    if (claim && waitingId) {
+      record.status = 'claimed'
+      record.updated_at = (d.now?.() ?? new Date()).toISOString()
+      if (filmP) await raceTimeout(filmP, d.filmWaitMs ?? filmWaitMs(d.env))
+      try {
+        await putOrder()
+        const w = await readWaiting(d.store, waitingId.replace(/^WO-/, ''))
+        if (w) await d.store.put(w.id, { ...w, order_ref: orderRef })
+      } catch (err) {
+        console.error('[ichirei-order] claim save failed', orderRef, err instanceof Error ? err.message : err)
+      }
+      console.log('[ichirei-order]', JSON.stringify({ order_ref: orderRef, status: record.status, package: order.package, language: order.language, claimed: claim.order_name }))
+      const sessionId = cleanSession((body as { session?: unknown } | null)?.session)
+      if (sessionId) void recordEvent({ ts: (d.now?.() ?? new Date()).toISOString(), session: sessionId, source: cleanSource((body as { source?: unknown } | null)?.source), event: 'ordered' }, d.store, d.now?.() ?? new Date())
+      return json(200, {
+        order_ref: orderRef,
+        claimed: true,
+        glyph: order.glyph,
+        certificate_text: record.production.certificate_text,
+        certificate: record.production.certificate,
+        animation_url: animationLink,
+        gift_url: giftLink,
+      })
+    }
+
     // 3. The Shopify cart.
     try {
-      const cart = await createCart(d.shopify, order.package, lineAttributes(order, orderRef, animationLink, giftLink), orderRef, d.fetchImpl)
+      const cart = await createCart(d.shopify!, order.package, lineAttributes(order, orderRef, animationLink, giftLink), orderRef, d.fetchImpl)
       record.status = 'cart_created'
       record.updated_at = (d.now?.() ?? new Date()).toISOString()
       record.shopify = { cart_id: cart.cartId, checkout_url: cart.checkoutUrl, variant_id: cart.variantId }

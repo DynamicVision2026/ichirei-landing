@@ -480,7 +480,7 @@ export interface OrderOps {
   log?: OpsLogEntry[]
 }
 
-export type OrderStatus = 'pending' | 'cart_created' | 'cart_failed'
+export type OrderStatus = 'pending' | 'cart_created' | 'cart_failed' | 'claimed'
 
 export interface OrderRecord {
   schema: 1
@@ -543,6 +543,8 @@ export interface OrderRecord {
   collected_at?: string | null
   /** True on every order made since 2026-11-06: the gift stays sealed for the receiver (and no send / save is reachable) until collected_at is set. Older orders have none and work as before. */
   collect_required?: boolean
+  /** A gift made for an order that was paid WITHOUT going through our site (a "waiting" order, 2026-11-13): the Shopify order it was attached to. The 24-hour clock starts at `claimed_at`, not at payment. */
+  claim?: import('./waiting.ts').OrderClaim
   engine_result: EngineResult
   shopify: { cart_id: string; checkout_url: string; variant_id: string } | null
   error: string | null

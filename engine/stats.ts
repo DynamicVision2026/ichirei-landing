@@ -7,7 +7,7 @@ import { FILM_SCRIPT_USD, PICTURES_PER_RENDER, PICTURE_USD, USD_JPY, tokensUsd }
 export const PERIODS = ['today', 'd7', 'd30', 'all'] as const
 export type Period = (typeof PERIODS)[number]
 
-export type OrderState = 'paid' | 'cancelled' | 'refunded' | 'unpaid' | 'unverified'
+export type OrderState = 'paid' | 'cancelled' | 'refunded' | 'unpaid' | 'unverified' | 'waiting' | 'refund_due'
 export type ChosenSlot = 'main' | 'free' | 'second'
 
 /** One ICHIREI order as the dashboard sees it — fixed, listed fields only. */
@@ -25,7 +25,10 @@ export interface OrderStat {
   memorial: boolean
   language: string
   purpose: string | null
+  /** What was actually paid for the order (from the Shopify order; the package price only when Shopify could not say). */
   price_jpy: number
+  /** waiting orders only (paid without our site, no gift yet): whole days left before it is "refund due". */
+  days_left?: number | null
   collected: boolean
   opened: boolean
   /** how many rounds of characters the sender looked at (1–3) */

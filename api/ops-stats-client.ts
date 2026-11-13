@@ -95,6 +95,8 @@ export const STATS_CLIENT_JS = String.raw`
   }
 
   function statusOf(o) {
+    if (o.state === 'refund_due') return t('status_refund_due');
+    if (o.state === 'waiting') return t('status_waiting', { d: o.days_left });
     if (o.state === 'cancelled' || o.state === 'refunded') return t('status_refunded');
     if (o.hours_left != null) return t('status_cancellable', { h: o.hours_left });
     return t('status_done');

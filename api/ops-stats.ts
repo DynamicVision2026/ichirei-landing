@@ -15,6 +15,7 @@ import { type OrderRecord } from '../engine/order.ts'
 import { readFreeSourceCounts, readMainCounts } from '../engine/free-source.ts'
 import { rendersPath } from '../engine/film-art.ts'
 import { windowOf } from '../engine/change-window.ts'
+import { listWaiting, waitingState } from '../engine/waiting.ts'
 import { shopifyPayments } from '../engine/payments-lookup.ts'
 import type { PaymentInfo, PaymentResult } from '../engine/shipping.ts'
 import { computeStats, type ChosenSlot, type OrderState, type OrderStat, type StatsResult } from '../engine/stats.ts'
@@ -49,17 +50,21 @@ export function orderStatOf(entry: OrderIndexEntry, rec: OrderRecord | null, pay
   if (!rec || !entry.size_code.startsWith('ICHIREI-')) return null // every other order of the shared store is ignored
   const win = windowOf(rec, pay, now)
   let state: OrderState
-  if (pay === 'unverified') state = win.phase === 'cancelled' ? 'cancelled' : 'unverified'
+  // a gift made for an order that was paid without our site (a claim): paid, counted by what that order paid
+  if (rec.claim) state = rec.ops?.cancelled_at ? 'cancelled' : 'paid'
+  else if (pay === 'unverified') state = win.phase === 'cancelled' ? 'cancelled' : 'unverified'
   else if (rec.ops?.cancelled_at) state = 'cancelled'
   else if (pay === null) state = Date.now() - Date.parse(rec.created_at) > SHOPIFY_VISIBLE_DAYS * DAY_MS ? 'unverified' : 'unpaid'
   else state = pay.state === 'paid' ? 'paid' : pay.state === 'refunded' ? 'refunded' : pay.state === 'cancelled' ? 'cancelled' : 'unpaid'
   const p = rec.production
+  // revenue = what the order actually paid (a sale price included), from the Shopify order — the package price only when Shopify could not say
+  const paidAmount = rec.claim ? rec.claim.amount_jpy : pay && pay !== 'unverified' ? (pay.amount_jpy ?? null) : null
   const shown = rec.shown_characters ?? []
   const chosen = shown.find((s) => s.candidate.kanji === p.kanji)
   return {
     order_ref: rec.order_ref,
     created_at: rec.created_at,
-    paid_at: pay && pay !== 'unverified' ? pay.paid_at : null,
+    paid_at: rec.claim ? rec.claim.paid_at : pay && pay !== 'unverified' ? pay.paid_at : null,
     state,
     hours_left: win.phase === 'open' ? win.hours_left : null,
     size_code: entry.size_code,
@@ -68,7 +73,7 @@ export function orderStatOf(entry: OrderIndexEntry, rec: OrderRecord | null, pay
     memorial: entry.memorial === true,
     language: p.language,
     purpose: p.certificate?.purpose ?? null,
-    price_jpy: typeof p.price_jpy === 'number' ? p.price_jpy : 0,
+    price_jpy: paidAmount ?? (typeof p.price_jpy === 'number' ? p.price_jpy : 0),
     collected: !!rec.collected_at,
     opened: !!entry.token && openedHashes.has(tokenHash(entry.token)),
     rounds: Math.max(1, ...shown.map((s) => s.set)),
@@ -112,6 +117,12 @@ export async function buildStats(d: OpsDeps, store: OrderStore, env: NodeJS.Proc
     const o = orderStatOf(e, records[i], verified ? (pay.found.get(e.order_ref) ?? null) : 'unverified', opened, now)
     if (o && o.state !== 'unpaid') orders.push(o)
   })
+  // orders paid without our site and not yet claimed: listed with their state (they are not in the paid count or the revenue until a gift is made)
+  for (const w of await listWaiting(store).catch(() => [])) {
+    const st = waitingState(w, now)
+    if (st.state === 'claimed') continue
+    orders.push({ order_ref: w.id, created_at: w.paid_at, paid_at: w.paid_at, state: st.state === 'refund_due' ? 'refund_due' : 'waiting', hours_left: null, days_left: st.state === 'waiting' ? st.days_left : null, size_code: 'ICHIREI-EGIFT', kanji: '', slot: null, memorial: false, language: w.language, purpose: null, price_jpy: w.amount_jpy ?? 0, collected: false, opened: false, rounds: 1 })
+  }
   const renderLists = await inBatches(days, 25, (day) => readJsonl<{ ts?: string }>(store, rendersPath(day)).catch(() => []))
   const renders = renderLists.flat().map((r) => r.ts).filter((t): t is string => typeof t === 'string')
   const stats = computeStats({ events, orders, renders, now })

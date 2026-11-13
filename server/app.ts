@@ -13,6 +13,7 @@ import { POST as selectPost } from '../api/select.ts'
 import { POST as orderPost } from '../api/order.ts'
 import { POST as poemPost } from '../api/poem.ts'
 import { POST as trackPost } from '../api/track.ts'
+import { claimHandlers } from '../api/claim.ts'
 import { handlers as animationHandlers } from '../api/animation.ts'
 import { handlers as previewHandlers } from '../api/preview.ts'
 import { handlers as selftestHandlers } from '../api/selftest.ts'
@@ -228,6 +229,10 @@ export function createApp(config: ServerConfig): Hono {
   app.post('/api/order', (c) => orderPost(c.req.raw))
   // Order status (read-only, ICHIREI orders only): number + email → status, carrier, tracking.
   app.post('/api/track', (c) => trackPost(c.req.raw))
+  // Orders paid WITHOUT going through our site ("waiting" orders, 2026-11-13): /claim checks the order number and e-mail (5 tries an hour per IP, in the handler);
+  // the Shopify order-payment webhook (signed) records the order. Neither ever writes to Shopify.
+  app.post('/api/claim', (c) => claimHandlers.claim(c.req.raw))
+  app.post('/api/shopify/orders-paid', (c) => claimHandlers.webhook(c.req.raw))
   // Learning loop: two browser events (chosen, explain_opened) → analytics/YYYY-MM-DD.jsonl. Always 204.
   app.post('/api/analytics', (c) => analyticsPost(c.req.raw))
 
@@ -244,11 +249,17 @@ export function createApp(config: ServerConfig): Hono {
   app.all('/api/order', methodNotAllowed)
   app.all('/api/poem', methodNotAllowed)
   app.all('/api/track', methodNotAllowed)
+  app.all('/api/claim', methodNotAllowed)
+  app.all('/api/shopify/orders-paid', methodNotAllowed)
   app.all('/api/analytics', methodNotAllowed)
   app.all('/api/*', (c) => c.json({ error: 'Not found' }, 404))
 
   // The private animation pages are never indexed.
   app.use('/a/*', async (c, next) => {
+    await next()
+    c.header('X-Robots-Tag', 'noindex, nofollow')
+  })
+  app.use('/claim', async (c, next) => {
     await next()
     c.header('X-Robots-Tag', 'noindex, nofollow')
   })

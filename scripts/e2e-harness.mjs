@@ -2683,6 +2683,10 @@ const SECTION_ORDER = ['.hero', '.strip', '.philo', '#shape', '#angles', '#write
     const cards = await page.evaluate(() => [...document.querySelectorAll('#gifts article.gift')].map((a) => ({ id: a.dataset.size, soon: a.dataset.comingSoon ?? null, badge: a.querySelector('.badge')?.textContent ?? null, cta: a.querySelector('[data-testid^=gift-cta]')?.tagName ?? null, disabled: a.querySelector('[data-testid^=gift-cta]')?.disabled ?? null, label: a.querySelector('[data-testid^=gift-cta]')?.textContent ?? null })))
     const byId = Object.fromEntries(cards.map((c) => [c.id, c]))
     if (soonOn) {
+      if (lang === 'en') {
+        // the US launch: nothing physical is offered in English, so a "coming soon" wooden size is not listed at all — only the e-gift
+        check('wood sizes switch on (en): the wooden sizes are NOT listed at all (not even as "Coming soon"); the e-gift keeps its badge and its link', cards.length === 1 && cards[0].id === 'egift' && byId.egift.cta === 'A' && byId.egift.soon === null, JSON.stringify(cards))
+      } else
       check(`wood sizes switch on (${lang}): 木札 and 版木 are listed with 「${SOON[lang]}」 and a DISABLED button; the e-gift keeps its badge and its link`, cards.length === 3 && ['simple', 'standard'].every((id) => byId[id].soon === 'yes' && byId[id].badge === SOON[lang] && byId[id].cta === 'BUTTON' && byId[id].disabled === true && byId[id].label === SOON[lang]) && byId.egift.soon === null && byId.egift.cta === 'A' && byId.egift.badge !== SOON[lang], JSON.stringify(cards))
     } else {
       check('wood sizes switch OFF (default): no 「近日公開」 anywhere, every size has its normal link', cards.length === 3 && cards.every((c) => c.soon === null && c.cta === 'A' && c.badge !== SOON.ja), JSON.stringify(cards))
@@ -3382,7 +3386,7 @@ const SECTION_ORDER = ['.hero', '.strip', '.philo', '#shape', '#angles', '#write
 
 // ---------- Run 24 (2026-11-12): the US e-gift launch — /en: delivery banner, chips, "What they receive", Western scenes, the dollar line; the English bridge on the cards, the chosen character and the receiver's page; Save the card / certificate; reply; share sheet ----------
 {
-  const FORBIDDEN = /\b(wood|wooden|walnut|EMS|ship|ships|shipping|shipped|shipment)\b/i
+  const FORBIDDEN = /\b(wood|wooden|walnut|EMS|ship|ships|shipping|shipped|shipment)\b|block set/i
   const ratesStub = { date: '2026-11-12', base: 'JPY', rates: { USD: 0.0066 } }
   const sizesStub = { sizes: ['egift', 'simple', 'standard'], coming_soon: ['simple', 'standard'] }
   const stubs = async (page) => {
@@ -3413,7 +3417,8 @@ const SECTION_ORDER = ['.hero', '.strip', '.philo', '#shape', '#angles', '#write
     check(`/en (${tag}): the scenes are the Western ink-wash ones (kitchen table, car hood, porch, bench, teacher's desk, holiday table, Christmas tree) — none of the Japanese photographs`, scenes.length >= 5 && scenes.every((s) => /\/img\/scenes\/en\//.test(s)) && ['kitchen', 'hood', 'porch', 'bench', 'desk', 'thanksgiving', 'tree'].every((n) => scenes.some((s) => s.includes(`/en/${n}`)) || n === 'tree' || n === 'hood' || n === 'porch' || n === 'bench' || n === 'desk' || n === 'thanksgiving'))
     check(`/en (${tag}): the price keeps the yen and shows "about $26" (¥3,980 at the owner's rate), nothing for the other currencies by default`, /about \$2\d/.test(await page.locator('.approxHero').innerText()))
     await page.evaluate(() => document.querySelectorAll('details').forEach((d) => (d.open = true)))
-    const text = await page.locator('body').innerText()
+    // (textContent, not innerText: the landing's sections are content-visibility: auto, so innerText of an off-screen one is empty)
+    const text = await page.evaluate(() => document.body.textContent ?? '')
     check(`/en (${tag}): no word "wood", "walnut", "EMS" or "ship" anywhere on the page, the FAQ opened included`, !FORBIDDEN.test(text), text.match(FORBIDDEN)?.[0])
     // chips: Christmas → thanks, counted; Mom → parent_mother
     await page.locator('[data-chip-code=mom]').click()
@@ -3450,6 +3455,7 @@ const SECTION_ORDER = ['.hero', '.strip', '.philo', '#shape', '#angles', '#write
     check(`/en (${tag}): the card preview carries the word and the line under the reading`, (await page.locator('[data-testid=card-sheet] [data-en-word]').innerText()) === 'hearth' && (await page.locator('[data-testid=card-sheet] [data-en-line]').count()) === 1)
     const refund = await page.locator('[data-testid=order-refund-line]').innerText()
     check(`/en (${tag}): the order step carries the owner's refund wording, word for word`, refund.startsWith("You can cancel for a full refund within 24 hours of payment, as long as you have not pressed 'Collect your gift'. After that, the gift has been made for one person and cannot be refunded. If we made a mistake, we will fix it or refund you."), refund)
+    check(`/en (${tag}): the order step lists only the e-gift — no wooden size, not even as "coming soon" — and no word wood / walnut / EMS / ship`, (await page.locator('[data-testid=order-form] input[name=package]').count()) === 1 && !FORBIDDEN.test((await page.locator('[data-testid=order-form]').textContent()) ?? ''), (await page.locator('[data-testid=order-form]').textContent())?.match(FORBIDDEN)?.[0])
     await page.click('label[data-size=egift]')
     check(`/en (${tag}): the opening-date field carries the Christmas hint`, (await page.locator('[data-testid=open-date-hint]').innerText()) === 'Set it to open on Christmas morning.')
     await page.locator('.slip').scrollIntoViewIfNeeded()
@@ -3560,6 +3566,179 @@ const SECTION_ORDER = ['.hero', '.strip', '.philo', '#shape', '#angles', '#write
     await sp.screenshot({ path: `${SHOTS}/us-sender-phone.png`, fullPage: true })
     check('no page errors (run 24, sender)', errors.length === 0, errors.join('; '))
     await sp.close()
+  }
+}
+
+// ---------- Run 25 (2026-11-13): orders with no gift attached (/claim, the claim flow with no payment) and the Thanksgiving sale (struck price, sale price, one line; gone when off or over) ----------
+{
+  const TOKEN = 'CT-testtesttesttesttesttest'
+  const ratesStub = { date: '2026-11-13', base: 'JPY', rates: { USD: 0.0066 } }
+  const sizesBody = (sale) => ({ sizes: ['egift', 'simple', 'standard'], coming_soon: ['simple', 'standard'], ...(sale ? { sale } : {}) })
+  const SALE = { percent: 30, from: '2026-11-20', until: '2026-11-30', starts_at: '2020-01-01T00:00:00.000Z', ends_at: '2099-11-30T14:59:59.999Z' }
+  const baseStubs = async (page, sale) => {
+    await page.route('**/api/rates', (r) => r.fulfill({ json: ratesStub }))
+    await page.route('**/api/sizes', (r) => r.fulfill({ json: sizesBody(sale) }))
+  }
+  const T = (page, id) => page.locator(`[data-testid=${id}]`)
+
+  // ---- /claim: the words, the refusal, the brake (phone) ----
+  const CLAIM = {
+    ja: { heading: '贈りものを作る', order: 'ご注文番号', email: 'ご注文時のメールアドレス', notFound: 'ご注文が見つかりません。番号とメールアドレスをご確認ください。', locale: 'ja-JP' },
+    'zh-Hant': { heading: '製作你的禮物', order: '訂單編號', email: '下單時的電子郵件', notFound: '找不到訂單，請確認訂單編號與電子郵件。', locale: 'zh-TW' },
+    en: { heading: 'Make your gift', order: 'Order number', email: 'Email used at checkout', notFound: "We couldn't find that order. Please check the number and email.", locale: 'en-US' },
+  }
+  for (const [lang, w] of Object.entries(CLAIM)) {
+    const ctx = await browser.newContext({ locale: w.locale, viewport: { width: 390, height: 844 }, deviceScaleFactor: 2 })
+    const page = await ctx.newPage()
+    const errs = []
+    page.on('pageerror', (e) => errs.push(String(e)))
+    const posts = []
+    await page.route('**/api/claim', async (route) => {
+      const b = JSON.parse(route.request().postData() ?? '{}')
+      posts.push(b)
+      if (posts.length > 5) return route.fulfill({ status: 429, json: { code: 'rate_limited' } })
+      if (b.order === '#1016' && b.email === 'buyer@example.com') return route.fulfill({ json: { ok: true, token: TOKEN, order: '#1016', order_number: '1016', language: lang } })
+      return route.fulfill({ status: 404, json: { error: 'not_found', code: 'not_found' } })
+    })
+    await page.goto(`http://localhost:5173/claim?o=%231016&lang=${lang}`, { waitUntil: 'networkidle' })
+    check(`/claim (${lang}): the heading, 「${w.order}」 (filled from the e-mail link: #1016) and 「${w.email}」`, (await T(page, 'claim-heading').innerText()) === w.heading && (await page.locator('input[name=order]').inputValue()) === '#1016' && (await page.locator('form').innerText()).includes(w.order) && (await page.locator('form').innerText()).includes(w.email))
+    check(`/claim (${lang}): the page is never indexed and has no price, no sale, no wood`, !/¥|\$\d|wood|walnut|ship/i.test(await page.locator('body').innerText()))
+    await page.screenshot({ path: `${SHOTS}/claim-${lang}.png` })
+    await page.locator('input[name=email]').fill('wrong@example.com')
+    await T(page, 'claim-submit').click()
+    await T(page, 'claim-error').waitFor()
+    check(`/claim (${lang}): a wrong e-mail shows exactly 「${w.notFound}」`, (await T(page, 'claim-error').innerText()) === w.notFound)
+    await page.screenshot({ path: `${SHOTS}/claim-${lang}-error.png` })
+    for (let i = 0; i < 4; i++) { await T(page, 'claim-submit').click(); await page.waitForTimeout(150) }
+    await page.locator('input[name=email]').fill('buyer@example.com')
+    await T(page, 'claim-submit').click()
+    await page.waitForTimeout(400)
+    check(`/claim (${lang}): after five tries the sixth — even with the right details — gets the "too many tries" answer and the flow does not open`, posts.length === 6 && /1|一|hour/.test(await T(page, 'claim-error').innerText()) && page.url().includes('/claim'))
+    check(`no page errors (run 25, /claim ${lang})`, errs.length === 0, errs.join('; '))
+    await ctx.close()
+  }
+
+  // ---- the claim flow: right details open the normal flow; at the choose step there is no payment ----
+  for (const lang of ['ja', 'en']) {
+    const w = CLAIM[lang]
+    const ctx = await browser.newContext({ locale: w.locale, viewport: { width: 1100, height: 950 } })
+    const page = await ctx.newPage()
+    const errs = []
+    page.on('pageerror', (e) => errs.push(String(e)))
+    const orders = []
+    await baseStubs(page, SALE) // even with a sale on, a claimed order shows no price at all
+    await page.route('**/api/analytics', (r) => r.fulfill({ status: 204, body: '' }))
+    await page.route('**/api/log', (r) => r.fulfill({ status: 204, body: '' }))
+    await page.route('**/api/claim', (r) => r.fulfill({ json: { ok: true, token: TOKEN, order: '#1016', order_number: '1016', language: lang } }))
+    await page.route('**/api/order', async (route) => { orders.push(JSON.parse(route.request().postData() ?? '{}')); await route.fulfill({ json: { claimed: true, order_ref: 'IC-20261114-ABCDEFGH', animation_url: 'http://localhost:5173/__claimed', gift_url: 'http://localhost:5173/g/RG-x' } }) })
+    await page.route('**/__claimed', (r) => r.fulfill({ contentType: 'text/html', body: '<h1 id=done>your gift page</h1>' }))
+    await page.route('**/api/select', async (route) => { const body = JSON.parse(route.request().postData() ?? '{}'); await route.fulfill({ json: shapeRound(lang === 'en' ? { ...FIXTURE, language: 'en', inscription_script: null, candidates: FIXTURE.candidates.map((c, i) => ({ ...c, reading: i === 0 ? 'akari' : `y${i}`, meaning: i === 0 ? 'lamp' : `m${i}`, eliminated: false, eliminated_reason: null })) } : lang === 'zh-Hant' ? { ...FIXTURE, language: 'zh-Hant', inscription_script: 'traditional' } : FIXTURE, body) }) })
+    await page.route('**/api/explain', (r) => r.fulfill({ json: { explanation: 'ok' } }))
+    await page.goto(`http://localhost:5173/claim?o=1016&lang=${lang}`, { waitUntil: 'networkidle' })
+    await page.locator('input[name=email]').fill('buyer@example.com')
+    await T(page, 'claim-submit').click()
+    await page.waitForURL(/#write$/, { timeout: 8000 })
+    await page.waitForLoadState('networkidle')
+    check(`claim flow (${lang}): the right number and e-mail open the normal flow (the landing's story step), with the claim kept for this tab only and a thin line "Order #1016 …"`, (await T(page, 'claim-banner').innerText()).includes('#1016') && (await page.evaluate(() => JSON.parse(sessionStorage.getItem('ichirei.claim') || 'null')?.token)) === TOKEN && (await page.evaluate(() => localStorage.getItem('ichirei.claim'))) === null)
+    await page.locator('#write [data-testid=story-input]').fill(lang === 'en' ? 'She left the porch light on every night until I got home, and she never once mentioned it.' : STORY)
+    await pickContext(page)
+    await page.click(`#write >> text=${GO[lang]}`)
+    await page.waitForSelector('[data-all-revealed=yes]', { timeout: 15000 })
+    await page.locator('article[data-slot=main]').click()
+    await page.locator('article[data-slot=main]').locator(`text=${GIVE[lang]}`).click()
+    await T(page, 'order-form').waitFor()
+    await page.waitForTimeout(500)
+    const form = await page.locator('[data-testid=order-form]').innerText()
+    check(`claim flow (${lang}): at the choose step there is NO payment — no price, no sale, no sizes to pick, no refund tick-box; the form says it is paid and the button says "${CLAIM[lang] && (lang === 'ja' ? '贈りものを作る' : 'Make my gift')}"`, (await T(page, 'order-form').locator('[data-price]').count()) === 0 && (await T(page, 'order-form').locator('[data-testid=sale-line]').count()) === 0 && (await T(page, 'order-form').locator('[data-testid=order-refund-check]').count()) === 0 && (await T(page, 'order-form').locator('input[name=package]').count()) === 1 && !/¥|\$\d/.test(form) && (await T(page, 'claim-order-note').innerText()).includes('#1016') && (await T(page, 'order-submit').innerText()) === (lang === 'ja' ? '贈りものを作る' : 'Make my gift'))
+    await page.screenshot({ path: `${SHOTS}/claim-flow-${lang}.png`, fullPage: false })
+    await T(page, 'order-submit').click()
+    await page.waitForSelector('#done', { timeout: 8000 })
+    const o = orders[0]
+    check(`claim flow (${lang}): the order goes out with the claim (number + token), as the e-gift, and without a refund tick; the browser then goes to the gift's own page — never to a checkout — and forgets the claim`, orders.length === 1 && o.claim?.order === '#1016' && o.claim?.token === TOKEN && o.package === 'egift' && !('refund_ack_at' in o) && page.url().endsWith('/__claimed') && (await page.evaluate(() => sessionStorage.getItem('ichirei.claim'))) === null)
+    check(`no page errors (run 25, claim flow ${lang})`, errs.length === 0, errs.join('; '))
+    await ctx.close()
+  }
+
+  // ---- the Thanksgiving sale: struck price, sale price, one line; gone when off or over ----
+  const LINE = { ja: '感謝の季節に、30％オフ（11月30日まで）', 'zh-Hant': '感恩季節，七折優惠（至11月30日）', en: 'Thanksgiving: 30% off until November 30' }
+  const LOCALE = { ja: 'ja-JP', 'zh-Hant': 'zh-TW', en: 'en-US' }
+  const reachOrderStep = async (page, lang) => {
+    await page.locator('#write [data-testid=story-input]').fill(lang === 'en' ? 'She left the porch light on every night until I got home, and she never once mentioned it.' : STORY)
+    await pickContext(page)
+    await page.click(`#write >> text=${GO[lang]}`)
+    await page.waitForSelector('[data-all-revealed=yes]', { timeout: 15000 })
+    await page.locator('article[data-slot=main]').click()
+    await page.locator('article[data-slot=main]').locator(`text=${GIVE[lang]}`).click()
+    await T(page, 'order-form').waitFor()
+    await page.waitForTimeout(500)
+  }
+  for (const [mode, sale] of [['on', SALE], ['off', null], ['over', { ...SALE, ends_at: '2020-11-30T14:59:59.999Z' }], ['not yet', { ...SALE, starts_at: '2098-01-01T00:00:00.000Z' }]]) {
+    for (const lang of ['ja', 'zh-Hant', 'en']) {
+      const ctx = await browser.newContext({ locale: LOCALE[lang], viewport: { width: 1100, height: 950 } })
+      const page = await ctx.newPage()
+      const errs = []
+      page.on('pageerror', (e) => errs.push(String(e)))
+      await baseStubs(page, sale)
+      await page.route('**/api/analytics', (r) => r.fulfill({ status: 204, body: '' }))
+      await page.route('**/api/log', (r) => r.fulfill({ status: 204, body: '' }))
+      await page.route('**/api/select', async (route) => { const body = JSON.parse(route.request().postData() ?? '{}'); await route.fulfill({ json: shapeRound(lang === 'en' ? { ...FIXTURE, language: 'en', inscription_script: null, candidates: FIXTURE.candidates.map((c, i) => ({ ...c, reading: i === 0 ? 'akari' : `y${i}`, meaning: i === 0 ? 'lamp' : `m${i}`, eliminated: false, eliminated_reason: null })) } : lang === 'zh-Hant' ? { ...FIXTURE, language: 'zh-Hant', inscription_script: 'traditional' } : FIXTURE, body) }) })
+      await page.route('**/api/explain', (r) => r.fulfill({ json: { explanation: 'ok' } }))
+      await page.goto(`http://localhost:5173/${lang === 'en' ? 'en' : ''}?lang=${lang}`, { waitUntil: 'networkidle' })
+      await page.waitForTimeout(600)
+      const card = page.locator('#gifts article[data-size=egift]')
+      const txt = async (loc) => ((await loc.count()) ? (await loc.first().textContent())?.trim() : null) // (the landing's sections are content-visibility: auto, so innerText of an off-screen one is empty)
+      const read = async () => ({ old: await txt(card.locator('[data-price-old=egift]')), sale: await txt(card.locator('[data-price-sale=egift]')), line: await txt(card.locator('[data-testid=sale-line]')), price: ((await card.locator('[data-price=egift]').textContent()) ?? '').replace(/\s+/g, ' ').trim() })
+      const L = await read()
+      if (mode === 'on') {
+        const struck = await card.locator('[data-price-old=egift]').evaluate((e) => getComputedStyle(e).textDecorationLine)
+        check(`sale on (${lang}): the landing's e-gift price shows ¥3,980 struck through, then ¥2,786, then 「${LINE[lang]}」`, L.old === '¥3,980' && L.sale === '¥2,786' && L.line === LINE[lang] && struck === 'line-through', JSON.stringify(L))
+        const woodPrices = await page.locator('#gifts article[data-size=simple] [data-price-old], #gifts article[data-size=standard] [data-price-old]').count()
+        check(`sale on (${lang}): the wooden sizes (coming soon) carry no sale`, woodPrices === 0)
+        if (lang === 'en') check('sale on (en): "about $n" follows the SALE price: hero (about $18) and the gift card (about $18) — not $26', /about \$18/.test((await page.locator('.approxHero').textContent()) ?? '') && /about \$18/.test((await card.locator('.approx').textContent()) ?? ''))
+        await page.screenshot({ path: `${SHOTS}/sale-landing-${lang}.png`, fullPage: false })
+      } else {
+        check(`sale ${mode} (${lang}): the landing shows the plain price ¥3,980 and no struck price, no sale price, no line`, L.old === null && L.sale === null && L.line === null && L.price === '¥3,980', JSON.stringify(L))
+        if (lang === 'en') check(`sale ${mode} (en): "about $26" as before`, /about \$26/.test((await page.locator('.approxHero').textContent()) ?? ''))
+      }
+      await page.locator('#write').scrollIntoViewIfNeeded()
+      await reachOrderStep(page, lang)
+      const pkg = page.locator('label.pkg:has(input[value=egift])')
+      const O = { old: await pkg.locator('[data-price-old]').count(), sale: await pkg.locator('[data-price-sale]').count() ? await pkg.locator('[data-price-sale]').innerText() : null, line: await pkg.locator('[data-testid=sale-line]').count() ? await pkg.locator('[data-testid=sale-line]').innerText() : null, plain: await pkg.locator('[data-price=egift]').innerText() }
+      if (mode === 'on') {
+        check(`sale on (${lang}): the order step shows the same — ¥3,980 struck through, ¥2,786, and 「${LINE[lang]}」`, O.old === 1 && O.sale === '¥2,786' && O.line === LINE[lang] && /3,980/.test(O.plain) && /2,786/.test(O.plain), JSON.stringify(O))
+        if (lang === 'en') check('sale on (en): the order step\'s "about $n" is for the sale price ($18)', /about \$18/.test(await pkg.locator('[data-approx]').innerText()))
+        await page.locator('label.pkg:has(input[value=egift])').scrollIntoViewIfNeeded()
+        await page.locator('[data-testid=order-form]').screenshot({ path: `${SHOTS}/sale-order-${lang}.png` })
+      } else {
+        check(`sale ${mode} (${lang}): the order step shows only the plain price — nothing struck, no sale line`, O.old === 0 && O.sale === null && O.line === null && O.plain === '¥3,980', JSON.stringify(O))
+      }
+      check(`no page errors (run 25, sale ${mode} ${lang})`, errs.length === 0, errs.join('; '))
+      await ctx.close()
+    }
+  }
+  // SALE_FROM: a page opened just before the sale begins shows nothing, then switches the sale on by itself at the start moment
+  {
+    const ctx = await browser.newContext({ locale: 'en-US', viewport: { width: 1100, height: 950 } })
+    const page = await ctx.newPage()
+    await baseStubs(page, { ...SALE, starts_at: new Date(Date.now() + 4000).toISOString() })
+    await page.goto('http://localhost:5173/en', { waitUntil: 'networkidle' })
+    const card = page.locator('#gifts article[data-size=egift]')
+    const before = await card.locator('[data-price-sale]').count()
+    await page.waitForFunction(() => document.querySelector('#gifts [data-price-sale=egift]'), null, { timeout: 12000 })
+    check('sale from SALE_FROM: before the start moment the page shows the plain price; at the start it switches the sale on by itself (struck price, ¥2,786, the line)', before === 0 && (await card.locator('[data-price-sale=egift]').textContent()) === '¥2,786' && (await card.locator('[data-testid=sale-line]').textContent()) === LINE.en)
+    await ctx.close()
+  }
+  // the sale line is ink, never cinnabar (red is only for the character and the seal)
+  {
+    const ctx = await browser.newContext({ locale: 'en-US', viewport: { width: 1100, height: 950 } })
+    const page = await ctx.newPage()
+    await baseStubs(page, SALE)
+    await page.goto('http://localhost:5173/en', { waitUntil: 'networkidle' })
+    await page.waitForTimeout(500)
+    const colours = await page.locator('#gifts article[data-size=egift]').evaluate((a) => ({ line: getComputedStyle(a.querySelector('[data-testid=sale-line]')).color, sale: getComputedStyle(a.querySelector('[data-price-sale]')).color }))
+    const isRed = (c) => { const m = /rgb\((\d+), (\d+), (\d+)/.exec(c); return !!m && Number(m[1]) > 150 && Number(m[2]) < 90 && Number(m[3]) < 90 }
+    check('sale on: the sale line and the sale price are not in cinnabar red', !isRed(colours.line) && !isRed(colours.sale), JSON.stringify(colours))
+    await ctx.close()
   }
 }
 

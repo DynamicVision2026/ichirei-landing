@@ -28,6 +28,8 @@ import { cancelOrder, windowOf, type ChangeDeps, type WindowInfo } from '../engi
 import { PRINTED_CARD } from '../src/order/packages.ts'
 import { readSecret } from '../engine/track.ts'
 import { adminTokens, shopifyPayments, trackDepsOf } from '../engine/payments-lookup.ts'
+import { listWaiting, waitingState } from '../engine/waiting.ts'
+import { sweepWaiting } from '../engine/waiting-shopify.ts'
 import { loadArtwork } from '../engine/render/artwork.ts'
 import { cardsPdf } from '../engine/render/card.ts'
 import { PACKAGE_SKU, SHIPS, WOODEN, type PackageId } from '../src/order/packages.ts'
@@ -47,6 +49,8 @@ export interface OpsDeps {
   shipping?: (refs: string[]) => Promise<ShippingResult>
   /** The payment lookup (when it was paid, cancelled, refunded): tests replace it. */
   payments?: (refs: string[]) => Promise<PaymentResult>
+  /** Waiting orders (paid without our site): the read-only Shopify sweep that records any we have not seen. Tests replace it. */
+  sweep?: (store: OrderStore, now: Date) => Promise<number | null>
 }
 
 const sha = (s: string) => createHash('sha256').update(s).digest()
@@ -218,6 +222,9 @@ export function createOpsHandlers(deps: () => OpsDeps) {
       const { d, env, now, store } = g
       const days = lastDays(now, 8)
       const { rows, verified } = await classify(await loadRows(store, days), d, env, now)
+      // orders paid WITHOUT going through our site: ask Shopify (read-only) for any we have not recorded yet, then list them
+      await (d.sweep ? d.sweep(store, now) : sweepWaiting(store, trackDepsOf(env), adminTokens, now)).catch(() => null)
+      const waiting = await listWaiting(store).catch(() => [])
       const flagged = await flaggedEgifts(store, now)
       const freeCounts = await readFreeSourceCounts(store, days).catch(() => null)
       const mainCounts = await readMainCounts(store, lastDays(now, 30)).catch(() => null)
@@ -274,6 +281,13 @@ export function createOpsHandlers(deps: () => OpsDeps) {
       // 本命（メインの字）上位10・直近30日: 同じ字ばかりになっていないかを見るための表（字と件数だけ）
       const mainTable = (c: MainCounts | null) =>
         !c ? '<p>集計を読み込めませんでした。</p>' : c.top.length === 0 ? '<p>まだ記録がありません。</p>' : `<div class="wide"><table class="mainT"><thead><tr><th>順位</th><th>字</th><th>回数</th><th>割合</th></tr></thead><tbody>${c.top.map((t, i) => `<tr><td>${i + 1}</td><td class="k">${esc(t.kanji)}</td><td>${t.count}</td><td>${t.share}%</td></tr>`).join('')}</tbody></table></div><p class="log">全${c.runs}回のうち。</p>`
+      const waitingLabel = (w: (typeof waiting)[number]) => {
+        const st = waitingState(w, now)
+        return st.state === 'claimed' ? '作成済み' : st.state === 'refund_due' ? '未作成・返金対象' : `未作成（あと${st.days_left}日）`
+      }
+      const waitingTable = `<div class="wide"><table class="waitingT"><thead><tr><th>Shopify注文番号</th><th>お支払い</th><th>金額</th><th>言語</th><th>状態</th></tr></thead><tbody>${
+        waiting.map((w) => `<tr${waitingState(w, now).state === 'refund_due' ? ' class="warn"' : ''} id="o-${esc(w.id)}"><td>${esc(w.order_name)}</td><td>${esc(jst(w.paid_at))}</td><td>${w.amount_jpy === null ? '—' : `¥${w.amount_jpy.toLocaleString('en-US')}`}</td><td>${esc(w.language)}</td><td>${esc(waitingLabel(w))}</td></tr>`).join('') || '<tr><td colspan="5">なし</td></tr>'
+      }</tbody></table></div>`
       const readyRows = rows.filter((r) => ready(r) && isCardSize(r))
       const openRows = rows.filter((r) => r.win.phase === 'open')
       const otherRows = rows.filter((r) => r.win.phase === 'cancelled' || r.win.phase === 'unpaid' || (ready(r) && !isCardSize(r)))
@@ -283,6 +297,8 @@ export function createOpsHandlers(deps: () => OpsDeps) {
         `<p class="note">お支払い完了から24時間は「キャンセル受付中」です。この間に製作は始めません。24時間が過ぎてキャンセルのないものだけが、下のPDFと木札・版木CSVに入ります。お支払い後の内容の変更（字・歌・お名前・メッセージ）は行いません。お客様が「贈りものを受け取る」を押した後（受け取り：済）は、キャンセルできません。期限内に受信したキャンセルのメールは、24時間を過ぎても対応できます（その場合は「キャンセルとして記録」を押してください）。</p>` +
         `${verified ? '' : '<p class="note">⚠ Shopifyから入金を確認できませんでした。いまは注文を作成した時刻から24時間で数えています（入金が確認できていない注文も含まれます）。</p>'}` +
         `<p class="bar"><a href="/ops/stats">数字（ダッシュボード）</a><a href="/ops/cards/today.pdf">製作に進めるカードをまとめてPDF</a><a href="/ops/wooden-today.csv">製作に進める木札・版木 CSV</a><button id="egift-run">eギフトの確認を今すぐ実行</button></p>` +
+        `<h2>贈りものが未作成の注文（${waiting.filter((w) => w.status === 'waiting').length}）</h2>` +
+        `<p class="note">当サイトを通らずに支払われた注文です（物語も字もありません）。お客様はメールのリンクから /claim で物語を書き、字を選びます。7日たっても未作成のものは「未作成・返金対象」になります。自動の返金はしません。Shopifyで手動で返金してください。</p>${waitingTable}` +
         `<h2>製作に進めるもの（${readyRows.length}）</h2>${readyTable(readyRows)}` +
         `<h2>キャンセル受付中（${openRows.length}）</h2>${openTable(openRows)}` +
         `<h2>そのほか（キャンセル・入金未確認・製作なし ${otherRows.length}）</h2>${otherTable(otherRows)}` +

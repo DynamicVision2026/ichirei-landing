@@ -5,9 +5,9 @@
 //   SHOPIFY_STOREFRONT_TOKEN_PUBLIC  Storefront API PUBLIC token (public by design; Cloud Build substitution) — wins if set
 //   SHOPIFY_STOREFRONT_TOKEN   same token from the Secret Manager mount (the original route; used when the above is empty)
 //                              (needs unauthenticated_write_checkouts)
-//   SHOPIFY_VARIANT_SIMPLE     variant of the ¥9,800 package   (gid://shopify/ProductVariant/… or the number)
-//   SHOPIFY_VARIANT_STANDARD   variant of the ¥18,850 package
-//   SHOPIFY_VARIANT_EGIFT      OPTIONAL: variant of the ¥3,980 一字礼 eギフト (a digital product with no shipping; hidden while missing)
+//   SHOPIFY_VARIANT_EGIFT      variant of the ¥3,980 一字礼 eギフト (a digital product with no shipping; 67913881616632 since 2026-11-13)
+//   SHOPIFY_VARIANT_SIMPLE     OPTIONAL: the wood variants were DELETED in Shopify on 2026-11-13. Wood is "coming soon", so these are never put in a cart; a missing
+//   SHOPIFY_VARIANT_STANDARD   (or deleted) variant behaves exactly like "coming soon" — it is never an error and never blocks startup.
 //   (the poem is free and included: it travels as attributes on the main line — there are no poem products or variants)
 //   SHOPIFY_STORE_DOMAIN       default soul-id-2.myshopify.com
 //   SHOPIFY_API_VERSION        default 2025-01
@@ -25,7 +25,7 @@ export interface ShopifyConfig {
   apiVersion: string
   token: string
   apiBase: string
-  /** The variant of each size that is on sale: simple and standard always; the e-gift only once the owner has created it in Shopify. */
+  /** The variant of each size that is on sale: only those whose id is configured (since 2026-11-13 that is the e-gift alone). */
   variants: Partial<Record<PackageId, string>>
 }
 
@@ -42,10 +42,8 @@ const toGid = (v: string) => (/^\d+$/.test(v) ? `gid://shopify/ProductVariant/${
 /** Read the config; `missing` lists the env vars still to set (empty when ready). */
 export function loadShopifyConfig(env: NodeJS.ProcessEnv = process.env): { config: ShopifyConfig | null; missing: string[] } {
   const token = env.SHOPIFY_STOREFRONT_TOKEN_PUBLIC?.trim() || env.SHOPIFY_STOREFRONT_TOKEN?.trim() || ''
-  const missing = [
-    ...(token ? [] : ['SHOPIFY_STOREFRONT_TOKEN']),
-    ...['SHOPIFY_VARIANT_SIMPLE', 'SHOPIFY_VARIANT_STANDARD'].filter((k) => !env[k]?.trim()),
-  ]
+  // Only the token is required: the wood variants are gone and the e-gift variant is optional (a size without a variant is simply not on sale).
+  const missing = token ? [] : ['SHOPIFY_STOREFRONT_TOKEN']
   if (missing.length > 0) return { config: null, missing }
   const storeDomain = (env.SHOPIFY_STORE_DOMAIN || DEFAULT_STORE_DOMAIN).trim()
   return {
@@ -56,9 +54,9 @@ export function loadShopifyConfig(env: NodeJS.ProcessEnv = process.env): { confi
       token,
       apiBase: (env.SHOPIFY_API_BASE || `https://${storeDomain}`).replace(/\/$/, ''),
       variants: {
-        simple: toGid(env.SHOPIFY_VARIANT_SIMPLE!.trim()),
-        standard: toGid(env.SHOPIFY_VARIANT_STANDARD!.trim()),
-        // The e-gift is created by the owner in Shopify: while its id is missing, that size is hidden on the page and refused by the server.
+        ...(env.SHOPIFY_VARIANT_SIMPLE?.trim() ? { simple: toGid(env.SHOPIFY_VARIANT_SIMPLE.trim()) } : {}),
+        ...(env.SHOPIFY_VARIANT_STANDARD?.trim() ? { standard: toGid(env.SHOPIFY_VARIANT_STANDARD.trim()) } : {}),
+        // While the e-gift id is missing, that size is hidden on the page and refused by the server.
         ...(env.SHOPIFY_VARIANT_EGIFT?.trim() ? { egift: toGid(env.SHOPIFY_VARIANT_EGIFT.trim()) } : {}),
       },
     },

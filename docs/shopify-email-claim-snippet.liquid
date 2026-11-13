@@ -1,0 +1,37 @@
+{%- comment -%}
+  ICHIREI — "your gift isn't made yet" line for an order that was paid WITHOUT going through ichirei.soul-id.jp (a store page, a ChatGPT checkout). That order has an ICHIREI
+  line but none of our hidden gift properties (the order reference `_order_ref`), so there is no story and no character yet.
+
+  WHERE TO PASTE IT: inside the existing ICHIREI block of the order-confirmation e-mail (docs/ichirei-order-email.liquid), directly AFTER this line of the loop:
+      {%- assign ichirei_ref = line.properties['_order_ref'] | default: line.properties['order_ref'] -%}
+  and before the line that starts  {%- if ichirei_ref != blank or line.sku contains 'ICHIREI-' -%}.
+  (docs/ichirei-order-email.liquid in this repository already has it pasted in; you may paste that whole file instead.)
+
+  WHAT IT DOES:
+    - an ICHIREI line WITH a gift reference (a normal order): nothing here fires; the existing block renders exactly as before.
+    - an ICHIREI line WITHOUT one (a waiting order): this prints the line below + the link, and then `continue` skips the rest of the existing block for that line.
+    - any other product: the first condition is false; nothing changes.
+  The language is the buyer's checkout language (order.locale; Japanese when Shopify does not say). The link is
+  https://ichirei.soul-id.jp/claim?o={{ order.name | url_encode }}  — the buyer then types the order number and the e-mail used at checkout.
+{%- endcomment -%}
+{%- if ichirei_ref == blank and line.sku contains 'ICHIREI-' -%}
+  {%- assign claim_lang = line.properties['_language'] | default: line.properties['language'] | default: order.locale | default: order.customer_locale | default: 'ja' | downcase -%}
+  {%- if claim_lang contains 'zh' -%}
+    {%- if claim_lang contains 'hans' or claim_lang contains 'cn' or claim_lang contains 'sg' -%}
+      {%- assign claim_heading = '感谢你订购一字礼。' -%}
+      {%- assign claim_text = '礼物还没有完成。请从这里写下故事、选出那个字：' -%}
+    {%- else -%}
+      {%- assign claim_heading = '感謝你訂購一字禮。' -%}
+      {%- assign claim_text = '禮物還沒有完成。請從這裡寫下故事、選出那個字：' -%}
+    {%- endif -%}
+  {%- elsif claim_lang contains 'ja' -%}
+    {%- assign claim_heading = '一字礼のご注文ありがとうございます。' -%}
+    {%- assign claim_text = '贈りものは、まだできていません。こちらから物語を書いて、字を選んでください：' -%}
+  {%- else -%}
+    {%- assign claim_heading = 'Thank you for your ICHIREI order.' -%}
+    {%- assign claim_text = "Your gift isn't made yet. Write your story and choose the character here:" -%}
+  {%- endif -%}
+  <p><strong>{{ claim_heading }}</strong></p>
+  <p>{{ claim_text }}<br><a href="https://ichirei.soul-id.jp/claim?o={{ order.name | url_encode }}">https://ichirei.soul-id.jp/claim?o={{ order.name | url_encode }}</a></p>
+  {%- continue -%}
+{%- endif -%}

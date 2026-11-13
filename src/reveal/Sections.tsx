@@ -1,13 +1,15 @@
 import { PACKAGE_DISPLAY_ORDER, RECOMMENDED_PACKAGE } from '../order/packages.ts'
 import { SIZE_COPY } from '../demo/sizes-copy.ts'
-import { useComingSoon, useSizes } from '../demo/useSizes.ts'
+import { useComingSoon, useSale, useSizes } from '../demo/useSizes.ts'
 import { useEffect, useId, useRef, useState, type KeyboardEvent, type ReactNode } from 'react'
 import { ANGLES, TEXT, type RevealLang } from './copy.ts'
 import { rich } from './rich.tsx'
 import Picture from './Picture.tsx'
 import { sceneName } from './scenes.ts'
 import { CURRENCIES, approxLine, type Currency, type Rates } from './currency.ts'
-import { PACKAGE_PRICE_JPY, formatYen } from '../order/packages.ts'
+import { PACKAGE_PRICE_JPY } from '../order/packages.ts'
+import { PriceWithSale, SaleLine } from '../order/SalePrice.tsx'
+import { salePriceJpy } from '../order/sale.ts'
 import { LEGAL, rowValue } from '../legal/legal-copy.ts'
 
 type T = (typeof TEXT)[RevealLang]
@@ -314,8 +316,11 @@ export function Gifts({
   // variant is missing is not listed (useSizes).
   const sizes = useSizes()
   const soon = useComingSoon() // e-gift-first launch: 木札 / 版木 are listed with 「近日公開」 and a disabled button
+  const sale = useSale() // the Thanksgiving sale (the e-gift only): the old price struck through, the sale price beside it, one line of words
   const sc = SIZE_COPY[lang]
-  const cards = PACKAGE_DISPLAY_ORDER.filter((id) => (sizes ?? []).includes(id)).map((id) => ({
+  // English (US launch): nothing physical is offered, so while the wooden sizes are "coming soon" they are not listed at all — only the e-gift
+  const enOnly = lang === 'en' && soon.length > 0
+  const cards = PACKAGE_DISPLAY_ORDER.filter((id) => (sizes ?? []).includes(id) && !(enOnly && soon.includes(id))).map((id) => ({
     id,
     title: sc.names[id],
     img: id === 'simple' ? 'simple-hero' : id === 'standard' ? 'standard-hero' : 'egift-hero',
@@ -329,14 +334,15 @@ export function Gifts({
     <section className="tintBand" id="gifts">
       <div className="wrap center">
         <span className="eyebrow">{t.gfEye}</span>
-        <h2>{t.gfH}</h2>
+        <h2>{enOnly ? 'Your gift, sent as a link' : t.gfH}</h2>
         <p className="lead" style={{ marginTop: '1rem' }}>
           {t.gfP}
         </p>
       </div>
       <div className="wrap gifts">
         {cards.map((c) => {
-          const approx = approxLine(PACKAGE_PRICE_JPY[c.id], currency, rates, lang)
+          const onSale = c.id === 'egift' ? sale : null
+          const approx = approxLine(onSale ? salePriceJpy(PACKAGE_PRICE_JPY[c.id], onSale.percent) : PACKAGE_PRICE_JPY[c.id], currency, rates, lang)
           return (
             <article className="gift" key={c.id} data-size={c.id} data-coming-soon={c.soon ? 'yes' : undefined}>
               <Picture name={c.img} width={1600} height={1000} alt={c.soon ? c.title : GIFT_ALT[c.id]} sizes="(max-width: 860px) 100vw, 380px" />
@@ -346,9 +352,10 @@ export function Gifts({
                   <span className="badgeSlot">{c.badge && <span className="badge" data-badge={c.soon ? 'soon' : c.id === 'egift' ? 'now' : 'recommended'}>{c.badge}</span>}</span>
                   <h3>{c.title}</h3>
                   <span className="price" data-price={c.id}>
-                    {formatYen(PACKAGE_PRICE_JPY[c.id])}
+                    <PriceWithSale yen={PACKAGE_PRICE_JPY[c.id]} sale={onSale} id={c.id} />
                   </span>
                 </div>
+                <SaleLine sale={onSale} lang={lang} />
                 {approx && <span className="approx">{approx}</span>}
                 <ul>
                   {c.items.map((x) => (

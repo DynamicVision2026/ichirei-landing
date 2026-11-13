@@ -30,6 +30,8 @@ export interface WindowInfo {
 export function windowOf(rec: OrderRecord | null, pay: PaymentInfo | null | 'unverified', now: Date): WindowInfo {
   const none = (phase: WindowPhase, verified = true): WindowInfo => ({ phase, paid_at: null, ends_at: null, hours_left: null, verified })
   if (rec?.ops?.cancelled_at) return none('cancelled')
+  // an order that was paid without going through our site and later claimed (2026-11-13): Shopify's own record has no order reference to find, and the 24 hours count from the CLAIM
+  if (rec?.claim) return span(rec.claim.claimed_at, now, true)
   if (pay === 'unverified') return span(rec?.created_at ?? null, now, false)
   if (pay === null) return none('unpaid')
   if (pay.state === 'cancelled' || pay.state === 'refunded') return none('cancelled')

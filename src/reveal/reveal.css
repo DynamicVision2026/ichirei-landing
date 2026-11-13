@@ -418,3 +418,10 @@
 .rv .usReceiveList small{grid-column:2;color:var(--mute);font-size:.9rem;line-height:1.5}
 .rv .usReceiveArt{width:min(15rem,60%);margin:1rem auto 0;border-radius:14px;overflow:hidden}
 .rv .heroTokyo{margin:.4rem 0 0;font-family:var(--display);font-style:italic;color:var(--gold);letter-spacing:.03em}
+
+/* An open claim (an order paid without our site, 2026-11-13): one thin line over the flow */
+.rv .claimBanner{margin:0;padding:.7rem 1rem;text-align:center;font-size:.95rem;background:#2a221b;color:#f4ecd8}
+/* The Thanksgiving sale (shown beside the price; Shopify's discount sets the real price): the old price struck through, the sale price beside it, one line of words */
+.rv .priceOld{color:var(--mute);font-weight:400;text-decoration:line-through;text-decoration-thickness:1px}
+.rv .priceSale{font-weight:700}
+.rv .saleLine{display:block;margin:.15rem 0 .1rem;color:inherit;font-weight:600}

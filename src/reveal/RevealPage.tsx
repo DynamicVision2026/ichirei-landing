@@ -4,6 +4,7 @@ import { trackPageView } from '../demo/analytics'
 import { DOCUMENT, REVEAL_LANGS, TEXT, type RevealLang } from './copy'
 import { Angles, Closing, Dock, Faq, Footer, Gifts, Moments, Philosophy, Reviews, Steps, StoryShape, Strip } from './Sections'
 import Hero from './Hero'
+import ClaimBanner from '../claim/ClaimBanner'
 import { UsBanner, UsReceive } from './UsSections'
 import { useCurrency } from './useCurrency'
 import { toRevealLang } from './lang'
@@ -103,6 +104,7 @@ export default function RevealPage() {
       </header>
 
       <main>
+        <ClaimBanner language={uiLang} />
         <Hero lang={lang} currency={currency} rates={rates} woodOnSale={woodOnSale} />
         {lang === 'en' && <UsBanner />}
         <Strip t={t} woodOnSale={woodOnSale} />

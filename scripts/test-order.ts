@@ -145,7 +145,8 @@ const shopBase = `http://127.0.0.1:${(shop.address() as { port: number }).port}`
 const SHOP_ENV = { SHOPIFY_STOREFRONT_TOKEN: 'shpat_test_token', SHOPIFY_VARIANT_SIMPLE: '1111', SHOPIFY_VARIANT_STANDARD: 'gid://shopify/ProductVariant/2222', SHOPIFY_API_BASE: shopBase } as NodeJS.ProcessEnv
 
 const none = loadShopifyConfig({} as NodeJS.ProcessEnv)
-check('shopify config: nothing set → not configured, and says exactly which variables are missing', none.config === null && none.missing.join() === 'SHOPIFY_STOREFRONT_TOKEN,SHOPIFY_VARIANT_SIMPLE,SHOPIFY_VARIANT_STANDARD')
+// 2026-11-13: the wood variants were deleted in Shopify, so only the storefront token is required (a size with no variant is simply not on sale)
+check('shopify config: nothing set → not configured, and says exactly which variable is missing (only the token)', none.config === null && none.missing.join() === 'SHOPIFY_STOREFRONT_TOKEN')
 const cfg = loadShopifyConfig(SHOP_ENV).config!
 check('shopify config: store defaults to soul-id-2.myshopify.com; numeric variant ids become gids; gids pass through', cfg.storeDomain === 'soul-id-2.myshopify.com' && cfg.variants.simple === 'gid://shopify/ProductVariant/1111' && cfg.variants.standard === 'gid://shopify/ProductVariant/2222' && cfg.apiVersion === '2025-01')
 check('shopify config: the real endpoint is https://<store>/api/<version>/graphql.json', loadShopifyConfig({ ...SHOP_ENV, SHOPIFY_API_BASE: '' } as NodeJS.ProcessEnv).config!.apiBase === 'https://soul-id-2.myshopify.com')

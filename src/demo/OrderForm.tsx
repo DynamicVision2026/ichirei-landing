@@ -5,7 +5,7 @@ import type { Copy, InscriptionStyle, OrderField, PackageId, UiLanguage } from '
 import { log } from './logging'
 import { sessionId, trackUs } from './analytics'
 import { clearDraft } from './draft'
-import { EGIFT_JAPAN_ONLY, GIFT_MESSAGE_MAX, OPEN_DATE_MAX_DAYS, PACKAGE_DISPLAY_ORDER, PACKAGE_PRICE_JPY, RECOMMENDED_PACKAGE, SHIPS, SHIP_TO, WOODEN, formatYen, type ShipTo } from '../order/packages.ts'
+import { EGIFT_JAPAN_ONLY, GIFT_MESSAGE_MAX, OPEN_DATE_MAX_DAYS, PACKAGE_DISPLAY_ORDER, PACKAGE_PRICE_JPY, RECOMMENDED_PACKAGE, SHIPS, SHIP_TO, WOODEN, type ShipTo } from '../order/packages.ts'
 import { SIZE_COPY } from './sizes-copy.ts'
 import { LEGAL } from '../legal/legal-copy.ts'
 import { useComingSoon, useSizes } from './useSizes.ts'
@@ -25,6 +25,11 @@ import { toRevealLang } from '../reveal/lang.ts'
 import { cleanInscriptionForm } from '../order/inscription'
 import EnBridgeStack from '../order/EnBridgeStack.tsx'
 import { getUtm } from './utm-store.ts'
+import { clearClaim, getClaim } from './claim-store.ts'
+import { CLAIM_COPY } from '../claim/copy.ts'
+import { PriceWithSale, SaleLine } from '../order/SalePrice.tsx'
+import { salePriceJpy } from '../order/sale.ts'
+import { useSale } from './useSizes.ts'
 import { cleanReading } from '../order/reading.ts'
 
 // The purchase step of the customer flow: after the sender has chosen a character, collect
@@ -79,7 +84,11 @@ export default function OrderForm({ result, story, followUps = [], promptQuestio
   const [receiver, setReceiver] = useState('')
   const [date, setDate] = useState('')
   const [style, setStyle] = useState<InscriptionStyle>(DEFAULT_STYLE[language])
-  const [pkg, setPkg] = useState<PackageId | ''>('')
+  // An order that was paid without our site (2026-11-13, /claim): the character is attached to that order — the e-gift, nothing to pay, no checkout.
+  const claim = useMemo(() => getClaim(), [])
+  const claimCopy = CLAIM_COPY[language]
+  const sale = useSale() // the Thanksgiving sale shown beside the e-gift's price (Shopify's discount sets the real price)
+  const [pkg, setPkg] = useState<PackageId | ''>(claim ? 'egift' : '')
   const sizes = useSizes() // the sizes on sale right now (Part C): a size without a Shopify variant is not shown
   const soon = useComingSoon() // e-gift-first launch: listed with 「近日公開」, not selectable
   const sc = SIZE_COPY[language]
@@ -115,7 +124,7 @@ export default function OrderForm({ result, story, followUps = [], promptQuestio
   const dateOk = pkg === 'egift' || (/^\d{4}-\d{2}-\d{2}$/.test(date) && date >= today)
   // (switching the carved form can make Simple unavailable after it was picked: the Standard set is then the only choice)
   if (pkg === 'simple' && !simpleOk) setTimeout(() => setPkg(''), 0)
-  const onSale = pkg !== '' && (sizes ?? []).includes(pkg)
+  const onSale = pkg !== '' && (claim ? pkg === 'egift' : (sizes ?? []).includes(pkg))
   // The e-gift has no printed card (2026-11-07): when it is the selected gift — or, while the wooden sizes are not on sale, the only gift there is — the poem note and the card-preview line say it
   // comes as a PDF the receiver prints at home. The printed-card wording stays for 木札 / 版木 (shown only while wood is on sale).
   const woodOnSale = (sizes ?? []).some((id) => WOODEN[id] && !soon.includes(id))
@@ -128,7 +137,7 @@ export default function OrderForm({ result, story, followUps = [], promptQuestio
   }, [today])
   const openDateOk = openDate === '' || (/^\d{4}-\d{2}-\d{2}$/.test(openDate) && openDate >= today && openDate <= lastOpenDay)
   const emailOk = shipTo !== 'egift' || pkg === '' || !SHIPS[pkg] || /^[^\s@]{1,64}@[^\s@]{1,190}\.[^\s@]{2,}$/.test(senderEmail.trim())
-  const valid = refundAckAt !== null && senderOk && receiverOk && dateOk && pkg !== '' && onSale && messageOk && openDateOk && emailOk && !(pkg === 'simple' && !simpleOk) && poemStep !== 'loading'
+  const valid = (refundAckAt !== null || !!claim) && senderOk && receiverOk && dateOk && pkg !== '' && onSale && messageOk && openDateOk && emailOk && !(pkg === 'simple' && !simpleOk) && poemStep !== 'loading'
 
   const submit = async () => {
     if (!valid || phase !== 'edit') return
@@ -157,19 +166,21 @@ export default function OrderForm({ result, story, followUps = [], promptQuestio
           ...(openDate ? { open_date: openDate } : {}),
           ...(poemIds.length ? { poems: poemIds.map((poem_id) => ({ poem_id })) } : {}),
           ...(refundAckAt ? { refund_ack_at: refundAckAt } : {}),
+          ...(claim ? { claim: { order: claim.order, token: claim.token } } : {}),
           ...(language === 'en' && Object.keys(getUtm()).length > 0 ? { utm: getUtm() } : {}),
           session: sessionId,
           source: 'customer',
         }),
       })
-      let data: { checkout_url?: string; order_ref?: string; code?: string; field?: string } | null = null
+      let data: { checkout_url?: string; animation_url?: string; claimed?: boolean; order_ref?: string; code?: string; field?: string } | null = null
       try {
         data = await res.json()
       } catch {
         data = null
       }
-      if (res.ok && data?.checkout_url && language === 'en' && openDate) trackUs('egift_scheduled') // (English launch: the buyer scheduled the opening day)
-      if (!res.ok || !data?.checkout_url) {
+      const landing = claim ? data?.animation_url : data?.checkout_url // a claimed order goes to its own page, a normal one to Shopify checkout
+      if (res.ok && landing && language === 'en' && openDate) trackUs('egift_scheduled') // (English launch: the buyer scheduled the opening day)
+      if (!res.ok || !landing) {
         const field = FIELD_KEYS.find((f) => f === data?.field)
         const message = field
           ? memorial && field === 'receiver_name'
@@ -183,11 +194,12 @@ export default function OrderForm({ result, story, followUps = [], promptQuestio
         setPhase('edit')
         return
       }
-      log('order_submitted', { order_ref: data.order_ref, package: pkg, language })
+      log('order_submitted', { order_ref: data?.order_ref, package: pkg, language })
       trackPreview('preview_to_order', { language })
       clearDraft() // the story is ordered: a saved draft of it is no longer wanted
       setPhase('redirecting')
-      window.location.assign(data.checkout_url)
+      if (claim) clearClaim()
+      window.location.assign(landing)
     } catch {
       log('order_failed', { status: 0, code: 'network' })
       setError(o.errors.network)
@@ -302,8 +314,9 @@ export default function OrderForm({ result, story, followUps = [], promptQuestio
         <fieldset className="cgroup">
           <legend className="clab">{o.packageLabel}</legend>
           <div className="optRow pkgRow">
-            {PACKAGE_DISPLAY_ORDER.filter((id) => (sizes ?? []).includes(id)).map((id) => {
-              const approx = approxLine(PACKAGE_PRICE_JPY[id], currency, rates, pageLang)
+            {PACKAGE_DISPLAY_ORDER.filter((id) => (claim ? id === 'egift' : (sizes ?? []).includes(id)) && !(language === 'en' && soon.includes(id))).map((id) => { // (English: a "coming soon" wooden size is not listed at all)
+              const priceSale = id === 'egift' && !claim ? sale : null
+              const approx = claim ? null : approxLine(priceSale ? salePriceJpy(PACKAGE_PRICE_JPY[id], priceSale.percent) : PACKAGE_PRICE_JPY[id], currency, rates, pageLang)
               return (
                 <label key={id} className={`opt pkg${pkg === id ? ' on' : ''}${(id === 'simple' && !simpleOk) || soon.includes(id) ? ' off' : ''}`} data-simple-unavailable={id === 'simple' && !simpleOk ? 'yes' : undefined} data-coming-soon={soon.includes(id) ? 'yes' : undefined} data-size={id}>
                   <input type="radio" name="package" value={id} checked={pkg === id} disabled={(id === 'simple' && !simpleOk) || soon.includes(id)} onChange={() => setPkg(id)} />
@@ -312,9 +325,12 @@ export default function OrderForm({ result, story, followUps = [], promptQuestio
                     {soon.includes(id) ? <span className="badge quiet" data-badge="soon">{sc.comingSoon}</span> : id === RECOMMENDED_PACKAGE && <span className="badge" data-badge="recommended">{sc.recommended}</span>}
                     {id === 'egift' && !memorial && <span className="badge quiet" data-badge="now">{sc.sendNow}</span>}
                   </span>
-                  <span className="pkgPrice" data-price={id}>
-                    {formatYen(PACKAGE_PRICE_JPY[id])}
-                  </span>
+                  {!claim && (
+                    <span className="pkgPrice" data-price={id}>
+                      <PriceWithSale yen={PACKAGE_PRICE_JPY[id]} sale={priceSale} id={id} />
+                    </span>
+                  )}
+                  {!claim && <SaleLine sale={priceSale} lang={pageLang} />}
                   {approx && <span className="sent" data-approx>{approx}</span>}
                   {/* a size that is "coming soon" says nothing about what it includes or how it is sent */}
                   {!soon.includes(id) && <span className="sent pkgIncludes" data-includes={id}>{memorial ? sc.includesMemorial[id] : sc.includes[id]}</span>}
@@ -385,13 +401,19 @@ export default function OrderForm({ result, story, followUps = [], promptQuestio
           </p>
         )}
 
-        <p className="sent orderNote" data-testid="order-refund-line">{memorial ? pc.refundLineMemorial : pc.refundLine} <a href="/legal#refund" data-testid="order-refund-details" className="legalLink">{pc.refundDetails}</a></p>
-        <label className="refundCheck" data-testid="order-refund-check-label">
-          <input type="checkbox" data-testid="order-refund-check" checked={refundAckAt !== null} onChange={(e) => setRefundAckAt(e.target.checked ? new Date().toISOString() : null)} />
-          <span>{pc.refundCheck}</span>
-        </label>
+        {claim ? (
+          <p className="sent orderNote" data-testid="claim-order-note">{claimCopy.banner.replace('{order}', claim.order)} {claimCopy.note}</p>
+        ) : (
+          <>
+            <p className="sent orderNote" data-testid="order-refund-line">{memorial ? pc.refundLineMemorial : pc.refundLine} <a href="/legal#refund" data-testid="order-refund-details" className="legalLink">{pc.refundDetails}</a></p>
+            <label className="refundCheck" data-testid="order-refund-check-label">
+              <input type="checkbox" data-testid="order-refund-check" checked={refundAckAt !== null} onChange={(e) => setRefundAckAt(e.target.checked ? new Date().toISOString() : null)} />
+              <span>{pc.refundCheck}</span>
+            </label>
+          </>
+        )}
         <button type="button" data-testid="order-submit" className="btn primary" onClick={submit} disabled={!valid || busy}>
-          {phase === 'submitting' ? o.submitting : phase === 'redirecting' ? o.redirecting : o.submit}
+          {phase === 'submitting' ? o.submitting : phase === 'redirecting' ? o.redirecting : claim ? claimCopy.make : o.submit}
         </button>
         <p className="sent">{memorial ? o.privacyMemorial : o.privacy}</p>
         <p className="sent"><a href="/legal" data-testid="legal-link" className="legalLink">{pc.legalLink}</a></p>
