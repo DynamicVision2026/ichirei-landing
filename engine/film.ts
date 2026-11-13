@@ -7,6 +7,7 @@
 // Env: ICHIREI_FILM_MODEL (default claude-haiku-5-5), ICHIREI_FILM_TIMEOUT_MS (30000 per call), ICHIREI_FILM=off (always the fallback).
 // Logs (no story text — codes and counts only): [ichirei-film] film_generated | film_retry | film_fallback.
 
+import { OLD_SCRIPT_SETTING, swapOnce, western } from './film-western.ts'
 import { PICTURE_UNSAFE_RE, findIllnessAll } from './unsafe-words.ts'
 import Anthropic from '@anthropic-ai/sdk'
 import { readFileSync } from 'node:fs'
@@ -326,7 +327,7 @@ const fill = (template: string, values: Record<string, string>): string =>
   template.replace(new RegExp(Object.keys(values).map((k) => `\\{\\{ ${k} \\}\\}`).join('|'), 'g'), (m) => values[m.slice(3, -3).trim()] ?? m)
 
 export function buildFilmPrompt(input: FilmInput, feedback = ''): string {
-  return (input.tone ? `${input.tone}\n\n` : '') + fill(loadFilmPrompt(), {
+  const text = (input.tone ? `${input.tone}\n\n` : '') + fill(loadFilmPrompt(), {
     LANGUAGE: input.language,
     RELATIONSHIP: input.relationship ?? 'unspecified',
     DIRECTION: input.direction ?? 'unspecified',
@@ -339,6 +340,8 @@ export function buildFilmPrompt(input: FilmInput, feedback = ''): string {
     LINE_LIMITS: lineLimitText(input.language),
     FEEDBACK: feedback,
   })
+  // English films (2026-11-13): the buyer's world is the United States or Europe, and each picture names its place in Western terms. ja / zh-Hant / zh-Hans: the text above, byte for byte.
+  return input.language === 'en' ? swapOnce(text, OLD_SCRIPT_SETTING, western('script setting')) : text
 }
 
 function parseJson(raw: string): Record<string, unknown> | null {
@@ -474,7 +477,7 @@ export async function makeFilm(input: FilmInput, opts: FilmOptions = {}): Promis
   const rewriteScene = async (i: number, scenes: Scene[], failed: FilmProblem[], signal: AbortSignal): Promise<Scene | null> => {
     try {
       const listed = scenes.map((sc, k) => `${k + 1}${k === i ? ' (FAILED)' : ''}. line: ${sc.line.replace(/\n/g, ' ')}\n   picture: ${sc.picture}`).join('\n')
-      const prompt = (input.tone ? `${input.tone}\n\n` : '') + fill(loadScenePrompt(), {
+      const built = (input.tone ? `${input.tone}\n\n` : '') + fill(loadScenePrompt(), {
         LANGUAGE: input.language,
         LINE_LIMITS: lineLimitText(input.language),
         STORY: input.story,
@@ -485,6 +488,7 @@ export async function makeFilm(input: FilmInput, opts: FilmOptions = {}): Promis
         SAFE: isUnsafe(failed) ? SAFE_SCENES_TEXT : '',
         FORBIDDEN: forms.length ? forms.join(' ') : '(none)',
       })
+      const prompt = input.language === 'en' ? `${built}\n\n${western('script scenes')}` : built
       const stream = client.messages.stream({ model, max_tokens: 1200, output_config: { effort: 'low' }, messages: [{ role: 'user', content: prompt }] }, { signal })
       const message = await stream.finalMessage()
       const raw = parseJson(message.content.filter((b): b is Anthropic.TextBlock => b.type === 'text').map((b) => b.text).join(''))

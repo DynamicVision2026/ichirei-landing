@@ -33,12 +33,15 @@ import type { Language } from './contract.ts'
 import { checkPictures as refereeDescriptions, type FilmRecord } from './film.ts'
 import { callSignal, timedOut } from './limits.ts'
 import type { OrderStore } from './order-store.ts'
+import { OLD_CHECK_SETTING, OLD_REWRITE_SETTING, swapOnce, western } from './film-western.ts'
 
 // ---- the style (fixed, the same for every order) ----------------------------------------------------------------------------------------------------
 
 export const IMAGE_STYLE =
   'Japanese sumi-e ink-wash painting on warm off-white washi paper. Soft graded black ink only, with at most one muted earth-brown accent wash. Loose, confident brush strokes, visible paper grain, generous empty space. People only as hands, or seen from behind, or from far away as small silhouettes; never a face, not even in profile, and no facial features. No text, letters, signatures, seals or frames. Quiet, tender, everyday life. People wear contemporary everyday clothes; modern objects (a plain modern umbrella, modern doors, phones and trains) unless the description says otherwise. Consistent hand, as if one painter made the whole series. Portrait 4:5.'
 export const IMAGE_STYLE_MEMORIAL = 'Paler grey-beige paper, very soft ink, still and calm.'
+/** English films: the same style, brush, paper, colours and rules — but "Sumi-e ink-wash painting", without the word "Japanese" (2026-11-13). */
+export const IMAGE_STYLE_EN = IMAGE_STYLE.replace('Japanese sumi-e ink-wash painting', 'Sumi-e ink-wash painting')
 /** Added to a picture drawn a second time, for the reason it failed the first time. */
 const RETRY_HINT: Record<string, string> = {
   face: 'Absolutely no faces, not even in profile: show only hands, or a person seen from behind or far away as a small silhouette.',
@@ -52,8 +55,14 @@ const RETRY_HINT: Record<string, string> = {
   off_story: 'Follow the description exactly; keep it a simple ink-wash painting.',
 }
 
-export const buildImagePrompt = (description: string, memorial: boolean, hint = ''): string =>
-  [IMAGE_STYLE, memorial ? IMAGE_STYLE_MEMORIAL : '', `Scene: ${description.trim()}`, hint].filter(Boolean).join('\n')
+/**
+ * The image prompt. For `en` (and only `en`): the style without "Japanese", then the Western world line, then the scene. For every other language — and when no language is given —
+ * it is exactly what it has always been.
+ */
+export const buildImagePrompt = (description: string, memorial: boolean, hint = '', language?: Language): string =>
+  language === 'en'
+    ? [IMAGE_STYLE_EN, memorial ? IMAGE_STYLE_MEMORIAL : '', western('image world'), `Scene: ${description.trim()}`, hint].filter(Boolean).join('\n')
+    : [IMAGE_STYLE, memorial ? IMAGE_STYLE_MEMORIAL : '', `Scene: ${description.trim()}`, hint].filter(Boolean).join('\n')
 
 export const IMAGE_SIZE = { width: 1080, height: 1350 }
 
@@ -259,7 +268,9 @@ export function buildCheckPrompt(descriptions: string[], memorial: boolean, lang
     MEMORIAL: memorial ? 'This is a REMEMBRANCE film (the person it is for has died): check "celebration".' : 'This is not a remembrance film: ignore "celebration".',
     DESCRIPTIONS: descriptions.map((d, i) => `Picture ${i + 1}: ${d}`).join('\n'),
   }
-  return readPrompt().replace(/\{\{ (MEMORIAL|DESCRIPTIONS|LANGUAGE) \}\}/g, (m) => values[m.slice(3, -3).trim()])
+  const text = readPrompt().replace(/\{\{ (MEMORIAL|DESCRIPTIONS|LANGUAGE) \}\}/g, (m) => values[m.slice(3, -3).trim()])
+  // English: the buyer's world is a contemporary American or European one (the ja / zh text is exactly as before)
+  return language === 'en' ? swapOnce(text, OLD_CHECK_SETTING, western('check setting')) : text
 }
 
 export function parseVerdicts(raw: string, n: number): Verdict[] | null {
@@ -387,7 +398,8 @@ export function buildRewritePrompt(description: string, reason: string, memorial
     DESCRIPTION: description,
     FEEDBACK: feedback,
   }
-  return readRewritePrompt().replace(/\{\{ (REASON|LANGUAGE|MEMORIAL|DESCRIPTION|FEEDBACK) \}\}/g, (m) => values[m.slice(3, -3).trim()])
+  const text = readRewritePrompt().replace(/\{\{ (REASON|LANGUAGE|MEMORIAL|DESCRIPTION|FEEDBACK) \}\}/g, (m) => values[m.slice(3, -3).trim()])
+  return language === 'en' ? swapOnce(text, OLD_REWRITE_SETTING, western('rewrite setting') + ')') : text
 }
 
 /**
@@ -601,8 +613,8 @@ async function renderLocked(deps: ArtDeps, input: RenderInput): Promise<ArtRecor
       const signal = callSignal(deps.signal, timeout)
       if (w === 0) tries[slot]++
       try {
-        const hint = attempt > 1 && reasons[slot] ? (RETRY_HINT[reasons[slot]] ?? '') : ''
-        const r = await image.generate(buildImagePrompt(desc(slot), input.memorial, hint), signal)
+        const hint = attempt > 1 && reasons[slot] ? (input.language === 'en' && reasons[slot] === 'setting' ? western('retry setting') : (RETRY_HINT[reasons[slot]] ?? '')) : ''
+        const r = await image.generate(buildImagePrompt(desc(slot), input.memorial, hint, input.language), signal)
         calls++
         afterRewrite.delete(slot)
         drawn++
