@@ -1,14 +1,13 @@
 import { PACKAGE_DISPLAY_ORDER, RECOMMENDED_PACKAGE } from '../order/packages.ts'
 import { SIZE_COPY } from '../demo/sizes-copy.ts'
-import { useComingSoon, useSale, useSizes } from '../demo/useSizes.ts'
+import { useComingSoon, useSale, useSizes, useUsd } from '../demo/useSizes.ts'
 import { useEffect, useId, useRef, useState, type KeyboardEvent, type ReactNode } from 'react'
 import { ANGLES, TEXT, type RevealLang } from './copy.ts'
 import { rich } from './rich.tsx'
 import Picture from './Picture.tsx'
-import { sceneName } from './scenes.ts'
 import { CURRENCIES, approxLine, type Currency, type Rates } from './currency.ts'
 import { PACKAGE_PRICE_JPY } from '../order/packages.ts'
-import { PriceWithSale, SaleLine } from '../order/SalePrice.tsx'
+import { PriceWithSale, SaleLine, UsdPriceView } from '../order/SalePrice.tsx'
 import { salePriceJpy } from '../order/sale.ts'
 import { LEGAL, rowValue } from '../legal/legal-copy.ts'
 
@@ -38,7 +37,7 @@ export function Strip({ t, woodOnSale = false }: { t: T; woodOnSale?: boolean })
   )
 }
 
-export function Philosophy({ t }: { t: T }) {
+export function Philosophy({ t, lang }: { t: T; lang?: string }) {
   return (
     <section className="philo">
       <div className="wrap">
@@ -47,9 +46,10 @@ export function Philosophy({ t }: { t: T }) {
         <div className="phGrid">
           {(
             [
-              ['一', t.ph1],
-              ['二', t.ph2],
-              ['三', t.ph3],
+              // English reads 1 / 2 / 3 (same style and size); Japanese and Chinese keep 一 二 三
+              [lang === 'en' ? '1' : '一', t.ph1],
+              [lang === 'en' ? '2' : '二', t.ph2],
+              [lang === 'en' ? '3' : '三', t.ph3],
             ] as const
           ).map(([n, text]) => (
             <div key={n}>
@@ -222,7 +222,7 @@ const MOMENTS = [
 ] as const
 
 /** Everyday moments mosaic: photo frames with a caption; a missing photo leaves the coloured frame. */
-export function Moments({ t, memorial = false, lang = 'ja' }: { t: T; memorial?: boolean; lang?: RevealLang }) {
+export function Moments({ t, memorial = false }: { t: T; memorial?: boolean }) {
   return (
     <section id="moments">
       <div className="wrap center">
@@ -239,7 +239,7 @@ export function Moments({ t, memorial = false, lang = 'ja' }: { t: T; memorial?:
               {m.k}
             </span>
             <Picture
-              name={lang === 'en' ? sceneName('en', m.cat) : `scenes/${m.n}`}
+              name={`scenes/${m.n}`}
               width={m.n === 'm4' || m.n === 'm6' ? 2 : 1}
               height={1}
               sizes={m.n === 'm1' || m.n === 'm4' || m.n === 'm6' ? '(max-width: 860px) 100vw, 560px' : '(max-width: 860px) 50vw, 280px'}
@@ -316,6 +316,7 @@ export function Gifts({
   // variant is missing is not listed (useSizes).
   const sizes = useSizes()
   const soon = useComingSoon() // e-gift-first launch: 木札 / 版木 are listed with 「近日公開」 and a disabled button
+  const usdPrice = useUsd() // English: a fixed dollar price
   const sale = useSale() // the Thanksgiving sale (the e-gift only): the old price struck through, the sale price beside it, one line of words
   const sc = SIZE_COPY[lang]
   // English (US launch): nothing physical is offered, so while the wooden sizes are "coming soon" they are not listed at all — only the e-gift
@@ -342,7 +343,7 @@ export function Gifts({
       <div className="wrap gifts">
         {cards.map((c) => {
           const onSale = c.id === 'egift' ? sale : null
-          const approx = approxLine(onSale ? salePriceJpy(PACKAGE_PRICE_JPY[c.id], onSale.percent) : PACKAGE_PRICE_JPY[c.id], currency, rates, lang)
+          const approx = lang === 'en' ? null : approxLine(onSale ? salePriceJpy(PACKAGE_PRICE_JPY[c.id], onSale.percent) : PACKAGE_PRICE_JPY[c.id], currency, rates, lang)
           return (
             <article className="gift" key={c.id} data-size={c.id} data-coming-soon={c.soon ? 'yes' : undefined}>
               <Picture name={c.img} width={1600} height={1000} alt={c.soon ? c.title : GIFT_ALT[c.id]} sizes="(max-width: 860px) 100vw, 380px" />
@@ -352,7 +353,7 @@ export function Gifts({
                   <span className="badgeSlot">{c.badge && <span className="badge" data-badge={c.soon ? 'soon' : c.id === 'egift' ? 'now' : 'recommended'}>{c.badge}</span>}</span>
                   <h3>{c.title}</h3>
                   <span className="price" data-price={c.id}>
-                    <PriceWithSale yen={PACKAGE_PRICE_JPY[c.id]} sale={onSale} id={c.id} />
+                    {lang === 'en' && c.id === 'egift' ? <UsdPriceView price={usdPrice} sale={onSale} id={c.id} /> : <PriceWithSale yen={PACKAGE_PRICE_JPY[c.id]} sale={onSale} id={c.id} />}
                   </span>
                 </div>
                 <SaleLine sale={onSale} lang={lang} />
@@ -379,7 +380,7 @@ export function Gifts({
       <div className="wrap shipNote">
         <span>{woodOnSale ? t.ship1 : t.ship1S}</span>
         {woodOnSale && <span>{t.ship2}</span>}
-        {rates && (
+        {rates && lang !== 'en' && (
           <label>
             <span>{t.cur}</span>{' '}
             <select value={currency} onChange={(e) => onCurrency(e.target.value as Currency)}>

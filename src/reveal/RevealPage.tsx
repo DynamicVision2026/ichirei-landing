@@ -108,7 +108,7 @@ export default function RevealPage() {
         <Hero lang={lang} currency={currency} rates={rates} woodOnSale={woodOnSale} />
         {lang === 'en' && <UsBanner />}
         <Strip t={t} woodOnSale={woodOnSale} />
-        <Philosophy t={t} />
+        <Philosophy t={t} lang={lang} />
         <StoryShape t={t} />
         <Angles t={t} lang={lang} />
         <Suspense
@@ -124,7 +124,7 @@ export default function RevealPage() {
           <DemoApp mode="customer" aside={aside} />
         </Suspense>
         <Steps t={t} memorial={memorial} woodOnSale={woodOnSale} />
-        <Moments t={t} memorial={memorial} lang={lang} />
+        <Moments t={t} memorial={memorial} />
         <Reviews t={t} />
         {lang === 'en' && <UsReceive />}
         <Gifts t={t} lang={lang} currency={currency} rates={rates} onCurrency={setCurrency} woodOnSale={woodOnSale} />

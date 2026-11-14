@@ -25,3 +25,19 @@ export function stripWhoOpening(line: string, language: Language | string): stri
 
 /** `labelShown` false: the line stands alone (a gift page or a print file without the label) and keeps its opening. */
 export const whoLine = (line: string, language: Language | string, labelShown: boolean): string => (labelShown ? stripWhoOpening(line, language) : line)
+
+/** English: a line that begins "Someone who…", "Someone whose…" or "The one who…" already reads as a whole sentence, so the "They are" label is left off. */
+const EN_STANDS_ALONE = /^\s*(?:someone\s+who(?:se)?|the\s+one\s+who)\b/i
+
+/**
+ * English card line with its label (2026-11-14): `{ label: false, text }` = show the line alone (it starts "Someone who…" / "Someone whose…" / "The one who…");
+ * `{ label: true, text }` = show "They are" and then the text, whose first letter is lowercased ("They are always at the door."). Other languages: the label and
+ * the line as before (the label is always shown; the matching opening is taken off).
+ */
+export function enWhoPart(line: string): { label: boolean; text: string } {
+  const raw = String(line ?? '').trim()
+  if (EN_STANDS_ALONE.test(raw)) return { label: false, text: raw }
+  const rest = raw.replace(/^\s*(?:this person is|they are)\b[,:]?\s*/i, '')
+  const text = rest.trim() === '' ? raw : rest
+  return { label: true, text: text.charAt(0).toLowerCase() + text.slice(1) }
+}

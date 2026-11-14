@@ -5,6 +5,7 @@
 import { useEffect, useState } from 'react'
 import { PACKAGES, PACKAGE_DISPLAY_ORDER, SHIPS, type PackageId } from '../order/packages.ts'
 import { saleOn, type Sale } from '../order/sale.ts'
+import { DEFAULT_USD_PRICE, type UsdPrice } from '../order/usd.ts'
 
 const FALLBACK: PackageId[] = ['simple', 'standard']
 let cache: PackageId[] | null = null
@@ -13,6 +14,15 @@ let soon: PackageId[] = []
 let inflight: Promise<PackageId[]> | null = null
 /** The Thanksgiving sale the server says is on (null = none). */
 let sale: Sale | null = null
+/** The English page's fixed dollar price (USD_PRICE_EGIFT / _SALE on the server). */
+let usdPrice: UsdPrice = DEFAULT_USD_PRICE
+
+/** Pure: the dollar price in a /api/sizes body (the defaults when it is missing or unreadable). */
+export const cleanUsd = (raw: unknown): UsdPrice => {
+  const u = (raw as { usd?: Partial<UsdPrice> } | null)?.usd
+  const ok = (n: unknown): n is number => typeof n === 'number' && Number.isInteger(n) && n >= 1
+  return u && ok(u.egift) && ok(u.egift_sale) ? { egift: u.egift, egift_sale: u.egift_sale } : DEFAULT_USD_PRICE
+}
 
 /** Pure: the sale in a /api/sizes body, or null. */
 export const cleanSale = (raw: unknown): Sale | null => {
@@ -42,6 +52,7 @@ export function loadSizes(): Promise<PackageId[]> {
       const sizes = j ? cleanSizes(j) : FALLBACK
       soon = j ? cleanComingSoon(j) : []
       sale = j ? cleanSale(j) : null
+      usdPrice = j ? cleanUsd(j) : DEFAULT_USD_PRICE
       cache = sizes
       return sizes
     })
@@ -105,4 +116,17 @@ export function useSale(): Sale | null {
   }, [raw, tick])
   void tick
   return saleOn(raw)
+}
+
+/** The English page's dollar price (the same single /api/sizes request). */
+export function useUsd(): UsdPrice {
+  const [u, setU] = useState<UsdPrice>(usdPrice)
+  useEffect(() => {
+    let alive = true
+    void loadSizes().then(() => alive && setU(usdPrice))
+    return () => {
+      alive = false
+    }
+  }, [])
+  return u
 }

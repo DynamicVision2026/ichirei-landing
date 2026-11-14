@@ -2,7 +2,7 @@ import { useEffect } from 'react'
 import type { PreviewCopy } from './preview-copy.ts'
 import type { PreviewState } from './usePreview.ts'
 import { trackPreview } from './analytics.ts'
-import { whoLine } from '../order/who-line.ts'
+import { enWhoPart, whoLine } from '../order/who-line.ts'
 import EnBridgeStack from '../order/EnBridgeStack.tsx'
 
 // The free card preview: an on-screen image of the card's inside (the four scenes of the story with their lines, the character, who they are, the poem), lightly marked
@@ -66,7 +66,14 @@ export default function CardPreview({ copy: c, glyph, reading, who, poem, certif
           ) : (
             <span className="cardReading notranslate">{reading}</span>
           )}
-          <p className="cardWho notranslate"><span className="cardWhoLabel">{c.who}</span> {whoLine(who, language, true)}</p>
+          {language === 'en' ? (
+            (() => {
+              const w = enWhoPart(who)
+              return <p className="cardWho notranslate" data-testid="card-who">{w.label && <><span className="cardWhoLabel">{c.who}</span>{' '}</>}{w.text}</p>
+            })()
+          ) : (
+            <p className="cardWho notranslate" data-testid="card-who"><span className="cardWhoLabel">{c.who}</span> {whoLine(who, language, true)}</p>
+          )}
           {poem && (poem.type === 'tanka' || poem.type === 'haiku' ? (
             // 短歌 / 俳句: vertical (縦書き), the first line on the right — the same as the gift page and the printed card
             <p className="cardPoem cardPoemVert notranslate" data-testid="card-poem" data-poem-type={poem.type} data-vertical="yes">

@@ -5,7 +5,7 @@ import type { Copy, InscriptionStyle, OrderField, PackageId, UiLanguage } from '
 import { log } from './logging'
 import { sessionId, trackUs } from './analytics'
 import { clearDraft } from './draft'
-import { EGIFT_JAPAN_ONLY, GIFT_MESSAGE_MAX, OPEN_DATE_MAX_DAYS, PACKAGE_DISPLAY_ORDER, PACKAGE_PRICE_JPY, RECOMMENDED_PACKAGE, SHIPS, SHIP_TO, WOODEN, type ShipTo } from '../order/packages.ts'
+import { EGIFT_JAPAN_ONLY, GIFT_MESSAGE_MAX, OPEN_DATE_MAX_DAYS, PACKAGE_DISPLAY_ORDER, PACKAGE_PRICE_JPY, RECOMMENDED_PACKAGE, SHIPS, SHIP_TO, WOODEN, formatYen, type ShipTo } from '../order/packages.ts'
 import { SIZE_COPY } from './sizes-copy.ts'
 import { LEGAL } from '../legal/legal-copy.ts'
 import { useComingSoon, useSizes } from './useSizes.ts'
@@ -27,9 +27,10 @@ import EnBridgeStack from '../order/EnBridgeStack.tsx'
 import { getUtm } from './utm-store.ts'
 import { clearClaim, getClaim } from './claim-store.ts'
 import { CLAIM_COPY } from '../claim/copy.ts'
-import { PriceWithSale, SaleLine } from '../order/SalePrice.tsx'
+import { PriceWithSale, SaleLine, UsdPriceView } from '../order/SalePrice.tsx'
 import { salePriceJpy } from '../order/sale.ts'
-import { useSale } from './useSizes.ts'
+import { yenCheckoutLine } from '../order/usd.ts'
+import { useSale, useUsd } from './useSizes.ts'
 import { cleanReading } from '../order/reading.ts'
 
 // The purchase step of the customer flow: after the sender has chosen a character, collect
@@ -87,6 +88,7 @@ export default function OrderForm({ result, story, followUps = [], promptQuestio
   // An order that was paid without our site (2026-11-13, /claim): the character is attached to that order — the e-gift, nothing to pay, no checkout.
   const claim = useMemo(() => getClaim(), [])
   const claimCopy = CLAIM_COPY[language]
+  const usdPrice = useUsd() // English: a fixed dollar price, never an "about" figure
   const sale = useSale() // the Thanksgiving sale shown beside the e-gift's price (Shopify's discount sets the real price)
   const [pkg, setPkg] = useState<PackageId | ''>(claim ? 'egift' : '')
   const sizes = useSizes() // the sizes on sale right now (Part C): a size without a Shopify variant is not shown
@@ -316,7 +318,7 @@ export default function OrderForm({ result, story, followUps = [], promptQuestio
           <div className="optRow pkgRow">
             {PACKAGE_DISPLAY_ORDER.filter((id) => (claim ? id === 'egift' : (sizes ?? []).includes(id)) && !(language === 'en' && soon.includes(id))).map((id) => { // (English: a "coming soon" wooden size is not listed at all)
               const priceSale = id === 'egift' && !claim ? sale : null
-              const approx = claim ? null : approxLine(priceSale ? salePriceJpy(PACKAGE_PRICE_JPY[id], priceSale.percent) : PACKAGE_PRICE_JPY[id], currency, rates, pageLang)
+              const approx = claim || language === 'en' ? null : approxLine(priceSale ? salePriceJpy(PACKAGE_PRICE_JPY[id], priceSale.percent) : PACKAGE_PRICE_JPY[id], currency, rates, pageLang)
               return (
                 <label key={id} className={`opt pkg${pkg === id ? ' on' : ''}${(id === 'simple' && !simpleOk) || soon.includes(id) ? ' off' : ''}`} data-simple-unavailable={id === 'simple' && !simpleOk ? 'yes' : undefined} data-coming-soon={soon.includes(id) ? 'yes' : undefined} data-size={id}>
                   <input type="radio" name="package" value={id} checked={pkg === id} disabled={(id === 'simple' && !simpleOk) || soon.includes(id)} onChange={() => setPkg(id)} />
@@ -327,7 +329,7 @@ export default function OrderForm({ result, story, followUps = [], promptQuestio
                   </span>
                   {!claim && (
                     <span className="pkgPrice" data-price={id}>
-                      <PriceWithSale yen={PACKAGE_PRICE_JPY[id]} sale={priceSale} id={id} />
+                      {language === 'en' && id === 'egift' ? <UsdPriceView price={usdPrice} sale={priceSale} id={id} /> : <PriceWithSale yen={PACKAGE_PRICE_JPY[id]} sale={priceSale} id={id} />}
                     </span>
                   )}
                   {!claim && <SaleLine sale={priceSale} lang={pageLang} />}
@@ -411,6 +413,9 @@ export default function OrderForm({ result, story, followUps = [], promptQuestio
               <span>{pc.refundCheck}</span>
             </label>
           </>
+        )}
+        {language === 'en' && !claim && (
+          <p className="sent orderNote" data-testid="order-yen-line">{yenCheckoutLine(formatYen(sale ? salePriceJpy(PACKAGE_PRICE_JPY.egift, sale.percent) : PACKAGE_PRICE_JPY.egift))}</p>
         )}
         <button type="button" data-testid="order-submit" className="btn primary" onClick={submit} disabled={!valid || busy}>
           {phase === 'submitting' ? o.submitting : phase === 'redirecting' ? o.redirecting : claim ? claimCopy.make : o.submit}

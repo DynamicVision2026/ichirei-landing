@@ -413,7 +413,7 @@
 .rv .usReceive{padding:clamp(2.5rem,6vw,4.5rem) 0}
 .rv .usReceiveList{list-style:none;margin:2rem auto 1.5rem;padding:0;display:grid;gap:.9rem;max-width:44rem;text-align:left;counter-reset:none}
 .rv .usReceiveList li{display:grid;grid-template-columns:2rem 1fr;column-gap:.9rem;align-items:baseline;padding:.9rem 1.1rem;background:var(--card);border:1px solid var(--line);border-radius:14px}
-.rv .usReceiveN{grid-row:span 2;font-family:var(--display);font-weight:700;color:var(--seal);font-size:1.3rem}
+.rv .usReceiveN{grid-row:span 2;font-family:var(--display);font-weight:700;color:var(--ink);font-size:1.3rem}
 .rv .usReceiveList b{font-family:var(--display);font-size:1.02rem}
 .rv .usReceiveList small{grid-column:2;color:var(--mute);font-size:.9rem;line-height:1.5}
 .rv .usReceiveArt{width:min(15rem,60%);margin:1rem auto 0;border-radius:14px;overflow:hidden}
@@ -425,3 +425,6 @@
 .rv .priceOld{color:var(--mute);font-weight:400;text-decoration:line-through;text-decoration-thickness:1px}
 .rv .priceSale{font-weight:700}
 .rv .saleLine{display:block;margin:.15rem 0 .1rem;color:inherit;font-weight:600}
+/* The English page's dollar price (2026-11-14) */
+.rv .usReceivePrice{margin:0 auto 1.4rem;font-family:var(--display);font-size:1.7rem;font-weight:700;color:var(--ink)}
+.rv .usdHero{font-family:var(--display);font-size:1.15rem;font-weight:700;color:var(--ink)}

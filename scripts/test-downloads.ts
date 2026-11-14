@@ -136,6 +136,13 @@ else {
   const wt = text('wood.pdf')
   check('(3) the keepsake copy of a wooden size is the printed card itself: two pages, A5 landscape with bleed, the lines for the names left blank', /Pages:\s+2/.test(wi) && /Page size:\s+6\d\d\.\d+ x 4\d\d\.\d+ pts/.test(wi) && wt.includes('＿＿') && !wt.includes('山田 一郎 さんへ'), wi + wt.slice(0, 300))
   check('(3) neither card carries a sample mark, a price or any order data', ![et, wt].some((t) => /見本|Sample|樣本|¥|IC-2026|order_ref|AN-|RG-/.test(t)))
+  // English (2026-11-14): the printed card never reads "They are Someone who…" — the line stands alone, with no "They are" label
+  const enG = await build({ language: 'en', engine_result: { ...clone(GOLDEN), language: 'en' }, sender_name: 'Ann', receiver_name: 'Ben', gift_message: 'Thank you.' }, ['ai', 'ai', 'ai', 'ai'])
+  await enG.store.put(enG.token, { ...enG.gift, who: 'Someone who waits at the door every night.' } as GiftRecord)
+  const enPdf = Buffer.from(await (await H(enG.store).cardPdf(enG.token)).arrayBuffer())
+  writeFileSync(join(dir, 'en.pdf'), enPdf)
+  const enT = text('en.pdf')
+  check('(3) en: the card PDF is made, and shows no "They are" label (and so no "They are Someone")', enPdf.subarray(0, 4).toString() === '%PDF' && !/They are/i.test(enT), enT.slice(0, 400))
   rmSync(dir, { recursive: true, force: true })
 }
 check('(3) a film that is not complete has no card yet (404)', (await H(mid.store).cardPdf(mid.token)).status === 404)

@@ -1,6 +1,6 @@
 // 2026-11-07: where the label (その人は / 這個人是 / They are, or どんな人か / 對方是怎樣的人 / What they're like) is shown, an opening on the line that repeats it is taken off.
 //   node --experimental-strip-types --disable-warning=ExperimentalWarning scripts/test-who-line.ts
-import { stripWhoOpening, whoLine } from '../src/order/who-line.ts'
+import { enWhoPart, stripWhoOpening, whoLine } from '../src/order/who-line.ts'
 
 let failures = 0
 const check = (name: string, cond: boolean, detail = '') => { console.log(`${cond ? 'PASS' : 'FAIL'}  ${name}${!cond && detail ? `  -> ${detail}` : ''}`); if (!cond) failures++ }
@@ -35,6 +35,16 @@ eq('label shown (zh): the same line is stripped', whoLine('這個人是會把你
 eq('a line that is only the opening is not emptied', stripWhoOpening('その人は、', 'ja'), 'その人は、')
 eq('only ONE opening is removed', stripWhoOpening('這個人是這個人是好人。', 'zh-Hant'), '這個人是好人。')
 eq('empty input stays empty', stripWhoOpening('', 'ja'), '')
+
+// 2026-11-14 (en): "Someone who…" / "Someone whose…" / "The one who…" stand alone (no "They are" label); every other line takes the label and a lowercased first letter
+const part = (l: string) => { const w = enWhoPart(l); return `${w.label ? 'They are ' : ''}${w.text}` }
+eq('en card: "Someone who…" has no label', part('Someone who waits at the door.'), 'Someone who waits at the door.')
+eq('en card: "Someone whose…" has no label', part('Someone whose light stays on.'), 'Someone whose light stays on.')
+eq('en card: "The one who…" has no label', part('The one who is still waiting when everyone else has gone home.'), 'The one who is still waiting when everyone else has gone home.')
+eq('en card: case does not matter ("someone who")', part('someone who waits.'), 'someone who waits.')
+eq('en card: any other line takes the label, first letter lowercased', part('Always up before me.'), 'They are always up before me.')
+eq('en card: a doubled "They are" is not printed twice', part('They are always up before me.'), 'They are always up before me.')
+check('en card: nothing printed reads "They are Someone"', !/They are Someone/i.test([ 'Someone who waits.', 'The one who waits.', 'Someone whose light stays on.', 'Always early.' ].map(part).join('\n')))
 
 if (failures > 0) { console.log(`\n${failures} check(s) FAILED`); process.exit(1) }
 console.log('\nAll who-line checks passed.')

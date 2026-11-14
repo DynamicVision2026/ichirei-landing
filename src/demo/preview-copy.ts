@@ -118,6 +118,6 @@ export const PREVIEW_COPY: Record<RevealLang, PreviewCopy> = {
     refundLineMemorial: REFUND_EN_MEMORIAL,
     refundDetails: 'Details',
     refundCheck: "I've read the cancellation and refund terms (within 24 hours of payment, before collecting).",
-    legalLink: 'Legal notice (特定商取引法) and returns',
+    legalLink: 'Legal notice and returns',
   },
 }

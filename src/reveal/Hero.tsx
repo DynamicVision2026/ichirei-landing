@@ -6,8 +6,8 @@ import { sceneName } from './scenes.ts'
 import { usePrefersReducedMotion } from './usePrefersReducedMotion.ts'
 import { approxShort, type Currency, type Rates } from './currency.ts'
 import { PACKAGE_PRICE_JPY } from '../order/packages.ts'
-import { salePriceJpy } from '../order/sale.ts'
-import { useSale } from '../demo/useSizes.ts'
+import { useSale, useUsd } from '../demo/useSizes.ts'
+import { UsdPriceView } from '../order/SalePrice.tsx'
 
 const INTERVAL_MS = 6000
 const SWAP_MS = 350
@@ -64,8 +64,9 @@ export default function Hero({ lang, currency, rates, woodOnSale = false }: { la
     ;(event.currentTarget.querySelectorAll('button')[next] as HTMLElement | undefined)?.focus()
   }
   const sale = useSale()
-  // English: the e-gift's price — and while the Thanksgiving sale is on, the SALE price ("about $n" follows it)
-  const approx = approxShort(lang === 'en' ? (sale ? salePriceJpy(PACKAGE_PRICE_JPY.egift, sale.percent) : PACKAGE_PRICE_JPY.egift) : PACKAGE_PRICE_JPY.simple, currency, rates, lang)
+  // English (2026-11-14): a fixed dollar price ($25; the sale $25 struck → $17), never an "about" figure. The other languages keep their converted line.
+  const usdPrice = useUsd()
+  const approx = lang === 'en' ? null : approxShort(PACKAGE_PRICE_JPY.simple, currency, rates, lang)
 
   return (
     <section className="hero">
@@ -81,6 +82,7 @@ export default function Hero({ lang, currency, rates, woodOnSale = false }: { la
             </a>
             <span className="free">{rich(t.freeLine)}</span>
             {approx && <span className="approxHero">{approx}</span>}
+            {lang === 'en' && <span className="approxHero usdHero" data-testid="usd-hero"><UsdPriceView price={usdPrice} sale={sale} id="hero" /></span>}
           </div>
           <ul className="chips">
             {(['c1', 'c2', 'c3', 'c4', 'c5'] as const).map((k) => (

@@ -1,6 +1,8 @@
 import { useEffect, useRef } from 'react'
 import { trackUs } from '../demo/analytics'
 import Picture from './Picture'
+import { UsdPriceView } from '../order/SalePrice.tsx'
+import { useSale, useUsd } from '../demo/useSizes'
 
 // The English landing page's own sections (ticket 2026-11-12, C1): the one-line delivery banner and the "What they receive" strip. English only — RevealPage mounts them for the English page and nothing else.
 
@@ -46,6 +48,8 @@ const RECEIVE_ITEMS: readonly { key: string; title: string; text: string }[] = [
 ]
 
 export function UsReceive() {
+  const price = useUsd()
+  const sale = useSale()
   return (
     <section className="usReceive" id="receive" data-testid="us-receive">
       <div className="wrap center">
@@ -60,8 +64,9 @@ export function UsReceive() {
             </li>
           ))}
         </ol>
+        <p className="usReceivePrice" data-testid="us-receive-price"><UsdPriceView price={price} sale={sale} id="receive" /></p>
         <figure className="usReceiveArt ph" aria-hidden="true">
-          <Picture name="scenes/en/tree" width={4} height={5} sizes="(max-width: 860px) 60vw, 240px" />
+          <Picture name="scenes/m1" width={4} height={5} sizes="(max-width: 860px) 60vw, 240px" />
         </figure>
       </div>
     </section>

@@ -852,7 +852,7 @@ const en: Copy = {
   chooseHint: 'Open a character and press “Choose this character” to decide',
   chooseHintCustomer: 'Choose one of the characters to continue.',
   glyphReading: (c, carved) =>
-    `${c.inscription_form && carved !== c.kanji ? `${c.kanji} · ` : ''}${cleanReading(c.reading)}${c.reading_zh ? ` · pinyin ${c.reading_zh}` : ''}${c.meaning ? ` — ${c.meaning}` : ''}`,
+    `${c.inscription_form && carved !== c.kanji ? `${c.kanji} · ` : ''}${cleanReading(c.reading)}${c.meaning ? ` · ${c.meaning}` : ''}`, // English (2026-11-14): reading · word — no pinyin for a US buyer
   inscriptionNote: () => null, // the character is carved in its modern Japanese form
   previewNote: () => null,
   slotLabels: { main: 'Main', second: 'Second', freestyle: 'Playful' },
@@ -877,12 +877,12 @@ const en: Copy = {
     inscriptionSame: 'This character is carved in its modern Japanese form.',
     simpleUnavailable: (n) => `This character has more than ${n} strokes, so only the Standard set can carve it.`,
     poem: { heading: 'A poem for this character', note: 'Choose the form you like. It is included with your order — no extra charge.', types: {tanka:'Tanka (5-7-5-7-7)',haiku:'Haiku (5-7-5)',tang:'Tang-style quatrain (5 or 7 characters per line)',ci:'Song-dynasty ci',en:'Free verse'}, loading: 'Writing the poem…', printedOnCard: 'This poem is printed on your card', printedOnCardEgift: 'This poem appears on the gift page and on the card PDF you can print at home.', failedFinal: 'We are sorry — we could not write the poem this time. You can order without it (the character and the card arrive as usual).', tryAgain: 'Try again' },
-    packageLabel: 'Package',
+    packageLabel: 'Your gift',
     packages: SIZE_COPY['en'].names,
     shippingNote: 'Free shipping in Japan · ¥6,000 international shipping',
-    certificateLabel: 'The line that comes with it',
-    privacy: 'When you order, we keep the names, the story and the character you chose, so that your piece can be made. Names are optional. Any name you enter is used only to show on the gift.',
-    privacyMemorial: 'When you order, we keep the names, the story and the character you chose, so that your piece can be made. Names are optional. Any name you enter is used only to be shown.',
+    certificateLabel: 'What this gift says',
+    privacy: 'When you order, we keep the names, the story and the character you chose, so that your gift can be made. Names are optional. Any name you enter is used only to show on the gift.',
+    privacyMemorial: 'When you order, we keep the names, the story and the character you chose, so that your gift can be made. Names are optional. Any name you enter is used only to be shown.',
     submit: 'Continue to payment',
     submitting: 'Preparing…',
     redirecting: 'Taking you to payment…',

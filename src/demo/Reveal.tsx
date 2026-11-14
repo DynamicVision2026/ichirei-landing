@@ -2,6 +2,7 @@ import { feelingLine } from '../order/register.ts'
 import { cleanReading } from '../order/reading.ts'
 import { quoteScene } from '../order/quote.ts'
 import { whoLine } from '../order/who-line.ts'
+import { sameSentence } from '../order/en-bridge.ts'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { AnimatePresence, motion, useReducedMotion } from 'framer-motion'
 import type { Candidate, Condition, EngineResult } from './types'
@@ -311,10 +312,13 @@ export default function Reveal({ result, story, followUps = [], condition, copy,
                   )}
                   {/* How it matches (spec v9.1 step 9): three short lines — who they are, your moment, the feeling. No numbers of any kind. */}
                   <dl className="space-y-2" data-match>
+                    {/* English: the line under the word and "What they're like" can be the same sentence; it is then shown once */}
+                    {!(language === 'en' && !isFreestyle && (sameSentence(c.one_line_gaze, c.en_line) || sameSentence(whoLine(c.one_line_gaze, language, true), c.en_line))) && (
                     <div data-match-who>
                       <dt className="font-label text-[11px] tracking-[0.12em] text-mute">{copy.match.who}</dt>
                       <dd className="font-label text-base font-semibold leading-relaxed text-fg">{whoLine(c.one_line_gaze, language, true)}</dd>
                     </div>
+                    )}
                     <div data-match-moment>
                       <dt className="font-label text-[11px] tracking-[0.12em] text-mute">{copy.match.moment}</dt>
                       <dd className="font-serif-jp border-l-2 border-accent/60 pl-3 text-sm text-mute" data-anchor>

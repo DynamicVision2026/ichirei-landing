@@ -86,16 +86,16 @@ const ja: SizeCopy = {
 const en: SizeCopy = {
   names: { egift: 'ICHIREI e-gift', simple: 'Wooden tag (Simple)', standard: 'Block set (Standard)' },
   includes: {
-    egift: 'The whole digital gift (the opening, the film of their story, the character page, the poem, the certificate, the story scroll) + the card as a PDF to print at home',
+    egift: 'Everything arrives as a private link: the opening, a short film of your story with music, the character, the poem and the certificate, plus a card to print at home (PDF).',
     simple: 'Everything in the e-gift + a printed story card + a wooden tag with the character in gold colour, mizuhiki cord and gift box',
     standard: 'Everything in the e-gift + a printed story card + a wooden block with the character, a rubbing set (ink, tampo, washi) and a cloth pouch',
   },
   includesMemorial: {
-    egift: 'The whole digital gift (a quiet opening, the film, the character page, the poem, the certificate, the story scroll) + the card as a PDF to print at home, the character in ink black',
+    egift: 'Everything arrives as a private link: a quiet opening, a short film of your story with music, the character in ink black, the poem and the certificate, plus a card to print at home (PDF).',
     simple: 'Everything in the e-gift + a printed story card + a wooden tag with the character in ink black, a plain cord and gift box',
     standard: 'Everything in the e-gift + a printed story card + a wooden block with the character, a rubbing set (ink, tampo, washi) and a cloth pouch',
   },
-  ship: { egift: 'Nothing to post (sent as a link)', simple: 'Free in Japan · overseas EMS ¥6,000', standard: 'Free in Japan · overseas EMS ¥6,000' },
+  ship: { egift: 'Digital — nothing is mailed', simple: 'Free in Japan · overseas EMS ¥6,000', standard: 'Free in Japan · overseas EMS ¥6,000' },
   recommended: 'Recommended',
   sendNow: 'Send it now',
   comingSoon: 'Coming soon',

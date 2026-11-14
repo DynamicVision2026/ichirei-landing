@@ -2453,10 +2453,10 @@ const SECTION_ORDER = ['.hero', '.strip', '.philo', '#shape', '#angles', '#write
   const sel = calls.select[0]
   check('en payload: language en, the context and occasion_detail, and NO inscription_script', sel.language === 'en' && sel.relationship === 'parent_mother' && sel.direction === 'up' && sel.purpose === 'celebrate' && sel.occasion_detail === '70th birthday' && !('inscription_script' in sel), JSON.stringify(sel))
   const lamp = page.locator('article').filter({ has: page.locator('[data-glyph]:text-is("灯")') })
-  check('en reveal: the carved glyph is the modern Japanese form 灯 (spec v9.1 step 9), shown with the romaji reading (from the palette), the pinyin and the one-phrase English meaning', (await lamp.count()) === 1 && await lamp.locator('text=akari · pinyin dēng — lamp').isVisible())
+  check('en reveal: the carved glyph is the modern Japanese form 灯 (spec v9.1 step 9), shown with the romaji reading (from the palette), and the one-phrase English meaning (reading · word, no pinyin)', (await lamp.count()) === 1 && await lamp.locator('text=akari · lamp').isVisible() && !/pinyin/i.test(await lamp.innerText()))
   check('en reveal: no old-form (kyūjitai) note — only the modern form is carved', (await lamp.locator('text=kyūjitai').count()) === 0)
   const plainCard = page.locator('article').filter({ has: page.locator('[data-glyph]:text-is("待")') })
-  check('en reveal: a character with no distinct old form shows romaji and meaning only', await plainCard.locator('text=matsu · pinyin dài — wait').isVisible())
+  check('en reveal: a character with no distinct old form shows romaji and meaning only', await plainCard.locator('text=matsu · wait').isVisible() && !/pinyin/i.test(await plainCard.innerText()))
   check('en reveal: each card shows the model\'s one plain-English why_this sentence under the gaze line', (await lamp.locator('[data-why-this]').innerText()) === 'Lamplight is the light you left on for me.' && (await plainCard.locator('[data-why-this]').innerText()) === 'Waiting is what you did, and never mentioned.')
   check('learning loop: the select call carries a random session id and source "customer" — and nothing else new', /^[A-Za-z0-9_-]{16,64}$/.test(calls.select[0].session) && calls.select[0].source === 'customer')
   await lamp.click()
@@ -2469,7 +2469,7 @@ const SECTION_ORDER = ['.hero', '.strip', '.philo', '#shape', '#angles', '#write
   const form = page.locator('[data-testid=order-form]')
   await form.waitFor()
   check('en order form: no form choice (the character is carved in its modern Japanese form 灯); never traditional/simplified', (await page.locator('input[name=inscription_style]').count()) === 0 && (await page.locator('[data-order-glyph]').innerText()) === '灯')
-  check('en order form: English labels, packages and the romaji + meaning line under the glyph', (await form.innerText()).toLowerCase().includes('your order') && (await form.innerText()).includes('Requested delivery date') && (await form.innerText()).includes('akari · pinyin dēng — lamp') && (await form.innerText()).includes('¥18,850'))
+  check('en order form: English labels, packages and the romaji + meaning line under the glyph', (await form.innerText()).toLowerCase().includes('your order') && (await form.innerText()).includes('Requested delivery date') && (await form.innerText()).includes('akari · lamp') && (await form.innerText()).includes('¥18,850'))
   check('en certificate: "This character is the person as seen through your eyes." and the shipping line', (await page.locator('[data-certificate]').innerText()) === 'This character is the person as seen through your eyes.' && (await page.locator('[data-shipping]').innerText()) === 'Free shipping in Japan · ¥6,000 international shipping' && (await page.locator('#write [data-price=standard]').innerText()) === '¥18,850')
   await page.fill('input[name=sender_name]', 'Emily Carter')
   await page.fill('input[name=receiver_name]', 'Margaret Carter')
@@ -3414,12 +3414,14 @@ const SECTION_ORDER = ['.hero', '.strip', '.philo', '#shape', '#angles', '#write
     check(`/en (${tag}): the relationship chips are Mom, Dad, Partner, Wife, Husband, Son, Daughter, Sister, Brother, Grandparent, Friend, Mentor, Colleague, Boss, Other`, (await page.locator('[data-chip^="relationship:"], [data-chip-code]').evaluateAll((els) => els.filter((e) => /^relationship:/.test(e.dataset.chip)).map((e) => e.textContent))).join() === 'Mom,Dad,Partner,Wife,Husband,Son,Daughter,Sister,Brother,Grandparent,Friend,Mentor,Colleague,Boss,Other')
     check(`/en (${tag}): "What they receive" comes above the gift options and lists the five live items (character with word and line, poem, four pictures, film with music, certificate)`, await page.evaluate(() => { const r = document.querySelector('#receive'); const g = document.querySelector('#gifts'); return !!r && !!g && (r.compareDocumentPosition(g) & Node.DOCUMENT_POSITION_FOLLOWING) !== 0 && [...r.querySelectorAll('li')].map((li) => li.dataset.receive).join() === 'character,poem,pictures,film,certificate' }))
     const scenes = await page.evaluate(() => [...document.querySelectorAll('.hero img, #moments img, .usReceive img')].map((i) => i.currentSrc || i.src))
-    check(`/en (${tag}): the scenes are the Western ink-wash ones (kitchen table, car hood, porch, bench, teacher's desk, holiday table, Christmas tree) — none of the Japanese photographs`, scenes.length >= 5 && scenes.every((s) => /\/img\/scenes\/en\//.test(s)) && ['kitchen', 'hood', 'porch', 'bench', 'desk', 'thanksgiving', 'tree'].every((n) => scenes.some((s) => s.includes(`/en/${n}`)) || n === 'tree' || n === 'hood' || n === 'porch' || n === 'bench' || n === 'desk' || n === 'thanksgiving'))
-    check(`/en (${tag}): the price keeps the yen and shows "about $26" (¥3,980 at the owner's rate), nothing for the other currencies by default`, /about \$2\d/.test(await page.locator('.approxHero').innerText()))
+    check(`/en (${tag}): the pictures are the real images of / (public/img/scenes/ only — nothing from scenes/en/)`, scenes.length >= 5 && scenes.every((u) => /\/img\/scenes\/[a-z0-9]+(-\d+)?\.(webp|jpg)/.test(u) && !/scenes\/en\//.test(u)), scenes.join(' '))
+    const usd = async (sel) => ((await page.locator(sel).first().textContent()) ?? '').replace(/\s+/g, ' ').trim()
+    check(`/en (${tag}): every price on the landing is $25 — hero, "What they receive" and the gift card — with no yen and no "about $"`, (await usd('[data-testid=usd-hero]')) === '$25' && (await usd('[data-testid=us-receive-price]')) === '$25' && (await usd('#gifts article[data-size=egift] [data-price=egift]')) === '$25' && (await page.locator('#gifts article[data-size=egift] .approx, [data-approx]').count()) === 0)
     await page.evaluate(() => document.querySelectorAll('details').forEach((d) => (d.open = true)))
     // (textContent, not innerText: the landing's sections are content-visibility: auto, so innerText of an off-screen one is empty)
     const text = await page.evaluate(() => document.body.textContent ?? '')
     check(`/en (${tag}): no word "wood", "walnut", "EMS" or "ship" anywhere on the page, the FAQ opened included`, !FORBIDDEN.test(text), text.match(FORBIDDEN)?.[0])
+    check(`/en (${tag}): "Why we start with your story" is numbered 1, 2, 3 (not 一 二 三), and the word "pinyin" is nowhere on the page`, (await page.locator('.philo .phN').allTextContents()).map((x) => x.trim()).join() === '1,2,3' && !/pinyin/i.test(text), (await page.locator('.philo .phN').allTextContents()).join())
     // chips: Christmas → thanks, counted; Mom → parent_mother
     await page.locator('[data-chip-code=mom]').click()
     await page.locator('[data-chip-code=christmas]').click()
@@ -3442,6 +3444,7 @@ const SECTION_ORDER = ['.hero', '.strip', '.philo', '#shape', '#angles', '#write
       return { ok: !!(g && rd && w && l), order: [g, rd, w, l, h, e, c].filter(Boolean).map((x) => Math.round(r(x).top)), reading: rd?.textContent, word: w?.textContent, line: l?.textContent, wordWeight: w ? Number(getComputedStyle(w).fontWeight) : 0, readingStyle: rd ? getComputedStyle(rd).fontStyle : '', heading: h?.textContent, echo: e?.textContent, classical: c?.textContent, why: !!q('[data-why-this]') }
     })
     check(`/en (${tag}): the main card shows the stack in order — character, reading (italic), word (bold), line — with nothing between`, stack.ok && stack.order.every((y, i, arr) => i === 0 || y >= arr[i - 1]) && stack.reading === 'akari' && stack.word === 'hearth' && stack.line === 'The light that is already on when everyone else wakes.' && stack.wordWeight >= 600 && stack.readingStyle === 'italic' && !stack.why, JSON.stringify(stack))
+    check(`/en (${tag}): when the English line and "What they're like" differ, both are shown`, (await main.locator('[data-match-who]').count()) === 1 && (await main.locator('[data-en-line]').count()) === 1)
     check(`/en (${tag}): a reviewed row shows its echo and the classical line together under the one small heading "Where this word comes from"`, stack.heading === 'Where this word comes from' && stack.echo === '“Save the cricket on the hearth” — Milton, Il Penseroso' && /床前明月光/.test(stack.classical ?? '') && /Quiet Night Thoughts/.test(stack.classical ?? ''), JSON.stringify(stack))
     check(`/en (${tag}): the freestyle card is exactly as it was — no word, no line, no echo`, (await page.locator('article[data-slot=freestyle] [data-en-stack]').count()) === 0 && (await page.locator('article[data-slot=freestyle] [data-reading]').count()) === 1)
     await page.locator('#write').scrollIntoViewIfNeeded()
@@ -3461,6 +3464,29 @@ const SECTION_ORDER = ['.hero', '.strip', '.philo', '#shape', '#angles', '#write
     await page.locator('.slip').scrollIntoViewIfNeeded()
     await page.locator('.slip').screenshot({ path: `${SHOTS}/us-chosen-${tag}.png` })
     check(`no page errors (run 24, /en ${tag})`, errors.length === 0, errors.join('; '))
+    await page.close()
+  }
+
+  // ---- English card: the same sentence is never shown twice (the line under the word and "What they're like") ----
+  {
+    const dupResult = () => {
+      const r = enResult()
+      r.candidates[0] = { ...r.candidates[0], one_line_gaze: 'Someone who kept the porch light on for me.', en_line: 'Someone who kept the porch light on for me!' }
+      return r
+    }
+    const { page, errors } = await mockPage(browser, { result: dupResult })
+    await stubs(page)
+    await page.goto('http://localhost:5173/en', { waitUntil: 'networkidle' })
+    await page.locator('[data-chip-code=mom]').click()
+    await page.locator('[data-chip-code=christmas]').click()
+    await page.locator('[data-chip="direction:up"]').click()
+    await page.locator('#moment').fill('She left the porch light on every night until I got home, and she never once mentioned it.')
+    await page.click(`#write >> text=${GO.en}`)
+    await page.waitForSelector('[data-all-revealed=yes]', { timeout: 15000 })
+    await page.waitForTimeout(500)
+    const main = page.locator('article[data-slot=main]')
+    check('/en card: when the English line and "What they\'re like" are the same sentence (case and punctuation aside), the sentence shows once — the "What they\'re like" block is hidden', (await main.locator('[data-match-who]').count()) === 0 && (await main.locator('[data-en-line]').innerText()) === 'Someone who kept the porch light on for me!' && ((await main.innerText()).match(/kept the porch light on for me/gi) ?? []).length === 1)
+    check(`no page errors (run 24, duplicate line)`, errors.length === 0, errors.join('; '))
     await page.close()
   }
 
@@ -3688,29 +3714,33 @@ const SECTION_ORDER = ['.hero', '.strip', '.philo', '#shape', '#angles', '#write
       const card = page.locator('#gifts article[data-size=egift]')
       const txt = async (loc) => ((await loc.count()) ? (await loc.first().textContent())?.trim() : null) // (the landing's sections are content-visibility: auto, so innerText of an off-screen one is empty)
       const read = async () => ({ old: await txt(card.locator('[data-price-old=egift]')), sale: await txt(card.locator('[data-price-sale=egift]')), line: await txt(card.locator('[data-testid=sale-line]')), price: ((await card.locator('[data-price=egift]').textContent()) ?? '').replace(/\s+/g, ' ').trim() })
+      check(`landing numerals (${lang}): ${lang === 'en' ? '1, 2, 3' : '一, 二, 三'} in "why we start with your story"`, (await page.locator('.philo .phN').allTextContents()).map((x) => x.trim()).join() === (lang === 'en' ? '1,2,3' : '一,二,三'))
       const L = await read()
+      const OLD = lang === 'en' ? '$25' : '¥3,980'
+      const NEW = lang === 'en' ? '$17' : '¥2,786'
       if (mode === 'on') {
         const struck = await card.locator('[data-price-old=egift]').evaluate((e) => getComputedStyle(e).textDecorationLine)
-        check(`sale on (${lang}): the landing's e-gift price shows ¥3,980 struck through, then ¥2,786, then 「${LINE[lang]}」`, L.old === '¥3,980' && L.sale === '¥2,786' && L.line === LINE[lang] && struck === 'line-through', JSON.stringify(L))
+        check(`sale on (${lang}): the landing's e-gift price shows ${OLD} struck through, then ${NEW}, then 「${LINE[lang]}」`, L.old === OLD && L.sale === NEW && L.line === LINE[lang] && struck === 'line-through', JSON.stringify(L))
         const woodPrices = await page.locator('#gifts article[data-size=simple] [data-price-old], #gifts article[data-size=standard] [data-price-old]').count()
         check(`sale on (${lang}): the wooden sizes (coming soon) carry no sale`, woodPrices === 0)
-        if (lang === 'en') check('sale on (en): "about $n" follows the SALE price: hero (about $18) and the gift card (about $18) — not $26', /about \$18/.test((await page.locator('.approxHero').textContent()) ?? '') && /about \$18/.test((await card.locator('.approx').textContent()) ?? ''))
+        if (lang === 'en') check('sale on (en): the hero shows $25 struck through, then $17 — and no "about $" anywhere', (await page.locator('[data-price-old=hero]').textContent()) === '$25' && (await page.locator('[data-price-sale=hero]').textContent()) === '$17' && !/about \$/.test((await page.evaluate(() => document.body.textContent)) ?? ''))
         await page.screenshot({ path: `${SHOTS}/sale-landing-${lang}.png`, fullPage: false })
       } else {
-        check(`sale ${mode} (${lang}): the landing shows the plain price ¥3,980 and no struck price, no sale price, no line`, L.old === null && L.sale === null && L.line === null && L.price === '¥3,980', JSON.stringify(L))
-        if (lang === 'en') check(`sale ${mode} (en): "about $26" as before`, /about \$26/.test((await page.locator('.approxHero').textContent()) ?? ''))
+        check(`sale ${mode} (${lang}): the landing shows the plain price ${OLD} and no struck price, no sale price, no line`, L.old === null && L.sale === null && L.line === null && L.price === OLD, JSON.stringify(L))
+        if (lang === 'en') check(`sale ${mode} (en): the hero shows the plain $25 (nothing struck) and no "about $"`, (await page.locator('[data-testid=usd-hero]').textContent())?.trim() === '$25' && (await page.locator('[data-price-old=hero]').count()) === 0 && !/about \$/.test((await page.evaluate(() => document.body.textContent)) ?? ''))
       }
       await page.locator('#write').scrollIntoViewIfNeeded()
       await reachOrderStep(page, lang)
       const pkg = page.locator('label.pkg:has(input[value=egift])')
       const O = { old: await pkg.locator('[data-price-old]').count(), sale: await pkg.locator('[data-price-sale]').count() ? await pkg.locator('[data-price-sale]').innerText() : null, line: await pkg.locator('[data-testid=sale-line]').count() ? await pkg.locator('[data-testid=sale-line]').innerText() : null, plain: await pkg.locator('[data-price=egift]').innerText() }
       if (mode === 'on') {
-        check(`sale on (${lang}): the order step shows the same — ¥3,980 struck through, ¥2,786, and 「${LINE[lang]}」`, O.old === 1 && O.sale === '¥2,786' && O.line === LINE[lang] && /3,980/.test(O.plain) && /2,786/.test(O.plain), JSON.stringify(O))
-        if (lang === 'en') check('sale on (en): the order step\'s "about $n" is for the sale price ($18)', /about \$18/.test(await pkg.locator('[data-approx]').innerText()))
+        check(`sale on (${lang}): the order step shows the same — ${OLD} struck through, ${NEW}, and 「${LINE[lang]}」`, O.old === 1 && O.sale === NEW && O.line === LINE[lang] && O.plain.includes(OLD.slice(1)) && O.plain.includes(NEW.slice(1)), JSON.stringify(O))
+        if (lang === 'en') check('sale on (en): the one yen line above "Continue to payment" gives the SALE yen amount, and it is the only yen on the order step', (await T(page, 'order-yen-line').innerText()) === 'Checkout is processed in Japanese yen (¥2,786); your card shows the converted amount.' && ((await T(page, 'order-form').innerText()).match(/¥[\d,]+/g) ?? []).length === 1)
         await page.locator('label.pkg:has(input[value=egift])').scrollIntoViewIfNeeded()
         await page.locator('[data-testid=order-form]').screenshot({ path: `${SHOTS}/sale-order-${lang}.png` })
       } else {
-        check(`sale ${mode} (${lang}): the order step shows only the plain price — nothing struck, no sale line`, O.old === 0 && O.sale === null && O.line === null && O.plain === '¥3,980', JSON.stringify(O))
+        if (lang === 'en') check(`sale ${mode} (en): the one yen line above "Continue to payment" gives ¥3,980, the only yen on the order step, and no "about $"`, (await T(page, 'order-yen-line').innerText()) === 'Checkout is processed in Japanese yen (¥3,980); your card shows the converted amount.' && ((await T(page, 'order-form').innerText()).match(/¥[\d,]+/g) ?? []).length === 1 && !/about \$/.test(await T(page, 'order-form').innerText()))
+        check(`sale ${mode} (${lang}): the order step shows only the plain price — nothing struck, no sale line`, O.old === 0 && O.sale === null && O.line === null && O.plain === OLD, JSON.stringify(O))
       }
       check(`no page errors (run 25, sale ${mode} ${lang})`, errs.length === 0, errs.join('; '))
       await ctx.close()
@@ -3725,7 +3755,7 @@ const SECTION_ORDER = ['.hero', '.strip', '.philo', '#shape', '#angles', '#write
     const card = page.locator('#gifts article[data-size=egift]')
     const before = await card.locator('[data-price-sale]').count()
     await page.waitForFunction(() => document.querySelector('#gifts [data-price-sale=egift]'), null, { timeout: 12000 })
-    check('sale from SALE_FROM: before the start moment the page shows the plain price; at the start it switches the sale on by itself (struck price, ¥2,786, the line)', before === 0 && (await card.locator('[data-price-sale=egift]').textContent()) === '¥2,786' && (await card.locator('[data-testid=sale-line]').textContent()) === LINE.en)
+    check('sale from SALE_FROM: before the start moment the page shows the plain price; at the start it switches the sale on by itself (struck $25, $17, the line)', before === 0 && (await card.locator('[data-price-sale=egift]').textContent()) === '$17' && (await card.locator('[data-testid=sale-line]').textContent()) === LINE.en)
     await ctx.close()
   }
   // the sale line is ink, never cinnabar (red is only for the character and the seal)

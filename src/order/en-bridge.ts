@@ -61,3 +61,9 @@ export const echoAuthor = (e: EnEcho): string => e.source.split(',')[0].trim()
 
 /** How many words a line has. */
 export const wordCount = (s: string): number => s.trim().split(/\s+/).filter(Boolean).length
+
+/** Two sentences are "the same" when they differ only in case, punctuation and spacing (the English card shows a line once: 2026-11-14). */
+export const sameSentence = (a: string | null | undefined, b: string | null | undefined): boolean => {
+  const norm = (x: string | null | undefined) => (x ?? '').toLowerCase().replace(/[^\p{L}\p{N}]+/gu, ' ').trim()
+  return norm(a) !== '' && norm(a) === norm(b)
+}

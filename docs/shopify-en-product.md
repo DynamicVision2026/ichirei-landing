@@ -35,4 +35,4 @@ Touch only the ICHIREI product. Never change store-wide settings, other products
 ## What the site does for the English launch (no Shopify admin involved)
 
 - **UTM:** utm_source / utm_medium / utm_campaign / utm_term / utm_content on an `/en` link are kept for the visitor's tab and sent with an English order as hidden cart-line properties `_utm_source` etc., so each order shows where it came from (ChatGPT adds `utm_source=chatgpt.com` itself).
-- **Dollar line:** `/en` shows the yen price and "about $[n]" beside it. Set the environment variable `USD_PER_JPY` (for example `0.0066`) on the Cloud Run service to fix the rate you want shown; without it the daily rate table is used.
+- **Dollar price (2026-11-14):** `/en` shows a fixed dollar price — `$25` — and no yen, no "about" figure; while the Thanksgiving sale is on, `$25` struck through then `$17`. The numbers are the Cloud Build substitutions `_USD_PRICE_EGIFT` (25) and `_USD_PRICE_EGIFT_SALE` (17), whole dollars, yours to edit. Checkout itself stays in yen (the Shopify variant price, ¥3,980; ¥2,786 in the sale), and one small line above the order button says so. `USD_PER_JPY` is no longer used.
