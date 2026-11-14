@@ -4,7 +4,7 @@
 
 import { useEffect, useState } from 'react'
 import { PACKAGES, PACKAGE_DISPLAY_ORDER, SHIPS, type PackageId } from '../order/packages.ts'
-import { saleOn, type Sale } from '../order/sale.ts'
+import { saleEndMs, saleOn, type Sale } from '../order/sale.ts'
 import { DEFAULT_USD_PRICE, type UsdPrice } from '../order/usd.ts'
 
 const FALLBACK: PackageId[] = ['simple', 'standard']
@@ -20,7 +20,7 @@ let usdPrice: UsdPrice = DEFAULT_USD_PRICE
 /** Pure: the dollar price in a /api/sizes body (the defaults when it is missing or unreadable). */
 export const cleanUsd = (raw: unknown): UsdPrice => {
   const u = (raw as { usd?: Partial<UsdPrice> } | null)?.usd
-  const ok = (n: unknown): n is number => typeof n === 'number' && Number.isInteger(n) && n >= 1
+  const ok = (n: unknown): n is number => typeof n === 'number' && Number.isFinite(n) && n >= 1 && Math.round(n * 100) === n * 100 // dollars, cents allowed
   return u && ok(u.egift) && ok(u.egift_sale) ? { egift: u.egift, egift_sale: u.egift_sale } : DEFAULT_USD_PRICE
 }
 
@@ -30,7 +30,8 @@ export const cleanSale = (raw: unknown): Sale | null => {
   const ok = !!s && typeof s.percent === 'number' && typeof s.until === 'string' && typeof s.ends_at === 'string' && Number.isFinite(Date.parse(s.ends_at))
   if (!ok || !s) return null
   const starts = typeof s.starts_at === 'string' && Number.isFinite(Date.parse(s.starts_at)) ? s.starts_at : '1970-01-01T00:00:00.000Z'
-  return { percent: s.percent as number, from: typeof s.from === 'string' ? s.from : '1970-01-01', until: s.until as string, starts_at: starts, ends_at: s.ends_at as string }
+  const en = typeof s.en_ends_at === 'string' && Number.isFinite(Date.parse(s.en_ends_at)) ? { en_ends_at: s.en_ends_at } : {}
+  return { percent: s.percent as number, from: typeof s.from === 'string' ? s.from : '1970-01-01', until: s.until as string, starts_at: starts, ends_at: s.ends_at as string, ...en }
 }
 
 export const cleanSizes = (raw: unknown): PackageId[] => {
@@ -96,7 +97,7 @@ export function useWoodOnSale(): boolean {
 }
 
 /** The sale to show right now (null = none): from the same single /api/sizes request. It shows only from its first moment to its last, and the page switches it on at the start and off at the end by itself. */
-export function useSale(): Sale | null {
+export function useSale(lang?: string): Sale | null {
   const [raw, setRaw] = useState<Sale | null>(sale)
   const [tick, setTick] = useState(0)
   useEffect(() => {
@@ -109,13 +110,13 @@ export function useSale(): Sale | null {
   useEffect(() => {
     if (!raw) return
     const now = Date.now()
-    const next = [Date.parse(raw.starts_at), Date.parse(raw.ends_at) + 1].filter((t) => t > now).sort((a, b) => a - b)[0]
+    const next = [Date.parse(raw.starts_at), saleEndMs(raw, lang) + 1].filter((t) => t > now).sort((a, b) => a - b)[0]
     if (next === undefined || next - now > 2_147_000_000) return
     const t = window.setTimeout(() => setTick((n) => n + 1), next - now + 50)
     return () => window.clearTimeout(t)
-  }, [raw, tick])
+  }, [raw, tick, lang])
   void tick
-  return saleOn(raw)
+  return saleOn(raw, new Date(), lang)
 }
 
 /** The English page's dollar price (the same single /api/sizes request). */

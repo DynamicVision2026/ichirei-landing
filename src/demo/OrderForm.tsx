@@ -5,7 +5,7 @@ import type { Copy, InscriptionStyle, OrderField, PackageId, UiLanguage } from '
 import { log } from './logging'
 import { sessionId, trackUs } from './analytics'
 import { clearDraft } from './draft'
-import { EGIFT_JAPAN_ONLY, GIFT_MESSAGE_MAX, OPEN_DATE_MAX_DAYS, PACKAGE_DISPLAY_ORDER, PACKAGE_PRICE_JPY, RECOMMENDED_PACKAGE, SHIPS, SHIP_TO, WOODEN, formatYen, type ShipTo } from '../order/packages.ts'
+import { EGIFT_JAPAN_ONLY, GIFT_MESSAGE_MAX, OPEN_DATE_MAX_DAYS, PACKAGE_DISPLAY_ORDER, PACKAGE_PRICE_JPY, RECOMMENDED_PACKAGE, SHIPS, SHIP_TO, WOODEN, type ShipTo } from '../order/packages.ts'
 import { SIZE_COPY } from './sizes-copy.ts'
 import { LEGAL } from '../legal/legal-copy.ts'
 import { useComingSoon, useSizes } from './useSizes.ts'
@@ -27,9 +27,8 @@ import EnBridgeStack from '../order/EnBridgeStack.tsx'
 import { getUtm } from './utm-store.ts'
 import { clearClaim, getClaim } from './claim-store.ts'
 import { CLAIM_COPY } from '../claim/copy.ts'
-import { PriceWithSale, SaleLine, UsdPriceView } from '../order/SalePrice.tsx'
+import { PriceWithSale, SaleLine, UsdLaunchLine, UsdPriceView } from '../order/SalePrice.tsx'
 import { salePriceJpy } from '../order/sale.ts'
-import { yenCheckoutLine } from '../order/usd.ts'
 import { useSale, useUsd } from './useSizes.ts'
 import { cleanReading } from '../order/reading.ts'
 
@@ -89,7 +88,7 @@ export default function OrderForm({ result, story, followUps = [], promptQuestio
   const claim = useMemo(() => getClaim(), [])
   const claimCopy = CLAIM_COPY[language]
   const usdPrice = useUsd() // English: a fixed dollar price, never an "about" figure
-  const sale = useSale() // the Thanksgiving sale shown beside the e-gift's price (Shopify's discount sets the real price)
+  const sale = useSale(language) // the Thanksgiving sale shown beside the e-gift's price (Shopify's discount sets the real price)
   const [pkg, setPkg] = useState<PackageId | ''>(claim ? 'egift' : '')
   const sizes = useSizes() // the sizes on sale right now (Part C): a size without a Shopify variant is not shown
   const soon = useComingSoon() // e-gift-first launch: listed with 「近日公開」, not selectable
@@ -332,7 +331,7 @@ export default function OrderForm({ result, story, followUps = [], promptQuestio
                       {language === 'en' && id === 'egift' ? <UsdPriceView price={usdPrice} sale={priceSale} id={id} /> : <PriceWithSale yen={PACKAGE_PRICE_JPY[id]} sale={priceSale} id={id} />}
                     </span>
                   )}
-                  {!claim && <SaleLine sale={priceSale} lang={pageLang} />}
+                  {!claim && (language === 'en' ? <UsdLaunchLine price={usdPrice} sale={priceSale} /> : <SaleLine sale={priceSale} lang={pageLang} />)}
                   {approx && <span className="sent" data-approx>{approx}</span>}
                   {/* a size that is "coming soon" says nothing about what it includes or how it is sent */}
                   {!soon.includes(id) && <span className="sent pkgIncludes" data-includes={id}>{memorial ? sc.includesMemorial[id] : sc.includes[id]}</span>}
@@ -413,9 +412,6 @@ export default function OrderForm({ result, story, followUps = [], promptQuestio
               <span>{pc.refundCheck}</span>
             </label>
           </>
-        )}
-        {language === 'en' && !claim && (
-          <p className="sent orderNote" data-testid="order-yen-line">{yenCheckoutLine(formatYen(sale ? salePriceJpy(PACKAGE_PRICE_JPY.egift, sale.percent) : PACKAGE_PRICE_JPY.egift))}</p>
         )}
         <button type="button" data-testid="order-submit" className="btn primary" onClick={submit} disabled={!valid || busy}>
           {phase === 'submitting' ? o.submitting : phase === 'redirecting' ? o.redirecting : claim ? claimCopy.make : o.submit}

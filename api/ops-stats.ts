@@ -59,6 +59,7 @@ export function orderStatOf(entry: OrderIndexEntry, rec: OrderRecord | null, pay
   const p = rec.production
   // revenue = what the order actually paid (a sale price included), from the Shopify order — the package price only when Shopify could not say
   const paidAmount = rec.claim ? rec.claim.amount_jpy : pay && pay !== 'unverified' ? (pay.amount_jpy ?? null) : null
+  const buyerAmount = rec.claim ? (rec.claim.amount_buyer ?? null) : pay && pay !== 'unverified' ? (pay.amount_buyer ?? null) : null
   const shown = rec.shown_characters ?? []
   const chosen = shown.find((s) => s.candidate.kanji === p.kanji)
   return {
@@ -74,6 +75,7 @@ export function orderStatOf(entry: OrderIndexEntry, rec: OrderRecord | null, pay
     language: p.language,
     purpose: p.certificate?.purpose ?? null,
     price_jpy: paidAmount ?? (typeof p.price_jpy === 'number' ? p.price_jpy : 0),
+    ...(buyerAmount ? { price_buyer: buyerAmount } : {}),
     collected: !!rec.collected_at,
     opened: !!entry.token && openedHashes.has(tokenHash(entry.token)),
     rounds: Math.max(1, ...shown.map((s) => s.set)),
@@ -121,7 +123,7 @@ export async function buildStats(d: OpsDeps, store: OrderStore, env: NodeJS.Proc
   for (const w of await listWaiting(store).catch(() => [])) {
     const st = waitingState(w, now)
     if (st.state === 'claimed') continue
-    orders.push({ order_ref: w.id, created_at: w.paid_at, paid_at: w.paid_at, state: st.state === 'refund_due' ? 'refund_due' : 'waiting', hours_left: null, days_left: st.state === 'waiting' ? st.days_left : null, size_code: 'ICHIREI-EGIFT', kanji: '', slot: null, memorial: false, language: w.language, purpose: null, price_jpy: w.amount_jpy ?? 0, collected: false, opened: false, rounds: 1 })
+    orders.push({ order_ref: w.id, created_at: w.paid_at, paid_at: w.paid_at, state: st.state === 'refund_due' ? 'refund_due' : 'waiting', hours_left: null, days_left: st.state === 'waiting' ? st.days_left : null, size_code: 'ICHIREI-EGIFT', kanji: '', slot: null, memorial: false, language: w.language, purpose: null, price_jpy: w.amount_jpy ?? 0, ...(w.amount_buyer ? { price_buyer: w.amount_buyer } : {}), collected: false, opened: false, rounds: 1 })
   }
   const renderLists = await inBatches(days, 25, (day) => readJsonl<{ ts?: string }>(store, rendersPath(day)).catch(() => []))
   const renders = renderLists.flat().map((r) => r.ts).filter((t): t is string => typeof t === 'string')

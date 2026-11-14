@@ -109,6 +109,12 @@ export function sameSitePost(req: Request): boolean {
   }
 }
 
+/** The buyer's own-currency amount, shown beside the yen amount: `$17.50` (USD), `EUR 15.00` otherwise. */
+const buyerLabel = (b: { amount: string; currency: string }): string => {
+  const n = Number(b.amount)
+  const v = Number.isFinite(n) ? (Number.isInteger(n) ? String(n) : n.toFixed(2)) : b.amount
+  return b.currency === 'USD' ? `$${v}` : `${b.currency} ${v}`
+}
 const esc = (s: unknown) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c] as string)
 const csvCell = (v: unknown) => {
   let s = String(v ?? '')
@@ -286,7 +292,7 @@ export function createOpsHandlers(deps: () => OpsDeps) {
         return st.state === 'claimed' ? '作成済み' : st.state === 'refund_due' ? '未作成・返金対象' : `未作成（あと${st.days_left}日）`
       }
       const waitingTable = `<div class="wide"><table class="waitingT"><thead><tr><th>Shopify注文番号</th><th>お支払い</th><th>金額</th><th>言語</th><th>状態</th></tr></thead><tbody>${
-        waiting.map((w) => `<tr${waitingState(w, now).state === 'refund_due' ? ' class="warn"' : ''} id="o-${esc(w.id)}"><td>${esc(w.order_name)}</td><td>${esc(jst(w.paid_at))}</td><td>${w.amount_jpy === null ? '—' : `¥${w.amount_jpy.toLocaleString('en-US')}`}</td><td>${esc(w.language)}</td><td>${esc(waitingLabel(w))}</td></tr>`).join('') || '<tr><td colspan="5">なし</td></tr>'
+        waiting.map((w) => `<tr${waitingState(w, now).state === 'refund_due' ? ' class="warn"' : ''} id="o-${esc(w.id)}"><td>${esc(w.order_name)}</td><td>${esc(jst(w.paid_at))}</td><td>${w.amount_jpy === null ? (w.amount_buyer ? esc(buyerLabel(w.amount_buyer)) : '—') : `¥${w.amount_jpy.toLocaleString('en-US')}${w.amount_buyer ? ` (${esc(buyerLabel(w.amount_buyer))})` : ''}`}</td><td>${esc(w.language)}</td><td>${esc(waitingLabel(w))}</td></tr>`).join('') || '<tr><td colspan="5">なし</td></tr>'
       }</tbody></table></div>`
       const readyRows = rows.filter((r) => ready(r) && isCardSize(r))
       const openRows = rows.filter((r) => r.win.phase === 'open')

@@ -287,7 +287,7 @@ let claimRef = ''
   const late = await jsonOf(sizesResponse(env, new Date('2026-12-01T03:00:00Z')))
   check('(8) /api/sizes before the 20th hands the page the coming sale, but the page shows nothing yet (saleOn is null); on the 25th it shows; after the 30th the server sends no sale at all', cleanSale(early)?.from === '2026-11-20' && saleOn(cleanSale(early), new Date('2026-11-14T03:00:00Z')) === null && saleOn(cleanSale(mid), new Date('2026-11-25T03:00:00Z')) !== null && !('sale' in late))
   const cb = readFileSync('cloudbuild.yaml', 'utf8')
-  check('(8) the settings are Cloud Build substitutions with the owner\'s dates as the defaults (30, 2026-11-20, 2026-11-30), passed to the service as SALE_PERCENT, SALE_FROM and SALE_UNTIL', /_SALE_PERCENT: '30'/.test(cb) && /_SALE_FROM: '2026-11-20'/.test(cb) && /_SALE_UNTIL: '2026-11-30'/.test(cb) && cb.includes('SALE_PERCENT=${_SALE_PERCENT},SALE_FROM=${_SALE_FROM},SALE_UNTIL=${_SALE_UNTIL}'))
+  check('(8) the settings are Cloud Build substitutions with the owner\'s dates as the defaults (30, 2026-11-15, 2026-11-30; the English end 2026-12-01T13:59+09:00), passed to the service as SALE_PERCENT, SALE_FROM, SALE_UNTIL and SALE_UNTIL_EN', /_SALE_PERCENT: '30'/.test(cb) && /_SALE_FROM: '2026-11-15'/.test(cb) && /_SALE_UNTIL: '2026-11-30'/.test(cb) && /_SALE_UNTIL_EN: '2026-12-01T13:59\+09:00'/.test(cb) && cb.includes('SALE_PERCENT=${_SALE_PERCENT},SALE_FROM=${_SALE_FROM},SALE_UNTIL=${_SALE_UNTIL},SALE_UNTIL_EN=${_SALE_UNTIL_EN}'))
 }
 
 // ---- 9. /claim words -----------------------------------------------------------------------------------------------------------------------------------------------

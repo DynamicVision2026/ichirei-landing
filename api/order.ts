@@ -237,7 +237,7 @@ export function createOrderHandler(deps: () => OrderDeps) {
 
     // 3. The Shopify cart.
     try {
-      const cart = await createCart(d.shopify!, order.package, lineAttributes(order, orderRef, animationLink, giftLink), orderRef, d.fetchImpl)
+      const cart = await createCart(d.shopify!, order.package, lineAttributes(order, orderRef, animationLink, giftLink), orderRef, d.fetchImpl, order.language)
       record.status = 'cart_created'
       record.updated_at = (d.now?.() ?? new Date()).toISOString()
       record.shopify = { cart_id: cart.cartId, checkout_url: cart.checkoutUrl, variant_id: cart.variantId }

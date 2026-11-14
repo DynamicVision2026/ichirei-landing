@@ -27,6 +27,8 @@ export interface OrderStat {
   purpose: string | null
   /** What was actually paid for the order (from the Shopify order; the package price only when Shopify could not say). */
   price_jpy: number
+  /** An order paid in another currency (USD 17.50): shown beside the yen amount. `price_jpy` (what the shop settles) is what revenue adds up. */
+  price_buyer?: { amount: string; currency: string } | null
   /** waiting orders only (paid without our site, no gift yet): whole days left before it is "refund due". */
   days_left?: number | null
   collected: boolean

@@ -428,3 +428,6 @@
 /* The English page's dollar price (2026-11-14) */
 .rv .usReceivePrice{margin:0 auto 1.4rem;font-family:var(--display);font-size:1.7rem;font-weight:700;color:var(--ink)}
 .rv .usdHero{font-family:var(--display);font-size:1.15rem;font-weight:700;color:var(--ink)}
+.rv .usReceivePrice .saleLine{display:block;margin-top:.35rem;font-family:var(--body);font-size:.86rem;font-weight:400;color:var(--mute)}
+.rv .usdHero{display:inline-flex;flex-direction:column;align-items:flex-start;gap:.1rem}
+.rv .usdLaunch{font-family:var(--body);font-size:.78rem;font-weight:400;color:var(--mute)}

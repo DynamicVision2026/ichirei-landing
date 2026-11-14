@@ -20,6 +20,9 @@ export const STATS_CLIENT_JS = String.raw`
   }
   function num(n) { return Math.round(n).toString().replace(/\B(?=(\d{3})+(?!\d))/g, ','); }
   function yen(n) { return '¥' + num(n); }
+  function buyerAmt(b) { var n = Number(b.amount); var v = isFinite(n) ? (Math.round(n) === n ? String(n) : n.toFixed(2)) : String(b.amount); return (b.currency === 'USD' ? '$' : b.currency + ' ') + v; }
+  // revenue is the yen amount the shop settles; an order paid in another currency shows what the buyer paid beside it: ¥2,786 ($17.50)
+  function money(o) { return yen(o.price_jpy) + (o.price_buyer ? ' (' + buyerAmt(o.price_buyer) + ')' : ''); }
   function pct(a, b) { return b > 0 ? Math.round((a / b) * 100) : 0; }
   function jst(iso) { var ms = Date.parse(iso); if (!isFinite(ms)) return ''; return new Date(ms + 9 * 3600000).toISOString().slice(5, 16).replace('T', ' '); }
   function giftOf(sku) { return { 'ICHIREI-EGIFT': t('gift_egift'), 'ICHIREI-SIMPLE': t('gift_simple'), 'ICHIREI-STANDARD': t('gift_standard') }[sku] || t('gift_other'); }
@@ -108,7 +111,7 @@ export const STATS_CLIENT_JS = String.raw`
     D.orders.forEach(function (o) {
       var cancelled = o.state === 'cancelled' || o.state === 'refunded';
       var lg = { ja: t('lang_ja'), en: t('lang_en'), 'zh-Hant': t('lang_zh'), 'zh-Hans': t('lang_zh') }[o.language] || o.language;
-      h += '<tr' + (cancelled ? ' class="cancel"' : '') + '><td>' + esc(jst(o.paid_at || o.created_at)) + '</td><td><a href="/ops#o-' + esc(o.order_ref) + '">' + esc(o.order_ref.replace(/^[A-Z]+-/, '').slice(-8)) + '</a></td><td>' + esc(giftOf(o.size_code)) + (o.memorial ? ' · ' + esc(t('memorial_mark')) : '') + '</td><td class="k">' + esc(o.kanji) + '</td><td>' + esc(slotOf(o)) + '</td><td>' + esc(lg) + '</td><td>' + esc(purposeOf(o.purpose)) + '</td><td class="n">' + yen(o.price_jpy) + '</td><td>' + esc(o.collected ? t('yes') : t('no')) + '</td><td>' + esc(o.opened ? t('yes') : t('no')) + '</td><td>' + esc(statusOf(o)) + '</td></tr>';
+      h += '<tr' + (cancelled ? ' class="cancel"' : '') + '><td>' + esc(jst(o.paid_at || o.created_at)) + '</td><td><a href="/ops#o-' + esc(o.order_ref) + '">' + esc(o.order_ref.replace(/^[A-Z]+-/, '').slice(-8)) + '</a></td><td>' + esc(giftOf(o.size_code)) + (o.memorial ? ' · ' + esc(t('memorial_mark')) : '') + '</td><td class="k">' + esc(o.kanji) + '</td><td>' + esc(slotOf(o)) + '</td><td>' + esc(lg) + '</td><td>' + esc(purposeOf(o.purpose)) + '</td><td class="n">' + money(o) + '</td><td>' + esc(o.collected ? t('yes') : t('no')) + '</td><td>' + esc(o.opened ? t('yes') : t('no')) + '</td><td>' + esc(statusOf(o)) + '</td></tr>';
     });
     if (!D.orders.length) h += '<tr><td colspan="11">' + esc(t('none')) + '</td></tr>';
     return h + '</tbody></table></div>';

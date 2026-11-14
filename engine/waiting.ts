@@ -39,8 +39,10 @@ export interface WaitingOrder {
   email: string
   /** From the order's locale; the language /claim opens in. */
   language: WaitingLanguage
-  /** What the buyer actually paid (JPY, whole yen) — the dashboard counts this, never the package price. null when Shopify did not say. */
+  /** What the buyer actually paid, in the SHOP's currency (JPY, whole yen) — the dashboard counts this, never the package price and never the buyer's own-currency amount. null when Shopify did not say. */
   amount_jpy: number | null
+  /** An order paid in another currency (a US buyer: USD 17.50): what the buyer saw and paid, shown beside the yen amount. Never added to any total. */
+  amount_buyer?: BuyerAmount | null
   source: 'webhook' | 'ops_sweep' | 'claim_lookup'
   status: 'waiting' | 'claimed'
   recorded_at: string
@@ -49,6 +51,13 @@ export interface WaitingOrder {
   claimed_at?: string
   /** The order record (OR-…) the claim produced. */
   order_ref?: string
+}
+
+export interface BuyerAmount {
+  /** the amount as Shopify writes it ("17.50") */
+  amount: string
+  /** ISO 4217 ("USD") */
+  currency: string
 }
 
 export const waitingId = (orderNumber: string): string => `WO-${orderNumber}`
@@ -64,8 +73,11 @@ export interface ShopifyOrderFacts {
   paidAt?: string | null
   createdAt?: string | null
   locale?: string | null
+  /** the order's total in the SHOP's currency (yen) — and `currency` its code; for a legacy body with no money sets it is the order's own total and currency */
   amount?: number | string | null
   currency?: string | null
+  /** what the buyer paid in THEIR currency when it is not the shop's (USD 17.50) */
+  buyer?: BuyerAmount | null
   /** one entry per line item */
   lines: { sku?: string | null; props: { key: string; value: string }[] }[]
   /** the order's own custom attributes (the cart's `order_ref` lands here too) */
@@ -104,6 +116,22 @@ export function fromWebhook(body: unknown): ShopifyOrderFacts | null {
     Array.isArray(v) ? v.filter((p): p is { name: string; value: unknown } => !!p && typeof (p as { name?: unknown }).name === 'string').map((p) => ({ key: p.name, value: typeof p.value === 'string' ? p.value : String(p.value ?? '') })) : []
   const status = String(o.financial_status ?? '').toLowerCase()
   const money = (o.current_total_price ?? o.total_price) as unknown
+  // Shopify's money sets: shop_money is what the shop settles (yen), presentment_money is what the buyer saw and paid (USD for an English order). Revenue is ALWAYS the shop amount.
+  type Money = { amount?: unknown; currency_code?: unknown } | null | undefined
+  const set = (o.current_total_price_set ?? o.total_price_set) as { shop_money?: Money; presentment_money?: Money } | null | undefined
+  const shop = set?.shop_money
+  const pres = set?.presentment_money
+  const text = (v: unknown): string | null => (typeof v === 'string' && v !== '' ? v : typeof v === 'number' && Number.isFinite(v) ? String(v) : null)
+  const shopAmount = text(shop?.amount)
+  const shopCurrency = text(shop?.currency_code)
+  const presAmount = text(pres?.amount)
+  const presCurrency = text(pres?.currency_code)
+  const buyer: BuyerAmount | null =
+    presAmount && presCurrency && presCurrency.toUpperCase() !== (shopCurrency ?? 'JPY').toUpperCase()
+      ? { amount: presAmount, currency: presCurrency.toUpperCase() }
+      : !set && typeof o.currency === 'string' && o.currency.toUpperCase() !== 'JPY' && (typeof money === 'string' || typeof money === 'number')
+        ? { amount: String(money), currency: o.currency.toUpperCase() } // a body with no money sets: the order's own currency is not yen — it cannot be counted as yen
+        : null
   return {
     name: typeof o.name === 'string' ? o.name : null,
     email: typeof o.email === 'string' ? o.email : typeof o.contact_email === 'string' ? o.contact_email : null,
@@ -112,8 +140,9 @@ export function fromWebhook(body: unknown): ShopifyOrderFacts | null {
     paidAt: typeof o.processed_at === 'string' ? o.processed_at : null,
     createdAt: typeof o.created_at === 'string' ? o.created_at : null,
     locale: typeof o.customer_locale === 'string' ? o.customer_locale : typeof o.locale === 'string' ? o.locale : null,
-    amount: typeof money === 'string' || typeof money === 'number' ? money : null,
-    currency: typeof o.currency === 'string' ? o.currency : null,
+    amount: shopAmount ?? (typeof money === 'string' || typeof money === 'number' ? money : null),
+    currency: shopCurrency ?? (typeof o.currency === 'string' ? o.currency : null),
+    buyer,
     lines: Array.isArray(o.line_items) ? o.line_items.map((l) => ({ sku: typeof (l as { sku?: unknown }).sku === 'string' ? (l as { sku: string }).sku : null, props: pairs((l as { properties?: unknown }).properties) })) : [],
     attrs: pairs(o.note_attributes),
   }
@@ -127,7 +156,7 @@ export interface AdminWaitingOrder {
   cancelledAt?: string | null
   displayFinancialStatus?: string | null
   customerLocale?: string | null
-  currentTotalPriceSet?: { shopMoney?: { amount?: string | null; currencyCode?: string | null } | null } | null
+  currentTotalPriceSet?: { shopMoney?: { amount?: string | null; currencyCode?: string | null } | null; presentmentMoney?: { amount?: string | null; currencyCode?: string | null } | null } | null
   customAttributes?: { key: string; value?: string | null }[] | null
   lineItems?: { nodes?: { sku?: string | null; customAttributes?: { key: string; value?: string | null }[] | null }[] } | null
   transactions?: { kind?: string | null; status?: string | null; processedAt?: string | null }[] | null
@@ -147,6 +176,7 @@ export function fromAdmin(o: AdminWaitingOrder): ShopifyOrderFacts {
     locale: o.customerLocale ?? null,
     amount: o.currentTotalPriceSet?.shopMoney?.amount ?? null,
     currency: o.currentTotalPriceSet?.shopMoney?.currencyCode ?? null,
+    buyer: ((p, s) => (p?.amount && p.currencyCode && p.currencyCode.toUpperCase() !== (s?.currencyCode ?? 'JPY').toUpperCase() ? { amount: p.amount, currency: p.currencyCode.toUpperCase() } : null))(o.currentTotalPriceSet?.presentmentMoney, o.currentTotalPriceSet?.shopMoney),
     lines: (o.lineItems?.nodes ?? []).map((n) => ({ sku: n.sku ?? null, props: flat(n.customAttributes) })),
     attrs: flat(o.customAttributes),
   }
@@ -169,6 +199,7 @@ export function waitingFromShopify(o: ShopifyOrderFacts, source: WaitingOrder['s
     email,
     language: languageOfLocale(o.locale),
     amount_jpy: !o.currency || o.currency.toUpperCase() === 'JPY' ? wholeYen(o.amount) : null,
+    ...(o.buyer ? { amount_buyer: o.buyer } : {}),
     source,
     status: 'waiting',
     recorded_at: now.toISOString(),
@@ -252,8 +283,10 @@ export interface OrderClaim {
   claimed_at: string
   paid_at: string
   amount_jpy: number | null
+  /** what the buyer paid in their own currency (USD 17.50), when it is not yen */
+  amount_buyer?: BuyerAmount | null
 }
 
-export const claimOf = (w: WaitingOrder, now: Date): OrderClaim => ({ order_name: w.order_name, claimed_at: now.toISOString(), paid_at: w.paid_at, amount_jpy: w.amount_jpy })
+export const claimOf = (w: WaitingOrder, now: Date): OrderClaim => ({ order_name: w.order_name, claimed_at: now.toISOString(), paid_at: w.paid_at, amount_jpy: w.amount_jpy, ...(w.amount_buyer ? { amount_buyer: w.amount_buyer } : {}) })
 
 export { jstDate, normalizeEmail, normalizeOrderNumber }

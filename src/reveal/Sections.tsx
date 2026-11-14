@@ -7,7 +7,7 @@ import { rich } from './rich.tsx'
 import Picture from './Picture.tsx'
 import { CURRENCIES, approxLine, type Currency, type Rates } from './currency.ts'
 import { PACKAGE_PRICE_JPY } from '../order/packages.ts'
-import { PriceWithSale, SaleLine, UsdPriceView } from '../order/SalePrice.tsx'
+import { PriceWithSale, SaleLine, UsdLaunchLine, UsdPriceView } from '../order/SalePrice.tsx'
 import { salePriceJpy } from '../order/sale.ts'
 import { LEGAL, rowValue } from '../legal/legal-copy.ts'
 
@@ -317,7 +317,7 @@ export function Gifts({
   const sizes = useSizes()
   const soon = useComingSoon() // e-gift-first launch: 木札 / 版木 are listed with 「近日公開」 and a disabled button
   const usdPrice = useUsd() // English: a fixed dollar price
-  const sale = useSale() // the Thanksgiving sale (the e-gift only): the old price struck through, the sale price beside it, one line of words
+  const sale = useSale(lang) // the Thanksgiving sale (the e-gift only): the old price struck through, the sale price beside it, one line of words
   const sc = SIZE_COPY[lang]
   // English (US launch): nothing physical is offered, so while the wooden sizes are "coming soon" they are not listed at all — only the e-gift
   const enOnly = lang === 'en' && soon.length > 0
@@ -356,7 +356,7 @@ export function Gifts({
                     {lang === 'en' && c.id === 'egift' ? <UsdPriceView price={usdPrice} sale={onSale} id={c.id} /> : <PriceWithSale yen={PACKAGE_PRICE_JPY[c.id]} sale={onSale} id={c.id} />}
                   </span>
                 </div>
-                <SaleLine sale={onSale} lang={lang} />
+                {lang === 'en' ? <UsdLaunchLine price={usdPrice} sale={onSale} /> : <SaleLine sale={onSale} lang={lang} />}
                 {approx && <span className="approx">{approx}</span>}
                 <ul>
                   {c.items.map((x) => (

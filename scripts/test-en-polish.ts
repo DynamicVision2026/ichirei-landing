@@ -1,26 +1,24 @@
 // English polish after the owner's live test (2026-11-14): the dollar price, the yen line, the real landing pictures, the wording changes. Pure checks, no browser.
 //   node --experimental-strip-types --disable-warning=ExperimentalWarning scripts/test-en-polish.ts
 import { existsSync, readFileSync, readdirSync } from 'node:fs'
-import { DEFAULT_USD_PRICE, parseUsdPrice, usd, yenCheckoutLine } from '../src/order/usd.ts'
+import { DEFAULT_USD_PRICE, parseUsdPrice, usd } from '../src/order/usd.ts'
 import { sceneName } from '../src/reveal/scenes.ts'
 import { SIZE_COPY } from '../src/demo/sizes-copy.ts'
 import { COPY } from '../src/demo/i18n.ts'
 import { PREVIEW_COPY } from '../src/demo/preview-copy.ts'
 import { TEXT } from '../src/reveal/copy.ts'
 import { sameSentence } from '../src/order/en-bridge.ts'
-import { formatYen } from '../src/order/packages.ts'
-import { salePriceJpy } from '../src/order/sale.ts'
 
 let failures = 0
 const check = (name: string, cond: boolean, detail = '') => { console.log(`${cond ? 'PASS' : 'FAIL'}  ${name}${!cond && detail ? `  -> ${detail}` : ''}`); if (!cond) failures++ }
 
 // ---- dollar price -------------------------------------------------------------------------------------------------------------------------------
-check('usd: the defaults are $25 and $17', DEFAULT_USD_PRICE.egift === 25 && DEFAULT_USD_PRICE.egift_sale === 17 && usd(25) === '$25')
+check('usd: the defaults are $25 and $17.50', DEFAULT_USD_PRICE.egift === 25 && DEFAULT_USD_PRICE.egift_sale === 17.5 && usd(25) === '$25' && usd(17.5) === '$17.50')
 check('usd: USD_PRICE_EGIFT / _SALE are read as whole dollars', JSON.stringify(parseUsdPrice('30', '21')) === '{"egift":30,"egift_sale":21}' && parseUsdPrice('$30', '').egift === 30)
-check('usd: an unreadable value falls back to the default ($25 / $17)', JSON.stringify(parseUsdPrice('abc', '1.5')) === '{"egift":25,"egift_sale":17}' && parseUsdPrice(undefined, undefined).egift === 25 && parseUsdPrice('0', '0').egift === 25)
-check('usd: with no sale price given, the sale percent is applied to the price (rounded down)', parseUsdPrice('25', '', 30).egift_sale === 17 && parseUsdPrice('40', '', 30).egift_sale === 28)
+check('usd: an unreadable value falls back to the default ($25 / $17.50)', JSON.stringify(parseUsdPrice('abc', 'x')) === '{"egift":25,"egift_sale":17.5}' && parseUsdPrice(undefined, undefined).egift === 25 && parseUsdPrice('0', '0').egift === 25)
+check('usd: with no sale price given, the sale percent is applied to the price (rounded down)', parseUsdPrice('25', '', 30).egift_sale === 17.5 && parseUsdPrice('40', '', 30).egift_sale === 28)
 check('usd: a sale price that is set wins over the percent', parseUsdPrice('25', '15', 30).egift_sale === 15)
-check('yen line: the one line above "Continue to payment", with the yen amount (¥3,980; sale ¥2,786)', yenCheckoutLine(formatYen(3980)) === 'Checkout is processed in Japanese yen (¥3,980); your card shows the converted amount.' && yenCheckoutLine(formatYen(salePriceJpy(3980, 30))) === 'Checkout is processed in Japanese yen (¥2,786); your card shows the converted amount.')
+check('yen line: the checkout line above "Continue to payment" is gone — checkout is in dollars now', !/yenCheckoutLine|order-yen-line/.test(readFileSync('src/demo/OrderForm.tsx', 'utf8')))
 
 // ---- the landing pictures ------------------------------------------------------------------------------------------------------------------------
 check('scenes: every language uses public/img/scenes/<category> — English has no set of its own', (['ja', 'zh-Hant', 'en'] as const).every((l) => ['parents', 'partner', 'children', 'friends', 'mentor', 'work'].every((c) => sceneName(l, c) === `scenes/${c}`)))

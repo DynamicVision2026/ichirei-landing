@@ -24,15 +24,17 @@ substitutions:
   # 一字礼 eギフト (¥3,980, SKU ICHIREI-EGIFT, a digital product with no shipping). While empty, that size is hidden on the page and refused by the server.
   _SHOPIFY_VARIANT_EGIFT: '67913881616632'
   # The Thanksgiving sale SHOWN on the site (2026-11-13): the old price struck through, the sale price and one line of words, from the first day 00:00 to the last day 23:59 (Japan time).
-  # The owner's dates (2026-11-13): 30% from 2026-11-20 to 2026-11-30, matching the Shopify automatic discount 「感謝の季節 30% OFF」 (ICHIREI only). Nothing shows before _SALE_FROM or after _SALE_UNTIL;
+  # The owner's dates (2026-11-14, all markets): 30% from 2026-11-15 to 2026-11-30, matching the Shopify automatic discount 「感謝の季節 30% OFF」 (ICHIREI only). Nothing shows before _SALE_FROM or after _SALE_UNTIL;
   # empty _SALE_PERCENT = no sale at all. Our site never sets the price — Shopify's discount does; if the two disagree Shopify wins at checkout, so keep them in step.
   # The English page's price (2026-11-14, owner decision): a fixed dollar price, whole dollars, shown instead of any converted "about" figure; the sale price shows while the sale is on.
   # Checkout itself stays in yen (Shopify's variant price); these only change what /en shows. Edit them here or on the trigger.
   _USD_PRICE_EGIFT: '25'
-  _USD_PRICE_EGIFT_SALE: '17'
+  _USD_PRICE_EGIFT_SALE: '17.50'
   _SALE_PERCENT: '30'
-  _SALE_FROM: '2026-11-20'
+  _SALE_FROM: '2026-11-15'
   _SALE_UNTIL: '2026-11-30'
+  # English pages only (2026-11-14): the exact moment their sale ends (US evening of the last day included); ja / zh end with _SALE_UNTIL 23:59 JST. Empty = English follows _SALE_UNTIL.
+  _SALE_UNTIL_EN: '2026-12-01T13:59+09:00'
   # The Storefront token is PUBLIC by design (it ships in every storefront). Set it on the trigger;
   # when empty the server falls back to the SHOPIFY_STOREFRONT_TOKEN secret mounted below.
   _SHOPIFY_STOREFRONT_TOKEN: ''
@@ -111,7 +113,7 @@ steps:
       # Mount the Secret Manager secrets as env vars of the same name.
       - --set-secrets=ANTHROPIC_API_KEY=ANTHROPIC_API_KEY:latest,SHOPIFY_STOREFRONT_TOKEN=SHOPIFY_STOREFRONT_TOKEN:latest
       # Non-secret settings: the purchase settings and the engine speed settings. --update-env-vars leaves any other variable alone.
-      - --update-env-vars=ICHIREI_EFFORT=${_EFFORT},ICHIREI_MAX_TOKENS=${_MAX_TOKENS},ICHIREI_MAX_TOKENS_RETRY=${_MAX_TOKENS_RETRY},ICHIREI_REVIEW_MODEL=${_REVIEW_MODEL},ICHIREI_REVIEW_EFFORT=${_REVIEW_EFFORT},ICHIREI_CALL_TIMEOUT_MS=${_CALL_TIMEOUT_MS},ICHIREI_REVIEW_TIMEOUT_MS=${_REVIEW_TIMEOUT_MS},ICHIREI_LEXICON_MODE=${_LEXICON_MODE},ICHIREI_SIMPLE_MAX_STROKES=${_SIMPLE_MAX_STROKES},ICHIREI_ANIMATION_SAMPLES=${_ANIMATION_SAMPLES},ICHIREI_FILM_IMAGE_MODEL=${_FILM_IMAGE_MODEL},ICHIREI_FILM_IMAGE_LOCATION=${_FILM_IMAGE_LOCATION},ICHIREI_FILM_DAILY_MAX=${_FILM_DAILY_MAX},SHOPIFY_VARIANT_SIMPLE=${_SHOPIFY_VARIANT_SIMPLE},SHOPIFY_VARIANT_STANDARD=${_SHOPIFY_VARIANT_STANDARD},SHOPIFY_VARIANT_EGIFT=${_SHOPIFY_VARIANT_EGIFT},SHOPIFY_STOREFRONT_TOKEN_PUBLIC=${_SHOPIFY_STOREFRONT_TOKEN},SHOPIFY_ADMIN_CLIENT_ID=${_SHOPIFY_ADMIN_CLIENT_ID},ORDER_BUCKET=${_ORDER_BUCKET},ICHIREI_WOOD_SIZES=${_WOOD_SIZES},ICHIREI_SUPPORT_EMAIL=${_SUPPORT_EMAIL},ICHIREI_SELFTEST_MONTHLY_USD=${_SELFTEST_MONTHLY_USD},ICHIREI_COMMIT=${SHORT_SHA},ICHIREI_DEPLOYED_AT=__DEPLOYED_AT__,SALE_PERCENT=${_SALE_PERCENT},SALE_FROM=${_SALE_FROM},SALE_UNTIL=${_SALE_UNTIL},USD_PRICE_EGIFT=${_USD_PRICE_EGIFT},USD_PRICE_EGIFT_SALE=${_USD_PRICE_EGIFT_SALE}
+      - --update-env-vars=ICHIREI_EFFORT=${_EFFORT},ICHIREI_MAX_TOKENS=${_MAX_TOKENS},ICHIREI_MAX_TOKENS_RETRY=${_MAX_TOKENS_RETRY},ICHIREI_REVIEW_MODEL=${_REVIEW_MODEL},ICHIREI_REVIEW_EFFORT=${_REVIEW_EFFORT},ICHIREI_CALL_TIMEOUT_MS=${_CALL_TIMEOUT_MS},ICHIREI_REVIEW_TIMEOUT_MS=${_REVIEW_TIMEOUT_MS},ICHIREI_LEXICON_MODE=${_LEXICON_MODE},ICHIREI_SIMPLE_MAX_STROKES=${_SIMPLE_MAX_STROKES},ICHIREI_ANIMATION_SAMPLES=${_ANIMATION_SAMPLES},ICHIREI_FILM_IMAGE_MODEL=${_FILM_IMAGE_MODEL},ICHIREI_FILM_IMAGE_LOCATION=${_FILM_IMAGE_LOCATION},ICHIREI_FILM_DAILY_MAX=${_FILM_DAILY_MAX},SHOPIFY_VARIANT_SIMPLE=${_SHOPIFY_VARIANT_SIMPLE},SHOPIFY_VARIANT_STANDARD=${_SHOPIFY_VARIANT_STANDARD},SHOPIFY_VARIANT_EGIFT=${_SHOPIFY_VARIANT_EGIFT},SHOPIFY_STOREFRONT_TOKEN_PUBLIC=${_SHOPIFY_STOREFRONT_TOKEN},SHOPIFY_ADMIN_CLIENT_ID=${_SHOPIFY_ADMIN_CLIENT_ID},ORDER_BUCKET=${_ORDER_BUCKET},ICHIREI_WOOD_SIZES=${_WOOD_SIZES},ICHIREI_SUPPORT_EMAIL=${_SUPPORT_EMAIL},ICHIREI_SELFTEST_MONTHLY_USD=${_SELFTEST_MONTHLY_USD},ICHIREI_COMMIT=${SHORT_SHA},ICHIREI_DEPLOYED_AT=__DEPLOYED_AT__,SALE_PERCENT=${_SALE_PERCENT},SALE_FROM=${_SALE_FROM},SALE_UNTIL=${_SALE_UNTIL},SALE_UNTIL_EN=${_SALE_UNTIL_EN},USD_PRICE_EGIFT=${_USD_PRICE_EGIFT},USD_PRICE_EGIFT_SALE=${_USD_PRICE_EGIFT_SALE}
 
 images:
   - ${_REGION}-docker.pkg.dev/$PROJECT_ID/${_REPO}/${_SERVICE}:$BUILD_ID

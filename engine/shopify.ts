@@ -65,7 +65,7 @@ export function loadShopifyConfig(env: NodeJS.ProcessEnv = process.env): { confi
 
 const CART_CREATE = `mutation CartCreate($input: CartInput!) {
   cartCreate(input: $input) {
-    cart { id checkoutUrl }
+    cart { id checkoutUrl cost { totalAmount { amount currencyCode } } }
     userErrors { field message }
   }
 }`
@@ -74,7 +74,12 @@ export interface CartResult {
   cartId: string
   checkoutUrl: string
   variantId: string
+  /** The currency Shopify priced the cart in (cost.totalAmount.currencyCode); null when it did not say. */
+  currency: string | null
 }
+
+/** English orders (2026-11-14): the cart names the United States as the buyer's country, so the "ICHIREI English" market (English, USD, a fixed price) prices the checkout. ja / zh carts name nobody. */
+export const EN_BUYER_COUNTRY = 'US'
 
 export async function createCart(
   config: ShopifyConfig,
@@ -82,6 +87,7 @@ export async function createCart(
   attributes: Attribute[],
   orderRef: string,
   fetchImpl: typeof fetch = fetch,
+  language?: string,
 ): Promise<CartResult> {
   const variantId = config.variants[pkg]
   if (!variantId) throw new ShopifyError(`The size "${pkg}" has no Shopify variant configured`, { code: 'size_unavailable' })
@@ -95,6 +101,7 @@ export async function createCart(
           // The line carries the attributes (the chosen poem included); the cart repeats order_ref so it also lands on the order itself.
           lines: [{ merchandiseId: variantId, quantity: 1, attributes }],
           attributes: [{ key: 'order_ref', value: orderRef }],
+          ...(language === 'en' ? { buyerIdentity: { countryCode: EN_BUYER_COUNTRY } } : {}),
         },
       },
     }),
@@ -102,7 +109,7 @@ export async function createCart(
   })
   if (!res.ok) throw new ShopifyError(`Shopify answered HTTP ${res.status}`, { status: res.status })
   let json: {
-    data?: { cartCreate?: { cart?: { id?: string; checkoutUrl?: string } | null; userErrors?: { field?: string[]; message: string }[] } | null }
+    data?: { cartCreate?: { cart?: { id?: string; checkoutUrl?: string; cost?: { totalAmount?: { amount?: string; currencyCode?: string } | null } | null } | null; userErrors?: { field?: string[]; message: string }[] } | null }
     errors?: { message: string }[]
   }
   try {
@@ -123,7 +130,12 @@ export async function createCart(
   }
   // Production Shopify checkouts are https. (Tests point SHOPIFY_API_BASE at http://127.0.0.1.)
   if (url.protocol !== 'https:' && !config.apiBase.startsWith('http://')) throw new ShopifyError('Shopify returned a non-https checkout URL')
-  return { cartId: cart.id, checkoutUrl: cart.checkoutUrl, variantId }
+  const currency = cart.cost?.totalAmount?.currencyCode ?? null
+  // An English cart should be priced in dollars. If Shopify says otherwise (the market is not set up for that buyer country), the buyer still gets the checkout; the owner sees the line.
+  if (language === 'en' && currency && currency.toUpperCase() !== 'USD') {
+    console.warn(`[ichirei-order] ${JSON.stringify({ event: 'en_cart_currency_mismatch', order_ref: orderRef, currency, amount: cart.cost?.totalAmount?.amount ?? null })}`)
+  }
+  return { cartId: cart.id, checkoutUrl: cart.checkoutUrl, variantId, currency }
 }
 
 /** The sizes that can be ordered right now: those with a variant. Without a config (not ready) none. */

@@ -1776,6 +1776,7 @@ const mockPage = async (browser, { onExplain, result, order, track } = {}) => {
     check(`legal (${lang}): the title and the five seller rows, filled with the owner's own details — and no 【 】 anywhere on the page, no placeholder note`, (await p.locator('h1').innerText()).includes(t.title) && t.rows.every((r) => rows.includes(r)) && !/[【】]/.test(await p.locator('body').innerText()) && (await p.locator('[data-testid=legal-note]').count()) === 0 && rows.includes('Beyond Culture 獨歩文化株式会社'))
     check(`legal (${lang}): the e-mail address is plain, selectable text (not a link)`, (await p.locator('[data-testid=legal-email]').innerText()) === EMAIL && (await p.locator('[data-testid=legal-email] a').count()) === 0)
     if (lang === 'ja') await p.screenshot({ path: 'shots/legal-ja.png', fullPage: true })
+    if (lang === 'en') check('legal (en): the price row reads "US$25 (sale US$17.50) for orders from the English site; ¥3,980 for orders from the Japanese and Chinese sites" (the one English page that keeps yen)', rows.includes('US$25 (sale US$17.50) for orders from the English site; ¥3,980 for orders from the Japanese and Chinese sites'))
     check(`legal (${lang}): the prices and the shipping come from the product (¥3,980 / ¥9,800 / ¥18,850; EMS ¥6,000)`, ['3,980', '9,800', '18,850', '6,000'].every((x) => rows.includes(x)))
     const ret = await p.locator('[data-testid=legal-returns]').innerText()
     check(`legal (${lang}): the refund section — four short paragraphs with their headings (within 24 hours of payment, after 24 hours, our mistake, delivery), word for word at their start; the first one is /legal#refund`, (await p.locator('[data-testid=legal-section]').count()) === 4 && t.ret.every((x) => ret.includes(x)) && (await p.locator('#refund h3').innerText()) === t.refundHead)
@@ -3600,7 +3601,7 @@ const SECTION_ORDER = ['.hero', '.strip', '.philo', '#shape', '#angles', '#write
   const TOKEN = 'CT-testtesttesttesttesttest'
   const ratesStub = { date: '2026-11-13', base: 'JPY', rates: { USD: 0.0066 } }
   const sizesBody = (sale) => ({ sizes: ['egift', 'simple', 'standard'], coming_soon: ['simple', 'standard'], ...(sale ? { sale } : {}) })
-  const SALE = { percent: 30, from: '2026-11-20', until: '2026-11-30', starts_at: '2020-01-01T00:00:00.000Z', ends_at: '2099-11-30T14:59:59.999Z' }
+  const SALE = { percent: 30, from: '2026-11-15', until: '2026-11-30', starts_at: '2020-01-01T00:00:00.000Z', ends_at: '2099-11-30T14:59:59.999Z' }
   const baseStubs = async (page, sale) => {
     await page.route('**/api/rates', (r) => r.fulfill({ json: ratesStub }))
     await page.route('**/api/sizes', (r) => r.fulfill({ json: sizesBody(sale) }))
@@ -3686,7 +3687,7 @@ const SECTION_ORDER = ['.hero', '.strip', '.philo', '#shape', '#angles', '#write
   }
 
   // ---- the Thanksgiving sale: struck price, sale price, one line; gone when off or over ----
-  const LINE = { ja: '感謝の季節に、30％オフ（11月30日まで）', 'zh-Hant': '感恩季節，七折優惠（至11月30日）', en: 'Thanksgiving: 30% off until November 30' }
+  const LINE = { ja: '感謝の季節に、30％オフ（11月30日まで）', 'zh-Hant': '感恩季節，七折優惠（至11月30日）', en: 'Thanksgiving launch price, through November 30. $25 from December 1.' }
   const LOCALE = { ja: 'ja-JP', 'zh-Hant': 'zh-TW', en: 'en-US' }
   const reachOrderStep = async (page, lang) => {
     await page.locator('#write [data-testid=story-input]').fill(lang === 'en' ? 'She left the porch light on every night until I got home, and she never once mentioned it.' : STORY)
@@ -3716,31 +3717,42 @@ const SECTION_ORDER = ['.hero', '.strip', '.philo', '#shape', '#angles', '#write
       const read = async () => ({ old: await txt(card.locator('[data-price-old=egift]')), sale: await txt(card.locator('[data-price-sale=egift]')), line: await txt(card.locator('[data-testid=sale-line]')), price: ((await card.locator('[data-price=egift]').textContent()) ?? '').replace(/\s+/g, ' ').trim() })
       check(`landing numerals (${lang}): ${lang === 'en' ? '1, 2, 3' : '一, 二, 三'} in "why we start with your story"`, (await page.locator('.philo .phN').allTextContents()).map((x) => x.trim()).join() === (lang === 'en' ? '1,2,3' : '一,二,三'))
       const L = await read()
-      const OLD = lang === 'en' ? '$25' : '¥3,980'
-      const NEW = lang === 'en' ? '$17' : '¥2,786'
+      const EN = lang === 'en'
+      // no struck-through price on any English page, ever (the English version has never been sold at the full price): no <s>, <del>, price-old element or line-through anywhere
+      const struckAnywhere = () => page.evaluate(() => ({ tags: document.querySelectorAll('s, del, strike, [data-price-old]').length, lt: [...document.querySelectorAll('body *')].filter((e) => getComputedStyle(e).textDecorationLine.includes('line-through')).length }))
       if (mode === 'on') {
-        const struck = await card.locator('[data-price-old=egift]').evaluate((e) => getComputedStyle(e).textDecorationLine)
-        check(`sale on (${lang}): the landing's e-gift price shows ${OLD} struck through, then ${NEW}, then 「${LINE[lang]}」`, L.old === OLD && L.sale === NEW && L.line === LINE[lang] && struck === 'line-through', JSON.stringify(L))
+        if (EN) {
+          check(`sale on (en): the landing's e-gift price shows ONLY the sale price $17.50, then 「${LINE.en}」 — no $25 before it, struck or plain`, L.old === null && L.sale === '$17.50' && L.price === '$17.50' && L.line === LINE.en, JSON.stringify(L))
+          const st = await struckAnywhere()
+          check('sale on (en): no <s>, <del>, price-old element or line-through anywhere on the English landing', st.tags === 0 && st.lt === 0, JSON.stringify(st))
+          check('sale on (en): the hero and "What they receive" show only $17.50 (with the launch line under it), and no "about $" and no ¥ anywhere on the page', (await page.locator('[data-testid=usd-hero]').textContent())?.trim() === '$17.50' && (await page.locator('[data-testid=usd-hero-line]').textContent()) === LINE.en && (await page.locator('[data-testid=us-receive-price]').textContent())?.trim() === '$17.50' && (await page.locator('#receive [data-testid=sale-line]').textContent()) === LINE.en && !/about \$/.test((await page.evaluate(() => document.body.textContent)) ?? '') && !/¥/.test((await page.evaluate(() => document.body.textContent)) ?? ''))
+        } else {
+          const struck = await card.locator('[data-price-old=egift]').evaluate((e) => getComputedStyle(e).textDecorationLine)
+          check(`sale on (${lang}): the landing's e-gift price shows ¥3,980 struck through, then ¥2,786, then 「${LINE[lang]}」`, L.old === '¥3,980' && L.sale === '¥2,786' && L.line === LINE[lang] && struck === 'line-through', JSON.stringify(L))
+        }
         const woodPrices = await page.locator('#gifts article[data-size=simple] [data-price-old], #gifts article[data-size=standard] [data-price-old]').count()
         check(`sale on (${lang}): the wooden sizes (coming soon) carry no sale`, woodPrices === 0)
-        if (lang === 'en') check('sale on (en): the hero shows $25 struck through, then $17 — and no "about $" anywhere', (await page.locator('[data-price-old=hero]').textContent()) === '$25' && (await page.locator('[data-price-sale=hero]').textContent()) === '$17' && !/about \$/.test((await page.evaluate(() => document.body.textContent)) ?? ''))
         await page.screenshot({ path: `${SHOTS}/sale-landing-${lang}.png`, fullPage: false })
       } else {
-        check(`sale ${mode} (${lang}): the landing shows the plain price ${OLD} and no struck price, no sale price, no line`, L.old === null && L.sale === null && L.line === null && L.price === OLD, JSON.stringify(L))
-        if (lang === 'en') check(`sale ${mode} (en): the hero shows the plain $25 (nothing struck) and no "about $"`, (await page.locator('[data-testid=usd-hero]').textContent())?.trim() === '$25' && (await page.locator('[data-price-old=hero]').count()) === 0 && !/about \$/.test((await page.evaluate(() => document.body.textContent)) ?? ''))
+        check(`sale ${mode} (${lang}): the landing shows the plain price ${EN ? '$25' : '¥3,980'} and no struck price, no sale price, no line`, L.old === null && L.sale === null && L.line === null && L.price === (EN ? '$25' : '¥3,980'), JSON.stringify(L))
+        if (EN) check(`sale ${mode} (en): the hero shows the plain $25 (nothing struck, no launch line), no "about $" and no ¥ anywhere on the page`, (await page.locator('[data-testid=usd-hero]').textContent())?.trim() === '$25' && (await page.locator('[data-testid=usd-hero-line]').count()) === 0 && (await struckAnywhere()).tags === 0 && !/about \$/.test((await page.evaluate(() => document.body.textContent)) ?? '') && !/¥/.test((await page.evaluate(() => document.body.textContent)) ?? ''))
       }
       await page.locator('#write').scrollIntoViewIfNeeded()
       await reachOrderStep(page, lang)
       const pkg = page.locator('label.pkg:has(input[value=egift])')
       const O = { old: await pkg.locator('[data-price-old]').count(), sale: await pkg.locator('[data-price-sale]').count() ? await pkg.locator('[data-price-sale]').innerText() : null, line: await pkg.locator('[data-testid=sale-line]').count() ? await pkg.locator('[data-testid=sale-line]').innerText() : null, plain: await pkg.locator('[data-price=egift]').innerText() }
       if (mode === 'on') {
-        check(`sale on (${lang}): the order step shows the same — ${OLD} struck through, ${NEW}, and 「${LINE[lang]}」`, O.old === 1 && O.sale === NEW && O.line === LINE[lang] && O.plain.includes(OLD.slice(1)) && O.plain.includes(NEW.slice(1)), JSON.stringify(O))
-        if (lang === 'en') check('sale on (en): the one yen line above "Continue to payment" gives the SALE yen amount, and it is the only yen on the order step', (await T(page, 'order-yen-line').innerText()) === 'Checkout is processed in Japanese yen (¥2,786); your card shows the converted amount.' && ((await T(page, 'order-form').innerText()).match(/¥[\d,]+/g) ?? []).length === 1)
+        if (EN) {
+          const st = await struckAnywhere()
+          check(`sale on (en): the order step shows ONLY $17.50 and 「${LINE.en}」 — nothing struck, no $25 before it — and no yen anywhere on the order step (checkout is in dollars)`, O.old === 0 && O.sale === '$17.50' && O.plain === '$17.50' && O.line === LINE.en && st.tags === 0 && st.lt === 0 && !/¥/.test(await T(page, 'order-form').innerText()) && (await T(page, 'order-yen-line').count()) === 0, JSON.stringify({ O, st }))
+        } else {
+          check(`sale on (${lang}): the order step shows the same — ¥3,980 struck through, ¥2,786, and 「${LINE[lang]}」`, O.old === 1 && O.sale === '¥2,786' && O.line === LINE[lang] && /3,980/.test(O.plain) && /2,786/.test(O.plain), JSON.stringify(O))
+        }
         await page.locator('label.pkg:has(input[value=egift])').scrollIntoViewIfNeeded()
         await page.locator('[data-testid=order-form]').screenshot({ path: `${SHOTS}/sale-order-${lang}.png` })
       } else {
-        if (lang === 'en') check(`sale ${mode} (en): the one yen line above "Continue to payment" gives ¥3,980, the only yen on the order step, and no "about $"`, (await T(page, 'order-yen-line').innerText()) === 'Checkout is processed in Japanese yen (¥3,980); your card shows the converted amount.' && ((await T(page, 'order-form').innerText()).match(/¥[\d,]+/g) ?? []).length === 1 && !/about \$/.test(await T(page, 'order-form').innerText()))
-        check(`sale ${mode} (${lang}): the order step shows only the plain price — nothing struck, no sale line`, O.old === 0 && O.sale === null && O.line === null && O.plain === OLD, JSON.stringify(O))
+        if (EN) check(`sale ${mode} (en): no yen line above "Continue to payment" and no ¥ anywhere on the order step, no "about $"`, (await T(page, 'order-yen-line').count()) === 0 && !/¥/.test(await T(page, 'order-form').innerText()) && !/about \$/.test(await T(page, 'order-form').innerText()))
+        check(`sale ${mode} (${lang}): the order step shows only the plain price — nothing struck, no sale line`, O.old === 0 && O.sale === null && O.line === null && O.plain === (EN ? '$25' : '¥3,980'), JSON.stringify(O))
       }
       check(`no page errors (run 25, sale ${mode} ${lang})`, errs.length === 0, errs.join('; '))
       await ctx.close()
@@ -3755,7 +3767,7 @@ const SECTION_ORDER = ['.hero', '.strip', '.philo', '#shape', '#angles', '#write
     const card = page.locator('#gifts article[data-size=egift]')
     const before = await card.locator('[data-price-sale]').count()
     await page.waitForFunction(() => document.querySelector('#gifts [data-price-sale=egift]'), null, { timeout: 12000 })
-    check('sale from SALE_FROM: before the start moment the page shows the plain price; at the start it switches the sale on by itself (struck $25, $17, the line)', before === 0 && (await card.locator('[data-price-sale=egift]').textContent()) === '$17' && (await card.locator('[data-testid=sale-line]').textContent()) === LINE.en)
+    check('sale from SALE_FROM: before the start moment the page shows the plain price; at the start it switches the sale on by itself (only $17.50, the launch line)', before === 0 && (await card.locator('[data-price-sale=egift]').textContent()) === '$17.50' && (await card.locator('[data-testid=sale-line]').textContent()) === LINE.en)
     await ctx.close()
   }
   // the sale line is ink, never cinnabar (red is only for the character and the seal)

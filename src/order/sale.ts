@@ -4,6 +4,8 @@
 //   SALE_PERCENT   e.g. 30      (empty = no sale)             Cloud Build substitution _SALE_PERCENT
 //   SALE_FROM      e.g. 2026-11-20  (a date, Japan time; the first day: the sale shows from 00:00)   Cloud Build substitution _SALE_FROM (empty = from now)
 //   SALE_UNTIL     e.g. 2026-11-30  (a date, Japan time; the last day: the sale shows until 23:59)   Cloud Build substitution _SALE_UNTIL
+//   SALE_UNTIL_EN  e.g. 2026-12-01T13:59+09:00  (an exact moment with its offset; English pages only — later than SALE_UNTIL's 23:59 so a US buyer's evening of the last day is covered;
+//                  empty = English follows SALE_UNTIL)   Cloud Build substitution _SALE_UNTIL_EN
 // A percent without a valid SALE_UNTIL shows nothing. The server hands the sale to the page in GET /api/sizes until it is over; the page shows it only from `starts_at` to `ends_at` and switches
 // itself on and off at those moments, so a page left open neither shows a sale that has not begun nor keeps one that is over.
 //
@@ -20,6 +22,8 @@ export interface Sale {
   starts_at: string
   /** The end of the last day in Japan, as an instant (ISO). */
   ends_at: string
+  /** English pages only (SALE_UNTIL_EN): the exact moment their sale ends. Absent = English ends with the others (ends_at). */
+  en_ends_at?: string
 }
 
 const validDay = (v: string): boolean => {
@@ -33,7 +37,7 @@ const validDay = (v: string): boolean => {
  * The sale described by the settings, or null when there is none (empty, unreadable, from after until, or already over). A sale that has not started yet IS returned (the page shows it only inside
  * [starts_at, ends_at] and switches itself on at the start). `from` empty = it starts at once.
  */
-export function parseSale(percentRaw: string | undefined | null, untilRaw: string | undefined | null, now: Date = new Date(), fromRaw?: string | null): Sale | null {
+export function parseSale(percentRaw: string | undefined | null, untilRaw: string | undefined | null, now: Date = new Date(), fromRaw?: string | null, untilEnRaw?: string | null): Sale | null {
   const p = (percentRaw ?? '').trim().replace(/%$/, '')
   if (!/^\d{1,2}$/.test(p)) return null
   const percent = Number(p)
@@ -46,13 +50,20 @@ export function parseSale(percentRaw: string | undefined | null, untilRaw: strin
   if (from > until) return null
   const end = Date.parse(`${until}T23:59:59.999+09:00`)
   const start = Date.parse(`${from}T00:00:00.000+09:00`)
-  if (!Number.isFinite(end) || !Number.isFinite(start) || now.getTime() > end) return null
-  return { percent, from, until, starts_at: new Date(start).toISOString(), ends_at: new Date(end).toISOString() }
+  // the English end: an exact instant with an offset (2026-12-01T13:59+09:00); anything else is ignored (English then follows SALE_UNTIL)
+  const enGiven = (untilEnRaw ?? '').trim()
+  const enMs = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(:\d{2})?(Z|[+-]\d{2}:\d{2})$/.test(enGiven) ? Date.parse(enGiven) : NaN
+  const enEnd = Number.isFinite(enMs) && enMs > start ? enMs : null
+  if (!Number.isFinite(end) || !Number.isFinite(start) || now.getTime() > Math.max(end, enEnd ?? 0)) return null
+  return { percent, from, until, starts_at: new Date(start).toISOString(), ends_at: new Date(end).toISOString(), ...(enEnd !== null ? { en_ends_at: new Date(enEnd).toISOString() } : {}) }
 }
 
-/** A sale from the page's own copy of it, only while it is on: from its first moment to its last (null before the start and after the end). */
-export const saleOn = (sale: Sale | null | undefined, now: Date = new Date()): Sale | null =>
-  sale && Date.parse(sale.starts_at) <= now.getTime() && Date.parse(sale.ends_at) >= now.getTime() ? sale : null
+/** A sale from the page's own copy of it, only while it is on: from its first moment to its last (null before the start and after the end). English pages (`lang` "en") end at `en_ends_at` when there is one. */
+export const saleOn = (sale: Sale | null | undefined, now: Date = new Date(), lang?: string): Sale | null =>
+  sale && Date.parse(sale.starts_at) <= now.getTime() && Date.parse(lang === 'en' ? (sale.en_ends_at ?? sale.ends_at) : sale.ends_at) >= now.getTime() ? sale : null
+
+/** The last moment this language's sale is on (ms). */
+export const saleEndMs = (sale: Sale, lang?: string): number => Date.parse(lang === 'en' ? (sale.en_ends_at ?? sale.ends_at) : sale.ends_at)
 
 /** The sale price in whole yen, rounded DOWN: ¥3,980 at 30% → ¥2,786. (Integer arithmetic: no floating-point surprises.) */
 export const salePriceJpy = (yen: number, percent: number): number => Math.floor((yen * (100 - percent)) / 100)

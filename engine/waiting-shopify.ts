@@ -7,7 +7,7 @@ import type { OrderStore } from './order-store.ts'
 import { TrackUnavailable, type AdminTokenCache, type TrackDeps } from './track.ts'
 
 const FIELDS = `name email createdAt cancelledAt displayFinancialStatus customerLocale
-      currentTotalPriceSet { shopMoney { amount currencyCode } }
+      currentTotalPriceSet { shopMoney { amount currencyCode } presentmentMoney { amount currencyCode } }
       customAttributes { key value }
       lineItems(first: 10) { nodes { sku customAttributes { key value } } }
       transactions(first: 5) { kind status processedAt }`

@@ -7,6 +7,7 @@ import { PACKAGE_PRICE_JPY, formatYen } from '../order/packages.ts'
 import type { RevealLang } from '../reveal/copy.ts'
 
 import { REFUND_EN } from '../order/refund-en.ts'
+import { DEFAULT_USD_PRICE, usdCode } from '../order/usd.ts'
 
 export interface LegalRow {
   label: string
@@ -31,6 +32,8 @@ export interface LegalCopy {
 }
 
 const y = (id: 'egift' | 'simple' | 'standard') => formatYen(PACKAGE_PRICE_JPY[id])
+/** The e-gift's price on the legal notice, in English (2026-11-14): dollars for orders from the English site (checkout is in USD), yen for the Japanese and Chinese sites. */
+const EN_EGIFT_PRICE = `${usdCode(DEFAULT_USD_PRICE.egift)} (sale ${usdCode(DEFAULT_USD_PRICE.egift_sale)}) for orders from the English site; ${y('egift')} for orders from the Japanese and Chinese sites`
 
 export const LEGAL: Record<RevealLang, LegalCopy> = {
   ja: {
@@ -112,7 +115,7 @@ export const LEGAL: Record<RevealLang, LegalCopy> = {
       { label: 'Telephone', value: 'Disclosed by email without delay upon request. Please contact us by email.' },
       { label: 'E-mail', value: 'info@beyondculture.ai' },
       { label: 'Site', value: 'https://ichirei.soul-id.jp' },
-      { label: 'Prices', value: `ICHIREI e-gift ${y('egift')} · Wooden tag ${y('simple')} · Carved block ${y('standard')} (all tax included)` },
+      { label: 'Prices', value: `ICHIREI e-gift ${EN_EGIFT_PRICE} · Wooden tag ${y('simple')} · Carved block ${y('standard')} (all tax included)` },
       { label: 'Other charges', value: 'Shipping inside Japan is free. Shipping abroad (wooden tag and carved block) is EMS ¥6,000. The e-gift is not posted, so it has no shipping.' },
       { label: 'Payment methods', value: 'The methods shown at checkout (Shopify)' },
       { label: 'When you pay', value: 'Payment is taken when you place the order.' },
@@ -158,7 +161,7 @@ const EGIFT_ONLY: Record<RevealLang, { price: string; other: string; defect: str
     defect: 'e禮物頁面無法正常顯示時，我們會修正；無法修正時將退款。',
   },
   en: {
-    price: `ICHIREI e-gift ${y('egift')} (tax included)`,
+    price: `ICHIREI e-gift ${EN_EGIFT_PRICE} (tax included)`,
     other: 'The e-gift is sent as a link, so there is nothing to post and no delivery charge.',
     defect: "If an e-gift page doesn't display properly, we'll fix it, or refund you if we can't.",
   },

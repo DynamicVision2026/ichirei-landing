@@ -8,6 +8,7 @@ import { approxShort, type Currency, type Rates } from './currency.ts'
 import { PACKAGE_PRICE_JPY } from '../order/packages.ts'
 import { useSale, useUsd } from '../demo/useSizes.ts'
 import { UsdPriceView } from '../order/SalePrice.tsx'
+import { usdLaunchLine } from '../order/usd.ts'
 
 const INTERVAL_MS = 6000
 const SWAP_MS = 350
@@ -63,8 +64,8 @@ export default function Hero({ lang, currency, rates, woodOnSale = false }: { la
     pick(next)
     ;(event.currentTarget.querySelectorAll('button')[next] as HTMLElement | undefined)?.focus()
   }
-  const sale = useSale()
-  // English (2026-11-14): a fixed dollar price ($25; the sale $25 struck → $17), never an "about" figure. The other languages keep their converted line.
+  const sale = useSale(lang)
+  // English (2026-11-14): a fixed dollar price ($25; while the sale is on only the sale price, with the launch line under it), never an "about" figure or a struck price. The other languages keep their converted line.
   const usdPrice = useUsd()
   const approx = lang === 'en' ? null : approxShort(PACKAGE_PRICE_JPY.simple, currency, rates, lang)
 
@@ -82,7 +83,12 @@ export default function Hero({ lang, currency, rates, woodOnSale = false }: { la
             </a>
             <span className="free">{rich(t.freeLine)}</span>
             {approx && <span className="approxHero">{approx}</span>}
-            {lang === 'en' && <span className="approxHero usdHero" data-testid="usd-hero"><UsdPriceView price={usdPrice} sale={sale} id="hero" /></span>}
+            {lang === 'en' && (
+              <span className="approxHero usdHero">
+                <span data-testid="usd-hero"><UsdPriceView price={usdPrice} sale={sale} id="hero" /></span>
+                {sale && <span className="usdLaunch" data-testid="usd-hero-line">{usdLaunchLine(usdPrice, sale.until)}</span>}
+              </span>
+            )}
           </div>
           <ul className="chips">
             {(['c1', 'c2', 'c3', 'c4', 'c5'] as const).map((k) => (
