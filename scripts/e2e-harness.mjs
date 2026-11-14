@@ -51,7 +51,7 @@ const pickContext = async (page, ctx = {}) => {
 const FINALIZE = { ja: 'この一字を、贈る', 'zh-Hans': '就用这一个字', 'zh-Hant': '就用這一個字', en: 'Give this character' }
 // the customer site's composer button (the reference's words)
 const GIVE = { ja: 'この字で贈る', 'zh-Hans': '送这个字', 'zh-Hant': '送這個字', en: 'Give this character' }
-const GO = { ja: 'わたしの物語から字を見つける', 'zh-Hans': '从我的故事里找出那个字', 'zh-Hant': '從我的故事裡找出那個字', en: 'Find the character in my story' }
+const GO = { ja: 'わたしのひと場面から字を見つける', 'zh-Hans': '从我的片刻里找出那个字', 'zh-Hant': '從我的片刻裡找出那個字', en: 'Find the character in my moment' }
 const SUBMIT = { ja: 'その一字を、探しにいく', 'zh-Hans': '去寻找那一个字', 'zh-Hant': '去尋找那一個字', en: 'Find the one character' }
 
 let failures = 0
@@ -96,7 +96,7 @@ const browser = await chromium.launch({
   // Angle chip opens an aimed box and appends to the story
   await page.click('text=つくったもの、直したもの')
   await page.fill('textarea >> nth=1', '壊れた自転車をいつのまにか直してくれていた')
-  await page.click('text=物語に加える')
+  await page.click('text=ひと場面に加える')
   const storyVal1 = await page.locator('textarea').first().inputValue()
   check('angle chip appends aimed text', storyVal1.includes('【つくったもの、直したもの】'))
 
@@ -603,7 +603,7 @@ const mockPage = async (browser, { onExplain, result, order, track } = {}) => {
   const counter = page.locator('#write [data-testid=story-counter]')
   const goBtn = page.locator('#write button[type=submit]')
   const paste = (loc, text) => loc.evaluate((el, t) => { const set = Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, 'value').set; set.call(el, t); el.dispatchEvent(new Event('input', { bubbles: true })) }, text)
-  check('story: the length line is under the box (ja: 「短くても長くても。ひとつの場面なら50字ほどから、物語なら5000字まで。」), the live counter reads "0 / 5000字" from the start (the Reveal composer), and the box has NO maxlength (nothing is ever cut by the browser)', (await page.locator('#write [data-testid=story-hint]').innerText()) === '短くても長くても。ひとつの場面なら50字ほどから、物語なら5000字まで。' && (await counter.innerText()) === '0 / 5000字' && (await box.getAttribute('maxlength')) === null)
+  check('story: the length line is under the box (ja: 「物語でなくていい。数行で十分です。本当のことを細かく書くほど、字も本当になります。」), the live counter reads "0 / 5000字" from the start (the Reveal composer), and the box has NO maxlength (nothing is ever cut by the browser)', (await page.locator('#write [data-testid=story-hint]').innerText()) === '物語でなくていい。数行で十分です。本当のことを細かく書くほど、字も本当になります。' && (await counter.innerText()) === '0 / 5000字' && (await box.getAttribute('maxlength')) === null)
   await box.fill('あ'.repeat(1499))
   check('story: the counter follows the length at 1499 characters', (await counter.innerText()) === '1499 / 5000字')
   await box.fill('あ'.repeat(4999))
@@ -693,11 +693,11 @@ const mockPage = async (browser, { onExplain, result, order, track } = {}) => {
   await p2.route('**/api/log', (route) => route.fulfill({ status: 204, body: '' }))
   await p2.route('**/api/select', (route) => route.fulfill({ status: 400, contentType: 'application/json', body: JSON.stringify({ error: '"story" is longer than 5000 characters (got 5100)', code: 'story_too_long', max: 5000 }) }))
   await p2.goto('http://localhost:5173/?lang=en', { waitUntil: 'networkidle' })
-  check('story (en): the length line, no maxlength on the box', (await p2.locator('#write [data-testid=story-hint]').innerText()) === '50–300 words is plenty.' && (await p2.locator('#write [data-testid=story-input]').getAttribute('maxlength')) === null)
+  check('story (en): the length line, no maxlength on the box', (await p2.locator('#write [data-testid=story-hint]').innerText()) === 'Not a whole story, a few lines are enough. The more true detail, the truer the character.' && (await p2.locator('#write [data-testid=story-input]').getAttribute('maxlength')) === null)
   await p2.locator('#write [data-testid=story-input]').fill('My mum left the porch light on.')
   await pickContext(p2, { relationship: 'parent_mother' })
   await p2.click(`#write >> text=${GO.en}`)
-  await p2.waitForSelector('text=Stories can be up to 5,000 characters', { timeout: 6000 })
+  await p2.waitForSelector('text=You can write up to 5,000 characters', { timeout: 6000 })
   check('story (en): a story_too_long answer from the server is shown as the localized message and the form stays', await p2.locator('#write [data-testid=story-input]').isVisible())
   await p2.close()
 }
@@ -718,8 +718,8 @@ const mockPage = async (browser, { onExplain, result, order, track } = {}) => {
   const headline = page.locator('#write [data-testid=story-headline]')
   const fs = (loc) => loc.evaluate((el) => parseFloat(getComputedStyle(el).fontSize))
   check('story box (2026-11-01): a LARGE headline names what the box is for — 「その人との、いちばん心に残っている場面を。」 — and it labels the textarea', (await headline.innerText()) === 'その人との、いちばん心に残っている場面を。' && (await fs(headline)) >= 20 && (await headline.getAttribute('for')) === 'moment')
-  check('story box: the random question is a small HINT under the headline — 「ヒント：」 + a question of the "up" set — much smaller than the headline, and the box placeholder is 「ひとつの場面でも、ふたりの物語まるごとでも。」', first in QJA && (await qEl.innerText()) === QJA[first] && (await page.locator('#write .qHintLabel').innerText()) === 'ヒント：' && (await fs(qEl)) <= 16 && (await fs(qEl)) < (await fs(headline)) && (await box.getAttribute('placeholder')) === 'ひとつの場面でも、ふたりの物語まるごとでも。')
-  check('story box: the line 「ヒントに答えなくても大丈夫。…」 sits under the hint (and its 「別のヒントにする」 link), before the box', (await page.locator('#write [data-testid=question-optional]').innerText()) === 'ヒントに答えなくても大丈夫。思い浮かぶ場面や、ふたりの物語を、そのまま書いてください。' && (await page.evaluate(() => { const order = ['story-headline', 'story-hint-line', 'question-switch', 'question-optional', 'story-input'].map((id) => document.querySelector(`#write [data-testid=${id}]`)); return order.every((el, i) => el && (i === 0 || (order[i - 1].compareDocumentPosition(el) & Node.DOCUMENT_POSITION_FOLLOWING) !== 0)) })) && (await page.locator('#write [data-testid=question-switch]').innerText()) === '別のヒントにする')
+  check('story box: the random question is a small HINT under the headline — 「ヒント：」 + a question of the "up" set — much smaller than the headline, and the box placeholder is 「例：母は、私が帰るまで毎晩玄関の灯りをつけて待っていた。二十代になってからも。」', first in QJA && (await qEl.innerText()) === QJA[first] && (await page.locator('#write .qHintLabel').innerText()) === 'ヒント：' && (await fs(qEl)) <= 16 && (await fs(qEl)) < (await fs(headline)) && (await box.getAttribute('placeholder')) === '例：母は、私が帰るまで毎晩玄関の灯りをつけて待っていた。二十代になってからも。')
+  check('story box: the line 「ヒントに答えなくても大丈夫。…」 sits under the hint (and its 「別のヒントにする」 link), before the box', (await page.locator('#write [data-testid=question-optional]').innerText()) === 'ヒントに答えなくても大丈夫。思い浮かぶ場面を、そのまま書いてください。' && (await page.evaluate(() => { const order = ['story-headline', 'story-hint-line', 'question-switch', 'question-optional', 'story-input'].map((id) => document.querySelector(`#write [data-testid=${id}]`)); return order.every((el, i) => el && (i === 0 || (order[i - 1].compareDocumentPosition(el) & Node.DOCUMENT_POSITION_FOLLOWING) !== 0)) })) && (await page.locator('#write [data-testid=question-switch]').innerText()) === '別のヒントにする')
   const seenIds = [first]
   for (let i = 0; i < 4; i++) { await page.click('#write [data-testid=question-switch]'); seenIds.push(await qEl.getAttribute('data-question-id')) }
   check('opener: 「別のヒントにする」 cycles the four angles of the same set and returns to the first', new Set(seenIds.slice(0, 4)).size === 4 && seenIds[4] === first && seenIds.every((id) => id in QJA))
@@ -775,7 +775,7 @@ const mockPage = async (browser, { onExplain, result, order, track } = {}) => {
   await page.reload({ waitUntil: 'networkidle' })
   const banner = page.locator('#write [data-testid=draft-banner]')
   await banner.waitFor()
-  check('opener: coming back shows the quiet banner 「書きかけの物語があります — 続ける / 新しく書く」 and nothing is applied silently', (await banner.innerText()).includes('書きかけの物語があります') && (await page.locator('#write [data-testid=story-input]').inputValue()) === '')
+  check('opener: coming back shows the quiet banner 「書きかけの場面があります — 続ける / 新しく書く」 and nothing is applied silently', (await banner.innerText()).includes('書きかけの場面があります') && (await page.locator('#write [data-testid=story-input]').inputValue()) === '')
   await page.click('#write [data-testid=draft-continue]')
   check('opener: 続ける restores the story, the chips and the same question', (await page.locator('#write [data-testid=story-input]').inputValue()).startsWith('父は、駅の改札') && (await page.locator('[data-chip="relationship:parent_father"]').getAttribute('aria-pressed')) === 'true' && (await page.locator('#write [data-testid=story-question]').getAttribute('data-question-id')) === shownId && (await banner.count()) === 0)
   await page.reload({ waitUntil: 'networkidle' })
@@ -806,7 +806,7 @@ const mockPage = async (browser, { onExplain, result, order, track } = {}) => {
     let found = false
     for (let i = 0; i < 4 && !found; i++) { found = (await e.page.locator('#write [data-testid=story-question]').innerText()) === q0; if (!found) await e.page.click('#write [data-testid=question-switch]') }
     check(`opener (${lang}): the "up" set is shown in the page language (the habit question found within four angles)`, found)
-    const HL = { en: ['The moment with them you remember most.', 'Hint:', 'Another hint', "You don't have to answer the hint. Write the scene or the story that comes to mind, just as it is.", 'One scene, or your whole story together.', '50–300 words is plenty.'], 'zh-Hant': ['寫下你和那個人之間，最難忘的一個場景。', '提示：', '換一個提示', '不必回答提示。想到的場景、你們之間的故事，直接寫下來就好。', '一個場景，或你們完整的故事都可以。', '長短都可以。一個場景約50字起，完整故事最多5000字。'] }[lang]
+    const HL = { en: ['The moment with them you remember most.', 'Hint:', 'Another hint', "You don't have to answer the hint. Write the scene that comes to mind, just as it is.", 'e.g. My mom left the porch light on every night until I got home, even in my twenties.', 'Not a whole story, a few lines are enough. The more true detail, the truer the character.'], 'zh-Hant': ['寫下你和那個人之間，最難忘的一個場景。', '提示：', '換一個提示', '不必回答提示。想到的場景，直接寫下來就好。', '例如：媽媽每天晚上都留著門口那盞燈，等我回家。即使我已經二十幾歲了。', '不必是完整的故事，幾行就夠了。寫得越真實、越具體，選出的字就越貼近。'] }[lang]
     check(`story box (${lang}): headline, 「${HL[1]}」 label, switch link, the "you don't have to answer" line, placeholder and length line, exactly as specified`, (await e.page.locator('#write [data-testid=story-headline]').innerText()) === HL[0] && (await e.page.locator('#write .qHintLabel').innerText()) === HL[1] && (await e.page.locator('#write [data-testid=question-switch]').innerText()) === HL[2] && (await e.page.locator('#write [data-testid=question-optional]').innerText()) === HL[3] && (await e.page.locator('#write [data-testid=story-input]').getAttribute('placeholder')) === HL[4] && (await e.page.locator('#write [data-testid=story-hint]').innerText()) === HL[5], `${await e.page.locator('#write [data-testid=story-headline]').innerText()} | ${await e.page.locator('#write .qHintLabel').innerText()}`)
     await e.page.close()
   }
@@ -858,14 +858,14 @@ const mockPage = async (browser, { onExplain, result, order, track } = {}) => {
 
   // 2026-11-01: remembrance is TWO cards (main + second, no free pick). While 偲ぶ / 追思 / In memory is picked, the steps and the examples say so; every other occasion is unchanged.
   for (const [lang, st2, st2p, note, st2Other, noteOther] of [
-    ['ja', '二つの字に出会う', '本命の二字。読み方、意味、選ばれた理由とともに。選ぶのはあなたです。', '見本です。あなたの物語には、本命の二字が届きます。', '二つの字に出会う', '見本です。あなたの物語には、本命の一字と遊び字の一字が届きます。'],
-    ['zh-Hant', '遇見兩個字', '兩個本命字，各附讀音、意思和選擇的理由。由你來選。', '以上為範例。你的故事會得到屬於自己的兩個本命字。', '遇見兩個字', '以上為範例。你的故事會得到屬於自己的兩個字：本命一字與趣字一字。'],
-    ['en', 'Meet two characters', 'Two main characters, each with its reading, its meaning and why it fits. You choose.', 'Examples for illustration. Your story gets two main characters of its own.', 'Meet two characters', 'Examples for illustration. Your story gets two characters of its own: a main one and a playful one.'],
+    ['ja', 'その場面から浮かぶ字を、無料で見る。あなたの目に映る一字を選ぶ。', '', '見本です。あなたの場面には、本命の二字が届きます。', 'その場面から浮かぶ字を、無料で見る。あなたの目に映る一字を選ぶ。', '見本です。あなたの場面には、本命の一字と遊び字の一字が届きます。'],
+    ['zh-Hant', '免費看看這個片刻帶出的字，選出你眼中的那一個。', '', '以上為範例。你的片刻會得到屬於自己的兩個本命字。', '免費看看這個片刻帶出的字，選出你眼中的那一個。', '以上為範例。你的片刻會得到屬於自己的兩個字：本命一字與趣字一字。'],
+    ['en', 'See the characters your moment brings up, free, and choose the one that fits how you see them.', '', 'Examples for illustration. Your moment gets two main characters of its own.', 'See the characters your moment brings up, free, and choose the one that fits how you see them.', 'Examples for illustration. Your moment gets two characters of its own: a main one and a playful one.'],
   ]) {
     const c = await mockPage(browser)
     await c.page.goto(`http://localhost:5173/?lang=${lang}`, { waitUntil: 'networkidle' })
     const h3 = () => c.page.locator('#how ol.steps li:nth-child(2) h3').innerText()
-    const p2 = () => c.page.locator('#how ol.steps li:nth-child(2) p').innerText()
+    const p2 = async () => ((await c.page.locator('#how ol.steps li:nth-child(2) p').count()) ? c.page.locator('#how ol.steps li:nth-child(2) p').innerText() : '')
     const mm = async () => ((await c.page.locator('p.from').first().textContent()) ?? '').trim()
     check(`copy (${lang}): before an occasion is picked the steps and the examples are unchanged — 「${st2Other}」 and the main-and-playful note`, (await h3()) === st2Other && (await mm()) === noteOther, `${await h3()} | ${await mm()}`)
     await pickContext(c.page, { occasion: 'memorial' })
@@ -1816,9 +1816,9 @@ const mockPage = async (browser, { onExplain, result, order, track } = {}) => {
 // ---------- Run 8h-2: the landing — step 3 and 「いつ届く？」 follow the wooden switch: sealed e-gift while wood is "coming soon", the 2–3 weeks wording only while wood is on sale ----------
 {
   const L = {
-    ja: { soon: ['封をして、届ける', '一字と歌と物語の絵を、封をした贈りものに。LINEやメールで、すぐに届けられます。'], wood: '国内 約2〜3週間 ・ 海外はさらに1〜2週間', egift: 'eギフト：お支払い後すぐ（開封日を指定した場合はその日）。', woodAns: '木札・版木：お支払い完了から24時間のキャンセル受付期間ののちに制作を始め、国内は約2〜3週間でお届けします（海外はさらに1〜2週間）。', q: 'いつ届く？' },
-    'zh-Hant': { soon: ['封好，送出', '把一個字、詩與故事的畫，封成一份禮物。用LINE或電子郵件，立刻就能送出。'], wood: '日本國內約2〜3週 · 海外另需1〜2週', egift: 'e禮物：付款後立即送達（若指定開啟日期，則於當天開啟）。', woodAns: '木牌、版木：付款完成後24小時的取消受理期間結束後開始製作，日本國內約2〜3週送達（海外另需1〜2週）。', q: '什麼時候送到？' },
-    en: { soon: ['Sealed, then sent', 'The character, the poem and your story’s pictures, sealed as a gift. Send it right away by LINE or email.'], wood: 'Japan about 2–3 weeks · Overseas 1–2 weeks more', egift: 'E-gift: right after payment (or on the opening date you set).', woodAns: 'Wooden tag and carved block: made after the 24-hour cancellation period, delivered in about 2–3 weeks in Japan (1–2 weeks more overseas).', q: 'When will it arrive?' },
+    ja: { soon: ['選んでから、お支払い。リンクで送るか、カードを印刷して渡す。', ''], wood: '国内 約2〜3週間 ・ 海外はさらに1〜2週間', egift: 'eギフト：お支払い後すぐ（開封日を指定した場合はその日）。', woodAns: '木札・版木：お支払い完了から24時間のキャンセル受付期間ののちに制作を始め、国内は約2〜3週間でお届けします（海外はさらに1〜2週間）。', q: 'いつ届く？' },
+    'zh-Hant': { soon: ['選好之後才付款。用連結傳送，或印出卡片親手交給對方。', ''], wood: '日本國內約2〜3週 · 海外另需1〜2週', egift: 'e禮物：付款後立即送達（若指定開啟日期，則於當天開啟）。', woodAns: '木牌、版木：付款完成後24小時的取消受理期間結束後開始製作，日本國內約2〜3週送達（海外另需1〜2週）。', q: '什麼時候送到？' },
+    en: { soon: ["Pay only once you've chosen. Then send the link, or print the card.", ''], wood: 'Japan about 2–3 weeks · Overseas 1–2 weeks more', egift: 'E-gift: right after payment (or on the opening date you set).', woodAns: 'Wooden tag and carved block: made after the 24-hour cancellation period, delivered in about 2–3 weeks in Japan (1–2 weeks more overseas).', q: 'When will it arrive?' },
   }
   for (const lang of ['ja', 'zh-Hant', 'en']) {
     for (const soon of [true, false]) {
@@ -1830,7 +1830,7 @@ const mockPage = async (browser, { onExplain, result, order, track } = {}) => {
       await p.waitForTimeout(500)
       const li = p.locator('#how li').nth(2)
       const h = (await li.locator('h3').first().textContent())?.trim()
-      const txt = (await li.locator('p').first().textContent())?.trim()
+      const txt = (await li.locator('p').count()) ? (await li.locator('p').first().textContent())?.trim() : ''
       const time = (await li.locator('.time').count()) ? (await li.locator('.time').textContent())?.trim() : null
       const faq = p.locator('.faq details').filter({ hasText: L[lang].q }).first()
       const ans = (await faq.locator('p').textContent())?.replace(/\s+/g, ' ').trim()
@@ -2126,11 +2126,11 @@ const SECTION_ORDER = ['.hero', '.strip', '.philo', '#shape', '#angles', '#write
   check('landing: the sections are all there, in the reference order (hero, strip, philosophy, story shape, angles, WRITE, steps, moments, reviews, gifts, FAQ, closing)', await page.evaluate((sel) => { const tops = sel.map((q) => document.querySelector(q)?.getBoundingClientRect().top + window.scrollY); return tops.every((t) => Number.isFinite(t)) && tops.every((t, i) => i === 0 || t > tops[i - 1]) }, SECTION_ORDER))
   // textContent, not innerText: sections below the fold are not rendered until they are near the screen (content-visibility)
   const t = await page.evaluate(() => document.body.textContent)
-  check('landing ja: <html lang>, title, hero (「あなたとわたし、一字の距離。」) and the primary call to action', (await page.getAttribute('html', 'lang')) === 'ja' && (await page.title()) === 'ICHIREI 一字礼 — 一字の贈りもの' && (await page.locator('h1').innerText()) === 'あなたとわたし、一字の距離。' && (await page.locator('.hero a.btn.primary').innerText()) === '物語を書く')
+  check('landing ja: <html lang>, title, hero (「あなたとわたし、一字の距離。」) and the primary call to action', (await page.getAttribute('html', 'lang')) === 'ja' && (await page.title()) === 'ICHIREI 一字礼 — 一字の贈りもの' && (await page.locator('h1').innerText()) === 'あなたとわたし、一字の距離。' && (await page.locator('.hero a.btn.primary').innerText()) === 'ひと場面を書く →')
   check('landing ja: honesty — no native-speaker claim, no AI, no payment methods, no review counts or ratings', !/ネイティブ|\bAI\b|人工知能|VISA|Visa|PayPal|クレジット|★|⭐/.test(t) && t.includes('本物のレビューが、ここに並びます'))
   check('landing ja: the trust strip has three items (no "checked by native speakers")', (await page.locator('.strip li').count()) === 3)
   check('landing ja: no test controls (no A/B/C, no log export, no golden fixture, no harness label)', !/condition|ログ書き出し|golden fixture|VALIDATION HARNESS|raw contract/.test(t))
-  check('landing ja: the composer is the real flow — chips for relationship, direction and the reason for giving (+ the optional state), the textarea, the "0 / 5000字" counter, the soft hint', (await page.locator('[data-chip^="relationship:"]').count()) === 15 && (await page.locator('[data-chip^="direction:"]').count()) === 3 && (await page.locator('[data-chip^="purpose:"]').count()) === 9 && (await page.locator('[data-chip^="state:"]').count()) === 6 && (await page.locator('#moment').count()) === 1 && (await page.locator('[data-testid=story-counter]').innerText()) === '0 / 5000字' && (await page.locator('[data-testid=story-hint]').innerText()) === '短くても長くても。ひとつの場面なら50字ほどから、物語なら5000字まで。')
+  check('landing ja: the composer is the real flow — chips for relationship, direction and the reason for giving (+ the optional state), the textarea, the "0 / 5000字" counter, the soft hint', (await page.locator('[data-chip^="relationship:"]').count()) === 15 && (await page.locator('[data-chip^="direction:"]').count()) === 3 && (await page.locator('[data-chip^="purpose:"]').count()) === 9 && (await page.locator('[data-chip^="state:"]').count()) === 6 && (await page.locator('#moment').count()) === 1 && (await page.locator('[data-testid=story-counter]').innerText()) === '0 / 5000字' && (await page.locator('[data-testid=story-hint]').innerText()) === '物語でなくていい。数行で十分です。本当のことを細かく書くほど、字も本当になります。')
   check('landing ja: no language pills inside the flow (the nav switch is the one control) and no inscription-script toggle', (await page.locator('#write [data-language]').count()) === 0 && (await page.locator('[data-inscription-script]').count()) === 0)
   check('landing ja: the nav switch shows exactly EN, 日本語, 繁中', (await page.locator('.lang button').allInnerTexts()).join('|') === 'EN|日本語|繁中')
   await page.locator('#gifts').scrollIntoViewIfNeeded()
@@ -2213,9 +2213,9 @@ const SECTION_ORDER = ['.hero', '.strip', '.philo', '#shape', '#angles', '#write
   await page.reload({ waitUntil: 'networkidle' })
   check('landing: three language buttons (EN, 日本語, 繁中); with no stored choice an ja-JP browser gets 日本語', (await page.locator('.lang button').count()) === 3 && (await page.locator('.lang [data-lang=ja][aria-pressed=true]').count()) === 1)
   const LANGS = {
-    en: { title: 'ICHIREI 一字礼 — A Gift of One Character', h1: 'Between you and me, one character.', cta: 'Tell your story', go: GO.en, htmlLang: 'en', hint: '50–300 words is plenty.', desc: 'ICHIREI (一字礼) — the person you see' },
-    ja: { title: 'ICHIREI 一字礼 — 一字の贈りもの', h1: 'あなたとわたし、一字の距離。', cta: '物語を書く', go: GO.ja, htmlLang: 'ja', hint: '短くても長くても。ひとつの場面なら50字ほどから、物語なら5000字まで。', desc: 'ICHIREI（一字礼）— あなたの目に映る、その人を、一文字に。' },
-    'zh-Hant': { title: 'ICHIREI 一字禮 — 一個字的禮物', h1: '你和我之間，只隔一個字。', cta: '寫下故事', go: GO['zh-Hant'], htmlLang: 'zh-Hant', hint: '長短都可以。一個場景約50字起，完整故事最多5000字。', desc: 'ICHIREI（一字禮）— 把你眼中的那個人' },
+    en: { title: 'ICHIREI 一字礼 — A Gift of One Character', h1: 'Between you and me, one character.', cta: 'Write your moment →', go: GO.en, htmlLang: 'en', hint: 'Not a whole story, a few lines are enough. The more true detail, the truer the character.', desc: 'ICHIREI (一字礼) — the person you see' },
+    ja: { title: 'ICHIREI 一字礼 — 一字の贈りもの', h1: 'あなたとわたし、一字の距離。', cta: 'ひと場面を書く →', go: GO.ja, htmlLang: 'ja', hint: '物語でなくていい。数行で十分です。本当のことを細かく書くほど、字も本当になります。', desc: 'ICHIREI（一字礼）— あなたの目に映る、その人を、一文字に。' },
+    'zh-Hant': { title: 'ICHIREI 一字禮 — 一個字的禮物', h1: '你和我之間，只隔一個字。', cta: '寫下一個片刻 →', go: GO['zh-Hant'], htmlLang: 'zh-Hant', hint: '不必是完整的故事，幾行就夠了。寫得越真實、越具體，選出的字就越貼近。', desc: 'ICHIREI（一字禮）— 把你眼中的那個人' },
   }
   for (const [l, want] of Object.entries(LANGS)) {
     await page.click(`.lang [data-lang="${l}"]`)
@@ -2435,7 +2435,7 @@ const SECTION_ORDER = ['.hero', '.strip', '.philo', '#shape', '#angles', '#write
   check('en landing: three language buttons (EN, 日本語, 繁中), EN pressed', (await page.locator('.lang button').count()) === 3 && (await page.locator('.lang [data-lang=en][aria-pressed=true]').count()) === 1)
   // textContent, not innerText: sections below the fold are not rendered until they are near the screen (content-visibility)
   const enBody = await page.evaluate(() => document.body.textContent)
-  check('en landing: the philosophy, the steps and the CTA are English; no AI, no "native speakers", no payment methods on the page', enBody.includes("We don't sell characters.") && enBody.includes('Three simple steps to one character') && enBody.includes('Tell your story') && !/\bAI\b|native speaker|visa|paypal/i.test(enBody))
+  check('en landing: the philosophy, the steps and the CTA are English; no AI, no "native speakers", no payment methods on the page', enBody.includes("We don't sell characters.") && enBody.includes('Three simple steps to one character') && enBody.includes('Write your moment') && !/\bAI\b|native speaker|visa|paypal/i.test(enBody))
   await page.screenshot({ path: `${SHOTS}/e2e-landing-en.png`, fullPage: false })
   await page.click('.lang [data-lang=ja]')
   check('en → ja through the nav switch, and back to en', (await page.locator('h1').innerText()) === 'あなたとわたし、一字の距離。' && (await page.getAttribute('html', 'lang')) === 'ja')
@@ -3422,7 +3422,7 @@ const SECTION_ORDER = ['.hero', '.strip', '.philo', '#shape', '#angles', '#write
     // (textContent, not innerText: the landing's sections are content-visibility: auto, so innerText of an off-screen one is empty)
     const text = await page.evaluate(() => document.body.textContent ?? '')
     check(`/en (${tag}): no word "wood", "walnut", "EMS" or "ship" anywhere on the page, the FAQ opened included`, !FORBIDDEN.test(text), text.match(FORBIDDEN)?.[0])
-    check(`/en (${tag}): "Why we start with your story" is numbered 1, 2, 3 (not 一 二 三), and the word "pinyin" is nowhere on the page`, (await page.locator('.philo .phN').allTextContents()).map((x) => x.trim()).join() === '1,2,3' && !/pinyin/i.test(text), (await page.locator('.philo .phN').allTextContents()).join())
+    check(`/en (${tag}): "Why we start with one moment" is numbered 1, 2, 3 (not 一 二 三), and the word "pinyin" is nowhere on the page`, (await page.locator('.philo .phN').allTextContents()).map((x) => x.trim()).join() === '1,2,3' && !/pinyin/i.test(text), (await page.locator('.philo .phN').allTextContents()).join())
     // chips: Christmas → thanks, counted; Mom → parent_mother
     await page.locator('[data-chip-code=mom]').click()
     await page.locator('[data-chip-code=christmas]').click()
@@ -3431,7 +3431,7 @@ const SECTION_ORDER = ['.hero', '.strip', '.philo', '#shape', '#angles', '#write
     check(`/en (${tag}): choosing Christmas is counted (occasion_chip, code christmas) and the page's purpose is thanks`, calls.analytics.some((e) => e.event === 'occasion_chip' && e.code === 'christmas') && (await page.locator('[data-chip-code=christmas]').getAttribute('aria-pressed')) === 'true' && (await page.locator('[data-chip-code=thanksgiving]').getAttribute('aria-pressed')) === 'false')
     await page.locator('[data-testid=us-banner]').scrollIntoViewIfNeeded()
     await page.waitForTimeout(400)
-    check(`/en (${tag}): the banner was counted once it came into view (us_banner_seen) — and the story hint says "50–300 words is plenty."`, calls.analytics.some((e) => e.event === 'us_banner_seen') && (await page.locator('[data-testid=story-hint]').innerText()) === '50–300 words is plenty.')
+    check(`/en (${tag}): the banner was counted once it came into view (us_banner_seen) — and the story hint says "Not a whole story, a few lines are enough…"`, calls.analytics.some((e) => e.event === 'us_banner_seen') && (await page.locator('[data-testid=story-hint]').innerText()) === 'Not a whole story, a few lines are enough. The more true detail, the truer the character.')
     await page.locator('#moment').fill('She left the porch light on every night until I got home, and she never once mentioned it.')
     await page.click(`#write >> text=${GO.en}`)
     await page.waitForSelector('[data-all-revealed=yes]', { timeout: 15000 })
@@ -3781,6 +3781,44 @@ const SECTION_ORDER = ['.hero', '.strip', '.philo', '#shape', '#angles', '#write
     const isRed = (c) => { const m = /rgb\((\d+), (\d+), (\d+)/.exec(c); return !!m && Number(m[1]) > 150 && Number(m[2]) < 90 && Number(m[3]) < 90 }
     check('sale on: the sale line and the sale price are not in cinnabar red', !isRed(colours.line) && !isRed(colours.sale), JSON.stringify(colours))
     await ctx.close()
+  }
+}
+
+// ---------- Run 26 (2026-11-14): "write one moment" — the new opening lines, the three steps, the hint and the placeholder, the English-only blocks; phone screenshots ----------
+{
+  const W = {
+    ja: { path: '/?lang=ja', cta: 'ひと場面を書く →', open1: '面と向かっては言えないことも、一字なら言える。', open2: '多くの贈りものが伝えるのは『想っている』。一字礼が伝えるのは『あなたが、こう見えている』。', steps: ['ひと場面を書く。数行で十分です。', 'その場面から浮かぶ字を、無料で見る。あなたの目に映る一字を選ぶ。', '選んでから、お支払い。リンクで送るか、カードを印刷して渡す。'], hint: '物語でなくていい。数行で十分です。本当のことを細かく書くほど、字も本当になります。', ph: '例：母は、私が帰るまで毎晩玄関の灯りをつけて待っていた。二十代になってからも。', story: /物語|ストーリー/ },
+    'zh-Hant': { path: '/?lang=zh-Hant', cta: '寫下一個片刻 →', open1: '當面說不出口的話，一個字可以替你說。', open2: '大多數禮物說的是「我想著你」。一字禮說的是「在我眼裡，你是這樣的人」。', steps: ['寫下一個片刻。幾行就夠了。', '免費看看這個片刻帶出的字，選出你眼中的那一個。', '選好之後才付款。用連結傳送，或印出卡片親手交給對方。'], hint: '不必是完整的故事，幾行就夠了。寫得越真實、越具體，選出的字就越貼近。', ph: '例如：媽媽每天晚上都留著門口那盞燈，等我回家。即使我已經二十幾歲了。', story: /故事/ },
+    en: { path: '/en', cta: 'Write your moment →', open1: 'Some things are hard to say face to face. One character can say them.', open2: 'Most gifts say I thought of you. ICHIREI says this is how I see you.', steps: ['Write one moment. A few lines are enough.', 'See the characters your moment brings up, free, and choose the one that fits how you see them.', "Pay only once you've chosen. Then send the link, or print the card."], hint: 'Not a whole story, a few lines are enough. The more true detail, the truer the character.', ph: 'e.g. My mom left the porch light on every night until I got home, even in my twenties.', story: /\bstor(y|ies)\b/i },
+  }
+  for (const [lang, w] of Object.entries(W)) {
+    const { page, errors } = await mockPage(browser)
+    await page.route('**/api/sizes', (r) => r.fulfill({ json: { sizes: ['egift', 'simple', 'standard'], coming_soon: ['simple', 'standard'] } })) // the launch state: only the e-gift is on sale
+    await page.setViewportSize({ width: 390, height: 844 })
+    await page.goto(`http://localhost:5173${w.path}`, { waitUntil: 'networkidle' })
+    await page.waitForTimeout(700)
+    const tc = async (sel) => ((await page.locator(sel).first().textContent()) ?? '').replace(/\s+/g, ' ').trim()
+    check(`moment (${lang}): the hero button is the owner's 「${w.cta}」, and the two opening lines sit right under the hero, word for word`, (await page.locator('.hero a.btn.primary').innerText()) === w.cta && (await tc('[data-testid=opening-1]')) === w.open1 && (await tc('[data-testid=opening-2]')) === w.open2 && (await page.evaluate(() => { const h = document.querySelector('.hero'); const o = document.querySelector('[data-testid=opening]'); return !!h && !!o && (h.compareDocumentPosition(o) & Node.DOCUMENT_POSITION_FOLLOWING) !== 0 && h.nextElementSibling === o })))
+    check(`moment (${lang}): how it works — the three steps are the owner's sentences (one line each, same numerals, no second line)`, JSON.stringify((await page.locator('#how ol.steps li h3').allTextContents()).map((x) => x.trim())) === JSON.stringify(w.steps) && (await page.locator('#how ol.steps li p').count()) === 0 && (await page.locator('#how ol.steps li .n').count()) === 3)
+    check(`moment (${lang}): under the box the hint, in the box the placeholder, exactly as given`, (await tc('#write [data-testid=story-hint]')) === w.hint && (await page.locator('#write #moment').getAttribute('placeholder')) === w.ph)
+    // what is left of "story" on the landing page: only the hint that says a whole story is not needed (en: also the example sentences of what people wrote, which are data)
+    const body = await page.evaluate(() => document.body.textContent ?? '')
+    const left = [...new Set((body.match(new RegExp(w.story.source, 'gi')) ?? []))]
+    const sentences = body.split(/[。.!?！？\n]/).filter((x) => w.story.test(x)).map((x) => x.trim()).filter((x) => !w.hint.includes(x.slice(0, 12)))
+    check(`moment (${lang}): no text on the landing page asks the sender to write a story (only the hint "${w.hint.slice(0, 12)}…" says the word)`, sentences.length === 0, sentences.join(' | '))
+    await page.evaluate(() => window.scrollTo(0, 0))
+    await page.screenshot({ path: `${SHOTS}/moment-landing-${lang}.png` })
+    await page.locator('#write').scrollIntoViewIfNeeded()
+    await page.waitForTimeout(400)
+    await page.locator('#write').screenshot({ path: `${SHOTS}/moment-write-${lang}.png` })
+    if (lang === 'en') {
+      const read = (sel) => page.evaluate((x) => (document.querySelector(x)?.textContent ?? '').replace(/\s+/g, ' ').trim(), sel)
+      check('moment (en): "What is a kanji?" — the owner\'s paragraph, 恒 and its word (the lexicon row\'s / the card\'s: "constant")', (await read('[data-testid=us-kanji]')).includes('What is a kanji?') && (await read('[data-testid=us-kanji]')).includes('Kanji are the characters of written Japanese, carried from China more than 1,500 years ago. Each one holds a meaning, not just a sound.') && (await read('[data-testid=us-kanji-glyph]')) === '恒' && (await read('[data-testid=us-kanji-word]')) === 'constant' && (await read('[data-testid=us-kanji]')).includes('means constant: the one who never changes. One character can hold what a long card can’t.'))
+      check('moment (en): "What they receive" — the five lines, then the private-link note with the Christmas line', JSON.stringify(await page.locator('#receive li').evaluateAll((els) => els.map((e) => e.querySelector('b')?.textContent))) === JSON.stringify(['Their character, with its reading and its meaning in English', 'A short poem written from your moment', 'Four ink-wash pictures of the moment you wrote', 'A short film (about 30 seconds) with music, made to share', 'A certificate, and a card to print at home (PDF)']) && (await read('[data-testid=us-receive-note]')) === 'Everything arrives as one private link, the same day. Send it by text, email or WhatsApp. Nothing is mailed. Or set it to open on Christmas morning.')
+      check('moment (en): "Who it\'s for" — the owner\'s paragraph; the blocks run kanji → what they receive → who it\'s for; the footer line is "Designed in Tokyo. Delivered worldwide."', (await read('[data-testid=us-who]')).includes('For Mom, Dad, your partner, a grandparent, a brother or sister, a friend, a mentor or a colleague. For Thanksgiving, Christmas, a birthday, an anniversary, a thank-you, or no reason at all. And for someone you’ve lost, it keeps how you saw them.') && (await page.evaluate(() => { const a = document.querySelector('[data-testid=us-kanji]'); const b = document.querySelector('[data-testid=us-receive]'); const c = document.querySelector('[data-testid=us-who]'); const f = (x, y) => (x.compareDocumentPosition(y) & Node.DOCUMENT_POSITION_FOLLOWING) !== 0; return !!a && !!b && !!c && f(a, b) && f(b, c) })) && (await read('[data-testid=footer-slogan]')) === 'Designed in Tokyo. Delivered worldwide.')
+    }
+    check(`no page errors (run 26, moment ${lang})`, errors.length === 0, JSON.stringify(errors))
+    await page.close()
   }
 }
 

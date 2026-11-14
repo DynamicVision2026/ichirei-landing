@@ -32,7 +32,7 @@ const files = [
 
 const BANNED = /手彫|手で刻|手刻|親手|手工|職人|手作り|手づくり|by hand|hand-carved|hand carved|handmade|hand-made|handcraft|artisan|craftsman|金箔|gold leaf|gold-leaf|walnut|ウォールナット|胡桃|核桃|烫金|燙金/i
 // story-writing examples (the "something they made with their own hands" angle) are about the receiver, not about our product: allowed
-const isStoryExample = (line: string) => /^\s*"(q|ex|m)":/.test(line) || line.includes('親手做的、修好的東西') || /^\s*(\/\/|\*|\/\*)/.test(line)
+const isStoryExample = (line: string) => /^\s*"(q|ex|m)":/.test(line) || line.includes('親手做的、修好的東西') || line.includes('親手交給對方') /* 2026-11-14, the owner's step 3: hand the printed card over in person — not a handmade claim */ || /^\s*(\/\/|\*|\/\*)/.test(line)
 const hits: string[] = []
 for (const f of files) {
   readFileSync(join(root, f), 'utf8').split('\n').forEach((line, i) => {
@@ -43,7 +43,7 @@ check('(F2–F4) no hand-made, hand-carved, artisan, gold-leaf or walnut claim a
 
 const SLOGAN = { en: 'Designed in Tokyo. Made in Japan. Delivered worldwide.', ja: '東京でデザインし、日本でつくり、世界へ届ける。', 'zh-Hant': '東京設計・日本製作・送達全世界。' }
 check('(F1) the slogan is on the badge row (s1) and in the footer (slogan), word for word, in en / ja / zh-Hant', (['en', 'ja', 'zh-Hant'] as const).every((l) => TEXT[l].s1 === SLOGAN[l] && TEXT[l].slogan === SLOGAN[l]))
-check('(F1) the footer shows it', readFileSync(join(root, 'src/reveal/Sections.tsx'), 'utf8').includes('{t.slogan}'))
+check('(F1) the footer shows it', readFileSync(join(root, 'src/reveal/Sections.tsx'), 'utf8').includes('t.slogan'))
 check('(F3/F4) the gift copy says 金色 / "gold colour" and 木札 / "wooden tag" / 木牌', /gold colour/.test(TEXT.en.sp1) && /Wooden tag/.test(TEXT.en.sp1) && /金色/.test(TEXT.ja.sp1) && /木札/.test(TEXT.ja.sp1) && /金色/.test(TEXT['zh-Hant'].sp1) && /木牌/.test(TEXT['zh-Hant'].sp1))
 check('(F2) the replacements: 木に刻む (ja) · "made in wood in Japan" (en) · 刻於木上 (zh-Hant)', TEXT.ja.sub.includes('日本で木に刻みます') && TEXT.en.sub.includes('make it in wood in Japan') && TEXT['zh-Hant'].sub.includes('刻於木上') && TEXT.ja.st3p.includes('木に刻み') && TEXT['zh-Hant'].st3p.includes('刻於木上') && TEXT.en.st3p.includes('in wood in Japan'))
 

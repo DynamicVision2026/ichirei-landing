@@ -12,7 +12,7 @@ export interface OpenerCopy {
   switchQuestion: string
   /** One quiet line under the question: answering it is optional. */
   optionalNote: string
-  /** The textarea placeholder: a short answer hint, not "write your story". */
+  /** The textarea placeholder: an example of one moment, not "write your story". */
   answerHint: string
   /** Shown while the story is shorter than the minimum. */
   tooShort: string
@@ -33,10 +33,10 @@ export const OPENER: Record<RevealLang, OpenerCopy> = {
     headline: 'その人との、いちばん心に残っている場面を。',
     hintLabel: 'ヒント：',
     switchQuestion: '別のヒントにする',
-    optionalNote: 'ヒントに答えなくても大丈夫。思い浮かぶ場面や、ふたりの物語を、そのまま書いてください。',
-    answerHint: 'ひとつの場面でも、ふたりの物語まるごとでも。',
+    optionalNote: 'ヒントに答えなくても大丈夫。思い浮かぶ場面を、そのまま書いてください。',
+    answerHint: '例：母は、私が帰るまで毎晩玄関の灯りをつけて待っていた。二十代になってからも。',
     tooShort: '10字以上で送れます。',
-    draftBanner: '書きかけの物語があります',
+    draftBanner: '書きかけの場面があります',
     draftContinue: '続ける',
     draftNew: '新しく書く',
     voiceNone: 'スマホのキーボードのマイクでも入力できます。',
@@ -47,10 +47,10 @@ export const OPENER: Record<RevealLang, OpenerCopy> = {
     headline: '寫下你和那個人之間，最難忘的一個場景。',
     hintLabel: '提示：',
     switchQuestion: '換一個提示',
-    optionalNote: '不必回答提示。想到的場景、你們之間的故事，直接寫下來就好。',
-    answerHint: '一個場景，或你們完整的故事都可以。',
+    optionalNote: '不必回答提示。想到的場景，直接寫下來就好。',
+    answerHint: '例如：媽媽每天晚上都留著門口那盞燈，等我回家。即使我已經二十幾歲了。',
     tooShort: '寫滿 10 個字即可送出。',
-    draftBanner: '有一篇還沒寫完的故事',
+    draftBanner: '有一個還沒寫完的片刻',
     draftContinue: '繼續',
     draftNew: '重新寫',
     voiceNone: '也可以用手機鍵盤上的麥克風輸入。',
@@ -61,10 +61,10 @@ export const OPENER: Record<RevealLang, OpenerCopy> = {
     headline: 'The moment with them you remember most.',
     hintLabel: 'Hint:',
     switchQuestion: 'Another hint',
-    optionalNote: "You don't have to answer the hint. Write the scene or the story that comes to mind, just as it is.",
-    answerHint: 'One scene, or your whole story together.',
+    optionalNote: "You don't have to answer the hint. Write the scene that comes to mind, just as it is.",
+    answerHint: 'e.g. My mom left the porch light on every night until I got home, even in my twenties.',
     tooShort: 'At least 10 characters to send.',
-    draftBanner: 'You have a story in progress',
+    draftBanner: 'You have a moment in progress',
     draftContinue: 'Continue',
     draftNew: 'Start new',
     voiceNone: "You can also use the microphone on your phone's keyboard.",

@@ -431,3 +431,13 @@
 .rv .usReceivePrice .saleLine{display:block;margin-top:.35rem;font-family:var(--body);font-size:.86rem;font-weight:400;color:var(--mute)}
 .rv .usdHero{display:inline-flex;flex-direction:column;align-items:flex-start;gap:.1rem}
 .rv .usdLaunch{font-family:var(--body);font-size:.78rem;font-weight:400;color:var(--mute)}
+/* the two opening lines under the hero (2026-11-14) */
+.rv .opening{padding:2.6rem 0 1.2rem}
+.rv .openLine1{margin:0 auto .9rem;max-width:34ch;font-family:var(--display);font-size:clamp(1.35rem,3.6vw,1.9rem);font-weight:600;line-height:1.5;color:var(--ink);text-wrap:balance}
+.rv .openLine2{margin:0 auto;max-width:44ch;font-size:clamp(1rem,2.4vw,1.18rem);line-height:1.8;color:var(--mute);text-wrap:balance}
+.rv .openLine2 em{font-style:italic;color:var(--ink)}
+/* English: what is a kanji / who it's for / the receive note */
+.rv .usKanji,.rv .usWho{padding:2.4rem 0}
+.rv .usKanjiText,.rv .usWhoText{margin:.6rem auto 0;max-width:52ch;font-size:1.05rem;line-height:1.85;color:var(--ink);text-wrap:pretty}
+.rv .usKanjiGlyph{font-size:1.5em;font-weight:900;vertical-align:-.08em;color:var(--ink)}
+.rv .usReceiveNote{margin:1.1rem auto .4rem;max-width:46ch;font-size:1rem;line-height:1.8;color:var(--mute)}

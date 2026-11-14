@@ -4,6 +4,7 @@ import { useComingSoon, useSale, useSizes, useUsd } from '../demo/useSizes.ts'
 import { useEffect, useId, useRef, useState, type KeyboardEvent, type ReactNode } from 'react'
 import { ANGLES, TEXT, type RevealLang } from './copy.ts'
 import { rich } from './rich.tsx'
+import { momentWording } from './moment-wording.ts'
 import Picture from './Picture.tsx'
 import { CURRENCIES, approxLine, type Currency, type Rates } from './currency.ts'
 import { PACKAGE_PRICE_JPY } from '../order/packages.ts'
@@ -34,6 +35,18 @@ export function Strip({ t, woodOnSale = false }: { t: T; woodOnSale?: boolean })
         ))}
       </ul>
     </div>
+  )
+}
+
+/** The two opening lines under the hero (2026-11-14): what one character can say, and how this gift differs from most. */
+export function Opening({ t }: { t: T }) {
+  return (
+    <section className="opening" data-testid="opening">
+      <div className="wrap center">
+        <p className="openLine1" data-testid="opening-1">{rich(t.open1)}</p>
+        <p className="openLine2" data-testid="opening-2">{rich(t.open2)}</p>
+      </div>
+    </section>
   )
 }
 
@@ -198,7 +211,7 @@ export function Steps({ t, memorial = false, woodOnSale = false }: { t: T; memor
               {i + 1}
             </span>
             <h3>{h}</h3>
-            <p>{p}</p>
+            {p && <p>{p}</p>}
             {time && <span className="time">{time}</span>}
           </li>
         ))}
@@ -326,7 +339,7 @@ export function Gifts({
     title: sc.names[id],
     img: id === 'simple' ? 'simple-hero' : id === 'standard' ? 'standard-hero' : 'egift-hero',
     // a size that is "coming soon" is listed by its name and price only: nothing about carving, printing or posting while it cannot be ordered
-    items: soon.includes(id) ? [] : id === 'simple' ? [t.sp1, t.sp2, t.sp3, t.sp4] : id === 'standard' ? [t.dp1, t.dp2, t.dp3, t.dp4] : [sc.includes[id], sc.ship[id]],
+    items: soon.includes(id) ? [] : id === 'simple' ? [t.sp1, t.sp2, t.sp3, t.sp4] : id === 'standard' ? [t.dp1, t.dp2, t.dp3, t.dp4] : [momentWording(sc.includes[id], lang), sc.ship[id]],
     cta: id === 'simple' ? t.buy1 : id === 'standard' ? t.buy2 : t.buy0,
     badge: soon.includes(id) ? sc.comingSoon : id === RECOMMENDED_PACKAGE ? sc.recommended : id === 'egift' ? sc.sendNow : null,
     soon: soon.includes(id),
@@ -453,12 +466,15 @@ function withTrackLink(text: string): ReactNode {
   return parts.flatMap((p, i) => (i === 0 ? [p] : [<a key={i} href="/track">/track</a>, p]))
 }
 
-export function Footer({ t }: { t: T }) {
+/** The English footer line (2026-11-14): the short form; the other languages keep the slogan. */
+export const EN_FOOTER_LINE = 'Designed in Tokyo. Delivered worldwide.'
+
+export function Footer({ t, lang }: { t: T; lang?: RevealLang }) {
   return (
     <footer>
       <div className="wrap">
         <span>ICHIREI 一字礼 · Beyond Culture 獨歩文化株式会社</span>
-        <span data-testid="footer-slogan">{t.slogan}</span>
+        <span data-testid="footer-slogan">{lang === 'en' ? EN_FOOTER_LINE : t.slogan}</span>
         <span>{withTrackLink(t.foot)}</span>
         <a href="/legal" data-testid="footer-legal">{t.legal}</a>
       </div>

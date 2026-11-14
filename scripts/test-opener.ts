@@ -120,7 +120,7 @@ check('(2) parsePromptQuestion / questionText: known ids only, the server\'s wor
 upstream.close()
 
 // ---- 3. the 10-character minimum ---------------------------------------------------------------------------------------------------------
-check('(3) the minimum is 10 characters (the submit button is enabled from the 10th); the length line is the new one (2026-11-01) and the maximum is 5,000; the note is in all three languages', STORY_MIN === 10 && LANGS.every((l) => OPENER[l].tooShort.length > 0 && /10/.test(OPENER[l].tooShort)) && read('src/demo/i18n.ts').includes('ひとつの場面なら50字ほどから、物語なら5000字まで') && read('engine/contract.ts').includes('STORY_MAX = 5000'))
+check('(3) the minimum is 10 characters (the submit button is enabled from the 10th); the hint under the box is the 2026-11-14 one (「物語でなくていい。…」) and the maximum is 5,000; the note is in all three languages', STORY_MIN === 10 && LANGS.every((l) => OPENER[l].tooShort.length > 0 && /10/.test(OPENER[l].tooShort)) && read('src/demo/i18n.ts').includes('物語でなくていい。数行で十分です。本当のことを細かく書くほど、字も本当になります。') && read('engine/contract.ts').includes('STORY_MAX = 5000'))
 
 // ---- 4. drafts ---------------------------------------------------------------------------------------------------------------------------------
 const mem = () => { const m = new Map<string, string>(); return { m, getItem: (k: string) => m.get(k) ?? null, setItem: (k: string, v: string) => void m.set(k, v), removeItem: (k: string) => void m.delete(k) } }
@@ -142,7 +142,7 @@ const gift = { relationship: 'parent_mother', direction: 'up', occasion: 'parent
   check('(4) an empty draft is not offered (and is deleted)', loadDraft(T0, st) === null && !st.m.has(DRAFT_KEY))
   const broken = { getItem: () => { throw new Error('blocked') }, setItem: () => { throw new Error('blocked') }, removeItem: () => { throw new Error('blocked') } }
   check('(4) without browser storage (private window, blocked) every call is safe: nothing saved, nothing thrown', saveDraft(d, broken) === false && loadDraft(T0, broken) === null && (clearDraft(broken), true) && saveDraft(d, null) === false && loadDraft(T0, null) === null)
-  check('(4) the draft banner is in all three languages (続ける / 新しく書く)', LANGS.every((l) => OPENER[l].draftBanner && OPENER[l].draftContinue && OPENER[l].draftNew) && OPENER.ja.draftBanner === '書きかけの物語があります' && OPENER.ja.draftContinue === '続ける' && OPENER.ja.draftNew === '新しく書く')
+  check('(4) the draft banner is in all three languages (続ける / 新しく書く)', LANGS.every((l) => OPENER[l].draftBanner && OPENER[l].draftContinue && OPENER[l].draftNew) && OPENER.ja.draftBanner === '書きかけの場面があります' && OPENER.ja.draftContinue === '続ける' && OPENER.ja.draftNew === '新しく書く')
   const src = read('src/demo/OrderForm.tsx')
   check('(4) the saved draft is cleared after a successful order (OrderForm calls clearDraft once the checkout link is back)', /log\('order_submitted'[\s\S]{0,200}clearDraft\(\)/.test(src))
 }

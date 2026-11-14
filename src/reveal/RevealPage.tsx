@@ -2,10 +2,10 @@ import { Suspense, lazy, useEffect, type ReactNode } from 'react'
 import { useLanguage } from '../useLanguage'
 import { trackPageView } from '../demo/analytics'
 import { DOCUMENT, REVEAL_LANGS, TEXT, type RevealLang } from './copy'
-import { Angles, Closing, Dock, Faq, Footer, Gifts, Moments, Philosophy, Reviews, Steps, StoryShape, Strip } from './Sections'
+import { Angles, Closing, Dock, Faq, Footer, Gifts, Moments, Opening, Philosophy, Reviews, Steps, StoryShape, Strip } from './Sections'
 import Hero from './Hero'
 import ClaimBanner from '../claim/ClaimBanner'
-import { UsBanner, UsReceive } from './UsSections'
+import { UsBanner, UsKanji, UsReceive, UsWho } from './UsSections'
 import { useCurrency } from './useCurrency'
 import { toRevealLang } from './lang'
 import { useMemorialSelected } from './occasion-store'
@@ -106,8 +106,10 @@ export default function RevealPage() {
       <main>
         <ClaimBanner language={uiLang} />
         <Hero lang={lang} currency={currency} rates={rates} woodOnSale={woodOnSale} />
+        <Opening t={t} />
         {lang === 'en' && <UsBanner />}
         <Strip t={t} woodOnSale={woodOnSale} />
+        {lang === 'en' && <UsKanji />}
         <Philosophy t={t} lang={lang} />
         <StoryShape t={t} />
         <Angles t={t} lang={lang} />
@@ -127,11 +129,12 @@ export default function RevealPage() {
         <Moments t={t} memorial={memorial} />
         <Reviews t={t} />
         {lang === 'en' && <UsReceive />}
+        {lang === 'en' && <UsWho />}
         <Gifts t={t} lang={lang} currency={currency} rates={rates} onCurrency={setCurrency} woodOnSale={woodOnSale} />
         <Faq t={t} lang={lang} woodOnSale={woodOnSale} />
         <Closing t={t} woodOnSale={woodOnSale} />
       </main>
-      <Footer t={t} />
+      <Footer t={t} lang={lang} />
       <Dock t={t} />
     </div>
   )
