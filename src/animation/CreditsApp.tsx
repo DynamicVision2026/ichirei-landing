@@ -2,7 +2,7 @@ import { useEffect } from 'react'
 import '../fonts.css'
 import './animation.css'
 
-// /credits — the attributions the typefaces behind the story film require. Shown in English and Japanese (the licences are English).
+// /credits — the attributions the typefaces behind the story film and the stroke data of the gift page (KanjiVG, CC BY-SA 3.0) require. Shown in English and Japanese (the licences are English).
 
 const ITEMS: { name: string; use: string; credit: string; licence: string; href: string; licenceHref: string }[] = [
   {
@@ -69,6 +69,12 @@ export default function CreditsApp() {
       ))}
       <h2>Illustrations</h2>
       <p data-testid="credit-illustrations">Illustrations drawn with Google&rsquo;s image model. イラストは Google の画像モデルで描いています。</p>
+      <h2>Brush strokes</h2>
+      <p data-testid="credit-kanjivg">
+        The stroke order of the character, written on the gift page, comes from <a href="https://kanjivg.tagaini.net/" rel="noreferrer">KanjiVG</a> © Ulrich Apel and contributors, licensed under{' '}
+        <a href="https://creativecommons.org/licenses/by-sa/3.0/" rel="noreferrer">Creative Commons Attribution-Share Alike 3.0</a>. The stroke file we serve (<a href="/strokes/kanjivg-subset.json">/strokes/kanjivg-subset.json</a>, only the
+        characters we use) is derived from it and is shared under the same licence. 贈りものの字を一画ずつ書く筆順は KanjiVG（Ulrich Apel ほか、CC BY-SA 3.0）によります。
+      </p>
       <h2>Music</h2>
       <p data-testid="credit-music">Music: Schumann, Satie, Grieg, Chopin, Beethoven (Musopen recordings, public domain). 音楽：シューマン、サティ、グリーグ、ショパン、ベートーヴェン（Musopen録音、パブリックドメイン）。 音樂：舒曼、薩提、葛利格、蕭邦、貝多芬（Musopen錄音，公有領域）。</p>
       <p>

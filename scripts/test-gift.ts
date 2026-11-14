@@ -63,7 +63,7 @@ check('(1) POST /api/gift/<token>/render answers with the receiver\'s view (the 
 
 // ---- 2. the sender's page: what to share and where the order stands -----------------------------------------------------------------------------
 const sv = (await (await A.view(animId)).json()) as { gift?: { url: string; size_code: string; ship_to: string; egift_state: string | null }; id: string }
-check('(2) the sender\'s page view carries the receiver link, the size code, where it goes and the e-gift state — and no price or names', !!sv.gift && sv.gift.url === giftUrl(token) && sv.gift.size_code === 'ICHIREI-SIMPLE' && sv.gift.ship_to === 'egift' && sv.gift.egift_state === 'waiting' && !JSON.stringify(sv).includes('山田') && !/¥|price/.test(JSON.stringify(sv)))
+check('(2) the sender\'s page view carries the receiver link, the size code, where it goes and the e-gift state — and no price or names', !!sv.gift && sv.gift.url === giftUrl(token) && sv.gift.size_code === 'ICHIREI-SIMPLE' && sv.gift.ship_to === 'egift' && sv.gift.egift_state === 'waiting' && !JSON.stringify({ ...sv, gift: { ...sv.gift, to: undefined } }).includes('山田') && !/¥|price/.test(JSON.stringify(sv)))
 
 // ---- 3. the e-gift address -------------------------------------------------------------------------------------------------------------------------
 const addr = { name: '山田 一郎', country: 'JP', postal: '1500001', region: '東京都', line1: '渋谷区神宮前1-2-3', line2: 'コーポA 201', phone: '03-1234-5678' }

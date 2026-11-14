@@ -19,6 +19,7 @@ import type { OrderRecord } from './order.ts'
 import type { ArtRecord } from './film-art.ts'
 import type { Language } from './contract.ts'
 import { purposeFromOccasion } from '../src/order/purpose.ts'
+import { isReturnChar } from '../src/order/return-chars.ts'
 import { convertLineScript, fullWidthPunctuation } from './script.ts'
 
 export const GIFT_TOKEN_PATTERN = /^RG-[a-z2-9]{20}$/
@@ -93,8 +94,12 @@ export interface GiftRecord {
   opens_tz?: string | null
   /** 「一字礼　第 NNNN 号」 — the running number (engine/certificate-no.ts); null on gifts made before numbers existed. */
   certificate_no?: number | null
-  /** The receiver's one reply (「ありがとうを返す」), shown on the sender's page. */
-  reply?: { text: string; at: string } | null
+  /** The receiver's one answer (2026-11-14): a written reply, one of the twelve characters given back, or both — sent once, shown on the sender's page. `text` is '' when only a character came. */
+  reply?: { text: string; at: string; char?: string } | null
+  /** The ceremony's states (codes, no text): when the sender first used a copy / share button, when the receiver untied the envelope, when an answer came. */
+  shared_at?: string | null
+  opened_at?: string | null
+  answered_at?: string | null
 }
 
 export function buildGiftRecord(record: OrderRecord, animationId: string, token: string, senderEmail: string | null, now: Date = new Date()): GiftRecord {
@@ -207,14 +212,27 @@ export function arrivingView(g: GiftRecord): GiftLockedView {
 
 export const REPLY_MAX = 200
 
-export type ReplyCheck = { ok: true; text: string } | { ok: false; error: string }
-export function checkReply(body: unknown): ReplyCheck {
-  const raw = (body as { text?: unknown } | null)?.text
-  if (typeof raw !== 'string') return { ok: false, error: 'text is required' }
-  const text = raw.replace(/\p{Cc}+/gu, ' ').replace(/[ \t]+/g, ' ').trim()
-  if (!text) return { ok: false, error: 'text is required' }
-  if ([...text].length > REPLY_MAX) return { ok: false, error: `text is longer than ${REPLY_MAX} characters` }
-  return { ok: true, text }
+export type ReplyCheck = { ok: true; text: string; char: string | null } | { ok: false; error: string }
+/**
+ * What the receiver sends back: a written reply (200 characters at most), one of the twelve characters given back (not for a remembrance), or both. At least one.
+ * The text keeps its line breaks (control characters other than a newline are dropped).
+ */
+export function checkReply(body: unknown, memorial = false): ReplyCheck {
+  const b = (body ?? {}) as { text?: unknown; char?: unknown }
+  let text = ''
+  if (b.text !== undefined && b.text !== null) {
+    if (typeof b.text !== 'string') return { ok: false, error: 'text must be text' }
+    text = b.text.replace(/\r\n?/g, '\n').replace(/[^\P{Cc}\n]+/gu, ' ').replace(/[ \t]+/g, ' ').replace(/\n{3,}/g, '\n\n').trim()
+    if ([...text].length > REPLY_MAX) return { ok: false, error: `text is longer than ${REPLY_MAX} characters` }
+  }
+  let char: string | null = null
+  if (b.char !== undefined && b.char !== null && b.char !== '') {
+    if (!isReturnChar(b.char)) return { ok: false, error: 'char is not one of the twelve' }
+    if (memorial) return { ok: false, error: 'no character is given back for a remembrance' }
+    char = b.char
+  }
+  if (!text && !char) return { ok: false, error: 'text or char is required' }
+  return { ok: true, text, char }
 }
 
 export function giftView(g: GiftRecord, anim: AnimationRecord, art: ArtRecord | null): GiftView {

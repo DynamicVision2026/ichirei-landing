@@ -82,7 +82,7 @@ check('card / PDF: a blank name is LEFT OUT (no ＿＿ line) on a card that ship
 // ---- /ops, the limits ------------------------------------------------------------------------------------------------------------------------------
 check('/ops and the e-mail show the blank in the order\'s language: ja「（なし）」 / zh-Hant「（未填）」 / en "(none)"', NO_NAME.ja === '（なし）' && NO_NAME['zh-Hant'] === '（未填）' && NO_NAME.en === '(none)')
 check('names: at most 20 characters, plain text — a 21st character or a control character is refused (field named), 20 is fine', NAME_MAX === 20 && parseOrderRequest(body({ sender_name: 'あ'.repeat(20) }), NOW).ok && (() => { const r = parseOrderRequest(body({ sender_name: 'あ'.repeat(21) }), NOW); return !r.ok && r.field === 'sender_name' })() && (() => { const r = parseOrderRequest(body({ receiver_name: 'a\u0000b' }), NOW); return !r.ok && r.field === 'receiver_name' })())
-check('the card message stays optional and at most 60 characters (unchanged)', (() => { const r = parseOrderRequest(body({ package: 'egift', ship_to: 'egift', sender_email: 'a@example.com', gift_message: 'あ'.repeat(61) }), NOW); return !r.ok && r.field === 'gift_message' })())
+check('the note stays optional and is at most 200 characters (2026-11-14: was 60)', (() => { const r = parseOrderRequest(body({ package: 'egift', ship_to: 'egift', sender_email: 'a@example.com', gift_message: 'あ'.repeat(201) }), NOW); return !r.ok && r.field === 'gift_message' })())
 
 // ---- names go nowhere else -------------------------------------------------------------------------------------------------------------------------
 const analytics = [...mem.lines.entries()].filter(([k]) => k.startsWith('analytics/')).flatMap(([, v]) => v).join('\n')

@@ -70,6 +70,7 @@ async function consumeEngineStream(
   body: ReadableStream<Uint8Array>,
   onStage: (stage: EngineStage) => void,
   onCard?: (partial: EngineResult) => void,
+  onTicket?: (ticket: string) => void,
 ): Promise<EngineResult> {
   const reader = body.getReader()
   const decoder = new TextDecoder()
@@ -82,7 +83,7 @@ async function consumeEngineStream(
       | { type: 'stage'; stage: EngineStage }
       | { type: 'card'; result: EngineResult } // a card has passed its checks: the result as it stands (main; main + second; all three)
       | { type: 'ping' } // server heartbeat during silent reasoning — ignore
-      | { type: 'result'; result: EngineResult }
+      | { type: 'result'; result: EngineResult; round_ticket?: string }
       | { type: 'error'; error: string; code?: string; seconds?: number }
     if (msg.type === 'ping') return null
     if (msg.type === 'delta') return null
@@ -94,6 +95,7 @@ async function consumeEngineStream(
       onCard?.(msg.result)
       return null
     }
+    if (msg.type === 'result' && msg.round_ticket) onTicket?.(msg.round_ticket) // the server's signed ticket for the rounds of this moment
     if (msg.type === 'error') throw msg.code === 'model_timeout' ? new ModelTimeoutStreamError(msg.error, msg.seconds ?? 150) : new Error(msg.error)
     return msg.result
   }
@@ -284,6 +286,8 @@ export default function DemoApp({ mode = 'harness', aside }: { mode?: Mode; asid
   // The request that just ran, so 「もう一度ためす」 (shown only after a failure) repeats exactly that request.
   const lastRun = useRef<(() => void) | null>(null)
   const sessionLogged = useRef(false)
+  /** The server's signed ticket for the rounds of this moment (issued with round 1; sent back with every 「別の候補」). */
+  const roundTicket = useRef<string | null>(null)
 
   // Customer site: when the flow moves on (processing → follow-up → cards → order form) bring the start of the
   // WRITE section back into view, so a long form never leaves the visitor in the middle of the next step.
@@ -370,7 +374,7 @@ export default function DemoApp({ mode = 'harness', aside }: { mode?: Mode; asid
       const res = await fetch('/api/select', {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ story: fullStory, ...(answers.length ? { follow_ups: answers } : {}), ...(customer && questionId ? { prompt_question: { id: questionId, text: questionTextOf(questionId, toRevealLang(ctx.language)) ?? '' } } : {}), session: sessionId, source: customer ? 'customer' : 'harness', condition, ...contextToPayload(ctx), ...(again ? { exclude: again.exclude, retry: again.retry } : {}) }),
+        body: JSON.stringify({ story: fullStory, ...(answers.length ? { follow_ups: answers } : {}), ...(customer && questionId ? { prompt_question: { id: questionId, text: questionTextOf(questionId, toRevealLang(ctx.language)) ?? '' } } : {}), session: sessionId, source: customer ? 'customer' : 'harness', condition, ...contextToPayload(ctx), ...(again ? { exclude: again.exclude, retry: again.retry, ...(roundTicket.current ? { round_ticket: roundTicket.current } : {}) } : {}) }),
         signal: controller.signal,
       })
       if (!res.ok) {
@@ -393,7 +397,7 @@ export default function DemoApp({ mode = 'harness', aside }: { mode?: Mode; asid
       const isStream =
         (res.headers.get('content-type') ?? '').includes('ndjson') && res.body
       const engineResult: EngineResult = isStream
-        ? await consumeEngineStream(res.body!, setStage, again ? undefined : showEarly)
+        ? await consumeEngineStream(res.body!, setStage, again ? undefined : showEarly, (t) => { roundTicket.current = t })
         : ((await res.json()) as EngineResult)
       if (again) {
         // 「別の候補を見る」: three new characters for the same story, or — when nothing new is true to it — the note to write a little more. Never an error page.

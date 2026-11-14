@@ -46,10 +46,10 @@ const offsetMs = (tz: string, ms: number): number => {
 }
 
 /** The instant at which the wall clock of `tz` reads `date` `hour`:00 (YYYY-MM-DD). null when the date or the zone is not valid. */
-export function localInstant(date: string, hour: number, tz: string): Date | null {
+export function localInstant(date: string, hour: number, tz: string, minute = 0): Date | null {
   const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(date)
   if (!m || !isValidZone(tz)) return null
-  const wall = Date.UTC(Number(m[1]), Number(m[2]) - 1, Number(m[3]), hour)
+  const wall = Date.UTC(Number(m[1]), Number(m[2]) - 1, Number(m[3]), hour, minute)
   let guess = wall
   for (let i = 0; i < 4; i++) {
     const next = wall - offsetMs(tz, guess)
@@ -96,6 +96,44 @@ export function openingLabel(lang: OpensLang, date: string, tz: string): string 
   return lang === 'en' ? `Opens ${day}, 7:00 a.m. (${zone})` : lang === 'ja' ? `${day} 午前7時（${zone}）に開きます` : lang === 'zh-Hans' ? `${day}上午7点（${zone}）开启` : `${day}上午7點（${zone}）開啟`
 }
 
+/** The clock time of an instant on the wall clock of `tz`, as the customer reads it: en "7:00 a.m." · ja 「午前7時」 · zh 「上午7點」 (minutes only when there are some: 「午後6時30分」). */
+export function clockText(lang: OpensLang, hour: number, minute: number): string {
+  const pm = hour >= 12
+  const h12 = hour % 12 === 0 ? 12 : hour % 12
+  if (lang === 'en') return `${h12}:${String(minute).padStart(2, '0')} ${pm ? 'p.m.' : 'a.m.'}`
+  const zh = lang === 'zh-Hant' || lang === 'zh-Hans'
+  const mm = minute ? (zh ? `${minute}分` : `${minute}分`) : ''
+  if (lang === 'ja') return `${pm ? '午後' : '午前'}${h12}時${mm}`
+  return `${pm ? '下午' : '上午'}${h12}${lang === 'zh-Hans' ? '点' : '點'}${mm}`
+}
+
+/** The wall-clock hour and minute of an instant in `tz` (null for an invalid pair). */
+export function clockIn(instantIso: string, tz: string): { hour: number; minute: number } | null {
+  const t = Date.parse(instantIso)
+  if (!Number.isFinite(t) || !isValidZone(tz)) return null
+  const p = partsOf(tz, t)
+  return { hour: Number(p.hour), minute: Number(p.minute) }
+}
+
+/** Like openingLabel, for any time of day: en "Opens Nov 26, 6:00 p.m. (Eastern)" · ja 「11月26日 午後6時（米国東部時間）に開きます」. */
+export function openingLabelAt(lang: OpensLang, date: string, hour: number, minute: number, tz: string): string {
+  const day = openingDayText(lang, date)
+  const zone = zoneName(lang, tz)
+  const clock = clockText(lang, hour, minute)
+  return lang === 'en' ? `Opens ${day}, ${clock} (${zone})` : lang === 'ja' ? `${day} ${clock}（${zone}）に開きます` : lang === 'zh-Hans' ? `${day}${clock}（${zone}）开启` : `${day}${clock}（${zone}）開啟`
+}
+
+/** The sealed envelope's own line (no zone): en "Opens Dec 25, 7:00 a.m." · ja 「12月25日 午前7時に開きます」 · zh-Hant 「12月25日上午7點開啟」. Memorial gifts use the same words (a date, never a countdown joke). */
+export function openingLabelShortFromRecord(lang: OpensLang, opensAt: string | null | undefined, opensTz: string | null | undefined): string | null {
+  if (!opensAt || !opensTz) return null
+  const d = dateInZone(opensAt, opensTz)
+  const c = clockIn(opensAt, opensTz)
+  if (!d || !c) return null
+  const day = openingDayText(lang, d)
+  const clock = clockText(lang, c.hour, c.minute)
+  return lang === 'en' ? `Opens ${day}, ${clock}` : lang === 'ja' ? `${day} ${clock}に開きます` : lang === 'zh-Hans' ? `${day}${clock}开启` : `${day}${clock}開啟`
+}
+
 /** The calendar date of an instant on the wall clock of `tz` (so the label can be written from a stored `opens_at`). */
 export function dateInZone(instantIso: string, tz: string): string | null {
   const t = Date.parse(instantIso)
@@ -108,7 +146,8 @@ export function dateInZone(instantIso: string, tz: string): string | null {
 export function openingLabelFromRecord(lang: OpensLang, opensAt: string | null | undefined, opensTz: string | null | undefined): string | null {
   if (!opensAt || !opensTz) return null
   const d = dateInZone(opensAt, opensTz)
-  return d ? openingLabel(lang, d, opensTz) : null
+  const c = clockIn(opensAt, opensTz)
+  return d && c ? openingLabelAt(lang, d, c.hour, c.minute, opensTz) : null
 }
 
 /** The zone of the visitor's browser when it is usable, else Japan. */

@@ -206,6 +206,8 @@ export function createApp(config: ServerConfig): Hono {
   app.get('/api/gift/:token/film.mp4', limited(animationLimit), (c) => giftHandlers.filmGet(c.req.param('token'), c.req.raw, c.req.query('preview')))
   app.get('/api/gift/:token/card.pdf', limited(scrollLimit), (c) => giftHandlers.cardPdf(c.req.param('token'), c.req.query('preview')))
   app.get('/api/gift/:token/keepsake-card.png', limited(scrollLimit), (c) => giftHandlers.keepsakeCard(c.req.param('token'), c.req.query('preview')))
+  app.post('/api/gift/:token/opened', limited(replyLimit), (c) => (c.req.query('preview') ? previewRefused() : giftHandlers.opened(c.req.param('token'))))
+  app.post('/api/animation/:id/shared', limited(replyLimit), (c) => giftHandlers.sharedBySender(c.req.param('id')))
   app.post('/api/animation/:id/schedule', limited(replyLimit), async (c) => giftHandlers.scheduleForSender(c.req.param('id'), await c.req.json().catch(() => null)))
   app.get('/api/animation/:id/keepsake-card.png', limited(scrollLimit), (c) => giftHandlers.keepsakeCardForSender(c.req.param('id')))
   // sharing to social media (2026-11-06): the share film (MP4 1080×1920) and the poem card (PNG 1080×1350) — only after collecting / opening, never for remembrance, never in preview mode

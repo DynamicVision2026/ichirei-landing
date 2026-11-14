@@ -1,4 +1,7 @@
-import { openingLabelFromRecord } from '../order/opens-at.ts'
+import { openingLabelShortFromRecord } from '../order/opens-at.ts'
+import { RETURN_CHARS } from '../order/return-chars.ts'
+import Cord from './Cord.tsx'
+import StrokeGlyph from './StrokeGlyph.tsx'
 import { inkOnly } from '../order/memorial.ts'
 import { isQuietPurpose } from '../order/purpose.ts'
 import { cleanReading } from '../order/reading.ts'
@@ -16,9 +19,12 @@ import { linerFor } from './liner.ts'
 import '../animation/animation.css'
 import '../fonts.css'
 import './gift.css'
+import './ceremony.css'
 import { trackReceiverOpened, trackUs } from '../demo/analytics'
 
-// The receiver's gift page /g/<token> (Part 3 of the 2026-10-31 ticket). One screen at a time:
+// The receiver's gift page /g/<token> (Part 3 of the 2026-10-31 ticket; the ceremony of 2026-11-14). One screen at a time, and nothing moves on by itself — every step waits for a tap:
+//   the sealed envelope with its mizuhiki cord (press and hold the knot, or tap 「ほどく」/Untie)  ·  the letter (the sender's own words)  ·  「This gift has music」  ·  the film  ·  the character written stroke by stroke  ·  the poem
+//   ·  the certificate  ·  keepsakes  ·  the answer (a reply, one of twelve characters, or both). The earlier note, kept for the steps that did not change:
 //   1 the sealed envelope (or, before the opening date, the same envelope with the date instead of the button)
 //   2 the opening (about 1.5 s: the seal breaks, the flap lifts onto the seasonal liner, the letter slides up; reduced motion: a fade)
 //   3 the letter   4 the 34-second film (it ends on a paper e-card)   5 the reveal   6 the poem   7 the certificate   8 what to keep, and the one thank-you
@@ -26,10 +32,12 @@ import { trackReceiverOpened, trackUs } from '../demo/analytics'
 // (names and the date) and nothing else until the day. The sender may look at any time with ?preview=<their own page id>.
 
 
-type Step = 'envelope' | 'opening' | 'letter' | 'film' | 'reveal' | 'poem' | 'cert' | 'keep'
+type Step = 'envelope' | 'opening' | 'letter' | 'music' | 'film' | 'reveal' | 'poem' | 'cert' | 'keep' | 'answer'
 type Load = { state: 'loading' } | { state: 'error'; kind: 'notFound' | 'unavailable' | 'gone' } | { state: 'locked'; view: GiftLockedView } | { state: 'ready'; view: GiftView }
 
 export const OPENING_MS = 1500
+/** How long the knot is held before it comes undone. */
+export const HOLD_MS = 1200
 export const FADE_MS = 450
 
 const routeToken = (): string | null => window.location.pathname.match(/^\/g\/(RG-[a-z2-9]{20})\/?$/)?.[1] ?? window.location.pathname.match(/^\/g\/([A-Za-z0-9-]{3,64})\/?$/)?.[1] ?? null
@@ -51,6 +59,7 @@ export default function GiftApp() {
   // until the gift says which language it is in, the reader's own browser language (so a Chinese or English reader is not shown Japanese while it loads)
   const [lang, setLang] = useState<PageLang>(() => { const n = (navigator.language ?? 'ja').toLowerCase(); return n.startsWith('zh') ? 'zh-Hant' : n.startsWith('en') ? 'en' : 'ja' })
   const [step, setStep] = useState<Step>('envelope')
+  const [filmEnded, setFilmEnded] = useState(false)
   const reduced = useMemo(prefersReducedMotion, [])
   const copy = GIFT_COPY[lang]
 
@@ -127,7 +136,11 @@ export default function GiftApp() {
   }, [needsPictures, token, q])
 
   const openEnvelope = useCallback(() => {
-    if (!preview && token) trackReceiverOpened(token)
+    if (!preview && token) {
+      trackReceiverOpened(token)
+      // the sender's page shows "Opened (time)": the first untying is kept (codes only)
+      try { void fetch(`/api/gift/${token}/opened`, { method: 'POST', keepalive: true }).catch(() => {}) } catch { /* the page works without it */ }
+    }
     setStep('opening')
     window.setTimeout(() => setStep('letter'), reduced ? FADE_MS : OPENING_MS)
   }, [reduced, preview, token])
@@ -150,7 +163,7 @@ export default function GiftApp() {
     const v = load.view
     return (
       <main className={shell} lang={lang} data-testid="gift-page" data-step="envelope" data-locked="yes">
-        <Envelope copy={copy} lang={lang} to={v.to} from={v.from} memorial={v.memorial} purpose={v.purpose ?? null} date={v.opens_on} reduced={reduced} state="closed" locked={{ opens_on: v.opens_on, days_left: v.days_left, arriving: v.arriving === true }} />
+        <Envelope copy={copy} lang={lang} to={v.to} from={v.from} memorial={v.memorial} purpose={v.purpose ?? null} date={v.opens_on} reduced={reduced} state="closed" locked={{ opens_on: v.opens_on, opens_at: v.opens_at ?? null, opens_tz: v.opens_tz ?? null, days_left: v.days_left, arriving: v.arriving === true }} />
       </main>
     )
   }
@@ -175,7 +188,17 @@ export default function GiftApp() {
         {view.message && <blockquote className="gf-message" data-testid="gift-message">{view.message}</blockquote>}
         <p className="gf-lead" data-testid="gift-lead">{view.memorial ? copy.letterLeadMemorial(view.from) : copy.letterLead(view.from)}</p>
         {view.from && <p className="gf-from" data-testid="gift-from">{copy.from(view.from)}</p>}
-        <button type="button" className="gf-btn" data-testid="gift-to-film" onClick={() => setStep('film')}>{copy.letterButton}</button>
+        <button type="button" className="gf-btn" data-testid="gift-to-film" onClick={() => setStep(view.music ? 'music' : 'film')}>{copy.letterButton}</button>
+      </section>,
+    )
+
+  // "This gift has music." — a short card; the tap that leaves it also starts the sound of the film (a phone allows sound only after a tap)
+  if (step === 'music')
+    return stage(
+      <section className="gf-music" data-testid="gift-music-card">
+        <svg className="gf-music-note" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M9 18V5l11-2v13" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" /><circle cx="6.5" cy="18" r="2.5" fill="none" stroke="currentColor" strokeWidth="1.4" /><circle cx="17.5" cy="16" r="2.5" fill="none" stroke="currentColor" strokeWidth="1.4" /></svg>
+        <p className="gf-music-line" data-testid="gift-music-line">{copy.musicLine}</p>
+        <button type="button" className="gf-btn gf-btn-hot" data-testid="gift-music-go" onClick={() => { try { sessionStorage.setItem('ichirei-film-sound', 'on') } catch { /* sound stays off */ } setStep('film') }}>{copy.musicButton}</button>
       </section>,
     )
 
@@ -189,30 +212,17 @@ export default function GiftApp() {
         {!pictures && view.film?.deferred && <p className="an-note" role="status" data-testid="animation-deferred">{copy.deferred}</p>}
         {pictures && view.film && (
           <section>
-            <Film key={view.id} view={view} film={{ ...view.film, pictures }} copy={FILM_COPY[lang]} giftMode onEnd={() => window.setTimeout(() => setStep('reveal'), reduced ? 0 : 1400)} />
+            <Film key={view.id} view={view} film={{ ...view.film, pictures }} copy={FILM_COPY[lang]} giftMode onEnd={() => setFilmEnded(true)} />
           </section>
         )}
-        {(reduced || !pictures) && (
+        {(reduced || !pictures || filmEnded) && (
           <p className="gf-skip"><button type="button" className="gf-btn gf-btn-quiet" data-testid="gift-skip" onClick={() => setStep('reveal')}>{copy.next}</button></p>
         )}
       </main>
     )
   }
 
-  if (step === 'reveal')
-    return stage(
-      <section className="gf-reveal" data-testid="gift-reveal">
-        <p className="gf-char notranslate" translate="no" data-testid="gift-glyph" aria-label={view.glyph}>{view.glyph}</p>
-        {view.language === 'en' && view.en ? (
-          <EnBridgeStack className="gf-en" reading={cleanReading(view.romanization.split(' / ')[0])} word={view.en.word} line={view.en.line} echo={view.en.echo} classical={view.en.classical} />
-        ) : (
-          <p className="gf-reading notranslate" translate="no" data-testid="gift-reading">{readingLine(view)}</p>
-        )}
-        {view.from && <p className="gf-gold" data-testid="gift-gold">{copy.revealGold(view.from)}</p>}
-        <p className="gf-who" data-testid="gift-who">{view.who}</p>
-        <button type="button" className="gf-btn" data-testid="gift-to-poem" onClick={() => setStep(view.poem ? 'poem' : 'cert')}>{view.poem ? copy.poemButton : copy.certButton}</button>
-      </section>,
-    )
+  if (step === 'reveal') return stage(<Reveal view={view} copy={copy} reduced={reduced} onNext={() => setStep(view.poem ? 'poem' : 'cert')} />)
 
   if (step === 'poem' && view.poem)
     return stage(
@@ -246,13 +256,24 @@ export default function GiftApp() {
       </section>,
     )
 
+  // 9. the answer: a reply, one of twelve characters, or both — once
+  if (step === 'answer')
+    return stage(
+      <section className="gf-answer" data-testid="gift-answer">
+        <AnswerBox token={view.token} lang={lang} copy={copy} from={view.from} replied={view.replied} memorial={view.memorial} />
+        <p className="gf-row">
+          <button type="button" className="gf-btn gf-btn-quiet" data-testid="gift-answer-back" onClick={() => setStep('keep')}>{copy.keepTitle}</button>
+        </p>
+      </section>,
+    )
+
   // 8. what to keep, and the one thank-you
   return stage(
     <section className="gf-keep" data-testid="gift-keep">
       {!preview && <Keepsakes lang={lang} base={`/api/gift/${view.token}`} q={q} complete={filmComplete(view)} scroll={scrollAvailable(view)} egift={view.package === 'egift'} enCard={view.language === 'en' && !!view.en} track />}
       {!preview && !view.memorial && filmComplete(view) && <ShareSection lang={lang} base={`/api/gift/${view.token}`} role="receiver" />}
       {view.egift && !preview && <EgiftReceive view={view} lang={lang} />}
-      {!preview && <ReplyBox token={view.token} copy={copy} from={view.from} replied={view.replied} />}
+      {!preview && <button type="button" className="gf-btn gf-btn-hot" data-testid="gift-to-answer" onClick={() => setStep('answer')}>{copy.answerTitle}</button>}
       <p className="gf-row">
         <button type="button" className="gf-btn gf-btn-quiet" data-testid="gift-replay" onClick={() => setStep('film')}>{FILM_COPY[lang].replay}</button>
         <a className="gf-btn gf-btn-quiet" href="/credits" data-testid="animation-credits-link">{FILM_COPY[lang].credits}</a>
@@ -286,6 +307,34 @@ function Envelope({ copy, lang, to, from, memorial, purpose, date, reduced, stat
   const liner = useMemo(() => linerFor(date, memorial), [date, memorial])
   const thisYear = new Date().getFullYear()
   const ref = useRef<HTMLDivElement>(null)
+  // untying (2026-11-14): press and hold the knot for ~1.2 s — a ring fills — or tap the visible 「ほどく」/Untie button; the cord loosens and slides off, then the existing opening plays
+  const [phase, setPhase] = useState<'tied' | 'untying'>('tied')
+  const [hold, setHold] = useState(0)
+  const raf = useRef(0)
+  const t0 = useRef(0)
+  const untie = useCallback(() => {
+    if (!onOpen || phase !== 'tied') return
+    cancelAnimationFrame(raf.current)
+    setHold(0)
+    setPhase('untying')
+    window.setTimeout(onOpen, reduced ? 300 : 800)
+  }, [onOpen, phase, reduced])
+  const cancelHold = useCallback(() => {
+    cancelAnimationFrame(raf.current)
+    if (phase === 'tied') setHold(0)
+  }, [phase])
+  const startHold = useCallback(() => {
+    if (phase !== 'tied') return
+    t0.current = performance.now()
+    const tick = (now: number) => {
+      const p = Math.min(1, (now - t0.current) / HOLD_MS)
+      setHold(p)
+      if (p >= 1) untie()
+      else raf.current = requestAnimationFrame(tick)
+    }
+    raf.current = requestAnimationFrame(tick)
+  }, [phase, untie])
+  useEffect(() => () => cancelAnimationFrame(raf.current), [])
   return (
     <section className="gf-env-screen" data-testid="gift-envelope-screen">
       <p className="gf-label" data-testid="gift-env-label">{memorial || letterLike ? copy.envLabelMemorial : copy.envLabel}</p>
@@ -307,47 +356,122 @@ function Envelope({ copy, lang, to, from, memorial, purpose, date, reduced, stat
         </div>
         <div className="gf-env-flap" aria-hidden="true"><div className="gf-flap-out" /><div className="gf-flap-in" /></div>
         <div className="gf-seal" aria-hidden="true" data-testid="gift-seal"><i className="gf-seal-l" /><i className="gf-seal-r" /><b>一字礼</b></div>
+        {state !== 'opening' && <Cord memorial={memorial} state={phase === 'untying' ? 'untying' : 'tied'} />}
+        {onOpen && !locked && state !== 'opening' && (
+          <button
+            type="button"
+            className="gf-knot"
+            data-testid="gift-knot"
+            data-holding={hold > 0 ? 'yes' : 'no'}
+            aria-label={copy.untieHint}
+            onPointerDown={(e) => { e.preventDefault(); startHold() }}
+            onPointerUp={cancelHold}
+            onPointerLeave={cancelHold}
+            onPointerCancel={cancelHold}
+            onContextMenu={(e) => e.preventDefault()}
+            onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); untie() } }}
+          >
+            <svg className="gf-knot-ring" viewBox="0 0 40 40" aria-hidden="true" focusable="false"><circle cx="20" cy="20" r="18" pathLength={1} style={{ strokeDashoffset: 1 - hold }} /></svg>
+          </button>
+        )}
       </div>
       {locked?.arriving ? (
         <p className="gf-locked" data-testid="gift-arriving">{copy.arriving}</p>
       ) : locked ? (
         <>
-          <p className="gf-locked" data-testid="gift-locked-date">{openingLabelFromRecord(lang, locked.opens_at, locked.opens_tz) ?? copy.opensOn(openDateText(lang, locked.opens_on, thisYear))}</p>
-          <p className="gf-locked-note" data-testid="gift-locked-note">{copy.daysLeft(locked.days_left)}</p>
+          <p className="gf-locked" data-testid="gift-locked-date">{openingLabelShortFromRecord(lang, locked.opens_at, locked.opens_tz) ?? copy.opensOn(openDateText(lang, locked.opens_on, thisYear))}</p>
+          {/* a remembrance shows the date only — no countdown */}
+          {!memorial && <p className="gf-locked-note" data-testid="gift-locked-note">{copy.daysLeft(locked.days_left)}</p>}
         </>
       ) : (
-        <button type="button" className="gf-btn gf-btn-hot" data-testid="gift-open" onClick={onOpen} disabled={state === 'opening'}>{copy.openShort && !memorial && !letterLike ? copy.openShort : copy.open}</button>
+        <>
+          <p className="gf-untie-hint" data-testid="gift-untie-hint">{copy.untieHint}</p>
+          <button type="button" className="gf-btn gf-btn-hot" data-testid="gift-open" onClick={untie} disabled={state === 'opening' || phase !== 'tied'}>{copy.untie}</button>
+        </>
       )}
     </section>
   )
 }
 
-function ReplyBox({ token, copy, from, replied }: { token: string; copy: GiftCopy; from: string; replied: boolean }) {
+/** The reveal (gift ceremony ticket, part 5): the character is written in brush strokes in the correct order, then its reading, its word and its line each appear a beat apart; the button comes last. About 4–6 s. */
+function Reveal({ view, copy, reduced, onNext }: { view: GiftView; copy: GiftCopy; reduced: boolean; onNext: () => void }) {
+  const [beat, setBeat] = useState(0) // 0 writing · 1 reading · 2 word / line · 3 who · 4 button
+  const timers = useRef<number[]>([])
+  const written = useCallback(() => {
+    const gap = reduced ? 150 : 450
+    ;[1, 2, 3, 4].forEach((b, i) => timers.current.push(window.setTimeout(() => setBeat(b), gap * (i + 1))))
+  }, [reduced])
+  useEffect(() => () => timers.current.forEach((t) => window.clearTimeout(t)), [])
+  const on = (n: number) => (beat >= n ? 'yes' : 'no')
+  return (
+    <section className="gf-reveal" data-testid="gift-reveal" data-beat={beat} data-motion={reduced ? 'fade' : 'full'}>
+      <p className="gf-char notranslate" translate="no" aria-label={view.glyph} data-testid="gift-glyph-wrap">
+        <StrokeGlyph char={view.glyph} color="var(--char)" testId="gift-glyph" onDone={written} reduced={reduced} />
+      </p>
+      <div className="gf-beat" data-on={on(1)} data-testid="gift-beat-reading">
+        {view.language === 'en' && view.en ? (
+          <EnBridgeStack className="gf-en" reading={cleanReading(view.romanization.split(' / ')[0])} word={view.en.word} line={view.en.line} echo={view.en.echo} classical={view.en.classical} />
+        ) : (
+          <p className="gf-reading notranslate" translate="no" data-testid="gift-reading">{readingLine(view)}</p>
+        )}
+      </div>
+      {view.from && <p className="gf-gold gf-beat" data-on={on(2)} data-testid="gift-gold">{copy.revealGold(view.from)}</p>}
+      <p className="gf-who gf-beat" data-on={on(3)} data-testid="gift-who">{view.who}</p>
+      <button type="button" className="gf-btn gf-beat" data-on={on(4)} disabled={beat < 4} tabIndex={beat < 4 ? -1 : 0} data-testid="gift-to-poem" onClick={onNext}>{view.poem ? copy.poemButton : copy.certButton}</button>
+    </section>
+  )
+}
+
+/** The answer (part 6): a written reply (200 characters), one of twelve characters given back (not for a remembrance), or both — sent once. */
+function AnswerBox({ token, lang, copy, from, replied, memorial }: { token: string; lang: PageLang; copy: GiftCopy; from: string; replied: boolean; memorial: boolean }) {
   const [text, setText] = useState('')
+  const [char, setChar] = useState<string | null>(null)
   const [phase, setPhase] = useState<'idle' | 'sending' | 'sent' | 'error'>(replied ? 'sent' : 'idle')
-  // English: the reply is one button, "Send a reply to <name>", that opens the form
-  const [opened, setOpened] = useState(!copy.replyOpen)
   const send = async () => {
     setPhase('sending')
     try {
-      const res = await fetch(`/api/gift/${token}/reply`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ text }) })
+      const res = await fetch(`/api/gift/${token}/reply`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ ...(text.trim() ? { text } : {}), ...(char ? { char } : {}) }) })
       setPhase(res.ok || res.status === 409 ? 'sent' : 'error')
       if (res.ok) trackUs('receiver_replied')
     } catch {
       setPhase('error')
     }
   }
-  if (phase === 'sent') return <p className="gf-sent" role="status" data-testid="gift-reply-sent">{copy.replySent(from)}</p>
+  const landing = lang === 'en' ? '/en' : lang === 'zh-Hant' ? '/?lang=zh-Hant' : '/'
+  if (phase === 'sent')
+    return (
+      <>
+        <p className="gf-sent-line" role="status" data-testid="gift-reply-sent">{copy.replySent(from)}</p>
+        {!memorial && <p className="gf-landing-line" data-testid="gift-landing-line"><a href={landing}>{copy.answerLanding}</a></p>}
+      </>
+    )
   const left = 200 - [...text].length
-  if (!opened && copy.replyOpen)
-    return <button type="button" className="gf-btn gf-btn-hot" data-testid="gift-reply-open" onClick={() => setOpened(true)}>{copy.replyOpen(from)}</button>
+  const key = lang === 'zh-Hant' ? 'zh-Hant' : lang
   return (
-    <form className="gf-reply" data-testid="gift-reply" onSubmit={(e) => { e.preventDefault(); if (text.trim()) void send() }}>
-      <h3 className="gf-label">{copy.replyTitle}</h3>
-      <textarea value={text} onChange={(e) => setText([...e.target.value].slice(0, 200).join(''))} placeholder={copy.replyPlaceholder} rows={3} maxLength={400} data-testid="gift-reply-text" />
-      <p className="gf-count" data-testid="gift-reply-left">{copy.replyLeft(left)}</p>
-      {phase === 'error' && <p role="alert" className="gf-error">{copy.replyError}</p>}
-      <button type="submit" className="gf-btn gf-btn-hot" data-testid="gift-reply-send" disabled={!text.trim() || phase === 'sending'}>{phase === 'sending' ? copy.replySending : copy.replySend}</button>
-    </form>
+    <>
+      <h2 data-testid="gift-answer-title">{copy.answerTitle}</h2>
+      {!memorial && (
+        <>
+          <h3 className="gf-label" data-testid="gift-chars-title">{copy.answerCharLabel(from)}</h3>
+          <ul className="gf-chars" data-testid="gift-chars">
+            {RETURN_CHARS.map((r) => (
+              <li key={r.char}>
+                <button type="button" className="gf-char-pick" aria-pressed={char === r.char} data-testid={`gift-char-${r.char}`} onClick={() => setChar((c) => (c === r.char ? null : r.char))}>
+                  <b className="notranslate" translate="no">{r.char}</b>
+                  <span>{r[key]}</span>
+                </button>
+              </li>
+            ))}
+          </ul>
+        </>
+      )}
+      <form className="gf-reply" data-testid="gift-reply" onSubmit={(e) => { e.preventDefault(); if (text.trim() || char) void send() }}>
+        <h3 className="gf-label">{copy.answerWrite}</h3>
+        <textarea value={text} onChange={(e) => setText([...e.target.value].slice(0, 200).join(''))} placeholder={copy.replyPlaceholder} rows={3} maxLength={400} data-testid="gift-reply-text" />
+        <p className="gf-count" data-testid="gift-reply-left">{copy.replyLeft(left)}</p>
+        {phase === 'error' && <p role="alert" className="gf-error">{copy.replyError}</p>}
+        <button type="submit" className="gf-btn gf-btn-hot" data-testid="gift-reply-send" disabled={(!text.trim() && !char) || phase === 'sending'}>{phase === 'sending' ? copy.replySending : copy.replySend}</button>
+      </form>
+    </>
   )
 }

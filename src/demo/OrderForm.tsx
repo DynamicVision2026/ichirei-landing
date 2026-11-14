@@ -412,7 +412,7 @@ export default function OrderForm({ result, story, followUps = [], promptQuestio
           <fieldset className="cgroup" data-testid="gift-letter">
             <div>
               <label className="clab" htmlFor="gift_message">{sc.messageLabel}</label>
-              <input id="gift_message" name="gift_message" type="text" maxLength={GIFT_MESSAGE_MAX} value={giftMessage} onChange={(e) => setGiftMessage([...e.target.value].slice(0, GIFT_MESSAGE_MAX).join(''))} placeholder={sc.messagePlaceholder} />
+              <textarea id="gift_message" name="gift_message" rows={4} maxLength={GIFT_MESSAGE_MAX + 20} value={giftMessage} onChange={(e) => setGiftMessage([...e.target.value].slice(0, GIFT_MESSAGE_MAX).join(''))} placeholder={sc.messagePlaceholder} data-testid="gift-message-input" />
               <span className="sent block" data-testid="gift-message-counter">{sc.messageCounter([...giftMessage].length, GIFT_MESSAGE_MAX)}</span>
               <span className="sent block">{sc.messageNote}</span>
             </div>

@@ -54,9 +54,12 @@ if (!haveBase) console.log(`SKIP  the base commit ${BASE} is not in this checkou
 else {
   // (2026-11-14: the later "final fix" ticket deliberately changes the receiver page, the buyer page, the legal page, the e-mail template and parts of the engine — so these checks now guard what that ticket must
   // NOT touch: the engine's CHOICE of characters (selection, cards, prompts, palette, lexicon) and the prices, compared with the moment release.)
-  const GUARD = ['engine/engine.ts', 'engine/cards.ts', 'engine/slots.ts', 'engine/prompt.ja.md', 'engine/prompt.zh.md', 'engine/prompt.en.md', 'engine/palette.csv', 'engine/lexicon.csv', 'engine/review.ts', 'src/order/packages.ts']
+  const GUARD = ['engine/engine.ts', 'engine/cards.ts', 'engine/slots.ts', 'engine/prompt.ja.md', 'engine/prompt.zh.md', 'engine/prompt.en.md', 'engine/palette.csv', 'engine/lexicon.csv', 'engine/review.ts']
   const sinceMoment = execFileSync('git', ['diff', '--name-only', 'b2af257', '--', ...GUARD]).toString().trim()
-  check('the engine\'s choice of characters (selection, cards, slots, prompts, palette, lexicon, review) and the prices are untouched since the moment release — so the request an existing story fixture produces is the same', sinceMoment === '', sinceMoment)
+  check('the engine\'s choice of characters (selection, cards, slots, prompts, palette, lexicon, review) is untouched since the moment release — so the request an existing story fixture produces is the same', sinceMoment === '', sinceMoment)
+  // the prices (src/order/packages.ts) are untouched too: since the moment release only the note's length limit (60 → 200, 2026-11-14) changed there
+  const pk = execFileSync('git', ['diff', '-U0', 'b2af257', '--', 'src/order/packages.ts']).toString().split('\n').filter((l) => /^[-+]/.test(l) && !/^(\+\+\+|---)/.test(l))
+  check('the prices are untouched since the moment release (only GIFT_MESSAGE_MAX changed in src/order/packages.ts)', pk.length > 0 ? pk.every((l) => /GIFT_MESSAGE_MAX/.test(l)) : true, pk.join('\n'))
 }
 
 // ---- 4. the /en blocks ---------------------------------------------------------------------------------------------------------------------------------------------

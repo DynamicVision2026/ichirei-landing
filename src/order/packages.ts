@@ -38,7 +38,7 @@ export const PRINTED_CARD: Record<PackageId, boolean> = { egift: false, simple: 
 export const SHIP_TO = ['me', 'direct', 'egift'] as const
 export type ShipTo = (typeof SHIP_TO)[number]
 /** The short message shown in the letter (and printed on the card when it goes to the receiver), in characters (by code point). */
-export const GIFT_MESSAGE_MAX = 60
+export const GIFT_MESSAGE_MAX = 200
 /** Entering the receiver's address (ship to "egift") for the wooden sizes is Japan only at launch. */
 export const EGIFT_JAPAN_ONLY: Record<PackageId, boolean> = { egift: false, simple: true, standard: true }
 /** How far ahead the sender may fix the day the gift opens (days). */

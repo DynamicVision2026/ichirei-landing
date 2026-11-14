@@ -1,0 +1,3 @@
+Stroke paths derived from KanjiVG (https://kanjivg.tagaini.net/), copyright Ulrich Apel and contributors, licensed under Creative Commons Attribution-Share Alike 3.0 (https://creativecommons.org/licenses/by-sa/3.0/). This derived file is distributed under the same licence.
+
+KanjiVG: Ulrich Apel and contributors. Strokes of 489 characters, in stroke order, one SVG path each.

@@ -78,14 +78,14 @@ const select = async (extra: Record<string, unknown>) => {
     const res = await selectPost(new Request('http://x/api/select', { method: 'POST', body: JSON.stringify({ story: FIX.story, language: 'ja', ...FIX.context, ...extra }) }))
     const text = await res.text()
     const last = text.trim().split('\n').filter(Boolean).map((l) => JSON.parse(l)).at(-1)
-    return { status: res.status, prompt: prompts[0] ?? '', result: last?.type === 'result' ? last.result : last }
+    return { status: res.status, prompt: prompts[0] ?? '', result: last?.type === 'result' ? last.result : last, ticket: last?.type === 'result' ? (last.round_ticket as string | undefined) : undefined }
   } finally { console.log = origLog }
 }
 const first = await select({})
 const mainKanji = first.result.primary_kanji as string
 const shownKanji = (first.result.candidates as { kanji: string; eliminated: boolean }[]).filter((c) => !c.eliminated).map((c) => c.kanji)
 check('(1) a first run names nobody as already shown', first.status === 200 && !first.prompt.includes('ALREADY SHOWN FOR THIS STORY:') && shownKanji.includes(mainKanji))
-const retry = await select({ exclude: shownKanji, retry: 1 })
+const retry = await select({ exclude: shownKanji, retry: 1, round_ticket: first.ticket })
 check('(1) 「別の候補を見る」: the prompt lists the characters already shown for this story, on one line before the story', retry.status === 200 && retry.prompt.includes(`ALREADY SHOWN FOR THIS STORY: ${shownKanji.join(' ')}`))
 const live = (retry.result.candidates as { kanji: string; eliminated: boolean; eliminated_reason?: string }[])
 check('(1) …and the referee removes every one of them from every slot, whatever the model chose (the fake model offers the same ones again)', live.every((c) => !shownKanji.includes(c.kanji) || (c.eliminated && /already shown/.test(String(c.eliminated_reason)))))

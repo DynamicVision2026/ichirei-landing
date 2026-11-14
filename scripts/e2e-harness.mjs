@@ -62,6 +62,8 @@ const toOrder = async (page) => {
   if (await make.isVisible().catch(() => false)) await make.click()
   await form.waitFor({ state: 'visible', timeout: 30000 })
 }
+// 2026-11-14 (gift ceremony): the letter leads to a short card, 「この贈りものには音楽があります。」 (when the film has music), whose button starts the film; the film ends on a button (nothing moves on by itself).
+const toMusic = async (page) => { await page.locator('[data-testid=gift-music-go]').click({ timeout: 2500 }).catch(() => {}) }
 let failures = 0
 const check = (name, cond, detail) => {
   console.log(`${cond ? 'PASS' : 'FAIL'}  ${name}${!cond && detail ? '  -> ' + String(detail).slice(0, 300) : ''}`)
@@ -928,8 +930,8 @@ const mockPage = async (browser, { onExplain, result, order, track } = {}) => {
   const shipOpts = await form.locator('[data-ship-to]').evaluateAll((els) => els.map((e) => e.getAttribute('data-ship-to')))
   check('ship-to: a wooden size asks where it goes — me / directly to them / e-gift — with 「自分に届ける」 first; the letter fields (message and opening date) are there for every size, "me" included', shipOpts.join() === 'me,direct,egift' && (await form.locator('[data-ship-to=me] .pkgName').innerText()) === '自分に届ける' && (await form.locator('[data-ship-to=direct] .pkgName').innerText()) === '相手に直接届ける' && (await form.locator('[data-ship-to=egift] .pkgName').innerText()).startsWith('eギフトで贈る') && (await form.locator('#gift_message').count()) === 1 && (await form.locator('#open_date').count()) === 1)
   await f.page.click('[data-ship-to=direct]')
-  await f.page.fill('#gift_message', 'あ'.repeat(70))
-  check('ship-to: directly to them → a message box (60 characters at most, with its counter), and a note that the receiver\'s address goes in at checkout', (await form.locator('#gift_message').inputValue()).length === 60 && (await form.locator('[data-testid=gift-message-counter]').innerText()) === '60 / 60字' && (await form.locator('[data-ship-to=direct]').innerText()).includes('チェックアウトの配送先'))
+  await f.page.fill('#gift_message', 'あ'.repeat(210))
+  check('ship-to: directly to them → a note box (200 characters at most, with its counter), and a note that the receiver\'s address goes in at checkout', (await form.locator('#gift_message').inputValue()).length === 200 && (await form.locator('[data-testid=gift-message-counter]').innerText()) === '200 / 200字' && (await form.locator('[data-ship-to=direct]').innerText()).includes('チェックアウトの配送先'))
   await f.page.fill('#gift_message', 'いつも、ありがとう。')
   await f.page.click('label[data-size=standard]')
   await f.page.click('[data-ship-to=egift]')
@@ -1068,7 +1070,7 @@ const mockPage = async (browser, { onExplain, result, order, track } = {}) => {
     await T(page, 'gift-envelope').waitFor()
     const body = await page.locator('body').innerText()
     check('envelope (locked): the label 「一字の贈りもの」, the line, 「○○へ」 and 「○○より」 on the washi envelope, and the gold 一字礼 seal', (await T(page, 'gift-env-label').innerText()) === '一字の贈りもの' && (await T(page, 'gift-env-line').innerText()) === 'あなただけに届いた、一字の贈りもの' && (await T(page, 'gift-env-to').innerText()) === '山田 一郎へ' && (await T(page, 'gift-env-from').innerText()) === '山田 太郎より' && (await T(page, 'gift-seal').innerText()) === '一字礼')
-    check('envelope (locked): no 「封を開く」 button — the real date and the real count instead', (await T(page, 'gift-open').count()) === 0 && (await T(page, 'gift-locked-date').innerText()) === '11月10日に開きます' && (await T(page, 'gift-locked-note').innerText()) === 'あと3日。その日まで、封は閉じたままです。')
+    check('envelope (locked): no 「ほどく」 button — the real date and the real count instead', (await T(page, 'gift-open').count()) === 0 && (await T(page, 'gift-locked-date').innerText()) === '11月10日に開きます' && (await T(page, 'gift-locked-note').innerText()) === 'あと3日。その日まで、封は閉じたままです。')
     check('envelope (locked): nothing of the gift is on the page — no character, poem, message, film, price or order number', !/備|朝ごとに|いつも、ありがとう|ちょうど今|¥|IC-2026|AN-test/.test(body) && (await page.locator('.an-film, [data-testid=film]').count()) === 0)
     check('envelope (locked): the page asks for the view only — no render, no pictures, no scroll', !seenHas(await pageUrls(page)), '')
     check('no page errors (run 8c-6, locked envelope)', errs.length === 0, errs.join('; '))
@@ -1105,7 +1107,7 @@ const mockPage = async (browser, { onExplain, result, order, track } = {}) => {
     })
     check(`${label}: the film ends on the e-card — a paper card, 74% of the frame wide and 5:8, inside the frame, the character about 45% of its width${quietInk ? ' in ink (no red)' : ' in cinnabar'}, not yet black`, r.opacity > 0.99 && Math.abs(r.widthRatio - 0.74) < 0.01 && Math.abs(r.aspect - 1.6) < 0.02 && r.inside && Math.abs(r.kanjiRatio - 0.45) < 0.01 && r.kanjiInCard && r.black === 0 && (quietInk ? /rgb\((\d+), (\d+), (\d+)/.exec(r.kanjiColour).slice(1).every((x) => Number(x) < 60) : r.kanjiColour === 'rgb(192, 57, 43)'), JSON.stringify(r))
     check(`${label}: the poem is ${vertical ? 'vertical (縦書き): one line per column, right to left, never wrapped' : 'horizontal and centred, one line per line'} — ${lines} lines, at least 4.4% of the frame's width, inside the card, clear of the seal`, r.lines === lines && (vertical ? r.poemVertical === 'yes' && String(r.writing).startsWith('vertical') && r.nowrap && r.rightToLeft : r.poemVertical === 'no' && !String(r.writing).startsWith('vertical') && r.topToBottom) && r.fontRatio >= 0.044 && r.poemInCard && r.noSealClash, JSON.stringify(r))
-    check(`${label}: the film starts muted and the sound button is at its corner (${r.sound})`, r.muted === true && r.sound.length > 0)
+    check(`${label}: the sound button is at its corner (${r.sound}); the film is muted unless the sound was asked for (on the receiver's page the tap on 「この贈りものには音楽があります。」 asks for it)`, typeof r.muted === 'boolean' && r.sound.length > 0)
     if (shot) await page.locator('[data-testid=film]').screenshot({ path: shot }).catch(() => {})
   }
   function seenHas(urls) { return urls.some((u) => /\/render|\/picture\/|\/scroll\./.test(u)) }
@@ -1115,7 +1117,7 @@ const mockPage = async (browser, { onExplain, result, order, track } = {}) => {
   {
     const { page, ctx, errs, seen } = await open(mk())
     await T(page, 'gift-envelope').waitFor()
-    check('envelope: 「封を開く」 button, data-motion full; a liner pattern for the season (opened on the order day in November → autumn)', (await T(page, 'gift-open').innerText()) === '封を開く' && (await T(page, 'gift-envelope').getAttribute('data-motion')) === 'full' && (await T(page, 'gift-envelope').getAttribute('data-liner')) === 'autumn')
+    check('envelope: 「ほどく」 button (the cord is tied across the seal), data-motion full; a liner pattern for the season (opened on the order day in November → autumn)', (await T(page, 'gift-open').innerText()) === 'ほどく' && (await T(page, 'gift-envelope').getAttribute('data-motion')) === 'full' && (await T(page, 'gift-envelope').getAttribute('data-liner')) === 'autumn')
     await T(page, 'gift-open').click()
     await page.waitForSelector('[data-testid=gift-envelope][data-state=opening]')
     const anims = await page.evaluate(() => {
@@ -1131,15 +1133,17 @@ const mockPage = async (browser, { onExplain, result, order, track } = {}) => {
     check('letter: 「○○へ」, the sender\'s message, 「○○さんの目に映る、あなたを一字にしました。まずは、ふたりの物語から。」, 「○○より」 and the button 「物語を見る」', (await T(page, 'gift-to').innerText()) === '山田 一郎へ' && (await T(page, 'gift-message').innerText()) === 'いつも、ありがとう。' && (await T(page, 'gift-lead').innerText()) === '山田 太郎さんの目に映る、あなたを一字にしました。まずは、ふたりの物語から。' && (await T(page, 'gift-from').innerText()) === '山田 太郎より' && (await T(page, 'gift-to-film').innerText()) === '物語を見る')
     await shot(page, 'shots/gift-letter-ja.png')
     await T(page, 'gift-to-film').click()
+    await toMusic(page)
     await page.waitForSelector('[data-testid=film][data-ready=yes]', { timeout: 8000 })
     check('film: the 34-second film plays on the receiver\'s page (no share button — the receiver has nothing to share)', (await step(page)) === 'film' && (await page.locator('[data-testid=animation-share]').count()) === 0)
     await checkEndCard(page, 'film end (ja, 短歌)', { vertical: true, lines: 5, shot: 'shots/film-card-ja.png' })
     await page.evaluate(() => window.__ichireiFilm.seek(window.__ichireiFilm.total))
+    await page.locator('[data-testid=gift-skip]').click({ timeout: 6000 })
     await T(page, 'gift-reveal').waitFor({ timeout: 6000 })
-    const rv = await page.evaluate(() => ({ colour: getComputedStyle(document.querySelector('[data-testid=gift-glyph]')).color, size: parseFloat(getComputedStyle(document.querySelector('[data-testid=gift-glyph]')).fontSize) }))
+    const rv = await page.evaluate(() => ({ colour: getComputedStyle(document.querySelector('[data-testid=gift-glyph]')).color, size: parseFloat(getComputedStyle(document.querySelector('[data-testid=gift-glyph-wrap]')).fontSize) }))
     check('reveal: the character large in cinnabar, the reading, the gold line 「○○さんの目に映る、あなた。」, the who line, and 「詩を読む」', rv.colour === 'rgb(192, 57, 43)' && rv.size >= 140 && (await T(page, 'gift-glyph').innerText()) === '備' && (await T(page, 'gift-reading').innerText()) === 'そなえる' && (await T(page, 'gift-gold').innerText()) === '山田 太郎さんの目に映る、あなた。' && (await T(page, 'gift-who').innerText()) === 'いつも、頼まれる前に備えている人。' && (await T(page, 'gift-to-poem').innerText()) === '詩を読む', JSON.stringify(rv))
     await shot(page, 'shots/gift-reveal-ja.png')
-    await T(page, 'gift-to-poem').click()
+    await T(page, 'gift-to-poem').click({ timeout: 9000 })
     await T(page, 'gift-poem').waitFor()
     const wm = await T(page, 'gift-poem-vertical').evaluate((el) => getComputedStyle(el).writingMode)
     check('poem: a tanka on a paper panel, written vertically (縦書き), with its reading, and 「証を見る」', wm.startsWith('vertical') && (await T(page, 'gift-poem-vertical').locator('p').count()) === 5 && (await T(page, 'gift-poem-reading').innerText()) === 'あさごとに' && (await T(page, 'gift-to-cert').innerText()) === '証を見る')
@@ -1150,7 +1154,9 @@ const mockPage = async (browser, { onExplain, result, order, track } = {}) => {
     await shot(page, 'shots/gift-cert-ja.png')
     await T(page, 'gift-to-keep').click()
     await T(page, 'gift-keep').waitFor()
-    check('keepsakes: the thank-you box (「ありがとうを返す」, 200 characters at most) and no way to send it twice', (await T(page, 'gift-keep').locator('h3').innerText()) === 'ありがとうを返す' && (await T(page, 'gift-reply-left').innerText()) === 'あと200字')
+    await T(page, 'gift-to-answer').click()
+    await T(page, 'gift-answer').waitFor()
+    check('the answer step (after the keepsakes): 「お返しをする」, the twelve characters to give back, and the written reply (200 characters at most, never sent twice)', (await T(page, 'gift-answer-title').innerText()) === 'お返しをする' && (await T(page, 'gift-chars').locator('button').count()) === 12 && (await T(page, 'gift-reply-left').innerText()) === 'あと200字')
     await T(page, 'gift-reply-text').fill('あ'.repeat(230))
     check('thank-you: clipped to 200 characters, with the count', (await T(page, 'gift-reply-text').inputValue()).length === 200 && (await T(page, 'gift-reply-left').innerText()) === 'あと0字')
     await T(page, 'gift-reply-text').fill('ありがとう。大切にします。')
@@ -1169,11 +1175,14 @@ const mockPage = async (browser, { onExplain, result, order, track } = {}) => {
     const { page, ctx } = await open(mk({ replied: true }))
     await T(page, 'gift-open').click()
     await T(page, 'gift-to-film').click({ timeout: 4000 })
+    await toMusic(page)
     await page.waitForSelector('[data-testid=film][data-ready=yes]', { timeout: 8000 })
     await page.evaluate(() => window.__ichireiFilm.seek(window.__ichireiFilm.total))
-    await T(page, 'gift-to-poem').click({ timeout: 6000 })
+    await page.locator('[data-testid=gift-skip]').click({ timeout: 6000 })
+    await T(page, 'gift-to-poem').click({ timeout: 9000 })
     await T(page, 'gift-to-cert').click()
     await T(page, 'gift-to-keep').click()
+    await T(page, 'gift-to-answer').click()
     check('thank-you: when the receiver has already replied the page shows 「○○さんに届けました。」 and no box', (await T(page, 'gift-reply-sent').innerText()) === '山田 太郎さんに届けました。' && (await T(page, 'gift-reply').count()) === 0)
     await ctx.close()
   }
@@ -1183,14 +1192,26 @@ const mockPage = async (browser, { onExplain, result, order, track } = {}) => {
     const { page, ctx, errs } = await open(mk(), { reduced: true })
     await T(page, 'gift-envelope').waitFor()
     check('reduced motion: the envelope says data-motion=fade', (await T(page, 'gift-envelope').getAttribute('data-motion')) === 'fade')
+    // (the fade is short: record the styles the moment the opening starts, so it cannot pass unseen)
+    await page.evaluate(() => {
+      window.__nm = null
+      new MutationObserver(() => {
+        const e = document.querySelector('.gf-env')
+        if (e && e.dataset.state === 'opening' && !window.__nm) {
+          const g = (sel) => getComputedStyle(document.querySelector(sel)).animationName
+          window.__nm = { env: getComputedStyle(e).animationName, flap: g('.gf-env-flap'), seal: g('.gf-seal i'), letter: g('.gf-env-letter') }
+        }
+      }).observe(document.body, { subtree: true, attributes: true, childList: true })
+    })
     await T(page, 'gift-open').click()
-    await page.waitForSelector('[data-testid=gift-envelope][data-state=opening]')
-    const nm = await page.evaluate(() => ({ env: getComputedStyle(document.querySelector('.gf-env')).animationName, flap: getComputedStyle(document.querySelector('.gf-env-flap')).animationName, seal: getComputedStyle(document.querySelector('.gf-seal i')).animationName, letter: getComputedStyle(document.querySelector('.gf-env-letter')).animationName }))
+    await page.waitForFunction(() => window.__nm)
+    const nm = await page.evaluate(() => window.__nm)
     check('reduced motion: nothing moves (no seal break, flap or slide) — only a fade', nm.env === 'gf-fade-out' && nm.flap === 'none' && nm.seal === 'none' && nm.letter === 'none', JSON.stringify(nm))
     const t0 = Date.now()
     await T(page, 'gift-letter').waitFor({ timeout: 3000 })
     check('reduced motion: the letter follows after a short fade (under a second)', Date.now() - t0 < 900, String(Date.now() - t0))
     await T(page, 'gift-to-film').click()
+    await toMusic(page)
     check('reduced motion: the film is shown as stills and 「次へ」 goes on to the reveal', (await page.locator('[data-testid=film-still]').count()) === 1 && (await T(page, 'gift-skip').innerText()) === '次へ')
     await T(page, 'gift-skip').click()
     await T(page, 'gift-reveal').waitFor()
@@ -1218,12 +1239,14 @@ const mockPage = async (browser, { onExplain, result, order, track } = {}) => {
     await T(page, 'gift-letter').waitFor({ timeout: 4000 })
     seen.push(await page.locator('body').innerText())
     await T(page, 'gift-to-film').click()
+    await toMusic(page)
     await page.waitForSelector('[data-testid=film][data-ready=yes]', { timeout: 8000 })
     await page.evaluate(() => window.__ichireiFilm.seek(window.__ichireiFilm.total))
+    await page.locator('[data-testid=gift-skip]').click({ timeout: 6000 })
     await T(page, 'gift-reveal').waitFor({ timeout: 6000 })
     const colour = await T(page, 'gift-glyph').evaluate((el) => getComputedStyle(el).color)
     seen.push(await page.locator('body').innerText())
-    await T(page, 'gift-to-poem').click()
+    await T(page, 'gift-to-poem').click({ timeout: 9000 })
     await T(page, 'gift-to-cert').click()
     await T(page, 'gift-cert').waitFor()
     const certColour = await T(page, 'gift-cert-glyph').evaluate((el) => getComputedStyle(el).color)
@@ -1253,8 +1276,8 @@ const mockPage = async (browser, { onExplain, result, order, track } = {}) => {
     ['en', 'en-US', { language: 'en', glyph: '備', reading: 'sonaeru', who: 'Someone who is ready before you ask.', poem: { type: 'en', lines: ['Each morning, a flower set', 'beside the cup.'], reading: '' } }],
   ]) {
     const want = lang === 'en'
-      ? { label: 'A gift of one character', to: 'To 山田 一郎', from: 'From 山田 太郎', open: 'Open', lockedDate: `Opens on 10 November${''}`, lockedNote: '3 days to go. The envelope stays sealed until then.', btn: 'See the story', cert: 'ICHIREI · No. 0012' }
-      : { label: '一個字的禮物', to: '致 山田 一郎', from: '山田 太郎 敬上', open: '拆開信封', lockedDate: '11月10日開啟', lockedNote: '還有 3 天。在那天之前，信封會一直封著。', btn: '看故事', cert: '一字禮　第 0012 號' }
+      ? { label: 'A gift of one character', to: 'To 山田 一郎', from: 'From 山田 太郎', open: 'Untie', lockedDate: `Opens on 10 November${''}`, lockedNote: '3 days to go. The envelope stays sealed until then.', btn: 'See the story', cert: 'ICHIREI · No. 0012' }
+      : { label: '一個字的禮物', to: '致 山田 一郎', from: '山田 太郎 敬上', open: '解開', lockedDate: '11月10日開啟', lockedNote: '還有 3 天。在那天之前，信封會一直封著。', btn: '看故事', cert: '一字禮　第 0012 號' }
     {
       const { page, ctx } = await open(lockedView({ language: lang }), { locale })
       await T(page, 'gift-envelope').waitFor()
@@ -1272,12 +1295,14 @@ const mockPage = async (browser, { onExplain, result, order, track } = {}) => {
       check(`${lang}: the letter — 「${want.to}」, the button 「${want.btn}」`, (await T(page, 'gift-to').innerText()) === want.to && (await T(page, 'gift-to-film').innerText()) === want.btn)
       await page.screenshot({ path: `shots/gift-letter-${lang}.png` }).catch(() => {})
       await T(page, 'gift-to-film').click()
+      await toMusic(page)
       await page.waitForSelector('[data-testid=film][data-ready=yes]', { timeout: 8000 })
       await checkEndCard(page, `film end (${lang}, ${lang === 'en' ? 'English verse' : '漢詩'})`, { vertical: false, lines: lang === 'en' ? 2 : 4, shot: `shots/film-card-${lang}.png` })
       await page.evaluate(() => window.__ichireiFilm.seek(window.__ichireiFilm.total))
+      await page.locator('[data-testid=gift-skip]').click({ timeout: 6000 })
       await T(page, 'gift-reveal').waitFor({ timeout: 6000 })
       await page.screenshot({ path: `shots/gift-reveal-${lang}.png` }).catch(() => {})
-      await T(page, 'gift-to-poem').click()
+      await T(page, 'gift-to-poem').click({ timeout: 9000 })
       await T(page, 'gift-poem').waitFor()
       await page.screenshot({ path: `shots/gift-poem-${lang}.png` }).catch(() => {})
       await T(page, 'gift-to-cert').click()
@@ -1297,9 +1322,11 @@ const mockPage = async (browser, { onExplain, result, order, track } = {}) => {
     const { page, ctx, seen } = await open(mk({ egift: { state: 'waiting', japan_only: true } }))
     await T(page, 'gift-open').click()
     await T(page, 'gift-to-film').click({ timeout: 4000 })
+    await toMusic(page)
     await page.waitForSelector('[data-testid=film][data-ready=yes]', { timeout: 8000 })
     await page.evaluate(() => window.__ichireiFilm.seek(window.__ichireiFilm.total))
-    await T(page, 'gift-to-poem').click({ timeout: 6000 })
+    await page.locator('[data-testid=gift-skip]').click({ timeout: 6000 })
+    await T(page, 'gift-to-poem').click({ timeout: 9000 })
     await T(page, 'gift-to-cert').click()
     await T(page, 'gift-to-keep').click()
     const gift = T(page, 'gift-panel')
@@ -1334,9 +1361,11 @@ const mockPage = async (browser, { onExplain, result, order, track } = {}) => {
     await page.goto(`http://localhost:5173/g/${TOKEN}`, { waitUntil: 'networkidle' })
     await T(page, 'gift-open').click()
     await T(page, 'gift-to-film').click({ timeout: 4000 })
+    await toMusic(page)
     await page.waitForSelector('[data-testid=film][data-ready=yes]', { timeout: 8000 })
     await page.evaluate(() => window.__ichireiFilm.seek(window.__ichireiFilm.total))
-    await T(page, 'gift-to-poem').click({ timeout: 6000 })
+    await page.locator('[data-testid=gift-skip]').click({ timeout: 6000 })
+    await T(page, 'gift-to-poem').click({ timeout: 9000 })
     await T(page, 'gift-to-cert').click()
     await T(page, 'gift-to-keep').click()
     const fonts = await page.evaluate(async () => { await document.fonts.ready; return { hero: document.fonts.check('900 40px "Zen Old Mincho"', '備'), body: document.fonts.check('400 16px "Noto Serif JP"', 'あ') } })
@@ -1385,9 +1414,11 @@ const mockPage = async (browser, { onExplain, result, order, track } = {}) => {
     await page.route(`**/api/gift/${TOKEN}/film.mp4**`, (r) => r.fulfill({ status: 200, contentType: 'video/mp4', body: 'x' }))
     await T(page, 'gift-open').click()
     await T(page, 'gift-to-film').click({ timeout: 4000 })
+    await toMusic(page)
     await page.waitForSelector('[data-testid=film][data-ready=yes]', { timeout: 8000 })
     await page.evaluate(() => window.__ichireiFilm.seek(window.__ichireiFilm.total))
-    await T(page, 'gift-to-poem').click({ timeout: 6000 })
+    await page.locator('[data-testid=gift-skip]').click({ timeout: 6000 })
+    await T(page, 'gift-to-poem').click({ timeout: 9000 })
     await T(page, 'gift-to-cert').click()
     await T(page, 'gift-to-keep').click()
     const k = T(page, 'keepsakes')
@@ -1406,9 +1437,11 @@ const mockPage = async (browser, { onExplain, result, order, track } = {}) => {
     const { page, ctx } = await open(mk({ film: { status: 'ready', lines: ['「a」', 'b', 'c', 'd'], pictures: ['/film/washi-1.webp', '/film/washi-2.webp', '/film/washi-1.webp', '/film/washi-2.webp'], incomplete: true } }))
     await T(page, 'gift-open').click()
     await T(page, 'gift-to-film').click({ timeout: 4000 })
+    await toMusic(page)
     await page.waitForSelector('[data-testid=film][data-ready=yes]', { timeout: 8000 })
     await page.evaluate(() => window.__ichireiFilm.seek(window.__ichireiFilm.total))
-    await T(page, 'gift-to-poem').click({ timeout: 6000 })
+    await page.locator('[data-testid=gift-skip]').click({ timeout: 6000 })
+    await T(page, 'gift-to-poem').click({ timeout: 9000 })
     await T(page, 'gift-to-cert').click()
     await T(page, 'gift-to-keep').click()
     check('keepsakes: while a picture is still to be drawn (incomplete film) there is no film button, no card button and no scroll', (await T(page, 'keepsakes').count()) === 0)
@@ -3534,10 +3567,11 @@ const SECTION_ORDER = ['.hero', '.strip', '.philo', '#shape', '#angles', '#write
     {
       const { page, ctx, errs, seen } = await open(view())
       await T(page, 'gift-envelope').waitFor()
-      check('receiver (en, phone): the envelope says "Emily chose one character for you." and the button reads "Open"', (await T(page, 'gift-env-line').innerText()) === 'Emily chose one character for you.' && (await T(page, 'gift-open').innerText()) === 'Open')
+      check('receiver (en, phone): the envelope says "Emily chose one character for you." and the button reads "Untie"', (await T(page, 'gift-env-line').innerText()) === 'Emily chose one character for you.' && (await T(page, 'gift-open').innerText()) === 'Untie')
       await T(page, 'gift-open').click()
       await T(page, 'gift-to-film').waitFor({ timeout: 8000 })
       await T(page, 'gift-to-film').click()
+      await toMusic(page)
       await T(page, 'gift-skip').click()
       await T(page, 'gift-reveal').waitFor()
       await page.waitForTimeout(500)
@@ -3547,7 +3581,7 @@ const SECTION_ORDER = ['.hero', '.strip', '.philo', '#shape', '#angles', '#write
       await page.screenshot({ path: `${SHOTS}/us-receiver-phone.png` })
       const body = await page.locator('body').innerText()
       check('receiver (en): no price, no sizes, no buy link anywhere on the page', !/¥|\$\d|price|Buy|Order now|size/i.test(body) && (await page.locator('a[href*="shopify"], a[href*="checkout"]').count()) === 0)
-      await T(page, 'gift-to-poem').click()
+      await T(page, 'gift-to-poem').click({ timeout: 9000 })
       await T(page, 'gift-poem-screen').waitFor()
       check('receiver (en): under the poem — "Written from the story Emily told about you."', (await T(page, 'gift-poem-from').innerText()) === 'Written from the story Emily told about you.')
       await T(page, 'gift-to-cert').click()
@@ -3561,7 +3595,7 @@ const SECTION_ORDER = ['.hero', '.strip', '.philo', '#shape', '#angles', '#write
       await T(page, 'save-card-image').click()
       await page.waitForTimeout(200)
       check('receiver (en): saving the card is counted (receiver_saved_card)', seen.analytics.some((e) => e.event === 'receiver_saved_card'))
-      check('receiver (en): the reply is one button, "Send a reply to Emily", that opens the thank-you form; sending it is counted (receiver_replied)', await (async () => { const b = T(page, 'gift-reply-open'); if ((await b.innerText()) !== 'Send a reply to Emily') return false; await b.click(); await T(page, 'gift-reply-text').fill('Thank you, it made my day.'); await T(page, 'gift-reply-send').click(); await T(page, 'gift-reply-sent').waitFor(); return seen.reply.length === 1 && seen.analytics.some((e) => e.event === 'receiver_replied') })())
+      check('receiver (en): the keepsakes lead to "Send something back" (twelve characters and a written reply); sending it is counted (receiver_replied)', await (async () => { await T(page, 'gift-to-answer').click(); await T(page, 'gift-answer').waitFor(); if ((await T(page, 'gift-answer-title').innerText()) !== 'Send something back') return false; await T(page, 'gift-reply-text').fill('Thank you, it made my day.'); await T(page, 'gift-reply-send').click(); await T(page, 'gift-reply-sent').waitFor(); return seen.reply.length === 1 && seen.analytics.some((e) => e.event === 'receiver_replied') })())
       check('no page errors (run 24, receiver)', errs.length === 0, errs.join('; '))
       await ctx.close()
     }
@@ -3572,8 +3606,9 @@ const SECTION_ORDER = ['.hero', '.strip', '.philo', '#shape', '#angles', '#write
       await T(page, 'gift-open').click()
       await T(page, 'gift-to-film').waitFor({ timeout: 8000 })
       await T(page, 'gift-to-film').click()
+      await toMusic(page)
       await T(page, 'gift-skip').click()
-      await T(page, 'gift-to-poem').click()
+      await T(page, 'gift-to-poem').click({ timeout: 9000 })
       check('receiver (en): …and under the poem "Written from a story told about you."', (await T(page, 'gift-poem-from').innerText()) === 'Written from a story told about you.' && errs.length === 0)
       await ctx.close()
     }
@@ -3588,18 +3623,21 @@ const SECTION_ORDER = ['.hero', '.strip', '.philo', '#shape', '#angles', '#write
     const seen = { schedule: [], analytics: [] }
     sp.on('pageerror', (e) => errors.push(String(e)))
     await sp.route('**/api/analytics', async (r) => { try { seen.analytics.push(JSON.parse(r.request().postData() ?? '{}')) } catch {} await r.fulfill({ status: 204, body: '' }) })
-    await sp.route(`**/api/animation/${ID}/schedule`, async (r) => { seen.schedule.push(JSON.parse(r.request().postData() ?? '{}')); await r.fulfill({ json: { ok: true, opens_on: seen.schedule.at(-1).open_date } }) })
+    await sp.route(`**/api/animation/${ID}/schedule`, async (r) => { seen.schedule.push(JSON.parse(r.request().postData() ?? '{}')); const b = seen.schedule.at(-1); await r.fulfill({ json: { ok: true, opens_on: b.open_date, opens_at: b.open_date ? `${b.open_date}T${b.open_time ? '23:00' : '12:00'}:00.000Z` : null, opens_tz: b.open_date ? b.open_tz : null } }) })
     await sp.route(`**/api/animation/${ID}`, (r) => r.fulfill({ json: { id: ID, language: 'en', glyph: '燈', reading: 'あかり', romanization: 'akari', meaning_en: 'lamp', en: { word: 'hearth', word_source: 'lexicon', line: 'The light that is already on when everyone else wakes.', echo: null }, who: 'Someone who kept the porch light on.', memorial: false, film: { status: 'fallback', lines: ['a', 'b'], pictures: ['/film/washi-1.webp', '/film/washi-2.webp'] }, gift: { url: GIFT, size_code: 'ICHIREI-EGIFT', ship_to: 'none', egift_state: null, opens_on: null, certificate_no: 12, reply: null } } }))
+    await sp.clock.install({ time: new Date('2026-11-14T15:00:00Z') })
     await sp.goto(`http://localhost:5173/a/${ID}`, { waitUntil: 'networkidle' })
     const panel = sp.locator('[data-testid=sender-panel]')
     await panel.waitFor()
     check('sender (en): after "Collect your gift" the share sheet offers Copy link, Email, WhatsApp, Messages and "Schedule for a date" — no LINE, no WeChat, no QR', (await panel.locator('[data-testid=en-share-sheet] > *').allInnerTexts()).join() === 'Copy link,Email,WhatsApp,Messages' && (await panel.locator('[data-testid=give-schedule]').innerText()) === 'Schedule for a date' && (await panel.locator('[data-testid=give-line], [data-testid=give-wechat], [data-testid=give-qr]').count()) === 0)
     await panel.locator('[data-testid=give-schedule]').click()
-    check('sender (en): the schedule hint reads "Set it to open on Christmas morning."', (await panel.locator('[data-testid=schedule-hint]').innerText()) === 'Set it to open on Christmas morning.')
-    await panel.locator('[data-testid=schedule-date]').fill(`${new Date().getFullYear() + 1}-12-25`)
+    check('sender (en, Nov 14): the choices are "Now", "Thanksgiving dinner (Nov 26, 6:00 p.m.)" and "Pick a date and time" — no Christmas morning before Dec 1', (await panel.locator('.by-choice label').allInnerTexts()).map((t) => t.trim()).join('|') === 'Now|Thanksgiving dinner (Nov 26, 6:00 p.m.)|Pick a date and time')
+    await panel.locator('[data-testid=choice-pick]').check()
+    await panel.locator('[data-testid=schedule-date]').fill('2026-12-25')
     await panel.locator('[data-testid=schedule-save]').click()
     await panel.locator('[data-testid=schedule-saved]').waitFor()
-    check('sender (en): setting the date is saved for the gift and counted (egift_scheduled)', seen.schedule.length === 1 && /-12-25$/.test(seen.schedule[0].open_date) && seen.analytics.some((e) => e.event === 'egift_scheduled'))
+    check('sender (en): the picked moment is saved for the gift with its zone (open_tz) and its time, and counted (egift_scheduled)', seen.schedule.length === 1 && seen.schedule[0].open_date === '2026-12-25' && typeof seen.schedule[0].open_tz === 'string' && seen.schedule[0].open_time === '07:00' && seen.analytics.some((e) => e.event === 'egift_scheduled'))
+    check('sender (en): once a moment is set, "Add to calendar" offers Google Calendar and an .ics download', await (async () => { await panel.locator('[data-testid=calendar-add]').click(); return (await panel.locator('[data-testid=calendar-google]').getAttribute('href')).startsWith('https://calendar.google.com/calendar/render?action=TEMPLATE') && (await panel.locator('[data-testid=calendar-ics]').count()) === 1 })())
     await sp.screenshot({ path: `${SHOTS}/us-sender-phone.png`, fullPage: true })
     check('no page errors (run 24, sender)', errors.length === 0, errors.join('; '))
     await sp.close()
@@ -3938,6 +3976,323 @@ const SECTION_ORDER = ['.hero', '.strip', '.philo', '#shape', '#angles', '#write
         await p.close()
       }
     }
+  }
+}
+
+// ---------- Run 28 (2026-11-14, gift ceremony phase 1): sealed with the cord + the opening label, press-and-hold untie / the Untie button / reduced motion, nothing auto-advances, the note, the music card, the stroke reveal (and the fade for a character with no stroke data), the answer (character / reply / both, once; none in a remembrance), the sender's states and the returned character in gold; phone screenshots in en and ja ----------
+{
+  const TOKEN = 'RG-testtesttesttesttest'
+  const ID = 'AN-testtesttesttesttest'
+  const year = new Date().getFullYear()
+  const V = {
+    ja: { language: 'ja', glyph: '備', reading: 'そな-える', romanization: 'sonaeru', meaning_en: 'to be ready', who: 'いつも、頼まれる前に備えている人。', film: { status: 'fallback', lines: ['「ちょうど今詰めてたところ」', 'いつも、頼まれる前に備えている人。'], pictures: ['/film/washi-1.webp', '/film/washi-2.webp'] }, certificate_line: 'この字は、あなたの目に映る、その人です。', poem: { type: 'tanka', lines: ['朝ごとに', '蓋の花添え', '備えたる', '母の背中を', '今も思へる'], reading: 'あさごとに' }, from: '山田 太郎', to: '山田 一郎', message: 'いつも、ありがとう。\n今年もよろしく。' },
+    en: { language: 'en', glyph: '燈', reading: 'あかり', romanization: 'akari', meaning_en: 'lamp', en: { word: 'hearth', word_source: 'lexicon', line: 'The light that is already on when everyone else wakes.', echo: null, classical: null }, who: 'Someone who kept the porch light on for me.', film: { status: 'fallback', lines: ['She left the porch light on.', 'I never mentioned it.'], pictures: ['/film/washi-1.webp', '/film/washi-2.webp'] }, certificate_line: 'This character is the person as seen through your eyes.', poem: { type: 'en', lines: ['Before the house wakes,', 'one lamp, left burning,', 'a quiet kind of care.'], reading: '' }, from: 'Emily', to: 'Margaret', message: 'Thank you for everything.\nSee you at Christmas.' },
+  }
+  const mk = (lang, over = {}) => ({ music: 'thanks', locked: false, id: TOKEN, token: TOKEN, memorial: false, egift: null, certificate_no: 12, order_date: `${year}-11-07`, opens_on: null, replied: false, package: 'egift', purpose: 'thanks', ...V[lang], ...over })
+  const lockedView = (lang, over = {}) => ({ locked: true, token: TOKEN, language: lang, memorial: false, from: V[lang].from, to: V[lang].to, opens_on: `${year}-12-25`, opens_at: `${year}-12-25T12:00:00.000Z`, opens_tz: 'America/New_York', days_left: 41, ...over })
+  const open = async (view, { reduced = false, locale = 'en-US', time = null } = {}) => {
+    const ctx = await browser.newContext({ locale, viewport: { width: 390, height: 844 }, reducedMotion: reduced ? 'reduce' : 'no-preference' })
+    const page = await ctx.newPage()
+    const errs = []
+    const seen = { reply: [], opened: 0, urls: [] }
+    page.on('pageerror', (e) => errs.push(String(e)))
+    page.on('request', (r) => seen.urls.push(r.url()))
+    await page.route('**/api/analytics', (r) => r.fulfill({ status: 204, body: '' }))
+    await page.route(`**/api/gift/${TOKEN}**`, async (r) => {
+      const u = new URL(r.request().url())
+      if (u.pathname === `/api/gift/${TOKEN}/reply`) { seen.reply.push(JSON.parse(r.request().postData() ?? '{}')); return r.fulfill({ json: { ok: true } }) }
+      if (u.pathname === `/api/gift/${TOKEN}/opened`) { seen.opened++; return r.fulfill({ json: { ok: true } }) }
+      if (u.pathname === `/api/gift/${TOKEN}/render`) return r.fulfill({ json: { state: 'ready', view } })
+      if (u.pathname === `/api/gift/${TOKEN}`) return r.fulfill({ json: view })
+      return r.continue()
+    })
+    if (time) await page.clock.install({ time: new Date(time) })
+    await page.goto(`http://localhost:5173/g/${TOKEN}`, { waitUntil: 'networkidle' })
+    return { page, ctx, errs, seen }
+  }
+  const T = (page, id) => page.locator(`[data-testid=${id}]`)
+  const step = (page) => page.locator('[data-testid=gift-page]').getAttribute('data-step')
+  const pause = async (page, path) => { await page.waitForTimeout(700); await page.screenshot({ path }).catch(() => {}) }
+  /** letter → (music card) → film end → reveal. Nothing moves on by itself, so each step is a tap. */
+  const toReveal = async (page) => {
+    await T(page, 'gift-to-film').click()
+    await toMusic(page)
+    await page.waitForSelector('[data-testid=film][data-ready=yes]', { timeout: 8000 })
+    await page.evaluate(() => window.__ichireiFilm.seek(window.__ichireiFilm.total))
+    await T(page, 'gift-skip').click({ timeout: 6000 })
+    await T(page, 'gift-reveal').waitFor({ timeout: 6000 })
+  }
+
+  for (const lang of ['en', 'ja']) {
+    const L = lang === 'en'
+    const loc = L ? 'en-US' : 'ja-JP'
+    const S = L
+      ? { label: 'Opens Dec 25, 7:00 a.m.', hint: 'Press and hold the knot to untie it', untie: 'Untie', music: 'This gift has music.', answer: 'Send something back', back: 'Give Emily a character back', sent: 'Sent to Emily.', landing: "Is there someone you've never quite said it to?", memLabel: 'Dec 25' }
+      : { label: '12月25日 午前7時に開きます', hint: '結び目を長押しして、ほどいてください', untie: 'ほどく', music: 'この贈りものには音楽があります。', answer: 'お返しをする', back: '山田 太郎さんに一字を返す', sent: '山田 太郎さんに届けました。', landing: 'まだ言えていない人が、いますか。', memLabel: '12月25日' }
+    const shots = `${SHOTS}/ceremony-${lang}`
+
+    // 1. sealed: the cord lies across the seal, the label and a quiet countdown; nothing to untie yet
+    {
+      const { page, ctx, errs } = await open(lockedView(lang), { locale: loc, time: `${year}-11-14T15:00:00Z` })
+      await T(page, 'gift-envelope').waitFor()
+      check(`ceremony (${lang}): sealed — the cord is across the seal, the label is "${S.label}", a countdown line, and no knot to hold nor Untie button`, (await T(page, 'gift-cord').count()) === 1 && (await T(page, 'gift-locked-date').innerText()) === S.label && (await T(page, 'gift-locked-note').count()) === 1 && (await T(page, 'gift-knot').count()) === 0 && (await T(page, 'gift-open').count()) === 0, await T(page, 'gift-locked-date').innerText())
+      check(`ceremony (${lang}): sealed — the cord is thin double gold (not the memorial grey)`, (await T(page, 'gift-cord').getAttribute('data-memorial')) === 'no')
+      await pause(page, `${shots}-1-sealed.png`)
+      check(`no page errors (run 28, ${lang} sealed)`, errs.length === 0, errs.join('; '))
+      await ctx.close()
+    }
+
+    // 2. untie by press and hold (full motion): a short press does nothing, a hold of about 1.2 s opens; then the letter with the note; nothing moves on by itself
+    {
+      const { page, ctx, errs, seen } = await open(mk(lang), { locale: loc })
+      await T(page, 'gift-envelope').waitFor()
+      check(`ceremony (${lang}): the hint "${S.hint}" and a visible "${S.untie}" button`, (await T(page, 'gift-untie-hint').innerText()) === S.hint && (await T(page, 'gift-open').innerText()) === S.untie)
+      const box = await T(page, 'gift-knot').boundingBox()
+      const cx = box.x + box.width / 2, cy = box.y + box.height / 2
+      await page.mouse.move(cx, cy)
+      await page.mouse.down()
+      await page.waitForTimeout(450)
+      await page.mouse.up()
+      await page.waitForTimeout(1400)
+      check(`ceremony (${lang}): letting go early does not untie it — still sealed`, (await T(page, 'gift-letter').count()) === 0 && (await T(page, 'gift-envelope').getAttribute('data-state')) === 'closed' && seen.opened === 0)
+      await page.mouse.move(cx, cy)
+      await page.mouse.down()
+      await page.waitForTimeout(500)
+      check(`ceremony (${lang}): while holding, the ring fills`, (await T(page, 'gift-knot').getAttribute('data-holding')) === 'yes')
+      await pause(page, `${shots}-2-holding.png`)
+      await page.waitForTimeout(900)
+      await page.mouse.up()
+      await T(page, 'gift-letter').waitFor({ timeout: 4000 })
+      check(`ceremony (${lang}): holding the knot for about 1.2 s unties it and opens the letter, and the opening is told to the server once`, (await step(page)) === 'letter' && seen.opened === 1)
+      const note = await T(page, 'gift-message').evaluate((el) => ({ text: el.innerText, font: getComputedStyle(el).fontFamily, ws: getComputedStyle(el).whiteSpace, italic: getComputedStyle(el).fontStyle }))
+      check(`ceremony (${lang}): the note keeps its line break and is set in ${L ? 'Cormorant Garamond italic' : 'Zen Old Mincho'}`, note.text.includes('\n') && /pre/.test(note.ws) && (L ? /Cormorant/.test(note.font) && note.italic === 'italic' : /Zen Old Mincho/.test(note.font)), JSON.stringify(note))
+      await pause(page, `${shots}-3-letter.png`)
+      await page.waitForTimeout(3500)
+      check(`ceremony (${lang}): nothing moves on by itself — after 3.5 s the letter is still the letter`, (await step(page)) === 'letter' && (await T(page, 'film').count()) === 0)
+      await T(page, 'gift-to-film').click()
+      await T(page, 'gift-music-card').waitFor()
+      check(`ceremony (${lang}): the music card says "${S.music}" and waits for a tap (no film yet, no sound)`, (await T(page, 'gift-music-line').innerText()) === S.music && (await step(page)) === 'music' && (await page.locator('[data-testid=film]').count()) === 0)
+      await pause(page, `${shots}-4-music.png`)
+      await page.waitForTimeout(2500)
+      check(`ceremony (${lang}): …and still waits after 2.5 s`, (await step(page)) === 'music')
+      await T(page, 'gift-music-go').click()
+      check(`ceremony (${lang}): the tap on the card asks for the sound (sessionStorage ichirei-film-sound = on)`, (await page.evaluate(() => sessionStorage.getItem('ichirei-film-sound'))) === 'on')
+      await page.waitForSelector('[data-testid=film][data-ready=yes]', { timeout: 8000 })
+      await page.evaluate(() => window.__ichireiFilm.seek(window.__ichireiFilm.total))
+      await T(page, 'gift-skip').waitFor({ timeout: 6000 })
+      await page.waitForTimeout(2500)
+      check(`ceremony (${lang}): the film ends and waits on its button — it does not move to the character by itself`, (await step(page)) === 'film')
+      await T(page, 'gift-skip').click()
+      // 3. the stroke reveal for a character with stroke data: written in strokes, then reading, word, line a beat apart, in 4–6 s
+      const t0 = Date.now()
+      await T(page, 'gift-reveal').waitFor()
+      await page.waitForFunction(() => document.querySelector('[data-testid=gift-glyph]')?.getAttribute('data-mode') !== 'loading', null, { timeout: 6000 })
+      const mode = await T(page, 'gift-glyph').getAttribute('data-mode')
+      const early = await T(page, 'gift-to-poem').isDisabled()
+      await page.waitForFunction(() => document.querySelector('[data-testid=gift-reveal]')?.getAttribute('data-beat') === '4', null, { timeout: 9000 })
+      const took = Date.now() - t0
+      check(`ceremony (${lang}): the reveal writes ${V[lang].glyph} in strokes (data-mode=strokes), the button waits until the end, and the whole reveal takes about 4–6 s`, mode === 'strokes' && early && took >= 3000 && took <= 7000, `${mode} ${early} ${took}`)
+      await pause(page, `${shots}-5-reveal.png`)
+      check(`ceremony (${lang}): the character stays readable as text (a hidden text copy) and is cinnabar`, (await T(page, 'gift-glyph').innerText()).includes(V[lang].glyph) && (await T(page, 'gift-glyph').evaluate((e) => getComputedStyle(e).color)) === 'rgb(192, 57, 43)')
+      await T(page, 'gift-to-poem').click()
+      await T(page, 'gift-to-cert').click({ timeout: 6000 })
+      await T(page, 'gift-to-keep').click()
+      await T(page, 'gift-to-answer').click()
+      await T(page, 'gift-answer').waitFor()
+      check(`ceremony (${lang}): the answer step — "${S.answer}", "${S.back}", twelve characters, the written reply`, (await T(page, 'gift-answer-title').innerText()) === S.answer && (await T(page, 'gift-chars-title').innerText()) === S.back && (await T(page, 'gift-chars').locator('button').count()) === 12 && (await T(page, 'gift-reply-text').count()) === 1, await T(page, 'gift-chars-title').innerText())
+      await pause(page, `${shots}-6-answer.png`)
+      // both at once, once only
+      await T(page, 'gift-char-謝').click()
+      await T(page, 'gift-reply-text').fill(L ? 'Thank you, Emily.\nSee you soon.' : 'ありがとう。\nまたね。')
+      await T(page, 'gift-reply-send').click()
+      await T(page, 'gift-reply-sent').waitFor()
+      check(`ceremony (${lang}): a character and a note sent together, once — "${S.sent}", then no box and no second send`, seen.reply.length === 1 && seen.reply[0].char === '謝' && seen.reply[0].text.includes('\n') && (await T(page, 'gift-reply-sent').innerText()) === S.sent && (await T(page, 'gift-reply-send').count()) === 0 && (await T(page, 'gift-chars').count()) === 0, JSON.stringify(seen.reply))
+      check(`ceremony (${lang}): then one quiet line to the landing in the receiver's language — "${S.landing}"`, (await T(page, 'gift-landing-line').innerText()) === S.landing && ((await T(page, 'gift-landing-line').locator('a').getAttribute('href')) ?? '').startsWith(L ? '/en' : '/'))
+      await pause(page, `${shots}-7-sent.png`)
+      check(`no page errors (run 28, ${lang} receiver path)`, errs.length === 0, errs.join('; '))
+      await ctx.close()
+    }
+
+    // 4. the Untie button, and a character only; a written reply only
+    {
+      const { page, ctx, seen } = await open(mk(lang), { locale: loc })
+      await T(page, 'gift-open').click()
+      await T(page, 'gift-letter').waitFor({ timeout: 4000 })
+      await toReveal(page)
+      await T(page, 'gift-to-poem').click({ timeout: 9000 })
+      await T(page, 'gift-to-cert').click()
+      await T(page, 'gift-to-keep').click()
+      await T(page, 'gift-to-answer').click()
+      await T(page, 'gift-char-心').click()
+      await T(page, 'gift-reply-send').click()
+      await T(page, 'gift-reply-sent').waitFor()
+      check(`ceremony (${lang}): the Untie button opens it; a character alone is sent (no text)`, seen.reply.length === 1 && seen.reply[0].char === '心' && !seen.reply[0].text)
+      await ctx.close()
+    }
+    {
+      const { page, ctx, seen } = await open(mk(lang), { locale: loc })
+      await T(page, 'gift-open').click()
+      await T(page, 'gift-letter').waitFor({ timeout: 4000 })
+      await toReveal(page)
+      await T(page, 'gift-to-poem').click({ timeout: 9000 })
+      await T(page, 'gift-to-cert').click()
+      await T(page, 'gift-to-keep').click()
+      await T(page, 'gift-to-answer').click()
+      await T(page, 'gift-reply-text').fill('Thanks')
+      await T(page, 'gift-reply-send').click()
+      await T(page, 'gift-reply-sent').waitFor()
+      check(`ceremony (${lang}): a written reply alone is sent (no character)`, seen.reply.length === 1 && seen.reply[0].text === 'Thanks' && !seen.reply[0].char)
+      await ctx.close()
+    }
+  }
+
+  // 5. reduced motion: the untie is a fade, the reveal does not animate strokes, and the whole path still completes
+  {
+    const { page, ctx, errs } = await open(mk('en'), { reduced: true })
+    await T(page, 'gift-envelope').waitFor()
+    check('ceremony (reduced motion): the envelope says data-motion=fade', (await T(page, 'gift-envelope').getAttribute('data-motion')) === 'fade')
+    await T(page, 'gift-open').click()
+    await T(page, 'gift-letter').waitFor({ timeout: 2500 })
+    await T(page, 'gift-to-film').click()
+    await toMusic(page)
+    await T(page, 'gift-skip').click({ timeout: 6000 })
+    await T(page, 'gift-reveal').waitFor({ timeout: 6000 })
+    const t0 = Date.now()
+    await page.waitForFunction(() => document.querySelector('[data-testid=gift-reveal]')?.getAttribute('data-beat') === '4', null, { timeout: 5000 })
+    check('ceremony (reduced motion): the reveal completes at once with no stroke animation (a soft fade, data-mode=fade) and the button follows', (await T(page, 'gift-glyph').getAttribute('data-mode')) === 'fade' && (await T(page, 'gift-glyph').getAttribute('data-motion')) === 'fade' && Date.now() - t0 < 2500)
+    check('no page errors (run 28, reduced motion)', errs.length === 0, errs.join('; '))
+    await ctx.close()
+  }
+
+  // 6. a character with no stroke data (a simplified form): a soft ink fade-in, not a failed drawing
+  {
+    const { page, ctx, errs } = await open(mk('ja', { glyph: '亲' }))
+    await T(page, 'gift-open').click()
+    await T(page, 'gift-letter').waitFor({ timeout: 4000 })
+    await toReveal(page)
+    await page.waitForFunction(() => document.querySelector('[data-testid=gift-glyph]')?.getAttribute('data-mode') !== 'loading', null, { timeout: 6000 })
+    check('ceremony: a character without stroke data (亲) fades in softly (data-mode=fade) and the reveal still completes', (await T(page, 'gift-glyph').getAttribute('data-mode')) === 'fade' && (await page.waitForFunction(() => document.querySelector('[data-testid=gift-reveal]')?.getAttribute('data-beat') === '4', null, { timeout: 9000 }).then(() => true)))
+    check('no page errors (run 28, fade fallback)', errs.length === 0, errs.join('; '))
+    await ctx.close()
+  }
+
+  // 7. remembrance: grey-beige paper, silver-grey cord, no countdown, no celebration words, no return character, no landing line — only the written reply
+  for (const lang of ['ja', 'en']) {
+    const loc = lang === 'en' ? 'en-US' : 'ja-JP'
+    {
+      const { page, ctx } = await open(lockedView(lang, { memorial: true }), { locale: loc, time: `${year}-11-14T15:00:00Z` })
+      await T(page, 'gift-envelope').waitFor()
+      check(`remembrance (${lang}): sealed — the silver-grey cord, the date only and no countdown`, (await T(page, 'gift-cord').getAttribute('data-memorial')) === 'yes' && (await T(page, 'gift-locked-date').count()) === 1 && (await T(page, 'gift-locked-note').count()) === 0)
+      await pause(page, `${SHOTS}/ceremony-memorial-${lang}-sealed.png`)
+      await ctx.close()
+    }
+    {
+      const { page, ctx, errs, seen } = await open(mk(lang, { memorial: true, purpose: 'memorial', message: '' }), { locale: loc })
+      await T(page, 'gift-open').click()
+      await T(page, 'gift-letter').waitFor({ timeout: 4000 })
+      await toReveal(page)
+      await page.waitForFunction(() => document.querySelector('[data-testid=gift-glyph]')?.getAttribute('data-mode') !== 'loading', null, { timeout: 6000 })
+      check(`remembrance (${lang}): the reveal writes the character in ink, never cinnabar`, (await T(page, 'gift-glyph').getAttribute('data-mode')) === 'strokes' && !/rgb\(192, 57, 43\)/.test(await T(page, 'gift-glyph').evaluate((e) => getComputedStyle(e).color)))
+      await pause(page, `${SHOTS}/ceremony-memorial-${lang}-reveal.png`)
+      await T(page, 'gift-to-poem').click({ timeout: 9000 })
+      await T(page, 'gift-to-cert').click()
+      await T(page, 'gift-to-keep').click()
+      await T(page, 'gift-to-answer').click()
+      check(`remembrance (${lang}): the answer step offers the written reply only — no return character, no landing line`, (await T(page, 'gift-chars').count()) === 0 && (await T(page, 'gift-reply-text').count()) === 1 && (await T(page, 'gift-landing-line').count()) === 0)
+      await pause(page, `${SHOTS}/ceremony-memorial-${lang}-answer.png`)
+      await T(page, 'gift-reply-text').fill('x')
+      await T(page, 'gift-reply-send').click()
+      await T(page, 'gift-reply-sent').waitFor()
+      check(`remembrance (${lang}): the reply is sent with no character, and still no landing line`, seen.reply.length === 1 && !seen.reply[0].char && (await T(page, 'gift-landing-line').count()) === 0)
+      check(`no page errors (run 28, remembrance ${lang})`, errs.length === 0, errs.join('; '))
+      await ctx.close()
+    }
+  }
+
+  // 8. the sender's page: Wrapped → Sent → Opened (with the time) → Answered, and the returned character in gold
+  for (const lang of ['en', 'ja']) {
+    const L = lang === 'en'
+    const base = { id: ID, language: lang, glyph: L ? '燈' : '備', reading: 'あかり', romanization: 'akari', meaning_en: 'lamp', ...(L ? { en: { word: 'hearth', word_source: 'lexicon', line: 'The light that is already on when everyone else wakes.', echo: null } } : {}), who: L ? 'Someone who kept the porch light on.' : 'いつも、頼まれる前に備えている人。', memorial: false, film: { status: 'fallback', lines: ['a', 'b'], pictures: ['/film/washi-1.webp', '/film/washi-2.webp'] } }
+    const gift = (states, reply = null) => ({ url: `https://ichirei.soul-id.jp/g/${TOKEN}`, size_code: 'ICHIREI-EGIFT', ship_to: 'none', egift_state: null, opens_on: `${year}-12-25`, opens_at: `${year}-12-25T12:12:00.000Z`, opens_tz: 'America/New_York', certificate_no: 12, reply, to: V[lang].to, states })
+    const want = L
+      ? { wrapped: 'Wrapped', sent: 'Sent', opened: 'Opened (Dec 25, 7:12 a.m.)', answered: 'Answered' }
+      : { wrapped: '包みました', sent: '送りました', opened: '開かれました（12月25日 午前7:12）', answered: 'お返しが届きました' }
+    const stages = [
+      ['wrapped', { shared_at: null, opened_at: null, answered_at: null }, null, ['wrapped']],
+      ['sent', { shared_at: `${year}-11-14T10:00:00Z`, opened_at: null, answered_at: null }, null, ['wrapped', 'sent']],
+      ['opened-no-share', { shared_at: null, opened_at: `${year}-12-25T12:12:00Z`, answered_at: null }, null, ['wrapped', 'opened']],
+      ['opened', { shared_at: `${year}-11-14T10:00:00Z`, opened_at: `${year}-12-25T12:12:00Z`, answered_at: null }, null, ['wrapped', 'sent', 'opened']],
+      ['answered', { shared_at: `${year}-11-14T10:00:00Z`, opened_at: `${year}-12-25T12:12:00Z`, answered_at: `${year}-12-25T13:00:00Z` }, { text: L ? 'Thank you.\nWe loved it.' : 'ありがとう。\nうれしかった。', at: `${year}-12-25T13:00:00Z`, char: '謝' }, ['wrapped', 'sent', 'opened', 'answered']],
+    ]
+    for (const [name, states, reply, ids] of stages) {
+      const ctx = await browser.newContext({ locale: L ? 'en-US' : 'ja-JP', viewport: { width: 390, height: 844 } })
+      const sp = await ctx.newPage()
+      const errs = []
+      sp.on('pageerror', (e) => errs.push(String(e)))
+      await sp.route('**/api/analytics', (r) => r.fulfill({ status: 204, body: '' }))
+      await sp.route(`**/api/animation/${ID}`, (r) => r.fulfill({ json: { ...base, gift: gift(states, reply) } }))
+      await sp.goto(`http://localhost:5173/a/${ID}`, { waitUntil: 'networkidle' })
+      await sp.locator('[data-testid=gift-states]').waitFor()
+      const ol = await sp.locator('[data-testid=gift-states] li').allInnerTexts()
+      check(`sender (${lang}, ${name}): the lines read ${ids.join(' → ')} — "${ids.map((i) => want[i]).join('", "')}"`, JSON.stringify(ol.map((x) => x.trim())) === JSON.stringify(ids.map((i) => want[i])), JSON.stringify(ol))
+      if (name === 'answered') {
+        await sp.locator('[data-testid=sender-answer-glyph]').waitFor({ timeout: 5000 })
+        const g = await sp.locator('[data-testid=sender-answer-glyph] [data-mode]').first()
+        await sp.waitForFunction(() => document.querySelector('[data-testid=sender-answer-glyph] [data-mode]')?.getAttribute('data-mode') !== 'loading', null, { timeout: 6000 })
+        const colour = await sp.locator('[data-testid=sender-answer-glyph]').evaluate((e) => getComputedStyle(e.firstElementChild).color)
+        check(`sender (${lang}): the returned character 謝 is written in gold, its word is shown (${await sp.locator('[data-testid=sender-answer-word]').innerText()}), and the written reply keeps its line break`, (await g.getAttribute('data-mode')) === 'strokes' && /201, 169, 110/.test(colour) && (await sp.locator('[data-testid=sender-answer-word]').innerText()) === (L ? 'The character that came back: thankful' : '返ってきた一字：ありがとう') && (await sp.locator('[data-testid=sender-reply]').innerText()).includes('\n'), colour)
+        await sp.waitForTimeout(900)
+        await sp.screenshot({ path: `${SHOTS}/ceremony-${lang}-sender-answered.png`, fullPage: true })
+      }
+      if (name === 'wrapped' || name === 'opened') { await sp.waitForTimeout(500); await sp.screenshot({ path: `${SHOTS}/ceremony-${lang}-sender-${name}.png`, fullPage: true }) }
+      check(`no page errors (run 28, sender ${lang} ${name})`, errs.length === 0, errs.join('; '))
+      await ctx.close()
+    }
+  }
+
+  // 9. the sender chooses Christmas morning (December): the four choices, the label with the zone, the saved moment and the calendar
+  for (const lang of ['en', 'ja']) {
+    const L = lang === 'en'
+    const ctx = await browser.newContext({ locale: L ? 'en-US' : 'ja-JP', viewport: { width: 390, height: 844 } })
+    const sp = await ctx.newPage()
+    const errs = []
+    const seen = { schedule: [], shared: 0 }
+    sp.on('pageerror', (e) => errs.push(String(e)))
+    await sp.route('**/api/analytics', (r) => r.fulfill({ status: 204, body: '' }))
+    await sp.route(`**/api/animation/${ID}/shared`, (r) => { seen.shared++; return r.fulfill({ json: { ok: true } }) })
+    await sp.route(`**/api/animation/${ID}/schedule`, async (r) => { const b = JSON.parse(r.request().postData() ?? '{}'); seen.schedule.push(b); await r.fulfill({ json: { ok: true, opens_on: b.open_date, opens_at: b.open_date ? `${b.open_date}T12:00:00.000Z` : null, opens_tz: b.open_date ? b.open_tz : null } }) })
+    await sp.route(`**/api/animation/${ID}`, (r) => r.fulfill({ json: { id: ID, language: lang, glyph: L ? '燈' : '備', reading: 'あかり', romanization: 'akari', meaning_en: 'lamp', ...(L ? { en: { word: 'hearth', word_source: 'lexicon', line: 'The light that is already on when everyone else wakes.', echo: null } } : {}), who: 'x', memorial: false, film: { status: 'fallback', lines: ['a', 'b'], pictures: ['/film/washi-1.webp'] }, gift: { url: `https://ichirei.soul-id.jp/g/${TOKEN}`, size_code: 'ICHIREI-EGIFT', ship_to: 'none', egift_state: null, opens_on: null, certificate_no: 12, reply: null, to: V[lang].to, states: { shared_at: null, opened_at: null, answered_at: null } } } }))
+    await sp.clock.install({ time: new Date('2026-12-05T15:00:00Z') })
+    await sp.goto(`http://localhost:5173/a/${ID}`, { waitUntil: 'networkidle' })
+    const panel = sp.locator('[data-testid=sender-panel]')
+    await panel.waitFor()
+    await panel.locator('[data-testid=give-schedule]').click()
+    const labels = (await panel.locator('.by-choice label').allInnerTexts()).map((t) => t.trim())
+    const wantChoices = L ? ['Now', 'Christmas morning (Dec 25, 7:00 a.m.)', 'Pick a date and time'] : ['すぐに開ける', 'クリスマスの朝（12月25日 午前7時）', '日時を選ぶ']
+    check(`sender (${lang}, Dec 5): the choices are ${wantChoices.join(' / ')}${L ? ' — no Thanksgiving after Nov 26' : ''}`, JSON.stringify(labels) === JSON.stringify(wantChoices), JSON.stringify(labels))
+    await panel.locator('[data-testid=choice-christmas]').check()
+    await panel.locator('[data-testid=schedule-zone]').selectOption({ index: 0 }).catch(() => {})
+    const lab = (await panel.locator('[data-testid=schedule-label]').innerText()).trim()
+    check(`sender (${lang}): under the choice the label names the moment and the zone ("${lab}")`, L ? /^Opens Dec 25, 7:00 a\.m\. \(.+\)$/.test(lab) : /^12月25日 午前7時（.+）に開きます$/.test(lab), lab)
+    await panel.locator('[data-testid=schedule-save]').click()
+    await panel.locator('[data-testid=schedule-saved]').waitFor()
+    check(`sender (${lang}): Christmas morning is saved as the date with its zone and 07:00`, seen.schedule.length === 1 && seen.schedule[0].open_date === `${2026}-12-25` && seen.schedule[0].open_time === '07:00' && typeof seen.schedule[0].open_tz === 'string', JSON.stringify(seen.schedule))
+    await panel.locator('[data-testid=calendar-add]').click()
+    const gh = await panel.locator('[data-testid=calendar-google]').getAttribute('href')
+    const u = new URL(gh)
+    const title = u.searchParams.get('text')
+    const details = u.searchParams.get('details') ?? ''
+    check(`sender (${lang}): the calendar title is "${L ? 'Give Margaret their ICHIREI' : '山田 一郎に一字礼を贈る'}", the time is the opening moment (15 minutes) and the description holds the two links and no character`, title === (L ? 'Give Margaret their ICHIREI' : '山田 一郎に一字礼を贈る') && /^20261225T\d{6}Z\/20261225T\d{6}Z$/.test(u.searchParams.get('dates') ?? '') && details.includes(`/g/${TOKEN}`) && details.includes(`/a/${ID}`) && !/[燈備]/.test(details), `${title} ${u.searchParams.get('dates')} ${details}`)
+    await sp.locator('[data-testid=calendar-ics]').scrollIntoViewIfNeeded()
+    await sp.waitForTimeout(500)
+    await sp.screenshot({ path: `${SHOTS}/ceremony-${lang}-sender-christmas.png`, fullPage: true })
+    // using copy marks the gift as "sent"
+    await sp.context().grantPermissions(['clipboard-read', 'clipboard-write']).catch(() => {})
+    await panel.locator('[data-testid=give-copy]').click().catch(() => {})
+    await sp.waitForTimeout(400)
+    check(`sender (${lang}): using "copy link" tells the server the gift was sent (shared)`, seen.shared === 1, String(seen.shared))
+    check(`no page errors (run 28, sender ${lang} schedule)`, errs.length === 0, errs.join('; '))
+    await ctx.close()
   }
 }
 

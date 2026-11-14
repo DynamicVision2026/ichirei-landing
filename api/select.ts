@@ -14,6 +14,7 @@
 //   {"type":"error","error":"<message>","code"?:"model_timeout","seconds"?:<n>}  ...terminal
 
 import { maxRoundsOf } from '../engine/limits.ts'
+import { claimRound } from '../engine/rounds.ts'
 import { runEngine } from '../engine/engine.ts'
 import { ModelTimeoutError, callTimeoutMs } from '../engine/limits.ts'
 import { cleanSession, cleanSource, recordEvent, shownEvent } from '../engine/analytics.ts'
@@ -101,6 +102,12 @@ export async function POST(req: Request): Promise<Response> {
     })
   }
 
+  // The rounds are counted by the server (gift ceremony ticket, part 0): round 1 hands out a signed ticket, a later round must present it, and round MAX + 1 is refused whatever the page says.
+  const round_ticket_in = (body as { round_ticket?: unknown }).round_ticket
+  const claim = await claimRound(createOrderStore(), round_ticket_in, ex.retry, maxRoundsOf(process.env))
+  if (!claim.ok) return jsonResponse(400, { error: claim.code === 'retry_limit' ? (NO_MORE_ROUNDS[parsed.context.language] ?? NO_MORE_ROUNDS.en) : 'The round ticket is not valid', code: claim.code })
+  const serverRetry = claim.round - 1
+
   let wantsDebug = false
   try {
     wantsDebug = new URL(req.url, 'http://localhost').searchParams.get('debug') === '1'
@@ -123,7 +130,7 @@ export async function POST(req: Request): Promise<Response> {
           context: parsed.context,
           promptQuestion: promptQuestion?.text ?? null,
           exclude: ex.exclude,
-          round: ex.retry + 1,
+          round: serverRetry + 1,
           followUpsUsed: fu.followUps.length,
           onStage: (stage) => send({ type: 'stage', stage }),
           onUsage: (stage, usage) => cost.add(stage, usage),
@@ -149,8 +156,9 @@ export async function POST(req: Request): Promise<Response> {
         // Learning loop: codes and booleans only, tied to a random browser session id (engine/analytics.ts). Never awaited.
         const sessionId = cleanSession(session)
         if (sessionId) void recordEvent(shownEvent(result, sessionId, cleanSource(source), new Date(), Date.now() - t0))
-        send({ type: 'result', result, ...(wantsDebug && debug ? { debug } : {}) })
+        send({ type: 'result', result, round_ticket: claim.ticket, ...(wantsDebug && debug ? { debug } : {}) })
       } catch (err) {
+        void claim.release() // the engine broke: this round is given back
         const message = err instanceof Error ? err.message : String(err)
         send({ type: 'error', error: `Engine failed: ${message}`, ...(err instanceof ModelTimeoutError ? { code: 'model_timeout', seconds: Math.round(callTimeoutMs() / 1000) } : {}) })
       } finally {

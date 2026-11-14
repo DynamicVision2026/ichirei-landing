@@ -1,10 +1,11 @@
-// The picture a link shows when it is shared (Open Graph, 1200 × 630): a sealed washi envelope with 「○○へ」 and the gold 一字礼 seal on the dark ground.
+// The picture a link shows when it is shared (Open Graph, 1200 × 630): a sealed washi envelope with 「○○へ」, the gold 一字礼 seal and the mizuhiki cord tied across it (2026-11-14), on the dark ground.
 // NEVER the character, the film or anything else of the gift — the character is the surprise. Text is drawn as outlines from our own font files (no system
 // fonts on Cloud Run), the PNG is made once per gift (and again only if the names change) and kept in the private bucket; the server hands it out.
 
 import sharp from 'sharp'
 import { fontObject, fontsFor } from './fonts.ts'
 import { textPaths, textWidth } from './text.ts'
+import { cordSvg } from '../../src/order/mizuhiki.ts'
 
 export const OG_WIDTH = 1200
 export const OG_HEIGHT = 630
@@ -62,6 +63,7 @@ export async function makeOgImage(input: OgInput, env: NodeJS.ProcessEnv = proce
 ${t1.svg}${t2.svg}
 <circle cx="${tipX}" cy="${tipY}" r="48" fill="url(#seal)"/>
 ${sealGlyph.svg}
+${cordSvg(tipX, tipY, W / 200, input.memorial)}
 ${brand.svg}
 </svg>`
   return sharp(Buffer.from(svg)).png({ compressionLevel: 9 }).toBuffer()

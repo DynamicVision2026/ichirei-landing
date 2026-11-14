@@ -8,6 +8,7 @@
 // Possession of the link is the only access control, as for the sender's page. Never cached by shared caches, never indexed.
 
 import { DEFAULT_ZONE, isValidZone, openingInstant, todayIn } from '../src/order/opens-at.ts'
+import { pickTarget } from '../src/order/opening-choices.ts'
 import { isQuietPurpose } from '../src/order/purpose.ts'
 import QRCode from 'qrcode'
 import { ANIMATION_ID_PATTERN, isAnimationRecord, type AnimationRecord } from '../engine/animation.ts'
@@ -377,6 +378,7 @@ export function createGiftHandlers(deps: () => GiftDeps) {
       { const gate = await gateOf(f.gift, d); if (gate === 'cancelled') return gone(f.gift); if (gate === 'pending') return notCollected() }
       const raw = (body as { open_date?: unknown } | null)?.open_date
       const rawTz = (body as { open_tz?: unknown } | null)?.open_tz
+      const rawTime = (body as { open_time?: unknown } | null)?.open_time
       const now = d.now?.() ?? new Date()
       let opens: string | null = null
       let opensAt: string | null = null
@@ -388,8 +390,10 @@ export function createGiftHandlers(deps: () => GiftDeps) {
         const tz = typeof rawTz === 'string' && rawTz !== '' ? rawTz : DEFAULT_ZONE
         const today = todayIn(tz, now)
         const last = todayIn(tz, new Date(now.getTime() + OPEN_DATE_MAX_DAYS * 86_400_000))
-        const at = openingInstant(raw, tz)
-        if (raw < today || raw > last || !at) return json(400, { error: 'open_date is out of range' }, noStore)
+        // a time of day (HH:MM, 2026-11-14: "Thanksgiving dinner", "Pick a date and time"); none = 7:00 a.m.
+        if (rawTime !== undefined && rawTime !== null && rawTime !== '' && (typeof rawTime !== 'string' || !/^([01]\d|2[0-3]):[0-5]\d$/.test(rawTime))) return json(400, { error: 'open_time must be HH:MM' }, noStore)
+        const at = typeof rawTime === 'string' && rawTime !== '' ? pickTarget(raw, rawTime, tz)?.instant ?? null : openingInstant(raw, tz)
+        if (raw < today || raw > last || !at || at.getTime() <= now.getTime() - 60_000) return json(400, { error: 'open_date is out of range' }, noStore)
         opens = raw
         opensAt = at.toISOString()
         opensTz = tz
@@ -506,15 +510,48 @@ export function createGiftHandlers(deps: () => GiftDeps) {
       { const gate = await gateOf(r.gift, d); if (gate === 'cancelled') return gone(r.gift); if (gate === 'pending') return notCollected() }
       if (closed(r.gift, d, null)) return json(403, { error: 'locked' }, { 'cache-control': 'no-store' })
       if (r.gift.reply) return json(409, { error: 'The reply has already been sent', code: 'already_replied' }, noStore)
-      const checked = checkReply(body)
+      const checked = checkReply(body, r.gift.memorial)
       if (!checked.ok) return json(400, { error: checked.error }, noStore)
       const now = d.now?.() ?? new Date()
       try {
-        await d.store!.put(token, { ...r.gift, reply: { text: checked.text, at: now.toISOString() } })
+        await d.store!.put(token, { ...r.gift, reply: { text: checked.text, at: now.toISOString(), ...(checked.char ? { char: checked.char } : {}) }, answered_at: now.toISOString() })
       } catch {
         return json(503, { error: 'unavailable' }, { 'cache-control': 'no-store' })
       }
-      console.log(`[ichirei-gift] reply_sent ${JSON.stringify({ token_prefix: token.slice(0, 5) })}`) // no text
+      console.log(`[ichirei-gift] reply_sent ${JSON.stringify({ token_prefix: token.slice(0, 5), text: !!checked.text, char: !!checked.char })}`) // no text, no character
+      return json(200, { ok: true }, noStore)
+    },
+
+    /** The receiver untied the envelope (2026-11-14): the first time is kept as `opened_at` for the sender's page. Nothing else is recorded; a sender's own preview never calls this. */
+    async opened(token: string): Promise<Response> {
+      const d = deps()
+      const r = await loadGift(token, d)
+      if (r.status !== 200) return json(r.status, { error: r.status === 404 ? 'not_found' : 'unavailable' }, { 'cache-control': 'no-store' })
+      { const gate = await gateOf(r.gift, d); if (gate === 'cancelled') return gone(r.gift); if (gate === 'pending') return notCollected() }
+      if (closed(r.gift, d, null)) return json(403, { error: 'locked' }, { 'cache-control': 'no-store' })
+      if (!r.gift.opened_at) {
+        try {
+          await d.store!.put(token, { ...r.gift, opened_at: (d.now?.() ?? new Date()).toISOString() })
+        } catch {
+          return json(503, { error: 'unavailable' }, { 'cache-control': 'no-store' })
+        }
+      }
+      return json(200, { ok: true }, noStore)
+    },
+
+    /** The sender used a copy or share button (2026-11-14): the first time is kept as `shared_at` (the sender's page shows "Sent"). */
+    async sharedBySender(animationId: string): Promise<Response> {
+      const d = deps()
+      const f = await bySender(animationId, d)
+      if (f instanceof Response) return f
+      { const gate = await gateOf(f.gift, d); if (gate === 'cancelled') return gone(f.gift); if (gate === 'pending') return notCollected() }
+      if (!f.gift.shared_at) {
+        try {
+          await d.store!.put(f.gift.token, { ...f.gift, shared_at: (d.now?.() ?? new Date()).toISOString() })
+        } catch {
+          return json(503, { error: 'unavailable' }, { 'cache-control': 'no-store' })
+        }
+      }
       return json(200, { ok: true }, noStore)
     },
 

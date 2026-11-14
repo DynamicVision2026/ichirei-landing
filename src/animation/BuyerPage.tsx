@@ -7,6 +7,13 @@ import type { AnimationView } from './types.ts'
 import Keepsakes from '../gift/Keepsakes.tsx'
 import ShareSection from '../gift/ShareSection.tsx'
 import Schedule from './Schedule.tsx'
+import Cord from '../gift/Cord.tsx'
+import StrokeGlyph from '../gift/StrokeGlyph.tsx'
+import { CEREMONY_COPY, stateTime } from './ceremony-copy.ts'
+import { returnWord } from '../order/return-chars.ts'
+import { isQuietPurpose } from '../order/purpose.ts'
+import { browserZone } from '../order/opens-at.ts'
+import '../gift/ceremony.css'
 import { SENDER_COPY } from './sender-copy.ts'
 import { openingLabelFromRecord } from '../order/opens-at.ts'
 
@@ -72,7 +79,10 @@ export default function BuyerPage({ view, lang, preparing, onCollected }: { view
   const token = g.url.split('/g/')[1] ?? ''
   const size = SKU_SIZE[g.size_code] ?? 'egift'
   const message = `${view.memorial ? s.sentLineMemorial : s.sentLine}\n${g.url}`
+  // the first copy or share is kept as `shared_at` (the states line shows "Sent"); a failed call changes nothing
+  const markShared = () => { try { void fetch(`/api/animation/${view.id}/shared`, { method: 'POST', keepalive: true }).catch(() => {}) } catch { /* the page works without it */ } }
   const copyLink = async () => {
+    markShared()
     try {
       await navigator.clipboard.writeText(g.url)
       setCopied(true)
@@ -154,22 +164,22 @@ export default function BuyerPage({ view, lang, preparing, onCollected }: { view
           <>
             <p className="an-buttons" data-testid="en-share-sheet">
               <button type="button" className="an-btn an-btn-hot" data-testid="give-copy" onClick={copyLink}>{copied ? s.copied : 'Copy link'}</button>
-              <a className="an-btn" data-testid="give-mail" href={`mailto:?subject=${encodeURIComponent(s.mailSubject)}&body=${encodeURIComponent(message)}`}>Email</a>
-              <a className="an-btn" data-testid="give-whatsapp" href={`https://wa.me/?text=${encodeURIComponent(message)}`} target="_blank" rel="noopener noreferrer">WhatsApp</a>
-              <a className="an-btn" data-testid="give-messages" href={`sms:?&body=${encodeURIComponent(message)}`}>Messages</a>
+              <a className="an-btn" data-testid="give-mail" onClick={markShared} href={`mailto:?subject=${encodeURIComponent(s.mailSubject)}&body=${encodeURIComponent(message)}`}>Email</a>
+              <a className="an-btn" data-testid="give-whatsapp" onClick={markShared} href={`https://wa.me/?text=${encodeURIComponent(message)}`} target="_blank" rel="noopener noreferrer">WhatsApp</a>
+              <a className="an-btn" data-testid="give-messages" onClick={markShared} href={`sms:?&body=${encodeURIComponent(message)}`}>Messages</a>
             </p>
-            <Schedule animationId={view.id} opensOn={g.opens_on} opensAt={g.opens_at} opensTz={g.opens_tz} />
           </>
         ) : (
         <p className="an-buttons">
-          <a className="an-btn an-btn-hot" data-testid="give-line" href={`https://line.me/R/share?text=${encodeURIComponent(message)}`} target="_blank" rel="noopener noreferrer">{s.line}</a>
-          <a className="an-btn" data-testid="give-whatsapp" href={`https://wa.me/?text=${encodeURIComponent(message)}`} target="_blank" rel="noopener noreferrer">{s.whatsapp}</a>
-          <button type="button" className="an-btn" data-testid="give-wechat" onClick={() => setWechat((v) => !v)} aria-expanded={wechat}>{s.wechat}</button>
+          <a className="an-btn an-btn-hot" data-testid="give-line" onClick={markShared} href={`https://line.me/R/share?text=${encodeURIComponent(message)}`} target="_blank" rel="noopener noreferrer">{s.line}</a>
+          <a className="an-btn" data-testid="give-whatsapp" onClick={markShared} href={`https://wa.me/?text=${encodeURIComponent(message)}`} target="_blank" rel="noopener noreferrer">{s.whatsapp}</a>
+          <button type="button" className="an-btn" data-testid="give-wechat" onClick={() => { markShared(); setWechat((v) => !v) }} aria-expanded={wechat}>{s.wechat}</button>
           <button type="button" className="an-btn" data-testid="give-copy" onClick={copyLink}>{copied ? s.copied : s.copyLink}</button>
-          <button type="button" className="an-btn" data-testid="give-qr" onClick={() => setQr((v) => !v)} aria-expanded={qr}>{s.qr}</button>
-          <a className="an-btn" data-testid="give-mail" href={`mailto:?subject=${encodeURIComponent(s.mailSubject)}&body=${encodeURIComponent(message)}`}>{s.email}</a>
+          <button type="button" className="an-btn" data-testid="give-qr" onClick={() => { markShared(); setQr((v) => !v) }} aria-expanded={qr}>{s.qr}</button>
+          <a className="an-btn" data-testid="give-mail" onClick={markShared} href={`mailto:?subject=${encodeURIComponent(s.mailSubject)}&body=${encodeURIComponent(message)}`}>{s.email}</a>
         </p>
         )}
+        <Schedule animationId={view.id} lang={lang} quiet={quiet || isQuietPurpose(view.purpose)} to={g.to ?? ''} giftUrl={g.url} opensOn={g.opens_on} opensAt={g.opens_at} opensTz={g.opens_tz} />
         <label className="an-field">
           <span>{s.linkLabel}</span>
           <input readOnly value={g.url} onFocus={(e) => e.currentTarget.select()} data-testid="give-link" />
@@ -191,10 +201,12 @@ export default function BuyerPage({ view, lang, preparing, onCollected }: { view
         <p className="an-buttons" data-testid="give-preview">
           <a className="an-btn" href={`${g.url}?preview=${view.id}`} target="_blank" rel="noopener noreferrer">{c.preview}</a>
         </p>
+        <GiftStates lang={lang} states={g.states ?? null} tz={g.opens_tz || browserZone()} />
         {g.reply && (
           <>
             <h3>{s.replyTitle}</h3>
-            <p className="an-reply" data-testid="sender-reply">{g.reply.text}</p>
+            {g.reply.char && <AnsweredChar lang={lang} char={g.reply.char} />}
+            {g.reply.text && <p className="an-reply" data-testid="sender-reply">{g.reply.text}</p>}
           </>
         )}
       </section>
@@ -239,6 +251,42 @@ export default function BuyerPage({ view, lang, preparing, onCollected }: { view
           {!collected && until && <p data-testid="buyer-deadline" data-until={until}>{c.changeUntil(deadlineText(lang, until))}</p>}
           {view.support_email && <p className="by-support" data-testid="buyer-support">{view.support_email}</p>}
         </section>
+      )}
+    </div>
+  )
+}
+
+/** The gift's states (2026-11-14, part 7): a quiet line of what has happened — wrapped, sent, opened (when), answered. "Sent" only when the sender used a copy or share button; if they never did the line goes straight to Opened. */
+function GiftStates({ lang, states, tz }: { lang: PageLang; states: { shared_at: string | null; opened_at: string | null; answered_at: string | null } | null; tz: string }) {
+  const c = CEREMONY_COPY[lang]
+  const items: { id: string; text: string }[] = [{ id: 'wrapped', text: c.wrapped }]
+  if (states?.shared_at) items.push({ id: 'sent', text: c.sent })
+  if (states?.opened_at) items.push({ id: 'opened', text: c.opened(stateTime(lang, states.opened_at, tz)) })
+  if (states?.answered_at) items.push({ id: 'answered', text: c.answered })
+  return (
+    <ol className="by-states" data-testid="gift-states" data-state={items.at(-1)?.id}>
+      {items.map((i) => <li key={i.id} data-done="yes" data-testid={`state-${i.id}`}>{i.text}</li>)}
+    </ol>
+  )
+}
+
+/** The character the receiver gave back: a small sealed envelope, its cord comes undone, then the character is written in gold, stroke by stroke. */
+function AnsweredChar({ lang, char }: { lang: PageLang; char: string }) {
+  const c = CEREMONY_COPY[lang]
+  const reduced = typeof window !== 'undefined' && (window.matchMedia?.('(prefers-reduced-motion: reduce)').matches ?? false)
+  const [untied, setUntied] = useState(false)
+  useEffect(() => {
+    const id = window.setTimeout(() => setUntied(true), reduced ? 200 : 900)
+    return () => window.clearTimeout(id)
+  }, [reduced])
+  return (
+    <div className="by-answer" data-testid="sender-answer-char" data-char={char} data-untied={untied ? 'yes' : 'no'}>
+      {!untied && <div className="by-mini-env gf-env" data-motion={reduced ? 'fade' : 'full'}><Cord memorial={false} state="tied" /></div>}
+      {untied && (
+        <>
+          <span className="by-answer-char" data-testid="sender-answer-glyph"><StrokeGlyph char={char} color="#c9a96e" reduced={reduced} /></span>
+          <p className="by-answer-word" data-testid="sender-answer-word">{c.answerChar(returnWord(char, lang))}</p>
+        </>
       )}
     </div>
   )

@@ -295,11 +295,12 @@ export function parseOrderRequest(body: unknown, now: Date = new Date(), palette
     return fail('package', `Invalid "package": expected one of ${PACKAGES.join(' | ')}`)
   }
 
-  // The message (optional, every size): shown in the letter the receiver opens, at most 60 characters. It is printed on the card only when the gift goes to the receiver.
+  // The message (optional, every size): shown in the letter the receiver opens, at most 200 characters, line breaks kept. It is printed on the card only when the gift goes to the receiver.
   let gift_message = ''
   if (body.gift_message !== undefined && body.gift_message !== null) {
     if (typeof body.gift_message !== 'string') return fail('gift_message', '"gift_message" must be text')
-    const flat = body.gift_message.replace(/\p{Cc}+/gu, ' ').replace(/\s+/g, ' ').trim()
+    // the sender's own words, as written (2026-11-14): line breaks are kept (never more than one empty line), other control characters and runs of spaces are not
+    const flat = body.gift_message.replace(/\r\n?/g, '\n').replace(/[^\P{Cc}\n]+/gu, ' ').replace(/[ \t]+/g, ' ').replace(/ ?\n ?/g, '\n').replace(/\n{3,}/g, '\n\n').trim()
     if (countChars(flat) > GIFT_MESSAGE_MAX) return fail('gift_message', `"gift_message" is longer than ${GIFT_MESSAGE_MAX} characters`)
     gift_message = flat
   }

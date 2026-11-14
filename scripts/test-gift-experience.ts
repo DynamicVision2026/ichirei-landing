@@ -94,9 +94,9 @@ check('(4) the sender\'s page knows the opening date, the number and (so far) no
   const r1 = await day.reply(g2.token, { text: 'ありがとう。\n大切にします。' })
   check('(5) the first reply is kept', r1.status === 200)
   const r2 = await day.reply(g2.token, { text: 'もう一度' })
-  check('(5) a second reply is refused (409), the first one stays', r2.status === 409 && ((await mem.get(g2.token)) as GiftRecord).reply?.text === 'ありがとう。 大切にします。')
+  check('(5) a second reply is refused (409), the first one stays', r2.status === 409 && ((await mem.get(g2.token)) as GiftRecord).reply?.text === 'ありがとう。\n大切にします。')
   const s2 = (await (await createAnimationHandlers(() => ({ store: mem, now: () => NOW })).view(((await mem.get(rec2.gift_token)) as GiftRecord).animation_id)).json()) as { gift?: { reply: { text: string } | null } }
-  check('(5) the sender\'s page shows it', s2.gift?.reply?.text === 'ありがとう。 大切にします。')
+  check('(5) the sender\'s page shows it', s2.gift?.reply?.text === 'ありがとう。\n大切にします。')
   const v = JSON.parse(await (await day.view(g2.token)).text())
   check('(5) the receiver\'s page only knows THAT a reply was sent (never the text of anyone else\'s page)', v.replied === true)
 }

@@ -44,7 +44,7 @@ export function ogMeta(g: GiftRecord, env: NodeJS.ProcessEnv = process.env, now:
 
 /** The object name of this gift's picture: it changes when the names or the language do, so a corrected name gets a new picture. */
 export const ogKey = (g: Pick<GiftRecord, 'token' | 'to' | 'from' | 'memorial' | 'language'>): string =>
-  `og/${g.token}.${createHash('sha1').update(`${g.to}|${g.from}|${g.memorial ? 1 : 0}|${g.language}`).digest('hex').slice(0, 8)}.png`
+  `og/${g.token}.${createHash('sha1').update(`cord1|${g.to}|${g.from}|${g.memorial ? 1 : 0}|${g.language}`).digest('hex').slice(0, 8)}.png`
 export const ogPath = (g: GiftRecord): string => `/api/gift/${g.token}/og.png?v=${ogKey(g).split('.')[1]}`
 
 const esc = (s: string): string => s.replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
