@@ -38,11 +38,11 @@ export const usd = (n: number): string => (Number.isInteger(n) ? `$${n}` : `$${n
 export const usdCode = (n: number): string => `US${usd(n)}`
 
 const MONTH = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December']
-/** "Thanksgiving launch price, through November 30. $25 from December 1." — `until` is the sale's last day (YYYY-MM-DD). */
+/** "Thanksgiving launch price, through November 30 (US Eastern time). $25 from December 1." — `until` is the sale's last day (YYYY-MM-DD). */
 export function usdLaunchLine(price: UsdPrice, until: string): string {
   const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(until)
   if (!m) return ''
   const last = new Date(Date.UTC(Number(m[1]), Number(m[2]) - 1, Number(m[3])))
   const next = new Date(last.getTime() + 86_400_000)
-  return `Thanksgiving launch price, through ${MONTH[last.getUTCMonth()]} ${last.getUTCDate()}. ${usd(price.egift)} from ${MONTH[next.getUTCMonth()]} ${next.getUTCDate()}.`
+  return `Thanksgiving launch price, through ${MONTH[last.getUTCMonth()]} ${last.getUTCDate()} (US Eastern time). ${usd(price.egift)} from ${MONTH[next.getUTCMonth()]} ${next.getUTCDate()}.`
 }

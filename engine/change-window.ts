@@ -15,7 +15,7 @@ export const WINDOW_MS = 24 * 3_600_000
 export type WindowPhase = 'open' | 'closed' | 'cancelled' | 'unpaid'
 export interface WindowInfo {
   phase: WindowPhase
-  /** When the payment went through (or, when Shopify could not be asked, when the order was made — then `verified` is false). */
+  /** When the payment went through (or, when Shopify could not be asked, the payment time seen earlier — then `verified` is false). */
   paid_at: string | null
   ends_at: string | null
   /** Whole hours left while the window is open (rounded up), else null. */
@@ -25,14 +25,20 @@ export interface WindowInfo {
 
 /**
  * `pay`: what Shopify said about this order — a PaymentInfo; `null` = Shopify answered but has no such order (never paid, or older than the app can see);
- * `'unverified'` = Shopify could not be asked (the order's own time is used, and the page says so).
+ * `'unverified'` = Shopify could not be asked (an order whose payment was seen before keeps its seen time; any other is "unpaid" — it is never treated as paid).
  */
 export function windowOf(rec: OrderRecord | null, pay: PaymentInfo | null | 'unverified', now: Date): WindowInfo {
   const none = (phase: WindowPhase, verified = true): WindowInfo => ({ phase, paid_at: null, ends_at: null, hours_left: null, verified })
   if (rec?.ops?.cancelled_at) return none('cancelled')
   // an order that was paid without going through our site and later claimed (2026-11-13): Shopify's own record has no order reference to find, and the 24 hours count from the CLAIM
   if (rec?.claim) return span(rec.claim.claimed_at, now, true)
-  if (pay === 'unverified') return span(rec?.created_at ?? null, now, false)
+  // Shopify could not be asked: only an order whose payment was SEEN before counts (2026-11-14); never one that merely exists
+  if (pay === 'unverified') {
+    if (rec?.paid_seen_at) return span(rec.paid_at_seen ?? rec.paid_seen_at, now, false)
+    // an order collected before this rule existed was collected after a payment check: it keeps working as it did
+    if (rec?.collected_at) return span(rec.created_at, now, false)
+    return none('unpaid', false)
+  }
   if (pay === null) return none('unpaid')
   if (pay.state === 'cancelled' || pay.state === 'refunded') return none('cancelled')
   if (pay.state === 'unpaid') return none('unpaid')

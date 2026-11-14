@@ -9,6 +9,7 @@ import sharp from 'sharp'
 import type { AnimationRecord } from '../animation.ts'
 import { filmUsable } from '../animation.ts'
 import { picturePath, type ArtRecord } from '../film-art.ts'
+import { resolveSlots, type ArtSlot } from '../film-pictures.ts'
 import { giftUrl, type GiftRecord } from '../gift.ts'
 import type { OrderStore } from '../order-store.ts'
 
@@ -49,17 +50,25 @@ export async function loadArtwork(store: OrderStore, gift: GiftRecord, anim: Ani
   const film = filmUsable(anim.film) ? anim.film : null
   const lines = film ? film.lines : []
   const pictures: (Buffer | null)[] = []
-  for (let i = 0; i < lines.length; i++) {
-    if (art?.slots[i] !== 'ai') {
-      pictures.push(null)
-      continue
-    }
+  // 2026-11-14: a slot that failed for good (or is still pending) shows the nearest PASSED picture of the same story, never the plain tile; with no passed picture at all every entry is null
+  // (the card then leaves the pictures block out and the film stays its text-and-character version)
+  const res = resolveSlots((art?.slots ?? []) as ArtSlot[], { settle: true })
+  const cache = new Map<number, Buffer | null>()
+  const jpegOf = async (j: number): Promise<Buffer | null> => {
+    if (cache.has(j)) return cache.get(j)!
+    let out: Buffer | null = null
     try {
-      const webp = await store.getObject(picturePath(anim.id, i + 1))
-      pictures.push(webp ? await sharp(webp).jpeg({ quality: 92 }).toBuffer() : null)
+      const webp = await store.getObject(picturePath(anim.id, j + 1))
+      out = webp ? await sharp(webp).jpeg({ quality: 92 }).toBuffer() : null
     } catch {
-      pictures.push(null)
+      out = null
     }
+    cache.set(j, out)
+    return out
+  }
+  for (let i = 0; i < lines.length; i++) {
+    const j = res.source[i] ?? null
+    pictures.push(j === null ? null : await jpegOf(j))
   }
   // the printed card of a wooden size has blank lines (the sender hands it over and may write them); the e-gift's home-print card carries the names
   const blank = gift.package !== 'egift' && (gift.ship_to === 'me' || gift.ship_to === 'none')

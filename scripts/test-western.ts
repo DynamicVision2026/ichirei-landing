@@ -3,10 +3,10 @@
 //
 //   node --experimental-strip-types --disable-warning=ExperimentalWarning scripts/test-western.ts
 
+import { fakePicture } from './_fake-picture.mjs'
 import { readFileSync } from 'node:fs'
-import sharp from 'sharp'
 import { SAMPLE_IDS, SAMPLE_RECORDS } from '../engine/animation.ts'
-import { IMAGE_STYLE, IMAGE_STYLE_EN, IMAGE_STYLE_MEMORIAL, buildCheckPrompt, buildImagePrompt, buildRewritePrompt, ensureArt, type ImageClient } from '../engine/film-art.ts'
+import { IMAGE_STYLE, IMAGE_STYLE_EN, IMAGE_STYLE_MEMORIAL, buildCheckPrompt, buildImagePrompt, ANGLE_TEXT, buildRewritePrompt, ensureArt, type ImageClient } from '../engine/film-art.ts'
 import { MemoryOrderStore } from '../engine/order-store.ts'
 import { buildFilmPrompt, lineLimitText, loadFilmPrompt, loadScenePrompt, type FilmInput } from '../engine/film.ts'
 import { western } from '../engine/film-western.ts'
@@ -72,13 +72,13 @@ const DESC = "a mother's hand placing one flower on a bento box, soft morning wi
   check('(3) the script prompt file itself is untouched (ja / zh readers see exactly the file)', loadFilmPrompt().includes('en → a neutral modern home.') && !loadFilmPrompt().includes('Western'))
   check('(3) the scene-rewrite prompt for en carries the Western-setting rule; for ja / zh it is the file, filled in, with nothing added', loadScenePrompt().length > 0 && western('script scenes').startsWith('ENGLISH FILMS: the buyer\'s world is the United States or Europe.') && !loadScenePrompt().includes('ENGLISH FILMS'))
   const rw = (lang: string) => buildRewritePrompt(DESC, 'setting', false, lang as never)
-  const oldRw = (lang: string) => read('film-picture-rewrite-prompt.md').replace(/\{\{ (REASON|LANGUAGE|MEMORIAL|DESCRIPTION|FEEDBACK) \}\}/g, (m) => ({ REASON: 'setting', LANGUAGE: lang, MEMORIAL: '', DESCRIPTION: DESC, FEEDBACK: '' } as Record<string, string>)[m.slice(3, -3).trim()])
+  const oldRw = (lang: string) => read('film-picture-rewrite-prompt.md').replace(/\{\{ (REASON|LANGUAGE|MEMORIAL|DESCRIPTION|ANGLE|FEEDBACK) \}\}/g, (m) => ({ REASON: 'setting', LANGUAGE: lang, MEMORIAL: '', DESCRIPTION: DESC, ANGLE: [ANGLE_TEXT.place, lang === 'en' ? 'State the Western home or street explicitly (for example a porch, a kitchen, a suburban street with parked cars) and, if a figure appears, name their hair colour (for example brown hair, grey hair, blond hair).' : ''].filter(Boolean).join('\n'), FEEDBACK: '' } as Record<string, string>)[m.slice(3, -3).trim()])
   check('(3) the picture-rewrite prompt: byte for byte today\'s for ja / zh; for en "neutral modern" becomes contemporary American or European, in Western terms', LANGS.every((l) => rw(l) === oldRw(l)) && rw('en').includes('en → contemporary American or European, in Western terms') && !rw('en').includes('neutral modern'))
 }
 
 // ---- the whole drawing step: the language reaches the image prompt, the check and the retry --------------------------------------------------------------------------------
 {
-  const PNG = await sharp({ create: { width: 400, height: 500, channels: 3, background: '#d8d0bc' } }).png().toBuffer()
+  const PNG = await fakePicture(400, 500)
   const FILM = SAMPLE_RECORDS[SAMPLE_IDS.ja].film!
   const run = async (language: 'en' | 'ja', id: string) => {
     const prompts: string[] = []

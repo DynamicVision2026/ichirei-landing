@@ -57,7 +57,7 @@ export interface StoryReport {
   error?: string
   ms: number
   /** the cards that stood: their slot and character — nothing else */
-  cards: { slot: string; kanji: string }[]
+  cards: { slot: string; kanji?: string }[]
   checks: {
     receiver: boolean
     facts: boolean
@@ -93,6 +93,8 @@ export interface SelftestReport {
   month_to_date_usd?: number
   summary: { stories: number; passed: number; failed: number; errors: number }
   stories: StoryReport[]
+  /** The daily picture probe (B7): what became of each of the four slots of one fixed internal film, drawn through the real path. Codes only; absent when no probe ran in this report. */
+  picture_probe?: { day: string; ran: boolean; skipped?: string; slots: string[]; reasons: string[]; ms: number }
 }
 
 // ---- the stories --------------------------------------------------------------------------------------------------------------------------------------
@@ -393,6 +395,7 @@ export function publicReport(r: SelftestReport): SelftestReport {
     ...(r.warm ? { warm: { id: code(r.warm.id), ms: Number(r.warm.ms) || 0 } } : {}),
     ...(r.month_to_date_usd !== undefined ? { month_to_date_usd: Math.round((Number(r.month_to_date_usd) || 0) * 100) / 100 } : {}),
     summary: { stories: r.summary.stories, passed: r.summary.passed, failed: r.summary.failed, errors: r.summary.errors },
+    ...(r.picture_probe ? { picture_probe: { day: code(r.picture_probe.day), ran: !!r.picture_probe.ran, ...(r.picture_probe.skipped ? { skipped: code(r.picture_probe.skipped) } : {}), slots: r.picture_probe.slots.map(code), reasons: r.picture_probe.reasons.map(code), ms: Number(r.picture_probe.ms) || 0 } } : {}),
     stories: r.stories.map((s) => ({
       id: code(s.id),
       purpose: code(s.purpose),
@@ -401,7 +404,7 @@ export function publicReport(r: SelftestReport): SelftestReport {
       status: s.status,
       ...(s.error ? { error: code(s.error) } : {}),
       ms: Number(s.ms) || 0,
-      cards: s.cards.map((c) => ({ slot: code(c.slot), kanji: [...String(c.kanji)].slice(0, 2).join('') })),
+      cards: s.cards.map((c) => ({ slot: code(c.slot) })), // codes only: the test characters are not published (2026-11-14)
       checks: {
         receiver: !!s.checks.receiver,
         facts: !!s.checks.facts,

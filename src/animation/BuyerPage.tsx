@@ -8,6 +8,7 @@ import Keepsakes from '../gift/Keepsakes.tsx'
 import ShareSection from '../gift/ShareSection.tsx'
 import Schedule from './Schedule.tsx'
 import { SENDER_COPY } from './sender-copy.ts'
+import { openingLabelFromRecord } from '../order/opens-at.ts'
 
 // The buyer's own page /a/<id> (2026-11-06): opened from the one link in the confirmation e-mail. The person who pays is the only person we deal with. Top to bottom:
 //   A welcome (the character, its reading, the 「どんな人か」 line, one small order line) · B send the gift (LINE, WhatsApp, WeChat QR, copy, e-mail; the preview) ·
@@ -24,7 +25,7 @@ function readingOf(view: AnimationView): string {
 
 /** The film is complete (a washi slot is allowed): its video and its card can be made. */
 const filmComplete = (v: AnimationView): boolean => !!v.film && v.film.status === 'ready' && !v.film.incomplete && !!v.film.pictures && !v.film.deferred
-const scrollAvailable = (v: AnimationView): boolean => !!v.film && v.film.status === 'ready' && !v.film.incomplete && !!v.film.pictures && v.film.pictures.length === 4 && v.film.pictures.every((u) => !u.startsWith('/film/washi-'))
+const scrollAvailable = (v: AnimationView): boolean => !!v.film && v.film.status === 'ready' && !v.film.incomplete && !!v.film.pictures && v.film.pictures.length === 4 && v.film.pictures.every((u) => !u.startsWith('/film/washi-')) && !v.film.substituted?.length && !v.film.no_pictures
 
 export default function BuyerPage({ view, lang, preparing, onCollected }: { view: AnimationView; lang: PageLang; preparing: string; onCollected: () => void }) {
   const c = BUYER_COPY[lang]
@@ -41,6 +42,31 @@ export default function BuyerPage({ view, lang, preparing, onCollected }: { view
     const t = window.setInterval(() => setNow(Date.now()), 20_000)
     return () => window.clearInterval(t)
   }, [])
+  const o = view.order ?? null
+  // the payment has not been seen yet: nothing is shown that unlocks (2026-11-14); the page looks again by itself
+  if (o?.confirming)
+    return (
+      <div className="by-page" data-testid="buyer-page" data-state="confirming">
+        <section className="an-panel by-confirming" data-testid="buyer-confirming" role="status">
+          <p>{c.confirmingPayment}</p>
+        </section>
+      </div>
+    )
+  // the paid gift is not complete yet (B4): "finishing" instead of the collect button; the 24-hour cancellation line stays
+  if (o?.finishing && !o.collected)
+    return (
+      <div className="by-page" data-testid="buyer-page" data-state="finishing">
+        <section className="an-panel by-finishing" data-testid="buyer-finishing" role="status">
+          <p>{c.finishingGift}</p>
+        </section>
+        {(o.change_until || view.support_email) && (
+          <section className="an-panel by-help" data-testid="buyer-help">
+            {o.change_until && Date.parse(o.change_until) > Date.now() && <p data-testid="buyer-deadline" data-until={o.change_until}>{c.changeUntil(deadlineText(lang, o.change_until))}</p>}
+            {view.support_email && <p className="by-support" data-testid="buyer-support">{view.support_email}</p>}
+          </section>
+        )}
+      </div>
+    )
   if (!g) return null
   const quiet = inkOnly(view)
   const token = g.url.split('/g/')[1] ?? ''
@@ -55,7 +81,6 @@ export default function BuyerPage({ view, lang, preparing, onCollected }: { view
       // the link is shown as selectable text too
     }
   }
-  const o = view.order ?? null
   const until = o?.change_until && Date.parse(o.change_until) > now ? o.change_until : null
   const wood = o?.wood ?? null
   // before the buyer presses 「贈りものを受け取る」 nothing can be sent or saved; a view with no order data (an older record) is treated as collected
@@ -133,7 +158,7 @@ export default function BuyerPage({ view, lang, preparing, onCollected }: { view
               <a className="an-btn" data-testid="give-whatsapp" href={`https://wa.me/?text=${encodeURIComponent(message)}`} target="_blank" rel="noopener noreferrer">WhatsApp</a>
               <a className="an-btn" data-testid="give-messages" href={`sms:?&body=${encodeURIComponent(message)}`}>Messages</a>
             </p>
-            <Schedule animationId={view.id} opensOn={g.opens_on} />
+            <Schedule animationId={view.id} opensOn={g.opens_on} opensAt={g.opens_at} opensTz={g.opens_tz} />
           </>
         ) : (
         <p className="an-buttons">
@@ -162,7 +187,7 @@ export default function BuyerPage({ view, lang, preparing, onCollected }: { view
             )}
           </p>
         )}
-        {g.opens_on && <p className="by-opens" data-testid="status-opens">{c.opensOn(dayText(lang, g.opens_on))}</p>}
+        {g.opens_on && <p className="by-opens" data-testid="status-opens">{openingLabelFromRecord(lang, g.opens_at, g.opens_tz) ?? c.opensOn(dayText(lang, g.opens_on))}</p>}
         <p className="an-buttons" data-testid="give-preview">
           <a className="an-btn" href={`${g.url}?preview=${view.id}`} target="_blank" rel="noopener noreferrer">{c.preview}</a>
         </p>

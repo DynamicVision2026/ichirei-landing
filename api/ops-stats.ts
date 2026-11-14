@@ -8,6 +8,9 @@
 //   GET /ops/stats        the page (HTML with its numbers embedded)
 //   GET /ops/stats.json   the same numbers as JSON (for tests and for the page's own refresh)
 
+import { readHealth } from '../engine/health.ts'
+import { needsAttention } from '../engine/gift-check.ts'
+import { paidSeen } from '../engine/paid-seen.ts'
 import { analyticsDay, tokenHash, type AnalyticsEvent } from '../engine/analytics.ts'
 import { readJsonl, type OrderIndexEntry } from '../engine/egift-ops.ts'
 import { createOrderStore, type OrderStore } from '../engine/order-store.ts'
@@ -89,6 +92,9 @@ export interface StatsPayload {
   orders: Omit<OrderStat, 'session'>[]
   free: Awaited<ReturnType<typeof readFreeSourceCounts>> | null
   main: Awaited<ReturnType<typeof readMainCounts>> | null
+  /** codes-only counters per day and the orders whose gift is incomplete (2026-11-14, B6) */
+  health: Awaited<ReturnType<typeof readHealth>> | null
+  attention: { count: number }
   /** false when Shopify could not be asked about payments */
   verified: boolean
   now: string
@@ -134,7 +140,16 @@ export async function buildStats(d: OpsDeps, store: OrderStore, env: NodeJS.Proc
     .map(({ session: _s, ...rest }) => rest)
   const free = await readFreeSourceCounts(store, daysBack(now, 30)).catch(() => null)
   const main = await readMainCounts(store, daysBack(now, 30)).catch(() => null)
-  return { stats, orders: latest, free, main, verified, now: now.toISOString() }
+  const health = await readHealth(store, daysBack(now, 30)).catch(() => null)
+  // paid gifts that are not complete 12 hours after payment (or whose 5 tries are used up): counted in red at the top
+  let attention = 0
+  for (let i = 0; i < entries.length; i++) {
+    const r = records[i]
+    if (!r || r.collected_at || r.ops?.cancelled_at || !paidSeen(r)) continue
+    if (r.gift_check?.attention) attention++
+    else if (r.gift_check && r.gift_check.missing.length > 0 && needsAttention(r, { complete: false, missing: r.gift_check.missing as never }, now)) attention++
+  }
+  return { stats, orders: latest, free, main, health, attention: { count: attention }, verified, now: now.toISOString() }
 }
 
 const jsonForScript = (v: unknown): string => JSON.stringify(v).replace(/</g, '\\u003c').replace(/>/g, '\\u003e').replace(/&/g, '\\u0026').replace(/\u2028/g, '\\u2028').replace(/\u2029/g, '\\u2029')
@@ -154,7 +169,7 @@ td.n,th.n{text-align:right;font-variant-numeric:tabular-nums}.k{font-size:1.2rem
 .bar{display:grid;grid-template-columns:minmax(8rem,14rem) 1fr auto;gap:.6rem;align-items:center;margin:.25rem 0;font-size:.9rem}.bar i{display:block;height:1.05rem;background:var(--bar);border-radius:2px;min-width:2px}.bar em{font-style:normal;color:var(--soft);font-variant-numeric:tabular-nums;white-space:nowrap}
 .days{display:flex;align-items:flex-end;gap:2px;height:150px;background:var(--card);border:1px solid var(--line);padding:.5rem .5rem .2rem;overflow-x:auto}.days div{flex:1 0 12px;max-width:64px;display:flex;flex-direction:column;justify-content:flex-end;align-items:center;height:100%;font-size:.65rem;color:var(--soft)}.days i{display:block;width:100%;background:var(--bar);min-height:1px}.days b{font-weight:400;color:var(--bar2)}
 .two{display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:1rem}.note{color:var(--soft);font-size:.85rem}.warn{background:#fff;border:1px solid var(--line);padding:.4rem .8rem}
-a{color:var(--ink)}tr.cancel td{color:var(--soft);background:#f4efe3}
+a{color:var(--ink)}tr.cancel td{color:var(--soft);background:#f4efe3}.alert{background:#fdeceb;border:2px solid #c0392b;color:#8e1f14;padding:.6rem .9rem;border-radius:6px;font-weight:600}tr.red td{background:#fdeceb;color:#8e1f14;font-weight:600}
 @media(max-width:560px){.bar{grid-template-columns:1fr auto}.bar i{grid-column:1/-1;order:3}header{padding:.7rem 1rem}main{padding:0 1rem 3rem}}`
 
 export function createStatsHandlers(deps: () => OpsDeps) {

@@ -297,9 +297,16 @@ export function createOpsHandlers(deps: () => OpsDeps) {
       const readyRows = rows.filter((r) => ready(r) && isCardSize(r))
       const openRows = rows.filter((r) => r.win.phase === 'open')
       const otherRows = rows.filter((r) => r.win.phase === 'cancelled' || r.win.phase === 'unpaid' || (ready(r) && !isCardSize(r)))
+      // 要確認（赤）: 贈りものが未完成のまま、5回の自動やり直しを使い切った、または入金から12時間たった注文。欠けているものはコードだけ。
+      const attentionRows = rows.filter((r) => !!r.record && !r.record.collected_at && r.win.phase !== 'cancelled' && !!r.record.gift_check && r.record.gift_check.missing.length > 0 && !!r.record.gift_check.attention)
+      const attentionBlock = attentionRows.length === 0 ? '' :
+        `<section data-testid="needs-attention" style="background:#fdeceb;border:2px solid #c0392b;padding:.6rem 1rem;margin:0 0 1rem"><h2 style="color:#8e1f14;margin:.2rem 0">⚠ 要確認（needs_attention）${attentionRows.length}件</h2><p class="note">贈りものが未完成のままです。24時間以内なら、お客様へ手動で返金できます。欠けているもの：character＝字・読み・一行、poem＝詩、pictures＝絵、film＝フィルム台本、certificate＝証書番号。</p><ul>${
+          attentionRows.map((r) => `<li data-ref="${esc(r.entry.order_ref)}"><a href="#o-${esc(r.entry.order_ref)}">${esc(r.entry.order_ref)}</a> — ${esc((r.record!.gift_check!.missing ?? []).join(', '))}（試行 ${r.record!.gift_check!.tries}/5）</li>`).join('')
+        }</ul></section>`
       const html = `<!doctype html><html lang="ja"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="robots" content="noindex,nofollow"><title>ICHIREI ops</title>` +
         `<style>body{font:15px/1.6 system-ui,'Hiragino Sans',sans-serif;margin:1.2rem;color:#2a221b;background:#efe6d2}table{border-collapse:collapse;width:100%;background:#fff}th,td{border:1px solid #d7ccb4;padding:.35rem .5rem;text-align:left;white-space:nowrap}.wide{overflow-x:auto}a,button{color:#2a221b}button{cursor:pointer}h1,h2{font-weight:600}.bar a,.bar button{margin-right:.8rem}tr.inwindow td{color:#8a8070;background:#f4efe3}tr.inwindow summary{cursor:pointer;color:#2a221b}.chg{white-space:normal;min-width:30rem;color:#2a221b}.chg p{margin:.4rem 0}.note{background:#fff;border:1px solid #d7ccb4;padding:.5rem .8rem}.log{font-size:.85rem}</style></head><body>` +
         `<h1>ICHIREI 注文</h1>` +
+        attentionBlock +
         `<p class="note">お支払い完了から24時間は「キャンセル受付中」です。この間に製作は始めません。24時間が過ぎてキャンセルのないものだけが、下のPDFと木札・版木CSVに入ります。お支払い後の内容の変更（字・歌・お名前・メッセージ）は行いません。お客様が「贈りものを受け取る」を押した後（受け取り：済）は、キャンセルできません。期限内に受信したキャンセルのメールは、24時間を過ぎても対応できます（その場合は「キャンセルとして記録」を押してください）。</p>` +
         `${verified ? '' : '<p class="note">⚠ Shopifyから入金を確認できませんでした。いまは注文を作成した時刻から24時間で数えています（入金が確認できていない注文も含まれます）。</p>'}` +
         `<p class="bar"><a href="/ops/stats">数字（ダッシュボード）</a><a href="/ops/cards/today.pdf">製作に進めるカードをまとめてPDF</a><a href="/ops/wooden-today.csv">製作に進める木札・版木 CSV</a><button id="egift-run">eギフトの確認を今すぐ実行</button></p>` +

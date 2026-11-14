@@ -2,7 +2,7 @@
 //   node --experimental-strip-types --disable-warning=ExperimentalWarning scripts/test-usd-checkout.ts
 //
 //   1. an English order's cart names the United States (buyerIdentity countryCode US); ja / zh carts name nobody; a cart priced in another currency is logged and still returned
-//   2. the sale dates: SALE_FROM 2026-11-15, SALE_UNTIL 2026-11-30 (ja / zh), SALE_UNTIL_EN 2026-12-01T13:59+09:00 (English), 30%
+//   2. the sale dates: SALE_FROM 2026-11-15, SALE_UNTIL 2026-11-30 (ja / zh), SALE_UNTIL_EN 2026-12-01T13:59:59+09:00 (English), 30%
 //   3. the prices on the English pages: $25, sale $17.50 (cents allowed), never a struck price; the launch line; the legal notice
 //   4. a paid USD order (presentment USD 17.50, shop money in yen, SKU ICHIREI-EGIFT) goes through the webhook, /claim, the gift and /ops/stats with no special path — revenue adds the YEN
 
@@ -58,7 +58,7 @@ const fake = (currency: string | null, sent: CartBody[] = []) =>
   console.warn = (...a: unknown[]) => { warned.push(a.join(' ')) }
   try {
     const mism = await createCart(cfg, 'egift', [], 'IC-6', fake('JPY'), 'en')
-    check('(1) an English cart that Shopify prices in yen is logged as en_cart_currency_mismatch — and the checkout is still returned', mism.checkoutUrl.startsWith('https://') && mism.currency === 'JPY' && warned.length === 1 && warned[0].includes('en_cart_currency_mismatch') && warned[0].includes('IC-6'))
+    check('(1) an English cart that Shopify prices in yen is made ONCE more (same buyer identity); if it is still not USD it is logged as en_cart_currency_mismatch, flagged `mismatch` for the red /ops/stats count — and the checkout is still returned', mism.checkoutUrl.startsWith('https://') && mism.currency === 'JPY' && mism.mismatch === true && warned.length === 2 && warned[0].includes('en_cart_currency_retry') && warned[1].includes('en_cart_currency_mismatch') && warned[1].includes('IC-6'))
     warned.length = 0
     await createCart(cfg, 'egift', [], 'IC-7', fake('USD'), 'en')
     await createCart(cfg, 'egift', [], 'IC-8', fake('JPY'), 'ja')
@@ -81,17 +81,17 @@ const fake = (currency: string | null, sent: CartBody[] = []) =>
 // ---- 2. the sale dates ----------------------------------------------------------------------------------------------------------------------------------------
 {
   const y = readFileSync('cloudbuild.yaml', 'utf8')
-  check('(2) cloudbuild defaults: 30 %, SALE_FROM 2026-11-15, SALE_UNTIL 2026-11-30, SALE_UNTIL_EN 2026-12-01T13:59+09:00, USD sale price 17.50 — all passed to the service', /_SALE_PERCENT: '30'/.test(y) && /_SALE_FROM: '2026-11-15'/.test(y) && /_SALE_UNTIL: '2026-11-30'/.test(y) && /_SALE_UNTIL_EN: '2026-12-01T13:59\+09:00'/.test(y) && /_USD_PRICE_EGIFT: '25'/.test(y) && /_USD_PRICE_EGIFT_SALE: '17\.50'/.test(y) && y.includes('SALE_UNTIL_EN=${_SALE_UNTIL_EN}') && y.includes('SALE_FROM=${_SALE_FROM}'))
-  const s = parseSale('30', '2026-11-30', NOW, '2026-11-15', '2026-12-01T13:59+09:00')!
-  check('(2) the Japanese / Chinese window is 15 Nov 00:00 JST to 30 Nov 23:59:59 JST; the English one ends at 2026-12-01 13:59 JST', s.starts_at === '2026-11-14T15:00:00.000Z' && s.ends_at === '2026-11-30T14:59:59.999Z' && s.en_ends_at === '2026-12-01T04:59:00.000Z')
+  check('(2) cloudbuild defaults: 30 %, SALE_FROM 2026-11-15, SALE_UNTIL 2026-11-30, SALE_UNTIL_EN 2026-12-01T13:59:59+09:00, USD sale price 17.50 — all passed to the service', /_SALE_PERCENT: '30'/.test(y) && /_SALE_FROM: '2026-11-15'/.test(y) && /_SALE_UNTIL: '2026-11-30'/.test(y) && /_SALE_UNTIL_EN: '2026-12-01T13:59:59\+09:00'/.test(y) && /_USD_PRICE_EGIFT: '25'/.test(y) && /_USD_PRICE_EGIFT_SALE: '17\.50'/.test(y) && y.includes('SALE_UNTIL_EN=${_SALE_UNTIL_EN}') && y.includes('SALE_FROM=${_SALE_FROM}'))
+  const s = parseSale('30', '2026-11-30', NOW, '2026-11-15', '2026-12-01T13:59:59+09:00')!
+  check('(2) the Japanese / Chinese window is 15 Nov 00:00 JST to 30 Nov 23:59:59 JST; the English one ends at 2026-12-01 13:59:59 JST', s.starts_at === '2026-11-14T15:00:00.000Z' && s.ends_at === '2026-11-30T14:59:59.999Z' && s.en_ends_at === '2026-12-01T04:59:59.000Z')
   const at = (iso: string) => new Date(iso)
   check('(2) at 2026-12-01 00:30 JST the ja / zh sale is over and the English one is still on; at 14:00 JST both are over', saleOn(s, at('2026-11-30T15:30:00Z'), 'ja') === null && saleOn(s, at('2026-11-30T15:30:00Z'), 'zh-Hant') === null && saleOn(s, at('2026-11-30T15:30:00Z'), 'en') !== null && saleOn(s, at('2026-12-01T05:00:00Z'), 'en') === null)
   check('(2) before 15 Nov 00:00 JST nothing shows in any language', saleOn(s, at('2026-11-14T14:59:00Z'), 'en') === null && saleOn(s, at('2026-11-14T14:59:00Z'), 'ja') === null && saleOn(s, at('2026-11-14T15:00:00Z'), 'ja') !== null)
   const noEn = parseSale('30', '2026-11-30', NOW, '2026-11-15')!
   check('(2) without SALE_UNTIL_EN (or with an unreadable one) English follows SALE_UNTIL', noEn.en_ends_at === undefined && parseSale('30', '2026-11-30', NOW, '2026-11-15', 'tomorrow')!.en_ends_at === undefined && saleOn(noEn, at('2026-11-30T15:30:00Z'), 'en') === null)
-  const sizes = await jsonOf(sizesResponse({ SHOPIFY_STOREFRONT_TOKEN: 't', SHOPIFY_VARIANT_EGIFT: '1', SALE_PERCENT: '30', SALE_FROM: '2026-11-15', SALE_UNTIL: '2026-11-30', SALE_UNTIL_EN: '2026-12-01T13:59+09:00' } as NodeJS.ProcessEnv, NOW))
+  const sizes = await jsonOf(sizesResponse({ SHOPIFY_STOREFRONT_TOKEN: 't', SHOPIFY_VARIANT_EGIFT: '1', SALE_PERCENT: '30', SALE_FROM: '2026-11-15', SALE_UNTIL: '2026-11-30', SALE_UNTIL_EN: '2026-12-01T13:59:59+09:00' } as NodeJS.ProcessEnv, NOW))
   const cs = cleanSale(sizes)
-  check('(2) /api/sizes carries the English end (sale.en_ends_at) and the page keeps it; after 14:00 JST on 1 Dec the sale is gone from the answer', (sizes.sale as { en_ends_at?: string }).en_ends_at === '2026-12-01T04:59:00.000Z' && cs?.en_ends_at === '2026-12-01T04:59:00.000Z' && !('sale' in (await jsonOf(sizesResponse({ SHOPIFY_STOREFRONT_TOKEN: 't', SALE_PERCENT: '30', SALE_UNTIL: '2026-11-30', SALE_UNTIL_EN: '2026-12-01T13:59+09:00' } as NodeJS.ProcessEnv, new Date('2026-12-01T05:00:00Z'))))))
+  check('(2) /api/sizes carries the English end (sale.en_ends_at) and the page keeps it; after 14:00 JST on 1 Dec the sale is gone from the answer', (sizes.sale as { en_ends_at?: string }).en_ends_at === '2026-12-01T04:59:59.000Z' && cs?.en_ends_at === '2026-12-01T04:59:59.000Z' && !('sale' in (await jsonOf(sizesResponse({ SHOPIFY_STOREFRONT_TOKEN: 't', SALE_PERCENT: '30', SALE_UNTIL: '2026-11-30', SALE_UNTIL_EN: '2026-12-01T13:59:59+09:00' } as NodeJS.ProcessEnv, new Date('2026-12-01T05:00:00Z'))))))
 }
 
 // ---- 3. the English prices -------------------------------------------------------------------------------------------------------------------------------------
@@ -99,7 +99,7 @@ const fake = (currency: string | null, sent: CartBody[] = []) =>
   check('(3) defaults: $25, sale $17.50 (= $25 minus 30 %, to the cent)', DEFAULT_USD_PRICE.egift === 25 && DEFAULT_USD_PRICE.egift_sale === 17.5 && parseUsdPrice('25', '', 30).egift_sale === 17.5)
   check('(3) USD_PRICE_EGIFT_SALE accepts cents: "17.50", "17.5", "$17.50"; three decimals or text fall back', parseUsdPrice('25', '17.50').egift_sale === 17.5 && parseUsdPrice('25', '17.5').egift_sale === 17.5 && parseUsdPrice('25', '$17.50').egift_sale === 17.5 && parseUsdPrice('25', '17.555', 30).egift_sale === 17.5 && parseUsdPrice('25', 'x').egift_sale === 17.5)
   check('(3) whole dollars have no decimals ($25), anything else has two ($17.50, $12.30)', usd(25) === '$25' && usd(17.5) === '$17.50' && usd(12.3) === '$12.30' && usd(18) === '$18')
-  check('(3) the launch line: "Thanksgiving launch price, through November 30. $25 from December 1."', usdLaunchLine(DEFAULT_USD_PRICE, '2026-11-30') === 'Thanksgiving launch price, through November 30. $25 from December 1.' && usdLaunchLine({ egift: 30, egift_sale: 21 }, '2026-12-31') === 'Thanksgiving launch price, through December 31. $30 from January 1.')
+  check('(3) the launch line: "Thanksgiving launch price, through November 30 (US Eastern time). $25 from December 1."', usdLaunchLine(DEFAULT_USD_PRICE, '2026-11-30') === 'Thanksgiving launch price, through November 30 (US Eastern time). $25 from December 1.' && usdLaunchLine({ egift: 30, egift_sale: 21 }, '2026-12-31') === 'Thanksgiving launch price, through December 31 (US Eastern time). $30 from January 1.')
   const u = cleanUsd({ usd: { egift: 25, egift_sale: 17.5 } })
   check('(3) the page reads cents from /api/sizes (and falls back on junk)', u.egift_sale === 17.5 && cleanUsd({ usd: { egift: 25, egift_sale: 17.555 } }).egift_sale === 17.5 && cleanUsd(null).egift === 25)
   const legal = legalView('en', false).rows.find((r) => r.label === 'Prices')!.value

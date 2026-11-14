@@ -88,6 +88,9 @@ export interface GiftRecord {
   shipped_at?: string | null
   /** The day the envelope may be opened (YYYY-MM-DD, JST); null/absent = at once. Until then the receiver's page shows the closed envelope only. */
   opens_on?: string | null
+  /** The exact moment the envelope opens (UTC instant) and the IANA zone it was picked in (2026-11-14): 7:00 a.m. on `opens_on` there. Absent on older gifts, which open at Japan midnight of `opens_on`. */
+  opens_at?: string | null
+  opens_tz?: string | null
   /** 「一字礼　第 NNNN 号」 — the running number (engine/certificate-no.ts); null on gifts made before numbers existed. */
   certificate_no?: number | null
   /** The receiver's one reply (「ありがとうを返す」), shown on the sender's page. */
@@ -124,6 +127,7 @@ export function buildGiftRecord(record: OrderRecord, animationId: string, token:
     egift: ship === 'egift' ? { state: 'waiting', sender_email: senderEmail, reminded_at: null, received_at: null, address: null } : null,
     shipped_at: null,
     opens_on: p.open_date ?? null,
+    ...(p.open_at && p.open_tz ? { opens_at: p.open_at, opens_tz: p.open_tz } : {}),
     certificate_no: record.certificate_no ?? null,
     reply: null,
   }
@@ -150,6 +154,9 @@ export interface GiftView extends AnimationView {
   /** The day the order was made (JST, YYYY-MM-DD) and the day the envelope opens (null = at once): the certificate shows one of them. */
   order_date: string
   opens_on: string | null
+  /** The exact opening moment and the zone it was picked in (null on older gifts). */
+  opens_at: string | null
+  opens_tz: string | null
   /** True once the receiver has sent their reply (the reply itself is for the sender's page only). */
   replied: boolean
   /** Which size it is: the keepsake lines of the last screen depend on it. */
@@ -166,6 +173,9 @@ export interface GiftLockedView {
   from: string
   to: string
   opens_on: string
+  /** The exact opening moment (UTC) and zone, when the gift has them: the sealed page shows "Opens Dec 25, 7:00 a.m. (Eastern)" and counts to this very instant. */
+  opens_at?: string | null
+  opens_tz?: string | null
   days_left: number
   /** The buyer has not collected the gift yet (2026-11-06): the envelope stays sealed with no open button and says it is arriving soon. */
   arriving?: boolean
@@ -176,11 +186,18 @@ export const todayJst = (now: Date): string => new Date(now.getTime() + JST).toI
 const dayNumber = (d: string): number => Math.floor(Date.parse(`${d}T00:00:00Z`) / 86_400_000)
 
 /** True while the envelope may not be opened yet (the opening date has not come, in Japan time). */
-export const isLocked = (g: GiftRecord, now: Date): boolean => !!g.opens_on && todayJst(now) < g.opens_on
+export const isLocked = (g: GiftRecord, now: Date): boolean => {
+  // a gift with an exact moment opens at that instant (7:00 a.m. in the chosen zone); an older one at Japan midnight of its date
+  if (g.opens_at && Number.isFinite(Date.parse(g.opens_at))) return now.getTime() < Date.parse(g.opens_at)
+  return !!g.opens_on && todayJst(now) < g.opens_on
+}
 
 export function lockedView(g: GiftRecord, now: Date): GiftLockedView {
   const opens = g.opens_on ?? todayJst(now)
-  return { locked: true, token: g.token, language: g.language, memorial: g.memorial, ...(g.purpose ? { purpose: g.purpose } : {}), from: g.from, to: g.to, opens_on: opens, days_left: Math.max(1, dayNumber(opens) - dayNumber(todayJst(now))) }
+  const exact = g.opens_at && g.opens_tz && Number.isFinite(Date.parse(g.opens_at)) ? { opens_at: g.opens_at, opens_tz: g.opens_tz } : null
+  // days left count to the same instant the lock uses (a whole day or more away shows days; the last hours show 1)
+  const days = exact ? Math.max(1, Math.ceil((Date.parse(exact.opens_at) - now.getTime()) / 86_400_000)) : Math.max(1, dayNumber(opens) - dayNumber(todayJst(now)))
+  return { locked: true, token: g.token, language: g.language, memorial: g.memorial, ...(g.purpose ? { purpose: g.purpose } : {}), from: g.from, to: g.to, opens_on: opens, ...(exact ?? {}), days_left: days }
 }
 
 /** The sealed envelope of a gift the buyer has not collected yet: the two names, nothing else, no open button. */
@@ -201,7 +218,7 @@ export function checkReply(body: unknown): ReplyCheck {
 }
 
 export function giftView(g: GiftRecord, anim: AnimationRecord, art: ArtRecord | null): GiftView {
-  const v = animationView(anim, art)
+  const v = animationView(anim, art, { settle: true }) // the receiver never sees a waiting tile: a picture that is not there yet shows a passed one
   const from = `/api/film/${anim.id}/picture/`
   const to = `/api/gift/${g.token}/picture/`
   return {
@@ -219,6 +236,8 @@ export function giftView(g: GiftRecord, anim: AnimationRecord, art: ArtRecord | 
     certificate_no: g.certificate_no ?? null,
     order_date: todayJst(new Date(g.created_at)),
     opens_on: g.opens_on ?? null,
+    opens_at: g.opens_at ?? null,
+    opens_tz: g.opens_tz ?? null,
     replied: !!g.reply,
     package: g.package,
   }

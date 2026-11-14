@@ -10,6 +10,7 @@
 //
 // Results live in the order bucket (selftest/latest.json, selftest/day-<date>.json, selftest/commit-<sha>.json, selftest/lock.json); without a bucket they are kept in memory for the life of the instance.
 
+import { runPictureProbe, type ProbeDeps } from '../engine/picture-probe.ts'
 import { createHash, timingSafeEqual } from 'node:crypto'
 import { createOrderStore, type OrderStore } from '../engine/order-store.ts'
 import { publicReport, runSelftest, type SelftestDeps, type SelftestReport } from '../engine/selftest.ts'
@@ -39,6 +40,8 @@ export interface SelftestApiDeps {
   /** Tests: stands in for the real run. */
   run?: (d: SelftestDeps) => Promise<SelftestReport>
   deps?: SelftestDeps
+  /** Tests: stand-ins for the probe's image model and picture check. */
+  probe?: Pick<ProbeDeps, 'image' | 'vision' | 'log'>
 }
 
 const digest = (s: string): Buffer => createHash('sha256').update(s).digest()
@@ -99,7 +102,10 @@ export function createSelftestHandlers(getDeps: () => SelftestApiDeps) {
       await writeJson(store, 'selftest/lock.json', { started_at: startedAt, done: false })
       await writeJson(store, `selftest/day-${today}.json`, { runs: day.runs + 1 })
       try {
-        const report = publicReport(await (d.run ?? runSelftest)({ ...(d.deps ?? {}), commit, env, now }))
+        const raw = await (d.run ?? runSelftest)({ ...(d.deps ?? {}), commit, env, now })
+        // the daily picture probe (B7): once a day, one fixed film drawn through the real image path; its per-slot outcome goes into the report
+        const probe = await runPictureProbe({ store, env, now, ...(d.probe ?? {}) }).catch(() => null)
+        const report = publicReport(probe ? { ...raw, picture_probe: probe } : raw)
         const spent = Number(report.spend_estimate_usd) || 0
         const after: MonthFile = { month, usd: round2(mtd + spent), runs: (mf && mf.month === month ? mf.runs : 0) + 1, last_usd: round2(spent) }
         await writeJson(store, `selftest/month-${month}.json`, after)

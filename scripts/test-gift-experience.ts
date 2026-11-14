@@ -68,7 +68,12 @@ const locked = JSON.parse(lockedText)
 check('(3) before the opening date the page gets the CLOSED ENVELOPE: locked, the two names, the date and the days left (3)', lockedRes.status === 200 && locked.locked === true && locked.to === '山田 一郎' && locked.from === '山田 太郎' && locked.opens_on === '2026-11-10' && locked.days_left === 3, lockedText)
 check('(3) …and nothing else leaves the server: no character, reading, poem, message, film, certificate number', !/証|glyph|reading|poem|message|いつも、ありがとう|film|certificate|pictures|AN-/.test(lockedText), lockedText)
 check('(3) the pictures, the render, the scroll and the thank-you are all closed too (403)', (await before.picture(g1.token, '1')).status === 403 && (await before.render(g1.token)).status === 403 && (await before.scroll(g1.token, 'png')).status === 403 && (await before.reply(g1.token, { text: 'ありがとう' })).status === 403)
-check('(3) the days left count in Japan time: 2 days the day before, and the page is open from the opening date at 00:00 JST', lockedView(g1, new Date('2026-11-08T03:00:00Z')).days_left === 2 && isLocked(g1, new Date('2026-11-09T14:59:59Z')) && !isLocked(g1, new Date('2026-11-09T15:00:00Z')) && todayJst(new Date('2026-11-09T15:00:00Z')) === '2026-11-10')
+// an OLD gift (made before 2026-11-14: a date only, no exact moment) keeps the Japan-midnight rule
+  const old1 = { ...g1 } as GiftRecord
+  delete old1.opens_at
+  delete old1.opens_tz
+  check('(3) an OLD gift (a date only): the days left count in Japan time — 2 days the day before — and the page is open from the opening date at 00:00 JST', lockedView(old1, new Date('2026-11-08T03:00:00Z')).days_left === 2 && isLocked(old1, new Date('2026-11-09T14:59:59Z')) && !isLocked(old1, new Date('2026-11-09T15:00:00Z')) && todayJst(new Date('2026-11-09T15:00:00Z')) === '2026-11-10')
+  check('(3) a NEW gift (2026-11-14: the order carries the exact moment, 7:00 a.m. Japan time when no zone is sent) opens at that instant, and the days left count to it', g1.opens_at === '2026-11-09T22:00:00.000Z' && g1.opens_tz === 'Asia/Tokyo' && isLocked(g1, new Date('2026-11-09T21:59:59Z')) && !isLocked(g1, new Date('2026-11-09T22:00:00Z')) && lockedView(g1, new Date('2026-11-08T03:00:00Z')).days_left === 2)
 const opened = await at('2026-11-10T00:30:00Z').view(g1.token)
 const openJ = (await opened.json()) as { locked: boolean; glyph: string; certificate_no: number; order_date: string; opens_on: string }
 check('(3) on the day it opens: the full view, with the certificate number and the dates', opened.status === 200 && openJ.locked === false && openJ.glyph === '証' && openJ.certificate_no === 1 && openJ.order_date === '2026-11-07' && openJ.opens_on === '2026-11-10', JSON.stringify(openJ).slice(0, 300))

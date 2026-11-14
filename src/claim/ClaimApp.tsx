@@ -102,6 +102,7 @@ export default function ClaimApp() {
             >
               {busy ? copy.submitting : copy.submit}
             </button>
+            <p className="font-label mt-5 text-xs leading-relaxed text-ivory/60" data-testid="claim-window-note">{copy.window24}</p>
           </form>
         </motion.div>
       </main>

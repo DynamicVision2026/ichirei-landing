@@ -710,13 +710,17 @@ export function validateEngineResult(raw: unknown): string[] {
 
 /** At most this many retries per story (so up to three sets of three characters). */
 export const MAX_RETRIES = 2
+/** How many rounds (sets of candidates) one story gets: ICHIREI_MAX_ROUNDS, 2 by default (2026-11-14; was 3). 1–3. The first round is the story itself, so a story may ask for rounds − 1 retries. */
+export const DEFAULT_MAX_ROUNDS = 2
+/** What the server says when a story has had all its rounds (the page shows it too). */
+export const NO_MORE_ROUNDS: Record<string, string> = { ja: 'この物語で探せるのはここまでです。', 'zh-Hant': '這個故事能找的字就到這裡。', 'zh-Hans': '这个故事能找的字就到这里。', en: "That's all the characters for this moment." }
 /** Characters (both forms of each) the sender has already been shown for this story: a generous cap, one code point per entry. */
 export const MAX_EXCLUDED = 24
 
 export type ExcludeParse = { ok: true; exclude: string[]; retry: number } | { ok: false; error: string; code: 'bad_exclude' | 'retry_limit' }
 
 /** `exclude` = the characters already shown for this story; `retry` = which retry this is (1 or 2). Neither = a first run. */
-export function parseExclude(exclude: unknown, retry: unknown): ExcludeParse {
+export function parseExclude(exclude: unknown, retry: unknown, maxRetries: number = MAX_RETRIES): ExcludeParse {
   if (exclude === undefined || exclude === null) {
     if (retry === undefined || retry === null || retry === 0) return { ok: true, exclude: [], retry: 0 }
     return { ok: false, error: '"retry" needs "exclude"', code: 'bad_exclude' }
@@ -726,6 +730,6 @@ export function parseExclude(exclude: unknown, retry: unknown): ExcludeParse {
   }
   const list = [...new Set(exclude as string[])]
   if (list.length === 0) return { ok: true, exclude: [], retry: 0 }
-  if (retry !== 1 && retry !== 2) return { ok: false, error: `a new set of candidates may be asked for at most ${MAX_RETRIES} times for one story`, code: 'retry_limit' }
+  if (typeof retry !== 'number' || !Number.isInteger(retry) || retry < 1 || retry > Math.min(maxRetries, MAX_RETRIES)) return { ok: false, error: `a new set of candidates may be asked for at most ${Math.min(maxRetries, MAX_RETRIES)} times for one story`, code: 'retry_limit' }
   return { ok: true, exclude: list, retry }
 }

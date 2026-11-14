@@ -188,13 +188,22 @@ function drawInside(doc: Doc, a: Artwork) {
   const colW = (half - 18 * MM - 5 * MM) / 2
   const picH = colW * 1.25
   const rowH = picH + 15 * MM
-  // the four pictures with their lines (a plain washi box where a picture is missing — the card never waits for one)
-  for (let i = 0; i < Math.min(4, a.lines.length); i++) {
+  // the four pictures with their lines. A picture that failed for good was replaced by another passed one when the artwork was loaded; when NO picture passed at all the pictures block is left out
+  // (2026-11-14): the four lines stand alone, and a plain washi box is never drawn.
+  const anyPicture = a.pictures.some(Boolean)
+  if (!anyPicture) {
+    const n = Math.min(4, a.lines.length)
+    const boxW = half - 18 * MM
+    for (let i = 0; i < n; i++) {
+      const y = BLEED + 22 * MM + i * ((TRIM_H - 44 * MM) / Math.max(1, n))
+      doc.font(names.body).fontSize(9).fillColor(INK).text(a.lines[i].replace(/\n+/g, ''), leftX, y, { width: boxW, align: 'center', lineGap: 2 })
+    }
+  }
+  for (let i = 0; i < (anyPicture ? Math.min(4, a.lines.length) : 0); i++) {
     const x = leftX + (i % 2) * (colW + 5 * MM)
     const y = BLEED + 8 * MM + Math.floor(i / 2) * rowH
     const pic = a.pictures[i]
     if (pic) doc.image(pic, x, y, { width: colW, height: picH })
-    else doc.rect(x, y, colW, picH).fill('#E8DEC6')
     doc.font(names.body).fontSize(6.4).fillColor(INK).text(a.lines[i].replace(/\n+/g, ''), x, y + picH + 1.8 * MM, { width: colW, align: 'center', lineGap: 1 })
   }
   // the right page

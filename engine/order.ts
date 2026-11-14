@@ -4,6 +4,7 @@
 //
 // Plumbing only — nothing here selects or judges a character.
 
+import { DEFAULT_ZONE, isValidZone, openingInstant, todayIn } from '../src/order/opens-at.ts'
 import { cleanReading } from '../src/order/reading.ts'
 import { findQuestion } from './story-questions.ts'
 import { randomBytes } from 'node:crypto'
@@ -154,8 +155,12 @@ export interface ValidOrder {
   sender_email: string | null
   /** The short message shown in the letter (empty when none); printed on the card only when the gift goes to the receiver. */
   gift_message: string
-  /** The day the receiver's envelope can be opened (YYYY-MM-DD, JST), or null = it opens at once. */
+  /** The day the receiver's envelope can be opened (the picked calendar date), or null = it opens at once. */
   open_date: string | null
+  /** The exact moment it opens (UTC instant): 7:00 a.m. on `open_date` in `open_tz` (2026-11-14); null when it opens at once. */
+  open_at: string | null
+  /** The IANA time zone the date was picked in (null when it opens at once). */
+  open_tz: string | null
   /** When the buyer ticked the refund terms on the order step (ISO); null when the request carried none (e.g. a direct API call). */
   refund_ack_at: string | null
   /** English orders only (2026-11-12): the utm_* parameters of the landing link, cleaned; passed to the cart line as hidden `_utm_…` attributes. */
@@ -258,14 +263,26 @@ export function parseOrderRequest(body: unknown, now: Date = new Date(), palette
   if (date > latest) return fail('delivery_date', `"delivery_date" is more than ${MAX_DAYS_AHEAD} days ahead`)
 
   // The opening date (optional, every size): the day the receiver's envelope can be opened — up to a year ahead. Today or nothing = it opens at once.
+  // It opens at 7:00 a.m. on that date in the zone the buyer chose ("open_tz", an IANA name; Japan when none is sent) — so Christmas morning is Christmas morning where the receiver is.
   let open_date: string | null = null
+  let open_at: string | null = null
+  let open_tz: string | null = null
   if (body.open_date !== undefined && body.open_date !== null && body.open_date !== '') {
     const od = body.open_date
     if (typeof od !== 'string' || !validDate(od)) return fail('open_date', '"open_date" must be a real date, YYYY-MM-DD')
-    if (od < today) return fail('open_date', '"open_date" is in the past')
-    const lastDay = new Date(new Date(`${today}T00:00:00Z`).getTime() + OPEN_DATE_MAX_DAYS * 86_400_000).toISOString().slice(0, 10)
+    const given = body.open_tz
+    if (given !== undefined && given !== null && given !== '' && !isValidZone(given)) return fail('open_tz', '"open_tz" must be an IANA time zone such as America/New_York')
+    const tz = typeof given === 'string' && given !== '' ? given : DEFAULT_ZONE
+    const todayThere = todayIn(tz, now)
+    if (od < todayThere) return fail('open_date', '"open_date" is in the past')
+    const lastDay = new Date(new Date(`${todayThere}T00:00:00Z`).getTime() + OPEN_DATE_MAX_DAYS * 86_400_000).toISOString().slice(0, 10)
     if (od > lastDay) return fail('open_date', `"open_date" is more than ${OPEN_DATE_MAX_DAYS} days ahead`)
-    open_date = od > today ? od : null
+    const at = openingInstant(od, tz)
+    if (at && at.getTime() > now.getTime()) {
+      open_date = od
+      open_at = at.toISOString()
+      open_tz = tz
+    }
   }
 
   const style = typeof body.inscription_style === 'string' ? normalizeStyle(lang, body.inscription_style) : body.inscription_style
@@ -342,6 +359,8 @@ export function parseOrderRequest(body: unknown, now: Date = new Date(), palette
       ship_to,
       gift_message,
       open_date,
+      open_at,
+      open_tz,
       refund_ack_at: (() => { const t = typeof body.refund_ack_at === 'string' ? Date.parse(body.refund_ack_at) : NaN; return Number.isFinite(t) && t <= now.getTime() + 5 * 60_000 && t >= now.getTime() - 24 * 3_600_000 ? new Date(t).toISOString() : null })(),
       sender_email,
       shown: withChosen(parseShown(body.shown_characters), candidate),
@@ -482,6 +501,23 @@ export interface OrderOps {
 
 export type OrderStatus = 'pending' | 'cart_created' | 'cart_failed' | 'claimed'
 
+export interface GiftCheckState {
+  /** Background tries made so far (at most 5, over about 6 hours). */
+  tries: number
+  /** The earliest time the next try may run (ISO). */
+  next_try_at?: string | null
+  last_try_at?: string | null
+  /** The parts still missing at the last look: character, poem, pictures, film, certificate. */
+  missing: string[]
+  /** When the gift was first seen incomplete (ISO). */
+  first_incomplete_at?: string | null
+  /** True once the owner is asked to look (5 tries used up, or 12 hours after payment and still incomplete). */
+  attention?: boolean
+  attention_at?: string | null
+  /** When it was last seen complete (ISO). */
+  complete_at?: string | null
+}
+
 export interface OrderRecord {
   schema: 1
   order_ref: string
@@ -518,6 +554,9 @@ export interface OrderRecord {
     gift_message?: string
     /** The day the receiver's envelope opens (null = at once). */
     open_date?: string | null
+    /** The exact opening moment (UTC) and the zone it was picked in; absent on orders made before 2026-11-14 (their date opens at Japan midnight). */
+    open_at?: string | null
+    open_tz?: string | null
     gift_packaging?: boolean
     no_price_slip?: boolean
     price_jpy: number
@@ -531,6 +570,8 @@ export interface OrderRecord {
   /** Kept here, never sent to Shopify. `story` is what the sender wrote first; `follow_ups` are their answers to the engine's questions. */
   story: string
   follow_ups: string[]
+  /** The completeness check of the PAID gift (engine/gift-check.ts, 2026-11-14): how many background tries were made, what was still missing (codes), and the owner's alert flag. */
+  gift_check?: GiftCheckState
   /** The owner's marks and changes (/ops). */
   ops?: OrderOps
   /** The story-opener question the sender was shown (a known id; codes only) — for the report of which questions lead to which characters. */
@@ -541,6 +582,10 @@ export interface OrderRecord {
   refund_ack_at?: string | null
   /** When the buyer pressed 「贈りものを受け取る」 on the order page (ISO, set once, server side): the gift is unlocked and the order can no longer be cancelled. */
   collected_at?: string | null
+  /** When the payment of this order was FIRST SEEN (ISO): Shopify's order-paid webhook or a successful payment lookup (engine/paid-seen.ts). Collect, downloads, sharing and the receiver's link need it. */
+  paid_seen_at?: string | null
+  /** The payment time Shopify gave on that first sighting (ISO): the 24-hour window counts from it even when Shopify cannot be asked later. */
+  paid_at_seen?: string | null
   /** True on every order made since 2026-11-06: the gift stays sealed for the receiver (and no send / save is reachable) until collected_at is set. Older orders have none and work as before. */
   collect_required?: boolean
   /** A gift made for an order that was paid WITHOUT going through our site (a "waiting" order, 2026-11-13): the Shopify order it was attached to. The 24-hour clock starts at `claimed_at`, not at payment. */
@@ -577,6 +622,8 @@ export function buildRecord(order: ValidOrder, orderRef: string, now: Date = new
       ship_to: order.ship_to,
       gift_message: order.gift_message,
       open_date: order.open_date,
+      open_at: order.open_at,
+      open_tz: order.open_tz,
       gift_packaging: order.ship_to === 'direct',
       no_price_slip: order.ship_to === 'direct',
       price_jpy: PACKAGE_PRICE_JPY[order.package],

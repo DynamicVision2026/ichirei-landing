@@ -20,11 +20,11 @@ export interface AnimationView {
   /** The piece of music under the film (the server picked it from the purpose; `thanks` when the purpose's own recording is not there). Absent = no music. */
   music?: 'celebrate' | 'thanks' | 'apology' | 'encourage' | 'confess' | 'memorial' | null
   /** null = the script is still being written; pictures null = drawn on the first open (the page asks POST /api/film/<id>/render); deferred = the daily limit. */
-  film: { status: 'ready' | 'fallback'; lines: string[]; pictures: string[] | null; deferred?: boolean; incomplete?: boolean } | null
+  film: { status: 'ready' | 'fallback'; lines: string[]; pictures: string[] | null; deferred?: boolean; incomplete?: boolean; pending?: number[]; substituted?: number[]; no_pictures?: boolean } | null
   /** The sender's page only: what to share with the receiver and where the order stands. */
-  gift?: { url: string; size_code: string; ship_to: string; egift_state: 'waiting' | 'received' | null; opens_on: string | null; certificate_no: number | null; reply: { text: string; at: string } | null } | null
+  gift?: { url: string; size_code: string; ship_to: string; egift_state: 'waiting' | 'received' | null; opens_on: string | null; opens_at?: string | null; opens_tz?: string | null; certificate_no: number | null; reply: { text: string; at: string } | null } | null
   /** The buyer's page only: when it was ordered, the end of the 24-hour change window while it is open (else null), and the wooden gift's step (null = no wood section). */
-  order?: { collected: boolean; ordered_at: string | null; change_until: string | null; wood: { step: 1 | 2 | 3 | 4; tracking_no: string | null; ship_to: 'me' | 'direct' } | null } | null
+  order?: { confirming?: boolean; finishing?: boolean; collected: boolean; ordered_at: string | null; change_until: string | null; wood: { step: 1 | 2 | 3 | 4; tracking_no: string | null; ship_to: 'me' | 'direct' } | null } | null
   /** The shop's support address, printed as plain text; null / absent = left out. */
   support_email?: string | null
 }
@@ -44,6 +44,9 @@ export interface GiftView extends AnimationView {
   /** The day it was ordered, and the day the envelope opens (null = at once); YYYY-MM-DD, Japan time. */
   order_date: string
   opens_on: string | null
+  /** The exact opening moment (UTC) and the zone it was picked in (null on gifts made before 2026-11-14). */
+  opens_at?: string | null
+  opens_tz?: string | null
   /** True once the receiver has sent their one thank-you (its text is for the sender's page only). */
   replied: boolean
   package: 'egift' | 'simple' | 'standard'
@@ -59,6 +62,8 @@ export interface GiftLockedView {
   from: string
   to: string
   opens_on: string
+  opens_at?: string | null
+  opens_tz?: string | null
   days_left: number
   /** The buyer has not collected the gift yet: a sealed envelope with no open button. */
   arriving?: boolean

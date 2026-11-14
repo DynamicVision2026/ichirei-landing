@@ -24,7 +24,7 @@ export type Choice = (typeof CHOICES)[number]
 export const FLOW_EVENTS = ['chips_done', 'story_opened', 'question_shown', 'question_switched', 'voice_used', 'draft_restored', 'story_submitted', 'followup_shown', 'reveal_shown'] as const
 export type FlowEvent = (typeof FLOW_EVENTS)[number]
 /** The free card preview (2026-10-30): codes only — never a character or a story. `n` = which retry (1 or 2); `state` = how the pictures went; `secs` = seconds from the pick to a complete preview. */
-export const PREVIEW_EVENTS = ['card_preview_shown', 'candidates_retry', 'pictures_before_pay', 'preview_to_order'] as const
+export const PREVIEW_EVENTS = ['card_preview_shown', 'candidates_retry', 'pictures_before_pay', 'preview_to_order', 'result_page_view', 'result_to_order'] as const
 export type PreviewEvent = (typeof PREVIEW_EVENTS)[number]
 export const PICTURE_STATES = ['shown', 'limited', 'failed'] as const
 export type PictureState = (typeof PICTURE_STATES)[number]

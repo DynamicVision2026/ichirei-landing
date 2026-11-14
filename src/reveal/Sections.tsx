@@ -1,3 +1,4 @@
+import { useFlowActive } from './flow-store.ts'
 import { PACKAGE_DISPLAY_ORDER, RECOMMENDED_PACKAGE } from '../order/packages.ts'
 import { SIZE_COPY } from '../demo/sizes-copy.ts'
 import { useComingSoon, useSale, useSizes, useUsd } from '../demo/useSizes.ts'
@@ -485,6 +486,7 @@ export function Footer({ t, lang }: { t: T; lang?: RevealLang }) {
 /** The phone's sticky call to action; out of the way while the story form itself is on screen. */
 export function Dock({ t }: { t: T }) {
   const [hide, setHide] = useState(false)
+  const flow = useFlowActive() // hidden for the whole write → cards → result → order flow (2026-11-14, C2)
   useEffect(() => {
     const target = document.getElementById('write')
     if (!target || typeof IntersectionObserver === 'undefined') return
@@ -493,7 +495,7 @@ export function Dock({ t }: { t: T }) {
     return () => io.disconnect()
   }, [])
   return (
-    <div className="dock" hidden={hide}>
+    <div className="dock" hidden={hide || flow} data-testid="dock">
       <a className="btn primary" href="#write">
         {t.dock}
       </a>

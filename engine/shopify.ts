@@ -76,12 +76,14 @@ export interface CartResult {
   variantId: string
   /** The currency Shopify priced the cart in (cost.totalAmount.currencyCode); null when it did not say. */
   currency: string | null
+  /** An English cart that Shopify priced in something other than USD, also on the one retry (2026-11-14). The buyer still gets the checkout; the order API counts it for /ops/stats. */
+  mismatch?: boolean
 }
 
 /** English orders (2026-11-14): the cart names the United States as the buyer's country, so the "ICHIREI English" market (English, USD, a fixed price) prices the checkout. ja / zh carts name nobody. */
 export const EN_BUYER_COUNTRY = 'US'
 
-export async function createCart(
+async function createCartOnce(
   config: ShopifyConfig,
   pkg: PackageId,
   attributes: Attribute[],
@@ -131,11 +133,28 @@ export async function createCart(
   // Production Shopify checkouts are https. (Tests point SHOPIFY_API_BASE at http://127.0.0.1.)
   if (url.protocol !== 'https:' && !config.apiBase.startsWith('http://')) throw new ShopifyError('Shopify returned a non-https checkout URL')
   const currency = cart.cost?.totalAmount?.currencyCode ?? null
-  // An English cart should be priced in dollars. If Shopify says otherwise (the market is not set up for that buyer country), the buyer still gets the checkout; the owner sees the line.
-  if (language === 'en' && currency && currency.toUpperCase() !== 'USD') {
-    console.warn(`[ichirei-order] ${JSON.stringify({ event: 'en_cart_currency_mismatch', order_ref: orderRef, currency, amount: cart.cost?.totalAmount?.amount ?? null })}`)
-  }
   return { cartId: cart.id, checkoutUrl: cart.checkoutUrl, variantId, currency }
+}
+
+const notUsd = (c: string | null): boolean => !!c && c.toUpperCase() !== 'USD'
+
+/**
+ * Creates the cart. An English cart should be priced in dollars: if Shopify says otherwise, the cart is made ONCE more with the same buyer identity (the market is sometimes picked late);
+ * if it still is not USD the buyer keeps the checkout (owner decision: never stop a sale) and the result says `mismatch` so the order API counts it in red on /ops/stats.
+ */
+export async function createCart(config: ShopifyConfig, pkg: PackageId, attributes: Attribute[], orderRef: string, fetchImpl: typeof fetch = fetch, language?: string): Promise<CartResult> {
+  const first = await createCartOnce(config, pkg, attributes, orderRef, fetchImpl, language)
+  if (language !== 'en' || !notUsd(first.currency)) return first
+  console.warn(`[ichirei-order] ${JSON.stringify({ event: 'en_cart_currency_retry', order_ref: orderRef, currency: first.currency })}`)
+  let second: CartResult
+  try {
+    second = await createCartOnce(config, pkg, attributes, orderRef, fetchImpl, language)
+  } catch {
+    second = first
+  }
+  if (!notUsd(second.currency)) return second
+  console.warn(`[ichirei-order] ${JSON.stringify({ event: 'en_cart_currency_mismatch', order_ref: orderRef, currency: second.currency })}`)
+  return { ...second, mismatch: true }
 }
 
 /** The sizes that can be ordered right now: those with a variant. Without a config (not ready) none. */

@@ -31,6 +31,10 @@ export interface SizeCopy {
   openDateLabel: string
   openDateNote: string
   openDateClear: string
+  /** The time zone the opening time (7:00 a.m.) is read in. */
+  openZoneLabel: string
+  openZoneOther: string
+  openZoneOtherPlaceholder: string
   /** E-gift of a wooden size is Japan only at launch. */
   egiftJapanOnly: string
   /** Shown under the sizes when remembrance is chosen. */
@@ -77,6 +81,9 @@ const ja: SizeCopy = {
   openDateLabel: '封を開ける日（任意）',
   openDateNote: '空欄なら、リンクを送ってすぐに開けます。日付を決めると、その日まで封は閉じたままです（1年先まで）。',
   openDateClear: '日付を消す',
+  openZoneLabel: '時間帯（午前7時に開きます）',
+  openZoneOther: 'その他の時間帯…',
+  openZoneOtherPlaceholder: '例：Australia/Sydney',
   egiftJapanOnly: '木札・版木のeギフトは、日本国内のみです。',
   memorialNote: '偲ぶ場合も、すべてのサイズをお選びいただけます。字は墨色で、紅白の水引・赤い印は使いません。',
   egiftNote: 'eギフトは郵送されません。リンクで贈ります。開封日を指定することもできます。',
@@ -120,6 +127,9 @@ const en: SizeCopy = {
   openDateLabel: 'The day the envelope opens (optional)',
   openDateNote: 'Leave it empty and the gift opens as soon as you send the link. Pick a date and the envelope stays sealed until then (up to a year ahead).',
   openDateClear: 'Clear the date',
+  openZoneLabel: 'Time zone (it opens at 7:00 a.m.)',
+  openZoneOther: 'Other time zone…',
+  openZoneOtherPlaceholder: 'e.g. Australia/Sydney',
   egiftJapanOnly: 'E-gift for the wooden tag and the block set is Japan only.',
   memorialNote: 'For remembrance every size is available. The character is in ink black; no red-and-white cord and no red seal.',
   egiftNote: 'The e-gift is not posted. You send it as a link, and you can fix the day it opens.',
@@ -163,6 +173,9 @@ const zhHant: SizeCopy = {
   openDateLabel: '信封開啟日（選填）',
   openDateNote: '留空的話，傳出連結後即可開啟。指定日期後，信封會一直封著直到那天（最長一年後）。',
   openDateClear: '清除日期',
+  openZoneLabel: '時區（上午7點開啟）',
+  openZoneOther: '其他時區…',
+  openZoneOtherPlaceholder: '例如：Australia/Sydney',
   egiftJapanOnly: '木牌與版木的電子禮物，僅限日本國內。',
   memorialNote: '追思時也可選擇所有尺寸。字以墨色呈現，不使用紅白水引與紅色印章。',
   egiftNote: 'e 禮物不會郵寄，以連結送出，也可以指定開封日。',
@@ -206,6 +219,9 @@ const zhHans: SizeCopy = {
   openDateLabel: '信封开启日（选填）',
   openDateNote: '留空的话，发出链接后即可开启。指定日期后，信封会一直封着直到那天（最长一年后）。',
   openDateClear: '清除日期',
+  openZoneLabel: '时区（上午7点开启）',
+  openZoneOther: '其他时区…',
+  openZoneOtherPlaceholder: '例如：Australia/Sydney',
   egiftJapanOnly: '木牌与版木的电子礼物，仅限日本国内。',
   memorialNote: '追思时也可选择所有尺寸。字以墨色呈现，不使用红白水引与红色印章。',
   egiftNote: 'e 礼物不会邮寄，以链接送出，也可以指定开封日。',

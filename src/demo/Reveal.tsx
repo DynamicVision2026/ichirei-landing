@@ -66,18 +66,21 @@ function InscriptionGlyph({
 }) {
   const glyph = carvedGlyph(candidate, language, script)
   const note = copy.inscriptionNote(candidate, script)
-  // English (2026-11-12): the bridge — the character, its reading (italic), the word (bold), the line from this story and, when reviewed, the echo. Main and second cards only; the freestyle stays as it was.
-  if (language === 'en' && candidate.slot !== 'freestyle' && candidate.en_word) {
+  // English (2026-11-12, equal cards 2026-11-14): the bridge — the character, its reading (italic), the word (bold), the line from this story and, when reviewed, the echo. BOTH cards use the same
+  // structure: the playful card shows the character, its reading and its word in the very same style (its word is the plain meaning; it has no line and no echo of its own — those slots are left out).
+  const enWord = candidate.en_word ?? candidate.meaning ?? null
+  if (language === 'en' && enWord) {
+    const playful = candidate.slot === 'freestyle'
     return (
       <div className="flex flex-col items-center text-center" data-en-bridge>
         <span className={`font-mincho notranslate leading-none ${customerGlyph ? 'font-black' : ''} ${size} ${color}`} data-glyph translate="no">{glyph}</span>
         <EnBridgeStack
           className="mt-3"
           reading={cleanReading(candidate.reading)}
-          word={candidate.en_word}
-          line={candidate.en_line}
-          echo={candidate.en_echo}
-          classical={candidate.classical_echo ?? null}
+          word={enWord}
+          line={playful ? null : candidate.en_line}
+          echo={playful ? null : candidate.en_echo}
+          classical={playful ? null : (candidate.classical_echo ?? null)}
           classes={{ reading: 'text-accent', word: 'text-fg', line: 'text-fg', where: 'text-mute' }}
           after={note ? <span className="font-serif-jp mt-1 text-[12px] text-mute">{note}</span> : undefined}
         />
@@ -263,7 +266,7 @@ export default function Reveal({ result, story, followUps = [], condition, copy,
     <div data-all-revealed={allRevealed ? 'yes' : 'no'}>
       <p className="font-serif-jp mb-8 text-sm text-mute" data-reveal-intro>{diagnostics ? copy.revealIntro : memorial ? copy.revealIntroMemorial : copy.revealIntroCustomer}</p>
 
-      <div className={pairLayout ? 'grid grid-cols-1 gap-6 md:grid-cols-2' : 'flex flex-col gap-6'} role="list" data-layout={pairLayout ? 'pair' : 'single'}>
+      <div className={pairLayout ? 'grid auto-rows-fr grid-cols-1 gap-6 md:grid-cols-2' : 'flex flex-col gap-6'} role="list" data-layout={pairLayout ? 'pair' : 'single'}>
         {revealOrder.slice(0, revealedCount).map((c) => {
           const isPrimary = c.kanji === result.primary_kanji
           const isFreestyle = c.slot === 'freestyle'
@@ -279,7 +282,7 @@ export default function Reveal({ result, story, followUps = [], condition, copy,
               transition={{ duration: 0.9, ease: [0.16, 1, 0.3, 1] }}
               data-slot={isFreestyle ? 'freestyle' : isPrimary ? 'main' : 'second'}
               data-memorial={memorial ? 'yes' : undefined}
-              className={`flex flex-col rounded-2xl border border-line border-t-4 bg-surface px-6 py-8 ${diagnostics ? PAPER_SHADOW : CARD_SHADOW} ${alwaysOpen ? '' : 'cursor-pointer'} ${
+              className={`flex h-full flex-col rounded-2xl border border-line border-t-4 bg-surface px-6 py-8 ${diagnostics ? PAPER_SHADOW : CARD_SHADOW} ${alwaysOpen ? '' : 'cursor-pointer'} ${
                 isPrimary ? (quiet ? 'border-t-fg' : 'border-t-seal') : 'border-t-fg/25'
               } ${isSelected ? 'ring-2 ring-accent' : ''}`}
               onClick={alwaysOpen ? undefined : () => toggleOpen(c)}
@@ -292,8 +295,8 @@ export default function Reveal({ result, story, followUps = [], condition, copy,
               >
                 {slotLabel}
               </p>
-              <div className={`flex flex-col items-center gap-6 ${pairLayout || (language === 'en' && !isFreestyle && c.en_word) ? '' : 'sm:flex-row sm:items-center'}`}>
-                <div className={pairLayout || (language === 'en' && !isFreestyle && c.en_word) ? '' : 'sm:w-44 sm:shrink-0'}>
+              <div className={`flex flex-col items-center gap-6 ${pairLayout || language === 'en' ? '' : 'sm:flex-row sm:items-center'}`}>
+                <div className={pairLayout || language === 'en' ? '' : 'sm:w-44 sm:shrink-0'}>
                   <InscriptionGlyph
                     candidate={c}
                     copy={copy}
@@ -352,7 +355,7 @@ export default function Reveal({ result, story, followUps = [], condition, copy,
                     animate={{ opacity: 1, height: 'auto' }}
                     exit={{ opacity: 0, height: 0 }}
                     transition={{ duration: 0.4 }}
-                    className="overflow-hidden"
+                    className={alwaysOpen ? 'mt-auto' : 'overflow-hidden'}
                     onClick={(e) => e.stopPropagation()}
                   >
                     <div className="mt-6 border-t border-line pt-5">

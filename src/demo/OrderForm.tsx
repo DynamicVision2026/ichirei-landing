@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { motion, useReducedMotion } from 'framer-motion'
 import type { Candidate, EngineResult } from './types'
 import type { Copy, InscriptionStyle, OrderField, PackageId, UiLanguage } from './i18n'
@@ -7,6 +7,8 @@ import { sessionId, trackUs } from './analytics'
 import { clearDraft } from './draft'
 import { EGIFT_JAPAN_ONLY, GIFT_MESSAGE_MAX, OPEN_DATE_MAX_DAYS, PACKAGE_DISPLAY_ORDER, PACKAGE_PRICE_JPY, RECOMMENDED_PACKAGE, SHIPS, SHIP_TO, WOODEN, type ShipTo } from '../order/packages.ts'
 import { SIZE_COPY } from './sizes-copy.ts'
+import ZoneSelect from './ZoneSelect.tsx'
+import { browserZone, isValidZone, openingLabel, todayIn } from '../order/opens-at.ts'
 import { LEGAL } from '../legal/legal-copy.ts'
 import { useComingSoon, useSizes } from './useSizes.ts'
 import { isMemorial } from '../order/memorial.ts'
@@ -15,7 +17,7 @@ import { certificateText } from '../order/certificate.ts'
 import { DEFAULT_STYLE, STYLES_BY_LANGUAGE, glyphFor, hasFormChoice } from '../order/inscription.ts'
 import { DEFAULT_SIMPLE_MAX_STROKES, carvedStrokes, simpleAvailable } from '../order/strokes.ts'
 import PoemAddOn, { type PoemStep } from './PoemAddOn'
-import CardPreview from './CardPreview.tsx'
+import type { ResultLive } from './ResultPage.tsx'
 import { usePreview, type DraftRef } from './usePreview.ts'
 import { PREVIEW_COPY } from './preview-copy.ts'
 import { trackPreview } from './analytics.ts'
@@ -53,6 +55,11 @@ type Props = {
   draftRef: DraftRef
   /** Every character shown for this story, by set (kept on the order: for 24 hours after payment the owner can switch to any of them). */
   shown: { set: 1 | 2 | 3; candidate: Candidate }[]
+  /** The result page (2026-11-14) is drawn by the page from what this form already holds: the pictures of the story (usePreview) and the poem. Called whenever either changes. */
+  onLive?: (live: ResultLive) => void
+  /** The receiver's name as typed here (the result page's heading uses it when it is known), and the name to start with when the sender comes back. */
+  receiverName?: string
+  onReceiver?: (name: string) => void
 }
 
 const pad = (n: number) => String(n).padStart(2, '0')
@@ -69,7 +76,7 @@ const daysUntil = (iso: string) => {
 
 const FIELD_KEYS: readonly OrderField[] = ['sender_name', 'receiver_name', 'delivery_date', 'inscription_style', 'package']
 
-export default function OrderForm({ result, story, followUps = [], promptQuestionId = null, candidate, copy, onBack, draftRef, shown }: Props) {
+export default function OrderForm({ result, story, followUps = [], promptQuestionId = null, candidate, copy, onBack, draftRef, shown, onLive, receiverName = '', onReceiver }: Props) {
   const reduceMotion = useReducedMotion()
   // The gift's language is the language the engine ran in (the certificate follows it).
   const language: UiLanguage = result.language ?? 'ja'
@@ -81,7 +88,11 @@ export default function OrderForm({ result, story, followUps = [], promptQuestio
   const distinct = hasFormChoice(language, candidate) // (ja and en carve the modern form only: no choice to show)
 
   const [sender, setSender] = useState('')
-  const [receiver, setReceiver] = useState('')
+  const [receiver, setReceiverState] = useState(receiverName)
+  const setReceiver = (v: string) => {
+    setReceiverState(v)
+    onReceiver?.(v)
+  }
   const [date, setDate] = useState('')
   const [style, setStyle] = useState<InscriptionStyle>(DEFAULT_STYLE[language])
   // An order that was paid without our site (2026-11-13, /claim): the character is attached to that order — the e-gift, nothing to pay, no checkout.
@@ -96,6 +107,7 @@ export default function OrderForm({ result, story, followUps = [], promptQuestio
   const [shipTo, setShipTo] = useState<ShipTo>('me')
   const [giftMessage, setGiftMessage] = useState('')
   const [openDate, setOpenDate] = useState('') // the day the receiver's envelope opens (empty = at once)
+  const [openTz, setOpenTz] = useState(browserZone) // the zone it opens in, at 7:00 a.m. (the visitor's own by default)
   const [senderEmail, setSenderEmail] = useState('')
   const [poemIds, setPoemIds] = useState<string[]>([]) // the included poem of this order (zero or one); the server reads it back by id
   const [poemShown, setPoemShown] = useState<{ lines: string[]; reading: string; type?: string } | null>(null)
@@ -112,6 +124,26 @@ export default function OrderForm({ result, story, followUps = [], promptQuestio
   const shownForms = useMemo(() => [...new Set(shown.flatMap((s) => [s.candidate.kanji, cleanInscriptionForm(s.candidate.kanji, s.candidate.inscription_form) ?? '']).filter(Boolean))].slice(0, 24), [shown])
   const pickedForms = useMemo(() => [candidate.kanji, cleanInscriptionForm(candidate.kanji, candidate.inscription_form) ?? ''].filter(Boolean), [candidate])
   const preview = usePreview({ result, story, followUps, shown: shownForms, picked: pickedForms, draftRef })
+
+  // what the result page shows, from what this form holds (the pictures are drawn once per story; the poem is written by PoemAddOn below)
+  const enBridge = language === 'en'
+  useEffect(() => {
+    onLive?.({
+      glyph,
+      reading: enBridge ? cleanReading(candidate.reading) : copy.glyphReading(candidate, glyph),
+      word: enBridge ? (candidate.en_word ?? candidate.meaning ?? null) : null,
+      line: enBridge ? (candidate.slot !== 'freestyle' && candidate.en_line ? candidate.en_line : candidate.one_line_gaze) : candidate.one_line_gaze,
+      poem: poemShown,
+      poemStep: poemStep === 'loading' ? 'loading' : poemShown ? 'ready' : 'none',
+      preview,
+      memorial,
+      quiet,
+      language,
+      receiverName: receiver,
+      pc,
+    })
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [glyph, candidate, poemShown, poemStep, preview, memorial, quiet, language, receiver])
   // The carving check (spec v9.1 step 9): the Simple set only takes up to N strokes; a character above it is offered with the Standard set only.
   // The server re-checks with its own count; with no count at all (an old result) the form does not block and the server decides.
   const maxStrokes = result.simple_max_strokes ?? DEFAULT_SIMPLE_MAX_STROKES
@@ -136,7 +168,9 @@ export default function OrderForm({ result, story, followUps = [], promptQuestio
     d.setUTCDate(d.getUTCDate() + OPEN_DATE_MAX_DAYS)
     return d.toISOString().slice(0, 10)
   }, [today])
-  const openDateOk = openDate === '' || (/^\d{4}-\d{2}-\d{2}$/.test(openDate) && openDate >= today && openDate <= lastOpenDay)
+  const openTzOk = openDate === '' || isValidZone(openTz)
+  const todayThere = isValidZone(openTz) ? todayIn(openTz, new Date()) : today
+  const openDateOk = openDate === '' || (/^\d{4}-\d{2}-\d{2}$/.test(openDate) && openDate >= todayThere && openDate <= lastOpenDay && openTzOk)
   const emailOk = shipTo !== 'egift' || pkg === '' || !SHIPS[pkg] || /^[^\s@]{1,64}@[^\s@]{1,190}\.[^\s@]{2,}$/.test(senderEmail.trim())
   const valid = (refundAckAt !== null || !!claim) && senderOk && receiverOk && dateOk && pkg !== '' && onSale && messageOk && openDateOk && emailOk && !(pkg === 'simple' && !simpleOk) && poemStep !== 'loading'
 
@@ -164,7 +198,7 @@ export default function OrderForm({ result, story, followUps = [], promptQuestio
           package: pkg,
           ...(SHIPS[pkg as PackageId] ? { ship_to: shipTo, ...(shipTo === 'egift' ? { sender_email: senderEmail.trim() } : {}) } : {}),
           ...(giftMessage.trim() ? { gift_message: giftMessage.trim() } : {}),
-          ...(openDate ? { open_date: openDate } : {}),
+          ...(openDate ? { open_date: openDate, open_tz: openTz } : {}),
           ...(poemIds.length ? { poems: poemIds.map((poem_id) => ({ poem_id })) } : {}),
           ...(refundAckAt ? { refund_ack_at: refundAckAt } : {}),
           ...(claim ? { claim: { order: claim.order, token: claim.token } } : {}),
@@ -266,8 +300,6 @@ export default function OrderForm({ result, story, followUps = [], promptQuestio
           )}
         </fieldset>
 
-        {/* The free card preview: the character, who they are, the poem and the four scenes of the story (drawn once per story) */}
-        <CardPreview egift={egiftCopy} copy={pc} glyph={glyph} reading={language === 'en' && candidate.slot !== 'freestyle' && candidate.en_word ? cleanReading(candidate.reading) : copy.glyphReading(candidate, glyph)} enWord={language === 'en' && candidate.slot !== 'freestyle' ? candidate.en_word ?? null : null} enLine={language === 'en' && candidate.slot !== 'freestyle' ? candidate.en_line ?? null : null} who={candidate.one_line_gaze} poem={poemShown} certificateLine={cert} memorial={memorial} quiet={quiet} language={language} preview={preview} />
 
         <div className="orderGrid">
           <div>
@@ -386,10 +418,12 @@ export default function OrderForm({ result, story, followUps = [], promptQuestio
             </div>
             <div>
               <label className="clab" htmlFor="open_date">{sc.openDateLabel}</label>
-              <input id="open_date" name="open_date" type="date" min={today} max={lastOpenDay} value={openDate} onChange={(e) => setOpenDate(e.target.value)} data-testid="open-date" />
+              <input id="open_date" name="open_date" type="date" min={todayThere} max={lastOpenDay} value={openDate} onChange={(e) => setOpenDate(e.target.value)} data-testid="open-date" />
               {openDate !== '' && (
                 <button type="button" className="backLink" data-testid="open-date-clear" onClick={() => setOpenDate('')}>{sc.openDateClear}</button>
               )}
+              {openDate !== '' && <ZoneSelect id="open-zone" tz={openTz} onTz={setOpenTz} lang={language} label={sc.openZoneLabel} otherLabel={sc.openZoneOther} otherPlaceholder={sc.openZoneOtherPlaceholder} />}
+              {openDate !== '' && openTzOk && <span className="sent block" data-testid="open-date-label">{openingLabel(language, openDate, openTz)}</span>}
               <span className="sent block">{sc.openDateNote}</span>
               {language === 'en' && <span className="sent block" data-testid="open-date-hint">Set it to open on Christmas morning.</span>}
             </div>
@@ -416,6 +450,7 @@ export default function OrderForm({ result, story, followUps = [], promptQuestio
         <button type="button" data-testid="order-submit" className="btn primary" onClick={submit} disabled={!valid || busy}>
           {phase === 'submitting' ? o.submitting : phase === 'redirecting' ? o.redirecting : claim ? claimCopy.make : o.submit}
         </button>
+        {claim && <p className="sent" data-testid="claim-window-note">{claimCopy.window24}</p>}
         <p className="sent">{memorial ? o.privacyMemorial : o.privacy}</p>
         <p className="sent"><a href="/legal" data-testid="legal-link" className="legalLink">{pc.legalLink}</a></p>
       </div>

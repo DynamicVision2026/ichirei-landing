@@ -4,10 +4,10 @@
 //
 //   node --experimental-strip-types --disable-warning=ExperimentalWarning scripts/test-preview.ts
 
+import { fakePicture } from './_fake-picture.mjs'
 import http from 'node:http'
 import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
-import sharp from 'sharp'
 import { POST as selectPost } from '../api/select.ts'
 import { createAnimationHandlers } from '../api/animation.ts'
 import { createGiftHandlers } from '../api/gift.ts'
@@ -106,7 +106,7 @@ check('(1) a third retry or a list without a retry number is refused (400), befo
 }
 
 // ---- 3. the draft: script first, pictures only on the pick, one set per story ------------------------------------------------------------------------------
-const PNG = await sharp({ create: { width: 400, height: 500, channels: 3, background: '#d8d0bc' } }).png().toBuffer()
+const PNG = await fakePicture(400, 500)
 const FILM: FilmRecord = { status: 'ready', lines: ['朝、母は台所に立っていた。', '「もういらない」と私は言った。', '母は黙って戻っていった。', '今も、庭の花が添えてある。'], pictures: [
   'A woman seen from behind standing at a quiet kitchen counter in soft morning light, a small bento box in front of her',
   'Two hands holding a closed modern lunch box over a wooden table, window light falling across the grain of the wood',
@@ -218,7 +218,7 @@ const rig = () => {
 {
   const s = 'abcdefghijklmnopqrstuvwx'
   const ev = (e: Record<string, unknown>) => parseClientEvent({ session: s, source: 'customer', language: 'ja', ...e }, NOW) as Record<string, unknown> | null
-  check('(6) the four preview events are accepted: card_preview_shown, candidates_retry (1 or 2), pictures_before_pay (shown / limited / failed), preview_to_order', PREVIEW_EVENTS.join() === 'card_preview_shown,candidates_retry,pictures_before_pay,preview_to_order' && ev({ event: 'candidates_retry', n: 2 })?.n === 2 && ev({ event: 'candidates_retry', n: 3 })?.n === null && ev({ event: 'pictures_before_pay', state: 'limited' })?.state === 'limited' && ev({ event: 'pictures_before_pay', state: 'zz' })?.state === null)
+  check('(6) the preview events are accepted (and since 2026-11-14 result_page_view, result_to_order): card_preview_shown, candidates_retry (1 or 2), pictures_before_pay (shown / limited / failed), preview_to_order', PREVIEW_EVENTS.join() === 'card_preview_shown,candidates_retry,pictures_before_pay,preview_to_order,result_page_view,result_to_order' && ev({ event: 'candidates_retry', n: 2 })?.n === 2 && ev({ event: 'candidates_retry', n: 3 })?.n === null && ev({ event: 'pictures_before_pay', state: 'limited' })?.state === 'limited' && ev({ event: 'pictures_before_pay', state: 'zz' })?.state === null)
   const e = ev({ event: 'card_preview_shown', secs: 41.6, kanji: '備', story: 'x', character: '備' })
   check('(6) only codes and whole seconds are kept: no character, no story, no free text', e !== null && e.secs === 42 && !('kanji' in e) && !('story' in e) && !('character' in e) && ev({ event: 'card_preview_shown', secs: -3 })?.secs === null)
 }

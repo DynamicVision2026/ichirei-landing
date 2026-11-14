@@ -1,3 +1,4 @@
+import { DEFAULT_MAX_ROUNDS, MAX_RETRIES } from './contract.ts'
 // A hard ceiling on how long ONE model call may take (selection, review, replacement), so a slow call can never hold a
 // customer for minutes. The SDK's own `timeout` only covers the time until the response starts and its retries multiply it,
 // so the ceiling is an AbortSignal on the whole streamed call. Plumbing only.
@@ -39,3 +40,9 @@ export class ModelTimeoutError extends Error {
 
 /** Shadow mode (ICHIREI_LEXICON_MODE=shadow): how long the customer's answer may wait for the lexicon's side call to finish so it can be logged (default 20 s). */
 export const shadowGraceMs = (env: NodeJS.ProcessEnv = process.env): number => ms(env.ICHIREI_SHADOW_GRACE_MS, 20_000)
+
+/** How many rounds (sets of characters) one story gets: ICHIREI_MAX_ROUNDS, 2 by default (2026-11-14; it was 3), clamped to 1–3. */
+export function maxRoundsOf(env: NodeJS.ProcessEnv = process.env): number {
+  const n = Number(env.ICHIREI_MAX_ROUNDS)
+  return Number.isInteger(n) && n >= 1 && n <= MAX_RETRIES + 1 ? n : DEFAULT_MAX_ROUNDS
+}

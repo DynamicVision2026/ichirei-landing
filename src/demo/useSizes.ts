@@ -16,6 +16,14 @@ let inflight: Promise<PackageId[]> | null = null
 let sale: Sale | null = null
 /** The English page's fixed dollar price (USD_PRICE_EGIFT / _SALE on the server). */
 let usdPrice: UsdPrice = DEFAULT_USD_PRICE
+/** How many sets of characters one story gets (ICHIREI_MAX_ROUNDS on the server; 2 by default). */
+let maxRounds = 2
+
+/** Pure: the round limit in a /api/sizes body (2 when it is missing or unreadable). */
+export const cleanRounds = (raw: unknown): number => {
+  const n = (raw as { max_rounds?: unknown } | null)?.max_rounds
+  return typeof n === 'number' && Number.isInteger(n) && n >= 1 && n <= 3 ? n : 2
+}
 
 /** Pure: the dollar price in a /api/sizes body (the defaults when it is missing or unreadable). */
 export const cleanUsd = (raw: unknown): UsdPrice => {
@@ -54,6 +62,7 @@ export function loadSizes(): Promise<PackageId[]> {
       soon = j ? cleanComingSoon(j) : []
       sale = j ? cleanSale(j) : null
       usdPrice = j ? cleanUsd(j) : DEFAULT_USD_PRICE
+      maxRounds = j ? cleanRounds(j) : 2
       cache = sizes
       return sizes
     })
@@ -130,4 +139,17 @@ export function useUsd(): UsdPrice {
     }
   }, [])
   return u
+}
+
+/** How many sets of characters one story gets (same single request as useSizes). */
+export function useMaxRounds(): number {
+  const [n, setN] = useState(maxRounds)
+  useEffect(() => {
+    let alive = true
+    void loadSizes().then(() => alive && setN(maxRounds))
+    return () => {
+      alive = false
+    }
+  }, [])
+  return n
 }

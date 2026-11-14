@@ -38,6 +38,10 @@ export interface BuyerCopy {
   collectNo: string
   cancelBy: (when: string) => string
   checkFirst: string
+  /** The payment has not been seen yet (Shopify has not confirmed it): nothing unlocks, the page asks to be opened again (2026-11-14). */
+  confirmingPayment: string
+  /** The paid gift is not complete yet (a picture, the poem, the film or the certificate number is still missing): the page asks to be opened again; cancelling stays possible. */
+  finishingGift: string
   /** A cancelled order. */
   gone: string
 }
@@ -70,6 +74,8 @@ export const BUYER_COPY: Record<PageLang, BuyerCopy> = {
     collectNo: 'まだ',
     cancelBy: (w) => `キャンセル期限：${w}まで（受け取る前に限ります）。期限を過ぎると、お客様都合による返金はできません。`,
     checkFirst: '受け取る前に、相手に届く内容をご確認ください。',
+    confirmingPayment: 'お支払いを確認しています。数分後にもう一度開いてください。',
+    finishingGift: '贈りものを仕上げています。数分後にもう一度開いてください。',
     gone: 'この贈りものは、現在ご覧いただけません。',
   },
   'zh-Hant': {
@@ -99,6 +105,8 @@ export const BUYER_COPY: Record<PageLang, BuyerCopy> = {
     collectNo: '先不要',
     cancelBy: (w) => `取消期限：${w}前（限領取前）。超過期限後，恕不接受個人因素退款。`,
     checkFirst: '領取前，請先確認對方將收到的內容。',
+    confirmingPayment: '正在確認付款，請幾分鐘後再打開。',
+    finishingGift: '禮物正在完成中，請幾分鐘後再打開。',
     gone: '這份禮物目前無法查看。',
   },
   en: {
@@ -128,6 +136,8 @@ export const BUYER_COPY: Record<PageLang, BuyerCopy> = {
     collectNo: 'Not yet',
     cancelBy: (w) => `Cancel by: ${w} (before you collect). After that, no refunds for change of mind.`,
     checkFirst: "Before collecting, check what they'll receive.",
+    confirmingPayment: "We're confirming your payment. Please open this page again in a few minutes.",
+    finishingGift: "Your gift is being finished. Please open this page again in a few minutes.",
     gone: 'This gift is no longer available.',
   },
 }

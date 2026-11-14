@@ -4,6 +4,7 @@
 //
 //   node --experimental-strip-types scripts/test-animation.ts
 
+import { fakePicture } from './_fake-picture.mjs'
 import http from 'node:http'
 import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import sharp from 'sharp'
@@ -153,7 +154,7 @@ const READY: FilmRecord = { status: 'ready', made_at: NOW.toISOString(), picture
 
 // ---- 3b. the first open: drawing the pictures, serving them -------------------------------------------------------------------------------------------------
 {
-  const PNG = await sharp({ create: { width: 300, height: 380, channels: 3, background: '#d8d0bc' } }).png().toBuffer()
+  const PNG = await fakePicture(300, 380)
   const mkRig = (over: { image?: () => Promise<unknown>; env?: Record<string, string>; film?: (i: FilmInput) => Promise<FilmRecord> } = {}) => {
     const store = new MemoryOrderStore()
     let imageCalls = 0
@@ -424,7 +425,7 @@ const READY: FilmRecord = { status: 'ready', made_at: NOW.toISOString(), picture
 
 // ---- 7c. the real server: the first open draws the pictures (fake image model + fake picture check), then every open plays at once -------------------------------
 {
-  const PNG = await sharp({ create: { width: 320, height: 400, channels: 3, background: '#d8d0bc' } }).png().toBuffer()
+  const PNG = await fakePicture(320, 400)
   const vertexSeen: { url: string; auth: string }[] = []
   const vertex = http.createServer(async (req, res) => {
     for await (const _c of req) void _c

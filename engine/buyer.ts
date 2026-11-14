@@ -26,6 +26,10 @@ export function orderGate(rec: OrderRecord | null | undefined): OrderGate {
 }
 
 export interface BuyerOrderView {
+  /** True while the payment has not been SEEN (Shopify's webhook or a successful lookup): the page says "we're confirming your payment" and shows nothing that unlocks. */
+  confirming: boolean
+  /** The paid gift is not complete yet (engine/gift-check.ts): the page says it is being finished instead of showing the collect button. */
+  finishing?: boolean
   /** True once the buyer pressed 「贈りものを受け取る」 (and for every order made before that button existed): the send buttons, the link and the downloads are then shown. */
   collected: boolean
   /** When the payment went through (else when the order was made); an ISO time the page shows in the buyer's own time zone. */
@@ -37,13 +41,14 @@ export interface BuyerOrderView {
 }
 
 export function buyerOrderView(rec: OrderRecord | null, win: WindowInfo, env: NodeJS.ProcessEnv = process.env): BuyerOrderView {
-  if (!rec) return { collected: true, ordered_at: null, change_until: null, wood: null }
+  if (!rec) return { confirming: false, collected: true, ordered_at: null, change_until: null, wood: null }
   const pkg = rec.production.package
   const alive = win.phase === 'open' || win.phase === 'closed'
   const wooden = !!SHIPS[pkg] && !comingSoonSizes(env.ICHIREI_WOOD_SIZES).includes(pkg)
   const step = woodStepOf(rec.ops)
   const ship = rec.production.ship_to ?? 'me'
   return {
+    confirming: win.phase === 'unpaid',
     collected: orderGate(rec) === 'ok',
     ordered_at: win.paid_at ?? rec.created_at,
     change_until: win.phase === 'open' ? win.ends_at : null,

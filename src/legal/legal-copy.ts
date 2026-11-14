@@ -56,7 +56,7 @@ export const LEGAL: Record<RevealLang, LegalCopy> = {
     returnsTitle: '返品・交換・キャンセルについて',
     deliveryWood: '木札・版木：お支払い完了から24時間のキャンセル受付期間ののちに制作を始め、国内は約2〜3週間でお届けします（海外はさらに1〜2週間）。',
     sections: [
-      { heading: 'お支払い完了から24時間以内', body: 'お支払い完了から24時間以内にメールを受信した場合に限り、ご注文のキャンセル（送料を含む全額返金）を承ります。ただし、ご注文ページで「贈りものを受け取る」を押した後は、キャンセルできません（すべての商品に共通）。ご注文確認メールにご返信ください。期限内に受信したお申し出は、対応が24時間を過ぎても承ります。お支払い後の内容の変更（字・歌・お名前・メッセージなど）はお受けしていません。別の内容をご希望の場合は、キャンセルのうえ、あらためてご注文ください。' },
+      { heading: 'お支払い完了から24時間以内', body: 'お支払い完了から24時間以内にメールを受信した場合に限り、ご注文のキャンセル（送料を含む全額返金）を承ります。ただし、ご注文ページで「贈りものを受け取る」を押した後は、キャンセルできません（すべての商品に共通）。ご注文確認メールにご返信ください。期限内に受信したお申し出は、対応が24時間を過ぎても承ります。お支払い後の内容の変更（字・歌・お名前・メッセージなど）はお受けしていません。別の内容をご希望の場合は、キャンセルのうえ、あらためてご注文ください。ストア等で直接ご購入いただいた注文は、受け取り（/claim）の時点から24時間です。' },
       { heading: '24時間を過ぎた場合', body: 'すべての商品はご注文ごとに制作するため、お支払い完了から24時間を過ぎたお客様都合による返品・返金はお受けできません。お支払い前にご確認いただいた字・歌・絵の内容は、不備には当たりません。' },
       { heading: '当方の不備', body: '木札・版木の破損、誤った字、誤印刷など当方の不備があった場合は、お届けから14日以内に写真を添えてメールでご連絡ください。作り直し、または返金いたします（返送料は当方負担）。eギフトのページが正常に表示されない場合は修正し、修正できない場合は返金いたします。' },
       { heading: '配送について', body: '配送中の紛失は、追跡で確認のうえ再発送または返金いたします。ご入力いただいた住所の誤りや長期不在などで返送された場合、再発送の送料はお客様のご負担となります。海外発送で発生する関税・輸入税は、受け取る方のご負担となります。' },
@@ -64,7 +64,7 @@ export const LEGAL: Record<RevealLang, LegalCopy> = {
     faqTitle: 'よくあるご質問',
     faq: [
       { q: '注文後に字を変えられますか？', a: 'お支払い後の内容の変更（字・歌・お名前・メッセージなど）はお受けしていません。別の内容をご希望の場合は、キャンセルのうえ、あらためてご注文ください。' },
-      { q: 'キャンセルできますか？', a: 'お支払い完了から24時間以内にメールを受信した場合に限り、ご注文のキャンセル（送料を含む全額返金）を承ります。ただし、ご注文ページで「贈りものを受け取る」を押した後は、キャンセルできません（すべての商品に共通）。' },
+      { q: 'キャンセルできますか？', a: 'お支払い完了から24時間以内にメールを受信した場合に限り、ご注文のキャンセル（送料を含む全額返金）を承ります。ただし、ご注文ページで「贈りものを受け取る」を押した後は、キャンセルできません（すべての商品に共通）。ストア等で直接ご購入いただいた注文は、受け取り（/claim）の時点から24時間です。' },
       { q: '届いた品物に問題があったら？', a: '木札・版木の破損、誤った字、誤印刷など当方の不備があった場合は、お届けから14日以内に写真を添えてメールでご連絡ください。作り直し、または返金いたします（返送料は当方負担）。eギフトのページが正常に表示されない場合は修正し、修正できない場合は返金いたします。' },
       { q: 'お名前は入力しないといけませんか？', a: 'お名前の入力は任意です。入力された呼び名は、贈りものに表示するためだけに使います。' },
     ],
@@ -90,7 +90,7 @@ export const LEGAL: Record<RevealLang, LegalCopy> = {
     returnsTitle: '退貨、更換與取消',
     deliveryWood: '木牌、版木：付款完成後24小時的取消受理期間結束後開始製作，日本國內約2〜3週送達（海外另需1〜2週）。',
     sections: [
-      { heading: '付款完成後24小時內', body: '僅限付款完成後24小時內我們收到您的郵件，可取消訂單（含運費全額退款）。但在訂單頁面按下「領取禮物」後，即無法取消（所有商品皆同）。請直接回覆訂單確認郵件。只要在期限內收到，即使處理時間超過24小時，仍會受理。付款後恕不更改內容（字、詩、姓名、訊息等）。如需不同內容，請先取消，再重新下單。' },
+      { heading: '付款完成後24小時內', body: '僅限付款完成後24小時內我們收到您的郵件，可取消訂單（含運費全額退款）。但在訂單頁面按下「領取禮物」後，即無法取消（所有商品皆同）。請直接回覆訂單確認郵件。只要在期限內收到，即使處理時間超過24小時，仍會受理。付款後恕不更改內容（字、詩、姓名、訊息等）。如需不同內容，請先取消，再重新下單。在商店等處直接購買的訂單，從領取（/claim）時起算24小時。' },
       { heading: '超過24小時', body: '所有商品皆為接單後製作，付款完成超過24小時後，恕不接受因個人因素的退貨或退款。付款前已確認的字、詩與圖畫內容，不屬於瑕疵。' },
       { heading: '我方疏失', body: '如木牌、版木有破損、刻錯字或印刷錯誤等我方疏失，請於送達後14日內附上照片來信告知，我們將重新製作或退款（退回運費由我方負擔）。e禮物頁面無法正常顯示時，我們會修正；無法修正時將退款。' },
       { heading: '關於配送', body: '運送途中遺失時，經追蹤確認後將重新寄送或退款。若因您填寫的地址有誤或長期無人收件而遭退回，重新寄送的運費由您負擔。寄送海外時產生的關稅與進口稅，由收件人負擔。' },
@@ -98,7 +98,7 @@ export const LEGAL: Record<RevealLang, LegalCopy> = {
     faqTitle: '常見問題',
     faq: [
       { q: '下單後可以換字嗎？', a: '付款後恕不更改內容（字、詩、姓名、訊息等）。如需不同內容，請先取消，再重新下單。' },
-      { q: '可以取消訂單嗎？', a: '僅限付款完成後24小時內我們收到您的郵件，可取消訂單（含運費全額退款）。但在訂單頁面按下「領取禮物」後，即無法取消（所有商品皆同）。' },
+      { q: '可以取消訂單嗎？', a: '僅限付款完成後24小時內我們收到您的郵件，可取消訂單（含運費全額退款）。但在訂單頁面按下「領取禮物」後，即無法取消（所有商品皆同）。在商店等處直接購買的訂單，從領取（/claim）時起算24小時。' },
       { q: '收到的商品有問題怎麼辦？', a: '如木牌、版木有破損、刻錯字或印刷錯誤等我方疏失，請於送達後14日內附上照片來信告知，我們將重新製作或退款（退回運費由我方負擔）。e禮物頁面無法正常顯示時，我們會修正；無法修正時將退款。' },
       { q: '一定要填寫姓名嗎？', a: '姓名為選填。你填寫的稱呼只會用來顯示在禮物上。' },
     ],
@@ -124,7 +124,7 @@ export const LEGAL: Record<RevealLang, LegalCopy> = {
     returnsTitle: 'Returns, changes and cancellation',
     deliveryWood: 'Wooden tag and carved block: made after the 24-hour cancellation period, delivered in about 2–3 weeks in Japan (1–2 weeks more overseas).',
     sections: [
-      { heading: 'Within 24 hours of payment', body: REFUND_EN + ' Please reply to your order confirmation email. Requests received in time are honoured even if we handle them later. We can\'t change an order after payment (character, poem, names or message). If you\'d like something different, cancel and place a new order.' },
+      { heading: 'Within 24 hours of payment', body: REFUND_EN + ' Please reply to your order confirmation email. Requests received in time are honoured even if we handle them later. We can\'t change an order after payment (character, poem, names or message). If you\'d like something different, cancel and place a new order. For orders bought directly in our store and claimed later, the 24 hours start at the claim.' },
       { heading: 'After 24 hours', body: 'Every gift is made to order, so more than 24 hours after payment we can\'t accept returns or refunds for change of mind. The character, poem and pictures you reviewed before paying are not considered a defect.' },
       { heading: 'If we made a mistake', body: 'If a wooden tag or block arrives damaged, with the wrong character or a misprint, email us a photo within 14 days of delivery and we\'ll remake it or refund you (we cover return shipping). If an e-gift page doesn\'t display properly, we\'ll fix it, or refund you if we can\'t.' },
       { heading: 'Delivery', body: 'If a parcel is lost in transit, we\'ll check the tracking and reship or refund. If it\'s returned because of an incorrect address you entered or because no one collected it, reshipping is at your cost. Import duties and taxes on overseas deliveries are paid by the recipient.' },
@@ -132,7 +132,7 @@ export const LEGAL: Record<RevealLang, LegalCopy> = {
     faqTitle: 'Questions',
     faq: [
       { q: 'Can I change the character after I order?', a: 'We can\'t change an order after payment (character, poem, names or message). If you\'d like something different, cancel and place a new order.' },
-      { q: 'Can I cancel?', a: REFUND_EN },
+      { q: 'Can I cancel?', a: REFUND_EN + ' ' + 'For orders bought directly in our store and claimed later, the 24 hours start at the claim.' },
       { q: 'What if what I receive has a problem?', a: 'If a wooden tag or block arrives damaged, with the wrong character or a misprint, email us a photo within 14 days of delivery and we\'ll remake it or refund you (we cover return shipping). If an e-gift page doesn\'t display properly, we\'ll fix it, or refund you if we can\'t.' },
       { q: 'Do I have to enter a name?', a: 'Names are optional. Any name you enter is used only to show on the gift.' },
     ],

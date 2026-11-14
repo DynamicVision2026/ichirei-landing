@@ -99,6 +99,14 @@ export function createApp(config: ServerConfig): Hono {
     await next()
   }
 
+  // The private pages (the buyer's /a/<id>, the receiver's /g/<token>) and their API routes never leak their address in a Referer header when a link, a font or an image
+  // is fetched from them (2026-11-14). Registered first so it also wraps the routes below.
+  const noReferrer: MiddlewareHandler = async (c, next) => {
+    await next()
+    c.header('Referrer-Policy', 'no-referrer')
+  }
+  for (const path of ['/a/*', '/g/*', '/api/animation/*', '/api/gift/*', '/api/film/*', '/api/preview/*']) app.use(path, noReferrer)
+
   // ---- API -------------------------------------------------------------
   app.get('/api/health', (c) =>
     c.json({

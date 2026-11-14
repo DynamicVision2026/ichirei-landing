@@ -17,6 +17,7 @@ import { mergeStory } from '../engine/contract.ts'
 import { ANIMATION_ID_PATTERN } from '../engine/animation.ts'
 import { buildGiftRecord, giftUrl, newGiftToken } from '../engine/gift.ts'
 import { allocateCertificateNo } from '../engine/certificate-no.ts'
+import { recordHealth } from '../engine/health.ts'
 import { recordOrderIndex } from '../engine/egift-ops.ts'
 import { filmInputFromRecord, filmWaitMs, raceTimeout, trackFilm } from '../engine/film-store.ts'
 import { makeFilm, type FilmInput, type FilmRecord } from '../engine/film.ts'
@@ -169,6 +170,7 @@ export function createOrderHandler(deps: () => OrderDeps) {
         record.certificate_no = await allocateCertificateNo(d.store, orderRef, now)
       } catch (err) {
         console.error('[ichirei-order] certificate number failed', orderRef, err instanceof Error ? err.message : err)
+        void recordHealth(d.store, 'certificate_no_missing', { ref: orderRef }, now) // retried when the payment is seen and on every buyer-page open (engine/gift-check.ts); the gift is held until it is written
       }
       anim.gift_token = token
       await d.store.put(animationId, anim)
@@ -184,6 +186,7 @@ export function createOrderHandler(deps: () => OrderDeps) {
       if (!adopted) filmP = trackFilm(
         animationId,
         (d.film ?? makeFilm)(filmInputFromRecord(record)).then(async (film) => {
+          if (film.status === 'fallback') void recordHealth(d.store, 'film_fallback', { ref: orderRef, reason: film.reason ?? undefined }, d.now?.() ?? new Date())
           try {
             anim.film = film
             record.production.film = film
@@ -238,6 +241,7 @@ export function createOrderHandler(deps: () => OrderDeps) {
     // 3. The Shopify cart.
     try {
       const cart = await createCart(d.shopify!, order.package, lineAttributes(order, orderRef, animationLink, giftLink), orderRef, d.fetchImpl, order.language)
+      if (cart.mismatch) void recordHealth(d.store, 'en_cart_currency_mismatch', { ref: orderRef }, d.now?.() ?? new Date()) // counted in red on /ops/stats; the checkout still opens
       record.status = 'cart_created'
       record.updated_at = (d.now?.() ?? new Date()).toISOString()
       record.shopify = { cart_id: cart.cartId, checkout_url: cart.checkoutUrl, variant_id: cart.variantId }

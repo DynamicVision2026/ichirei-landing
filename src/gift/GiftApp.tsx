@@ -1,3 +1,4 @@
+import { openingLabelFromRecord } from '../order/opens-at.ts'
 import { inkOnly } from '../order/memorial.ts'
 import { isQuietPurpose } from '../order/purpose.ts'
 import { cleanReading } from '../order/reading.ts'
@@ -40,7 +41,7 @@ const prefersReducedMotion = (): boolean => window.matchMedia?.('(prefers-reduce
 const filmComplete = (v: GiftView): boolean => !!v.film && v.film.status === 'ready' && !v.film.incomplete && !!v.film.pictures && !v.film.deferred
 
 /** The story scroll exists only when all four pictures are real (never with a washi slot). */
-const scrollAvailable = (v: GiftView): boolean => !!v.film && v.film.status === 'ready' && !v.film.incomplete && !!v.film.pictures && v.film.pictures.length === 4 && v.film.pictures.every((u) => !u.startsWith('/film/washi-'))
+const scrollAvailable = (v: GiftView): boolean => !!v.film && v.film.status === 'ready' && !v.film.incomplete && !!v.film.pictures && v.film.pictures.length === 4 && v.film.pictures.every((u) => !u.startsWith('/film/washi-')) && !v.film.substituted?.length && !v.film.no_pictures
 
 export default function GiftApp() {
   const token = useMemo(routeToken, [])
@@ -278,7 +279,7 @@ function Envelope({ copy, lang, to, from, memorial, purpose, date, reduced, stat
   date: string
   reduced: boolean
   state: 'closed' | 'opening'
-  locked?: { opens_on: string; days_left: number; arriving?: boolean }
+  locked?: { opens_on: string; opens_at?: string | null; opens_tz?: string | null; days_left: number; arriving?: boolean }
   onOpen?: () => void
 }) {
   const letterLike = purpose === 'apology' || purpose === 'encourage'
@@ -311,7 +312,7 @@ function Envelope({ copy, lang, to, from, memorial, purpose, date, reduced, stat
         <p className="gf-locked" data-testid="gift-arriving">{copy.arriving}</p>
       ) : locked ? (
         <>
-          <p className="gf-locked" data-testid="gift-locked-date">{copy.opensOn(openDateText(lang, locked.opens_on, thisYear))}</p>
+          <p className="gf-locked" data-testid="gift-locked-date">{openingLabelFromRecord(lang, locked.opens_at, locked.opens_tz) ?? copy.opensOn(openDateText(lang, locked.opens_on, thisYear))}</p>
           <p className="gf-locked-note" data-testid="gift-locked-note">{copy.daysLeft(locked.days_left)}</p>
         </>
       ) : (

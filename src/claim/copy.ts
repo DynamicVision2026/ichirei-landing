@@ -20,6 +20,8 @@ export interface ClaimCopy {
   note: string
   /** The order step's button (it makes the gift; it does not go to checkout). */
   make: string
+  /** Under the claim buttons (2026-11-14): when the 24-hour cancellation window of a claimed order starts. */
+  window24: string
 }
 
 export const CLAIM_COPY: Record<UiLanguage, ClaimCopy> = {
@@ -40,6 +42,7 @@ export const CLAIM_COPY: Record<UiLanguage, ClaimCopy> = {
     banner: 'ご注文 {order}：お支払い済みです。物語を書いて、字を選んでください。',
     note: 'お支払いは済んでいます。追加のお支払いはありません。字を選ぶと、贈りものができあがります。',
     make: '贈りものを作る',
+    window24: 'この注文の24時間（キャンセル受付）は、ここで受け取った時点から始まります。',
   },
   'zh-Hant': {
     documentTitle: '製作你的禮物｜一字禮',
@@ -54,6 +57,7 @@ export const CLAIM_COPY: Record<UiLanguage, ClaimCopy> = {
     banner: '訂單 {order}：款項已付清。請寫下故事、選出那個字。',
     note: '款項已經付清，不會再收費。選好字，你的禮物就會製作完成。',
     make: '製作禮物',
+    window24: '此訂單的24小時取消期限，從你在這裡領取時開始計算。',
   },
   'zh-Hans': {
     documentTitle: '制作你的礼物｜一字礼',
@@ -68,6 +72,7 @@ export const CLAIM_COPY: Record<UiLanguage, ClaimCopy> = {
     banner: '订单 {order}：款项已付清。请写下故事、选出那个字。',
     note: '款项已经付清，不会再收费。选好字，你的礼物就会制作完成。',
     make: '制作礼物',
+    window24: '此订单的24小时取消期限，从你在这里领取时开始计算。',
   },
   en: {
     documentTitle: 'Make your gift | ICHIREI',
@@ -86,6 +91,7 @@ export const CLAIM_COPY: Record<UiLanguage, ClaimCopy> = {
     banner: 'Order {order}: paid. Write your story and choose the character.',
     note: 'You have already paid. There is nothing more to pay. Choose the character and your gift will be made.',
     make: 'Make my gift',
+    window24: "For this order, the 24-hour cancellation window starts when you claim it here.",
   },
 }
 

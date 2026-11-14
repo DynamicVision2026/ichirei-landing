@@ -3,6 +3,7 @@
 // its reading, the "who they are" line, the memorial flag and — when it is ready — the film script (engine/film.ts: four lines and four picture descriptions; the pictures themselves are drawn on the first open, engine/film-art.ts).
 // The page `/a/<id>` plays it with the fixed template in src/animation/; no model call happens when it is played.
 
+import { resolveSlots, type ArtSlot } from './film-pictures.ts'
 import type { EnBridge } from '../src/order/en-bridge.ts'
 import { randomBytes } from 'node:crypto'
 import type { Language } from './contract.ts'
@@ -96,10 +97,13 @@ export interface AnimationView {
    * `pictures` null = the script is there but the four pictures are not drawn yet: the page asks POST /api/film/<id>/render, which stays open until they are.
    * `deferred` = the daily picture limit was reached; they come the next day.
    * `incomplete` = some pictures could not be drawn yet (quota or an outage): washi is shown in their place and the page asks the server to draw only those.
+   * 2026-11-14: `pending` = the slots still being drawn (the result page shows its waiting state there); `substituted` = slots that show another slot's passed picture (a slot that failed for good,
+   * or — in the receiver's view — one that is still pending); `no_pictures` = nothing passed at all (fallback script, or every picture failed): the pictures block is left out and the film stays text and character.
+   * The plain washi tile is never what a customer sees as "a picture".
    */
-  film: { status: 'ready' | 'fallback'; lines: string[]; pictures: string[] | null; deferred?: boolean; incomplete?: boolean } | null
+  film: { status: 'ready' | 'fallback'; lines: string[]; pictures: string[] | null; deferred?: boolean; incomplete?: boolean; pending?: number[]; substituted?: number[]; no_pictures?: boolean } | null
   /** The sender's page only (api/animation.ts adds it): what to share and where the order stands. */
-  gift?: { url: string; size_code: string; ship_to: string; egift_state: 'waiting' | 'received' | null; opens_on: string | null; certificate_no: number | null; reply: { text: string; at: string } | null } | null
+  gift?: { url: string; size_code: string; ship_to: string; egift_state: 'waiting' | 'received' | null; opens_on: string | null; opens_at?: string | null; opens_tz?: string | null; certificate_no: number | null; reply: { text: string; at: string } | null } | null
   /** The buyer's page only (engine/buyer.ts): when it was ordered, the end of the 24-hour change window while it is open, and the wooden gift's step. */
   order?: import('./buyer.ts').BuyerOrderView | null
   /** The shop's support address (ICHIREI_SUPPORT_EMAIL), printed as plain text on the buyer's page; null when none is set. */
@@ -114,14 +118,24 @@ export const pictureUrl = (id: string, n: number, madeAt?: string): string => `/
 export const washiPictureUrl = (slot: number): string => `/film/washi-${(slot % 2) + 1}.webp`
 
 /** What the page receives: what the film shows, and nothing about the order, the names or the story beyond the film's own lines. */
-export function animationView(r: AnimationRecord, art: ArtRecord | null = null): AnimationView {
+export function animationView(r: AnimationRecord, art: ArtRecord | null = null, opts: { settle?: boolean } = {}): AnimationView {
   const f = r.film
   let film: AnimationView['film'] = null
   if (filmUsable(f)) {
-    if (f.status === 'fallback') film = { status: 'fallback', lines: f.lines, pictures: f.lines.map((_, i) => washiPictureUrl(i)) }
+    if (f.status === 'fallback') film = { status: 'fallback', lines: f.lines, pictures: f.lines.map((_, i) => washiPictureUrl(i)), no_pictures: true }
     else if (art && art.status !== 'deferred' && art.slots.length === f.lines.length) {
-      // done, incomplete, or being drawn again (a lease still shows what was there): a picture where there is one, washi elsewhere
-      film = { status: 'ready', lines: f.lines, pictures: f.lines.map((_, i) => (art.slots[i] === 'ai' ? pictureUrl(r.id, i + 1, art.made_at) : washiPictureUrl(i))), ...(art.slots.includes('pending') || art.slots.includes('unchecked') ? { incomplete: true } : {}) }
+      // done, incomplete, or being drawn again (a lease still shows what was there). A slot that failed for good shows another passed picture (never the washi tile); a pending one keeps a washi
+      // URL only as a placeholder address and is listed in `pending` (the result page shows its waiting state); with `settle` (the receiver's view) a pending slot gets a stand-in too.
+      const res = resolveSlots(art.slots as ArtSlot[], { settle: opts.settle })
+      const urlOf = (i: number): string => (res.source[i] === null ? washiPictureUrl(i) : pictureUrl(r.id, (res.source[i] as number) + 1, art.made_at))
+      film = {
+        status: 'ready',
+        lines: f.lines,
+        pictures: f.lines.map((_, i) => urlOf(i)),
+        ...(res.pending.length ? { incomplete: true, pending: res.pending } : {}),
+        ...(res.substituted.length ? { substituted: res.substituted } : {}),
+        ...(!res.anyDrawn && res.pending.length === 0 ? { no_pictures: true } : {}),
+      }
     } else film = { status: 'ready', lines: f.lines, pictures: null, ...(art?.status === 'deferred' ? { deferred: true } : {}) }
   }
   return { id: r.id, language: r.language, glyph: r.glyph, reading: r.reading, romanization: r.romanization, meaning_en: r.meaning_en, ...(r.language === 'en' && r.en ? { en: r.en } : {}), who: r.who, memorial: r.memorial, ...(r.purpose ? { purpose: r.purpose } : {}), ...(film ? { music: chooseTrack({ purpose: r.purpose, memorial: r.memorial }, makeFilmTimeline(f ? f.lines.length : 4, r.memorial).total) } : {}), film }

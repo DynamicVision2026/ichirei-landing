@@ -368,7 +368,7 @@ try {
   const h4 = await run()
   const t4 = cardsLine().ms.total
   const HC4 = cardsLine().parallel.calls.filter((c: any) => c.slot === 'freestyle')
-  check('(H4) the first free-pick call hangs and the second answers: two cards, no refill, the winner is hedge 2 and the hung call is cancelled — no waiting for the 400 ms ceiling', sum(h4) === 'main:誠,freestyle:朝' && counts.refill === 0 && HC4.find((c: any) => c.hedge === 2)?.won === true && HC4.find((c: any) => c.hedge === 1)?.won === false && HC4.find((c: any) => c.hedge === 1)?.error === 'cancelled' && t4 < 380, JSON.stringify({ t4, HC4: HC4.map((c: any) => [c.hedge, c.won, c.error, c.parse]) }))
+  check('(H4) the first free-pick call hangs and the second answers: two cards, no refill, the winner is hedge 2 and the hung call is cancelled — and the 400 ms ceiling is never reached (no call ended as a timeout; decided by which call answers, not by the clock)', sum(h4) === 'main:誠,freestyle:朝' && counts.refill === 0 && HC4.find((c: any) => c.hedge === 2)?.won === true && HC4.find((c: any) => c.hedge === 1)?.won === false && HC4.find((c: any) => c.hedge === 1)?.error === 'cancelled' && !HC4.some((c: any) => c.error === 'timeout'), JSON.stringify({ t4, HC4: HC4.map((c: any) => [c.hedge, c.won, c.error, c.parse]) }))
   // the other way round: the second call hangs, the first answers
   hedgeScript = ['ok', 'hang']
   const h4b = await run()

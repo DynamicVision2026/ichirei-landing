@@ -4,7 +4,7 @@
 //   SALE_PERCENT   e.g. 30      (empty = no sale)             Cloud Build substitution _SALE_PERCENT
 //   SALE_FROM      e.g. 2026-11-20  (a date, Japan time; the first day: the sale shows from 00:00)   Cloud Build substitution _SALE_FROM (empty = from now)
 //   SALE_UNTIL     e.g. 2026-11-30  (a date, Japan time; the last day: the sale shows until 23:59)   Cloud Build substitution _SALE_UNTIL
-//   SALE_UNTIL_EN  e.g. 2026-12-01T13:59+09:00  (an exact moment with its offset; English pages only — later than SALE_UNTIL's 23:59 so a US buyer's evening of the last day is covered;
+//   SALE_UNTIL_EN  e.g. 2026-12-01T13:59:59+09:00  (an exact moment with its offset; English pages only — later than SALE_UNTIL's 23:59 so a US buyer's evening of the last day is covered;
 //                  empty = English follows SALE_UNTIL)   Cloud Build substitution _SALE_UNTIL_EN
 // A percent without a valid SALE_UNTIL shows nothing. The server hands the sale to the page in GET /api/sizes until it is over; the page shows it only from `starts_at` to `ends_at` and switches
 // itself on and off at those moments, so a page left open neither shows a sale that has not begun nor keeps one that is over.

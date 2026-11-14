@@ -1,7 +1,7 @@
 // The Reveal landing page: its copy (word for word from design/reveal/index.html, three languages, honesty rules),
 // the approximate-price lines, the daily-rate cache behind /api/rates, and the photos (WebP + JPG for every name).
 //   node --experimental-strip-types scripts/test-reveal.ts
-process.env.ICHIREI_RATES = 'off' // the shared cache must never reach the network in tests
+import './_no-rates.ts' // FIRST: the shared rate cache must never reach the network in tests (imports are hoisted, so a plain assignment here would run too late)
 import { existsSync, readFileSync, readdirSync } from 'node:fs'
 import { TEXT, EXAMPLES, ANGLES, CATS, SCENE, DOCUMENT, REVEAL_LANGS, CATEGORIES } from '../src/reveal/copy.ts'
 import { approxLine, approxShort, formatApprox, ratesFromBody, DEFAULT_CURRENCY, CURRENCIES } from '../src/reveal/currency.ts'

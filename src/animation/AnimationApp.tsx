@@ -35,7 +35,7 @@ export default function AnimationApp() {
   const copy = COPY[lang]
 
   // a real order's page (the view carries the gift) is the buyer's welcome page; the reserved sample films have none and stay a film
-  const buyer = load.state === 'ready' && !!load.view.gift
+  const buyer = load.state === 'ready' && (!!load.view.gift || !!load.view.order?.confirming)
   useEffect(() => {
     document.title = buyer ? BUYER_COPY[lang].title : COPY[lang].title
     const meta = document.createElement('meta')
@@ -68,6 +68,7 @@ export default function AnimationApp() {
         setLang(pageLang(view.language))
         setLoad({ state: 'ready', view })
         if (!view.film) timer = setTimeout(go, 3000)
+        else if (view.order?.confirming || view.order?.finishing) timer = setTimeout(go, 30_000) // the page looks again by itself while it says "confirming" / "finishing"
       } catch {
         if (!ac.signal.aborted) setLoad({ state: 'error', kind: 'unavailable' })
       }
@@ -97,8 +98,16 @@ export default function AnimationApp() {
         }
         const j = (await res.json()) as { state: string; view: AnimationView }
         // never take pictures away from a film that is already playing
-        setLoad((cur) => (cur.state === 'ready' && cur.view.film?.pictures && !j.view.film?.pictures ? cur : { state: 'ready', view: j.view }))
+        setLoad((cur) => (cur.state === 'ready' && cur.view.film?.pictures && !j.view.film?.pictures ? cur : { state: 'ready', view: cur.state === 'ready' ? { ...j.view, gift: cur.view.gift, order: cur.view.order, support_email: cur.view.support_email } : j.view }))
         if (j.state === 'pending') timer = setTimeout(go, 3000)
+        else {
+          // the pictures are settled: look at the order again, so a buyer page that said "being finished" can show the collect button
+          const again = await fetch(viewUrl, { signal: ac.signal }).catch(() => null)
+          if (again?.ok) {
+            const v = (await again.json()) as AnimationView
+            setLoad((cur) => (cur.state === 'ready' ? { state: 'ready', view: { ...v, film: cur.view.film?.pictures && !v.film?.pictures ? cur.view.film : v.film } } : cur))
+          }
+        }
       } catch {
         if (!ac.signal.aborted) timer = setTimeout(go, 5000)
       }
@@ -108,10 +117,10 @@ export default function AnimationApp() {
       ac.abort()
       if (timer) clearTimeout(timer)
     }
-  }, [needsPictures, id, renderUrl])
+  }, [needsPictures, id, renderUrl, viewUrl])
 
   // the buyer's welcome page (/a/<id> of an order): no film here — the film plays in the preview of what the receiver sees; its pictures are still drawn on this first open
-  if (load.state === 'ready' && load.view.gift)
+  if (load.state === 'ready' && (load.view.gift || load.view.order?.confirming))
     return (
       <main className={`an-page an-buyer${inkOnly(load.view) ? ' an-memorial' : ''}`} data-testid="animation-page" lang={lang}>
         <BuyerPage view={load.view} lang={lang} preparing={copy.preparing} onCollected={() => setLoad((cur) => (cur.state === 'ready' ? { state: 'ready', view: { ...cur.view, order: cur.view.order ? { ...cur.view.order, collected: true } : cur.view.order } } : cur))} />

@@ -1,0 +1,68 @@
+lang,match,plain
+en,Ziploc bags?,clear plastic bag
+en,Tupperware( container| box)?,plastic food container
+en,Starbucks( coffee)? cups?,paper coffee cup
+en,Starbucks,coffee shop
+en,McDonald'?s,fast-food restaurant
+en,Burger King,fast-food restaurant
+en,Coca-?Cola( cans?| bottles?)?,soda can
+en,Coke( cans?| bottles?),soda can
+en,Pepsi( cans?| bottles?)?,soda can
+en,Nike( sneakers| shoes| trainers)?,sneakers
+en,Adidas( sneakers| shoes| trainers)?,sneakers
+en,iPhones?,smartphone
+en,iPads?,tablet
+en,MacBooks?,laptop
+en,Kindles?,e-reader
+en,Kleenex,paper tissue
+en,Post-?it notes?,small square paper note
+en,Sharpie( marker| pen)?,marker pen
+en,Lego( bricks| set)?,toy building bricks
+en,Barbie( doll)?,doll
+en,Walmart,supermarket
+en,Costco,warehouse store
+en,Target store,supermarket
+en,Amazon (box|package|parcel),cardboard box
+en,Tesla,electric car
+en,Ford (truck|pickup),pickup truck
+en,(Toyota|Honda|Chevrolet|Chevy|Volkswagen|Subaru),car
+en,Jeep,off-road car
+en,Harley(-Davidson)?,motorcycle
+en,(Yankees|Dodgers|Red Sox|Cubs) (cap|hat),baseball cap
+en,(a |the |his |her |their )?(sports |football |baseball |basketball |soccer )?jerseys? (with|bearing|showing) (his|her|their|a|the) (number|name)( on it| on the back| on the front)?,sports jersey
+en,jerseys? with (a )?(number|name)s?( on (it|the back|the front))?,sports jersey
+en,(a |the )?(license|number|registration) plates?,car seen from far away
+en,(a |the )?signs? (that |which )?(says|read|reads|reading|saying|with the words)[^,.;]*?(?=\s(above|over|on|beside|at|in|by|near|behind|outside)\b|[,.;]|$),sign seen from far away
+en,(a |the )?(price|name|luggage) tags?,small tag seen from far away
+en,(a |the )?(brand|product) labels?,plain label-free packaging
+en,(a |the )?(brand |company )?logos?,plain unmarked surface
+en,(a |the )?(birthday |greeting |thank-you )?cards? (that |which )?(says|reads|reading|saying|with the words)[^,.;]*?(?=\s(above|over|on|beside|at|in|by|near|behind|outside)\b|[,.;]|$),folded paper card
+en,(a |the )?(text |chat )?messages? on (the |a )?(phone|screen),a phone held in a hand
+en,Disney,cartoon
+en,Netflix,television
+en,Google,search
+en,Facebook|Instagram|TikTok|WhatsApp|WeChat|LINE app,phone app
+en,Uber,taxi
+ja,ジップロック,透明なポリ袋
+ja,タッパー(ウェア)?,プラスチックの保存容器
+ja,スターバックス|スタバ,コーヒーショップ
+ja,スタバのカップ,紙のコーヒーカップ
+ja,マクドナルド|マック|ミスド|モスバーガー,ファストフード店
+ja,コカ[・･]?コーラ|ペプシ,清涼飲料の缶
+ja,ポストイット|付箋,小さな四角い紙
+ja,レゴ,積み木のおもちゃ
+ja,ユニクロ|ZARA|ナイキ|アディダス,普段着
+ja,アイフォン|アイフォーン|iPhone,スマートフォン
+ja,ドラえもん|ディズニー,アニメのキャラクター
+ja,背番号[^、。]*のユニフォーム,スポーツのユニフォーム
+ja,看板に「[^」]*」と書かれた,遠くに見える看板
+zh,夾鏈袋|Ziploc,透明塑膠袋
+zh,星巴克,咖啡店
+zh,麥當勞|肯德基|麦当劳,速食店
+zh,可口可樂|百事可樂|可口可乐,汽水罐
+zh,便利貼|便利贴,小方紙片
+zh,樂高|乐高,積木玩具
+zh,耐吉|愛迪達|阿迪达斯|耐克,運動鞋
+zh,蘋果手機|iPhone|苹果手机,智慧型手機
+zh,印有號碼的球衣|印有号码的球衣,運動球衣
+zh,寫著「[^」]*」的招牌|写着「[^」]*」的招牌,遠處的招牌

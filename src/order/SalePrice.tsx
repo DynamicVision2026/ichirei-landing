@@ -28,7 +28,7 @@ export function UsdPriceView({ price, sale, id }: { price: UsdPrice; sale: Sale 
   return <b className="priceSale" data-price-sale={id}>{usd(price.egift_sale)}</b>
 }
 
-/** "Thanksgiving launch price, through November 30. $25 from December 1." — only while the sale is on. */
+/** "Thanksgiving launch price, through November 30 (US Eastern time). $25 from December 1." — only while the sale is on. */
 export function UsdLaunchLine({ price, sale }: { price: UsdPrice; sale: Sale | null }) {
   if (!sale) return null
   return <span className="saleLine sent" data-testid="sale-line">{usdLaunchLine(price, sale.until)}</span>

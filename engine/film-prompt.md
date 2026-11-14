@@ -29,11 +29,12 @@ STEP 2 — FOUR SCENES, FOLLOWING THIS ARC (not just "the first four things that
   2. LEAD-UP — the moment that leads to the discovery.
   3. THE TURNING POINT (required) — scene 3 shows `turning_point` directly: the discovery, the act or the sentence itself.
   4. AFTER — the image the story ends on, or what remains. Scene 4 must be RESOLVED: never end on a setup, a question, a cliff-hanger or an object still waiting to be opened, developed or answered. If the story ends on such a moment, scene 4 is the answer the story gives afterwards.
-  A SHORT STORY (one or two sentences, fewer than four different moments) has no arc to find, and it STILL gets four pictures: build four scenes from the SAME moment, seen differently —
-    1. the place and its light (the setting the story names, wide, far away);
-    2. the receiver's act (the act the story tells, as hands or seen from behind);
-    3. a close-up of a detail that is already in the story (an object or a gesture it names);
-    4. the quiet after (the feeling the story states or implies, shown through the same place or the same object).
+  A SHORT STORY (one or two sentences, fewer than four different moments) has no arc to find, and it STILL gets four pictures. FOUR PICTURES FROM ANY MOMENT: always plan exactly four pictures. When the moment has four distinct steps, follow them in order. When it has fewer (often only one or two sentences), show the same moment from different angles, in this order of preference:
+    1. the place: a wide, quiet view of where it happened;
+    2. the hands or the object: a close view of the thing at the heart of the moment (the bag of orange slices, the porch light, the steering wheel), with no writing on it;
+    3. the person seen from behind or far away: a small figure in that place;
+    4. the after: the same place a moment later, or one quiet detail left behind.
+    Each picture must be different enough to stand on its own, but it is fine for two pictures to show the same moment. Never leave a picture empty, and never invent events the sender did not write. The captions follow the same plan: the sender's own words first, then short lines drawn only from the moment.
   In a short story NEVER add a person, an animal, an object, an event, a place or a word that the story does not have. Mood, light, weather, season and camera distance are yours to choose, as long as nothing in the story contradicts them. The caption (line) of an extra scene reuses a short phrase of the story; if no phrase of the story fits, the line is the empty string "" (never invented). Do not leave a picture out: the washi tile is only for a picture that cannot be drawn safely.
 STEP 3 — Each line tells what happened at one moment — a scene a painter could draw — complete and readable on its own, in the sender's view and voice. For each line, also one PICTURE DESCRIPTION (rule 7).
 
@@ -56,7 +57,7 @@ RULES
    - CLOTHES AND SETTING. People wear contemporary everyday clothes — never a kimono, yukata, hanbok, qipao or any other traditional dress unless the story mentions it. The setting is the buyer's own modern world, by the language above: ja → a modern Japanese home and town; zh-Hant / zh-Hans → a modern Taiwanese, Hong Kong or Chinese home and street (never Japanese houses, paper lanterns, tatami, shoji or torii); en → a neutral modern home. If the story names a place or a culture, follow the story.
    - NO RELIGIOUS SYMBOLS: no cross (also not one made by a window frame or a shadow), no Buddhist altar, shrine, temple, torii, prayer beads or any other religious sign — unless the story itself mentions it. This matters most in a remembrance film: show a quiet table, a window, hands, a chair, never an altar.
    - NO FACES. A person appears ONLY as hands, or seen from behind, or from far away as a small silhouette — never close enough to show a face. Never show a face, not even in profile. Never write smile, eyes, expression, profile, looking at, facing or any feature of a face.
-   - NO TEXT of any kind in the picture: no letters, signs, writing, screens with words, logos or brands. (A letter or a card may appear as a folded paper, never as writing.)
+   - NO TEXT of any kind in the picture: no letters, signs, writing, screens with words, logos or brands. (A letter or a card may appear as a folded paper, never as writing.) Never name a brand or product, and never describe writing, labels, numbers or signs; describe the object plainly ("a clear plastic bag", not a brand of bag; "a sports jersey", not its number).
    - No names, no real place names, no schools or companies; no digits; no Japanese or Chinese characters.
    - NO illness, hospital, injury, blood, funeral or decline image, even if the story mentions it — paint the moment around it. For a remembrance film, and for a quiet gift (an apology, an encouragement — the tone line above says so), no celebration image either (no party, cake, candles, festival, wedding).
    - NO knife, blade, weapon, fight or quarrel in a picture, in word or in image (a work tool is a plane, a chisel, sandpaper, a ruler; a quarrel is told by its quiet aftermath: a table laid for one more, a door left unlatched, two cups).

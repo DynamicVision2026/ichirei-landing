@@ -7,6 +7,7 @@
 //
 // Needs playwright (npm i --no-save playwright) and builds dist/ with ICHIREI_BASE=/ like the other browser tests.
 
+import { fakePicture } from './_fake-picture.mjs'
 import { execSync } from 'node:child_process'
 import http from 'node:http'
 import { mkdtempSync, mkdirSync, rmSync, writeFileSync } from 'node:fs'
@@ -60,7 +61,7 @@ for (const i of [1, 3, 4]) writeFileSync(join(dir, 'films', inc.id, `${i}.webp`)
 writeFileSync(join(dir, 'films', inc.id, 'art.json'), JSON.stringify({ schema: 'film-art', id: inc.id, status: 'incomplete', started_at: '2026-10-28T00:00:00Z', made_at: '2026-10-28T00:00:00Z', slots: ['ai', 'pending', 'ai', 'ai'], reasons: ['ok', 'quota', 'ok', 'ok'], check_fails: [0, 0, 0, 0], calls: 3, retry_after: '2026-10-28T00:01:00Z' }))
 const expectedPictures = (rec) => (rec.film.status === 'fallback' ? ['/film/washi-1.webp', '/film/washi-2.webp'] : [1, 2, 3, 4].map((i) => `/api/film/${rec.id}/picture/${i}.webp`))
 // fakes for the first-open flow: Google's image model (a plain image after a short wait) and the picture check (every picture passes)
-const PNG = await sharp({ create: { width: 320, height: 400, channels: 3, background: '#cdbf9f' } }).png().toBuffer()
+const PNG = await fakePicture(320, 400, '#cdbf9f')
 let imageCalls = 0
 let imageDelayMs = 700
 const vertex = http.createServer(async (req, res) => {

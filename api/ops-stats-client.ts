@@ -117,6 +117,32 @@ export const STATS_CLIENT_JS = String.raw`
     return h + '</tbody></table></div>';
   }
 
+  var HEALTH_CODES = ['en_cart_currency_mismatch', 'needs_attention', 'certificate_no_missing', 'gift_incomplete', 'picture_substituted', 'pictures_none', 'picture_empty', 'poem_failed', 'film_fallback'];
+  var RED = { en_cart_currency_mismatch: 1, needs_attention: 1, certificate_no_missing: 1 };
+  function renderHealth() {
+    var H = D.health; if (!H) return '';
+    var tot = H.total || {}, days = Object.keys(H.by_day || {}).sort().reverse().slice(0, 14);
+    var h = '<h2>' + esc(t('health_title')) + '</h2><div class="wide"><table data-testid="health-table"><thead><tr><th></th><th class="n">30</th>';
+    days.forEach(function (d) { h += '<th class="n">' + esc(d.slice(5)) + '</th>'; });
+    h += '</tr></thead><tbody>';
+    HEALTH_CODES.forEach(function (c) {
+      var n = tot[c] || 0, red = RED[c] && n > 0;
+      h += '<tr data-code="' + c + '"' + (red ? ' class="red"' : '') + '><td>' + esc(t('h_' + c)) + '</td><td class="n">' + n + '</td>';
+      days.forEach(function (d) { h += '<td class="n">' + ((H.by_day[d] || {})[c] || 0) + '</td>'; });
+      h += '</tr>';
+    });
+    h += '</tbody></table></div>';
+    var drawn = tot.film_drawn || 0, bad = tot.film_blank_or_substituted || 0;
+    h += '<p class="note" data-testid="health-rate">' + esc(t('h_rate')) + ': ' + (drawn ? Math.round(bad / drawn * 1000) / 10 + '% (' + bad + ' / ' + drawn + ')' : esc(t('no_data'))) + '</p>';
+    var rs = H.reasons || {}, keys = Object.keys(rs).sort(function (a, b) { return rs[b] - rs[a]; });
+    if (keys.length) { h += '<p class="note" data-testid="health-reasons">' + esc(t('h_reasons')) + ': ' + keys.map(function (k) { return esc(k) + ' ' + rs[k]; }).join(' · ') + '</p>'; }
+    return h;
+  }
+  function renderAttention() {
+    var n = (D.attention && D.attention.count) || 0, red = ((D.health && D.health.total) || {}).en_cart_currency_mismatch || 0;
+    if (!n && !red) return '';
+    return '<p class="alert" role="alert" data-testid="attention-banner">' + (n ? esc(t('health_attention').replace('{n}', n)) : '') + (red ? ' ' + esc(t('h_en_cart_currency_mismatch')) + ': ' + red : '') + '</p>';
+  }
   function render() {
     var s = D.stats.periods[period];
     document.documentElement.lang = lang === 'zh-Hant' ? 'zh-Hant' : lang === 'zh-Hans' ? 'zh-Hans' : lang;
@@ -130,8 +156,8 @@ export const STATS_CLIENT_JS = String.raw`
     PERIODS.forEach(function (p) { th += '<button type="button" data-period="' + p + '" aria-pressed="' + (p === period) + '">' + esc(t('p_' + p)) + '</button>'; });
     document.getElementById('tabs').innerHTML = th;
     document.getElementById('app').innerHTML =
-      (D.verified ? '' : '<p class="warn">' + esc(t('payments_unverified')) + '</p>') +
-      renderNumbers(s) + '<p class="note">' + esc(t('cost_note')) + '</p>' + renderChoice(s) + renderFunnel(s) + renderDaily(s) + renderSources(s) + renderOrders() +
+      renderAttention() + (D.verified ? '' : '<p class="warn">' + esc(t('payments_unverified')) + '</p>') +
+      renderNumbers(s) + '<p class="note">' + esc(t('cost_note')) + '</p>' + renderChoice(s) + renderFunnel(s) + renderDaily(s) + renderSources(s) + renderHealth() + renderOrders() +
       '<p class="note">' + esc(t('privacy_note')) + '</p>';
   }
 

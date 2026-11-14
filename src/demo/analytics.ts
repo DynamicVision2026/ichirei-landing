@@ -63,7 +63,7 @@ export function trackFlow(event: FlowEvent, fields: { language?: string; set?: s
 }
 
 /** The free card preview (engine/analytics.ts PREVIEW_EVENTS): codes and counts only — never a character, a poem or a story. */
-export type PreviewEvent = 'card_preview_shown' | 'candidates_retry' | 'pictures_before_pay' | 'preview_to_order'
+export type PreviewEvent = 'card_preview_shown' | 'candidates_retry' | 'pictures_before_pay' | 'preview_to_order' | 'result_page_view' | 'result_to_order'
 export function trackPreview(event: PreviewEvent, fields: { language?: string; n?: 1 | 2; state?: 'shown' | 'limited' | 'failed'; secs?: number } = {}): void {
   try {
     void fetch('/api/analytics', {

@@ -2,6 +2,7 @@
 // single-page app, which these crawlers do not run, so the server puts the tags into the HTML of /g/<token>. Names and the opening date only: never the
 // character, the poem, the message or the story. Everything here is escaped, because a sender's name is text typed by a person.
 
+import { openingLabelFromRecord } from '../src/order/opens-at.ts'
 import { createHash } from 'node:crypto'
 import { publicUrl } from './animation.ts'
 import type { GiftRecord } from './gift.ts'
@@ -29,13 +30,14 @@ export interface OgMeta {
 export function ogMeta(g: GiftRecord, env: NodeJS.ProcessEnv = process.env, now: Date = new Date()): OgMeta {
   const lang = pageLang(g.language)
   const base = publicUrl(env)
+  const exact = openingLabelFromRecord(lang, g.opens_at, g.opens_tz) // "Opens Dec 25, 7:00 a.m. (Eastern)"
   const date = g.opens_on ? openDateText(lang, g.opens_on, now.getUTCFullYear()) : null
   // A name nobody gave is left out — no placeholder, no relationship word.
   const thing = lang === 'ja' ? (g.memorial ? '一字の便り' : '一字の贈りもの') : lang === 'zh-Hant' ? (g.memorial ? '一個字的來信' : '一個字的禮物') : g.memorial ? 'a letter of one character' : 'a gift of one character'
   const title =
     lang === 'ja' ? (g.to ? `${g.to}へ　${thing}` : thing) : lang === 'zh-Hant' ? (g.to ? `致 ${g.to}　${thing}` : thing) : g.to ? `To ${g.to} — ${thing}` : thing[0].toUpperCase() + thing.slice(1)
   const sentence = lang === 'ja' ? (g.from ? `${g.from}さんから` : '') : lang === 'zh-Hant' ? (g.from ? `來自 ${g.from}` : '') : g.from ? `From ${g.from}` : ''
-  const when = date ? (lang === 'ja' ? `${date}に開封` : lang === 'zh-Hant' ? `${date}開啟` : `opens ${date}`) : ''
+  const when = exact ?? (date ? (lang === 'ja' ? `${date}に開封` : lang === 'zh-Hant' ? `${date}開啟` : `opens ${date}`) : '')
   const description = [sentence, when].filter(Boolean).join(' · ') || (lang === 'en' ? 'ICHIREI' : '一字礼')
   return { title, description, image: `${base}${ogPath(g)}`, url: `${base}/g/${g.token}`, lang }
 }

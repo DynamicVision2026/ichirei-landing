@@ -40,7 +40,10 @@ const paid = (h: number): PaymentInfo => ({ state: 'paid', paid_at: at(h).toISOS
   check('(1) the window starts at PAYMENT, not at the cart: a cart paid a day later is open from its own payment', windowOf({ ...rec0, created_at: at(-30).toISOString() } as OrderRecord, paid(0), at(2)).phase === 'open')
   check('(1) never paid (Shopify has no such paid order) is "unpaid", cancelled or refunded in Shopify is "cancelled", and our own cancel flag wins', windowOf(rec0, null, at(2)).phase === 'unpaid' && windowOf(rec0, { state: 'unpaid', paid_at: null }, at(2)).phase === 'unpaid' && windowOf(rec0, { state: 'cancelled', paid_at: null }, at(2)).phase === 'cancelled' && windowOf(rec0, { state: 'refunded', paid_at: null }, at(2)).phase === 'cancelled' && windowOf({ ...rec0, ops: { cancelled_at: 'x' } } as OrderRecord, paid(0), at(2)).phase === 'cancelled')
   const un = windowOf(rec0, 'unverified', at(2))
-  check('(1) when Shopify cannot be asked, the order\'s own time is used and the answer says it is not verified', un.phase === 'open' && !un.verified && windowOf(rec0, 'unverified', at(30)).phase === 'closed')
+  check('(1) when Shopify cannot be asked, an order whose payment was NEVER seen is "unpaid" (2026-11-14: "could not be asked" is not proof of payment) and the answer says it is not verified', un.phase === 'unpaid' && !un.verified && windowOf(rec0, 'unverified', at(30)).phase === 'unpaid')
+  const seen = { ...rec0, paid_seen_at: at(0).toISOString(), paid_at_seen: at(0).toISOString() } as OrderRecord
+  check('(1) …but an order whose payment WAS seen before keeps its seen time: open at 2 hours, closed after 24, still "not verified"', windowOf(seen, 'unverified', at(2)).phase === 'open' && !windowOf(seen, 'unverified', at(2)).verified && windowOf(seen, 'unverified', at(30)).phase === 'closed')
+  check('(1) an order collected before this rule existed keeps the old behaviour (its own creation time)', windowOf({ ...rec0, collected_at: at(1).toISOString() } as OrderRecord, 'unverified', at(2)).phase === 'open')
   check('(1) paymentOf: PAID with a sale at 12:05 → paid then; AUTHORIZED counts; PENDING (a bank transfer not yet in) is unpaid; cancelledAt and REFUNDED are not alive', paymentOf({ displayFinancialStatus: 'PAID', createdAt: '2026-10-23T03:00:00Z', transactions: [{ kind: 'SALE', status: 'SUCCESS', processedAt: '2026-10-23T03:05:00Z' }] }).paid_at === '2026-10-23T03:05:00Z' && paymentOf({ displayFinancialStatus: 'AUTHORIZED', createdAt: '2026-10-23T03:00:00Z', transactions: [{ kind: 'AUTHORIZATION', status: 'SUCCESS', processedAt: '2026-10-23T03:01:00Z' }] }).state === 'paid' && paymentOf({ displayFinancialStatus: 'PENDING' }).state === 'unpaid' && paymentOf({ displayFinancialStatus: 'PAID', cancelledAt: 'x' }).state === 'cancelled' && paymentOf({ displayFinancialStatus: 'REFUNDED' }).state === 'refunded')
 }
 
@@ -210,9 +213,11 @@ paidAt['IC-20261023-CLOSED01'] = paid(-30) // paid 30 hours before T0 → at T0+
   // Shopify cannot be asked: the order's own time; the page and the CSV say so
   paymentsDown = true
   NOW = at(40)
+  // (2026-11-14) only an order whose payment was SEEN before is listed while Shopify cannot be asked: this one was (the webhook / an earlier lookup recorded it)
+  { const r = (await store.get('IC-20261023-CLOSED01')) as OrderRecord; await store.put('IC-20261023-CLOSED01', { ...r, paid_seen_at: at(0).toISOString(), paid_at_seen: at(0).toISOString() }) }
   const page2 = await (await O.page(req('/ops'))).text()
   const csv2 = await (await O.woodenCsv(req('/ops/wooden-today.csv'))).text()
-  check('(10) when Shopify cannot be asked the order\'s own time is used — and the page and the CSV both say it is not verified', page2.includes('Shopifyから入金を確認できませんでした') && csv2.includes('unverified (Shopify could not be asked)'))
+  check('(10) when Shopify cannot be asked, an order whose payment was seen keeps its seen time — and the page and the CSV both say it is not verified', page2.includes('Shopifyから入金を確認できませんでした') && csv2.includes('unverified (Shopify could not be asked)'))
   paymentsDown = false
   NOW = at(2)
 }

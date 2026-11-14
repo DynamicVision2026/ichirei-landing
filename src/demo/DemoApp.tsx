@@ -1,3 +1,5 @@
+import ResultPage, { type ResultLive } from './ResultPage'
+import { setFlowActive } from '../reveal/flow-store.ts'
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { AnimatePresence, motion, useReducedMotion } from 'framer-motion'
 import type { Candidate, Condition, EngineResult } from './types'
@@ -16,7 +18,7 @@ import { OPENER } from '../reveal/opener-copy'
 import { exportEvents, log, setCondition as logSetCondition, setStory as logSetStory } from './logging'
 import { setMemorialSelected } from '../reveal/occasion-store'
 import { egiftCopy } from './egift-copy'
-import { useWoodOnSale } from './useSizes'
+import { useMaxRounds, useWoodOnSale } from './useSizes'
 import { COPY, DEFAULT_GIFT_CONTEXT, FOLLOW_UP_COUNTER_FROM, FOLLOW_UP_MAX, clipStory, contextToPayload, occasionOf, purposeOf, storyLength, type Copy, type GiftContext } from './i18n'
 import { getLanguage, setLanguage } from '../lang-store'
 import { useLanguage } from '../useLanguage'
@@ -132,7 +134,7 @@ const GOLDEN_CONTEXT: GiftContext = {
 const GOLDEN_FIXTURE =
   '父は口下手で厳しくて、ほめられた記憶なんてほとんどない。進路のことでも何度もぶつかった。ただ、私が東京に出るとき駅まで送ってくれて、改札で「金は要るか」って、それだけ言って封筒を押し付けてきた。あれから二十年、盆に帰るたびに車で駅まで迎えに来て、帰りも必ず送ってくれる。相変わらず、ほとんど何も話さないけど。'
 
-type Phase = 'elicit' | 'processing' | 'followup' | 'suggest' | 'reveal' | 'order' | 'thin' | 'declined'
+type Phase = 'elicit' | 'processing' | 'followup' | 'suggest' | 'reveal' | 'result' | 'order' | 'thin' | 'declined'
 
 /**
  * harness  — /demo: the internal validation harness (A/B/C conditions, log export, golden fixture,
@@ -251,6 +253,7 @@ export default function DemoApp({ mode = 'harness', aside }: { mode?: Mode; asid
   }, [customer, memorialNow])
   // while the wooden sizes are "coming soon" the lines about the carved form and the shipping say nothing about wood (src/demo/egift-copy.ts)
   const woodOnSale = useWoodOnSale()
+  const maxRounds = useMaxRounds() // how many sets of characters one story gets (ICHIREI_MAX_ROUNDS, 2 by default)
   const baseCopy = COPY[context.language]
   const copy = useMemo(() => (woodOnSale ? baseCopy : egiftCopy(baseCopy, context.language)), [woodOnSale, baseCopy, context.language])
   const [chosen, setChosen] = useState<Candidate | null>(null)
@@ -284,15 +287,49 @@ export default function DemoApp({ mode = 'harness', aside }: { mode?: Mode; asid
 
   // Customer site: when the flow moves on (processing → follow-up → cards → order form) bring the start of the
   // WRITE section back into view, so a long form never leaves the visitor in the middle of the next step.
+  // Only a REAL step change scrolls (2026-11-14, C1): the phase is compared with the one before, so neither the first render nor the late answer of useReducedMotion (which re-runs an effect that
+  // lists it) can scroll the landing page to #write on load. The result page is its own full-screen page: it does not scroll the landing behind it.
   const reduceMotion = useReducedMotion()
-  const firstPhase = useRef(true)
+  const reduceRef = useRef(reduceMotion)
+  reduceRef.current = reduceMotion
+  const prevPhase = useRef<Phase>('elicit')
   useEffect(() => {
-    if (firstPhase.current) {
-      firstPhase.current = false
-      return
+    const before = prevPhase.current
+    prevPhase.current = phase
+    if (!customer || before === phase || phase === 'result') return
+    document.getElementById('write')?.scrollIntoView({ block: 'start', behavior: reduceRef.current ? 'auto' : 'smooth' })
+  }, [phase, customer])
+  // the dock is hidden for the whole flow (a phase flag, C2)
+  useEffect(() => {
+    if (!customer) return
+    setFlowActive(phase !== 'elicit')
+    return () => setFlowActive(false)
+  }, [customer, phase])
+  // the result page has its own address state (#result): the browser's back button returns to the cards with the rounds as they were
+  const [live, setLive] = useState<ResultLive | null>(null)
+  const [receiverName, setReceiverName] = useState('')
+  useEffect(() => {
+    if (!customer || phase !== 'result') return
+    try {
+      if (window.location.hash !== '#result') window.history.pushState({ ichireiResult: true }, '', '#result')
+    } catch {
+      // a page without history access simply has no address state
     }
-    if (customer) document.getElementById('write')?.scrollIntoView({ block: 'start', behavior: reduceMotion ? 'auto' : 'smooth' })
-  }, [phase, customer, reduceMotion])
+    const onPop = () => {
+      if (window.location.hash !== '#result') setPhase((p) => (p === 'result' ? 'reveal' : p))
+    }
+    window.addEventListener('popstate', onPop)
+    return () => window.removeEventListener('popstate', onPop)
+  }, [customer, phase])
+  const leaveResult = (to: 'order' | 'reveal') => {
+    try {
+      if (window.location.hash === '#result') window.history.replaceState(null, '', window.location.pathname + window.location.search)
+    } catch {
+      // nothing to clear
+    }
+    if (to === 'order') trackPreview('result_to_order', { language: context.language })
+    setPhase(to)
+  }
 
   // Never lose a draft (customer page): the story, the chips and the question are saved in this browser as the visitor types — but not
   // while an earlier draft is still waiting for 続ける / 新しく書く, and never into a page without browser storage (saveDraft swallows that).
@@ -473,7 +510,7 @@ export default function DemoApp({ mode = 'harness', aside }: { mode?: Mode; asid
   // 「別の候補を見る」: three new characters for the same story, leaving out every character already shown (at most two retries).
   const shownForms = () => [...new Set(sets.flatMap((r) => r.candidates.filter((c) => !c.eliminated).flatMap((c) => [c.kanji, cleanInscriptionForm(c.kanji, c.inscription_form) ?? ''])).filter(Boolean))]
   const seeOthers = () => {
-    if (retryCount >= 2 || phase !== 'reveal') return
+    if (retryCount >= maxRounds - 1 || phase !== 'reveal') return
     void runEngine(story, followUps, context, { exclude: shownForms(), retry: (retryCount + 1) as 1 | 2 })
   }
   const pc = PREVIEW_COPY[toRevealLang(context.language)]
@@ -669,8 +706,8 @@ export default function DemoApp({ mode = 'harness', aside }: { mode?: Mode; asid
         </div>
       )}
 
-      {(phase === 'reveal' || phase === 'order') && result && (
-        <div hidden={phase === 'order'}>
+      {(phase === 'reveal' || phase === 'order' || phase === 'result') && result && (
+        <div hidden={phase !== 'reveal'}>
           {result.primary_kanji !== null && result.candidates.some((c) => !c.eliminated) && (
             <Reveal
               key={setIdx}
@@ -686,7 +723,7 @@ export default function DemoApp({ mode = 'harness', aside }: { mode?: Mode; asid
                   ? (c) => {
                       setChosen(c)
                       setChosenSet(setIdx)
-                      setPhase('order')
+                      setPhase('result') // the character, the four pictures and the poem come first, on their own page (B3)
                     }
                   : undefined
               }
@@ -694,13 +731,13 @@ export default function DemoApp({ mode = 'harness', aside }: { mode?: Mode; asid
           )}
           {customer && sets.length > 0 && result.primary_kanji !== null && (
             <div className="candidateSets" data-testid="candidate-sets">
-              {retryCount < 2 && !retryNote ? (
+              {retryCount < maxRounds - 1 && !retryNote ? (
                 <button type="button" className="btn ghost" data-testid="see-others" onClick={seeOthers}>
-                  {pc.another(2 - retryCount)}
+                  {pc.another(maxRounds - 1 - retryCount)}
                 </button>
               ) : (
                 <p className="sent" role="status" data-testid="retry-cap">
-                  {pc.addDetail}
+                  {retryCount >= maxRounds - 1 ? pc.noMore : pc.addDetail}
                 </p>
               )}
               {sets.length > 1 && (
@@ -729,8 +766,12 @@ export default function DemoApp({ mode = 'harness', aside }: { mode?: Mode; asid
         </div>
       )}
 
-      {customer && phase === 'order' && result && chosen && (
-        <OrderForm result={customer && sets[chosenSet] ? sets[chosenSet] : result} draftRef={draftRef} shown={sets.flatMap((r, i) => r.candidates.filter((c) => !c.eliminated).map((c) => ({ set: (i + 1) as 1 | 2 | 3, candidate: c })))} story={story} followUps={followUps} promptQuestionId={customer ? questionId : null} candidate={chosen} copy={copy} onBack={() => setPhase('reveal')} />
+      {customer && phase === 'result' && live && <ResultPage live={live} onMake={() => leaveResult('order')} onAnother={() => leaveResult('reveal')} />}
+
+      {customer && (phase === 'order' || phase === 'result') && result && chosen && (
+        <div hidden={phase === 'result'}>
+        <OrderForm onLive={setLive} receiverName={receiverName} onReceiver={setReceiverName} result={customer && sets[chosenSet] ? sets[chosenSet] : result} draftRef={draftRef} shown={sets.flatMap((r, i) => r.candidates.filter((c) => !c.eliminated).map((c) => ({ set: (i + 1) as 1 | 2 | 3, candidate: c })))} story={story} followUps={followUps} promptQuestionId={customer ? questionId : null} candidate={chosen} copy={copy} onBack={() => setPhase('reveal')} />
+        </div>
       )}
 
       {!customer && result && (phase === 'reveal' || phase === 'thin') && (

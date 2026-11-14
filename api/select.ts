@@ -13,6 +13,7 @@
 //   {"type":"result","result":<engine JSON contract>[,"debug":{…}]}  ...terminal (`debug`: only with ?debug=1 — this request's timings, codes and numbers, no story text)
 //   {"type":"error","error":"<message>","code"?:"model_timeout","seconds"?:<n>}  ...terminal
 
+import { maxRoundsOf } from '../engine/limits.ts'
 import { runEngine } from '../engine/engine.ts'
 import { ModelTimeoutError, callTimeoutMs } from '../engine/limits.ts'
 import { cleanSession, cleanSource, recordEvent, shownEvent } from '../engine/analytics.ts'
@@ -20,7 +21,7 @@ import { costCollector } from '../engine/ai-cost.ts'
 import { recordFreeSource, recordMain } from '../engine/free-source.ts'
 import { createOrderStore } from '../engine/order-store.ts'
 import { parsePromptQuestion } from '../engine/story-questions.ts'
-import { FOLLOW_UP_MAX, STORY_MAX, parseExclude, countChars, mergeStory, parseContext, parseFollowUps, type Condition } from '../engine/contract.ts'
+import { FOLLOW_UP_MAX, NO_MORE_ROUNDS, STORY_MAX, parseExclude, countChars, mergeStory, parseContext, parseFollowUps, type Condition } from '../engine/contract.ts'
 
 // Full Hobby-plan ceiling (also mirrored in vercel.json).
 export const maxDuration = 60
@@ -90,8 +91,8 @@ export async function POST(req: Request): Promise<Response> {
   const promptQuestion = parsePromptQuestion(prompt_question, parsed.context.language)
 
   // 「別の候補を見る」: the characters already shown for this story (never chosen again) and which retry this is (at most 2).
-  const ex = parseExclude(exclude, retry)
-  if (!ex.ok) return jsonResponse(400, { error: ex.error, code: ex.code })
+  const ex = parseExclude(exclude, retry, maxRoundsOf(process.env) - 1)
+  if (!ex.ok) return jsonResponse(400, { error: ex.code === 'retry_limit' ? (NO_MORE_ROUNDS[parsed.context.language] ?? NO_MORE_ROUNDS.en) : ex.error, code: ex.code })
 
   if (!process.env.ANTHROPIC_API_KEY) {
     return jsonResponse(500, {

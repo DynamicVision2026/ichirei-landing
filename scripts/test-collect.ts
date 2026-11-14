@@ -38,6 +38,10 @@ async function addOrder(ref: string, opts: { legacy?: boolean; art?: boolean; pk
   const p = parseOrderRequest({ story: '父は口下手で厳しくて、駅まで送ってくれて、帰りも必ず送ってくれる。', engine_result: clone(GOLDEN), selected_kanji: '証', language: 'ja', sender_name: '山田 太郎', receiver_name: '山田 一郎', delivery_date: '2026-12-01', inscription_style: 'modern', package: pkg, ...(pkg === 'egift' ? { sender_email: 'taro@example.com' } : { ship_to: 'me' }) }, T0)
   if (!p.ok) throw new Error(p.error)
   const record: OrderRecord = buildRecord(p.order, ref, T0)
+  // a COMPLETE gift (2026-11-14, B4): the certificate number is written and the poem is there (the film and its four pictures are added below)
+  record.certificate_no = 7
+  record.production.poems = [{ poem_id: 'PM-20261106-aaaaaaaaaa', type: 'tanka', lines: ['朝ごとに', '蓋の花添え', '備えたる'], pattern: null, reading: 'あさごとに' }]
+  record.production.certificate.poems = [{ type: 'tanka', lines: ['朝ごとに', '蓋の花添え', '備えたる'], reading: 'あさごとに' }]
   if (opts.legacy) {
     delete record.collect_required
     delete record.collected_at

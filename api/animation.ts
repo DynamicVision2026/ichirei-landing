@@ -18,6 +18,9 @@ import { FILM_RETRY_AFTER_MS, ensureFilm, filmInFlight, raceTimeout } from '../e
 import type { FilmInput, FilmRecord } from '../engine/film.ts'
 import { buyerOrderView, isOrderRecord } from '../engine/buyer.ts'
 import { windowOf } from '../engine/change-window.ts'
+import { notePayment, paidSeen } from '../engine/paid-seen.ts'
+import { checkOrder, exhausted, startTryIfDue, type GiftCheckDeps } from '../engine/gift-check.ts'
+import { makePoemFor } from '../engine/poem-repair.ts'
 import { shopifyPayments } from '../engine/payments-lookup.ts'
 import type { PaymentInfo, PaymentResult } from '../engine/shipping.ts'
 
@@ -39,7 +42,12 @@ export interface AnimationDeps {
   pollMs?: number
   /** The payment lookup behind the 24-hour deadline on the buyer's page (read-only Shopify app); tests replace it. */
   payments?: (refs: string[]) => Promise<PaymentResult>
+  /** Tests: stand-ins for what the completeness gate rewrites (certificate number, poem, film script, pictures). */
+  giftCheck?: Partial<GiftCheckDeps>
 }
+
+/** What the completeness gate may use: the store, the clock, and the default poem writer (tests replace any of it). */
+export const giftCheckDeps = (d: AnimationDeps): GiftCheckDeps => ({ store: d.store!, env: d.env, now: d.now, log: d.log, makePoem: (r) => makePoemFor(r), image: d.image, vision: d.vision, pollMs: d.pollMs, film: d.film, ...d.giftCheck })
 
 /** The payment of one order, kept for a minute so a page that is opened again and again does not ask Shopify every time. `'unverified'` = Shopify could not be asked. */
 const payCache = new Map<string, { at: number; value: PaymentInfo | null | 'unverified' }>()
@@ -104,7 +112,7 @@ export function createAnimationHandlers(deps: () => AnimationDeps) {
       if (rec.gift_token && d.store) {
         try {
           const g = await d.store.get(rec.gift_token)
-          if (isGiftRecord(g)) view.gift = { url: giftUrl(g.token, d.env), size_code: g.size_code, ship_to: g.ship_to, egift_state: g.egift?.state ?? null, opens_on: g.opens_on ?? null, certificate_no: g.certificate_no ?? null, reply: g.reply ?? null }
+          if (isGiftRecord(g)) view.gift = { url: giftUrl(g.token, d.env), size_code: g.size_code, ship_to: g.ship_to, egift_state: g.egift?.state ?? null, opens_on: g.opens_on ?? null, opens_at: g.opens_at ?? null, opens_tz: g.opens_tz ?? null, certificate_no: g.certificate_no ?? null, reply: g.reply ?? null }
         } catch {
           // the page works without it
         }
@@ -112,13 +120,25 @@ export function createAnimationHandlers(deps: () => AnimationDeps) {
       // the buyer's page only: when it was ordered, until when it can still be changed, and the wooden gift's step. Read-only; no price, no name, no address.
       if (view.gift && d.store && rec.order_ref !== 'SAMPLE') {
         try {
-          const o = await d.store.get(rec.order_ref)
-          if (isOrderRecord(o)) {
+          const stored = await d.store.get(rec.order_ref)
+          if (isOrderRecord(stored)) {
             const now = d.now?.() ?? new Date()
-            const win = windowOf(o, await paymentOf(rec.order_ref, d), now)
+            const pay = await paymentOf(rec.order_ref, d)
+            const o = await notePayment(d.store, stored, pay, now) // the first time Shopify says "paid" is kept: unlocking never rests on "could not be asked"
+            const win = windowOf(o, pay, now)
             // a cancelled order shows nothing at all (the page says only that the gift is no longer available)
             if (win.phase === 'cancelled') return json(410, { error: 'unavailable', language: rec.language }, { 'cache-control': 'private, no-store' })
             view.order = buyerOrderView(o, win, d.env ?? process.env)
+            // payment not seen yet: the receiver's link, the sharing and everything behind "collect" stay out of the answer
+            if (view.order.confirming) view.gift = undefined
+            // the completeness gate (B4): a paid gift that is not complete is "being finished" — nothing to collect yet — and a background try starts when one is due
+            else if (!o.collected_at) {
+              const chk = await checkOrder(d.store, o)
+              if (!chk.complete) {
+                view.order.finishing = !exhausted(o)
+                startTryIfDue(giftCheckDeps(d), o, chk)
+              }
+            }
             const mail = (d.env ?? process.env).ICHIREI_SUPPORT_EMAIL?.trim() ?? ''
             view.support_email = /^[^\s@<>,;]+@[^\s@<>,;]+\.[^\s@<>,;]+$/.test(mail) ? mail : null
           }
@@ -140,10 +160,12 @@ export function createAnimationHandlers(deps: () => AnimationDeps) {
       if (r.status === 404) return json(404, { error: 'not_found' }, { 'cache-control': 'no-store' })
       if (!d.store || r.rec.order_ref === 'SAMPLE') return json(404, { error: 'not_found' }, { 'cache-control': 'no-store' })
       try {
-        const o = await d.store.get(r.rec.order_ref)
-        if (!isOrderRecord(o)) return json(404, { error: 'not_found' }, { 'cache-control': 'no-store' })
+        const stored = await d.store.get(r.rec.order_ref)
+        if (!isOrderRecord(stored)) return json(404, { error: 'not_found' }, { 'cache-control': 'no-store' })
         const now = d.now?.() ?? new Date()
-        const win = windowOf(o, await paymentOf(r.rec.order_ref, d), now)
+        const pay = await paymentOf(r.rec.order_ref, d)
+        const o = await notePayment(d.store, stored, pay, now)
+        const win = windowOf(o, pay, now)
         if (win.phase === 'cancelled') return json(410, { error: 'unavailable' }, { 'cache-control': 'no-store' })
         if (win.phase === 'unpaid') return json(409, { error: 'unpaid', code: 'unpaid' }, { 'cache-control': 'no-store' })
         if (o.collected_at) return json(200, { collected: true, collected_at: o.collected_at }, { 'cache-control': 'private, no-store' })
@@ -151,7 +173,13 @@ export function createAnimationHandlers(deps: () => AnimationDeps) {
         const rec = await withScript(r.rec, d, false)
         const art = filmUsable(rec.film) && rec.film.status === 'ready' ? await safeArt(d.store, rec.id) : null
         const f = animationView(rec, art).film
-        if (!f || !f.pictures || f.deferred || f.incomplete) return json(409, { error: 'not_ready', code: 'not_ready' }, { 'cache-control': 'no-store' })
+        if (!f || !f.pictures || f.deferred) return json(409, { error: 'not_ready', code: 'not_ready' }, { 'cache-control': 'no-store' })
+        // the gift must be complete (B4): character, poem, pictures (or stand-ins), film script, certificate number — or the 5 background tries are used up (it then goes out with what is there)
+        const chk = await checkOrder(d.store, o)
+        if (!chk.complete && !exhausted(o)) {
+          startTryIfDue(giftCheckDeps(d), o, chk)
+          return json(409, { error: 'not_ready', code: 'not_ready' }, { 'cache-control': 'no-store' })
+        }
         const at = now.toISOString()
         await d.store.put(o.order_ref, { ...o, collected_at: at, updated_at: at })
         return json(200, { collected: true, collected_at: at }, { 'cache-control': 'private, no-store' })
@@ -177,7 +205,13 @@ export function createAnimationHandlers(deps: () => AnimationDeps) {
       if (!filmUsable(rec.film)) return json(200, { state: 'pending', view: animationView(rec, null) }, noStore)
       if (rec.film.status === 'fallback' || !d.store) return json(200, { state: 'ready', view: animationView(rec, null) }, noStore)
       const budget = renderBudgetMs(d.env)
-      const art = await raceTimeout(ensureArt({ store: d.store, image: d.image, client: d.vision, env: d.env, log: d.log, now: d.now, pollMs: d.pollMs }, { id: rec.id, film: rec.film, memorial: rec.memorial, language: rec.language, rev: artRevFor(rec.id) }), budget)
+      // a PAID order is never held back by the daily picture limit (B5); a free preview keeps it
+      let paid = false
+      if (rec.order_ref !== 'SAMPLE') {
+        const o = await d.store.get(rec.order_ref).catch(() => null)
+        paid = isOrderRecord(o) && paidSeen(o)
+      }
+      const art = await raceTimeout(ensureArt({ store: d.store, image: d.image, client: d.vision, env: d.env, log: d.log, now: d.now, pollMs: d.pollMs }, { id: rec.id, film: rec.film, memorial: rec.memorial, language: rec.language, rev: artRevFor(rec.id), ...(paid ? { paid: true } : {}) }), budget)
       if (!art) return json(200, { state: 'pending', view: animationView(rec, await safeArt(d.store, rec.id)) }, noStore) // still being drawn: ask again
       if (art.status === 'rendering') return json(200, { state: 'pending', view: animationView(rec, art) }, noStore)
       return json(200, { state: art.status === 'deferred' ? 'deferred' : 'ready', view: animationView(rec, art) }, noStore)

@@ -50,11 +50,13 @@ check('the example fields of the landing (examples of what other people wrote) a
 const BASE = 'd56789a'
 let haveBase = true
 try { execFileSync('git', ['cat-file', '-e', `${BASE}^{commit}`], { stdio: 'ignore' }) } catch { haveBase = false }
-const changed = (paths: string[]): string => execFileSync('git', ['diff', '--name-only', BASE, '--', ...paths]).toString().trim()
 if (!haveBase) console.log(`SKIP  the base commit ${BASE} is not in this checkout — the "unchanged" checks are skipped`)
 else {
-  check('the receiver page, the buyer page, the email templates and /legal are byte-identical to the last release', changed(['src/gift', 'src/animation/BuyerPage.tsx', 'src/animation/buyer-copy.ts', 'src/legal', 'docs/ichirei-order-email.liquid', 'docs/shopify-email-claim-snippet.liquid']) === '', changed(['src/gift', 'src/animation/BuyerPage.tsx', 'src/animation/buyer-copy.ts', 'src/legal', 'docs/ichirei-order-email.liquid', 'docs/shopify-email-claim-snippet.liquid']))
-  check('the engine, its prompts, the API and the server are untouched — so the request an existing story fixture produces is the same', changed(['engine', 'api', 'server']) === '', changed(['engine', 'api', 'server']))
+  // (2026-11-14: the later "final fix" ticket deliberately changes the receiver page, the buyer page, the legal page, the e-mail template and parts of the engine — so these checks now guard what that ticket must
+  // NOT touch: the engine's CHOICE of characters (selection, cards, prompts, palette, lexicon) and the prices, compared with the moment release.)
+  const GUARD = ['engine/engine.ts', 'engine/cards.ts', 'engine/slots.ts', 'engine/prompt.ja.md', 'engine/prompt.zh.md', 'engine/prompt.en.md', 'engine/palette.csv', 'engine/lexicon.csv', 'engine/review.ts', 'src/order/packages.ts']
+  const sinceMoment = execFileSync('git', ['diff', '--name-only', 'b2af257', '--', ...GUARD]).toString().trim()
+  check('the engine\'s choice of characters (selection, cards, slots, prompts, palette, lexicon, review) and the prices are untouched since the moment release — so the request an existing story fixture produces is the same', sinceMoment === '', sinceMoment)
 }
 
 // ---- 4. the /en blocks ---------------------------------------------------------------------------------------------------------------------------------------------

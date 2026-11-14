@@ -7,11 +7,12 @@
 //   POST /api/gift/<token>/address         — the e-gift receiver types their address (once). Kept on our side only; never returned by any call.
 // Possession of the link is the only access control, as for the sender's page. Never cached by shared caches, never indexed.
 
+import { DEFAULT_ZONE, isValidZone, openingInstant, todayIn } from '../src/order/opens-at.ts'
 import { isQuietPurpose } from '../src/order/purpose.ts'
 import QRCode from 'qrcode'
 import { ANIMATION_ID_PATTERN, isAnimationRecord, type AnimationRecord } from '../engine/animation.ts'
 import { orderGate, type OrderGate } from '../engine/buyer.ts'
-import { GIFT_TOKEN_PATTERN, arrivingView, checkAddress, checkReply, giftUrl, giftView, isGiftRecord, isLocked, lockedView, todayJst, type GiftRecord } from '../engine/gift.ts'
+import { GIFT_TOKEN_PATTERN, arrivingView, checkAddress, checkReply, giftUrl, giftView, isGiftRecord, isLocked, lockedView, type GiftRecord } from '../engine/gift.ts'
 import { OPEN_DATE_MAX_DAYS } from '../src/order/packages.ts'
 import { readArt, picturePath, type ArtRecord } from '../engine/film-art.ts'
 import { createOrderStore, type OrderStore } from '../engine/order-store.ts'
@@ -375,21 +376,31 @@ export function createGiftHandlers(deps: () => GiftDeps) {
       if (f instanceof Response) return f
       { const gate = await gateOf(f.gift, d); if (gate === 'cancelled') return gone(f.gift); if (gate === 'pending') return notCollected() }
       const raw = (body as { open_date?: unknown } | null)?.open_date
+      const rawTz = (body as { open_tz?: unknown } | null)?.open_tz
       const now = d.now?.() ?? new Date()
       let opens: string | null = null
+      let opensAt: string | null = null
+      let opensTz: string | null = null
       if (raw !== null && raw !== undefined && raw !== '') {
         if (typeof raw !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(raw)) return json(400, { error: 'open_date must be YYYY-MM-DD' }, noStore)
-        const today = todayJst(now)
-        const last = todayJst(new Date(now.getTime() + OPEN_DATE_MAX_DAYS * 86_400_000))
-        if (raw < today || raw > last || Number.isNaN(Date.parse(raw))) return json(400, { error: 'open_date is out of range' }, noStore)
+        if (rawTz !== undefined && rawTz !== null && rawTz !== '' && !isValidZone(rawTz)) return json(400, { error: 'open_tz must be an IANA time zone' }, noStore)
+        // 7:00 a.m. on that date in the chosen zone (Japan when none is sent)
+        const tz = typeof rawTz === 'string' && rawTz !== '' ? rawTz : DEFAULT_ZONE
+        const today = todayIn(tz, now)
+        const last = todayIn(tz, new Date(now.getTime() + OPEN_DATE_MAX_DAYS * 86_400_000))
+        const at = openingInstant(raw, tz)
+        if (raw < today || raw > last || !at) return json(400, { error: 'open_date is out of range' }, noStore)
         opens = raw
+        opensAt = at.toISOString()
+        opensTz = tz
       }
       try {
-        await d.store!.put(f.gift.token, { ...f.gift, opens_on: opens })
+        const { opens_at: _a, opens_tz: _z, ...rest } = f.gift
+        await d.store!.put(f.gift.token, { ...rest, opens_on: opens, ...(opensAt && opensTz ? { opens_at: opensAt, opens_tz: opensTz } : {}) })
       } catch {
         return json(503, { error: 'unavailable' }, { 'cache-control': 'no-store' })
       }
-      return json(200, { ok: true, opens_on: opens }, noStore)
+      return json(200, { ok: true, opens_on: opens, opens_at: opensAt, opens_tz: opensTz }, noStore)
     },
     async keepsakeCard(token: string, preview?: string | null): Promise<Response> {
       const d = deps()
