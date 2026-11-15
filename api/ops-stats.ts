@@ -11,7 +11,8 @@
 import { readHealth } from '../engine/health.ts'
 import { needsAttention } from '../engine/gift-check.ts'
 import { paidIn, paidSeen } from '../engine/paid-seen.ts'
-import { promoOn, promoWindow } from '../engine/promo.ts'
+import { promoDaily, promoDayKey, promoOn, promoWindow } from '../engine/promo.ts'
+import { scanDay } from '../engine/promo-holds.ts'
 import { analyticsDay, tokenHash, type AnalyticsEvent } from '../engine/analytics.ts'
 import { readJsonl, type OrderIndexEntry } from '../engine/egift-ops.ts'
 import { createOrderStore, type OrderStore } from '../engine/order-store.ts'
@@ -98,7 +99,7 @@ export interface StatsPayload {
   health: Awaited<ReturnType<typeof readHealth>> | null
   attention: { count: number }
   /** While the "Days of Thanks" promotion runs: how many free (total 0) gifts were paid today (Japan time) — shown at the top. null when the promotion is off. */
-  promo: { on: boolean; free_today: number } | null
+  promo: { on: boolean; free_today: number; /** per promo day (US Eastern 4:00 a.m.): the gifts given, the holds placed today and what is left */ days: { day: string; given: number; held: number; left: number }[] } | null
   /** false when Shopify could not be asked about payments */
   verified: boolean
   now: string
@@ -154,7 +155,23 @@ export async function buildStats(d: OpsDeps, store: OrderStore, env: NodeJS.Proc
     else if (r.gift_check && r.gift_check.missing.length > 0 && needsAttention(r, { complete: false, missing: r.gift_check.missing as never }, now)) attention++
   }
   // "Free gifts today": the orders paid today (Japan time) with a total of 0 — shown at the top of the page only while the promotion runs
-  const promo = promoWindow(d.env ?? process.env) ? { on: promoOn(d.env ?? process.env, now), free_today: orders.filter((o) => o.free && o.state === 'paid' && analyticsDay(new Date(Date.parse(o.paid_at ?? o.created_at))) === analyticsDay(now)).length } : null
+  const env2 = d.env ?? process.env
+  const win = promoWindow(env2)
+  let promoDays: { day: string; given: number; held: number; left: number }[] = []
+  if (win) {
+    const daily = promoDaily(env2)
+    const last = promoDayKey(new Date(Math.min(now.getTime(), win.until)))
+    let key = promoDayKey(new Date(win.from))
+    for (let n = 0; n < 16 && key <= last; n++) {
+      const sc = await scanDay(store, key, daily, now).catch(() => null)
+      if (sc) promoDays.push({ day: key, given: sc.used, held: sc.active, left: Math.max(0, daily - sc.used - sc.active) })
+      const nx = new Date(`${key}T12:00:00Z`)
+      nx.setUTCDate(nx.getUTCDate() + 1)
+      key = nx.toISOString().slice(0, 10)
+    }
+    promoDays = promoDays.reverse()
+  }
+  const promo = promoWindow(d.env ?? process.env) ? { on: promoOn(env2, now), days: promoDays, free_today: orders.filter((o) => o.free && o.state === 'paid' && analyticsDay(new Date(Date.parse(o.paid_at ?? o.created_at))) === analyticsDay(now)).length } : null
   return { stats, orders: latest, free, main, health, attention: { count: attention }, promo, verified, now: now.toISOString() }
 }
 

@@ -23,6 +23,8 @@ import { COPY, DEFAULT_GIFT_CONTEXT, FOLLOW_UP_COUNTER_FROM, FOLLOW_UP_MAX, clip
 import { getLanguage, setLanguage } from '../lang-store'
 import { useLanguage } from '../useLanguage'
 import { cleanInscriptionForm } from '../order/inscription'
+import { BasketBar } from '../loop/LoopBars'
+import { refreshMe, setBasketCount } from '../loop/me'
 
 // Validation-harness orchestrator: elicitation (§7) → engine call (§4) →
 // adaptive follow-up (§7.4, at most twice) → progressive reveal (§8), with the
@@ -222,11 +224,15 @@ function HarnessShell({ children }: { children: React.ReactNode }) {
  * the whole width of a single column.
  */
 function CustomerShell({ children, aside, phase }: { children: React.ReactNode; aside?: ReactNode; phase: Phase }) {
+  const [uiLang] = useLanguage()
   return (
     <section className="tintBand" id="write" data-phase={phase}>
       <div className={phase === 'elicit' ? 'wrap writeGrid' : 'wrap flowWrap'}>
         {phase === 'elicit' && <div>{aside}</div>}
-        <div className="flowMain">{children}</div>
+        <div className="flowMain">
+          {phase === 'elicit' && <BasketBar lang={toRevealLang(uiLang)} className="loopBar--under" />}
+          {children}
+        </div>
       </div>
     </section>
   )
@@ -276,6 +282,8 @@ export default function DemoApp({ mode = 'harness', aside }: { mode?: Mode; asid
   // The draft of this story's pictures: one set per story, kept while the visitor tries other characters or other candidates.
   const draftRef: DraftRef = useRef(null)
   const [error, setError] = useState<string | null>(null)
+  /** The server's code for the last refusal (limit_person shows the basket bar under the message). */
+  const [errorCode, setErrorCode] = useState<string | null>(null)
   const [stage, setStage] = useState<EngineStage>('reading')
   const [followUpQuestion, setFollowUpQuestion] = useState<string | null>(null)
   const [followUpAnswer, setFollowUpAnswer] = useState('')
@@ -301,7 +309,9 @@ export default function DemoApp({ mode = 'harness', aside }: { mode?: Mode; asid
     const before = prevPhase.current
     prevPhase.current = phase
     if (!customer || before === phase || phase === 'result') return
-    document.getElementById('write')?.scrollIntoView({ block: 'start', behavior: reduceRef.current ? 'auto' : 'smooth' })
+    // when the cards arrive the page goes to the TOP OF THE CARDS (2026-11-15), not to the writing box above them
+    const target = (phase === 'reveal' ? document.getElementById('cards') : null) ?? document.getElementById('write')
+    target?.scrollIntoView({ block: 'start', behavior: reduceRef.current ? 'auto' : 'smooth' })
   }, [phase, customer])
   // the dock is hidden for the whole flow (a phase flag, C2)
   useEffect(() => {
@@ -312,6 +322,77 @@ export default function DemoApp({ mode = 'harness', aside }: { mode?: Mode; asid
   // the result page has its own address state (#result): the browser's back button returns to the cards with the rounds as they were
   const [live, setLive] = useState<ResultLive | null>(null)
   const [receiverName, setReceiverName] = useState('')
+
+  // The basket (2026-11-15): every time a result page opens, it is saved to the server under this browser's record — the chosen card, the story it came from, the names and the draft's id. Opening the
+  // same result again is the same item; nothing is asked of a model. What is saved is exactly what the page needs to open the result page again.
+  const savedKey = useRef('')
+  useEffect(() => {
+    if (!customer || phase !== 'result' || !live || !chosen || !result) return
+    const set = sets[chosenSet] ?? result
+    const key = JSON.stringify([chosen.kanji, live.receiverName, live.preview.draftId])
+    if (savedKey.current === key) return
+    savedKey.current = key
+    const resume = { v: 1, story, followUps, context, questionId, result: set, kanji: chosen.kanji, receiver: live.receiverName }
+    void fetch('/api/basket', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      credentials: 'same-origin',
+      body: JSON.stringify({ resume, story, language: context.language, kanji: chosen.kanji, reading: live.reading, word: live.word ?? '', line: live.line, to: live.receiverName, preview_id: live.preview.draftId }),
+    })
+      .then((r) => (r.ok ? (r.json() as Promise<{ count: number }>) : null))
+      .then((j) => {
+        if (j) setBasketCount(j.count)
+      })
+      .catch(() => {})
+  }, [customer, phase, live, chosen, result, sets, chosenSet, story, followUps, context, questionId])
+  // 「この贈りものを贈る →」 on the basket page opens the landing with ?resume=<item id>: the saved result page is put back, with no model call.
+  useEffect(() => {
+    if (!customer) return
+    let id: string | null = null
+    try {
+      id = new URLSearchParams(window.location.search).get('resume')
+    } catch {
+      id = null
+    }
+    if (!id || !/^BK-[a-z2-9]{20}$/.test(id)) return
+    let alive = true
+    void (async () => {
+      try {
+        const r = await fetch(`/api/basket/${encodeURIComponent(id as string)}`, { credentials: 'same-origin' })
+        if (!r.ok || !alive) return
+        const item = (await r.json()) as { resume?: { story?: string; followUps?: string[]; context?: GiftContext; questionId?: string | null; result?: EngineResult; kanji?: string; receiver?: string } }
+        const rs = item.resume
+        const cand = rs?.result?.candidates?.find((c) => c.kanji === rs.kanji)
+        if (!rs || !rs.story || !rs.context || !rs.result || !cand) return
+        savedKey.current = JSON.stringify([cand.kanji, rs.receiver ?? '', null]) // (already saved: the page does not save it again until something changes)
+        setLanguage(rs.context.language)
+        setStory(rs.story)
+        setFollowUps(Array.isArray(rs.followUps) ? rs.followUps : [])
+        setContextState(rs.context)
+        setQuestionId(rs.questionId ?? null)
+        setResult(rs.result)
+        setSets([rs.result])
+        setSetIdx(0)
+        setChosenSet(0)
+        setChosen(cand)
+        setReceiverName(rs.receiver ?? '')
+        setDraftOffer(null)
+        setPhase('result')
+        try {
+          window.history.replaceState(null, '', window.location.pathname + '#result')
+        } catch {
+          // an address that cannot be changed stays as it is
+        }
+        void refreshMe()
+      } catch {
+        // a basket that cannot be read leaves the page as it is
+      }
+    })()
+    return () => {
+      alive = false
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [customer])
   useEffect(() => {
     if (!customer || phase !== 'result') return
     try {
@@ -358,6 +439,7 @@ export default function DemoApp({ mode = 'harness', aside }: { mode?: Mode; asid
     setPhase('processing')
     setRetryNote(false)
     setError(null)
+    setErrorCode(null)
     setStage('reading')
     if (!sessionLogged.current) {
       log('session_started', {})
@@ -381,6 +463,7 @@ export default function DemoApp({ mode = 'harness', aside }: { mode?: Mode; asid
         let message: string | null = null
         try {
           const body = (await res.json()) as { error?: string; code?: string }
+          setErrorCode(body?.code ?? null)
           message = body?.code === 'story_too_long' || body?.code === 'follow_up_too_long' ? copy.storyTooLong : body?.code === 'rate_limited' ? copy.rateLimited : (body?.error ?? null)
         } catch {
           message = null
@@ -535,6 +618,7 @@ export default function DemoApp({ mode = 'harness', aside }: { mode?: Mode; asid
       {error && (
         <div role="alert" className="font-label mb-6 rounded-sm border border-seal/60 bg-seal/10 p-4 text-sm text-fg">
           <p>{error}</p>
+          {customer && errorCode === 'limit_person' && <BasketBar lang={revealLang} className="loopBar--under" />}
           {customer && lastRun.current && (
             <button type="button" className="btn ghost mt-4" data-testid="retry-request" onClick={() => lastRun.current?.()}>
               {pc.retry}

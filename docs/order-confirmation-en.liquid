@@ -1,0 +1,145 @@
+{%- comment -%}
+  ORDER CONFIRMATION — ENGLISH. A complete, ready-to-paste replacement for the English "Order confirmation" notification (Shopify admin → Settings → Notifications → Customer notifications → Order confirmation,
+  in the English version of the template). It follows the structure of Shopify's default English template (title, intro, one action row, order summary, customer information, footer) with ONE change:
+
+    · An order with an ICHIREI line (its SKU starts with ICHIREI-, or it carries the hidden property _order_ref) gets the ICHIREI block FIRST, right under the heading: "Your gift is ready", then the button
+      "Open your gift" → the BUYER'S OWN private page (/a/AN-…, hidden property _ichirei_animation_url). It never links to the receiver's gift page (/g/…). The block is the same as docs/ichirei-order-email.liquid (English).
+    · For such an order the usual action row ("View your order" / "Visit our store") is NOT printed: the main button is "Open your gift", and there is no "Visit our store" link. Shopify's own order page stays
+      reachable as a small "Receipt and order details" link under the order summary.
+    · An order of any other product prints exactly the default e-mail (View your order / Visit our store).
+
+  Written from Shopify's default structure; before pasting, put it beside the current default once and check nothing the store relies on is missing (gift-card, pickup or local-delivery sections can be added back from the default).
+{%- endcomment -%}
+{%- assign has_ichirei = false -%}
+{%- for line in subtotal_line_items -%}
+  {%- assign ref = line.properties['_order_ref'] | default: line.properties['order_ref'] -%}
+  {%- if ref != blank or line.sku contains 'ICHIREI-' -%}
+    {%- assign has_ichirei = true -%}
+    {%- assign ichirei_link = line.properties['_ichirei_animation_url'] | default: line.properties['ichirei_animation_url'] -%}
+    {%- assign ichirei_glyph = line.properties['_inscription_form'] | default: line.properties['inscription_form'] -%}
+    {%- assign ichirei_size = line.properties['_ichirei_size'] | default: line.sku -%}
+  {%- endif -%}
+{%- endfor -%}
+{%- unless ichirei_link contains '/a/' -%}{%- assign ichirei_link = '' -%}{%- endunless -%}
+{%- if has_ichirei -%}
+  {%- capture email_title -%}Thank you for your ICHIREI order.{%- endcapture -%}
+{%- elsif has_pending_payment -%}
+  {%- capture email_title -%}Thank you for your order!{%- endcapture -%}
+{%- else -%}
+  {%- capture email_title -%}Thank you for your purchase!{%- endcapture -%}
+{%- endif -%}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<title>{{ email_title }}</title>
+<meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+<meta name="viewport" content="width=device-width">
+<style>
+  body, table, td, p, a { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; }
+  body { margin: 0; padding: 0; background: #ffffff; color: #545454; }
+  .wrap { max-width: 600px; margin: 0 auto; padding: 40px 20px; }
+  h1 { font-size: 30px; font-weight: normal; color: #333; margin: 0 0 8px; }
+  h2 { font-size: 24px; font-weight: normal; color: #333; margin: 24px 0 8px; }
+  h3 { font-size: 16px; font-weight: 600; color: #555; margin: 24px 0 8px; }
+  p { font-size: 16px; line-height: 1.5; margin: 0 0 12px; }
+  .button { display: inline-block; padding: 16px 28px; background: #1a1813; color: #ffffff !important; text-decoration: none; border-radius: 4px; font-size: 16px; }
+  .small { font-size: 14px; color: #777; }
+  table.summary { width: 100%; border-collapse: collapse; }
+  table.summary td { padding: 8px 0; font-size: 15px; vertical-align: top; border-bottom: 1px solid #e5e5e5; }
+  td.right { text-align: right; }
+  .total td { font-size: 18px; color: #333; border-bottom: 0; }
+  hr { border: 0; border-top: 1px solid #e5e5e5; margin: 24px 0; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>{{ shop.name }}</h1>
+  <h2>{{ email_title }}</h2>
+
+  {%- if has_ichirei -%}
+    {%- comment -%} the ICHIREI block comes FIRST, right under the heading {%- endcomment -%}
+    <p>Your gift is ready.</p>
+    {%- if ichirei_link != blank %}
+    <p><a class="button" href="{{ ichirei_link | escape }}">Open your gift</a></p>
+    <p>Send your gift from this page. This link is for you only; please don't forward it.</p>
+    {%- endif %}
+    <p>Character: {{ ichirei_glyph | escape }}<br>Gift: {% if ichirei_size contains 'STANDARD' %}Carved block{% elsif ichirei_size contains 'SIMPLE' %}Wooden tag{% else %}E-gift{% endif %}</p>
+    <p class="small">Within 24 hours of payment, and before you press 'Collect your gift', reply to the confirmation email to cancel for a full refund.</p>
+    <hr>
+  {%- else -%}
+    <p>
+      {%- if has_pending_payment -%}
+        {%- if buyer_action_required -%}You'll get a confirmation email after completing your payment.{%- else -%}Your payment is being processed. You'll get an email when your order is confirmed.{%- endif -%}
+      {%- else -%}
+        {%- if requires_shipping -%}
+          {%- case delivery_method -%}
+            {%- when 'pick-up' -%}You'll receive an email when your order is ready for pickup.
+            {%- when 'local' -%}Hi {{ customer.first_name }}, we're getting your order ready for delivery.
+            {%- else -%}We're getting your order ready to be shipped. We will notify you when it has been sent.
+          {%- endcase -%}
+        {%- else -%}
+          Thank you for your purchase.
+        {%- endif -%}
+      {%- endif -%}
+    </p>
+    {%- if order_status_url %}
+    <p><a class="button" href="{{ order_status_url }}">View your order</a></p>
+    {%- if shop.url %}<p class="small">or <a href="{{ shop.url }}">Visit our store</a></p>{%- endif %}
+    {%- endif %}
+    <hr>
+  {%- endif -%}
+
+  <h3>Order summary</h3>
+  <table class="summary">
+    {%- for line in subtotal_line_items %}
+    <tr>
+      <td>
+        {{ line.title }}{% if line.variant.title != blank and line.variant.title != 'Default Title' %} — {{ line.variant.title }}{% endif %}<br>
+        {%- for property in line.properties -%}
+          {%- assign first_char = property.first | slice: 0, 1 -%}
+          {%- if first_char != '_' and property.last != blank -%}
+            <span class="small">{{ property.first }}: {{ property.last }}</span><br>
+          {%- endif -%}
+        {%- endfor -%}
+        <span class="small">Quantity: {{ line.quantity }}</span>
+      </td>
+      <td class="right">{{ line.final_line_price | money }}</td>
+    </tr>
+    {%- endfor %}
+    <tr><td>Subtotal</td><td class="right">{{ subtotal_price | money }}</td></tr>
+    {%- for discount in discounts %}
+    <tr><td>Discount{% if discount.code != blank %} ({{ discount.code }}){% endif %}</td><td class="right">-{{ discount.savings | money }}</td></tr>
+    {%- endfor %}
+    {%- if requires_shipping and shipping_price != blank %}
+    <tr><td>Shipping</td><td class="right">{{ shipping_price | money }}</td></tr>
+    {%- endif %}
+    {%- for tax_line in tax_lines %}
+    <tr><td>{{ tax_line.title }}</td><td class="right">{{ tax_line.price | money }}</td></tr>
+    {%- endfor %}
+    <tr class="total"><td>Total</td><td class="right">{{ total_price | money_with_currency }}</td></tr>
+  </table>
+
+  {%- if has_ichirei and order_status_url %}
+  <p class="small"><a href="{{ order_status_url }}">Receipt and order details</a></p>
+  {%- endif %}
+
+  {%- if requires_shipping and shipping_address %}
+  <h3>Shipping address</h3>
+  <p>{{ shipping_address | format_address }}</p>
+  {%- endif %}
+  {%- if billing_address %}
+  <h3>Billing address</h3>
+  <p>{{ billing_address | format_address }}</p>
+  {%- endif %}
+  {%- if payment_terms or transactions.size > 0 %}
+  <h3>Payment method</h3>
+  {%- for transaction in transactions %}{%- if transaction.status == 'success' %}
+  <p>{{ transaction.gateway_display_name | default: transaction.gateway }} — {{ transaction.amount | money }}</p>
+  {%- endif %}{%- endfor %}
+  {%- endif %}
+
+  <hr>
+  <p class="small">If you have any questions, reply to this email or contact us at <a href="mailto:{{ shop.email }}">{{ shop.email }}</a>.</p>
+</div>
+</body>
+</html>

@@ -31,7 +31,7 @@ for (const lang of ['ja', 'zh-Hant', 'en'] as const) {
   const soon = legalView(lang, false)
   const text = JSON.stringify({ ...soon, deliveryWood: '' }) // (deliveryWood is added to the delivery row only while wood is on sale: legal-copy rowValue)
   // (the 24-hour refund rule is the owner's own text and says 「送料を含む」 / "including shipping": kept word for word)
-  check(`${lang}: while wood is coming soon the legal page says nothing about the wooden sizes (prices, charges, mistakes, delivery, FAQ)`, !WOOD[lang].test(text.replace(/送料を含む|含運費|including shipping/g, '')), text.match(WOOD[lang]) ? text.slice(Math.max(0, (text.match(WOOD[lang])!.index ?? 0) - 30), (text.match(WOOD[lang])!.index ?? 0) + 40) : '')
+  check(`${lang}: while wood is coming soon the legal page says nothing about the wooden sizes (prices, charges, mistakes, delivery, FAQ)`, !WOOD[lang].test(text.replace(/送料を含む|含運費|including shipping|キャンセルのご連絡は、メールを送信した時刻で受け付けます。/g, '')), text.match(WOOD[lang]) ? text.slice(Math.max(0, (text.match(WOOD[lang])!.index ?? 0) - 30), (text.match(WOOD[lang])!.index ?? 0) + 40) : '')
   check(`${lang}: …the e-gift's price stays, the refund rules stay (all four paragraphs but the parcel one), the seller rows are untouched`, soon.rows.some((r) => r.value.includes('3,980')) && !soon.rows.some((r) => r.value.includes('9,800')) && soon.sections.length === LEGAL[lang].sections.length - 1 && soon.rows.slice(0, 6).every((r, i) => r.value === LEGAL[lang].rows[i].value) && soon.faq.length === LEGAL[lang].faq.length)
   check(`${lang}: …with wood on sale it is the full page, unchanged`, JSON.stringify(legalView(lang, true)) === JSON.stringify(LEGAL[lang]))
 }

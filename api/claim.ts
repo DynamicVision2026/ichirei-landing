@@ -15,6 +15,10 @@ import { createOrderStore, type OrderStore } from '../engine/order-store.ts'
 import { SlidingWindowLimiter, clientIp } from '../engine/rate-limit.ts'
 import { adminTokens, trackDepsOf } from '../engine/payments-lookup.ts'
 import { lookupWaiting } from '../engine/waiting-shopify.ts'
+import { recordCustomerEvent, validEmail } from '../engine/customer.ts'
+import { markHoldUsed } from '../engine/promo-holds.ts'
+import { promoShopifyFrom } from '../engine/promo-shopify.ts'
+import type { ShopifyOrderFacts } from '../engine/waiting.ts'
 import { fromWebhook, matchClaim, normalizeEmail, normalizeOrderNumber, openClaimSession, readWaiting, recordWaiting, waitingFromShopify } from '../engine/waiting.ts'
 import { readSecret, type TrackDeps } from '../engine/track.ts'
 import { isOrderRecord } from '../engine/buyer.ts'
@@ -36,6 +40,8 @@ export interface ClaimDeps {
   webhookSecret?: () => Promise<string>
   /** Called (not awaited by Shopify's retry logic) once an order made on our site is seen paid: the completeness check of the paid gift (engine/gift-check.ts). Tests inject a spy. */
   onPaid?: (rec: OrderRecord) => Promise<void>
+  /** Called with the order (and Shopify's facts) the first time its buyer's email is saved: the free-gift hold of a $0 order is marked used here (engine/promo-holds.ts). */
+  onOrderPaid?: (rec: OrderRecord, facts: ShopifyOrderFacts) => Promise<void>
 }
 
 export interface ClaimLimits {
@@ -111,8 +117,18 @@ export function createClaimHandlers(deps: () => ClaimDeps, limits: ClaimLimits =
           try {
             const rec = await d.store.get(ref)
             if (isOrderRecord(rec)) {
-              const seen = await markPaidSeen(d.store, rec, facts.paidAt ?? facts.createdAt ?? null, at)
+              let seen = await markPaidSeen(d.store, rec, facts.paidAt ?? facts.createdAt ?? null, at)
               console.log('[ichirei-paid]', JSON.stringify({ event: 'paid_seen', source: 'webhook' }))
+              // the buyer's email, Shopify's order name and what it paid are kept on the order (once), and the customer's timeline gets the order (2026-11-15)
+              if (!seen.buyer_email && facts.email && validEmail(facts.email)) {
+                const amount = Number(facts.amount)
+                const yen = Number.isFinite(amount) ? Math.round(amount) : null
+                const email = normalizeEmail(facts.email)
+                seen = { ...seen, buyer_email: email, shopify_order_name: facts.name ?? null, shopify_amount_jpy: yen, discount_code: facts.discountCodes?.[0] ?? null }
+                await d.store.put(ref, seen)
+                await recordCustomerEvent(d.store, { email, browser: seen.visitor ?? null }, yen === 0 ? 'ordered_free' : 'ordered_paid', { order: facts.name ?? undefined, ref, ...(yen !== null ? { amount: yen } : {}), language: seen.production.language }, at)
+              }
+              if (d.onOrderPaid) await d.onOrderPaid(seen, facts).catch((err) => console.error('[ichirei-paid] onOrderPaid failed', err instanceof Error ? err.message : err))
               if (d.onPaid) await d.onPaid(seen).catch((err) => console.error('[ichirei-paid] onPaid failed', err instanceof Error ? err.message : err))
             }
           } catch (err) {
@@ -137,4 +153,13 @@ async function onPaidDefault(rec: OrderRecord): Promise<void> {
   startTryIfDue({ store, makePoem: (r) => makePoemFor(r) }, rec, chk)
 }
 
-export const claimHandlers = createClaimHandlers(() => ({ store: createOrderStore(), onPaid: onPaidDefault }))
+/** A paid order that used a free-gift hold ($0, the hold's code or id on the order): the hold is USED, the customer comes off Shopify's eligible list (engine/promo-holds.ts). */
+async function onOrderPaidDefault(rec: OrderRecord, facts: ShopifyOrderFacts): Promise<void> {
+  const store = createOrderStore()
+  if (!store || !rec.buyer_email) return
+  const holdId = facts.attrs.find((a) => a.key === 'ichirei_hold')?.value ?? null
+  if (!holdId && !(facts.discountCodes ?? []).length) return
+  await markHoldUsed({ store, env: process.env, shopify: promoShopifyFrom(process.env) }, { holdId, email: rec.buyer_email })
+}
+
+export const claimHandlers = createClaimHandlers(() => ({ store: createOrderStore(), onPaid: onPaidDefault, onOrderPaid: onOrderPaidDefault }))

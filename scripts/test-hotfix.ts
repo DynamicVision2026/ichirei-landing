@@ -24,7 +24,7 @@ import { createCart, loadShopifyConfig } from '../engine/shopify.ts'
 import { paymentOf } from '../engine/shipping.ts'
 import type { PaymentInfo, PaymentResult } from '../engine/shipping.ts'
 import { cleanPromo } from '../src/demo/useSizes.ts'
-import { PROMO_LINE_EN, SIZE_COPY } from '../src/demo/sizes-copy.ts'
+import { SIZE_COPY } from '../src/demo/sizes-copy.ts'
 import { LEGAL } from '../src/legal/legal-copy.ts'
 import { PREVIEW_COPY } from '../src/demo/preview-copy.ts'
 import { cookieValue, ensureVisitor, newVisitorId, verifyVisitor, visitorOf, visitorSetCookie, visitorToken } from '../engine/visitor.ts'
@@ -117,7 +117,7 @@ const NOW = new Date('2026-11-18T03:00:00Z')
   check('(3) the whole site: card rounds a day are capped (ICHIREI_SELECT_DAILY_MAX; 3 here → the 4th is refused); the next day starts again', JSON.stringify(a) === JSON.stringify([true, true, true, false]) && (await siteRound(null, site, new Date(NOW.getTime() + 86_400_000))) === true)
   resetDayLimits()
   check('(3) the site cap is 2,000 a day by default', (await siteRound(null, {} as NodeJS.ProcessEnv, NOW)) === true)
-  check('(3) the owner\'s messages (ja / zh-Hant / en, zh-Hans by OpenCC)', LIMIT_PERSON.ja === '本日はここまでです。明日またお試しください。' && LIMIT_PERSON['zh-Hant'] === '今天的次數已用完，請明天再試。' && LIMIT_PERSON.en === "That's all for today. Please try again tomorrow." && LIMIT_PERSON['zh-Hans'] === '今天的次数已用完，请明天再试。' && LIMIT_SITE.ja === 'ただいま混み合っています。しばらくしてからお試しください。' && LIMIT_SITE['zh-Hant'] === '目前使用人數較多，請稍後再試。' && LIMIT_SITE.en === "We're very busy right now. Please try again a little later." && LIMIT_SITE['zh-Hans'] === '目前使用人数较多，请稍后再试。')
+  check('(3) the owner\'s warmer messages (2026-11-15: ja / zh-Hant / en, zh-Hans by OpenCC)', LIMIT_PERSON.ja === '今日はたくさんの場面を書いてくださいました。続きは明日また書けます。すでに見つけた字は、今日このまま贈れます。' && LIMIT_PERSON['zh-Hant'] === '今天你已經寫下許多片刻了。明天可以繼續寫。已經找到的字，今天就能送出。' && LIMIT_PERSON.en === "You've written many moments today. You can write more tomorrow, and any character you've already found can still be given today." && LIMIT_PERSON['zh-Hans'] === '今天你已经写下许多片刻了。明天可以继续写。已经找到的字，今天就能送出。' && LIMIT_SITE.ja === 'ただいま多くの方にご利用いただいています。少し時間をおいて、もう一度お試しください。' && LIMIT_SITE['zh-Hant'] === '目前有很多人正在使用，請稍等片刻再試一次。' && LIMIT_SITE.en === 'Lots of people are writing their moments right now. Please try again in a little while.' && LIMIT_SITE['zh-Hans'] === '目前有很多人正在使用，请稍等片刻再试一次。')
   check('(3) /legal: one sentence about the one functional cookie in each language, no banner', LEGAL.ja.privacy.body === '無料のお試し回数を管理するため、機能上必要なCookieを1つ使用します。' && LEGAL['zh-Hant'].privacy.body === '為了管理免費試用次數，我們使用一個功能上必要的Cookie。' && LEGAL.en.privacy.body === 'We use one functional cookie to limit free previews.')
   check('(3) the "pictures are painted later" line (never "try again tomorrow"): ja / zh-Hant / en', PREVIEW_COPY.ja.afterOrder === '4枚の絵は、贈ると決めたときに描かれます。' && PREVIEW_COPY['zh-Hant'].afterOrder === '四幅畫會在你決定送出時繪製。' && PREVIEW_COPY.en.afterOrder === 'Your four pictures are painted the moment you give this gift.' && !/tomorrow|明日|明天/.test(JSON.stringify([PREVIEW_COPY.ja.afterOrder, PREVIEW_COPY['zh-Hant'].afterOrder, PREVIEW_COPY.en.afterOrder])))
 }
@@ -157,11 +157,6 @@ const NOW = new Date('2026-11-18T03:00:00Z')
   const over = await body(env, at('2026-11-27T12:00:00Z'))
   const none = await body({}, at('2026-11-20T12:00:00Z'))
   check('(4) /api/sizes carries the promotion window until it is over; nothing when it is off or over', !!on.promo && Date.parse(on.promo.from) === Date.parse('2026-11-17T12:00:00-05:00') && cleanPromo(on)?.until === Date.parse('2026-11-25T23:59:59-05:00') && over.promo === undefined && none.promo === undefined && cleanPromo({}) === null)
-  check('(4) the promo line (en only): "Have today\'s code? Enter it at checkout. The first 100 gifts each day are on us (one per person per day, through November 25)."', PROMO_LINE_EN === "Have today's code? Enter it at checkout. The first 100 gifts each day are on us (one per person per day, through November 25).")
-  const order = readFileSync('src/demo/OrderForm.tsx', 'utf8')
-  check('(4) the order form shows the line only for English, not for a claim, and only while the promotion is on', /language === 'en' && !claim && promoOn &&[^]{0,120}PROMO_LINE_EN/.test(order))
-  const cb = readFileSync('cloudbuild.yaml', 'utf8')
-  check('(4) cloudbuild.yaml carries the promo dates as substitutions (_PROMO_FROM, _PROMO_UNTIL) and passes them on', /_PROMO_FROM: '2026-11-17T12:00:00-05:00'/.test(cb) && /_PROMO_UNTIL: '2026-11-25T23:59:59-05:00'/.test(cb) && /ICHIREI_PROMO_FROM=\$\{_PROMO_FROM\}/.test(cb) && /ICHIREI_PROMO_UNTIL=\$\{_PROMO_UNTIL\}/.test(cb) && /ICHIREI_FILM_DAILY_MAX_PROMO=\$\{_FILM_DAILY_MAX_PROMO\}/.test(cb))
 }
 
 // ---- 5. a $0 order is a normal paid order ------------------------------------------------------------------------------------------------------------------

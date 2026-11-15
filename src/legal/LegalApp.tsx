@@ -58,8 +58,11 @@ export default function LegalApp() {
             </section>
           ))}
         </div>
+        <p data-testid="legal-cancel-time">{t.cancelTime}</p>
         <h2 id="privacy">{t.privacy.heading}</h2>
         <p data-testid="legal-privacy">{t.privacy.body}</p>
+        <p data-testid="legal-email-use">{t.emailUse}</p>
+        <p data-testid="legal-retention">{t.retention}</p>
         <h2 id="faq">{t.faqTitle}</h2>
         <div className="legalFaq" data-testid="legal-faq">
           {t.faq.map((f) => (

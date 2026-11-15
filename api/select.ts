@@ -25,6 +25,7 @@ import { newMoment, siteRound } from '../engine/day-limits.ts'
 import { recordHealth } from '../engine/health.ts'
 import { clientIp } from '../engine/rate-limit.ts'
 import { visitorOf } from '../engine/visitor.ts'
+import { recordCustomerEvent } from '../engine/customer.ts'
 import { parsePromptQuestion } from '../engine/story-questions.ts'
 import { FOLLOW_UP_MAX, LIMIT_PERSON, LIMIT_SITE, NO_MORE_ROUNDS, STORY_MAX, parseExclude, countChars, mergeStory, parseContext, parseFollowUps, type Condition } from '../engine/contract.ts'
 
@@ -119,6 +120,7 @@ export async function POST(req: Request): Promise<Response> {
     if (ex.retry === 0) {
       const v = newMoment(visitorOf(req), clientIp(req))
       if (!v.ok) return refuse(v.code)
+      void recordCustomerEvent(store, { browser: visitorOf(req) }, 'tried', { language: lang }).catch(() => {})
     }
     if (!(await siteRound(store))) return refuse('limit_site')
   }

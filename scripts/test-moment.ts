@@ -54,9 +54,12 @@ if (!haveBase) console.log(`SKIP  the base commit ${BASE} is not in this checkou
 else {
   // (2026-11-14: the later "final fix" ticket deliberately changes the receiver page, the buyer page, the legal page, the e-mail template and parts of the engine — so these checks now guard what that ticket must
   // NOT touch: the engine's CHOICE of characters (selection, cards, prompts, palette, lexicon) and the prices, compared with the moment release.)
-  const GUARD = ['engine/engine.ts', 'engine/cards.ts', 'engine/slots.ts', 'engine/prompt.ja.md', 'engine/prompt.zh.md', 'engine/prompt.en.md', 'engine/palette.csv', 'engine/lexicon.csv', 'engine/review.ts']
+  const GUARD = ['engine/engine.ts', 'engine/cards.ts', 'engine/slots.ts', 'engine/prompt.ja.md', 'engine/prompt.zh.md', 'engine/prompt.en.md', 'engine/review.ts']
   const sinceMoment = execFileSync('git', ['diff', '--name-only', 'b2af257', '--', ...GUARD]).toString().trim()
   check('the engine\'s choice of characters (selection, cards, slots, prompts, palette, lexicon, review) is untouched since the moment release — so the request an existing story fixture produces is the same', sinceMoment === '', sinceMoment)
+  // (2026-11-15, the customer-loop ticket, item 4: the owner's English word for 修 is "mend", and the first-listed meaning of three more characters whose gift sense is not their first one is reordered — nothing else in the palette or the lexicon moves)
+  const dataDiff = execFileSync('git', ['diff', '-U0', 'b2af257', '--', 'engine/palette.csv', 'engine/lexicon.csv']).toString().split('\n').filter((l) => /^[+-][^+-]/.test(l))
+  check('the palette and the lexicon are untouched since the moment release except the four English meanings the owner asked to change (修 mend, 添, 寄, 送)', dataDiff.every((l) => /^[+-](ja|zh),(修|添|寄|送),|^[+-]修,verb/.test(l)), dataDiff.filter((l) => !/^[+-](ja|zh),(修|添|寄|送),|^[+-]修,verb/.test(l)).join(' | ').slice(0, 200))
   // the prices (src/order/packages.ts) are untouched too: since the moment release only the note's length limit (60 → 200, 2026-11-14) changed there
   const pk = execFileSync('git', ['diff', '-U0', 'b2af257', '--', 'src/order/packages.ts']).toString().split('\n').filter((l) => /^[-+]/.test(l) && !/^(\+\+\+|---)/.test(l))
   check('the prices are untouched since the moment release (only GIFT_MESSAGE_MAX changed in src/order/packages.ts)', pk.length > 0 ? pk.every((l) => /GIFT_MESSAGE_MAX/.test(l)) : true, pk.join('\n'))

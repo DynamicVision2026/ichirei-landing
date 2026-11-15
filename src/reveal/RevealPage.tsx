@@ -11,6 +11,8 @@ import { toRevealLang } from './lang'
 import { useMemorialSelected } from './occasion-store'
 import { useComingSoon, useSizes } from '../demo/useSizes'
 import { SHIPS } from '../order/packages'
+import LoopBars from '../loop/LoopBars'
+import DaysOfThanks from '../loop/DaysOfThanks'
 
 // The story flow (composer → cards → order) is the heaviest part of the page and sits below the fold: it loads
 // right after the first paint, so the hero shows without waiting for it.
@@ -104,8 +106,10 @@ export default function RevealPage() {
       </header>
 
       <main>
+        <LoopBars lang={lang} />
         <ClaimBanner language={uiLang} />
         <Hero lang={lang} currency={currency} rates={rates} woodOnSale={woodOnSale} />
+        {lang === 'en' && <DaysOfThanks />}
         <Opening t={t} />
         {lang === 'en' && <UsBanner />}
         <Strip t={t} woodOnSale={woodOnSale} />

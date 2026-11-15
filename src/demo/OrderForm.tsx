@@ -32,7 +32,7 @@ import { CLAIM_COPY } from '../claim/copy.ts'
 import { PriceWithSale, SaleLine, UsdLaunchLine, UsdPriceView } from '../order/SalePrice.tsx'
 import { salePriceJpy } from '../order/sale.ts'
 import { usePromoOn, useSale, useUsd } from './useSizes.ts'
-import { PROMO_LINE_EN } from './sizes-copy.ts'
+import OrderLine from '../loop/OrderLine.tsx'
 import { cleanReading } from '../order/reading.ts'
 
 // The purchase step of the customer flow: after the sender has chosen a character, collect
@@ -175,6 +175,15 @@ export default function OrderForm({ result, story, followUps = [], promptQuestio
   const openDateOk = openDate === '' || (/^\d{4}-\d{2}-\d{2}$/.test(openDate) && openDate >= todayThere && openDate <= lastOpenDay && openTzOk)
   const emailOk = shipTo !== 'egift' || pkg === '' || !SHIPS[pkg] || /^[^\s@]{1,64}@[^\s@]{1,190}\.[^\s@]{2,}$/.test(senderEmail.trim())
   const valid = (refundAckAt !== null || !!claim) && senderOk && receiverOk && dateOk && pkg !== '' && onSale && messageOk && openDateOk && emailOk && !(pkg === 'simple' && !simpleOk) && poemStep !== 'loading'
+
+  // The one plain line under the button that says what is missing (2026-11-15): the button never looks dead without a reason.
+  const hint = valid || phase !== 'edit' ? null : pkg === '' || !onSale ? (memorial ? o.hints.giftMemorial : o.hints.gift) : refundAckAt === null && !claim ? o.hints.tick : null
+  // The e-gift is preselected when it is the only gift that can be ordered (English: always, while the wooden sizes are "coming soon" or off): the pay button then works right after the refund box is ticked.
+  useEffect(() => {
+    if (pkg !== '' || claim || sizes === null) return
+    const orderable = sizes.filter((id) => !soon.includes(id))
+    if (orderable.length === 1) setPkg(orderable[0])
+  }, [pkg, claim, sizes, soon, language])
 
   const submit = async () => {
     if (!valid || phase !== 'edit') return
@@ -451,10 +460,11 @@ export default function OrderForm({ result, story, followUps = [], promptQuestio
             </label>
           </>
         )}
-        {language === 'en' && !claim && promoOn && <p className="sent promoLine" data-testid="promo-line">{PROMO_LINE_EN}</p>}
+        {language === 'en' && promoOn && !claim && <OrderLine />}
         <button type="button" data-testid="order-submit" className="btn primary" onClick={submit} disabled={!valid || busy}>
           {phase === 'submitting' ? o.submitting : phase === 'redirecting' ? o.redirecting : claim ? claimCopy.make : o.submit}
         </button>
+        {hint && <p className="sent orderHint" role="status" data-testid="order-hint">{hint}</p>}
         {claim && <p className="sent" data-testid="claim-window-note">{claimCopy.window24}</p>}
         <p className="sent">{memorial ? o.privacyMemorial : o.privacy}</p>
         <p className="sent"><a href="/legal" data-testid="legal-link" className="legalLink">{pc.legalLink}</a></p>

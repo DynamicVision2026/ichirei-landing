@@ -1933,19 +1933,30 @@ const mockPage = async (browser, { onExplain, result, order, track } = {}) => {
       pm.push(b)
       await route.fulfill({ json: { poem_id: 'PM-20261030-abcdefghj1', type: b.type, lines: POEM_LINES, reading: '', aids: {}, preview: 'x' } })
     })
+    // the basket (2026-11-15): every result page saves its item; the saved item opens the result page again
+    const bk = []
+    await f.page.route('**/api/basket', async (route) => {
+      if (route.request().method() === 'POST') {
+        bk.push(JSON.parse(route.request().postData() ?? '{}'))
+        return route.fulfill({ json: { id: 'BK-aaaaaaaaaaaaaaaaaaaa', token: 'BT-x', count: 1, created: true } })
+      }
+      return route.fulfill({ json: { items: [], token: null } })
+    })
+    await f.page.route('**/api/basket/BK-*', (route) => (bk[0] ? route.fulfill({ json: { id: 'BK-aaaaaaaaaaaaaaaaaaaa', resume: bk[0].resume } }) : route.fulfill({ status: 404, json: {} })))
+    await f.page.route('**/api/me*', (route) => route.fulfill({ json: { basket: { count: bk.length }, ready: null, hold: null } }))
     await f.page.goto(`http://localhost:5173/?lang=${lang}`, { waitUntil: 'networkidle' })
     await f.page.locator('#write [data-testid=story-input]').fill(STORY)
     await pickContext(f.page)
     await f.page.click(`#write >> text=${GO[lang]}`)
     await f.page.waitForSelector('[data-all-revealed=yes]', { timeout: 15000 })
-    return { ...f, pv, pm }
+    return { ...f, pv, pm, bk }
   }
   const pickMain = async (page, lang) => {
     await page.locator('article[data-slot=main]').click()
     await page.locator('article[data-slot=main]').locator(`text=${GIVE[lang]}`).click()
     await page.locator('[data-testid=result-page]').waitFor()
   }
-  const RC = { ja: { make: 'この一字を贈る →', another: 'ほかの字を選ぶ', waiting: 'その場面を描いています。20秒ほどお待ちください。', drawing: '描いています…' }, 'zh-Hant': { make: '把這個字送出去 →', another: '選別的字', waiting: '正在描繪這個片刻，約需20秒。', drawing: '描繪中……' }, en: { make: 'Make it a gift →', another: 'Choose another character', waiting: 'Painting your moment. About 20 seconds.', drawing: 'Painting…' } }
+  const RC = { ja: { make: 'この一字を贈る →', another: 'ほかの字を選ぶ', waiting: 'その場面を描いています。1分ほどお待ちください。', drawing: '描いています…' }, 'zh-Hant': { make: '把這個字送出去 →', another: '選別的字', waiting: '正在描繪這個片刻，約需一分鐘。', drawing: '描繪中……' }, en: { make: 'Make it a gift →', another: 'Choose another character', waiting: 'Painting your moment. About a minute.', drawing: 'Painting…' } }
   const figs = (page, st) => page.locator(`[data-testid=result-pictures] .rs-fig[data-ready=${st}]`)
   const ja = await mk('ja')
   check('preview: CHARACTER FIRST — the two characters are on screen and not one picture was asked for (no /api/preview call before a character is picked), and no result page yet', ja.pv.start.length === 0 && (await ja.page.locator('[data-testid=result-page]').count()) === 0)
@@ -1954,8 +1965,21 @@ const mockPage = async (browser, { onExplain, result, order, track } = {}) => {
   await ja.page.locator('[data-testid=result-page]').waitFor()
   await ja.page.waitForTimeout(400)
   check('result page: picking the character opens the full-screen result page (the order form is not visible yet) and starts the draft at once (one /api/preview call with the story, the context and every character shown — both forms)', ja.pv.start.length >= 1 && ja.pv.start[0].story === STORY && ja.pv.start[0].language === 'ja' && ja.pv.start[0].shown.join('') === '証證守' && !(await ja.page.locator('[data-testid=order-form]').isVisible()))
+  check('basket: opening the result page saved ONE item (POST /api/basket) with the story, the language, the chosen character, the card line and what the page needs to open it again — and nothing was asked of a model', ja.bk.length >= 1 && ja.bk[0].story === STORY && ja.bk[0].language === 'ja' && ['證', '証'].includes(ja.bk[0].kanji) && ja.bk[0].resume?.result?.candidates?.length >= 1 && ja.bk[0].resume?.story === STORY && ja.bk.every((b) => b.kanji === ja.bk[0].kanji), JSON.stringify(ja.bk.map((b) => [b.kanji, b.story?.slice(0, 5)])))
+  {
+    const r2 = await mockPage(browser)
+    let selects = 0
+    await r2.page.route('**/api/select', (route) => { selects++; return route.fulfill({ status: 500, json: {} }) })
+    await r2.page.route('**/api/me*', (route) => route.fulfill({ json: { basket: { count: 1 }, ready: null, hold: null } }))
+    await r2.page.route('**/api/basket/BK-*', (route) => route.fulfill({ json: { id: 'BK-aaaaaaaaaaaaaaaaaaaa', resume: ja.bk[0].resume } }))
+    await r2.page.route('**/api/basket', (route) => route.fulfill({ json: { id: 'BK-aaaaaaaaaaaaaaaaaaaa', token: 'BT-x', count: 1, created: false } }))
+    await r2.page.goto('http://localhost:5173/?resume=BK-aaaaaaaaaaaaaaaaaaaa', { waitUntil: 'networkidle' })
+    await r2.page.locator('[data-testid=result-page]').waitFor({ timeout: 8000 })
+    check('basket: 「この贈りものを贈る →」 (/?resume=<item>) puts the saved result page back with its character, and no engine call is made (/api/select was never asked)', ['證', '証'].includes(await r2.page.locator('[data-testid=result-glyph]').innerText()) && selects === 0)
+    await r2.page.close()
+  }
   check('result page: it opens at the top, with the character in big type and the heading 「あなたの贈りもの」 — and no 「見本」 / Sample label anywhere', (await ja.page.locator('[data-testid=result-page]').evaluate((el) => el.scrollTop)) === 0 && ['證', '証'].includes(await ja.page.locator('[data-testid=result-glyph]').innerText()) && (await ja.page.locator('[data-testid=result-heading]').innerText()) === 'あなたの贈りもの' && !(await ja.page.locator('[data-testid=result-page]').innerText()).match(/見本|Sample/))
-  check('result page: while drawing it says 「その場面を描いています。20秒ほどお待ちください。」 with the quiet ink line, the character is already there, and the four picture places are there', (await ja.page.locator('[data-testid=result-waiting]').innerText()).includes(RC.ja.waiting) && (await ja.page.locator('[data-testid=result-pictures] .rs-fig').count()) === 4)
+  check('result page: while drawing it says 「その場面を描いています。1分ほどお待ちください。」 with the quiet ink line, the character is already there, and the four picture places are there', (await ja.page.locator('[data-testid=result-waiting]').innerText()).includes(RC.ja.waiting) && (await ja.page.locator('[data-testid=result-pictures] .rs-fig').count()) === 4)
   await ja.page.waitForFunction(() => document.querySelectorAll('[data-testid=result-pictures] .rs-fig[data-ready=yes]').length >= 2, null, { timeout: 8000 })
   const partial = await figs(ja.page, 'yes').count()
   check('result page: the pictures fill in as they arrive (some are there while others still wait)', partial >= 2 && partial < 4, String(partial))
@@ -1963,7 +1987,7 @@ const mockPage = async (browser, { onExplain, result, order, track } = {}) => {
   check('result page: when all four are there the waiting line is gone; each picture has its line of the story under it', (await ja.page.locator('[data-testid=result-waiting]').count()) === 0 && (await ja.page.locator('[data-testid=result-pictures] .rs-fig figcaption').nth(1).innerText()) === '「もういらない」と私は言った。')
   await ja.page.locator('[data-testid=result-poem]').waitFor({ timeout: 5000 })
   check('result page: the poem of the chosen format is on the page', (await ja.page.locator('[data-testid=result-poem]').innerText()).includes('蓋の花添え'))
-  check('result page: NO download before payment — no link, no download attribute, no scroll or PDF address anywhere; the only buttons are the two choices', (await ja.page.locator('[data-testid=result-page] a, [data-testid=result-page] [download]').count()) === 0 && !(await ja.page.locator('[data-testid=result-page]').innerHTML()).match(/scroll\.|\.pdf|download/) && (await ja.page.locator('[data-testid=result-page] button').count()) === 2)
+  check('result page: NO download before payment — no link, no download attribute, no scroll or PDF address anywhere; the only buttons are the two choices and 「保存」 (the basket\'s Save panel, 2026-11-15; its link opens only once pressed)', (await ja.page.locator('[data-testid=result-page] a, [data-testid=result-page] [download]').count()) === 0 && !(await ja.page.locator('[data-testid=result-page]').innerHTML()).match(/scroll\.|\.pdf|download/) && (await ja.page.locator('[data-testid=result-page] button').count()) === 3 && (await ja.page.locator('[data-testid=result-page] [data-testid=save-button]').count()) === 1)
   check('result page: the closing line, the note and the two buttons are the owner\'s words', (await ja.page.locator('[data-testid=result-closing]').innerText()) === 'この一字は、あなたの目に映る、その人です。' && (await ja.page.locator('[data-testid=result-make]').innerText()) === RC.ja.make && (await ja.page.locator('[data-testid=result-another]').innerText()) === RC.ja.another)
   await ja.page.screenshot({ path: `${SHOTS}/e2e-result-ja-desktop.png`, fullPage: false })
   // 「別の字を選ぶ」 goes back to the cards (no new engine call)
@@ -2062,6 +2086,18 @@ const mockPage = async (browser, { onExplain, result, order, track } = {}) => {
     await l.page.click('[data-testid=result-make]')
     await l.page.locator('[data-testid=order-form]').waitFor()
     check(`order step (${lang}): the refund line is above the order button`, (await l.page.locator('[data-testid=order-refund-line]').innerText()).includes(note))
+    if (lang === 'en') {
+      // 2026-11-15: what blocks the button is said in one plain line under it; with three sizes on sale nothing is preselected, so the first line asks for the gift, then for the box
+      await l.page.waitForTimeout(1500)
+      const first = await l.page.locator('[data-testid=order-hint]').innerText().catch(() => '')
+      await l.page.click('label:has(input[name=package][value=egift])')
+      await l.page.waitForTimeout(300)
+      const second = await l.page.locator('[data-testid=order-hint]').innerText().catch(() => '')
+      check('order step (en): the button is disabled and says "Please choose your gift above." — then, once the e-gift is picked, "Please tick the box above."', first === 'Please choose your gift above.' && second === 'Please tick the box above.' && (await l.page.locator('[data-testid=order-submit]').isDisabled()), `${first} | ${second}`)
+      await l.page.locator('[data-testid=order-refund-check]').check()
+      await l.page.waitForTimeout(500)
+      check('order step (en): after ticking the box the button is live and the hint line is gone — straight to payment', (await l.page.locator('[data-testid=order-submit]').isEnabled()) && (await l.page.locator('[data-testid=order-hint]').count()) === 0)
+    }
     await l.page.close()
   }
 }
@@ -2511,6 +2547,8 @@ const SECTION_ORDER = ['.hero', '.strip', '.philo', '#shape', '#angles', '#write
   const form = page.locator('[data-testid=order-form]')
   await toOrder(page)
   check('en order form: no form choice (the character is carved in its modern Japanese form 灯); never traditional/simplified', (await page.locator('input[name=inscription_style]').count()) === 0 && (await page.locator('[data-order-glyph]').innerText()) === '灯')
+  // (2026-11-15: the e-gift is preselected only when it is the ONLY orderable size; here three are on sale, so nothing is picked yet)
+  check('en order form: with three sizes on sale nothing is preselected', (await page.locator('input[name=package]:checked').count()) === 0)
   check('en order form: English labels, packages and the romaji + meaning line under the glyph', (await form.innerText()).toLowerCase().includes('your order') && (await form.innerText()).includes('Requested delivery date') && (await form.innerText()).includes('akari · lamp') && (await form.innerText()).includes('¥18,850'))
   check('en certificate: "This character is the person as seen through your eyes." and the shipping line', (await page.locator('[data-certificate]').innerText()) === 'This character is the person as seen through your eyes.' && (await page.locator('[data-shipping]').innerText()) === 'Free shipping in Japan · ¥6,000 international shipping' && (await page.locator('#write [data-price=standard]').innerText()) === '¥18,850')
   await page.fill('input[name=sender_name]', 'Emily Carter')
@@ -2814,7 +2852,7 @@ const SECTION_ORDER = ['.hero', '.strip', '.philo', '#shape', '#angles', '#write
   // what may stay: the names of the sizes (they are listed with 「近日公開」), and the e-gift's own words (it is not posted, it needs no shipping, its card is a PDF to print at home)
   const NAMES = ['木札（シンプル）', '版木（スタンダード）', '木牌（簡約）', '版木（標準）', 'Wooden tag (Simple)', 'Block set (Standard)']
   // (the example stories on the page are customers' sample stories, not promises: 「彫った木のスプーン」 / 「我九歲刻的木湯匙」 / "the wooden spoon I carved at nine")
-  const ALLOWED = ['那一刻', '這一刻', '一刻', '時刻', '此刻', '片刻', '立刻', '九歳のわたしが彫った木のスプーン', '我九歲刻的木湯匙', 'the wooden spoon I carved at nine', '免運費（以連結送出）', '送料を含む', '含運費', 'including shipping', '郵送されません', '郵送がなく', '送料はかかりません', '送料なし', '不郵寄', '無運費', '无运费', 'No shipping', 'no shipping', 'not posted', 'ご自宅で印刷できる', '可在家列印', 'print at home', 'you can print at home']
+  const ALLOWED = ['那一刻', '這一刻', '一刻', '時刻', '此刻', '片刻', '立刻', '九歳のわたしが彫った木のスプーン', '我九歲刻的木湯匙', 'the wooden spoon I carved at nine', '免運費（以連結送出）', '送料を含む', '含運費', 'including shipping', '郵送されません', '郵送がなく', '送料はかかりません', '送料なし', '不郵寄', '不會郵寄', '無運費', '无运费', 'No shipping', 'no shipping', 'not posted', 'ご自宅で印刷できる', '可在家列印', 'print at home', 'you can print at home']
   const PROMISE = {
     ja: /刻|彫|木に|木の|拓本|拓墨|EMS|郵送|送料|水引|化粧箱|ギフトボックス|お届け希望日|印刷した|印刷され/,
     'zh-Hant': /刻|木牌|木字版|版木|拓|EMS|郵寄|運費|水引|禮盒|期望送達日|印刷|印在/,
@@ -3876,7 +3914,7 @@ const SECTION_ORDER = ['.hero', '.strip', '.philo', '#shape', '#angles', '#write
   const LINES = ['朝、母は台所に立っていた。', '「もういらない」と私は言った。', '母は黙って戻っていった。', '今も、庭の花が添えてある。']
   const INTRO = { ja: 'あなたの思い出のひと場面から浮かんだ字です。贈りたい一字を選んでください。', 'zh-Hant': '這些字來自你寫下的片刻。選出你想送的那一個。', en: 'These characters came from your moment. Choose the one you want to give.' }
   const DOCK = { ja: 'ひと場面を書く・無料で試せます', 'zh-Hant': '寫下一個片刻・可免費試用', en: 'Write your moment · free to try' }
-  const RC = { ja: { heading: 'あなたの贈りもの', sub: 'あなたの目に映る、その人。', pics: 'その場面の4枚の絵', closing: 'この一字は、あなたの目に映る、その人です。', note: 'お届けする贈りものは、封を開くところから始まり、音楽つきのフィルムとともに届きます。', make: 'この一字を贈る →', another: 'ほかの字を選ぶ', waiting: 'その場面を描いています。20秒ほどお待ちください。' }, 'zh-Hant': { heading: '你的禮物', sub: '你眼中的那個人。', pics: '那個片刻的四幅畫', closing: '這個字，是你眼中的那個人。', note: '送出的禮物會從拆開信封開始，並附上配樂短片。', make: '把這個字送出去 →', another: '選別的字', waiting: '正在描繪這個片刻，約需20秒。' }, en: { heading: 'Your gift', sub: 'This is how you see them.', pics: 'Four pictures of your moment', closing: 'This character is the person as seen through your eyes.', note: 'The finished gift opens from a sealed envelope, with the film and music.', make: 'Make it a gift →', another: 'Choose another character', waiting: 'Painting your moment. About 20 seconds.' } }
+  const RC = { ja: { heading: 'あなたの贈りもの', sub: 'あなたの目に映る、その人。', pics: 'その場面の4枚の絵', closing: 'この一字は、あなたの目に映る、その人です。', note: 'お届けする贈りものは、封を開くところから始まり、音楽つきのフィルムとともに届きます。', make: 'この一字を贈る →', another: 'ほかの字を選ぶ', waiting: 'その場面を描いています。1分ほどお待ちください。' }, 'zh-Hant': { heading: '你的禮物', sub: '你眼中的那個人。', pics: '那個片刻的四幅畫', closing: '這個字，是你眼中的那個人。', note: '送出的禮物會從拆開信封開始，並附上配樂短片。', make: '把這個字送出去 →', another: '選別的字', waiting: '正在描繪這個片刻，約需一分鐘。' }, en: { heading: 'Your gift', sub: 'This is how you see them.', pics: 'Four pictures of your moment', closing: 'This character is the person as seen through your eyes.', note: 'The finished gift opens from a sealed envelope, with the film and music.', make: 'Make it a gift →', another: 'Choose another character', waiting: 'Painting your moment. About a minute.' } }
   const mk27 = async (lang, vp, { slow = false } = {}) => {
     const f = await mockPage(browser, { result: (b) => ({ ...clone(FIXTURE), language: b.language }), order: () => ({ json: { order_ref: 'IC-20261114-FINAL111', checkout_url: 'http://localhost:5173/__checkout?cart=f', glyph: '証', certificate_text: 'x' } }) })
     await f.page.setViewportSize(vp)
@@ -4027,8 +4065,8 @@ const SECTION_ORDER = ['.hero', '.strip', '.philo', '#shape', '#angles', '#write
     const L = lang === 'en'
     const loc = L ? 'en-US' : 'ja-JP'
     const S = L
-      ? { label: 'Opens Dec 25, 7:00 a.m.', hint: 'Press and hold the knot to untie it', untie: 'Untie', music: 'This gift has music.', answer: 'Send something back', back: 'Give Emily a character back', sent: 'Sent to Emily.', landing: "Is there someone you've never quite said it to?", memLabel: 'Dec 25' }
-      : { label: '12月25日 午前7時に開きます', hint: '結び目を長押しして、ほどいてください', untie: 'ほどく', music: 'この贈りものには音楽があります。', answer: 'お返しをする', back: '山田 太郎さんに一字を返す', sent: '山田 太郎さんに届けました。', landing: 'まだ言えていない人が、いますか。', memLabel: '12月25日' }
+      ? { label: 'Opens Dec 25, 7:00 a.m.', hint: 'Press and hold the knot to untie it', untie: 'Untie', music: 'This gift has music.', answer: 'Send something back', back: 'Give Emily a character back', sent: 'Sent to Emily.', landing: "Give one of your own →", memLabel: 'Dec 25' }
+      : { label: '12月25日 午前7時に開きます', hint: '結び目を長押しして、ほどいてください', untie: 'ほどく', music: 'この贈りものには音楽があります。', answer: 'お返しをする', back: '山田 太郎さんに一字を返す', sent: '山田 太郎さんに届けました。', landing: '自分も一字を贈る →', memLabel: '12月25日' }
     const shots = `${SHOTS}/ceremony-${lang}`
 
     // 1. sealed: the cord lies across the seal, the label and a quiet countdown; nothing to untie yet
@@ -4334,49 +4372,8 @@ for (const [lang, locale, text] of [['en', 'en-US', 'Your gift is being finished
   await ctx.close()
 }
 
-// ---------- Run 30 (2026-11-15, hotfix): the "Days of Thanks" line above the order button (English only, only between its dates), the /legal cookie sentence, and the free-try limit messages on the page ----------
+// ---------- Run 30 (2026-11-15, hotfix): the /legal cookie sentence, and the free-try limit messages on the page ----------
 {
-  const promo = { from: '2026-11-17T17:00:00.000Z', until: '2026-11-26T04:59:59.000Z' }
-  const PROMO_TEXT = "Have today's code? Enter it at checkout. The first 100 gifts each day are on us (one per person per day, through November 25)."
-  const LOCALE30 = { ja: 'ja-JP', 'zh-Hant': 'zh-TW', en: 'en-US' }
-  const reach = async (page, lang) => {
-    await page.locator('#write [data-testid=story-input]').fill(lang === 'en' ? 'She left the porch light on every night until I got home, and she never once mentioned it.' : STORY)
-    await pickContext(page)
-    await page.click(`#write >> text=${GO[lang]}`)
-    await page.waitForSelector('[data-all-revealed=yes]', { timeout: 15000 })
-    await page.locator('article[data-slot=main]').click()
-    await page.locator('article[data-slot=main]').locator(`text=${GIVE[lang]}`).click()
-    await toOrder(page)
-    await page.waitForTimeout(400)
-  }
-  for (const [mode, time, shown] of [['inside the dates', '2026-11-20T15:00:00Z', true], ['before the dates', '2026-11-16T15:00:00Z', false], ['after the dates', '2026-11-27T15:00:00Z', false]]) {
-    for (const lang of ['en', 'ja', 'zh-Hant']) {
-      if (lang !== 'en' && mode !== 'inside the dates') continue
-      const ctx = await browser.newContext({ locale: LOCALE30[lang], viewport: { width: 390, height: 844 } })
-      const page = await ctx.newPage()
-      const errs = []
-      page.on('pageerror', (e) => errs.push(String(e)))
-      await page.clock.install({ time: new Date(time) })
-      await page.route('**/api/sizes', (r) => r.fulfill({ json: { sizes: ['egift', 'simple', 'standard'], coming_soon: ['simple', 'standard'], promo } }))
-      await page.route('**/api/rates', (r) => r.fulfill({ json: { jpy_per_usd: 155 } }))
-      await page.route('**/api/analytics', (r) => r.fulfill({ status: 204, body: '' }))
-      await page.route('**/api/log', (r) => r.fulfill({ status: 204, body: '' }))
-      await page.route('**/api/explain', (r) => r.fulfill({ json: { explanation: 'ok' } }))
-      await page.route('**/api/select', async (route) => { const body = JSON.parse(route.request().postData() ?? '{}'); await route.fulfill({ json: shapeRound(lang === 'en' ? { ...FIXTURE, language: 'en', inscription_script: null, candidates: FIXTURE.candidates.map((c, i) => ({ ...c, reading: i === 0 ? 'akari' : `y${i}`, meaning: i === 0 ? 'lamp' : `m${i}`, eliminated: false, eliminated_reason: null })) } : lang === 'zh-Hant' ? { ...FIXTURE, language: 'zh-Hant', inscription_script: 'traditional' } : FIXTURE, body) }) })
-      await page.goto(`http://localhost:5173/${lang === 'en' ? 'en' : ''}?lang=${lang}`, { waitUntil: 'networkidle' })
-      await page.waitForTimeout(500)
-      await reach(page, lang)
-      const line = page.locator('[data-testid=promo-line]')
-      if (lang === 'en') {
-        check(`promo (en, ${mode}): ${shown ? 'the one line "Have today\'s code? …through November 25)." sits right above "Continue to payment"' : 'no promo line'}`, shown ? (await line.count()) === 1 && (await line.innerText()).trim() === PROMO_TEXT && (await page.evaluate(() => { const l = document.querySelector('[data-testid=promo-line]'); const b = document.querySelector('[data-testid=order-submit]'); return !!l && !!b && !!(l.compareDocumentPosition(b) & 4) })) : (await line.count()) === 0)
-        if (shown) { await line.scrollIntoViewIfNeeded(); await page.waitForTimeout(300); await page.screenshot({ path: `${SHOTS}/promo-order-en.png` }) }
-      } else {
-        check(`promo (${lang}): nothing — ja and zh show no promo line`, (await line.count()) === 0)
-      }
-      check(`no page errors (run 30, promo ${lang} ${mode})`, errs.length === 0, errs.join('; '))
-      await ctx.close()
-    }
-  }
   // /legal: the one-cookie sentence, no banner
   for (const [lang, locale, text] of [['ja', 'ja-JP', '無料のお試し回数を管理するため、機能上必要なCookieを1つ使用します。'], ['zh-Hant', 'zh-TW', '為了管理免費試用次數，我們使用一個功能上必要的Cookie。'], ['en', 'en-US', 'We use one functional cookie to limit free previews.']]) {
     const ctx = await browser.newContext({ locale, viewport: { width: 390, height: 844 } })
@@ -4387,7 +4384,7 @@ for (const [lang, locale, text] of [['en', 'en-US', 'Your gift is being finished
     await ctx.close()
   }
   // the limit messages: a 429 from /api/select shows the owner's sentence, never "try again tomorrow" on a payment
-  for (const [lang, code, text] of [['ja', 'limit_person', '本日はここまでです。明日またお試しください。'], ['en', 'limit_person', "That's all for today. Please try again tomorrow."], ['en', 'limit_site', "We're very busy right now. Please try again a little later."], ['zh-Hant', 'limit_site', '目前使用人數較多，請稍後再試。']]) {
+  for (const [lang, code, text] of [['ja', 'limit_person', '今日はたくさんの場面を書いてくださいました。続きは明日また書けます。すでに見つけた字は、今日このまま贈れます。'], ['en', 'limit_person', "You've written many moments today. You can write more tomorrow, and any character you've already found can still be given today."], ['en', 'limit_site', 'Lots of people are writing their moments right now. Please try again in a little while.'], ['zh-Hant', 'limit_site', '目前有很多人正在使用，請稍等片刻再試一次。']]) {
     const f = await mockPage(browser)
     await f.page.route('**/api/select', (r) => r.fulfill({ status: 429, json: { error: text, code } }))
     await f.page.goto(`http://localhost:5173/${lang === 'en' ? 'en' : ''}?lang=${lang}`, { waitUntil: 'networkidle' })
@@ -4398,6 +4395,169 @@ for (const [lang, locale, text] of [['en', 'en-US', 'Your gift is being finished
     await f.page.waitForTimeout(1500)
     check(`limit (${lang}, ${code}): the page shows 「${text}」`, (await f.page.locator('body').innerText()).includes(text))
     await f.page.close()
+  }
+}
+
+// ---------- Run 31 (2026-11-15, the customer loop): the basket bar, the gift-ready bar, the basket page and its Save panel, the private link, the "Days of Thanks" card and its hold, the new /legal sentences ----------
+{
+  const newPage = async (locale = 'en-US', viewport = { width: 390, height: 844 }) => {
+    const ctx = await browser.newContext({ locale, viewport })
+    const page = await ctx.newPage()
+    const errs = []
+    page.on('pageerror', (e) => errs.push(String(e)))
+    await page.route('**/api/analytics', (r) => r.fulfill({ status: 204, body: '' }))
+    return { ctx, page, errs }
+  }
+  const soon = { sizes: ['egift'], promo: { from: '2026-11-01T00:00:00Z', until: '2099-01-01T00:00:00Z' }, usd: { egift: 25, egift_sale: 17.5 } }
+  // the bars on the landing, in each language
+  for (const [lang, url, bar, ready] of [
+    ['ja', 'http://localhost:5173/?lang=ja', '保存した贈りもの（2）→', '花子への贈りものの準備ができました。受け取る →'],
+    ['zh-Hant', 'http://localhost:5173/?lang=zh-Hant', '已儲存的禮物（2）→', '給花子的禮物準備好了。前往領取 →'],
+    ['en', 'http://localhost:5173/en', 'Your basket (2) →', 'Your gift for 花子 is ready. Collect it →'],
+  ]) {
+    const { ctx, page, errs } = await newPage()
+    await page.route('**/api/me*', (r) => r.fulfill({ json: { basket: { count: 2 }, ready: { id: 'AN-abcdefghjkmnpqrstuvw', name: '花子' }, hold: null } }))
+    await page.route('**/api/sizes', (r) => r.fulfill({ json: soon }))
+    await page.route('**/api/promo', (r) => r.fulfill({ json: { on: false } }))
+    await page.goto(url, { waitUntil: 'networkidle' })
+    await page.waitForTimeout(400)
+    check(`loop bars (${lang}): the gift-ready bar says 「${ready}」 and links to the buyer page`, ((await page.locator('[data-testid=gift-ready-bar]').innerText()) === ready) && ((await page.locator('[data-testid=gift-ready-bar] a').getAttribute('href')) === '/a/AN-abcdefghjkmnpqrstuvw'))
+    check(`loop bars (${lang}): the basket bar says 「${bar}」 (top of the page and on the writing step) and links to /basket`, (await page.locator('[data-testid=basket-bar]').first().innerText()) === bar && (await page.locator('[data-testid=basket-bar]').count()) >= 2 && ((await page.locator('[data-testid=basket-bar] a').first().getAttribute('href')) === '/basket'))
+    check(`no page errors (run 31, bars ${lang})`, errs.length === 0, errs.join('; '))
+    await ctx.close()
+  }
+  // an empty basket and nothing to collect: no bar
+  {
+    const { ctx, page } = await newPage()
+    await page.route('**/api/me*', (r) => r.fulfill({ json: { basket: { count: 0 }, ready: null, hold: null } }))
+    await page.route('**/api/sizes', (r) => r.fulfill({ json: soon }))
+    await page.goto('http://localhost:5173/en', { waitUntil: 'networkidle' })
+    await page.waitForTimeout(300)
+    check('loop bars: with an empty basket and nothing to collect there is no bar', (await page.locator('[data-testid=basket-bar], [data-testid=gift-ready-bar]').count()) === 0)
+    await ctx.close()
+  }
+  // the Days of Thanks card
+  {
+    const { ctx, page, errs } = await newPage()
+    let holdBody = null
+    let left = 37
+    await page.route('**/api/me*', (r) => r.fulfill({ json: { basket: { count: 0 }, ready: null, hold: null } }))
+    await page.route('**/api/sizes', (r) => r.fulfill({ json: soon }))
+    let heldNow = null
+    await page.route('**/api/promo', (r) => r.fulfill({ json: { on: true, left, daily: 100, hold: heldNow } }))
+    await page.route('**/api/promo/hold', async (r) => {
+      holdBody = JSON.parse(r.request().postData() ?? '{}')
+      if (String(holdBody.code).toUpperCase() !== 'THANKS100') return r.fulfill({ json: { ok: false, code: 'bad_code' } })
+      heldNow = { state: 'active', expires_at: new Date(Date.now() + 119 * 60000).toISOString(), minutes_left: 119, email: 'a@example.com' }
+      left = 36
+      return r.fulfill({ json: { ok: true, existing: false, link: 'https://ichirei.soul-id.jp/b/BT-x', hold: { ...heldNow, count: 1 }, left: 36 } })
+    })
+    await page.route('**/api/basket/qr.svg*', (r) => r.fulfill({ status: 200, contentType: 'image/svg+xml', body: '<svg xmlns="http://www.w3.org/2000/svg" width="10" height="10"/>' }))
+    await page.goto('http://localhost:5173/en?code=thanks100', { waitUntil: 'networkidle' })
+    await page.waitForTimeout(500)
+    const card = page.locator('[data-testid=thanks-card]')
+    check('Days of Thanks: the card shows the title, "37 of today\'s 100 free gifts are still available." and the sub-line', (await card.locator('h2').innerText()) === 'Days of Thanks' && (await card.locator('[data-testid=thanks-count]').innerText()).replace(/\s+/g, ' ') === "37 of today's 100 free gifts are still available." && (await card.innerText()).includes('One free gift per person per day, through November 25. New gifts arrive every morning (US Eastern).'))
+    check('Days of Thanks: /en?code=thanks100 fills the code field; the box "Also tell me about new seasons and offers" is not ticked; the small print is there', (await page.locator('[data-testid=thanks-code]').inputValue()) === 'thanks100' && !(await page.locator('[data-testid=thanks-marketing]').isChecked()) && (await card.innerText()).includes('We use your email only to hold your free gift and match it at checkout.') && (await card.innerText()).includes('Hold my free gift'))
+    // a wrong code
+    await page.locator('[data-testid=thanks-code]').fill('NOPE')
+    await page.locator('[data-testid=thanks-email]').fill('a@example.com')
+    await page.locator('[data-testid=thanks-submit]').click()
+    await page.locator('[data-testid=thanks-message]').waitFor()
+    check('Days of Thanks: a wrong code says "Please check the free gift code."', (await page.locator('[data-testid=thanks-message]').innerText()) === 'Please check the free gift code.')
+    // the right one
+    await page.locator('[data-testid=thanks-code]').fill('THANKS100')
+    await page.locator('[data-testid=thanks-marketing]').check()
+    await page.locator('[data-testid=thanks-submit]').click()
+    await page.locator('[data-testid=thanks-held]').waitFor()
+    const heldText = await page.locator('[data-testid=thanks-held]').innerText()
+    check('Days of Thanks: after "Hold my free gift" the card says "Your free gift is held until {time} (119 min left)." with "Write your moment →", and the code, email and box were sent', /^Your free gift is held until .+ \(119 min left\)\.$/.test(heldText) && (await page.locator('[data-testid=thanks-write]').innerText()) === 'Write your moment →' && holdBody.email === 'a@example.com' && holdBody.marketing === true)
+    check('Days of Thanks: right after holding, once: "Continuing on your phone? Scan this to take your gift with you." with the QR', (await page.locator('[data-testid=thanks-phone]').innerText()).includes('Continuing on your phone? Scan this to take your gift with you.') && (await page.locator('[data-testid=thanks-phone] img').count()) === 1)
+    check(`no page errors (run 31, thanks card)`, errs.length === 0, errs.join('; '))
+    await ctx.close()
+  }
+  // none left: the form is hidden
+  {
+    const { ctx, page } = await newPage()
+    await page.route('**/api/me*', (r) => r.fulfill({ json: { basket: { count: 0 }, ready: null, hold: null } }))
+    await page.route('**/api/sizes', (r) => r.fulfill({ json: soon }))
+    await page.route('**/api/promo', (r) => r.fulfill({ json: { on: true, left: 0, daily: 100, hold: null } }))
+    await page.goto('http://localhost:5173/en', { waitUntil: 'networkidle' })
+    await page.waitForTimeout(400)
+    check('Days of Thanks: with none left the card says "Today\'s free gifts are all held or given. New ones arrive tomorrow morning (US Eastern)." and the form is gone', (await page.locator('[data-testid=thanks-count]').innerText()) === "Today's free gifts are all held or given. New ones arrive tomorrow morning (US Eastern)." && (await page.locator('[data-testid=thanks-form]').count()) === 0)
+    await ctx.close()
+  }
+  // the basket page, its delete and its Save panel
+  {
+    const { ctx, page, errs } = await newPage()
+    let items = [
+      { id: 'BK-aaaaaaaaaaaaaaaaaaaa', created_at: '2026-11-15T10:00:00Z', language: 'en', to: 'Kenji', card: { kanji: '証', reading: 'akashi', word: 'proof', line: 'x' }, preview_id: null },
+      { id: 'BK-bbbbbbbbbbbbbbbbbbbb', created_at: '2026-11-14T10:00:00Z', language: 'en', to: '', card: { kanji: '憶', reading: 'oku', word: 'remember', line: 'y' }, preview_id: null },
+    ]
+    let deleted = null
+    await page.route('**/api/me*', (r) => r.fulfill({ json: { basket: { count: items.length }, ready: null, hold: null } }))
+    await page.route('**/api/basket/BK-*', (r) => {
+      if (r.request().method() === 'DELETE') {
+        deleted = r.request().url().split('/').pop()
+        items = items.filter((i) => i.id !== deleted)
+        return r.fulfill({ json: { deleted: true } })
+      }
+      return r.fulfill({ status: 404, json: {} })
+    })
+    await page.route('**/api/basket/qr.svg*', (r) => r.fulfill({ status: 200, contentType: 'image/svg+xml', body: '<svg xmlns="http://www.w3.org/2000/svg" width="10" height="10"/>' }))
+    await page.route('**/api/basket', (r) => r.fulfill({ json: { items, token: 'BT-x', link: 'https://ichirei.soul-id.jp/b/BT-abcdefghjkmnpqrstuvwxyz2' } }))
+    await page.goto('http://localhost:5173/basket', { waitUntil: 'networkidle' })
+    await page.waitForSelector('[data-testid=basket-item]')
+    check('basket page: the heading "Your basket", "Saved for 30 days.", two items each with the character, "Give this gift →" and "×"', (await page.locator('.basketPage h1').innerText()) === 'Your basket' && (await page.locator('[data-testid=basket-saved]').innerText()) === 'Saved for 30 days.' && (await page.locator('[data-testid=basket-item]').count()) === 2 && (await page.locator('[data-testid=basket-give]').first().innerText()) === 'Give this gift →' && (await page.locator('[data-testid=basket-remove]').first().innerText()) === '×')
+    check('basket page: "Give this gift →" opens the landing with the item to put back', ((await page.locator('[data-testid=basket-give]').first().getAttribute('href')) ?? '') === '/?resume=BK-aaaaaaaaaaaaaaaaaaaa')
+    await page.locator('[data-testid=save-button]').click()
+    await page.locator('[data-testid=save-panel]').waitFor()
+    await page.waitForSelector('[data-testid=save-mail]')
+    const href = (await page.locator('[data-testid=save-mail]').getAttribute('href')) ?? ''
+    check('Save panel: "Copy link", the QR code, "Scan with your phone to continue there", "Email it to myself" (a mailto with no recipient, the subject "My ICHIREI basket" and the link) and the privacy note', (await page.locator('[data-testid=save-copy]').innerText()) === 'Copy link' && (await page.locator('[data-testid=save-qr]').count()) === 1 && (await page.locator('[data-testid=save-panel]').innerText()).includes('Scan with your phone to continue there') && (await page.locator('[data-testid=save-mail]').innerText()) === 'Email it to myself' && href.startsWith('mailto:?subject=My%20ICHIREI%20basket&body=') && href.includes(encodeURIComponent('https://ichirei.soul-id.jp/b/BT-abcdefghjkmnpqrstuvwxyz2')) && (await page.locator('[data-testid=save-note]').innerText()) === 'Anyone with this link can see your saved gifts. Keep it private.', href)
+    await page.locator('[data-testid=basket-remove]').first().click()
+    await page.waitForTimeout(400)
+    check('basket page: "×" deletes at once (no confirmation) and the item is gone', deleted === 'BK-aaaaaaaaaaaaaaaaaaaa' && (await page.locator('[data-testid=basket-item]').count()) === 1)
+    check('no page errors (run 31, basket page)', errs.length === 0, errs.join('; '))
+    await ctx.close()
+  }
+  // the private link: a wrong token is the normal landing
+  {
+    const { ctx, page } = await newPage()
+    await page.route('**/api/me*', (r) => r.fulfill({ json: { basket: { count: 0 }, ready: null, hold: null } }))
+    await page.route('**/api/b/*', (r) => r.fulfill({ status: 404, json: { error: 'not_found' } }))
+    await page.goto('http://localhost:5173/b/BT-zzzzzzzzzzzzzzzzzzzzzzzz', { waitUntil: 'networkidle' })
+    await page.waitForTimeout(500)
+    check('/b/<wrong token>: the normal landing page (hero and the writing box), not a basket', (await page.locator('[data-testid=basket-page]').count()) === 0 && (await page.locator('#write').count()) === 1)
+    await ctx.close()
+  }
+  // the private link: the right token opens the basket
+  {
+    const { ctx, page } = await newPage()
+    await page.route('**/api/me*', (r) => r.fulfill({ json: { basket: { count: 1 }, ready: null, hold: null } }))
+    await page.route('**/api/b/*', (r) => r.fulfill({ json: { token: 'BT-x', items: [{ id: 'BK-aaaaaaaaaaaaaaaaaaaa', created_at: '2026-11-15T10:00:00Z', language: 'en', to: '', card: { kanji: '証', reading: 'akashi', word: 'proof', line: 'x' }, preview_id: null }] } }))
+    await page.goto('http://localhost:5173/b/BT-abcdefghjkmnpqrstuvwxyz2', { waitUntil: 'networkidle' })
+    await page.waitForSelector('[data-testid=basket-item]')
+    check('/b/<token>: opens the basket, and the token leaves the address bar', (await page.locator('[data-testid=basket-item]').count()) === 1 && new URL(page.url()).pathname === '/basket')
+    await ctx.close()
+  }
+  // /legal: the new sentences, in each language
+  for (const [lang, email, cancel, keep] of [
+    ['ja', '無料の贈りものを確保するためにメールアドレスをご入力いただいた場合、確保と決済時の照合のためだけに使います。ご希望の場合のみ、お知らせをお送りします。', 'キャンセルのご連絡は、メールを送信した時刻で受け付けます。', 'ご注文のない保存データは、30日後に削除します。'],
+    ['zh-Hant', '若你為保留免費禮物輸入電子郵件，我們只用它來保留禮物並在結帳時核對。只有在你同意時，才會寄送消息。', '取消申請以你寄出郵件的時間為準。', '沒有下單的儲存資料，會在30天後刪除。'],
+    ['en', 'If you enter your email to hold a free gift, we use it only to hold it and match it at checkout. We send news only if you ask for it.', 'For cancellations, the time you send your email is the time that counts.', 'Saved gifts without an order are deleted after 30 days.'],
+  ]) {
+    const { ctx, page } = await newPage()
+    await page.goto(`http://localhost:5173/legal?lang=${lang}`, { waitUntil: 'networkidle' })
+    check(`legal (${lang}): the Email, Cancellation-time and Retention sentences, and the public contact info@beyondculture.ai`, (await page.locator('[data-testid=legal-email-use]').innerText()) === email && (await page.locator('[data-testid=legal-cancel-time]').innerText()) === cancel && (await page.locator('[data-testid=legal-retention]').innerText()) === keep && (await page.locator('[data-testid=legal-email]').innerText()) === 'info@beyondculture.ai')
+    await ctx.close()
+  }
+  // the footer shows the one public contact
+  {
+    const { ctx, page } = await newPage()
+    await page.route('**/api/me*', (r) => r.fulfill({ json: { basket: { count: 0 }, ready: null, hold: null } }))
+    await page.goto('http://localhost:5173/en', { waitUntil: 'networkidle' })
+    check('footer: the public contact info@beyondculture.ai', (await page.locator('[data-testid=footer-contact]').innerText()) === 'info@beyondculture.ai')
+    await ctx.close()
   }
 }
 

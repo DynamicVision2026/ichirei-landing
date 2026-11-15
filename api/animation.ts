@@ -14,6 +14,7 @@ import { ANIMATION_ID_PATTERN, animationUrl, animationView, artRevFor, filmUsabl
 import { giftUrl, isGiftRecord } from '../engine/gift.ts'
 import { ensureArt, markWashiForRetry, picturePath, readArt, renderBudgetMs, type ArtRecord, type ImageClient } from '../engine/film-art.ts'
 import { createOrderStore, type OrderStore } from '../engine/order-store.ts'
+import { recordOrderEvent } from '../engine/customer.ts'
 import { FILM_RETRY_AFTER_MS, ensureFilm, filmInFlight, raceTimeout } from '../engine/film-store.ts'
 import type { FilmInput, FilmRecord } from '../engine/film.ts'
 import { buyerOrderView, isOrderRecord } from '../engine/buyer.ts'
@@ -191,6 +192,7 @@ export function createAnimationHandlers(deps: () => AnimationDeps) {
         }
         const at = now.toISOString()
         await d.store.put(o.order_ref, { ...o, collected_at: at, updated_at: at })
+        void recordOrderEvent(d.store, o.order_ref, 'collected', now)
         return json(200, { collected: true, collected_at: at }, { 'cache-control': 'private, no-store' })
       } catch {
         return json(503, { error: 'unavailable' }, { 'cache-control': 'no-store' })

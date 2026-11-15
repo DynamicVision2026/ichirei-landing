@@ -82,6 +82,8 @@ export interface ShopifyOrderFacts {
   lines: { sku?: string | null; props: { key: string; value: string }[] }[]
   /** the order's own custom attributes (the cart's `order_ref` lands here too) */
   attrs: { key: string; value: string }[]
+  /** the discount codes the order used (names only) */
+  discountCodes?: string[]
 }
 
 const isRef = (key: string) => key === '_order_ref' || key === 'order_ref'
@@ -145,6 +147,7 @@ export function fromWebhook(body: unknown): ShopifyOrderFacts | null {
     buyer,
     lines: Array.isArray(o.line_items) ? o.line_items.map((l) => ({ sku: typeof (l as { sku?: unknown }).sku === 'string' ? (l as { sku: string }).sku : null, props: pairs((l as { properties?: unknown }).properties) })) : [],
     attrs: pairs(o.note_attributes),
+    discountCodes: Array.isArray(o.discount_codes) ? o.discount_codes.map((d) => String((d as { code?: unknown })?.code ?? '').replace(/[^A-Za-z0-9_-]/g, '').slice(0, 40)).filter(Boolean) : [],
   }
 }
 

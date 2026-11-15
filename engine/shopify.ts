@@ -76,6 +76,13 @@ const CART_CREATE = `mutation CartCreate($input: CartInput!) {
  */
 const CART_CREATE_EN = CART_CREATE.replace('mutation CartCreate($input: CartInput!) {', 'mutation CartCreate($input: CartInput!) @inContext(country: US, language: EN) {')
 
+/** A held free gift (English, during the promotion): the cart carries the free-gift code, the hold's email and the hold id. Without one the cart carries no code. */
+export interface CartPromo {
+  code: string
+  email: string
+  holdId: string
+}
+
 export interface CartResult {
   cartId: string
   checkoutUrl: string
@@ -96,6 +103,7 @@ async function createCartOnce(
   orderRef: string,
   fetchImpl: typeof fetch = fetch,
   language?: string,
+  promo?: CartPromo,
 ): Promise<CartResult> {
   const variantId = config.variants[pkg]
   if (!variantId) throw new ShopifyError(`The size "${pkg}" has no Shopify variant configured`, { code: 'size_unavailable' })
@@ -108,8 +116,9 @@ async function createCartOnce(
         input: {
           // The line carries the attributes (the chosen poem included); the cart repeats order_ref so it also lands on the order itself.
           lines: [{ merchandiseId: variantId, quantity: 1, attributes }],
-          attributes: [{ key: 'order_ref', value: orderRef }],
-          ...(language === 'en' ? { buyerIdentity: { countryCode: EN_BUYER_COUNTRY } } : {}),
+          attributes: [{ key: 'order_ref', value: orderRef }, ...(language === 'en' && promo ? [{ key: 'ichirei_hold', value: promo.holdId }] : [])],
+          ...(language === 'en' ? { buyerIdentity: { countryCode: EN_BUYER_COUNTRY, ...(promo ? { email: promo.email } : {}) } } : {}),
+          ...(language === 'en' && promo ? { discountCodes: [promo.code] } : {}),
         },
       },
     }),
@@ -154,13 +163,13 @@ const notUsd = (c: string | null): boolean => !!c && c.toUpperCase() !== 'USD'
  * Creates the cart. An English cart should be priced in dollars: if Shopify says otherwise, the cart is made ONCE more with the same buyer identity (the market is sometimes picked late);
  * if it still is not USD the buyer keeps the checkout (owner decision: never stop a sale) and the result says `mismatch` so the order API counts it in red on /ops/stats.
  */
-export async function createCart(config: ShopifyConfig, pkg: PackageId, attributes: Attribute[], orderRef: string, fetchImpl: typeof fetch = fetch, language?: string): Promise<CartResult> {
-  const first = await createCartOnce(config, pkg, attributes, orderRef, fetchImpl, language)
+export async function createCart(config: ShopifyConfig, pkg: PackageId, attributes: Attribute[], orderRef: string, fetchImpl: typeof fetch = fetch, language?: string, promo?: CartPromo): Promise<CartResult> {
+  const first = await createCartOnce(config, pkg, attributes, orderRef, fetchImpl, language, promo)
   if (language !== 'en' || !notUsd(first.currency)) return first
   console.warn(`[ichirei-order] ${JSON.stringify({ event: 'en_cart_currency_retry', order_ref: orderRef, currency: first.currency })}`)
   let second: CartResult
   try {
-    second = await createCartOnce(config, pkg, attributes, orderRef, fetchImpl, language)
+    second = await createCartOnce(config, pkg, attributes, orderRef, fetchImpl, language, promo)
   } catch {
     second = first
   }

@@ -230,5 +230,3 @@ const zhHans: SizeCopy = {
 
 export const SIZE_COPY: Record<UiLanguage, SizeCopy> = { ja, en, 'zh-Hant': zhHant, 'zh-Hans': zhHans }
 
-/** The "Days of Thanks" line above 「Continue to payment」 (2026-11-15). English order section only, and only while the promotion runs (the dates come from the server); ja and zh show nothing. */
-export const PROMO_LINE_EN = "Have today's code? Enter it at checkout. The first 100 gifts each day are on us (one per person per day, through November 25)."

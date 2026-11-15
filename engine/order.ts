@@ -589,6 +589,15 @@ export interface OrderRecord {
   paid_at_seen?: string | null
   /** True on every order made since 2026-11-06: the gift stays sealed for the receiver (and no send / save is reachable) until collected_at is set. Older orders have none and work as before. */
   collect_required?: boolean
+  /** The buyer's email as Shopify gave it on the paid webhook (lowercased) — kept on the order so the customer record and /ops can find the order (2026-11-15). */
+  buyer_email?: string | null
+  /** Shopify's order name (#1018) and what the order paid in the shop's whole yen (0 for a free gift), from the paid webhook. */
+  shopify_order_name?: string | null
+  shopify_amount_jpy?: number | null
+  /** The discount code the order used (the free-gift code), when Shopify sent it. */
+  discount_code?: string | null
+  /** The browser (ic_v id) that created this order: the "your gift is ready" bar and the basket find it by this. */
+  visitor?: string | null
   /** A gift made for an order that was paid WITHOUT going through our site (a "waiting" order, 2026-11-13): the Shopify order it was attached to. The 24-hour clock starts at `claimed_at`, not at payment. */
   claim?: import('./waiting.ts').OrderClaim
   engine_result: EngineResult

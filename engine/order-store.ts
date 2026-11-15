@@ -9,7 +9,7 @@
 // so it needs no SDK. Cloud Run's service account needs roles/storage.objectAdmin on the bucket
 // (DEPLOY.md). Env: ORDER_BUCKET, ORDER_STORE_DIR; tests may set GCS_API_BASE and GCS_ACCESS_TOKEN.
 
-import { appendFile, mkdir, readFile, rename, writeFile } from 'node:fs/promises'
+import { appendFile, mkdir, readFile, rename, unlink, writeFile } from 'node:fs/promises'
 import { dirname, join } from 'node:path'
 
 export interface OrderStore {
@@ -25,14 +25,21 @@ export interface OrderStore {
    */
   putObject(path: string, body: Buffer | string, contentType: string, opts?: { ifAbsent?: boolean }): Promise<boolean>
   getObject(path: string): Promise<Buffer | null>
+  /**
+   * Read-modify-write of one small object with a PRECONDITION (Cloud Storage: ifGenerationMatch; a new object is created with ifGenerationMatch=0): `mutate` gets the current bytes (null when absent)
+   * and returns the new bytes, or null to leave it as it is. A concurrent writer makes the write fail and `mutate` runs again on the newer bytes, so two instances can never both win. Returns what is stored after.
+   */
+  casObject?(path: string, mutate: (current: Buffer | null) => Buffer | string | null, contentType?: string): Promise<Buffer | null>
+  /** Remove an object (the 30-day clean-up of saved gifts and customer records). Absent = nothing to do. */
+  deleteObject?(path: string): Promise<void>
 }
 
-const SAFE_OBJECT = /^(analytics\/\d{4}-\d{2}-\d{2}\.jsonl|films\/(AN-[a-z2-9]{20}\/(art\.json|film\.(mp4|json)|share\.(mp4|json)|[1-4](\.unchecked)?\.webp)|renders-\d{4}-\d{2}-\d{2}\.jsonl)|ops\/(orders-\d{4}-\d{2}-\d{2}|cards-\d{4}-\d{2}-\d{2}|mains-\d{4}-\d{2}-\d{2}|health-\d{4}-\d{2}-\d{2}|egift|waiting)\.jsonl|ops\/certno\/(\d{4,7}|last)\.json|og\/RG-[a-z2-9]{20}\.[0-9a-f]{8}\.png|rounds\/RS-[a-z2-9]{20}-[1-9]\.json|selftest\/(latest|lock)\.json|selftest\/probe-\d{4}-\d{2}-\d{2}\.json|selftest\/day-\d{4}-\d{2}-\d{2}\.json|selftest\/month-\d{4}-\d{2}\.json|selftest\/commit-[0-9a-zA-Z]{4,40}\.json)$/
+const SAFE_OBJECT = /^(analytics\/\d{4}-\d{2}-\d{2}\.jsonl|films\/(AN-[a-z2-9]{20}\/(art\.json|film\.(mp4|json)|share\.(mp4|json)|[1-4](\.unchecked)?\.webp)|renders-\d{4}-\d{2}-\d{2}\.jsonl)|ops\/(orders-\d{4}-\d{2}-\d{2}|cards-\d{4}-\d{2}-\d{2}|mains-\d{4}-\d{2}-\d{2}|health-\d{4}-\d{2}-\d{2}|customers-\d{4}-\d{2}-\d{2}|egift|waiting)\.jsonl|ops\/certno\/(\d{4,7}|last)\.json|og\/RG-[a-z2-9]{20}\.[0-9a-f]{8}\.png|rounds\/RS-[a-z2-9]{20}-[1-9]\.json|customers\/(ptr\/)?[EV][A-Za-z0-9_-]{22,64}\.json|customers\/byorder\/\d{3,8}\.json|basket\/BK-[a-z2-9]{20}\.json|basket\/tok\/BT-[a-z2-9]{24}\.json|promo\/\d{4}-\d{2}-\d{2}\/(holds\/[0-9a-f]{32}|slots\/\d{1,3}-\d{1,3}|used\/H-[a-z2-9]{16}|checkout\/H-[a-z2-9]{16}|ip\/[0-9a-f]{16}-\d{1,2})\.json|selftest\/(latest|lock)\.json|selftest\/probe-\d{4}-\d{2}-\d{2}\.json|selftest\/day-\d{4}-\d{2}-\d{2}\.json|selftest\/month-\d{4}-\d{2}\.json|selftest\/commit-[0-9a-zA-Z]{4,40}\.json)$/
 export function assertObjectPath(path: string): void {
   if (!SAFE_OBJECT.test(path)) throw new Error(`Unsafe object path: ${path.slice(0, 40)}`)
 }
 
-const SAFE_PATH = /^(analytics\/\d{4}-\d{2}-\d{2}|films\/renders-\d{4}-\d{2}-\d{2}|ops\/orders-\d{4}-\d{2}-\d{2}|ops\/cards-\d{4}-\d{2}-\d{2}|ops\/mains-\d{4}-\d{2}-\d{2}|ops\/health-\d{4}-\d{2}-\d{2}|ops\/egift|ops\/waiting)\.jsonl$/
+const SAFE_PATH = /^(analytics\/\d{4}-\d{2}-\d{2}|films\/renders-\d{4}-\d{2}-\d{2}|ops\/orders-\d{4}-\d{2}-\d{2}|ops\/cards-\d{4}-\d{2}-\d{2}|ops\/mains-\d{4}-\d{2}-\d{2}|ops\/health-\d{4}-\d{2}-\d{2}|ops\/customers-\d{4}-\d{2}-\d{2}|ops\/egift|ops\/waiting)\.jsonl$/
 function assertJsonlPath(path: string): void {
   if (!SAFE_PATH.test(path)) throw new Error(`Unsafe analytics path: ${path.slice(0, 40)}`)
 }
@@ -69,6 +76,19 @@ export class MemoryOrderStore implements OrderStore {
     assertObjectPath(path)
     if (path.endsWith('.jsonl')) return this.lines.has(path) ? Buffer.from(this.lines.get(path)!.join('\n') + '\n') : null
     return this.objects.get(path)?.body ?? null
+  }
+  async casObject(path: string, mutate: (current: Buffer | null) => Buffer | string | null, contentType = 'application/json') {
+    assertObjectPath(path)
+    // one process, no await between the read and the write: atomic
+    const cur = this.objects.get(path)?.body ?? null
+    const next = mutate(cur ? Buffer.from(cur) : null)
+    if (next === null) return cur
+    this.objects.set(path, { body: Buffer.from(next), contentType })
+    return this.objects.get(path)!.body
+  }
+  async deleteObject(path: string) {
+    assertObjectPath(path)
+    this.objects.delete(path)
   }
 }
 
@@ -117,6 +137,29 @@ export class FileOrderStore implements OrderStore {
     } catch (e) {
       if ((e as NodeJS.ErrnoException).code === 'ENOENT') return null
       throw e
+    }
+  }
+  private readonly casQueue = new Map<string, Promise<unknown>>()
+  async casObject(path: string, mutate: (current: Buffer | null) => Buffer | string | null, contentType = 'application/json') {
+    assertObjectPath(path)
+    // one process: writes to the same path go one after the other
+    const prev = this.casQueue.get(path) ?? Promise.resolve()
+    const run = prev.catch(() => {}).then(async () => {
+      const cur = await this.getObject(path)
+      const next = mutate(cur ? Buffer.from(cur) : null)
+      if (next === null) return cur
+      await this.putObject(path, next, contentType)
+      return Buffer.from(next)
+    })
+    this.casQueue.set(path, run)
+    return run as Promise<Buffer | null>
+  }
+  async deleteObject(path: string) {
+    assertObjectPath(path)
+    try {
+      await unlink(join(this.dir, path))
+    } catch (e) {
+      if ((e as NodeJS.ErrnoException).code !== 'ENOENT') throw e
     }
   }
   async get(ref: string) {
@@ -230,6 +273,45 @@ export class GcsOrderStore implements OrderStore {
     if (res.status === 404) return null
     if (!res.ok) throw new Error(`GCS get failed: HTTP ${res.status}`)
     return Buffer.from(await res.arrayBuffer())
+  }
+
+  /** Read-modify-write with ifGenerationMatch: a concurrent writer makes the upload answer 412 and the whole step runs again on the newer bytes. */
+  async casObject(path: string, mutate: (current: Buffer | null) => Buffer | string | null, contentType = 'application/json') {
+    assertObjectPath(path)
+    const name = encodeURIComponent(path)
+    const bucket = encodeURIComponent(this.bucket)
+    for (let attempt = 0; attempt < 8; attempt++) {
+      const auth = { authorization: `Bearer ${await this.token()}` }
+      const cur = await this.doFetch(`${this.api}/storage/v1/b/${bucket}/o/${name}?alt=media`, { headers: auth, signal: AbortSignal.timeout(15_000) })
+      let current: Buffer | null = null
+      let generation = '0'
+      if (cur.status === 200) {
+        current = Buffer.from(await cur.arrayBuffer())
+        generation = cur.headers.get('x-goog-generation') ?? ''
+        if (!generation) throw new Error('GCS cas: no x-goog-generation on the existing object')
+      } else if (cur.status !== 404) throw new Error(`GCS cas read failed: HTTP ${cur.status}`)
+      const next = mutate(current ? Buffer.from(current) : null)
+      if (next === null) return current
+      const res = await this.doFetch(`${this.api}/upload/storage/v1/b/${bucket}/o?uploadType=media&name=${name}&ifGenerationMatch=${generation}`, {
+        method: 'POST',
+        headers: { ...auth, 'content-type': contentType },
+        body: typeof next === 'string' ? next : new Uint8Array(next),
+        signal: AbortSignal.timeout(15_000),
+      })
+      if (res.ok) return Buffer.from(next)
+      if (res.status !== 412) throw new Error(`GCS cas failed: HTTP ${res.status}`)
+      await new Promise((r) => setTimeout(r, 20 + Math.random() * 80 * (attempt + 1)))
+    }
+    throw new Error('GCS cas: gave up after repeated generation conflicts')
+  }
+  async deleteObject(path: string) {
+    assertObjectPath(path)
+    const res = await this.doFetch(`${this.api}/storage/v1/b/${encodeURIComponent(this.bucket)}/o/${encodeURIComponent(path)}`, {
+      method: 'DELETE',
+      headers: { authorization: `Bearer ${await this.token()}` },
+      signal: AbortSignal.timeout(15_000),
+    })
+    if (res.status !== 404 && !res.ok) throw new Error(`GCS delete failed: HTTP ${res.status}`)
   }
 
   async get(ref: string) {

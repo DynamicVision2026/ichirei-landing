@@ -14,6 +14,7 @@ const GiftApp = lazy(() => import('./gift/GiftApp.tsx'))
 const CreditsApp = lazy(() => import('./animation/CreditsApp.tsx'))
 const LegalApp = lazy(() => import('./legal/LegalApp.tsx'))
 const ClaimApp = lazy(() => import('./claim/ClaimApp.tsx'))
+const BasketApp = lazy(() => import('./loop/BasketApp.tsx'))
 
 export default function Routes() {
   const path = window.location.pathname
@@ -51,6 +52,14 @@ export default function Routes() {
     return (
       <Suspense fallback={null}>
         <ClaimApp />
+      </Suspense>
+    )
+  }
+  // the basket (2026-11-15): /basket is this browser's saved gifts, /b/<token> the private link that opens them on any device (a token that is not a basket's shows the normal landing page)
+  if (path === '/basket' || path === '/basket/' || path.startsWith('/b/')) {
+    return (
+      <Suspense fallback={null}>
+        <BasketApp />
       </Suspense>
     )
   }

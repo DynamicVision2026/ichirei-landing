@@ -1,0 +1,50 @@
+/* The customer loop (2026-11-15): thin bars, the basket page, the Save panel and the "Days of Thanks" card. The site's own look: washi, a gold rule, ink — no glass, no blur. */
+.loopBars{display:flex;flex-direction:column;gap:0}
+.loopBar{margin:0;padding:.7rem max(16px,env(safe-area-inset-left,0px));text-align:center;background:var(--tint,#F4E7E1);border-bottom:1px solid var(--line,#E6D8D1);font:500 .95rem var(--body,system-ui)}
+.loopBar a{color:var(--ink,#1F2A44);text-decoration:none;border-bottom:1px solid var(--gold,#8A6A35);padding-bottom:1px}
+.loopBar a:hover{color:var(--seal-text,#B3331F)}
+.loopBar--ready{background:var(--card,#fff);border-bottom:1px solid var(--gold,#8A6A35)}
+.loopBar--under{margin-top:.9rem;background:transparent;border:0;padding:0;text-align:left}
+
+.basketPage{min-height:100vh;background:var(--paper,#FBF4F0);color:var(--ink,#1F2A44);padding:clamp(1.5rem,5vw,3rem) 0 4rem}
+.basketPage .wrap{max-width:46rem}
+.basketPage h1{font:700 clamp(1.7rem,4vw,2.3rem) var(--display,system-ui);margin:0 0 .4rem}
+.basketPage .basketSaved{margin:0 0 1.6rem;color:var(--mute,#5B6178);font-size:.95rem}
+.basketTop{display:flex;justify-content:space-between;align-items:center;gap:1rem;flex-wrap:wrap;margin-bottom:1.4rem}
+.basketTop a.back{color:var(--mute,#5B6178);text-decoration:none;font-size:.95rem}
+.basketList{list-style:none;margin:0;padding:0;display:grid;gap:1rem}
+.basketItem{display:grid;grid-template-columns:auto 1fr auto;gap:1rem;align-items:center;padding:1rem 1.1rem;background:var(--card,#fff);border:1px solid var(--line,#E6D8D1);border-top:2px solid var(--gold,#8A6A35);border-radius:6px}
+.basketItem .glyph{font:900 3rem/1 var(--kanji,serif);min-width:3.4rem;text-align:center}
+.basketItem .meta{min-width:0}
+.basketItem .reading{margin:0;font-weight:600}
+.basketItem .date{margin:.15rem 0 0;color:var(--mute,#5B6178);font-size:.85rem}
+.basketItem .strip{display:flex;gap:4px;margin-top:.5rem}
+.basketItem .strip img{width:2.6rem;height:2.6rem;object-fit:cover;border-radius:3px;border:1px solid var(--line,#E6D8D1);background:var(--tint,#F4E7E1)}
+.basketItem .acts{display:flex;flex-direction:column;align-items:flex-end;gap:.5rem}
+.basketItem .x{background:none;border:0;font-size:1.5rem;line-height:1;color:var(--mute,#5B6178);cursor:pointer;padding:.1rem .4rem}
+.basketItem .x:hover{color:var(--seal-text,#B3331F)}
+@media (max-width:560px){.basketItem{grid-template-columns:auto 1fr}.basketItem .acts{grid-column:1/-1;flex-direction:row;justify-content:space-between;align-items:center}}
+
+.savePanelWrap{position:relative;display:inline-block}
+.savePanel{margin-top:.7rem;padding:1rem 1.1rem;background:var(--card,#fff);border:1px solid var(--line,#E6D8D1);border-top:2px solid var(--gold,#8A6A35);border-radius:6px;max-width:22rem;display:grid;gap:.8rem;font-size:.92rem}
+.savePanel svg,.savePanel img{width:9rem;height:9rem;justify-self:start;background:#fff}
+.savePanel .note{margin:0;color:var(--mute,#5B6178);font-size:.85rem}
+.savePanel .row{display:flex;gap:.6rem;flex-wrap:wrap}
+.savePanel .miniBtn{font:600 .9rem var(--display,system-ui);padding:.5rem .95rem;border-radius:999px;border:1.5px solid var(--line,#E6D8D1);background:transparent;color:var(--ink,#1F2A44);cursor:pointer;text-decoration:none}
+.savePanel .miniBtn:hover{border-color:var(--gold,#8A6A35)}
+
+.thanksCard{margin:0 auto;max-width:42rem;padding:1.4rem 1.5rem;background:var(--card,#fff);border:1px solid var(--line,#E6D8D1);border-top:3px solid var(--gold,#8A6A35);border-radius:4px;text-align:center}
+.thanksCard h2{font:700 1.5rem var(--display,system-ui);margin:0 0 .6rem}
+.thanksCard .count{margin:.2rem 0;font-size:1.05rem}
+.thanksCard .count b{font:900 2.6rem/1 var(--kanji,serif);margin-right:.35rem;vertical-align:-.12em;transition:opacity .5s ease}
+.thanksCard .sub{margin:.3rem 0 1rem;color:var(--mute,#5B6178);font-size:.92rem}
+.thanksCard form{display:grid;gap:.7rem;max-width:26rem;margin:0 auto;text-align:left}
+.thanksCard label{display:grid;gap:.25rem;font-size:.85rem;color:var(--mute,#5B6178)}
+.thanksCard input[type=text],.thanksCard input[type=email]{font:1rem var(--body,system-ui);padding:.65rem .8rem;border:1px solid var(--line,#E6D8D1);border-radius:4px;background:#fff;color:var(--ink,#1F2A44)}
+.thanksCard .check{display:flex;gap:.55rem;align-items:flex-start;color:var(--ink,#1F2A44);font-size:.9rem}
+.thanksCard .small{margin:.2rem 0 0;color:var(--mute,#5B6178);font-size:.8rem}
+.thanksCard .err{margin:0;color:var(--seal-text,#B3331F);font-size:.9rem}
+.thanksCard .phoneBox{margin:1rem auto 0;display:grid;gap:.4rem;justify-items:center;font-size:.9rem}
+.thanksCard .phoneBox img{width:8rem;height:8rem;background:#fff}
+.orderThanks{margin:.2rem 0 .8rem;font-size:.95rem}
+.orderThanks a{color:inherit;border-bottom:1px solid var(--gold,#8A6A35);text-decoration:none}

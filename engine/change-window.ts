@@ -7,6 +7,7 @@
 //   Everything here changes OUR records only (the order, the film page, the receiver's page) — never Shopify, whose order keeps what was sent at checkout.
 
 import { paidIn } from './paid-seen.ts'
+import { recordOrderEvent } from './customer.ts'
 import type { OpsLogEntry, OrderRecord } from './order.ts'
 import type { OrderStore } from './order-store.ts'
 import type { PaymentInfo } from './shipping.ts'
@@ -78,5 +79,6 @@ export async function cancelOrder(d: ChangeDeps, rec: OrderRecord, opts: { overr
   rec.ops = { ...(rec.ops ?? {}), cancelled_at: d.now.toISOString(), log: [...(rec.ops?.log ?? []), logEntry(d, 'cancel', rec.collected_at ? 'flag (override after collected)' : 'flag')] }
   rec.updated_at = d.now.toISOString()
   await d.store.put(rec.order_ref, rec)
+  void recordOrderEvent(d.store, rec.order_ref, 'cancelled', d.now)
   return { ok: true, message: 'cancelled' }
 }

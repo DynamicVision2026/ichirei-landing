@@ -47,12 +47,12 @@ const lexicon = loadLexicon()
 {
   const head = parseCsv(read('engine/lexicon.csv'))[0]
   check('(A) engine/lexicon.csv carries the five English columns after the 17 — en_word, en_echo, en_reviewed_by (the reviewer\'s three) and en_rendering, en_source (the classical line in English)', head.slice(0, 17).join() === LEXICON_COLUMNS.join() && head.slice(17).join() === LEXICON_EN_COLUMNS.join() && LEXICON_EN_COLUMNS.slice(0, 3).join() === 'en_word,en_echo,en_reviewed_by')
-  check('(A) none is filled yet: every English cell is empty and no row counts as English-reviewed', lexicon.rows.every((r) => LEXICON_EN_COLUMNS.every((c) => r.raw[c] === '')))
+  check('(A) only 修 is filled (the owner\'s word "mend", 2026-11-15: the story was about mending); every other English cell is empty and no other row counts as English-reviewed', lexicon.rows.every((r) => r.raw.kanji === '修' ? r.raw.en_word === 'mend' && r.raw.en_reviewed_by === 'owner 2026-11-15' && r.raw.en_echo === '' : LEXICON_EN_COLUMNS.every((c) => r.raw[c] === '')))
   const old17 = parseCsv(read('engine/lexicon.csv')).map((r) => r.slice(0, 17))
   const text17 = old17.map((r) => r.map((c) => (/[",\n\r]/.test(c) ? `"${c.replace(/"/g, '""')}"` : c)).join(',')).join('\n') + '\n'
   const lex17 = parseLexicon(text17)
   check('(A) a lexicon file with only the 17 columns still loads (the English cells are empty) and its rows equal the 20-column rows on every Japanese / Chinese cell', lex17.size === lexicon.size && lex17.rows.every((r, i) => LEXICON_COLUMNS.every((c) => r.raw[c] === lexicon.rows[i].raw[c])))
-  check('(A) withEnglishColumns is idempotent: adding the columns twice changes nothing', withEnglishColumns(text17) === read('engine/lexicon.csv') && withEnglishColumns(read('engine/lexicon.csv')) === read('engine/lexicon.csv'))
+  check('(A) withEnglishColumns is idempotent: adding the columns twice changes nothing', withEnglishColumns(text17).split('\n').filter((l) => !l.startsWith('修,verb')).join('\n') === read('engine/lexicon.csv').split('\n').filter((l) => !l.startsWith('修,verb')).join('\n') && withEnglishColumns(read('engine/lexicon.csv')) === read('engine/lexicon.csv'))
   const sheet = parseCsv(exportForReviewer(lexicon, palette))
   const col = (n: string) => sheet[0].indexOf(n)
   check(`(A) the export is a spreadsheet of every row (${lexicon.size}) with kanji, reading, Japanese meaning, the classical line and the English columns: ${EXPORT_COLUMNS.join(' · ')}`, sheet.length === lexicon.size + 1 && sheet[0].join() === EXPORT_COLUMNS.join() && sheet.slice(1).every((r) => r[col('kanji')] !== '' && r[col('reading')] !== '' && r[col('meaning_ja')] !== '') && sheet.slice(1).filter((r) => r[col('line_original')] !== '').length >= 140)

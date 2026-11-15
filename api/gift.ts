@@ -17,6 +17,7 @@ import { GIFT_TOKEN_PATTERN, arrivingView, checkAddress, checkReply, giftUrl, gi
 import { OPEN_DATE_MAX_DAYS } from '../src/order/packages.ts'
 import { readArt, picturePath, type ArtRecord } from '../engine/film-art.ts'
 import { createOrderStore, type OrderStore } from '../engine/order-store.ts'
+import { recordOrderEvent } from '../engine/customer.ts'
 import { createAnimationHandlers, type AnimationDeps } from './animation.ts'
 import { filmUsable } from '../engine/animation.ts'
 import { loadArtwork, scrollReady } from '../engine/render/artwork.ts'
@@ -526,6 +527,7 @@ export function createGiftHandlers(deps: () => GiftDeps) {
       } catch {
         return json(503, { error: 'unavailable' }, { 'cache-control': 'no-store' })
       }
+      void recordOrderEvent(d.store, r.gift.order_ref, 'answered', now)
       console.log(`[ichirei-gift] reply_sent ${JSON.stringify({ token_prefix: token.slice(0, 5), text: !!checked.text, char: !!checked.char })}`) // no text, no character
       return json(200, { ok: true }, noStore)
     },
@@ -540,6 +542,7 @@ export function createGiftHandlers(deps: () => GiftDeps) {
       if (!r.gift.opened_at) {
         try {
           await d.store!.put(token, { ...r.gift, opened_at: (d.now?.() ?? new Date()).toISOString() })
+          void recordOrderEvent(d.store, r.gift.order_ref, 'opened', d.now?.() ?? new Date())
         } catch {
           return json(503, { error: 'unavailable' }, { 'cache-control': 'no-store' })
         }
@@ -556,6 +559,7 @@ export function createGiftHandlers(deps: () => GiftDeps) {
       if (!f.gift.shared_at) {
         try {
           await d.store!.put(f.gift.token, { ...f.gift, shared_at: (d.now?.() ?? new Date()).toISOString() })
+          void recordOrderEvent(d.store, f.gift.order_ref, 'sent', d.now?.() ?? new Date())
         } catch {
           return json(503, { error: 'unavailable' }, { 'cache-control': 'no-store' })
         }

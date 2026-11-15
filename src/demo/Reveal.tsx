@@ -263,7 +263,7 @@ export default function Reveal({ result, story, followUps = [], condition, copy,
     : 'btn primary'
 
   return (
-    <div data-all-revealed={allRevealed ? 'yes' : 'no'}>
+    <div id="cards" data-all-revealed={allRevealed ? 'yes' : 'no'}>
       <p className="font-serif-jp mb-8 text-sm text-mute" data-reveal-intro>{diagnostics ? copy.revealIntro : memorial ? copy.revealIntroMemorial : copy.revealIntroCustomer}</p>
 
       <div className={pairLayout ? 'grid auto-rows-fr grid-cols-1 gap-6 md:grid-cols-2' : 'flex flex-col gap-6'} role="list" data-layout={pairLayout ? 'pair' : 'single'}>

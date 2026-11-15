@@ -18,6 +18,9 @@ import { ANIMATION_ID_PATTERN } from '../engine/animation.ts'
 import { buildGiftRecord, giftUrl, newGiftToken } from '../engine/gift.ts'
 import { allocateCertificateNo } from '../engine/certificate-no.ts'
 import { recordHealth } from '../engine/health.ts'
+import { visitorOf } from '../engine/visitor.ts'
+import { holdForCart, startCheckout } from '../engine/promo-holds.ts'
+import { removeOrderedItem } from '../engine/basket.ts'
 import { recordOrderIndex } from '../engine/egift-ops.ts'
 import { filmInputFromRecord, filmWaitMs, raceTimeout, trackFilm } from '../engine/film-store.ts'
 import { makeFilm, type FilmInput, type FilmRecord } from '../engine/film.ts'
@@ -25,7 +28,7 @@ import { cleanSession, cleanSource, recordEvent } from '../engine/analytics.ts'
 import { POEM_ID_PATTERN, buildRecord, lineAttributes, newOrderRef, parseOrderRequest, type OrderRecord, type StoredPoem, type ValidOrder } from '../engine/order.ts'
 import { createOrderStore, type OrderStore } from '../engine/order-store.ts'
 import type { Palette } from '../engine/palette.ts'
-import { ShopifyError, createCart, loadShopifyConfig, type ShopifyConfig } from '../engine/shopify.ts'
+import { ShopifyError, createCart, type CartPromo, loadShopifyConfig, type ShopifyConfig } from '../engine/shopify.ts'
 import { checkClaimSession, claimOf, readWaiting, normalizeOrderNumber } from '../engine/waiting.ts'
 import { MAX_POEMS, POEM_TYPES, comingSoonSizes, poemTypeAllowed } from '../src/order/packages.ts'
 
@@ -144,6 +147,7 @@ export function createOrderHandler(deps: () => OrderDeps) {
     order.certificate.poems = poems.map((p) => ({ type: p.type, lines: p.lines, reading: p.reading }))
     const orderRef = newOrderRef(now)
     const record: OrderRecord = buildRecord(order, orderRef, now, poems)
+    record.visitor = visitorOf(req) // the browser that makes the order: the customer record, the basket and the "your gift is ready" bar find it by this
     if (claim) record.claim = claim
 
     // Writes of the order record go one after the other, so a film that finishes late can never be overwritten by an older write.
@@ -221,6 +225,8 @@ export function createOrderHandler(deps: () => OrderDeps) {
       await releaseClaim()
       return json(503, { error: 'Could not save the order. Nothing was charged; please try again.', code: 'store_failed' })
     }
+    // the ordered gift leaves the basket (the others stay)
+    void removeOrderedItem(d.store, record.visitor, order.story, order.language, order.candidate.kanji)
     // The owner's list (/ops) and the e-gift reminders read this small index: codes only, no story, no names, no address.
     await recordOrderIndex(d.store, record, now, cleanSession((body as { session?: unknown } | null)?.session))
 
@@ -252,7 +258,19 @@ export function createOrderHandler(deps: () => OrderDeps) {
 
     // 3. The Shopify cart.
     try {
-      const cart = await createCart(d.shopify!, order.package, lineAttributes(order, orderRef, animationLink, giftLink), orderRef, d.fetchImpl, order.language)
+      // a held free gift (English, during the promotion): the cart carries the free-gift code, the hold's email and the hold id — otherwise NO code (2026-11-15)
+      let heldCart: CartPromo | undefined
+      let heldRec: Awaited<ReturnType<typeof holdForCart>> = null
+      if (order.language === 'en') {
+        try {
+          heldRec = await holdForCart({ store: d.store, env: d.env ?? process.env, now: d.now }, { browser: record.visitor ?? null })
+          if (heldRec) heldCart = { code: heldRec.code, email: heldRec.rec.email, holdId: heldRec.rec.id }
+        } catch {
+          heldRec = null // the promotion never breaks a checkout: no hold found = the normal price
+        }
+      }
+      const cart = await createCart(d.shopify!, order.package, lineAttributes(order, orderRef, animationLink, giftLink), orderRef, d.fetchImpl, order.language, heldCart)
+      if (heldRec) await startCheckout({ store: d.store, env: d.env ?? process.env, now: d.now }, heldRec.rec).catch(() => null)
       if (cart.mismatch) void recordHealth(d.store, 'en_cart_currency_mismatch', { ref: orderRef }, d.now?.() ?? new Date()) // counted in red on /ops/stats; the checkout still opens
       record.status = 'cart_created'
       record.updated_at = (d.now?.() ?? new Date()).toISOString()

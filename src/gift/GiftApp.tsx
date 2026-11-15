@@ -1,4 +1,5 @@
 import { openingLabelShortFromRecord } from '../order/opens-at.ts'
+import { usePromoOn } from '../demo/useSizes'
 import { RETURN_CHARS } from '../order/return-chars.ts'
 import Cord from './Cord.tsx'
 import StrokeGlyph from './StrokeGlyph.tsx'
@@ -427,6 +428,7 @@ function AnswerBox({ token, lang, copy, from, replied, memorial }: { token: stri
   const [text, setText] = useState('')
   const [char, setChar] = useState<string | null>(null)
   const [phase, setPhase] = useState<'idle' | 'sending' | 'sent' | 'error'>(replied ? 'sent' : 'idle')
+  const promoOn = usePromoOn() // (en: "The first 100 gifts each day are on us." while the promotion runs)
   const send = async () => {
     setPhase('sending')
     try {
@@ -442,7 +444,8 @@ function AnswerBox({ token, lang, copy, from, replied, memorial }: { token: stri
     return (
       <>
         <p className="gf-sent-line" role="status" data-testid="gift-reply-sent">{copy.replySent(from)}</p>
-        {!memorial && <p className="gf-landing-line" data-testid="gift-landing-line"><a href={landing}>{copy.answerLanding}</a></p>}
+        {!memorial && <p className="gf-landing-line" data-testid="gift-landing-line"><a className="gf-landing-btn" href={landing}>{copy.answerLanding}</a></p>}
+        {!memorial && promoOn && lang === 'en' && copy.answerPromo && <p className="gf-landing-promo" data-testid="gift-landing-promo">{copy.answerPromo}</p>}
       </>
     )
   const left = 200 - [...text].length

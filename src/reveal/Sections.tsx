@@ -1,4 +1,5 @@
 import { useFlowActive } from './flow-store.ts'
+import { SUPPORT_EMAIL } from '../order/support'
 import { PACKAGE_DISPLAY_ORDER, RECOMMENDED_PACKAGE } from '../order/packages.ts'
 import { SIZE_COPY } from '../demo/sizes-copy.ts'
 import { useComingSoon, useSale, useSizes, useUsd } from '../demo/useSizes.ts'
@@ -478,6 +479,7 @@ export function Footer({ t, lang }: { t: T; lang?: RevealLang }) {
         <span data-testid="footer-slogan">{lang === 'en' ? EN_FOOTER_LINE : t.slogan}</span>
         <span>{withTrackLink(t.foot)}</span>
         <a href="/legal" data-testid="footer-legal">{t.legal}</a>
+        <span data-testid="footer-contact">{SUPPORT_EMAIL}</span>
       </div>
     </footer>
   )

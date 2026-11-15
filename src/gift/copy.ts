@@ -66,6 +66,8 @@ export interface GiftCopy {
   answerWrite: string
   answerCharLabel: (from: string) => string
   answerLanding: string
+  /** en, while the promotion runs: the line under the landing button */
+  answerPromo?: string
   replyPlaceholder: string
   replySend: string
   replySending: string
@@ -146,7 +148,7 @@ export const GIFT_COPY: Record<PageLang, GiftCopy> = {
     answerTitle: 'お返しをする',
     answerWrite: 'ひとこと返す',
     answerCharLabel: (n) => (n ? `${n}さんに一字を返す` : '一字を返す'),
-    answerLanding: 'まだ言えていない人が、いますか。',
+    answerLanding: '自分も一字を贈る →',
     replyPlaceholder: '一言、届けませんか（200字まで）',
     replySending: '届けています…',
     replySend: '届ける',
@@ -205,7 +207,7 @@ export const GIFT_COPY: Record<PageLang, GiftCopy> = {
     answerTitle: '回一份心意',
     answerWrite: '回一句話',
     answerCharLabel: (n) => (n ? `回一個字給${n}` : '回一個字'),
-    answerLanding: '還有沒說出口的人嗎？',
+    answerLanding: '我也想送一個字 →',
     replyPlaceholder: '想說的一句話（200 字以內）',
     replySending: '傳送中…',
     replySend: '傳達',
@@ -267,7 +269,8 @@ export const GIFT_COPY: Record<PageLang, GiftCopy> = {
     answerTitle: 'Send something back',
     answerWrite: 'Write back',
     answerCharLabel: (n) => (n ? `Give ${n} a character back` : 'Give a character back'),
-    answerLanding: "Is there someone you've never quite said it to?",
+    answerLanding: "Give one of your own →",
+    answerPromo: 'The first 100 gifts each day are on us.',
     replyPlaceholder: 'A few words back (up to 200 characters)',
     replySending: 'Sending…',
     replySend: 'Send',

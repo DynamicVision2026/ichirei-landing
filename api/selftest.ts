@@ -13,6 +13,9 @@
 import { runPictureProbe, type ProbeDeps } from '../engine/picture-probe.ts'
 import { createHash, timingSafeEqual } from 'node:crypto'
 import { createOrderStore, type OrderStore } from '../engine/order-store.ts'
+import { sweepCustomers } from '../engine/customer.ts'
+import { reapExpired } from '../engine/promo-holds.ts'
+import { promoShopifyFrom } from '../engine/promo-shopify.ts'
 import { publicReport, runSelftest, type SelftestDeps, type SelftestReport } from '../engine/selftest.ts'
 
 export const SELFTEST_DAILY_MAX = 2
@@ -42,6 +45,8 @@ export interface SelftestApiDeps {
   deps?: SelftestDeps
   /** Tests: stand-ins for the probe's image model and picture check. */
   probe?: Pick<ProbeDeps, 'image' | 'vision' | 'log'>
+  /** Tests: stands in for the daily housekeeping (customer clean-up, ended holds). */
+  housekeeping?: () => Promise<void>
 }
 
 const digest = (s: string): Buffer => createHash('sha256').update(s).digest()
@@ -80,6 +85,12 @@ export function createSelftestHandlers(getDeps: () => SelftestApiDeps) {
       if (req.method !== 'POST') return json(405, { state: 'refused', code: 'method_not_allowed' })
       if (!tokenOk(req.headers.get('x-selftest-token'), expected)) return json(401, { state: 'refused', code: 'unauthorized' })
       const store = d.store
+      // the daily housekeeping of the customer loop (2026-11-15): records with no order are deleted 30 days after their last event, and ended free-gift holds are cleaned up. Idempotent; never blocks the self-test.
+      try {
+        await (d.housekeeping ?? (async () => { await sweepCustomers(store, now()); await reapExpired({ store, env, now, shopify: promoShopifyFrom(env) }) }))()
+      } catch (err) {
+        console.log(`[ichirei-housekeeping] ${JSON.stringify({ error: String((err as Error)?.name ?? 'error').slice(0, 40) })}`)
+      }
       const commit = commitOf(env)
       const today = now().toISOString().slice(0, 10)
       // this commit was tested already: nothing to do (and it does not count against the day)

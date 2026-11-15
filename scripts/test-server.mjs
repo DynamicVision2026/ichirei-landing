@@ -427,9 +427,9 @@ try {
       await done(a2)
       const a3 = await sel('203.0.113.91', jar)
       const a3j = await a3.json()
-      check('limits: the 3rd new moment of one browser in a day (limit 2 here) gets 429 limit_person with the owner\'s ja message', a2.status === 200 && a3.status === 429 && a3j.code === 'limit_person' && a3j.error === '本日はここまでです。明日またお試しください。', JSON.stringify(a3j))
+      check('limits: the 3rd new moment of one browser in a day (limit 2 here) gets 429 limit_person with the owner\'s ja message', a2.status === 200 && a3.status === 429 && a3j.code === 'limit_person' && a3j.error === '今日はたくさんの場面を書いてくださいました。続きは明日また書けます。すでに見つけた字は、今日このまま贈れます。', JSON.stringify(a3j))
       const en = await sel('203.0.113.91', jar, 'en')
-      check('limits: …and the English message "That\'s all for today. Please try again tomorrow."', (await en.json()).error === "That's all for today. Please try again tomorrow.")
+      check('limits: …and the English message ("You\'ve written many moments today. …")', (await en.json()).error === "You've written many moments today. You can write more tomorrow, and any character you've already found can still be given today.")
       const b1 = await sel('203.0.113.91')
       await done(b1)
       check('limits: a second browser on the same address is not blocked (until the address backstop)', b1.status === 200)
@@ -451,7 +451,7 @@ try {
       for (const ip of ['203.0.113.100', '203.0.113.101']) { const r = await sel(ip); await readNdjson(r).catch(() => {}) }
       const over = await sel('203.0.113.102', 'en')
       const oj = await over.json()
-      check('limits: the whole site\'s card rounds a day (2 here): the next one gets 429 limit_site — "We\'re very busy right now. Please try again a little later."', over.status === 429 && oj.code === 'limit_site' && oj.error === "We're very busy right now. Please try again a little later.", JSON.stringify(oj))
+      check('limits: the whole site\'s card rounds a day (2 here): the next one gets 429 limit_site — "Lots of people are writing their moments right now. Please try again in a little while."', over.status === 429 && oj.code === 'limit_site' && oj.error === "Lots of people are writing their moments right now. Please try again in a little while.", JSON.stringify(oj))
     } finally {
       await lim2.stop()
     }

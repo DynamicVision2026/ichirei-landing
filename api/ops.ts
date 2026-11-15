@@ -309,7 +309,7 @@ export function createOpsHandlers(deps: () => OpsDeps) {
         attentionBlock +
         `<p class="note">お支払い完了から24時間は「キャンセル受付中」です。この間に製作は始めません。24時間が過ぎてキャンセルのないものだけが、下のPDFと木札・版木CSVに入ります。お支払い後の内容の変更（字・歌・お名前・メッセージ）は行いません。お客様が「贈りものを受け取る」を押した後（受け取り：済）は、キャンセルできません。期限内に受信したキャンセルのメールは、24時間を過ぎても対応できます（その場合は「キャンセルとして記録」を押してください）。</p>` +
         `${verified ? '' : '<p class="note">⚠ Shopifyから入金を確認できませんでした。いまは注文を作成した時刻から24時間で数えています（入金が確認できていない注文も含まれます）。</p>'}` +
-        `<p class="bar"><a href="/ops/stats">数字（ダッシュボード）</a><a href="/ops/cards/today.pdf">製作に進めるカードをまとめてPDF</a><a href="/ops/wooden-today.csv">製作に進める木札・版木 CSV</a><button id="egift-run">eギフトの確認を今すぐ実行</button></p>` +
+        `<p class="bar"><a href="/ops/stats">数字（ダッシュボード）</a><a href="/ops/customers">お客様の記録</a><a href="/ops/cards/today.pdf">製作に進めるカードをまとめてPDF</a><a href="/ops/wooden-today.csv">製作に進める木札・版木 CSV</a><button id="egift-run">eギフトの確認を今すぐ実行</button></p>` +
         `<h2>贈りものが未作成の注文（${waiting.filter((w) => w.status === 'waiting').length}）</h2>` +
         `<p class="note">当サイトを通らずに支払われた注文です（物語も字もありません）。お客様はメールのリンクから /claim で物語を書き、字を選びます。7日たっても未作成のものは「未作成・返金対象」になります。自動の返金はしません。Shopifyで手動で返金してください。</p>${waitingTable}` +
         `<h2>製作に進めるもの（${readyRows.length}）</h2>${readyTable(readyRows)}` +

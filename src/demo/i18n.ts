@@ -257,6 +257,7 @@ export interface Copy {
     submitting: string
     redirecting: string
     back: string
+    hints: { gift: string; /** the same line for a remembrance (no gift wording) */ giftMemorial: string; tick: string }
     errors: { generic: string; network: string; notConfigured: string; recordFailed: string; field: (field: OrderField) => string }
   }
 }
@@ -407,6 +408,7 @@ const ja: Copy = {
     submitting: '準備しています…',
     redirecting: 'お支払いページへ移動します…',
     back: '字を選びなおす',
+    hints: { gift: '贈りものの種類を選んでください。', giftMemorial: 'お届けの形を選んでください。', tick: '上のチェックボックスにチェックを入れてください。' },
     errors: {
       generic: 'ご注文を受け付けられませんでした。お手数ですが、もう一度お試しください。',
       network: '通信に失敗しました。もう一度お試しください。',
@@ -567,6 +569,7 @@ const zhHans: Copy = {
     submitting: '正在准备…',
     redirecting: '正在前往付款页面…',
     back: '重新选字',
+    hints: { gift: '请选择礼物的形式。', giftMemorial: '请选择送达的形式。', tick: '请勾选上方的方框。' },
     errors: {
       generic: '未能受理订单，请再试一次。',
       network: '网络连接失败，请再试一次。',
@@ -725,6 +728,7 @@ const zhHant: Copy = {
     submitting: '正在準備…',
     redirecting: '正在前往付款頁面…',
     back: '重新選字',
+    hints: { gift: '請選擇禮物的形式。', giftMemorial: '請選擇送達的形式。', tick: '請勾選上方的方框。' },
     errors: {
       generic: '未能受理訂單，請再試一次。',
       network: '網路連線失敗，請再試一次。',
@@ -890,6 +894,7 @@ const en: Copy = {
     submitting: 'Preparing…',
     redirecting: 'Taking you to payment…',
     back: 'Choose a different character',
+    hints: { gift: 'Please choose your gift above.', giftMemorial: 'Please choose how it is sent above.', tick: 'Please tick the box above.' },
     errors: {
       generic: 'We could not take your order. Please try again.',
       network: 'The connection failed. Please try again.',

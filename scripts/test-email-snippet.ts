@@ -67,5 +67,30 @@ check('a cart with another product AND an ICHIREI item prints one block, for the
 const deploy = readFileSync('DEPLOY.md', 'utf8')
 check('DEPLOY.md holds this exact snippet (one source of truth) with the paste instructions: 設定 → 通知 → 注文の確認 → コードを編集', deploy.includes(SNIPPET.trim()) && deploy.includes('設定 → 通知 → 注文の確認 → コードを編集'))
 
+
+// ---- P0 (2026-11-15): the complete English order-confirmation template (docs/order-confirmation-en.liquid) ---------------------------------------------------------------------------
+{
+  const EN = readFileSync('docs/order-confirmation-en.liquid', 'utf8')
+  const eng = new Liquid({ strictVariables: false })
+  const money = (v: unknown) => `$${(Number(v ?? 0) / 100).toFixed(2)}`
+  eng.registerFilter('money', money)
+  eng.registerFilter('money_with_currency', (v: unknown) => `${money(v)} USD`)
+  eng.registerFilter('format_address', (a: { name?: string }) => String(a?.name ?? ''))
+  const line1018 = { title: 'ICHIREI — E-gift', sku: 'ICHIREI-EGIFT', quantity: 1, final_line_price: 0, variant: { title: 'Default Title' }, properties: { Character: '燈', _inscription_form: '燈', _ichirei_size: 'ICHIREI-EGIFT', _language: 'en', _order_ref: 'IC-20261115-ABCDEFGH', _sender_name: 'Brian', _receiver_name: 'Kenji', _gift_message: 'Thank you.\nSee you.', _ichirei_gift_url: 'https://ichirei.soul-id.jp/g/RG-abcdefghijklmnopqrst', _ichirei_animation_url: 'https://ichirei.soul-id.jp/a/AN-abcdefghijkmnpqrstuv' } }
+  const order1018 = { shop: { name: 'soul-id', url: 'https://soul-id.jp', email: 'info@beyondculture.ai' }, order_status_url: 'https://soul-id.jp/orders/abc/authenticate?key=k', subtotal_line_items: [line1018], subtotal_price: 0, total_price: 0, discounts: [{ code: 'THANKS100', savings: 1750 }], requires_shipping: false }
+  const html = eng.parseAndRenderSync(EN, order1018)
+  const links = [...html.matchAll(/href="([^"]+)"/g)].map((m) => m[1])
+  check('P0 (#1018: en, $0, THANKS100): the FIRST link in the body is the buyer\'s page (/a/AN-…)', links[0] === 'https://ichirei.soul-id.jp/a/AN-abcdefghijkmnpqrstuv', links.join(' | '))
+  check('P0: the receiver\'s /g/ link appears nowhere in the e-mail', !html.includes('/g/') && !html.includes('RG-'))
+  check('P0: the main button reads "Open your gift"; there is no "View your order" and no "Visit our store" for an ICHIREI order', html.includes('>Open your gift<') && !html.includes('View your order') && !html.includes('Visit our store'))
+  check('P0: the ICHIREI block comes first, right under the heading (before the order summary), and the discount shows on the summary', html.indexOf('Your gift is ready.') > html.indexOf('Thank you for your ICHIREI order.') && html.indexOf('Your gift is ready.') < html.indexOf('Order summary') && html.includes('THANKS100'))
+  check('P0: hidden "_" properties are not printed on the summary (no _gift_message, no receiver link)', !html.includes('_gift_message') && !html.includes('See you.') && !html.includes('_ichirei_gift_url'))
+  check('P0: Shopify\'s own order page stays reachable as a small "Receipt and order details" link, after the gift link', html.includes('Receipt and order details') && links.indexOf(order1018.order_status_url) > 0)
+  const other = eng.parseAndRenderSync(EN, { ...order1018, subtotal_line_items: [{ title: 'T-shirt', sku: 'TSHIRT-M', quantity: 1, final_line_price: 2000, properties: {} }], requires_shipping: true, discounts: [], total_price: 2000, subtotal_price: 2000 })
+  check('P0: an order of another product is the default e-mail — "View your order" and "Visit our store", no ICHIREI block', other.includes('View your order') && other.includes('Visit our store') && !other.includes('Open your gift') && !other.includes('ICHIREI'))
+  const ck = readFileSync('docs/order-confirmation-ja-zh-checklist.md', 'utf8')
+  check('P0: the ja / zh checklist says what to paste where (the guard at the top, the action row wrapped, the English template into the English version)', /has_ichirei/.test(ck) && /unless has_ichirei/.test(ck) && /order-confirmation-en\.liquid/.test(ck))
+}
+
 console.log(failures ? `\n${failures} snippet check(s) FAILED` : '\nAll snippet checks passed.')
 process.exit(failures ? 1 : 0)

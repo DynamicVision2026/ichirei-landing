@@ -26,6 +26,14 @@ export const HEALTH_CODES = [
   'limit_person',
   'limit_site',
   'limit_pictures',
+  'promo_unavailable',
+  'consent_saved',
+  'consent_not_saved',
+  'held',
+  'hold_used',
+  'hold_expired',
+  'basket_saved',
+  'basket_link_opened',
 ] as const
 export type HealthCode = (typeof HEALTH_CODES)[number]
 export const RED_HEALTH_CODES: readonly HealthCode[] = ['en_cart_currency_mismatch', 'needs_attention', 'certificate_no_missing', 'order_record_failed']
@@ -59,10 +67,12 @@ export interface HealthCounts {
   total: Partial<Record<HealthCode, number>>
   /** per-reason counts of the picture failures (text / setting / religious / face …), over the days read */
   reasons: Record<string, number>
+  /** the free-gift holds by the public code they were placed with (over the days read) */
+  held_by_code: Record<string, number>
 }
 
 export async function readHealth(store: OrderStore, days: string[]): Promise<HealthCounts> {
-  const out: HealthCounts = { by_day: {}, total: {}, reasons: {} }
+  const out: HealthCounts = { by_day: {}, total: {}, reasons: {}, held_by_code: {} }
   for (const day of days) {
     let lines: HealthLine[] = []
     try {
@@ -75,6 +85,7 @@ export async function readHealth(store: OrderStore, days: string[]): Promise<Hea
       if (!(HEALTH_CODES as readonly string[]).includes(l.code)) continue
       d[l.code] = (d[l.code] ?? 0) + 1
       out.total[l.code] = (out.total[l.code] ?? 0) + 1
+      if (l.code === 'held' && l.reason) out.held_by_code[l.reason] = (out.held_by_code[l.reason] ?? 0) + 1
       if (l.reason && (l.code === 'picture_substituted' || l.code === 'picture_empty' || l.code === 'picture_failed')) out.reasons[l.reason] = (out.reasons[l.reason] ?? 0) + 1
     }
     out.by_day[day] = d

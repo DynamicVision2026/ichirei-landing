@@ -19,6 +19,7 @@ import { ANIMATION_ID_PATTERN } from '../engine/animation.ts'
 import { createOrderStore, type OrderStore } from '../engine/order-store.ts'
 import { SlidingWindowLimiter, clientIp } from '../engine/rate-limit.ts'
 import { visitorOf } from '../engine/visitor.ts'
+import { recordCustomerEvent } from '../engine/customer.ts'
 import { recordHealth } from '../engine/health.ts'
 import { previewOutcome, previewView, renderPreview, startPreview, type PreviewDeps } from '../engine/preview.ts'
 
@@ -98,6 +99,7 @@ export function createPreviewHandlers(deps: () => PreviewApiDeps) {
       const dailyIp = d.dailyIp ?? ipFor(env)
       const ip = clientIp(req)
       const person = visitorOf(req, env) ?? `ip:${ip}` // no usable cookie: the connection stands in for the person
+      void recordCustomerEvent(d.store, { browser: visitorOf(req, env) }, 'previewed', { language: ctx.context.language }).catch(() => {})
       const out = await startPreview(
         { ...d, store: d.store },
         {

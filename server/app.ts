@@ -14,6 +14,7 @@ import { POST as orderPost } from '../api/order.ts'
 import { POST as poemPost } from '../api/poem.ts'
 import { POST as trackPost } from '../api/track.ts'
 import { claimHandlers } from '../api/claim.ts'
+import { loopHandlers } from '../api/loop.ts'
 import { handlers as animationHandlers } from '../api/animation.ts'
 import { handlers as previewHandlers } from '../api/preview.ts'
 import { handlers as selftestHandlers } from '../api/selftest.ts'
@@ -21,6 +22,7 @@ import { readFile } from 'node:fs/promises'
 import { handlers as giftHandlers } from '../api/gift.ts'
 import { handlers as opsHandlers } from '../api/ops.ts'
 import { statsHandlers } from '../api/ops-stats.ts'
+import { customerHandlers } from '../api/ops-customers.ts'
 import { POST as analyticsPost } from '../api/analytics.ts'
 import { GET as ratesGet } from '../api/rates.ts'
 import { GET as sizesGet } from '../api/sizes.ts'
@@ -107,13 +109,13 @@ export function createApp(config: ServerConfig): Hono {
     await next()
     c.header('Referrer-Policy', 'no-referrer')
   }
-  for (const path of ['/a/*', '/g/*', '/api/animation/*', '/api/gift/*', '/api/film/*', '/api/preview/*']) app.use(path, noReferrer)
+  for (const path of ['/a/*', '/g/*', '/api/animation/*', '/api/gift/*', '/api/film/*', '/api/preview/*', '/b/*', '/api/b/*']) app.use(path, noReferrer)
 
   // The browser token (2026-11-15, engine/visitor.ts): a first-party cookie, `ic_v`, on the first page visit and on the two routes that count free tries (/api/select, /api/preview). A missing or
   // forged cookie is replaced; nothing is ever refused for the lack of one. No banner: it is one functional cookie, named on /legal.
   app.use('*', async (c, next) => {
     const path = new URL(c.req.url).pathname
-    const wants = c.req.method === 'POST' ? path === '/api/select' || path.startsWith('/api/preview') : c.req.method === 'GET' && (c.req.header('accept') ?? '').includes('text/html')
+    const wants = c.req.method === 'POST' ? path === '/api/select' || path.startsWith('/api/preview') || path === '/api/basket' || path === '/api/promo/hold' : c.req.method === 'GET' && (c.req.header('accept') ?? '').includes('text/html')
     if (!wants) return next()
     const v = ensureVisitor(c.req.raw)
     await next()
@@ -166,6 +168,8 @@ export function createApp(config: ServerConfig): Hono {
   // the open endpoints (2026-11-14), per IP: an order that opens a checkout, the event log, the analytics events ("max/minutes" or "off", like the others)
   const orderLimit = envRunLimiter('ICHIREI_ORDER_LIMIT', { max: 20, minutes: 60 })
   const logLimit = envRunLimiter('ICHIREI_LOG_LIMIT', { max: 60, minutes: 1 })
+  const meLimit = envRunLimiter('ICHIREI_ME_LIMIT', { max: 120, minutes: 1 })
+  const basketLimit = envRunLimiter('ICHIREI_BASKET_LIMIT', { max: 60, minutes: 1 })
   const analyticsLimit = envRunLimiter('ICHIREI_ANALYTICS_LIMIT', { max: 120, minutes: 1 })
   // these two take a few small fields: a body over 4 KB is refused before it is read
   const tinyBody = bodyLimit({ maxSize: 4096, onError: (c) => c.json({ error: 'Request too large.', code: 'too_large' }, 413) })
@@ -249,6 +253,7 @@ export function createApp(config: ServerConfig): Hono {
   const opsLimit = envRunLimiter('ICHIREI_OPS_LIMIT', { max: 120, minutes: 10 })
   app.get('/ops', limited(opsLimit), (c) => opsHandlers.page(c.req.raw))
   app.get('/ops/stats', limited(opsLimit), (c) => statsHandlers.page(c.req.raw))
+  app.get('/ops/customers', limited(opsLimit), (c) => customerHandlers.page(c.req.raw))
   app.get('/ops/stats.json', limited(opsLimit), (c) => statsHandlers.json(c.req.raw))
   app.get('/ops/card/:file', limited(opsLimit), (c) => opsHandlers.card(c.req.raw, c.req.param('file').replace(/\.pdf$/, '')))
   app.get('/ops/cards/today.pdf', limited(opsLimit), (c) => opsHandlers.cardsToday(c.req.raw))
@@ -265,6 +270,16 @@ export function createApp(config: ServerConfig): Hono {
   // Orders paid WITHOUT going through our site ("waiting" orders, 2026-11-13): /claim checks the order number and e-mail (5 tries an hour per IP, in the handler);
   // the Shopify order-payment webhook (signed) records the order. Neither ever writes to Shopify.
   app.post('/api/claim', (c) => claimHandlers.claim(c.req.raw))
+  // the customer loop (2026-11-15): the basket, the free-gift card, the landing's small "me" answer
+  app.get('/api/me', limited(meLimit), (c) => loopHandlers.me(c.req.raw))
+  app.post('/api/basket', limited(basketLimit), (c) => loopHandlers.basketSave(c.req.raw))
+  app.get('/api/basket', limited(basketLimit), (c) => loopHandlers.basketList(c.req.raw))
+  app.get('/api/basket/qr.svg', limited(basketLimit), (c) => loopHandlers.basketQr(c.req.raw))
+  app.get('/api/basket/:id', limited(basketLimit), (c) => loopHandlers.basketItem(c.req.raw, c.req.param('id')))
+  app.delete('/api/basket/:id', limited(basketLimit), (c) => loopHandlers.basketDelete(c.req.raw, c.req.param('id')))
+  app.get('/api/b/:token', limited(basketLimit), (c) => loopHandlers.basketLink(c.req.raw, c.req.param('token')))
+  app.get('/api/promo', limited(meLimit), (c) => loopHandlers.promoState(c.req.raw))
+  app.post('/api/promo/hold', limited(basketLimit), (c) => loopHandlers.promoHold(c.req.raw))
   app.post('/api/shopify/orders-paid', (c) => claimHandlers.webhook(c.req.raw))
   // Learning loop: two browser events (chosen, explain_opened) → analytics/YYYY-MM-DD.jsonl. Always 204.
   app.post('/api/analytics', limited(analyticsLimit), tinyBody, (c) => analyticsPost(c.req.raw))
@@ -292,6 +307,13 @@ export function createApp(config: ServerConfig): Hono {
     await next()
     c.header('X-Robots-Tag', 'noindex, nofollow')
   })
+  // the basket and its private link (2026-11-15) are never indexed either
+  for (const p of ['/basket', '/b/*']) {
+    app.use(p, async (c, next) => {
+      await next()
+      c.header('X-Robots-Tag', 'noindex, nofollow')
+    })
+  }
   app.use('/claim', async (c, next) => {
     await next()
     c.header('X-Robots-Tag', 'noindex, nofollow')

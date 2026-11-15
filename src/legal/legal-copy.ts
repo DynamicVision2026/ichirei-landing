@@ -5,6 +5,7 @@
 
 import { PACKAGE_PRICE_JPY, formatYen } from '../order/packages.ts'
 import type { RevealLang } from '../reveal/copy.ts'
+import { SUPPORT_EMAIL } from '../order/support.ts'
 
 import { REFUND_EN } from '../order/refund-en.ts'
 import { DEFAULT_USD_PRICE, usdCode } from '../order/usd.ts'
@@ -29,6 +30,10 @@ export interface LegalCopy {
   faqTitle: string
   /** The privacy section (2026-11-15): the one functional cookie. No banner. */
   privacy: { heading: string; body: string }
+  /** 2026-11-15: what the email is used for (Email), how long saved gifts stay (Retention) — shown under the privacy sentence — and the cancellation-time sentence (under the return rules). */
+  emailUse: string
+  retention: string
+  cancelTime: string
   faq: { q: string; a: string }[]
   back: string
 }
@@ -47,7 +52,7 @@ export const LEGAL: Record<RevealLang, LegalCopy> = {
       { label: '運営責任者', value: '代表取締役 傅豊国' },
       { label: '所在地', value: '〒143-0023 東京都大田区山王2丁目5番13号 大森北口ビル5F 5-72' },
       { label: '電話番号', value: '請求があった場合、遅滞なく電子メールにて開示いたします。お問い合わせはメールにてお願いいたします。' },
-      { label: 'メールアドレス', value: 'info@beyondculture.ai' },
+      { label: 'メールアドレス', value: SUPPORT_EMAIL },
       { label: '販売URL', value: 'https://ichirei.soul-id.jp' },
       { label: '販売価格', value: `一字礼 eギフト ${y('egift')} ／ 木札 ${y('simple')} ／ 版木 ${y('standard')}（いずれも税込）` },
       { label: '商品代金以外の必要料金', value: '日本国内への送料は無料です。海外へのお届け（木札・版木）は EMS ¥6,000。eギフトは郵送がなく、送料はかかりません。' },
@@ -64,6 +69,9 @@ export const LEGAL: Record<RevealLang, LegalCopy> = {
       { heading: '配送について', body: '配送中の紛失は、追跡で確認のうえ再発送または返金いたします。ご入力いただいた住所の誤りや長期不在などで返送された場合、再発送の送料はお客様のご負担となります。海外発送で発生する関税・輸入税は、受け取る方のご負担となります。' },
     ],
     privacy: { heading: 'プライバシー', body: '無料のお試し回数を管理するため、機能上必要なCookieを1つ使用します。' },
+    emailUse: '無料の贈りものを確保するためにメールアドレスをご入力いただいた場合、確保と決済時の照合のためだけに使います。ご希望の場合のみ、お知らせをお送りします。',
+    retention: 'ご注文のない保存データは、30日後に削除します。',
+    cancelTime: 'キャンセルのご連絡は、メールを送信した時刻で受け付けます。',
     faqTitle: 'よくあるご質問',
     faq: [
       { q: '注文後に字を変えられますか？', a: 'お支払い後の内容の変更（字・歌・お名前・メッセージなど）はお受けしていません。別の内容をご希望の場合は、キャンセルのうえ、あらためてご注文ください。' },
@@ -82,7 +90,7 @@ export const LEGAL: Record<RevealLang, LegalCopy> = {
       { label: '營運負責人', value: '代表董事 傅豊国' },
       { label: '所在地', value: '〒143-0023 東京都大田区山王2丁目5番13號 大森北口大樓5F 5-72' },
       { label: '電話號碼', value: '如有需要，我們會在收到請求後儘速以電子郵件提供。諮詢請透過電子郵件聯絡。' },
-      { label: '電子郵件', value: 'info@beyondculture.ai' },
+      { label: '電子郵件', value: SUPPORT_EMAIL },
       { label: '販售網址', value: 'https://ichirei.soul-id.jp' },
       { label: '售價', value: `一字禮 e 禮物 ${y('egift')} ／ 木牌 ${y('simple')} ／ 版木 ${y('standard')}（皆含稅）` },
       { label: '商品價款以外的費用', value: '寄往日本國內免運費。寄往海外（木牌、版木）為 EMS ¥6,000。e 禮物不郵寄，無運費。' },
@@ -99,6 +107,9 @@ export const LEGAL: Record<RevealLang, LegalCopy> = {
       { heading: '關於配送', body: '運送途中遺失時，經追蹤確認後將重新寄送或退款。若因您填寫的地址有誤或長期無人收件而遭退回，重新寄送的運費由您負擔。寄送海外時產生的關稅與進口稅，由收件人負擔。' },
     ],
     privacy: { heading: '隱私', body: '為了管理免費試用次數，我們使用一個功能上必要的Cookie。' },
+    emailUse: '若你為保留免費禮物輸入電子郵件，我們只用它來保留禮物並在結帳時核對。只有在你同意時，才會寄送消息。',
+    retention: '沒有下單的儲存資料，會在30天後刪除。',
+    cancelTime: '取消申請以你寄出郵件的時間為準。',
     faqTitle: '常見問題',
     faq: [
       { q: '下單後可以換字嗎？', a: '付款後恕不更改內容（字、詩、姓名、訊息等）。如需不同內容，請先取消，再重新下單。' },
@@ -117,7 +128,7 @@ export const LEGAL: Record<RevealLang, LegalCopy> = {
       { label: 'Person in charge', value: '傅豊国, Representative Director' },
       { label: 'Address', value: 'Omori Kitaguchi Bldg. 5F 5-72, 2-5-13 Sanno, Ota-ku, Tokyo 143-0023, Japan' },
       { label: 'Telephone', value: 'Disclosed by email without delay upon request. Please contact us by email.' },
-      { label: 'E-mail', value: 'info@beyondculture.ai' },
+      { label: 'E-mail', value: SUPPORT_EMAIL },
       { label: 'Site', value: 'https://ichirei.soul-id.jp' },
       { label: 'Prices', value: `ICHIREI e-gift ${EN_EGIFT_PRICE} · Wooden tag ${y('simple')} · Carved block ${y('standard')} (all tax included)` },
       { label: 'Other charges', value: 'Shipping inside Japan is free. Shipping abroad (wooden tag and carved block) is EMS ¥6,000. The e-gift is not posted, so it has no shipping.' },
@@ -134,6 +145,9 @@ export const LEGAL: Record<RevealLang, LegalCopy> = {
       { heading: 'Delivery', body: 'If a parcel is lost in transit, we\'ll check the tracking and reship or refund. If it\'s returned because of an incorrect address you entered or because no one collected it, reshipping is at your cost. Import duties and taxes on overseas deliveries are paid by the recipient.' },
     ],
     privacy: { heading: 'Privacy', body: 'We use one functional cookie to limit free previews.' },
+    emailUse: 'If you enter your email to hold a free gift, we use it only to hold it and match it at checkout. We send news only if you ask for it.',
+    retention: 'Saved gifts without an order are deleted after 30 days.',
+    cancelTime: 'For cancellations, the time you send your email is the time that counts.',
     faqTitle: 'Questions',
     faq: [
       { q: 'Can I change the character after I order?', a: 'We can\'t change an order after payment (character, poem, names or message). If you\'d like something different, cancel and place a new order.' },

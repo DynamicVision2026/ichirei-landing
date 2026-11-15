@@ -39,6 +39,12 @@ const partsOf = (tz: string, ms: number): Record<string, string> => {
   return Object.fromEntries(f.formatToParts(new Date(ms)).map((p) => [p.type, p.value]))
 }
 
+/** The wall clock of a zone at an instant: its calendar date (YYYY-MM-DD) and hour / minute. */
+export function partsOfZone(tz: string, ms: number): { date: string; hour: number; minute: number } {
+  const p = partsOf(tz, ms)
+  return { date: `${p.year}-${p.month}-${p.day}`, hour: Number(p.hour), minute: Number(p.minute) }
+}
+
 /** The zone's offset from UTC at that instant, in ms. */
 const offsetMs = (tz: string, ms: number): number => {
   const p = partsOf(tz, ms)

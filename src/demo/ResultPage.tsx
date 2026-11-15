@@ -1,4 +1,6 @@
 import { useEffect, useMemo, useRef } from 'react'
+import SavePanel from '../loop/SavePanel'
+import { toRevealLang } from '../reveal/lang'
 import type { PreviewState } from './usePreview.ts'
 import type { PreviewCopy } from './preview-copy.ts'
 import { RESULT_COPY } from './result-copy.ts'
@@ -132,6 +134,7 @@ export default function ResultPage({ live, onMake, onAnother }: { live: ResultLi
           <div className="rs-actions">
             <button type="button" className="rs-btn" data-testid="result-make" onClick={onMake}>{c.make}</button>
             <button type="button" className="rs-link" data-testid="result-another" onClick={onAnother}>{c.another}</button>
+            <SavePanel lang={toRevealLang(live.language)} className="rs-link" />
           </div>
         </footer>
       </div>

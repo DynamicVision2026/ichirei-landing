@@ -715,8 +715,18 @@ export const DEFAULT_MAX_ROUNDS = 2
 /** What the server says when a story has had all its rounds (the page shows it too). */
 export const NO_MORE_ROUNDS: Record<string, string> = { ja: 'この物語で探せるのはここまでです。', 'zh-Hant': '這個故事能找的字就到這裡。', 'zh-Hans': '这个故事能找的字就到这里。', en: "That's all the characters for this moment." }
 /** The free-tries limits (2026-11-15): this browser has used its day of new moments, or the whole site has used its day of card rounds. Never "try again" on a payment. */
-export const LIMIT_PERSON: Record<string, string> = { ja: '本日はここまでです。明日またお試しください。', 'zh-Hant': '今天的次數已用完，請明天再試。', 'zh-Hans': '今天的次数已用完，请明天再试。', en: "That's all for today. Please try again tomorrow." }
-export const LIMIT_SITE: Record<string, string> = { ja: 'ただいま混み合っています。しばらくしてからお試しください。', 'zh-Hant': '目前使用人數較多，請稍後再試。', 'zh-Hans': '目前使用人数较多，请稍后再试。', en: "We're very busy right now. Please try again a little later." }
+export const LIMIT_PERSON: Record<string, string> = {
+  ja: '今日はたくさんの場面を書いてくださいました。続きは明日また書けます。すでに見つけた字は、今日このまま贈れます。',
+  'zh-Hant': '今天你已經寫下許多片刻了。明天可以繼續寫。已經找到的字，今天就能送出。',
+  'zh-Hans': '今天你已经写下许多片刻了。明天可以继续写。已经找到的字，今天就能送出。',
+  en: "You've written many moments today. You can write more tomorrow, and any character you've already found can still be given today.",
+}
+export const LIMIT_SITE: Record<string, string> = {
+  ja: 'ただいま多くの方にご利用いただいています。少し時間をおいて、もう一度お試しください。',
+  'zh-Hant': '目前有很多人正在使用，請稍等片刻再試一次。',
+  'zh-Hans': '目前有很多人正在使用，请稍等片刻再试一次。',
+  en: 'Lots of people are writing their moments right now. Please try again in a little while.',
+}
 /** Characters (both forms of each) the sender has already been shown for this story: a generous cap, one code point per entry. */
 export const MAX_EXCLUDED = 24
 

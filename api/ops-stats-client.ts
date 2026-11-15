@@ -117,7 +117,7 @@ export const STATS_CLIENT_JS = String.raw`
     return h + '</tbody></table></div>';
   }
 
-  var HEALTH_CODES = ['en_cart_currency_mismatch', 'needs_attention', 'certificate_no_missing', 'gift_incomplete', 'picture_substituted', 'pictures_none', 'picture_empty', 'poem_failed', 'film_fallback', 'order_record_failed', 'limit_person', 'limit_site', 'limit_pictures'];
+  var HEALTH_CODES = ['en_cart_currency_mismatch', 'needs_attention', 'certificate_no_missing', 'gift_incomplete', 'picture_substituted', 'pictures_none', 'picture_empty', 'poem_failed', 'film_fallback', 'order_record_failed', 'limit_person', 'limit_site', 'limit_pictures', 'promo_unavailable', 'consent_saved', 'consent_not_saved', 'held', 'hold_used', 'hold_expired', 'basket_saved', 'basket_link_opened'];
   var RED = { en_cart_currency_mismatch: 1, needs_attention: 1, certificate_no_missing: 1, order_record_failed: 1 };
   function renderHealth() {
     var H = D.health; if (!H) return '';
@@ -140,7 +140,15 @@ export const STATS_CLIENT_JS = String.raw`
   }
   function renderPromo() {
     var P = D.promo; if (!P || !P.on) return '';
-    return '<p class="note" data-testid="promo-free-today"><b>' + esc(t('free_today', { n: P.free_today })) + '</b></p>';
+    var h = '<p class="note" data-testid="promo-free-today"><b>' + esc(t('free_today', { n: P.free_today })) + '</b></p>';
+    if (P.days && P.days.length) {
+      h += '<h2>' + esc(t('promo_days_title')) + '</h2><div class="wide"><table data-testid="promo-days"><thead><tr><th>' + esc(t('promo_day')) + '</th><th class="n">' + esc(t('promo_given')) + '</th><th class="n">' + esc(t('h_held')) + '</th><th class="n">' + esc(t('promo_left')) + '</th></tr></thead><tbody>';
+      P.days.forEach(function (r) { h += '<tr data-day="' + esc(r.day) + '"><td>' + esc(r.day) + '</td><td class="n">' + r.given + '</td><td class="n">' + r.held + '</td><td class="n">' + r.left + '</td></tr>'; });
+      h += '</tbody></table></div>';
+    }
+    var bc = (D.health && D.health.held_by_code) || {}, ks = Object.keys(bc).sort(function (a, b) { return bc[b] - bc[a]; });
+    if (ks.length) h += '<p class="note" data-testid="promo-by-code">' + esc(t('promo_by_code')) + ': ' + ks.map(function (k) { return esc(k) + ' ' + bc[k]; }).join(' · ') + '</p>';
+    return h;
   }
   function renderAttention() {
     var n = (D.attention && D.attention.count) || 0, red = ((D.health && D.health.total) || {}).en_cart_currency_mismatch || 0;
