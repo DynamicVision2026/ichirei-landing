@@ -56,7 +56,7 @@ substitutions:
   _PROMO_HOLD_MINUTES: '120'        # how long an email hold lasts (never past the end of the promo day)
   _PROMO_HOLDS_PER_DAY: '3'         # holds one email may place per promo day
   _PROMO_CHECKOUT_GRACE_MINUTES: '30' # extra minutes a hold lives once its owner has gone to checkout
-  _PROMO_DISCOUNT_ID: ''            # ICHIREI_PROMO_DISCOUNT_ID — the numeric id of the Shopify discount THANKS100 (Discounts → THANKS100: the number at the end of the address). Empty = no free-gift holds can be placed ("taking a short break")
+  _PROMO_DISCOUNT_ID: '1584694624504' # ICHIREI_PROMO_DISCOUNT_ID — the numeric id of the Shopify discount THANKS100 (Discounts → THANKS100: the number at the end of the address). Empty = no free-gift holds can be placed ("taking a short break")
   _PROMO_CODES: 'THANKS100'         # ICHIREI_PROMO_CODES — the public free-gift codes a visitor may type on the card, case-insensitive. Several: separate with | (gcloud's env list cannot carry a comma)
   _PROMO_SHOPIFY_CODE: 'THANKS100'  # ICHIREI_PROMO_SHOPIFY_CODE — the Shopify discount code put on a held cart
   _FILM_DAILY_MAX_PROMO: '300'      # ICHIREI_FILM_DAILY_MAX_PROMO — the picture capacity per day while the promotion runs (200 otherwise)
