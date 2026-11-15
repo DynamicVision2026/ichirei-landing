@@ -18,6 +18,8 @@ import { FOLLOW_UP_MAX, STORY_MAX, countChars, mergeStory, parseContext, parseEx
 import { ANIMATION_ID_PATTERN } from '../engine/animation.ts'
 import { createOrderStore, type OrderStore } from '../engine/order-store.ts'
 import { SlidingWindowLimiter, clientIp } from '../engine/rate-limit.ts'
+import { visitorOf } from '../engine/visitor.ts'
+import { recordHealth } from '../engine/health.ts'
 import { previewOutcome, previewView, renderPreview, startPreview, type PreviewDeps } from '../engine/preview.ts'
 
 const MAX_BODY_BYTES = 60_000
@@ -32,13 +34,15 @@ const rejected = (status: number, body: Record<string, unknown>): Response => {
 const hdr = (extra: Record<string, string> = {}) => ({ 'x-robots-tag': 'noindex, nofollow', 'cache-control': 'no-store', ...extra })
 const json = (status: number, body: unknown, extra: Record<string, string> = {}) => new Response(JSON.stringify(body), { status, headers: hdr({ 'content-type': 'application/json; charset=utf-8', ...extra }) })
 
-/** At most this many NEW picture sets per person per day (ICHIREI_PREVIEW_DAILY_MAX, default 5): the same identity as the story limit (the connection's address). */
+/** At most this many NEW picture sets per person per day (ICHIREI_PREVIEW_DAILY_MAX, default 5). A person is a BROWSER (the signed ic_v cookie, engine/visitor.ts); the connection's address
+ * (the last X-Forwarded-For hop) is the backstop (ICHIREI_PREVIEW_IP_DAILY_MAX, default 25), so a family or an office sharing one address is not stopped by one person's day. */
 export const previewDailyMax = (env: NodeJS.ProcessEnv = process.env): number => (Number(env.ICHIREI_PREVIEW_DAILY_MAX) >= 0 && env.ICHIREI_PREVIEW_DAILY_MAX !== undefined && env.ICHIREI_PREVIEW_DAILY_MAX !== '' ? Number(env.ICHIREI_PREVIEW_DAILY_MAX) : 5)
 
 export interface PreviewApiDeps extends Omit<PreviewDeps, 'store'> {
   store: OrderStore | null
-  /** Tests: their own daily limiter. */
+  /** Tests: their own per-person and per-address daily limiters. */
   daily?: SlidingWindowLimiter
+  dailyIp?: SlidingWindowLimiter
 }
 
 let sharedDaily: SlidingWindowLimiter | null = null
@@ -50,6 +54,17 @@ const dailyFor = (env: NodeJS.ProcessEnv): SlidingWindowLimiter => {
     sharedMax = max
   }
   return sharedDaily
+}
+let sharedIp: SlidingWindowLimiter | null = null
+let sharedIpMax = -1
+const ipFor = (env: NodeJS.ProcessEnv): SlidingWindowLimiter => {
+  const raw = env.ICHIREI_PREVIEW_IP_DAILY_MAX
+  const max = raw !== undefined && raw !== '' && Number(raw) >= 0 ? Number(raw) : 25
+  if (!sharedIp || sharedIpMax !== max) {
+    sharedIp = new SlidingWindowLimiter(max, DAY_MS)
+    sharedIpMax = max
+  }
+  return sharedIp
 }
 
 export function createPreviewHandlers(deps: () => PreviewApiDeps) {
@@ -80,7 +95,9 @@ export function createPreviewHandlers(deps: () => PreviewApiDeps) {
       const draftId = typeof body.draft_id === 'string' && ANIMATION_ID_PATTERN.test(body.draft_id) ? body.draft_id : null
       const env = d.env ?? process.env
       const daily = d.daily ?? dailyFor(env)
+      const dailyIp = d.dailyIp ?? ipFor(env)
       const ip = clientIp(req)
+      const person = visitorOf(req, env) ?? `ip:${ip}` // no usable cookie: the connection stands in for the person
       const out = await startPreview(
         { ...d, store: d.store },
         {
@@ -97,7 +114,16 @@ export function createPreviewHandlers(deps: () => PreviewApiDeps) {
           ...(picked.length ? { picked } : {}),
           draft_id: draftId,
         },
-        () => daily.hit(ip),
+        () => {
+          // both counters are asked before either is recorded
+          if (daily.blocked(person) || dailyIp.blocked(ip)) {
+            void recordHealth(d.store, 'limit_pictures', { reason: 'person' }, d.now?.() ?? new Date())
+            return false
+          }
+          daily.hit(person)
+          dailyIp.hit(ip)
+          return true
+        },
       )
       void cleanSession(body.session)
       if (wantsDebug(req)) return json(200, { ...out, debug: out.state === 'limited' ? { outcome: 'limit', limit: 'person_daily', max: previewDailyMax(env) } : { outcome: 'drawing', script_status: out.script, reused: out.reused } })

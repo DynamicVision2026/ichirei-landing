@@ -22,7 +22,7 @@ export const STATS_CLIENT_JS = String.raw`
   function yen(n) { return '¥' + num(n); }
   function buyerAmt(b) { var n = Number(b.amount); var v = isFinite(n) ? (Math.round(n) === n ? String(n) : n.toFixed(2)) : String(b.amount); return (b.currency === 'USD' ? '$' : b.currency + ' ') + v; }
   // revenue is the yen amount the shop settles; an order paid in another currency shows what the buyer paid beside it: ¥2,786 ($17.50)
-  function money(o) { return yen(o.price_jpy) + (o.price_buyer ? ' (' + buyerAmt(o.price_buyer) + ')' : ''); }
+  function money(o) { return yen(o.price_jpy) + (o.price_buyer ? ' (' + buyerAmt(o.price_buyer) + ')' : '') + (o.free ? ' · ' + t('free_mark') + (o.free_code ? ' ' + o.free_code : '') : ''); }
   function pct(a, b) { return b > 0 ? Math.round((a / b) * 100) : 0; }
   function jst(iso) { var ms = Date.parse(iso); if (!isFinite(ms)) return ''; return new Date(ms + 9 * 3600000).toISOString().slice(5, 16).replace('T', ' '); }
   function giftOf(sku) { return { 'ICHIREI-EGIFT': t('gift_egift'), 'ICHIREI-SIMPLE': t('gift_simple'), 'ICHIREI-STANDARD': t('gift_standard') }[sku] || t('gift_other'); }
@@ -117,8 +117,8 @@ export const STATS_CLIENT_JS = String.raw`
     return h + '</tbody></table></div>';
   }
 
-  var HEALTH_CODES = ['en_cart_currency_mismatch', 'needs_attention', 'certificate_no_missing', 'gift_incomplete', 'picture_substituted', 'pictures_none', 'picture_empty', 'poem_failed', 'film_fallback'];
-  var RED = { en_cart_currency_mismatch: 1, needs_attention: 1, certificate_no_missing: 1 };
+  var HEALTH_CODES = ['en_cart_currency_mismatch', 'needs_attention', 'certificate_no_missing', 'gift_incomplete', 'picture_substituted', 'pictures_none', 'picture_empty', 'poem_failed', 'film_fallback', 'order_record_failed', 'limit_person', 'limit_site', 'limit_pictures'];
+  var RED = { en_cart_currency_mismatch: 1, needs_attention: 1, certificate_no_missing: 1, order_record_failed: 1 };
   function renderHealth() {
     var H = D.health; if (!H) return '';
     var tot = H.total || {}, days = Object.keys(H.by_day || {}).sort().reverse().slice(0, 14);
@@ -138,6 +138,10 @@ export const STATS_CLIENT_JS = String.raw`
     if (keys.length) { h += '<p class="note" data-testid="health-reasons">' + esc(t('h_reasons')) + ': ' + keys.map(function (k) { return esc(k) + ' ' + rs[k]; }).join(' · ') + '</p>'; }
     return h;
   }
+  function renderPromo() {
+    var P = D.promo; if (!P || !P.on) return '';
+    return '<p class="note" data-testid="promo-free-today"><b>' + esc(t('free_today', { n: P.free_today })) + '</b></p>';
+  }
   function renderAttention() {
     var n = (D.attention && D.attention.count) || 0, red = ((D.health && D.health.total) || {}).en_cart_currency_mismatch || 0;
     if (!n && !red) return '';
@@ -156,7 +160,7 @@ export const STATS_CLIENT_JS = String.raw`
     PERIODS.forEach(function (p) { th += '<button type="button" data-period="' + p + '" aria-pressed="' + (p === period) + '">' + esc(t('p_' + p)) + '</button>'; });
     document.getElementById('tabs').innerHTML = th;
     document.getElementById('app').innerHTML =
-      renderAttention() + (D.verified ? '' : '<p class="warn">' + esc(t('payments_unverified')) + '</p>') +
+      renderPromo() + renderAttention() + (D.verified ? '' : '<p class="warn">' + esc(t('payments_unverified')) + '</p>') +
       renderNumbers(s) + '<p class="note">' + esc(t('cost_note')) + '</p>' + renderChoice(s) + renderFunnel(s) + renderDaily(s) + renderSources(s) + renderHealth() + renderOrders() +
       '<p class="note">' + esc(t('privacy_note')) + '</p>';
   }

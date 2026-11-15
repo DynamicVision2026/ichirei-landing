@@ -714,6 +714,9 @@ export const MAX_RETRIES = 2
 export const DEFAULT_MAX_ROUNDS = 2
 /** What the server says when a story has had all its rounds (the page shows it too). */
 export const NO_MORE_ROUNDS: Record<string, string> = { ja: 'この物語で探せるのはここまでです。', 'zh-Hant': '這個故事能找的字就到這裡。', 'zh-Hans': '这个故事能找的字就到这里。', en: "That's all the characters for this moment." }
+/** The free-tries limits (2026-11-15): this browser has used its day of new moments, or the whole site has used its day of card rounds. Never "try again" on a payment. */
+export const LIMIT_PERSON: Record<string, string> = { ja: '本日はここまでです。明日またお試しください。', 'zh-Hant': '今天的次數已用完，請明天再試。', 'zh-Hans': '今天的次数已用完，请明天再试。', en: "That's all for today. Please try again tomorrow." }
+export const LIMIT_SITE: Record<string, string> = { ja: 'ただいま混み合っています。しばらくしてからお試しください。', 'zh-Hant': '目前使用人數較多，請稍後再試。', 'zh-Hans': '目前使用人数较多，请稍后再试。', en: "We're very busy right now. Please try again a little later." }
 /** Characters (both forms of each) the sender has already been shown for this story: a generous cap, one code point per entry. */
 export const MAX_EXCLUDED = 24
 

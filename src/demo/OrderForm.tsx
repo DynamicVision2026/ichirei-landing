@@ -31,7 +31,8 @@ import { clearClaim, getClaim } from './claim-store.ts'
 import { CLAIM_COPY } from '../claim/copy.ts'
 import { PriceWithSale, SaleLine, UsdLaunchLine, UsdPriceView } from '../order/SalePrice.tsx'
 import { salePriceJpy } from '../order/sale.ts'
-import { useSale, useUsd } from './useSizes.ts'
+import { usePromoOn, useSale, useUsd } from './useSizes.ts'
+import { PROMO_LINE_EN } from './sizes-copy.ts'
 import { cleanReading } from '../order/reading.ts'
 
 // The purchase step of the customer flow: after the sender has chosen a character, collect
@@ -99,6 +100,7 @@ export default function OrderForm({ result, story, followUps = [], promptQuestio
   const claim = useMemo(() => getClaim(), [])
   const claimCopy = CLAIM_COPY[language]
   const usdPrice = useUsd() // English: a fixed dollar price, never an "about" figure
+  const promoOn = usePromoOn() // "Days of Thanks" (US, English only): one line above the order button while it runs
   const sale = useSale(language) // the Thanksgiving sale shown beside the e-gift's price (Shopify's discount sets the real price)
   const [pkg, setPkg] = useState<PackageId | ''>(claim ? 'egift' : '')
   const sizes = useSizes() // the sizes on sale right now (Part C): a size without a Shopify variant is not shown
@@ -449,6 +451,7 @@ export default function OrderForm({ result, story, followUps = [], promptQuestio
             </label>
           </>
         )}
+        {language === 'en' && !claim && promoOn && <p className="sent promoLine" data-testid="promo-line">{PROMO_LINE_EN}</p>}
         <button type="button" data-testid="order-submit" className="btn primary" onClick={submit} disabled={!valid || busy}>
           {phase === 'submitting' ? o.submitting : phase === 'redirecting' ? o.redirecting : claim ? claimCopy.make : o.submit}
         </button>

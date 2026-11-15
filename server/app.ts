@@ -36,6 +36,7 @@ import { simpleMaxStrokes } from '../engine/strokes.ts'
 import { adaptVercelHandler } from './vercel-compat.ts'
 import { bodyLimit } from 'hono/body-limit'
 import { envRunLimiter } from '../engine/rate-limit.ts'
+import { ensureVisitor } from '../engine/visitor.ts'
 import { withHeartbeat } from './heartbeat.ts'
 
 export interface ServerConfig {
@@ -108,6 +109,17 @@ export function createApp(config: ServerConfig): Hono {
   }
   for (const path of ['/a/*', '/g/*', '/api/animation/*', '/api/gift/*', '/api/film/*', '/api/preview/*']) app.use(path, noReferrer)
 
+  // The browser token (2026-11-15, engine/visitor.ts): a first-party cookie, `ic_v`, on the first page visit and on the two routes that count free tries (/api/select, /api/preview). A missing or
+  // forged cookie is replaced; nothing is ever refused for the lack of one. No banner: it is one functional cookie, named on /legal.
+  app.use('*', async (c, next) => {
+    const path = new URL(c.req.url).pathname
+    const wants = c.req.method === 'POST' ? path === '/api/select' || path.startsWith('/api/preview') : c.req.method === 'GET' && (c.req.header('accept') ?? '').includes('text/html')
+    if (!wants) return next()
+    const v = ensureVisitor(c.req.raw)
+    await next()
+    if (v.setCookie) c.header('Set-Cookie', v.setCookie, { append: true })
+  })
+
   // ---- API -------------------------------------------------------------
   app.get('/api/health', (c) =>
     c.json({
@@ -164,8 +176,12 @@ export function createApp(config: ServerConfig): Hono {
     return c.json({ error: 'Too many requests from this connection. Please wait a little and try again.', code: 'rate_limited' }, 429, { 'Retry-After': String(r.retryAfterSeconds) })
   }
 
+  // The hourly per-address brake on /api/select is now OFF unless ICHIREI_SELECT_LIMIT is set ("max/minutes"): the free tries are counted per browser, per address (backstop) and for the whole site
+  // in api/select.ts (engine/day-limits.ts), so a family or an office behind one address is not stopped by it (2026-11-15).
+  const selectBrake: MiddlewareHandler = (c, next) => ((process.env.ICHIREI_SELECT_LIMIT ?? '').trim() ? limited(selectLimit)(c, next) : next())
+
   // Streams NDJSON (stage … delta … result|error) — handler reused as-is.
-  app.post('/api/select', requireApiKey, limited(selectLimit), async (c) =>
+  app.post('/api/select', requireApiKey, selectBrake, async (c) =>
     withHeartbeat(await selectPost(c.req.raw), config.heartbeatMs),
   )
   app.post('/api/explain', requireApiKey, limited(explainLimit), adaptVercelHandler(explainHandler))

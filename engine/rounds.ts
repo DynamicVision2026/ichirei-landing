@@ -17,7 +17,8 @@ export const newRoundSession = (random: (n: number) => Uint8Array = randomBytes)
   return out
 }
 
-function key(env: NodeJS.ProcessEnv): string {
+/** The signing key shared by the round tickets and the browser token (engine/visitor.ts): ICHIREI_ROUND_SECRET, else derived from the Anthropic key. Never printed or sent. */
+export function key(env: NodeJS.ProcessEnv): string {
   return createHmac('sha256', 'ichirei-round-ticket').update(env.ICHIREI_ROUND_SECRET || env.ANTHROPIC_API_KEY || 'dev-only').digest('hex')
 }
 const mac = (sid: string, env: NodeJS.ProcessEnv): string => createHmac('sha256', key(env)).update(sid).digest('base64url').slice(0, 27)

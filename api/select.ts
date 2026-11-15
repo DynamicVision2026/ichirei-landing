@@ -21,8 +21,12 @@ import { cleanSession, cleanSource, recordEvent, shownEvent } from '../engine/an
 import { costCollector } from '../engine/ai-cost.ts'
 import { recordFreeSource, recordMain } from '../engine/free-source.ts'
 import { createOrderStore } from '../engine/order-store.ts'
+import { newMoment, siteRound } from '../engine/day-limits.ts'
+import { recordHealth } from '../engine/health.ts'
+import { clientIp } from '../engine/rate-limit.ts'
+import { visitorOf } from '../engine/visitor.ts'
 import { parsePromptQuestion } from '../engine/story-questions.ts'
-import { FOLLOW_UP_MAX, NO_MORE_ROUNDS, STORY_MAX, parseExclude, countChars, mergeStory, parseContext, parseFollowUps, type Condition } from '../engine/contract.ts'
+import { FOLLOW_UP_MAX, LIMIT_PERSON, LIMIT_SITE, NO_MORE_ROUNDS, STORY_MAX, parseExclude, countChars, mergeStory, parseContext, parseFollowUps, type Condition } from '../engine/contract.ts'
 
 // Full Hobby-plan ceiling (also mirrored in vercel.json).
 export const maxDuration = 60
@@ -100,6 +104,23 @@ export async function POST(req: Request): Promise<Response> {
       error:
         'ANTHROPIC_API_KEY is not set on the server. Add it as a Vercel environment variable.',
     })
+  }
+
+  // The free tries (2026-11-15): a NEW moment (round 1) is counted per browser (the signed ic_v cookie) with the connection as the backstop; every card round counts for the whole site.
+  // A missing or forged cookie is never a reason to refuse — it is just a new browser. Nothing here touches checkout or payment.
+  {
+    const store = createOrderStore()
+    const lang = parsed.context.language
+    const refuse = (code: 'limit_person' | 'limit_site') => {
+      console.log(`[ichirei-limit] ${JSON.stringify({ route: '/api/select', code })}`)
+      void recordHealth(store, code)
+      return jsonResponse(429, { error: (code === 'limit_person' ? LIMIT_PERSON : LIMIT_SITE)[lang] ?? (code === 'limit_person' ? LIMIT_PERSON : LIMIT_SITE).en, code })
+    }
+    if (ex.retry === 0) {
+      const v = newMoment(visitorOf(req), clientIp(req))
+      if (!v.ok) return refuse(v.code)
+    }
+    if (!(await siteRound(store))) return refuse('limit_site')
   }
 
   // The rounds are counted by the server (gift ceremony ticket, part 0): round 1 hands out a signed ticket, a later round must present it, and round MAX + 1 is refused whatever the page says.

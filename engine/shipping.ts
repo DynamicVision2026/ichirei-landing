@@ -66,6 +66,7 @@ const PAYMENT_QUERY = `query Paid($q: String!, $after: String) {
       createdAt
       cancelledAt
       displayFinancialStatus
+      discountCodes
       customAttributes { key value }
       currentTotalPriceSet { shopMoney { amount currencyCode } presentmentMoney { amount currencyCode } }
       lineItems(first: 5) { nodes { customAttributes { key value } } }
@@ -171,6 +172,9 @@ export interface PaymentInfo {
   state: 'paid' | 'unpaid' | 'cancelled' | 'refunded'
   /** Shopify says PARTIALLY_REFUNDED: it counts as paid only for an order whose payment was already SEEN (`paid_seen_at`), never as a first sighting (engine/paid-seen.ts `paidIn`). */
   partially_refunded?: boolean
+  /** A paid order whose total is 0 (a 100%-off code, 2026-11-15): a normal paid order with revenue 0. `free_code` is the discount code's name when Shopify sends it. */
+  free?: boolean
+  free_code?: string | null
   /** When the payment went through (the 24-hour change window starts here). null while unpaid. */
   paid_at: string | null
   /** What the order actually cost (the order's total after discounts, whole yen; null when Shopify did not say or the currency is not JPY). The dashboard's revenue uses this, never the package price. */
@@ -187,6 +191,8 @@ interface AdminOrderPay {
   createdAt?: string | null
   cancelledAt?: string | null
   displayFinancialStatus?: string | null
+  /** The discount codes used (Shopify's `discountCodes`): the name of a promotion code, never a customer's data. */
+  discountCodes?: string[] | null
   customAttributes?: Attr[] | null
   lineItems?: { nodes?: { customAttributes?: Attr[] | null }[] } | null
   transactions?: { kind?: string | null; status?: string | null; processedAt?: string | null }[] | null
@@ -209,7 +215,7 @@ export function paymentOf(o: AdminOrderPay): PaymentInfo {
   // the buyer's own-currency amount (USD for an English order): shown beside the yen amount, never summed. The yen amount above is always the SHOP's money.
   const pres = o.currentTotalPriceSet?.presentmentMoney
   const buyer = pres?.amount && pres.currencyCode && pres.currencyCode.toUpperCase() !== (money?.currencyCode ?? 'JPY').toUpperCase() ? { amount: pres.amount, currency: pres.currencyCode.toUpperCase() } : null
-  return { state: 'paid', paid_at: pick(['SALE', 'CAPTURE']) ?? pick(['AUTHORIZATION']) ?? o.createdAt ?? null, amount_jpy: amount, ...(buyer ? { amount_buyer: buyer } : {}), ...(status === 'PARTIALLY_REFUNDED' ? { partially_refunded: true } : {}) }
+  return { state: 'paid', paid_at: pick(['SALE', 'CAPTURE']) ?? pick(['AUTHORIZATION']) ?? o.createdAt ?? null, amount_jpy: amount, ...(buyer ? { amount_buyer: buyer } : {}), ...(status === 'PARTIALLY_REFUNDED' ? { partially_refunded: true } : {}), ...(amount === 0 ? { free: true, free_code: (o.discountCodes ?? []).map((c) => String(c).replace(/[^A-Za-z0-9_-]/g, '').slice(0, 40)).find(Boolean) ?? null } : {}) }
 }
 
 export async function readPayments(refs: string[], d: TrackDeps | null, tokens: AdminTokenCache): Promise<PaymentResult> {

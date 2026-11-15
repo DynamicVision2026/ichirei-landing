@@ -23,6 +23,9 @@ export const HEALTH_CODES = [
   'film_blank_or_substituted',
   'film_drawn',
   'order_record_failed',
+  'limit_person',
+  'limit_site',
+  'limit_pictures',
 ] as const
 export type HealthCode = (typeof HEALTH_CODES)[number]
 export const RED_HEALTH_CODES: readonly HealthCode[] = ['en_cart_currency_mismatch', 'needs_attention', 'certificate_no_missing', 'order_record_failed']

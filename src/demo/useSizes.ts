@@ -14,6 +14,8 @@ let soon: PackageId[] = []
 let inflight: Promise<PackageId[]> | null = null
 /** The Thanksgiving sale the server says is on (null = none). */
 let sale: Sale | null = null
+/** The "Days of Thanks" promotion's window (ICHIREI_PROMO_FROM / _UNTIL on the server; null = none). */
+let promo: { from: number; until: number } | null = null
 /** The English page's fixed dollar price (USD_PRICE_EGIFT / _SALE on the server). */
 let usdPrice: UsdPrice = DEFAULT_USD_PRICE
 /** How many sets of characters one story gets (ICHIREI_MAX_ROUNDS on the server; 2 by default). */
@@ -30,6 +32,14 @@ export const cleanUsd = (raw: unknown): UsdPrice => {
   const u = (raw as { usd?: Partial<UsdPrice> } | null)?.usd
   const ok = (n: unknown): n is number => typeof n === 'number' && Number.isFinite(n) && n >= 1 && Math.round(n * 100) === n * 100 // dollars, cents allowed
   return u && ok(u.egift) && ok(u.egift_sale) ? { egift: u.egift, egift_sale: u.egift_sale } : DEFAULT_USD_PRICE
+}
+
+/** Pure: the promotion window in a /api/sizes body (instants in ms), or null. */
+export const cleanPromo = (raw: unknown): { from: number; until: number } | null => {
+  const p = (raw as { promo?: { from?: unknown; until?: unknown } } | null)?.promo
+  const from = typeof p?.from === 'string' ? Date.parse(p.from) : NaN
+  const until = typeof p?.until === 'string' ? Date.parse(p.until) : NaN
+  return Number.isFinite(from) && Number.isFinite(until) && until > from ? { from, until } : null
 }
 
 /** Pure: the sale in a /api/sizes body, or null. */
@@ -61,6 +71,7 @@ export function loadSizes(): Promise<PackageId[]> {
       const sizes = j ? cleanSizes(j) : FALLBACK
       soon = j ? cleanComingSoon(j) : []
       sale = j ? cleanSale(j) : null
+      promo = j ? cleanPromo(j) : null
       usdPrice = j ? cleanUsd(j) : DEFAULT_USD_PRICE
       maxRounds = j ? cleanRounds(j) : 2
       cache = sizes
@@ -152,4 +163,28 @@ export function useMaxRounds(): number {
     }
   }, [])
   return n
+}
+
+/** True only while the "Days of Thanks" promotion runs (from the same single /api/sizes request): the page switches the line on at the start and off at the end by itself. */
+export function usePromoOn(): boolean {
+  const [raw, setRaw] = useState(promo)
+  const [tick, setTick] = useState(0)
+  useEffect(() => {
+    let alive = true
+    void loadSizes().then(() => alive && setRaw(promo))
+    return () => {
+      alive = false
+    }
+  }, [])
+  useEffect(() => {
+    if (!raw) return
+    const now = Date.now()
+    const next = [raw.from, raw.until + 1].filter((t) => t > now).sort((a, b) => a - b)[0]
+    if (next === undefined || next - now > 2_147_000_000) return
+    const t = window.setTimeout(() => setTick((n) => n + 1), next - now + 50)
+    return () => window.clearTimeout(t)
+  }, [raw, tick])
+  void tick
+  const now = Date.now()
+  return !!raw && now >= raw.from && now <= raw.until
 }

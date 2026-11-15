@@ -29,6 +29,9 @@ export interface OrderStat {
   price_jpy: number
   /** An order paid in another currency (USD 17.50): shown beside the yen amount. `price_jpy` (what the shop settles) is what revenue adds up. */
   price_buyer?: { amount: string; currency: string } | null
+  /** A paid order whose total was 0 (a 100%-off promotion code): counted as an order with revenue 0. `free_code` is the code's name when Shopify sent it. */
+  free?: boolean
+  free_code?: string | null
   /** waiting orders only (paid without our site, no gift yet): whole days left before it is "refund due". */
   days_left?: number | null
   collected: boolean

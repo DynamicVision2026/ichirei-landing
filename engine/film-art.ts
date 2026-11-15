@@ -23,6 +23,7 @@
 // incomplete film), ICHIREI_FILM_BG_RETRY_MS (600000: the one background retry; 0 = none), ICHIREI_FILM_CALL_CAP (16: four first, four second tries, four after the first rewrite, four after the second).
 // Logs (no story text): [ichirei-film] film_render_start | film_render_done | film_picture_fail | film_image_error | film_quota_wait | film_check_error | film_check_wait | film_picture_rewrite | film_render_deferred | film_render_retry.
 
+import { promoFilmDailyMax, promoOn } from './promo.ts'
 import Anthropic from '@anthropic-ai/sdk'
 import { readFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
@@ -134,9 +135,11 @@ export const washiUrl = (slot: number) => `/film/washi-${(slot % 2) + 1}.webp`
 const LEASE_MS = 240_000
 const num = (v: string | undefined, d: number) => (Number(v) > 0 ? Number(v) : d)
 export const renderBudgetMs = (env: NodeJS.ProcessEnv = process.env) => num(env.ICHIREI_FILM_RENDER_MS, 120_000)
-export const dailyMax = (env: NodeJS.ProcessEnv = process.env): number => {
+/** Picture sets of previews per day, the whole site: 200 (ICHIREI_FILM_DAILY_MAX) — 300 while the "Days of Thanks" promotion runs (ICHIREI_FILM_DAILY_MAX_PROMO, engine/promo.ts). Never applied to a paid or $0 order. */
+export const dailyMax = (env: NodeJS.ProcessEnv = process.env, at: Date = new Date()): number => {
   const v = env.ICHIREI_FILM_DAILY_MAX?.trim().toLowerCase()
   if (v === 'off' || v === 'none') return Infinity
+  if (promoOn(env, at)) return promoFilmDailyMax(env)
   return num(v, 200)
 }
 
@@ -579,13 +582,14 @@ async function renderLocked(deps: ArtDeps, input: RenderInput): Promise<ArtRecor
 
   // the daily limit (a set is counted once, when it is first drawn)
   const today = dayOf(now())
-  const max = dailyMax(env)
+  const max = dailyMax(env, now())
   if (!retry && !input.paid && Number.isFinite(max)) {
     const used = ((await store.getObject(rendersPath(today)))?.toString('utf8').split('\n').filter(Boolean).length) ?? 0
     if (used >= max) {
       const deferred: ArtRecord = { schema: 'film-art', id, status: 'deferred', started_at: now().toISOString(), date: today, slots: [], rev: input.rev }
       await store.putObject(artPath(id), JSON.stringify(deferred), 'application/json')
       logLine(log, 'film_render_deferred', { used, max })
+      void recordHealth(store, 'limit_pictures', { ref: id, reason: 'site' }, now()) // counted on /ops/stats (a code and a day, nothing more)
       return deferred
     }
   }

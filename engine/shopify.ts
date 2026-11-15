@@ -70,6 +70,12 @@ const CART_CREATE = `mutation CartCreate($input: CartInput!) {
   }
 }`
 
+/**
+ * English carts (2026-11-15): the mutation runs in the context of the United States and English, so the checkout is written in English (without a language the checkout falls back to
+ * the store's primary language, Japanese). The ja / zh mutation is exactly the one above — no @inContext.
+ */
+const CART_CREATE_EN = CART_CREATE.replace('mutation CartCreate($input: CartInput!) {', 'mutation CartCreate($input: CartInput!) @inContext(country: US, language: EN) {')
+
 export interface CartResult {
   cartId: string
   checkoutUrl: string
@@ -97,7 +103,7 @@ async function createCartOnce(
     method: 'POST',
     headers: { 'content-type': 'application/json', 'x-shopify-storefront-access-token': config.token },
     body: JSON.stringify({
-      query: CART_CREATE,
+      query: language === 'en' ? CART_CREATE_EN : CART_CREATE,
       variables: {
         input: {
           // The line carries the attributes (the chosen poem included); the cart repeats order_ref so it also lands on the order itself.
@@ -133,7 +139,13 @@ async function createCartOnce(
   // Production Shopify checkouts are https. (Tests point SHOPIFY_API_BASE at http://127.0.0.1.)
   if (url.protocol !== 'https:' && !config.apiBase.startsWith('http://')) throw new ShopifyError('Shopify returned a non-https checkout URL')
   const currency = cart.cost?.totalAmount?.currencyCode ?? null
-  return { cartId: cart.id, checkoutUrl: cart.checkoutUrl, variantId, currency }
+  // an English checkout link names its language too (locale=en), keeping every query parameter Shopify put on it; ja / zh links are returned as they came
+  let checkoutUrl = cart.checkoutUrl
+  if (language === 'en') {
+    url.searchParams.set('locale', 'en')
+    checkoutUrl = url.toString()
+  }
+  return { cartId: cart.id, checkoutUrl, variantId, currency }
 }
 
 const notUsd = (c: string | null): boolean => !!c && c.toUpperCase() !== 'USD'

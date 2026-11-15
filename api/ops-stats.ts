@@ -11,6 +11,7 @@
 import { readHealth } from '../engine/health.ts'
 import { needsAttention } from '../engine/gift-check.ts'
 import { paidIn, paidSeen } from '../engine/paid-seen.ts'
+import { promoOn, promoWindow } from '../engine/promo.ts'
 import { analyticsDay, tokenHash, type AnalyticsEvent } from '../engine/analytics.ts'
 import { readJsonl, type OrderIndexEntry } from '../engine/egift-ops.ts'
 import { createOrderStore, type OrderStore } from '../engine/order-store.ts'
@@ -79,6 +80,7 @@ export function orderStatOf(entry: OrderIndexEntry, rec: OrderRecord | null, pay
     purpose: p.certificate?.purpose ?? null,
     price_jpy: paidAmount ?? (typeof p.price_jpy === 'number' ? p.price_jpy : 0),
     ...(buyerAmount ? { price_buyer: buyerAmount } : {}),
+    ...(state === 'paid' && paidAmount === 0 ? { free: true, free_code: pay && pay !== 'unverified' ? (pay.free_code ?? null) : null } : {}),
     collected: !!rec.collected_at,
     opened: !!entry.token && openedHashes.has(tokenHash(entry.token)),
     rounds: Math.max(1, ...shown.map((s) => s.set)),
@@ -95,6 +97,8 @@ export interface StatsPayload {
   /** codes-only counters per day and the orders whose gift is incomplete (2026-11-14, B6) */
   health: Awaited<ReturnType<typeof readHealth>> | null
   attention: { count: number }
+  /** While the "Days of Thanks" promotion runs: how many free (total 0) gifts were paid today (Japan time) — shown at the top. null when the promotion is off. */
+  promo: { on: boolean; free_today: number } | null
   /** false when Shopify could not be asked about payments */
   verified: boolean
   now: string
@@ -149,7 +153,9 @@ export async function buildStats(d: OpsDeps, store: OrderStore, env: NodeJS.Proc
     if (r.gift_check?.attention) attention++
     else if (r.gift_check && r.gift_check.missing.length > 0 && needsAttention(r, { complete: false, missing: r.gift_check.missing as never }, now)) attention++
   }
-  return { stats, orders: latest, free, main, health, attention: { count: attention }, verified, now: now.toISOString() }
+  // "Free gifts today": the orders paid today (Japan time) with a total of 0 — shown at the top of the page only while the promotion runs
+  const promo = promoWindow(d.env ?? process.env) ? { on: promoOn(d.env ?? process.env, now), free_today: orders.filter((o) => o.free && o.state === 'paid' && analyticsDay(new Date(Date.parse(o.paid_at ?? o.created_at))) === analyticsDay(now)).length } : null
+  return { stats, orders: latest, free, main, health, attention: { count: attention }, promo, verified, now: now.toISOString() }
 }
 
 const jsonForScript = (v: unknown): string => JSON.stringify(v).replace(/</g, '\\u003c').replace(/>/g, '\\u003e').replace(/&/g, '\\u0026').replace(/\u2028/g, '\\u2028').replace(/\u2029/g, '\\u2029')

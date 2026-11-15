@@ -30,7 +30,7 @@ check('scenes: the "What they receive" picture is one of them (scenes/m1)', /nam
 // ---- wording ---------------------------------------------------------------------------------------------------------------------------------------
 const en = SIZE_COPY.en
 check('wording: package card says "Digital — nothing is mailed"', en.ship.egift === 'Digital — nothing is mailed')
-check('wording: package description is the owner\'s sentence', en.includes.egift === 'Everything arrives as a private link: the opening, a short film of your story with music, the character, the poem and the certificate, plus a card to print at home (PDF).')
+check('wording: package description is the owner\'s sentence', en.includes.egift === 'Everything arrives as a private link: the opening, a short film of your moment with music, the character, the poem and the certificate, plus a card to print at home (PDF).')
 check('wording: the order step says "Your gift", "What this gift says" and "so that your gift can be made"', COPY.en.order.packageLabel === 'Your gift' && COPY.en.order.certificateLabel === 'What this gift says' && /so that your gift can be made\./.test(COPY.en.order.privacy) && !/your piece/.test(COPY.en.order.privacy + COPY.en.order.privacyMemorial) && /Any name you enter is used only to show on the gift\./.test(COPY.en.order.privacy))
 check('wording: the footer / order-step link is "Legal notice and returns" (no Japanese law name)', PREVIEW_COPY.en.legalLink === 'Legal notice and returns' && TEXT.en.legal === 'Legal notice and returns')
 check('wording: Japanese and Chinese are unchanged ("Package" label, 特商法 link)', /特定商取引法/.test(PREVIEW_COPY.ja.legalLink) && !/Your gift/.test(JSON.stringify(COPY.ja.order)))

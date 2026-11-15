@@ -2013,7 +2013,7 @@ const mockPage = async (browser, { onExplain, result, order, track } = {}) => {
   const lim = await mk('ja', { limited: true })
   await pickMain(lim.page, 'ja')
   await lim.page.locator('[data-testid=result-after-order]').waitFor({ timeout: 8000 })
-  check('limit: at the daily limit the result page shows NO pictures block and says 「その場面の絵は、ご注文後にお届けします」; nothing is drawn (no render call)', (await lim.page.locator('[data-testid=result-pictures]').count()) === 0 && (await lim.page.locator('[data-testid=result-after-order]').innerText()) === 'その場面の絵は、ご注文後にお届けします' && lim.pv.render === 0)
+  check('limit: at the daily limit the result page shows NO pictures block and says 「4枚の絵は、贈ると決めたときに描かれます。」; nothing is drawn (no render call)', (await lim.page.locator('[data-testid=result-pictures]').count()) === 0 && (await lim.page.locator('[data-testid=result-after-order]').innerText()) === '4枚の絵は、贈ると決めたときに描かれます。' && lim.pv.render === 0)
   await lim.page.click('[data-testid=result-make]')
   await lim.page.locator('[data-testid=order-form]').waitFor()
   await lim.page.locator('[data-poem-result=tanka][data-state=ready]').waitFor({ timeout: 6000 })
@@ -2052,7 +2052,7 @@ const mockPage = async (browser, { onExplain, result, order, track } = {}) => {
   const af = await mk('ja', { mode: 'allfail' })
   await pickMain(af.page, 'ja')
   await af.page.locator('[data-testid=result-after-order]').waitFor({ timeout: 8000 })
-  check('washi: only when ALL FOUR failed does the result page leave the pictures out and say 「その場面の絵は、ご注文後にお届けします」 (and no tile is shown)', (await af.page.locator('[data-testid=result-pictures]').count()) === 0 && (await af.page.locator('[data-testid=result-after-order]').innerText()) === 'その場面の絵は、ご注文後にお届けします' && (await af.page.locator('[data-testid=washi-tile]').count()) === 0)
+  check('washi: only when ALL FOUR failed does the result page leave the pictures out and say 「4枚の絵は、贈ると決めたときに描かれます。」 (and no tile is shown)', (await af.page.locator('[data-testid=result-pictures]').count()) === 0 && (await af.page.locator('[data-testid=result-after-order]').innerText()) === '4枚の絵は、贈ると決めたときに描かれます。' && (await af.page.locator('[data-testid=washi-tile]').count()) === 0)
   await af.page.close()
   // the other two languages: the waiting line, no sample mark, the owner's headings, the refund line on the order step
   for (const [lang, heading, note] of [['zh-Hant', '你的禮物', '取消（全額退款）僅限付款完成後24小時內'], ['en', 'Your gift', 'You can cancel for a full refund within 24 hours of payment']]) {
@@ -4332,6 +4332,73 @@ for (const [lang, locale, text] of [['en', 'en-US', 'Your gift is being finished
   check(`buyer page (${lang}): when the order cannot be read (503) the page says "${text}" — no link, no collect button`, (await page.locator('[data-testid=buyer-finishing]').innerText()).trim() === text && (await page.locator('[data-testid=give-link], [data-testid=collect-button], [data-testid=sender-panel]').count()) === 0, await page.locator('body').innerText())
   check(`no page errors (run 29, buyer ${lang})`, errs.length === 0, errs.join('; '))
   await ctx.close()
+}
+
+// ---------- Run 30 (2026-11-15, hotfix): the "Days of Thanks" line above the order button (English only, only between its dates), the /legal cookie sentence, and the free-try limit messages on the page ----------
+{
+  const promo = { from: '2026-11-17T17:00:00.000Z', until: '2026-11-26T04:59:59.000Z' }
+  const PROMO_TEXT = "Have today's code? Enter it at checkout. The first 100 gifts each day are on us (one per person per day, through November 25)."
+  const LOCALE30 = { ja: 'ja-JP', 'zh-Hant': 'zh-TW', en: 'en-US' }
+  const reach = async (page, lang) => {
+    await page.locator('#write [data-testid=story-input]').fill(lang === 'en' ? 'She left the porch light on every night until I got home, and she never once mentioned it.' : STORY)
+    await pickContext(page)
+    await page.click(`#write >> text=${GO[lang]}`)
+    await page.waitForSelector('[data-all-revealed=yes]', { timeout: 15000 })
+    await page.locator('article[data-slot=main]').click()
+    await page.locator('article[data-slot=main]').locator(`text=${GIVE[lang]}`).click()
+    await toOrder(page)
+    await page.waitForTimeout(400)
+  }
+  for (const [mode, time, shown] of [['inside the dates', '2026-11-20T15:00:00Z', true], ['before the dates', '2026-11-16T15:00:00Z', false], ['after the dates', '2026-11-27T15:00:00Z', false]]) {
+    for (const lang of ['en', 'ja', 'zh-Hant']) {
+      if (lang !== 'en' && mode !== 'inside the dates') continue
+      const ctx = await browser.newContext({ locale: LOCALE30[lang], viewport: { width: 390, height: 844 } })
+      const page = await ctx.newPage()
+      const errs = []
+      page.on('pageerror', (e) => errs.push(String(e)))
+      await page.clock.install({ time: new Date(time) })
+      await page.route('**/api/sizes', (r) => r.fulfill({ json: { sizes: ['egift', 'simple', 'standard'], coming_soon: ['simple', 'standard'], promo } }))
+      await page.route('**/api/rates', (r) => r.fulfill({ json: { jpy_per_usd: 155 } }))
+      await page.route('**/api/analytics', (r) => r.fulfill({ status: 204, body: '' }))
+      await page.route('**/api/log', (r) => r.fulfill({ status: 204, body: '' }))
+      await page.route('**/api/explain', (r) => r.fulfill({ json: { explanation: 'ok' } }))
+      await page.route('**/api/select', async (route) => { const body = JSON.parse(route.request().postData() ?? '{}'); await route.fulfill({ json: shapeRound(lang === 'en' ? { ...FIXTURE, language: 'en', inscription_script: null, candidates: FIXTURE.candidates.map((c, i) => ({ ...c, reading: i === 0 ? 'akari' : `y${i}`, meaning: i === 0 ? 'lamp' : `m${i}`, eliminated: false, eliminated_reason: null })) } : lang === 'zh-Hant' ? { ...FIXTURE, language: 'zh-Hant', inscription_script: 'traditional' } : FIXTURE, body) }) })
+      await page.goto(`http://localhost:5173/${lang === 'en' ? 'en' : ''}?lang=${lang}`, { waitUntil: 'networkidle' })
+      await page.waitForTimeout(500)
+      await reach(page, lang)
+      const line = page.locator('[data-testid=promo-line]')
+      if (lang === 'en') {
+        check(`promo (en, ${mode}): ${shown ? 'the one line "Have today\'s code? …through November 25)." sits right above "Continue to payment"' : 'no promo line'}`, shown ? (await line.count()) === 1 && (await line.innerText()).trim() === PROMO_TEXT && (await page.evaluate(() => { const l = document.querySelector('[data-testid=promo-line]'); const b = document.querySelector('[data-testid=order-submit]'); return !!l && !!b && !!(l.compareDocumentPosition(b) & 4) })) : (await line.count()) === 0)
+        if (shown) { await line.scrollIntoViewIfNeeded(); await page.waitForTimeout(300); await page.screenshot({ path: `${SHOTS}/promo-order-en.png` }) }
+      } else {
+        check(`promo (${lang}): nothing — ja and zh show no promo line`, (await line.count()) === 0)
+      }
+      check(`no page errors (run 30, promo ${lang} ${mode})`, errs.length === 0, errs.join('; '))
+      await ctx.close()
+    }
+  }
+  // /legal: the one-cookie sentence, no banner
+  for (const [lang, locale, text] of [['ja', 'ja-JP', '無料のお試し回数を管理するため、機能上必要なCookieを1つ使用します。'], ['zh-Hant', 'zh-TW', '為了管理免費試用次數，我們使用一個功能上必要的Cookie。'], ['en', 'en-US', 'We use one functional cookie to limit free previews.']]) {
+    const ctx = await browser.newContext({ locale, viewport: { width: 390, height: 844 } })
+    const page = await ctx.newPage()
+    await page.route('**/api/analytics', (r) => r.fulfill({ status: 204, body: '' }))
+    await page.goto(`http://localhost:5173/legal?lang=${lang}`, { waitUntil: 'networkidle' })
+    check(`legal (${lang}): the privacy section carries the one-cookie sentence "${text}" and there is no cookie banner`, ((await page.locator('[data-testid=legal-privacy]').textContent()) ?? '').trim() === text && (await page.locator('[role=dialog], [data-testid*=cookie], .cookieBanner').count()) === 0)
+    await ctx.close()
+  }
+  // the limit messages: a 429 from /api/select shows the owner's sentence, never "try again tomorrow" on a payment
+  for (const [lang, code, text] of [['ja', 'limit_person', '本日はここまでです。明日またお試しください。'], ['en', 'limit_person', "That's all for today. Please try again tomorrow."], ['en', 'limit_site', "We're very busy right now. Please try again a little later."], ['zh-Hant', 'limit_site', '目前使用人數較多，請稍後再試。']]) {
+    const f = await mockPage(browser)
+    await f.page.route('**/api/select', (r) => r.fulfill({ status: 429, json: { error: text, code } }))
+    await f.page.goto(`http://localhost:5173/${lang === 'en' ? 'en' : ''}?lang=${lang}`, { waitUntil: 'networkidle' })
+    await f.page.waitForTimeout(400)
+    await f.page.locator('#write [data-testid=story-input]').fill(lang === 'en' ? 'She left the porch light on every night until I got home, and she never once mentioned it.' : STORY)
+    await pickContext(f.page)
+    await f.page.click(`#write >> text=${GO[lang]}`)
+    await f.page.waitForTimeout(1500)
+    check(`limit (${lang}, ${code}): the page shows 「${text}」`, (await f.page.locator('body').innerText()).includes(text))
+    await f.page.close()
+  }
 }
 
 await browser.close()

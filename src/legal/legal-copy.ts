@@ -27,6 +27,8 @@ export interface LegalCopy {
   /** The wooden sizes' part of the delivery row: shown only while the wooden sizes are on sale (not while they are "coming soon"). */
   deliveryWood: string
   faqTitle: string
+  /** The privacy section (2026-11-15): the one functional cookie. No banner. */
+  privacy: { heading: string; body: string }
   faq: { q: string; a: string }[]
   back: string
 }
@@ -61,6 +63,7 @@ export const LEGAL: Record<RevealLang, LegalCopy> = {
       { heading: '当方の不備', body: '木札・版木の破損、誤った字、誤印刷など当方の不備があった場合は、お届けから14日以内に写真を添えてメールでご連絡ください。作り直し、または返金いたします（返送料は当方負担）。eギフトのページが正常に表示されない場合は修正し、修正できない場合は返金いたします。' },
       { heading: '配送について', body: '配送中の紛失は、追跡で確認のうえ再発送または返金いたします。ご入力いただいた住所の誤りや長期不在などで返送された場合、再発送の送料はお客様のご負担となります。海外発送で発生する関税・輸入税は、受け取る方のご負担となります。' },
     ],
+    privacy: { heading: 'プライバシー', body: '無料のお試し回数を管理するため、機能上必要なCookieを1つ使用します。' },
     faqTitle: 'よくあるご質問',
     faq: [
       { q: '注文後に字を変えられますか？', a: 'お支払い後の内容の変更（字・歌・お名前・メッセージなど）はお受けしていません。別の内容をご希望の場合は、キャンセルのうえ、あらためてご注文ください。' },
@@ -95,6 +98,7 @@ export const LEGAL: Record<RevealLang, LegalCopy> = {
       { heading: '我方疏失', body: '如木牌、版木有破損、刻錯字或印刷錯誤等我方疏失，請於送達後14日內附上照片來信告知，我們將重新製作或退款（退回運費由我方負擔）。e禮物頁面無法正常顯示時，我們會修正；無法修正時將退款。' },
       { heading: '關於配送', body: '運送途中遺失時，經追蹤確認後將重新寄送或退款。若因您填寫的地址有誤或長期無人收件而遭退回，重新寄送的運費由您負擔。寄送海外時產生的關稅與進口稅，由收件人負擔。' },
     ],
+    privacy: { heading: '隱私', body: '為了管理免費試用次數，我們使用一個功能上必要的Cookie。' },
     faqTitle: '常見問題',
     faq: [
       { q: '下單後可以換字嗎？', a: '付款後恕不更改內容（字、詩、姓名、訊息等）。如需不同內容，請先取消，再重新下單。' },
@@ -129,6 +133,7 @@ export const LEGAL: Record<RevealLang, LegalCopy> = {
       { heading: 'If we made a mistake', body: 'If a wooden tag or block arrives damaged, with the wrong character or a misprint, email us a photo within 14 days of delivery and we\'ll remake it or refund you (we cover return shipping). If an e-gift page doesn\'t display properly, we\'ll fix it, or refund you if we can\'t.' },
       { heading: 'Delivery', body: 'If a parcel is lost in transit, we\'ll check the tracking and reship or refund. If it\'s returned because of an incorrect address you entered or because no one collected it, reshipping is at your cost. Import duties and taxes on overseas deliveries are paid by the recipient.' },
     ],
+    privacy: { heading: 'Privacy', body: 'We use one functional cookie to limit free previews.' },
     faqTitle: 'Questions',
     faq: [
       { q: 'Can I change the character after I order?', a: 'We can\'t change an order after payment (character, poem, names or message). If you\'d like something different, cancel and place a new order.' },

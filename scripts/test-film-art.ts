@@ -499,6 +499,17 @@ const eventsOf = (logs: string[]) => logs.map((l) => JSON.parse(l.replace('[ichi
   next.deps.now = () => new Date('2026-10-29T03:00:00Z')
   const later = await ensureArt(next.deps, input(mkId('daythreedaythreedayt22')))
   check('(6) the same day it stays deferred (no spend); the next day the same film is drawn', same.status === 'deferred' && later.status === 'done' && next.imageCalls() === 4)
+  // 2026-11-15: a PAID (or $0) order is never held back by the site cap — a preview that got no pictures is drawn in full after checkout, even with the day's cap reached
+  const capStore = mem()
+  const capped = rig({ store: capStore, env: { ICHIREI_FILM_DAILY_MAX: '1' } })
+  await ensureArt(capped.deps, input(mkId('capfirstcapfirstcapfi22')))
+  const pid = mkId('capdraftcapdraftcapdr2')
+  const preview = await ensureArt(capped.deps, input(pid))
+  const before = capped.imageCalls()
+  const paidRun = await ensureArt(capped.deps, { ...input(pid), paid: true })
+  check('(6) at the site cap a PREVIEW gets no pictures (deferred) — but the same film, once its order is paid (or $0), is drawn: all four, and the cap never applies to it', preview.status === 'deferred' && paidRun.status === 'done' && paidRun.slots.filter((x) => x === 'ai').length === 4 && capped.imageCalls() - before === 4, `${preview.status} ${paidRun.status} ${capped.imageCalls() - before}`)
+  const promoEnv = { ICHIREI_FILM_DAILY_MAX: '200', ICHIREI_PROMO_FROM: '2026-11-17T12:00:00-05:00', ICHIREI_PROMO_UNTIL: '2026-11-25T23:59:59-05:00' } as never
+  check('(6) the cap for previews: 300 while the "Days of Thanks" promotion runs, 200 outside it', dailyMax(promoEnv, new Date('2026-11-20T12:00:00Z')) === 300 && dailyMax(promoEnv, new Date('2026-11-27T12:00:00Z')) === 200)
 }
 
 // ---- 7. private storage -------------------------------------------------------------------------------------------------------------------------------------------

@@ -231,7 +231,7 @@ try {
         last = r.status
         if (r.status === 429) break
       }
-      check('rate limit: default is 12 per hour per IP — the 13th request is 429', last === 429, String(last))
+      check('rate limit: the hourly per-address brake on /api/select is OFF by default now (2026-11-15: the free tries are counted per browser, per address and for the site) — 13 requests in a row are never 429', last === 400, String(last))
     } finally {
       await dflt.stop()
     }
@@ -407,6 +407,53 @@ try {
       check('limits: a small body is still accepted (204)', (await hit('/api/log', '203.0.113.82', '1.1.1.1', '{"event":"x"}')).status === 204)
     } finally {
       await lim.stop()
+    }
+  }
+
+  // ---- L. the free tries per browser (2026-11-15): the ic_v cookie, 20 new moments a day per browser (2 here), the address backstop (4 here), the site's card rounds a day (2 here); never a block on paying ---
+  {
+    const lim = await startServer({ upstreamUrl: upstream.url, env: { ICHIREI_RATES: 'off', ICHIREI_MOMENT_DAILY_MAX: '2', ICHIREI_MOMENT_IP_DAILY_MAX: '4', ICHIREI_EXPLAIN_LIMIT: 'off' } })
+    try {
+      const sel = (ip, cookie, lang = 'ja') => post(lim.url, '/api/select', { story: STORY, condition: 'A', ...GOLDEN_CONTEXT, language: lang }, { headers: { 'content-type': 'application/json', 'x-forwarded-for': `6.6.6.6, ${ip}`, ...(cookie ? { cookie } : {}) } })
+      const done = async (r) => { try { await readNdjson(r) } catch {} }
+      const page = await fetch(lim.url + '/', { headers: { accept: 'text/html', 'x-forwarded-for': '203.0.113.90' } })
+      const pc = page.headers.get('set-cookie') ?? ''
+      check('limits: a first page visit sets the first-party cookie ic_v — HttpOnly, Secure, SameSite=Lax, one year', /^ic_v=V[\w-]{22}\.[\w-]{22};/.test(pc) && /HttpOnly/i.test(pc) && /Secure/i.test(pc) && /SameSite=Lax/i.test(pc) && /Max-Age=31536000/.test(pc), pc)
+      const a1 = await sel('203.0.113.91')
+      const jar = (a1.headers.get('set-cookie') ?? '').split(';')[0]
+      await done(a1)
+      check('limits: the first /api/select from a new browser answers and hands it a cookie', a1.status === 200 && /^ic_v=V/.test(jar), `${a1.status} ${jar}`)
+      const a2 = await sel('203.0.113.91', jar)
+      await done(a2)
+      const a3 = await sel('203.0.113.91', jar)
+      const a3j = await a3.json()
+      check('limits: the 3rd new moment of one browser in a day (limit 2 here) gets 429 limit_person with the owner\'s ja message', a2.status === 200 && a3.status === 429 && a3j.code === 'limit_person' && a3j.error === '本日はここまでです。明日またお試しください。', JSON.stringify(a3j))
+      const en = await sel('203.0.113.91', jar, 'en')
+      check('limits: …and the English message "That\'s all for today. Please try again tomorrow."', (await en.json()).error === "That's all for today. Please try again tomorrow.")
+      const b1 = await sel('203.0.113.91')
+      await done(b1)
+      check('limits: a second browser on the same address is not blocked (until the address backstop)', b1.status === 200)
+      const forged = await sel('203.0.113.92', 'ic_v=Vxxxxxxxxxxxxxxxxxxxxxx.yyyyyyyyyyyyyyyyyyyyyy')
+      await done(forged)
+      check('limits: a forged cookie gets a NEW token, not a block', forged.status === 200 && /^ic_v=V/.test(forged.headers.get('set-cookie') ?? ''))
+      const b2 = await sel('203.0.113.91')
+      await done(b2)
+      const b3 = await sel('203.0.113.91')
+      check('limits: the address backstop (4 here): the fifth new moment from one address in a day is refused (limit_person)', b2.status === 200 && b3.status === 429 && (await b3.json()).code === 'limit_person')
+      const order = await post(lim.url, '/api/order', {}, { headers: { 'content-type': 'application/json', 'x-forwarded-for': '6.6.6.6, 203.0.113.91' } })
+      check('limits: checkout is never limited by the free tries — /api/order from the limited address is answered by the order handler itself (not 429)', order.status !== 429, String(order.status))
+    } finally {
+      await lim.stop()
+    }
+    const lim2 = await startServer({ upstreamUrl: upstream.url, env: { ICHIREI_RATES: 'off', ICHIREI_SELECT_DAILY_MAX: '2', ICHIREI_EXPLAIN_LIMIT: 'off' } })
+    try {
+      const sel = (ip, lang = 'ja') => post(lim2.url, '/api/select', { story: STORY, condition: 'A', ...GOLDEN_CONTEXT, language: lang }, { headers: { 'content-type': 'application/json', 'x-forwarded-for': `6.6.6.6, ${ip}` } })
+      for (const ip of ['203.0.113.100', '203.0.113.101']) { const r = await sel(ip); await readNdjson(r).catch(() => {}) }
+      const over = await sel('203.0.113.102', 'en')
+      const oj = await over.json()
+      check('limits: the whole site\'s card rounds a day (2 here): the next one gets 429 limit_site — "We\'re very busy right now. Please try again a little later."', over.status === 429 && oj.code === 'limit_site' && oj.error === "We're very busy right now. Please try again a little later.", JSON.stringify(oj))
+    } finally {
+      await lim2.stop()
     }
   }
 
