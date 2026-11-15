@@ -135,7 +135,7 @@ export function fromWebhook(body: unknown): ShopifyOrderFacts | null {
   return {
     name: typeof o.name === 'string' ? o.name : null,
     email: typeof o.email === 'string' ? o.email : typeof o.contact_email === 'string' ? o.contact_email : null,
-    paid: ['paid', 'partially_paid', 'authorized', 'partially_refunded'].includes(status),
+    paid: status === 'paid', // (same rule as the admin read above)
     cancelled: typeof o.cancelled_at === 'string' && o.cancelled_at !== '',
     paidAt: typeof o.processed_at === 'string' ? o.processed_at : null,
     createdAt: typeof o.created_at === 'string' ? o.created_at : null,
@@ -169,7 +169,7 @@ export function fromAdmin(o: AdminWaitingOrder): ShopifyOrderFacts {
   return {
     name: o.name ?? null,
     email: o.email ?? null,
-    paid: ['PAID', 'PARTIALLY_PAID', 'AUTHORIZED', 'PARTIALLY_REFUNDED'].includes(status),
+    paid: status === 'PAID', // paid means paid (2026-11-14): AUTHORIZED, PARTIALLY_PAID and PARTIALLY_REFUNDED are not a payment (a waiting order is one we have never seen paid)
     cancelled: !!o.cancelledAt,
     paidAt: ok.map((t) => t.processedAt as string).sort()[0] ?? null,
     createdAt: o.createdAt ?? null,

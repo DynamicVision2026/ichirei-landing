@@ -12,6 +12,9 @@ export const ORDER_REF_PATTERN = /^IC-\d{8}-[A-Z0-9]{8}$/
 /** True once the payment of this order was seen (an order claimed from a waiting Shopify order was paid there: Shopify's own record showed it paid). */
 export const paidSeen = (rec: OrderRecord | null | undefined): boolean => !!rec && (!!rec.paid_seen_at || !!rec.claim || !!rec.collected_at)
 
+/** Whether a payment lookup counts as PAID for this order: `paid`, and a partial refund only when the payment was already seen (`paid_seen_at`) — a first sighting needs PAID itself. */
+export const paidIn = (pay: PaymentInfo | null | undefined, rec: OrderRecord | null | undefined): boolean => !!pay && pay.state === 'paid' && (!pay.partially_refunded || !!rec?.paid_seen_at)
+
 /** The order reference our checkout attached to a Shopify order (cart attribute or line property), or null. */
 export function orderRefOfFacts(o: ShopifyOrderFacts): string | null {
   const all = [...o.attrs, ...o.lines.flatMap((l) => l.props)]
@@ -33,6 +36,6 @@ export async function markPaidSeen(store: OrderStore, rec: OrderRecord, paidAt: 
 
 /** A lookup result that proves payment (Shopify says paid): record it. Anything else (unverified, not found, unpaid, cancelled) changes nothing. */
 export async function notePayment(store: OrderStore | null, rec: OrderRecord, pay: PaymentInfo | null | 'unverified', now: Date): Promise<OrderRecord> {
-  if (!store || rec.paid_seen_at || !pay || pay === 'unverified' || pay.state !== 'paid') return rec
+  if (!store || rec.paid_seen_at || !pay || pay === 'unverified' || !paidIn(pay, rec)) return rec
   return markPaidSeen(store, rec, pay.paid_at, now)
 }

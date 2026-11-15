@@ -55,15 +55,20 @@ async function loadGift(token: string, d: GiftDeps): Promise<{ status: 200; gift
   }
 }
 
-/** Whether the buyer has collected the gift (2026-11-06) and whether the order was cancelled: read from the order record (an older order, or one with no record, is open as before). */
-async function gateOf(g: GiftRecord, d: GiftDeps): Promise<OrderGate> {
-  if (!d.store || !g.order_ref) return 'ok'
+/**
+ * Whether the buyer has collected the gift (2026-11-06) and whether the order was cancelled: read from the order record. Fails closed (2026-11-14): a missing record (or no
+ * store) is held — the sealed envelope — never open, except for a gift from before order records existed whose own record says `collected_at`; a read that throws is `error`
+ * (every caller answers 503).
+ */
+async function gateOf(g: GiftRecord, d: GiftDeps): Promise<OrderGate | 'error'> {
+  if (!d.store || !g.order_ref) return orderGate(null, g.collected_at)
   try {
-    return orderGate((await d.store.get(g.order_ref)) as never)
+    return orderGate((await d.store.get(g.order_ref)) as never, g.collected_at)
   } catch {
-    return 'ok'
+    return 'error'
   }
 }
+const busy = () => json(503, { error: 'unavailable' }, { 'cache-control': 'no-store' })
 const gone = (g: GiftRecord) => json(410, { error: 'unavailable', language: g.language }, { 'cache-control': 'no-store' })
 const notCollected = () => json(403, { error: 'not_collected' }, { 'cache-control': 'no-store' })
 
@@ -230,6 +235,7 @@ export function createGiftHandlers(deps: () => GiftDeps) {
       const r = await loadGift(token, d)
       if (r.status !== 200) return json(r.status, { error: r.status === 404 ? 'not_found' : 'unavailable' }, { 'cache-control': 'no-store' })
       const gate = await gateOf(r.gift, d)
+      if (gate === 'error') return busy()
       if (gate === 'cancelled') return gone(r.gift)
       // not collected yet: the sealed envelope with no open button (the buyer's own preview sees the final gift)
       if (gate === 'pending' && !senderPreview(r.gift, preview)) return json(200, arrivingView(r.gift), noStore)
@@ -245,6 +251,7 @@ export function createGiftHandlers(deps: () => GiftDeps) {
       const r = await loadGift(token, d)
       if (r.status !== 200) return json(r.status, { error: r.status === 404 ? 'not_found' : 'unavailable' }, { 'cache-control': 'no-store' })
       const gate = await gateOf(r.gift, d)
+      if (gate === 'error') return busy()
       if (gate === 'cancelled') return gone(r.gift)
       if (gate === 'pending' && !senderPreview(r.gift, preview)) return notCollected()
       if (closed(r.gift, d, preview)) return json(403, { error: 'locked' }, { 'cache-control': 'no-store' })
@@ -267,6 +274,7 @@ export function createGiftHandlers(deps: () => GiftDeps) {
       if (r.status !== 200) return json(r.status, { error: r.status === 404 ? 'not_found' : 'unavailable' }, { 'cache-control': 'no-store' })
       if (!ANIMATION_ID_PATTERN.test(r.gift.animation_id)) return json(404, { error: 'not_found' }, { 'cache-control': 'no-store' })
       const gate = await gateOf(r.gift, d)
+      if (gate === 'error') return busy()
       if (gate === 'cancelled') return gone(r.gift)
       if (gate === 'pending' && !senderPreview(r.gift, preview)) return notCollected()
       if (closed(r.gift, d, preview)) return json(403, { error: 'locked' }, { 'cache-control': 'no-store' })
@@ -337,7 +345,7 @@ export function createGiftHandlers(deps: () => GiftDeps) {
       const r = await loadGift(token, d)
       if (r.status !== 200) return json(r.status, { error: r.status === 404 ? 'not_found' : 'unavailable' }, { 'cache-control': 'no-store' })
       if (closed(r.gift, d, preview)) return json(403, { error: 'locked' }, { 'cache-control': 'no-store' })
-      { const gate = await gateOf(r.gift, d); if (gate === 'cancelled') return gone(r.gift); if (gate === 'pending') return notCollected() }
+      { const gate = await gateOf(r.gift, d); if (gate === 'cancelled') return gone(r.gift); if (gate === 'pending') return notCollected(); if (gate === 'error') return busy() }
       return videoMake(r, d)
     },
     async filmGet(token: string, req: Request, preview?: string | null): Promise<Response> {
@@ -345,7 +353,7 @@ export function createGiftHandlers(deps: () => GiftDeps) {
       const r = await loadGift(token, d)
       if (r.status !== 200) return json(r.status, { error: r.status === 404 ? 'not_found' : 'unavailable' }, { 'cache-control': 'no-store' })
       if (closed(r.gift, d, preview)) return json(403, { error: 'locked' }, { 'cache-control': 'no-store' })
-      { const gate = await gateOf(r.gift, d); if (gate === 'cancelled') return gone(r.gift); if (gate === 'pending') return notCollected() }
+      { const gate = await gateOf(r.gift, d); if (gate === 'cancelled') return gone(r.gift); if (gate === 'pending') return notCollected(); if (gate === 'error') return busy() }
       return videoGet(r, d, req)
     },
     async cardPdf(token: string, preview?: string | null): Promise<Response> {
@@ -353,21 +361,21 @@ export function createGiftHandlers(deps: () => GiftDeps) {
       const r = await loadGift(token, d)
       if (r.status !== 200) return json(r.status, { error: r.status === 404 ? 'not_found' : 'unavailable' }, { 'cache-control': 'no-store' })
       if (closed(r.gift, d, preview)) return json(403, { error: 'locked' }, { 'cache-control': 'no-store' })
-      { const gate = await gateOf(r.gift, d); if (gate === 'cancelled') return gone(r.gift); if (gate === 'pending') return notCollected() }
+      { const gate = await gateOf(r.gift, d); if (gate === 'cancelled') return gone(r.gift); if (gate === 'pending') return notCollected(); if (gate === 'error') return busy() }
       return cardResponse(r, d)
     },
     async filmMakeForSender(animationId: string): Promise<Response> {
       const d = deps()
       const f = await bySender(animationId, d)
       if (f instanceof Response) return f
-      { const gate = await gateOf(f.gift, d); if (gate === 'cancelled') return gone(f.gift); if (gate === 'pending') return notCollected() }
+      { const gate = await gateOf(f.gift, d); if (gate === 'cancelled') return gone(f.gift); if (gate === 'pending') return notCollected(); if (gate === 'error') return busy() }
       return videoMake(f, d)
     },
     async filmGetForSender(animationId: string, req: Request): Promise<Response> {
       const d = deps()
       const f = await bySender(animationId, d)
       if (f instanceof Response) return f
-      { const gate = await gateOf(f.gift, d); if (gate === 'cancelled') return gone(f.gift); if (gate === 'pending') return notCollected() }
+      { const gate = await gateOf(f.gift, d); if (gate === 'cancelled') return gone(f.gift); if (gate === 'pending') return notCollected(); if (gate === 'error') return busy() }
       return videoGet(f, d, req)
     },
     /** The sender sets (or clears) the day the envelope opens, after paying and collecting (English share sheet, 2026-11-12). Only while the gift is not cancelled; the day is today or later, at most OPEN_DATE_MAX_DAYS ahead. */
@@ -375,7 +383,7 @@ export function createGiftHandlers(deps: () => GiftDeps) {
       const d = deps()
       const f = await bySender(animationId, d)
       if (f instanceof Response) return f
-      { const gate = await gateOf(f.gift, d); if (gate === 'cancelled') return gone(f.gift); if (gate === 'pending') return notCollected() }
+      { const gate = await gateOf(f.gift, d); if (gate === 'cancelled') return gone(f.gift); if (gate === 'pending') return notCollected(); if (gate === 'error') return busy() }
       const raw = (body as { open_date?: unknown } | null)?.open_date
       const rawTz = (body as { open_tz?: unknown } | null)?.open_tz
       const rawTime = (body as { open_time?: unknown } | null)?.open_time
@@ -411,21 +419,21 @@ export function createGiftHandlers(deps: () => GiftDeps) {
       const r = await loadGift(token, d)
       if (r.status !== 200) return json(r.status, { error: r.status === 404 ? 'not_found' : 'unavailable' }, { 'cache-control': 'no-store' })
       if (closed(r.gift, d, preview)) return json(403, { error: 'locked' }, { 'cache-control': 'no-store' })
-      { const gate = await gateOf(r.gift, d); if (gate === 'cancelled') return gone(r.gift); if (gate === 'pending') return notCollected() }
+      { const gate = await gateOf(r.gift, d); if (gate === 'cancelled') return gone(r.gift); if (gate === 'pending') return notCollected(); if (gate === 'error') return busy() }
       return keepsakeCardResponse(r)
     },
     async keepsakeCardForSender(animationId: string): Promise<Response> {
       const d = deps()
       const f = await bySender(animationId, d)
       if (f instanceof Response) return f
-      { const gate = await gateOf(f.gift, d); if (gate === 'cancelled') return gone(f.gift); if (gate === 'pending') return notCollected() }
+      { const gate = await gateOf(f.gift, d); if (gate === 'cancelled') return gone(f.gift); if (gate === 'pending') return notCollected(); if (gate === 'error') return busy() }
       return keepsakeCardResponse(f)
     },
     async cardPdfForSender(animationId: string): Promise<Response> {
       const d = deps()
       const f = await bySender(animationId, d)
       if (f instanceof Response) return f
-      { const gate = await gateOf(f.gift, d); if (gate === 'cancelled') return gone(f.gift); if (gate === 'pending') return notCollected() }
+      { const gate = await gateOf(f.gift, d); if (gate === 'cancelled') return gone(f.gift); if (gate === 'pending') return notCollected(); if (gate === 'error') return busy() }
       return cardResponse(f, d)
     },
 
@@ -435,7 +443,7 @@ export function createGiftHandlers(deps: () => GiftDeps) {
       const r = await loadGift(token, d)
       if (r.status !== 200) return json(r.status, { error: r.status === 404 ? 'not_found' : 'unavailable' }, { 'cache-control': 'no-store' })
       if (closed(r.gift, d, preview)) return json(403, { error: 'locked' }, { 'cache-control': 'no-store' })
-      { const gate = await gateOf(r.gift, d); if (gate === 'cancelled') return gone(r.gift); if (gate === 'pending') return notCollected() }
+      { const gate = await gateOf(r.gift, d); if (gate === 'cancelled') return gone(r.gift); if (gate === 'pending') return notCollected(); if (gate === 'error') return busy() }
       return scrollResponse(r.gift, r.anim, ext, d)
     },
 
@@ -448,7 +456,7 @@ export function createGiftHandlers(deps: () => GiftDeps) {
         if (!isAnimationRecord(a) || !a.gift_token) return json(404, { error: 'not_found' }, { 'cache-control': 'no-store' })
         const r = await loadGift(a.gift_token, d)
         if (r.status !== 200) return json(404, { error: 'not_found' }, { 'cache-control': 'no-store' })
-        { const gate = await gateOf(r.gift, d); if (gate === 'cancelled') return gone(r.gift); if (gate === 'pending') return notCollected() }
+        { const gate = await gateOf(r.gift, d); if (gate === 'cancelled') return gone(r.gift); if (gate === 'pending') return notCollected(); if (gate === 'error') return busy() }
         return scrollResponse(r.gift, r.anim, ext, d)
       } catch {
         return json(503, { error: 'unavailable' }, { 'cache-control': 'no-store' })
@@ -461,7 +469,7 @@ export function createGiftHandlers(deps: () => GiftDeps) {
       const r = await loadGift(token, d)
       if (r.status !== 200) return json(r.status, { error: r.status === 404 ? 'not_found' : 'unavailable' }, { 'cache-control': 'no-store' })
       if (closed(r.gift, d, null)) return json(403, { error: 'locked' }, { 'cache-control': 'no-store' })
-      { const gate = await gateOf(r.gift, d); if (gate === 'cancelled') return gone(r.gift); if (gate === 'pending') return notCollected() }
+      { const gate = await gateOf(r.gift, d); if (gate === 'cancelled') return gone(r.gift); if (gate === 'pending') return notCollected(); if (gate === 'error') return busy() }
       return shareFilmMake(r, d)
     },
     async shareFilmGet(token: string, req: Request): Promise<Response> {
@@ -469,7 +477,7 @@ export function createGiftHandlers(deps: () => GiftDeps) {
       const r = await loadGift(token, d)
       if (r.status !== 200) return json(r.status, { error: r.status === 404 ? 'not_found' : 'unavailable' }, { 'cache-control': 'no-store' })
       if (closed(r.gift, d, null)) return json(403, { error: 'locked' }, { 'cache-control': 'no-store' })
-      { const gate = await gateOf(r.gift, d); if (gate === 'cancelled') return gone(r.gift); if (gate === 'pending') return notCollected() }
+      { const gate = await gateOf(r.gift, d); if (gate === 'cancelled') return gone(r.gift); if (gate === 'pending') return notCollected(); if (gate === 'error') return busy() }
       return shareFilmGet(r, d, req)
     },
     async shareCard(token: string): Promise<Response> {
@@ -477,28 +485,28 @@ export function createGiftHandlers(deps: () => GiftDeps) {
       const r = await loadGift(token, d)
       if (r.status !== 200) return json(r.status, { error: r.status === 404 ? 'not_found' : 'unavailable' }, { 'cache-control': 'no-store' })
       if (closed(r.gift, d, null)) return json(403, { error: 'locked' }, { 'cache-control': 'no-store' })
-      { const gate = await gateOf(r.gift, d); if (gate === 'cancelled') return gone(r.gift); if (gate === 'pending') return notCollected() }
+      { const gate = await gateOf(r.gift, d); if (gate === 'cancelled') return gone(r.gift); if (gate === 'pending') return notCollected(); if (gate === 'error') return busy() }
       return shareCardGet(r, d)
     },
     async shareFilmMakeForSender(animationId: string): Promise<Response> {
       const d = deps()
       const f = await bySender(animationId, d)
       if (f instanceof Response) return f
-      { const gate = await gateOf(f.gift, d); if (gate === 'cancelled') return gone(f.gift); if (gate === 'pending') return notCollected() }
+      { const gate = await gateOf(f.gift, d); if (gate === 'cancelled') return gone(f.gift); if (gate === 'pending') return notCollected(); if (gate === 'error') return busy() }
       return shareFilmMake(f, d)
     },
     async shareFilmGetForSender(animationId: string, req: Request): Promise<Response> {
       const d = deps()
       const f = await bySender(animationId, d)
       if (f instanceof Response) return f
-      { const gate = await gateOf(f.gift, d); if (gate === 'cancelled') return gone(f.gift); if (gate === 'pending') return notCollected() }
+      { const gate = await gateOf(f.gift, d); if (gate === 'cancelled') return gone(f.gift); if (gate === 'pending') return notCollected(); if (gate === 'error') return busy() }
       return shareFilmGet(f, d, req)
     },
     async shareCardForSender(animationId: string): Promise<Response> {
       const d = deps()
       const f = await bySender(animationId, d)
       if (f instanceof Response) return f
-      { const gate = await gateOf(f.gift, d); if (gate === 'cancelled') return gone(f.gift); if (gate === 'pending') return notCollected() }
+      { const gate = await gateOf(f.gift, d); if (gate === 'cancelled') return gone(f.gift); if (gate === 'pending') return notCollected(); if (gate === 'error') return busy() }
       return shareCardGet(f, d)
     },
 
@@ -507,7 +515,7 @@ export function createGiftHandlers(deps: () => GiftDeps) {
       const d = deps()
       const r = await loadGift(token, d)
       if (r.status !== 200) return json(r.status, { error: r.status === 404 ? 'not_found' : 'unavailable' }, { 'cache-control': 'no-store' })
-      { const gate = await gateOf(r.gift, d); if (gate === 'cancelled') return gone(r.gift); if (gate === 'pending') return notCollected() }
+      { const gate = await gateOf(r.gift, d); if (gate === 'cancelled') return gone(r.gift); if (gate === 'pending') return notCollected(); if (gate === 'error') return busy() }
       if (closed(r.gift, d, null)) return json(403, { error: 'locked' }, { 'cache-control': 'no-store' })
       if (r.gift.reply) return json(409, { error: 'The reply has already been sent', code: 'already_replied' }, noStore)
       const checked = checkReply(body, r.gift.memorial)
@@ -527,7 +535,7 @@ export function createGiftHandlers(deps: () => GiftDeps) {
       const d = deps()
       const r = await loadGift(token, d)
       if (r.status !== 200) return json(r.status, { error: r.status === 404 ? 'not_found' : 'unavailable' }, { 'cache-control': 'no-store' })
-      { const gate = await gateOf(r.gift, d); if (gate === 'cancelled') return gone(r.gift); if (gate === 'pending') return notCollected() }
+      { const gate = await gateOf(r.gift, d); if (gate === 'cancelled') return gone(r.gift); if (gate === 'pending') return notCollected(); if (gate === 'error') return busy() }
       if (closed(r.gift, d, null)) return json(403, { error: 'locked' }, { 'cache-control': 'no-store' })
       if (!r.gift.opened_at) {
         try {
@@ -544,7 +552,7 @@ export function createGiftHandlers(deps: () => GiftDeps) {
       const d = deps()
       const f = await bySender(animationId, d)
       if (f instanceof Response) return f
-      { const gate = await gateOf(f.gift, d); if (gate === 'cancelled') return gone(f.gift); if (gate === 'pending') return notCollected() }
+      { const gate = await gateOf(f.gift, d); if (gate === 'cancelled') return gone(f.gift); if (gate === 'pending') return notCollected(); if (gate === 'error') return busy() }
       if (!f.gift.shared_at) {
         try {
           await d.store!.put(f.gift.token, { ...f.gift, shared_at: (d.now?.() ?? new Date()).toISOString() })
@@ -561,7 +569,7 @@ export function createGiftHandlers(deps: () => GiftDeps) {
       const r = await loadGift(token, d)
       if (r.status !== 200) return json(r.status, { error: r.status === 404 ? 'not_found' : 'unavailable' }, { 'cache-control': 'no-store' })
       const g = r.gift
-      { const gate = await gateOf(g, d); if (gate === 'cancelled') return gone(g); if (gate === 'pending') return notCollected() }
+      { const gate = await gateOf(g, d); if (gate === 'cancelled') return gone(g); if (gate === 'pending') return notCollected(); if (gate === 'error') return busy() }
       if (!g.egift) return json(409, { error: 'This gift is not an e-gift', code: 'not_egift' }, noStore)
       if (g.egift.state === 'received') return json(409, { error: 'The address has already been received', code: 'already_received' }, noStore)
       const checked = checkAddress(body, g.package)

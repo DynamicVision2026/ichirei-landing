@@ -22,9 +22,10 @@ export const HEALTH_CODES = [
   'needs_attention',
   'film_blank_or_substituted',
   'film_drawn',
+  'order_record_failed',
 ] as const
 export type HealthCode = (typeof HEALTH_CODES)[number]
-export const RED_HEALTH_CODES: readonly HealthCode[] = ['en_cart_currency_mismatch', 'needs_attention', 'certificate_no_missing']
+export const RED_HEALTH_CODES: readonly HealthCode[] = ['en_cart_currency_mismatch', 'needs_attention', 'certificate_no_missing', 'order_record_failed']
 
 export interface HealthLine {
   ts: string

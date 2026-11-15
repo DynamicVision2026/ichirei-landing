@@ -23,7 +23,7 @@ const routeFromPath = (): { id: string } | null => {
   return a ? { id: a } : null
 }
 
-type Load = { state: 'loading' } | { state: 'error'; kind: 'notFound' | 'unavailable' | 'gone' } | { state: 'ready'; view: AnimationView }
+type Load = { state: 'loading' } | { state: 'error'; kind: 'notFound' | 'unavailable' | 'gone' | 'finishing' } | { state: 'ready'; view: AnimationView }
 
 export default function AnimationApp() {
   const route = useMemo(routeFromPath, [])
@@ -62,6 +62,15 @@ export default function AnimationApp() {
           const j = (await res.json().catch(() => ({}))) as { language?: AnimationView['language'] }
           if (j.language) setLang(pageLang(j.language))
           return setLoad({ state: 'error', kind: 'gone' })
+        }
+        if (res.status === 503) {
+          // the order could not be read: nothing unlocks, and the page says the gift is being finished (it looks again by itself)
+          const j = (await res.json().catch(() => ({}))) as { language?: AnimationView['language']; finishing?: boolean }
+          if (j.finishing) {
+            if (j.language) setLang(pageLang(j.language))
+            timer = setTimeout(go, 30_000)
+            return setLoad({ state: 'error', kind: 'finishing' })
+          }
         }
         if (!res.ok) return setLoad({ state: 'error', kind: 'unavailable' })
         const view = (await res.json()) as AnimationView
@@ -130,8 +139,8 @@ export default function AnimationApp() {
     <main className="an-page" data-testid="animation-page" lang={lang}>
       {load.state === 'loading' && <p className="an-note">{copy.loading}</p>}
       {load.state === 'error' && (
-        <p className="an-note" role="alert" data-testid="animation-error">
-          {load.kind === 'notFound' ? copy.notFound : load.kind === 'gone' ? BUYER_COPY[lang].gone : copy.unavailable}
+        <p className="an-note" role={load.kind === 'finishing' ? 'status' : 'alert'} data-testid={load.kind === 'finishing' ? 'buyer-finishing' : 'animation-error'}>
+          {load.kind === 'notFound' ? copy.notFound : load.kind === 'gone' ? BUYER_COPY[lang].gone : load.kind === 'finishing' ? BUYER_COPY[lang].finishingGift : copy.unavailable}
         </p>
       )}
       {load.state === 'ready' && !load.view.film?.pictures && !load.view.film?.deferred && (

@@ -19,8 +19,12 @@ export const TRACKING_PATTERN = /^[A-Za-z0-9-]{4,40}$/
 
 /** What a gift may do: `pending` = not collected yet (the receiver's link is sealed, nothing can be sent or saved), `cancelled` = the order was cancelled (nothing is shown). */
 export type OrderGate = 'ok' | 'pending' | 'cancelled'
-export function orderGate(rec: OrderRecord | null | undefined): OrderGate {
-  if (!rec) return 'ok'
+/**
+ * Fails closed (2026-11-14): a missing order record is HELD (`pending`, the sealed envelope), never open. The one exception is a gift from before order records existed:
+ * it opens only when the gift record itself says it was collected (`legacyCollectedAt`).
+ */
+export function orderGate(rec: OrderRecord | null | undefined, legacyCollectedAt?: string | null): OrderGate {
+  if (!rec) return legacyCollectedAt ? 'ok' : 'pending'
   if (rec.ops?.cancelled_at) return 'cancelled'
   return rec.collect_required && !rec.collected_at ? 'pending' : 'ok'
 }
@@ -40,9 +44,11 @@ export interface BuyerOrderView {
   wood: { step: 1 | 2 | 3 | 4; tracking_no: string | null; ship_to: 'me' | 'direct' } | null
 }
 
-export function buyerOrderView(rec: OrderRecord | null, win: WindowInfo, env: NodeJS.ProcessEnv = process.env): BuyerOrderView {
-  if (!rec) return { confirming: false, collected: true, ordered_at: null, change_until: null, wood: null }
+export function buyerOrderView(rec: OrderRecord | null, win: WindowInfo | null, env: NodeJS.ProcessEnv = process.env): BuyerOrderView {
+  // no order record: nothing unlocks — the page says the gift is being finished (a record that is missing is held, never open)
+  if (!rec) return { confirming: false, finishing: true, collected: false, ordered_at: null, change_until: null, wood: null }
   const pkg = rec.production.package
+  if (!win) return { confirming: false, finishing: true, collected: false, ordered_at: null, change_until: null, wood: null }
   const alive = win.phase === 'open' || win.phase === 'closed'
   const wooden = !!SHIPS[pkg] && !comingSoonSizes(env.ICHIREI_WOOD_SIZES).includes(pkg)
   const step = woodStepOf(rec.ops)

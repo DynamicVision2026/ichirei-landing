@@ -9,7 +9,7 @@ import { CLIENT_EVENTS, parseClientEvent, recordEvent } from '../engine/analytic
 import { SlidingWindowLimiter, clientIp } from '../engine/rate-limit.ts'
 
 const MAX_BODY_BYTES = 1_000
-const limiter = new SlidingWindowLimiter(60, 60_000)
+const limiter = new SlidingWindowLimiter(120, 60_000)
 const noContent = () => new Response(null, { status: 204, headers: { 'cache-control': 'no-store' } })
 
 export async function POST(req: Request): Promise<Response> {

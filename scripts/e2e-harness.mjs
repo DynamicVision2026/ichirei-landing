@@ -4296,6 +4296,44 @@ const SECTION_ORDER = ['.hero', '.strip', '.philo', '#shape', '#angles', '#write
   }
 }
 
+// ---------- Run 29 (2026-11-14, pre-launch safety): a checkout that could not be prepared shows the owner's message (no redirect); the buyer's page shows "being finished" when its order cannot be read ----------
+{
+  const f = await mockPage(browser, { order: () => ({ status: 503, json: { error: 'x', code: 'order_record_failed' } }) })
+  await f.page.goto('http://localhost:5173/', { waitUntil: 'networkidle' })
+  await f.page.locator('#write [data-testid=story-input]').fill('父は口下手で厳しくて、駅まで送ってくれて、盆に帰るたびに車で駅まで迎えに来て、帰りも必ず送ってくれる。')
+  await pickContext(f.page)
+  await f.page.click(`#write >> text=${GO.ja}`)
+  await f.page.waitForSelector('[data-all-revealed=yes]', { timeout: 15000 })
+  await f.page.locator('article[data-slot=main]').click()
+  await f.page.locator('article[data-slot=main]').locator('text=この字で贈る').click()
+  await toOrder(f.page)
+  await f.page.fill('input[name=sender_name]', '山田 太郎')
+  await f.page.fill('input[name=receiver_name]', '山田 一郎')
+  const od = new Date(); od.setDate(od.getDate() + 20)
+  await f.page.fill('input[name=delivery_date]', `${od.getFullYear()}-${String(od.getMonth() + 1).padStart(2, '0')}-${String(od.getDate()).padStart(2, '0')}`)
+  await f.page.click('label:has(input[name=package][value=simple])')
+  await tickRefund(f.page)
+  await f.page.click('[data-testid=order-submit]')
+  await f.page.locator('[data-testid=order-error]').waitFor({ timeout: 8000 })
+  check('order failed to prepare (503 order_record_failed): the form says 「ただいま混み合っています。少しおいてもう一度お試しください。」 and goes nowhere (no checkout page)', (await f.page.locator('[data-testid=order-error]').innerText()).includes('ただいま混み合っています。少しおいてもう一度お試しください。') && (await f.page.locator('#co').count()) === 0 && f.page.url().startsWith('http://localhost:5173/'))
+  check('…and the order button is usable again (try once more)', await f.page.locator('[data-testid=order-submit]').isEnabled())
+  check('no page errors (run 29, order failure)', f.errors.length === 0, f.errors.join('; '))
+  await f.page.close()
+}
+for (const [lang, locale, text] of [['en', 'en-US', 'Your gift is being finished. Please open this page again in a few minutes.'], ['ja', 'ja-JP', '贈りものを仕上げています。数分後にもう一度開いてください。'], ['zh-Hant', 'zh-TW', '禮物正在完成中，請幾分鐘後再打開。']]) {
+  const ctx = await browser.newContext({ locale, viewport: { width: 390, height: 800 } })
+  const page = await ctx.newPage()
+  const errs = []
+  page.on('pageerror', (e) => errs.push(String(e)))
+  await page.route('**/api/analytics', (r) => r.fulfill({ status: 204, body: '' }))
+  await page.route('**/api/animation/AN-testtesttesttesttest', (r) => r.fulfill({ status: 503, json: { error: 'unavailable', finishing: true, language: lang } }))
+  await page.goto('http://localhost:5173/a/AN-testtesttesttesttest', { waitUntil: 'networkidle' })
+  await page.locator('[data-testid=buyer-finishing]').waitFor({ timeout: 6000 })
+  check(`buyer page (${lang}): when the order cannot be read (503) the page says "${text}" — no link, no collect button`, (await page.locator('[data-testid=buyer-finishing]').innerText()).trim() === text && (await page.locator('[data-testid=give-link], [data-testid=collect-button], [data-testid=sender-panel]').count()) === 0, await page.locator('body').innerText())
+  check(`no page errors (run 29, buyer ${lang})`, errs.length === 0, errs.join('; '))
+  await ctx.close()
+}
+
 await browser.close()
 console.log(failures === 0 ? '\nALL E2E CHECKS PASSED' : `\n${failures} CHECKS FAILED`)
 process.exit(failures === 0 ? 0 : 1)

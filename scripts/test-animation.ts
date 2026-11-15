@@ -358,7 +358,7 @@ const READY: FilmRecord = { status: 'ready', made_at: NOW.toISOString(), picture
   const soft = await post(handler({ s: failing }), orderBody('ja'))
   console.error = quiet
   const softJ = (await soft.json()) as any
-  check('(5) if the animation record cannot be written the ORDER still goes through — without a link', soft.status === 200 && softJ.animation_url === null && !carts[0].variables.input.lines[0].attributes.some((a: any) => a.key === '_ichirei_animation_url'))
+  check('(5) if the animation record cannot be written the order is REFUSED (2026-11-14: 503 order_record_failed, no cart, no checkout URL) — we never sell a gift that has no page', soft.status === 503 && softJ.code === 'order_record_failed' && softJ.checkout_url === undefined && carts.length === 0)
 
   const memBody = orderBody('ja')
   ;(memBody.engine_result as any).occasion = 'memorial'

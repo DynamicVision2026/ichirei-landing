@@ -101,15 +101,15 @@ const readLines = () => {
   const d = join(adir, 'analytics')
   try { return readdirSync(d).flatMap((f) => readFileSync(join(d, f), 'utf8').trim().split('\n').filter(Boolean).map((l) => JSON.parse(l))) } catch { return [] }
 }
-const post = (b: unknown, ip = '203.0.113.9') => analyticsPost(new Request('http://x/api/analytics', { method: 'POST', headers: { 'x-forwarded-for': `${ip}, 1.1.1.1` }, body: typeof b === 'string' ? b : JSON.stringify(b) }))
+const post = (b: unknown, ip = '203.0.113.9') => analyticsPost(new Request('http://x/api/analytics', { method: 'POST', headers: { 'x-forwarded-for': `6.6.6.6, ${ip}` }, body: typeof b === 'string' ? b : JSON.stringify(b) }))
 const r1 = await post({ session: S1, source: 'customer', event: 'chosen', choice: 'main' })
 const r2 = await post({ session: S1, source: 'customer', event: 'explain_opened', choice: 'main' })
 check('/api/analytics: 204 and the events land in analytics/<day>.jsonl', r1.status === 204 && r2.status === 204 && readLines().map((l) => l.event).join() === 'chosen,explain_opened', JSON.stringify(readLines()))
 const junk = [await post('{nope'), await post({ session: 'bad', event: 'chosen', choice: 'main' }), await post({ session: S1, event: 'ordered' }), await post('x'.repeat(5000))]
 check('/api/analytics: junk, bad ids and forged server-only events (ordered/shown) are all answered 204 and NOT recorded', junk.every((r) => r.status === 204) && readLines().length === 2)
 check('/api/analytics: GET → 405', (await (await import('../api/analytics.ts')).GET()).status === 405)
-for (let i = 0; i < 70; i++) await post({ session: S1, event: 'explain_opened', choice: 'main' }, '198.51.100.1')
-check('/api/analytics: rate-limited per IP (60/min): the flood is capped, other IPs unaffected', readLines().length < 2 + 70 && readLines().length >= 2 + 60 - 1 && (await post({ session: S1, event: 'chosen', choice: 'second' }, '198.51.100.2')).status === 204 && readLines().some((l) => l.choice === 'second'))
+for (let i = 0; i < 130; i++) await post({ session: S1, event: 'explain_opened', choice: 'main' }, '198.51.100.1')
+check('/api/analytics: rate-limited per IP (120/min): the flood is capped, other IPs unaffected', readLines().length < 2 + 130 && readLines().length >= 2 + 120 - 1 && (await post({ session: S1, event: 'chosen', choice: 'second' }, '198.51.100.2')).status === 204 && readLines().some((l) => l.choice === 'second'))
 
 // select → "shown", from the REAL handler against a fake model
 const seen: string[] = []

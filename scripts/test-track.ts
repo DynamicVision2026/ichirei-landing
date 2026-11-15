@@ -125,7 +125,7 @@ const mkHandler = (limits = {}, over: Record<string, unknown> = {}) =>
   createTrackHandler(() => ({ config: cfg, missing: [], secret: async () => SECRET, now: () => clock, ...over }), limits)
 let ipN = 0
 const call = (h: ReturnType<typeof mkHandler>, body: unknown, ip = `203.0.113.${++ipN}`) =>
-  h(new Request('http://x/api/track', { method: 'POST', headers: { 'x-forwarded-for': `${ip}, 130.211.0.1` }, body: typeof body === 'string' ? body : JSON.stringify(body) }))
+  h(new Request('http://x/api/track', { method: 'POST', headers: { 'x-forwarded-for': `6.6.6.6, ${ip}` }, body: typeof body === 'string' ? body : JSON.stringify(body) }))
 const logged: string[] = []
 const origErr = console.error
 console.error = (...a: unknown[]) => { logged.push(a.map(String).join(' ')) }
@@ -176,7 +176,7 @@ try {
   const glob = mkHandler({ global: { max: 2, windowMs: 3_600_000 } })
   const gl = [(await call(glob, { order: '1016', email: 'hanako@example.com' })).status, (await call(glob, { order: '1016', email: 'hanako@example.com' })).status, (await call(glob, { order: '1016', email: 'hanako@example.com' })).status]
   check('rate limit, instance-wide backstop: refused beyond the cap whatever the IP', gl.join() === '200,200,429')
-  check('client IP: the entry added by the front end (second from the right) — a forged leading entry does not change it', clientIp(new Request('http://x', { headers: { 'x-forwarded-for': '6.6.6.6, 203.0.113.9, 130.211.0.1' } })) === '203.0.113.9' && clientIp(new Request('http://x', { headers: { 'x-forwarded-for': '203.0.113.9' } })) === '203.0.113.9' && clientIp(new Request('http://x')) === 'unknown')
+  check('client IP: the LAST entry (the one the front end appended) — a forged leading hop does not change it', clientIp(new Request('http://x', { headers: { 'x-forwarded-for': '6.6.6.6, 203.0.113.9' } })) === '203.0.113.9' && clientIp(new Request('http://x', { headers: { 'x-forwarded-for': '203.0.113.9' } })) === '203.0.113.9' && clientIp(new Request('http://x')) === 'unknown')
   check('limiter unit: counts only inside the window and never records a refused hit', (() => { const l = new SlidingWindowLimiter(2, 1000); return l.hit('a', 0) && l.hit('a', 10) && !l.hit('a', 20) && l.blocked('a', 30) && !l.blocked('a', 1500) && l.hit('a', 1500) })())
 
   // ---- failures are "unavailable", never "not found"

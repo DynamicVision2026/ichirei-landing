@@ -221,9 +221,11 @@ export default function OrderForm({ result, story, followUps = [], promptQuestio
           ? memorial && field === 'receiver_name'
             ? o.errors.field(field).replace(o.receiverLabel, copy.memorial.receiverLabel)
             : o.errors.field(field)
-          : data?.code === 'store_not_configured' || data?.code === 'shopify_not_configured'
-            ? o.errors.notConfigured
-            : o.errors.generic
+          : data?.code === 'order_record_failed'
+            ? o.errors.recordFailed
+            : data?.code === 'store_not_configured' || data?.code === 'shopify_not_configured'
+              ? o.errors.notConfigured
+              : o.errors.generic
         log('order_failed', { status: res.status, code: data?.code ?? null, field: data?.field ?? null })
         setError(message)
         setPhase('edit')

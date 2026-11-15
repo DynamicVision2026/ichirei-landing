@@ -42,6 +42,7 @@ anim.film = { status: 'fallback', lines: ['「ちょうど今詰めてたとこ�
 const gift = buildGiftRecord(record, animId, token, parsed.order.sender_email, NOW)
 await store.put(animId, anim)
 await store.put(token, gift)
+await store.put(record.order_ref, { ...record, collected_at: NOW.toISOString() } as never) // the gift gate reads the order: a gift whose order is not collected stays sealed (2026-11-14: a missing order is held too)
 await store.putObject(picturePath(animId, 1), Buffer.from('RIFFxxxxWEBP'), 'image/webp')
 const H = createGiftHandlers(() => ({ store, now: () => NOW }))
 const A = createAnimationHandlers(() => ({ store, now: () => NOW }))
@@ -77,7 +78,7 @@ const view2 = await (await H.view(token)).text()
 const sv2 = JSON.stringify(await (await A.view(animId)).json())
 check('(3) the address is returned by NO call: not in the receiver\'s view, not in the sender\'s page — the sender only sees "received"', !view2.includes('渋谷') && !view2.includes('03-1234') && !sv2.includes('渋谷') && !sv2.includes('03-1234') && JSON.parse(view2).egift.state === 'received' && JSON.parse(sv2).gift.egift_state === 'received')
 check('(3) a second submission is refused (409 already_received) and does not overwrite', (await H.address(token, { ...addr, name: '別の人' })).status === 409 && ((await store.get(token)) as GiftRecord).egift?.address?.name === '山田 一郎')
-check('(3) an ordinary gift (not an e-gift) takes no address: 409 not_egift', await (async () => { const p = parseOrderRequest(body({ ship_to: 'direct', sender_email: undefined }), NOW); if (!p.ok) return false; const t = newGiftToken(); await store.put(t, buildGiftRecord(buildRecord(p.order, 'IC-20261023-ZZZZZZZZ', NOW), animId, t, null, NOW)); return (await H.address(t, addr)).status === 409 })())
+check('(3) an ordinary gift (not an e-gift) takes no address: 409 not_egift', await (async () => { const p = parseOrderRequest(body({ ship_to: 'direct', sender_email: undefined }), NOW); if (!p.ok) return false; const t = newGiftToken(); const rz = buildRecord(p.order, 'IC-20261023-ZZZZZZZZ', NOW); await store.put(rz.order_ref, { ...rz, collected_at: NOW.toISOString() } as never); await store.put(t, buildGiftRecord(rz, animId, t, null, NOW)); return (await H.address(t, addr)).status === 409 })())
 check('(3) entering the receiver\'s address for the wooden sizes is Japan only; the Japan format is checked (7-digit postal code, prefecture, name)', !checkAddress({ ...addr, country: 'US', postal: '10001' }, 'simple').ok && !checkAddress({ ...addr, country: 'US', postal: '10001' }, 'standard').ok && !checkAddress({ ...addr, postal: '12' }, 'simple').ok && !checkAddress({ ...addr, region: '' }, 'simple').ok && !checkAddress({ ...addr, name: '' }, 'standard').ok)
 
 // ---- 4. 7-day reminder, 30-day flag, 90-day clean-up ---------------------------------------------------------------------------------------------
@@ -116,6 +117,7 @@ check('(4) the receiver\'s address is deleted 90 days after the order ships (not
   const g0 = buildGiftRecord(entry, animId, t, 'taro@example.com', NOW)
   await mem.put(animId, anim)
   await mem.put(t, g0)
+  await mem.put(entry.order_ref, { ...entry, collected_at: NOW.toISOString() } as never) // collected, so the gate lets the address through
   await recordOrderIndex(mem, entry, NOW)
   const idx = await readJsonl<Record<string, unknown>>(mem, ordersIndexPath(NOW))
   check('(6) every order is indexed for the owner\'s list: order_ref, receiver token, size, where it goes, remembrance, delivery date — and nothing private (no names, story, e-mail or address)', idx.length === 1 && idx[0].order_ref === 'IC-20261023-QQQQQQQQ' && idx[0].token === t && idx[0].size_code === 'ICHIREI-SIMPLE' && idx[0].ship_to === 'egift' && idx[0].memorial === false && !JSON.stringify(idx).includes('taro@') && !JSON.stringify(idx).includes('山田') && (await readJsonl(mem, EGIFT_INDEX_PATH)).length === 1)

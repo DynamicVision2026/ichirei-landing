@@ -43,14 +43,12 @@ export class SlidingWindowLimiter {
 }
 
 /**
- * The caller's IP. On Cloud Run the front end appends the connecting client's address to
- * X-Forwarded-For, so earlier entries can be forged by the caller: take the entry the front end
- * added (second from the right when a Google front-end hop follows it, else the last).
+ * The caller's IP. On Cloud Run the front end APPENDS the connecting client's address to X-Forwarded-For, so every entry before the last one may have been set by
+ * the caller: take the last entry, never the first (2026-11-14). A forged leading hop therefore changes nothing.
  */
 export function clientIp(req: Request): string {
   const xff = (req.headers.get('x-forwarded-for') ?? '').split(',').map((s) => s.trim()).filter(Boolean)
-  if (xff.length === 0) return 'unknown'
-  return xff.length >= 2 ? xff[xff.length - 2] : xff[0]
+  return xff.length === 0 ? 'unknown' : xff[xff.length - 1]
 }
 
 /** "12/60" → at most 12 hits per 60 minutes; "off" (or 0 / false / no) → no limit; anything unreadable → the default. */

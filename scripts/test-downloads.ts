@@ -43,6 +43,7 @@ async function build(over: Record<string, unknown>, slots: ArtRecord['slots'], s
   const art: ArtRecord = { schema: 'film-art', id: aid, status, started_at: NOW.toISOString(), made_at: '2026-11-07T03:00:05Z', slots }
   await store.put(aid, anim)
   await store.put(token, gift)
+  await store.put(rec.order_ref, { ...rec, collected_at: NOW.toISOString() } as never) // collected: a missing or uncollected order would hold the gift sealed
   await store.putObject(artPath(aid), JSON.stringify(art), 'application/json')
   const washi = readFileSync('public/film/washi-1.webp')
   slots.forEach((s, i) => { if (s === 'ai') void store.putObject(picturePath(aid, i + 1), washi, 'image/webp') })

@@ -169,6 +169,8 @@ export async function readShippingAddresses(refs: string[], d: TrackDeps | null,
 /** What Shopify says about one order: paid (and when), cancelled, refunded. No customer data. */
 export interface PaymentInfo {
   state: 'paid' | 'unpaid' | 'cancelled' | 'refunded'
+  /** Shopify says PARTIALLY_REFUNDED: it counts as paid only for an order whose payment was already SEEN (`paid_seen_at`), never as a first sighting (engine/paid-seen.ts `paidIn`). */
+  partially_refunded?: boolean
   /** When the payment went through (the 24-hour change window starts here). null while unpaid. */
   paid_at: string | null
   /** What the order actually cost (the order's total after discounts, whole yen; null when Shopify did not say or the currency is not JPY). The dashboard's revenue uses this, never the package price. */
@@ -191,7 +193,8 @@ interface AdminOrderPay {
   currentTotalPriceSet?: { shopMoney?: { amount?: string | null; currencyCode?: string | null } | null; presentmentMoney?: { amount?: string | null; currencyCode?: string | null } | null } | null
 }
 
-const PAID_STATES = new Set(['PAID', 'PARTIALLY_PAID', 'AUTHORIZED', 'PARTIALLY_REFUNDED'])
+// Paid means paid (2026-11-14): only PAID. AUTHORIZED and PARTIALLY_PAID are "confirming" (the money is not in yet). PARTIALLY_REFUNDED was paid before: it carries `partially_refunded`, and counts only for an order already seen as paid.
+const PAID_STATES = new Set(['PAID', 'PARTIALLY_REFUNDED'])
 
 /** The moment of payment: the first successful sale / capture (else authorization) transaction, else the order's own time when it is marked paid. */
 export function paymentOf(o: AdminOrderPay): PaymentInfo {
@@ -206,7 +209,7 @@ export function paymentOf(o: AdminOrderPay): PaymentInfo {
   // the buyer's own-currency amount (USD for an English order): shown beside the yen amount, never summed. The yen amount above is always the SHOP's money.
   const pres = o.currentTotalPriceSet?.presentmentMoney
   const buyer = pres?.amount && pres.currencyCode && pres.currencyCode.toUpperCase() !== (money?.currencyCode ?? 'JPY').toUpperCase() ? { amount: pres.amount, currency: pres.currencyCode.toUpperCase() } : null
-  return { state: 'paid', paid_at: pick(['SALE', 'CAPTURE']) ?? pick(['AUTHORIZATION']) ?? o.createdAt ?? null, amount_jpy: amount, ...(buyer ? { amount_buyer: buyer } : {}) }
+  return { state: 'paid', paid_at: pick(['SALE', 'CAPTURE']) ?? pick(['AUTHORIZATION']) ?? o.createdAt ?? null, amount_jpy: amount, ...(buyer ? { amount_buyer: buyer } : {}), ...(status === 'PARTIALLY_REFUNDED' ? { partially_refunded: true } : {}) }
 }
 
 export async function readPayments(refs: string[], d: TrackDeps | null, tokens: AdminTokenCache): Promise<PaymentResult> {

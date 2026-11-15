@@ -6,6 +6,7 @@
 //   Nothing is made before the window closes: the workshop CSV and the card PDFs list only orders whose window has closed (api/ops.ts).
 //   Everything here changes OUR records only (the order, the film page, the receiver's page) — never Shopify, whose order keeps what was sent at checkout.
 
+import { paidIn } from './paid-seen.ts'
 import type { OpsLogEntry, OrderRecord } from './order.ts'
 import type { OrderStore } from './order-store.ts'
 import type { PaymentInfo } from './shipping.ts'
@@ -42,6 +43,7 @@ export function windowOf(rec: OrderRecord | null, pay: PaymentInfo | null | 'unv
   if (pay === null) return none('unpaid')
   if (pay.state === 'cancelled' || pay.state === 'refunded') return none('cancelled')
   if (pay.state === 'unpaid') return none('unpaid')
+  if (!paidIn(pay, rec)) return none('unpaid') // PARTIALLY_REFUNDED on an order never seen as paid: not a payment
   return span(pay.paid_at, now, true)
 }
 

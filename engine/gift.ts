@@ -61,6 +61,8 @@ export interface GiftRecord {
   animation_id: string
   /** Kept for the owner; never sent to a page. */
   order_ref: string
+  /** Only for a gift made before order records existed: when it was collected. Without an order record, a gift opens only if this is set. */
+  collected_at?: string | null
   created_at: string
   language: Language
   glyph: string

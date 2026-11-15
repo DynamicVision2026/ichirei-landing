@@ -34,6 +34,7 @@ import { lexiconModeFromEnv } from '../engine/lexicon.ts'
 import { cardsMode } from '../engine/cards.ts'
 import { simpleMaxStrokes } from '../engine/strokes.ts'
 import { adaptVercelHandler } from './vercel-compat.ts'
+import { bodyLimit } from 'hono/body-limit'
 import { envRunLimiter } from '../engine/rate-limit.ts'
 import { withHeartbeat } from './heartbeat.ts'
 
@@ -150,6 +151,12 @@ export function createApp(config: ServerConfig): Hono {
   const selectLimit = envRunLimiter('ICHIREI_SELECT_LIMIT', { max: 12, minutes: 60 })
   const explainLimit = envRunLimiter('ICHIREI_EXPLAIN_LIMIT', { max: 40, minutes: 60 })
   const poemLimit = envRunLimiter('ICHIREI_POEM_LIMIT', { max: 20, minutes: 60 })
+  // the open endpoints (2026-11-14), per IP: an order that opens a checkout, the event log, the analytics events ("max/minutes" or "off", like the others)
+  const orderLimit = envRunLimiter('ICHIREI_ORDER_LIMIT', { max: 20, minutes: 60 })
+  const logLimit = envRunLimiter('ICHIREI_LOG_LIMIT', { max: 60, minutes: 1 })
+  const analyticsLimit = envRunLimiter('ICHIREI_ANALYTICS_LIMIT', { max: 120, minutes: 1 })
+  // these two take a few small fields: a body over 4 KB is refused before it is read
+  const tinyBody = bodyLimit({ maxSize: 4096, onError: (c) => c.json({ error: 'Request too large.', code: 'too_large' }, 413) })
   const limited = (limiter: typeof selectLimit): MiddlewareHandler => async (c, next) => {
     const r = limiter.check(c.req.raw)
     if (r.ok) return next()
@@ -234,9 +241,9 @@ export function createApp(config: ServerConfig): Hono {
   app.post('/ops/wood', limited(opsLimit), (c) => opsHandlers.wood(c.req.raw))
   app.post('/ops/change', limited(opsLimit), (c) => opsHandlers.change(c.req.raw))
   app.post('/ops/egift/run', limited(opsLimit), (c) => opsHandlers.egiftRun(c.req.raw))
-  app.post('/api/log', adaptVercelHandler(logHandler))
+  app.post('/api/log', limited(logLimit), tinyBody, adaptVercelHandler(logHandler))
   // Purchase hand-off: stores the story + result under order_ref, creates the Shopify cart.
-  app.post('/api/order', (c) => orderPost(c.req.raw))
+  app.post('/api/order', limited(orderLimit), (c) => orderPost(c.req.raw))
   // Order status (read-only, ICHIREI orders only): number + email → status, carrier, tracking.
   app.post('/api/track', (c) => trackPost(c.req.raw))
   // Orders paid WITHOUT going through our site ("waiting" orders, 2026-11-13): /claim checks the order number and e-mail (5 tries an hour per IP, in the handler);
@@ -244,7 +251,7 @@ export function createApp(config: ServerConfig): Hono {
   app.post('/api/claim', (c) => claimHandlers.claim(c.req.raw))
   app.post('/api/shopify/orders-paid', (c) => claimHandlers.webhook(c.req.raw))
   // Learning loop: two browser events (chosen, explain_opened) → analytics/YYYY-MM-DD.jsonl. Always 204.
-  app.post('/api/analytics', (c) => analyticsPost(c.req.raw))
+  app.post('/api/analytics', limited(analyticsLimit), tinyBody, (c) => analyticsPost(c.req.raw))
 
   // Approximate JPY rates for the "≈ US$65" lines (display only; null → the page hides them).
   app.get('/api/rates', () => ratesGet())

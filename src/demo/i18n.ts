@@ -257,7 +257,7 @@ export interface Copy {
     submitting: string
     redirecting: string
     back: string
-    errors: { generic: string; network: string; notConfigured: string; field: (field: OrderField) => string }
+    errors: { generic: string; network: string; notConfigured: string; recordFailed: string; field: (field: OrderField) => string }
   }
 }
 
@@ -411,6 +411,7 @@ const ja: Copy = {
       generic: 'ご注文を受け付けられませんでした。お手数ですが、もう一度お試しください。',
       network: '通信に失敗しました。もう一度お試しください。',
       notConfigured: 'ただいまご注文を受け付けられません。時間をおいて、もう一度お試しください。',
+      recordFailed: 'ただいま混み合っています。少しおいてもう一度お試しください。',
       field: (f) => `「${{ sender_name: 'あなたの呼び名', receiver_name: '贈る相手の呼び名', delivery_date: 'お届け希望日', inscription_style: '刻印の字体', package: 'パッケージ' }[f]}」をご確認ください。`,
     },
   },
@@ -570,6 +571,7 @@ const zhHans: Copy = {
       generic: '未能受理订单，请再试一次。',
       network: '网络连接失败，请再试一次。',
       notConfigured: '目前暂时无法下单，请稍后再试。',
+      recordFailed: '目前系统繁忙，请稍后再试一次。',
       field: (f) => `请检查「${{ sender_name: '你的称呼', receiver_name: '收礼人的称呼', delivery_date: '期望送达日', inscription_style: '刻字字体', package: '套餐' }[f]}」。`,
     },
   },
@@ -727,6 +729,7 @@ const zhHant: Copy = {
       generic: '未能受理訂單，請再試一次。',
       network: '網路連線失敗，請再試一次。',
       notConfigured: '目前暫時無法下單，請稍後再試。',
+      recordFailed: '目前系統繁忙，請稍後再試一次。',
       field: (f) => `請檢查「${{ sender_name: '你的稱呼', receiver_name: '收禮人的稱呼', delivery_date: '期望送達日', inscription_style: '刻字字體', package: '方案' }[f]}」。`,
     },
   },
@@ -891,6 +894,7 @@ const en: Copy = {
       generic: 'We could not take your order. Please try again.',
       network: 'The connection failed. Please try again.',
       notConfigured: 'Orders are not available right now. Please try again a little later.',
+      recordFailed: 'Something went wrong on our side. Please try again in a moment.',
       field: (f) => `Please check “${{ sender_name: 'Your name or nickname', receiver_name: 'Their name or nickname', delivery_date: 'Requested delivery date', inscription_style: 'Carved form', package: 'Package' }[f]}”.`,
     },
   },

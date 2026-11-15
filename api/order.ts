@@ -31,6 +31,13 @@ import { MAX_POEMS, POEM_TYPES, comingSoonSizes, poemTypeAllowed } from '../src/
 
 const MAX_BODY_BYTES = 300_000
 
+/** What the buyer reads when the gift's records could not be written (nothing was sold, no checkout was opened). */
+export const ORDER_RECORD_FAILED: Record<string, string> = {
+  ja: 'ただいま混み合っています。少しおいてもう一度お試しください。',
+  'zh-Hant': '目前系統繁忙，請稍後再試一次。',
+  'zh-Hans': '目前系统繁忙，请稍后再试一次。',
+  en: 'Something went wrong on our side. Please try again in a moment.',
+}
 const json = (status: number, body: unknown) =>
   new Response(JSON.stringify(body), { status, headers: { 'content-type': 'application/json; charset=utf-8', 'cache-control': 'no-store' } })
 
@@ -173,6 +180,7 @@ export function createOrderHandler(deps: () => OrderDeps) {
         void recordHealth(d.store, 'certificate_no_missing', { ref: orderRef }, now) // retried when the payment is seen and on every buyer-page open (engine/gift-check.ts); the gift is held until it is written
       }
       anim.gift_token = token
+      // both records are written before anything is sold: without them the buyer would pay for a gift that has no page (2026-11-14: a failed write stops the order here)
       await d.store.put(animationId, anim)
       await d.store.put(token, buildGiftRecord(record, animationId, token, order.sender_email, now))
       record.animation_id = animationId
@@ -197,8 +205,12 @@ export function createOrderHandler(deps: () => OrderDeps) {
           return film
         }),
       )
-    } catch (err) {
-      console.error('[ichirei-order] animation record failed', orderRef, err instanceof Error ? err.message : err)
+    } catch {
+      // fails closed: no checkout, no claimed order — the buyer is asked to try again; codes only in the log (never the story, a name or the error's text)
+      console.error('[ichirei-order]', JSON.stringify({ event: 'order_record_failed', order_ref: orderRef }))
+      void recordHealth(d.store, 'order_record_failed', { ref: orderRef, reason: 'store' }, d.now?.() ?? new Date())
+      await releaseClaim()
+      return json(503, { error: ORDER_RECORD_FAILED[order.language] ?? ORDER_RECORD_FAILED.en, code: 'order_record_failed' })
     }
 
     // 2. Keep the story and the result before anything is sold.

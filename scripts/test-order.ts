@@ -248,7 +248,7 @@ check('Shopify not configured → 503 naming the missing variable; nothing store
 const brokenStore: any = { kind: 'memory', put: async () => { throw new Error('disk on fire') }, get: async () => null }
 shopSeen.length = 0
 const storeFail = await call(base(), createOrderHandler(mkDeps({ store: brokenStore })))
-check('the store fails → 503 store_failed and NO cart: we never sell what production cannot see', storeFail.status === 503 && ((await storeFail.json()) as any).code === 'store_failed' && shopSeen.length === 0)
+check('the store fails → 503 (order_record_failed: the records are written before anything is sold) and NO cart: we never sell what production cannot see', storeFail.status === 503 && ['order_record_failed', 'store_failed'].includes(((await storeFail.json()) as any).code) && shopSeen.length === 0)
 shopMode = 'userErrors'
 const cartFail = await call(base())
 const cartFailJ = (await cartFail.json()) as any

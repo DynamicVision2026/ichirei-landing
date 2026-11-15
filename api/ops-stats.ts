@@ -10,7 +10,7 @@
 
 import { readHealth } from '../engine/health.ts'
 import { needsAttention } from '../engine/gift-check.ts'
-import { paidSeen } from '../engine/paid-seen.ts'
+import { paidIn, paidSeen } from '../engine/paid-seen.ts'
 import { analyticsDay, tokenHash, type AnalyticsEvent } from '../engine/analytics.ts'
 import { readJsonl, type OrderIndexEntry } from '../engine/egift-ops.ts'
 import { createOrderStore, type OrderStore } from '../engine/order-store.ts'
@@ -58,7 +58,7 @@ export function orderStatOf(entry: OrderIndexEntry, rec: OrderRecord | null, pay
   else if (pay === 'unverified') state = win.phase === 'cancelled' ? 'cancelled' : 'unverified'
   else if (rec.ops?.cancelled_at) state = 'cancelled'
   else if (pay === null) state = Date.now() - Date.parse(rec.created_at) > SHOPIFY_VISIBLE_DAYS * DAY_MS ? 'unverified' : 'unpaid'
-  else state = pay.state === 'paid' ? 'paid' : pay.state === 'refunded' ? 'refunded' : pay.state === 'cancelled' ? 'cancelled' : 'unpaid'
+  else state = paidIn(pay, rec) ? 'paid' : pay.state === 'refunded' ? 'refunded' : pay.state === 'cancelled' ? 'cancelled' : 'unpaid'
   const p = rec.production
   // revenue = what the order actually paid (a sale price included), from the Shopify order — the package price only when Shopify could not say
   const paidAmount = rec.claim ? rec.claim.amount_jpy : pay && pay !== 'unverified' ? (pay.amount_jpy ?? null) : null

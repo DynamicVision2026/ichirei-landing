@@ -379,6 +379,37 @@ try {
     }
   }
 
+  // ---- K. request limits on the open endpoints (2026-11-14): /api/order 20 an hour, /api/log 60 a minute, /api/analytics 120 a minute, per client IP = the LAST X-Forwarded-For entry ---
+  {
+    const lim = await startServer({ upstreamUrl: upstream.url, env: { ICHIREI_RATES: 'off' } })
+    try {
+      // the hop Cloud Run appends is the last one; whatever the caller puts in front of it is theirs to forge
+      const xff = (first, real) => ({ 'x-forwarded-for': `${first}, ${real}` })
+      const hit = (path, real, first = '6.6.6.6', body = '{}') => fetch(lim.url + path, { method: 'POST', headers: { 'content-type': 'application/json', ...xff(first, real) }, body })
+      let last = 0
+      for (let i = 1; i <= 20; i++) last = (await hit('/api/order', '203.0.113.50', `10.0.0.${i}`)).status
+      check('limits: the first 20 orders an hour from one client are not refused (400 — the body is empty — not 429)', last !== 429, String(last))
+      const o21 = await hit('/api/order', '203.0.113.50', '10.0.0.99')
+      check('limits: the 21st order in an hour gets 429 with Retry-After — and a different FORGED first X-Forwarded-For hop does not reset the count', o21.status === 429 && Number(o21.headers.get('retry-after')) > 0 && ((await o21.json()).code === 'rate_limited'), String(o21.status))
+      check('limits: another client (a different last hop) is not affected', (await hit('/api/order', '203.0.113.51', '10.0.0.99')).status !== 429)
+      let l = 0
+      for (let i = 1; i <= 60; i++) l = (await hit('/api/log', '203.0.113.60', `9.9.9.${i}`, '{"event":"x"}')).status
+      const l61 = await hit('/api/log', '203.0.113.60', '9.9.9.200', '{"event":"x"}')
+      check('limits: /api/log takes 60 a minute per client and the 61st gets 429 (forged first hops change nothing)', l === 204 && l61.status === 429, `${l} ${l61.status}`)
+      let a = 0
+      for (let i = 1; i <= 120; i++) a = (await hit('/api/analytics', '203.0.113.70', `8.8.8.${i}`, '{"event":"x"}')).status
+      const a121 = await hit('/api/analytics', '203.0.113.70', '8.8.8.250', '{"event":"x"}')
+      check('limits: /api/analytics takes 120 a minute per client and the 121st gets 429', a === 204 && a121.status === 429, `${a} ${a121.status}`)
+      const big = JSON.stringify({ event: 'x', pad: 'y'.repeat(4200) })
+      const lb = await hit('/api/log', '203.0.113.80', '1.1.1.1', big)
+      const ab = await hit('/api/analytics', '203.0.113.81', '1.1.1.1', big)
+      check('limits: a /api/log or /api/analytics body over 4 KB is refused (413) before it is read', lb.status === 413 && ab.status === 413, `${lb.status} ${ab.status}`)
+      check('limits: a small body is still accepted (204)', (await hit('/api/log', '203.0.113.82', '1.1.1.1', '{"event":"x"}')).status === 204)
+    } finally {
+      await lim.stop()
+    }
+  }
+
   // ---- J. (opt-in) one stream longer than Vercel's 60s cap --------------
   if (LONG) {
     console.log('\n--long: streaming a 75s response (Vercel Hobby would have killed this at 60s)…')
