@@ -1,9 +1,10 @@
 import { useEffect, useRef, useState } from 'react'
 import { usePromoOn } from '../demo/useSizes.ts'
 import { useTodayPrice } from './useTodayPrice.ts'
-import { THANKS, holdRefusal } from './copy.ts'
+import { holdRefusal, thanksCopy, type ThanksLang } from './copy.ts'
 import { localTime, requestHold, usePromo } from './promo.ts'
 import { refreshMe } from './me.ts'
+import { writeHref } from '../reveal/paths.ts'
 import './loop.css'
 
 const LAST_KEY = 'ichirei.promo.last'
@@ -26,13 +27,15 @@ const safe = {
 }
 
 /**
- * Under the hero on /en while the promotion runs: a paper-slip card — "Days of Thanks", how many of today's 100 free gifts are left (refreshed every 60 s with a soft fade), and the form that
- * holds one for an email (the email and an unticked box — no code since 2026-11-15). With a hold: "held until …". With none left: the form is gone.
+ * Under the hero on /en and (2026-11-16) on the Japanese page while the promotion runs — the US and Japan share ONE daily pool: a paper-slip card — the title, how many of today's 100 free
+ * gifts are left (refreshed every 60 s with a soft fade), and the form that holds one for an email (the email and an unticked box — no code since 2026-11-15). With a hold: "held until …".
+ * With none left: the form is gone. After a hold ended: one line, "Your hold ended.", and the form as usual.
  */
-export default function DaysOfThanks() {
+export default function DaysOfThanks({ lang = 'en' }: { lang?: ThanksLang }) {
+  const THANKS = thanksCopy(lang)
   const on = usePromoOn()
   const p = usePromo()
-  const price = useTodayPrice()
+  const price = useTodayPrice(lang)
   const [email, setEmail] = useState('')
   const [marketing, setMarketing] = useState(false)
   const [busy, setBusy] = useState(false)
@@ -59,29 +62,29 @@ export default function DaysOfThanks() {
   const place = async (e: string, m: boolean) => {
     setBusy(true)
     setMessage(null)
-    const r = await requestHold(e, m)
+    const r = await requestHold(e, m, lang)
     if (r.ok) {
       safe.set({ email: e })
       setPhone(!!r.link && !r.existing)
       void refreshMe()
-    } else setMessage(holdRefusal(r.code ?? 'unavailable', price.text))
+    } else setMessage(holdRefusal(r.code ?? 'unavailable', price.text, lang))
     setBusy(false)
   }
 
   const n = THANKS.count(left, p.daily ?? 100)
   const hold = p.hold
   return (
-    <section className="thanksWrap" id="days-of-thanks" aria-labelledby="dot-title">
+    <section className="thanksWrap" id="days-of-thanks" aria-labelledby="dot-title" lang={lang} data-lang={lang}>
       <div className="wrap">
         <div className="thanksCard" data-testid="thanks-card">
           <h2 id="dot-title">{THANKS.title}</h2>
           {hold ? (
             <>
               <p className="count" data-testid="thanks-held">
-                {THANKS.held(localTime(hold.expires_at), hold.minutes_left)}
+                {THANKS.held(localTime(hold.expires_at, lang), hold.minutes_left)}
               </p>
               <p className="sub">
-                <a href="#write" data-testid="thanks-write">
+                <a href={writeHref(lang)} data-testid="thanks-write">
                   {THANKS.write}
                 </a>
               </p>
@@ -97,6 +100,7 @@ export default function DaysOfThanks() {
               <p className="count" data-testid="thanks-count" style={{ opacity: fade ? 0.2 : 1, transition: 'opacity .45s ease' }}>
                 {left > 0 ? (
                   <>
+                    {n.before}
                     <b>{n.n}</b>
                     {n.after}
                   </>
@@ -107,16 +111,14 @@ export default function DaysOfThanks() {
               <p className="sub">{THANKS.sub}</p>
               {p.ended === 'used' && <p className="sub" data-testid="thanks-given">{THANKS.alreadyGiven(price.text)}</p>}
               {p.ended === 'three_holds' && <p className="sub" data-testid="thanks-three">{THANKS.threeHolds(price.text)}</p>}
-              {p.ended === 'expired' && left > 0 && safe.get() && (
+              {p.ended === 'expired' && left > 0 && (
                 <p className="sub" data-testid="thanks-ended">
-                  {THANKS.ended}{' '}
-                  <button type="button" className="miniBtn" disabled={busy} onClick={() => void place(safe.get()!.email, false)} data-testid="thanks-hold-again">
-                    {THANKS.holdAgain}
-                  </button>
+                  {THANKS.ended}
                 </p>
               )}
               {left > 0 && p.ended !== 'used' && p.ended !== 'three_holds' && (
                 <form
+                  className={lang === 'ja' ? 'ja' : undefined}
                   onSubmit={(ev) => {
                     ev.preventDefault()
                     void place(email.trim(), marketing)

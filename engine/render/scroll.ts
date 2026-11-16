@@ -48,8 +48,12 @@ export async function makeScroll(a: Artwork, env: NodeJS.ProcessEnv = process.en
   const g = textPaths(charFont, a.glyph, cs, WIDTH / 2, y + cs * 0.82, color, 'middle', f.stroke)
   svg += g.svg
   y += cs + 120
-  svg += textPaths(body, a.reading, 76, WIDTH / 2, y, MUTED, 'middle').svg
-  y += 150
+  // English first (2026-11-16): an English scroll draws no romanized reading — the word leads, right under the character (the certificate alone keeps the reading)
+  const enFirst = a.language === 'en' && !!a.en
+  if (!enFirst) {
+    svg += textPaths(body, a.reading, 76, WIDTH / 2, y, MUTED, 'middle').svg
+    y += 150
+  } else y += 40
   if (a.language === 'en' && a.en) {
     // English (2026-11-12): the bridge under the character — the word (bold), the line, and the reviewed echo when there is one
     svg += textPaths(body, a.en.word, 128, WIDTH / 2, y, INK, 'middle', 4.4).svg

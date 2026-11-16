@@ -6,6 +6,7 @@ import { LANDING_COPY } from '../landing/copy'
 import { setClaim } from '../demo/claim-store.ts'
 import { setLanguage } from '../lang-store.ts'
 import { CLAIM_COPY, orderFromSearch } from './copy.ts'
+import { writePath } from '../reveal/paths.ts'
 
 // /claim — an order that was paid WITHOUT going through our site. Order number + the e-mail used at checkout in; on a match the normal flow opens (story → characters → choose), and at the
 // choose step there is no payment: the character is attached to this order. Same look as /track. Never indexed.
@@ -40,7 +41,7 @@ export default function ClaimApp() {
         // the flow opens in the page's language (the customer pages show Traditional Chinese for 简体 visitors, like the landing page)
         const to = language === 'zh-Hans' ? 'zh-Hant' : language
         setLanguage(to)
-        window.location.assign(`/${to === 'en' ? 'en' : ''}#write`)
+        window.location.assign(writePath(to === 'en' ? 'en' : to === 'ja' ? 'ja' : 'zh-Hant'))
         return
       }
       setError(res.status === 429 ? copy.errors.rateLimited : res.status === 404 || res.status === 400 ? copy.errors.notFound : copy.errors.network)

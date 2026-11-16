@@ -138,7 +138,7 @@ export function renderHome(payload: StatsPayload, p: Period, now: Date, customer
   const tabs = PERIODS.map((k) => `<a href="/ops/home?p=${k}"${k === p ? ' aria-current="page"' : ''}>${PERIOD_LABEL[k]}</a>`).join('')
   const kpi = (label: string, big: string, note: string, extra = '') => `<div class="card kpi"><div class="label">${label}</div><div class="big serif">${big}</div>${extra}<div class="note">${note}</div></div>`
   const promoKpi = promoToday
-    ? kpi('Free gifts today', `${promoToday.given}<small> / ${promoToday.given + promoToday.held + promoToday.left}</small>`, `${promoToday.held} held now · ${promoToday.left} left`,
+    ? kpi('Free gifts today · US + Japan', `${promoToday.given}<small> / ${promoToday.given + promoToday.held + promoToday.left}</small>`, `${promoToday.held} held now · ${promoToday.left} left`,
         `<div class="meter"><i style="width:${Math.round((100 * promoToday.given) / Math.max(1, promoToday.given + promoToday.held + promoToday.left))}%"></i></div>`)
     : kpi('Free gifts given', String(freeGiven), PERIOD_LABEL[p])
   const rows = orders.slice(0, 25).map((o) => {
@@ -172,7 +172,7 @@ export function renderHome(payload: StatsPayload, p: Period, now: Date, customer
     `<section class="card" aria-label="Latest gifts"><div style="display:flex;flex-wrap:wrap;justify-content:space-between;gap:8px;align-items:baseline"><h2 class="serif">Latest gifts</h2><div style="display:flex;gap:18px;font-size:14px"><a href="/ops/home/orders.csv">Download spreadsheet (CSV)</a><a href="/ops">All orders →</a></div></div>` +
     (rows ? `<div class="scroll"><table><thead><tr><th>When (ET)</th><th>Character</th><th>English</th><th>Card</th><th>Language</th><th>Occasion</th><th>Price</th><th>Status</th><th>Order</th></tr></thead><tbody>${rows}</tbody></table></div>` : `<p class="muted">No gifts in this period yet.</p>`) +
     `</section></div><div class="side">` +
-    (promoRows ? `<section class="card" aria-label="Free gifts by day"><h2 class="serif" style="font-size:19px">Free gifts by day</h2>${promoRows}<div class="muted">A promotion day runs 4:00 a.m. to 3:59 a.m. Eastern.</div></section>` : '') +
+    (promoRows ? `<section class="card" aria-label="Free gifts by day"><h2 class="serif" style="font-size:19px">Free gifts by day</h2><div class="muted">One shared pool for /en and the Japanese page; the language of each gift is in the table below.</div>${promoRows}<div class="muted">A promotion day runs 4:00 a.m. to 3:59 a.m. Eastern.</div></section>` : '') +
     `<section class="card" aria-label="AI cost"><h2 class="serif" style="font-size:19px">AI cost (estimate)</h2><div class="serif" style="font-size:34px;font-weight:700">$${s.ai_cost_usd.toFixed(2)} <span style="font-size:16px;color:#5C564D">¥${n(s.ai_cost_jpy)}</span></div><div class="muted">${perMoment ? `About $${perMoment.toFixed(2)} per moment written. ` : ''}Real bills: Anthropic Console and Google Cloud Billing.</div></section>` +
     (chars ? `<section class="card" aria-label="Characters chosen"><h2 class="serif" style="font-size:19px">Most chosen characters, 30 days</h2><div class="chars">${chars}</div></section>` : '') +
     `</div></div>` +

@@ -61,3 +61,21 @@
 .priceFree b{font-weight:700}
 .savePanel .note.saved{font-weight:600;opacity:1}
 .priceFree .freeLabel{font-size:.62em;font-weight:600;white-space:nowrap}
+/* 2026-11-16: the header's "My gifts", the writing room's header, and the landing's welcome-back card */
+.myGifts{display:inline-flex;align-items:center;min-height:40px;padding:.35rem .8rem;border:1px solid var(--line,#E6D8D1);border-radius:999px;background:var(--paper,#FBF8F1);color:var(--ink,#1F2A44);font:600 .86rem var(--body,system-ui);text-decoration:none;white-space:nowrap}
+.myGifts[data-count]:not([data-count="0"]){border-color:var(--gold,#8A6A35)}
+.writeTop .wrap{display:flex;align-items:center;justify-content:space-between;gap:.6rem}
+.writeTop .topR{display:flex;align-items:center;gap:.5rem}
+.writeBack{color:var(--ink,#1F2A44);font:500 .9rem var(--body,system-ui);text-decoration:none;opacity:.75;padding:.4rem .2rem;white-space:nowrap}
+.writeBack:hover{opacity:1}
+.writeRoom main{min-height:calc(100vh - 64px)}
+.welcomeBack{padding:1.4rem 0 .4rem}
+.welcomeBack .wrap{background:var(--paper,#FBF8F1);border:1px solid var(--line,#E6D8D1);border-radius:6px;padding:1.1rem 1rem 1rem;max-width:44rem}
+.wbHead{margin:0 0 .8rem;font:600 1rem var(--body,system-ui);color:var(--ink,#1F2A44)}
+.wbList{list-style:none;margin:0;padding:0;display:grid;grid-template-columns:repeat(auto-fit,minmax(9rem,1fr));gap:.75rem}
+.wbItem{display:flex;flex-direction:column;align-items:center;text-align:center;gap:.25rem;padding:.6rem .4rem;border-radius:4px;background:#fff8}
+.wbGlyph{font-family:'Zen Old Mincho','Noto Serif JP',serif;font-weight:900;font-size:3.4rem;line-height:1;color:#C0392B}
+.wbWord{font:600 1.05rem var(--body,system-ui);color:var(--ink,#1F2A44)}
+.wbGive{margin-top:.2rem;font:600 .9rem var(--body,system-ui);color:var(--ink,#1F2A44);border-bottom:1px solid var(--gold,#8A6A35);text-decoration:none}
+.wbAll{display:inline-block;margin-top:.8rem;font:500 .9rem var(--body,system-ui);color:var(--ink,#1F2A44)}
+.by-top{display:flex;justify-content:flex-end;padding:.6rem max(16px,env(safe-area-inset-right,0px)) 0}

@@ -7,7 +7,7 @@
 // Env: ICHIREI_FILM_MODEL (default claude-haiku-5-5), ICHIREI_FILM_TIMEOUT_MS (30000 per call), ICHIREI_FILM=off (always the fallback).
 // Logs (no story text — codes and counts only): [ichirei-film] film_generated | film_retry | film_fallback.
 
-import { OLD_SCRIPT_SETTING, swapOnce, western } from './film-western.ts'
+import { OLD_SCRIPT_SETTING, swapOnce, world, worldLang } from './film-world.ts'
 import { PICTURE_UNSAFE_RE, findIllnessAll } from './unsafe-words.ts'
 import Anthropic from '@anthropic-ai/sdk'
 import { readFileSync } from 'node:fs'
@@ -340,8 +340,9 @@ export function buildFilmPrompt(input: FilmInput, feedback = ''): string {
     LINE_LIMITS: lineLimitText(input.language),
     FEEDBACK: feedback,
   })
-  // English films (2026-11-13): the buyer's world is the United States or Europe, and each picture names its place in Western terms. ja / zh-Hant / zh-Hans: the text above, byte for byte.
-  return input.language === 'en' ? swapOnce(text, OLD_SCRIPT_SETTING, western('script setting')) : text
+  // Each market's own world (2026-11-16; English since 2026-11-13): the clause naming all three worlds becomes this language's world only (engine/film-world.<lang>.md).
+  const wl = worldLang(input.language)
+  return wl ? swapOnce(text, OLD_SCRIPT_SETTING, world(wl, 'script setting')) : text
 }
 
 function parseJson(raw: string): Record<string, unknown> | null {
@@ -488,7 +489,8 @@ export async function makeFilm(input: FilmInput, opts: FilmOptions = {}): Promis
         SAFE: isUnsafe(failed) ? SAFE_SCENES_TEXT : '',
         FORBIDDEN: forms.length ? forms.join(' ') : '(none)',
       })
-      const prompt = input.language === 'en' ? `${built}\n\n${western('script scenes')}` : built
+      const wl = worldLang(input.language)
+      const prompt = wl ? `${built}\n\n${world(wl, 'script scenes')}` : built
       const stream = client.messages.stream({ model, max_tokens: 1200, output_config: { effort: 'low' }, messages: [{ role: 'user', content: prompt }] }, { signal })
       const message = await stream.finalMessage()
       const raw = parseJson(message.content.filter((b): b is Anthropic.TextBlock => b.type === 'text').map((b) => b.text).join(''))

@@ -342,7 +342,8 @@ export function createApp(config: ServerConfig): Hono {
 
   // The English and Traditional Chinese landing pages, as HTML with their own link-preview tags (2026-11-15, engine/landing-share.ts): the apps that show a link's card do not run the page.
   // `/` and the Japanese page are index.html exactly as it is.
-  for (const [path, lang] of [['/en', 'en'], ['/en/', 'en'], ['/zh', 'zh-Hant'], ['/zh/', 'zh-Hant']] as const) {
+  // (2026-11-16) the writing rooms /en/write and /zh/write carry their language's tags too; /write is the Japanese one (index.html as it is, via the SPA fallback)
+  for (const [path, lang] of [['/en', 'en'], ['/en/', 'en'], ['/en/write', 'en'], ['/en/write/', 'en'], ['/zh', 'zh-Hant'], ['/zh/', 'zh-Hant'], ['/zh/write', 'zh-Hant'], ['/zh/write/', 'zh-Hant']] as const) {
     app.get(path, async (c, next) => {
       try {
         indexHtml ??= await readFile('./dist/index.html', 'utf8')

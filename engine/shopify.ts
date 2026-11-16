@@ -76,7 +76,7 @@ const CART_CREATE = `mutation CartCreate($input: CartInput!) {
  */
 const CART_CREATE_EN = CART_CREATE.replace('mutation CartCreate($input: CartInput!) {', 'mutation CartCreate($input: CartInput!) @inContext(country: US, language: EN) {')
 
-/** A held free gift (English, during the promotion): the cart carries the free-gift code, the hold's email and the hold id. Without one the cart carries no code. */
+/** A held free gift (English or Japanese, during the promotion — one shared pool): the cart carries the free-gift code, the hold's email and the hold id. Without one the cart carries no code. */
 export interface CartPromo {
   code: string
   email: string
@@ -107,6 +107,7 @@ async function createCartOnce(
 ): Promise<CartResult> {
   const variantId = config.variants[pkg]
   if (!variantId) throw new ShopifyError(`The size "${pkg}" has no Shopify variant configured`, { code: 'size_unavailable' })
+  const promoLang = language === 'en' || language === 'ja'
   const res = await fetchImpl(`${config.apiBase}/api/${config.apiVersion}/graphql.json`, {
     method: 'POST',
     headers: { 'content-type': 'application/json', 'x-shopify-storefront-access-token': config.token },
@@ -116,9 +117,10 @@ async function createCartOnce(
         input: {
           // The line carries the attributes (the chosen poem included); the cart repeats order_ref so it also lands on the order itself.
           lines: [{ merchandiseId: variantId, quantity: 1, attributes }],
-          attributes: [{ key: 'order_ref', value: orderRef }, ...(language === 'en' && promo ? [{ key: 'ichirei_hold', value: promo.holdId }] : [])],
-          ...(language === 'en' ? { buyerIdentity: { countryCode: EN_BUYER_COUNTRY, ...(promo ? { email: promo.email } : {}) } } : {}),
-          ...(language === 'en' && promo ? { discountCodes: [promo.code] } : {}),
+          attributes: [{ key: 'order_ref', value: orderRef }, ...(promoLang && promo ? [{ key: 'ichirei_hold', value: promo.holdId }] : [])],
+          // English: the US buyer (and the hold's email). Japanese (2026-11-16, one shared pool): only a holder's cart names the hold's email; a non-holder's ja cart is exactly as before.
+          ...(language === 'en' ? { buyerIdentity: { countryCode: EN_BUYER_COUNTRY, ...(promo ? { email: promo.email } : {}) } } : language === 'ja' && promo ? { buyerIdentity: { email: promo.email } } : {}),
+          ...(promoLang && promo ? { discountCodes: [promo.code] } : {}),
         },
       },
     }),

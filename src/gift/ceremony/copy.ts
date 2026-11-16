@@ -87,7 +87,7 @@ export const CER = {
   ask: "Is there someone you've never quite said it to?",
   giveOwn: 'Give one of your own',
   promo: 'The first 100 gifts each day are on us.',
-  promoSub: 'One per person per day, through November 25.',
+  promoSub: 'One free gift per person, through November 30. New free gifts every morning (US Eastern).',
   backToGift: 'Back to my gift',
   previewNote: 'You are the sender, seeing it exactly as they will.',
 } as const

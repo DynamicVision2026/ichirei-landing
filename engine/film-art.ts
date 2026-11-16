@@ -34,7 +34,7 @@ import type { Language } from './contract.ts'
 import { checkPictures as refereeDescriptions, type FilmRecord } from './film.ts'
 import { callSignal, timedOut } from './limits.ts'
 import type { OrderStore } from './order-store.ts'
-import { OLD_CHECK_SETTING, OLD_REWRITE_SETTING, swapOnce, western } from './film-western.ts'
+import { OLD_CHECK_SETTING, OLD_REWRITE_SETTING, swapOnce, world, worldLang } from './film-world.ts'
 import { plainDescription } from './film-plain.ts'
 import { checkEmpty } from './picture-pixels.ts'
 import { recordHealth } from './health.ts'
@@ -62,13 +62,13 @@ const RETRY_HINT: Record<string, string> = {
 }
 
 /**
- * The image prompt. For `en` (and only `en`): the style without "Japanese", then the Western world line, then the scene. For every other language — and when no language is given —
- * it is exactly what it has always been.
+ * The image prompt: the style ("Sumi-e ink-wash painting" for `en`, "Japanese sumi-e ink-wash painting" otherwise), the pale-paper line for a remembrance, then THIS language's world line
+ * (engine/film-world.<lang>.md — en, ja, zh; 2026-11-16), then the scene and any retry hint. With no language it is the style and the scene only, as it always was.
  */
-export const buildImagePrompt = (description: string, memorial: boolean, hint = '', language?: Language): string =>
-  language === 'en'
-    ? [IMAGE_STYLE_EN, memorial ? IMAGE_STYLE_MEMORIAL : '', western('image world'), `Scene: ${description.trim()}`, hint].filter(Boolean).join('\n')
-    : [IMAGE_STYLE, memorial ? IMAGE_STYLE_MEMORIAL : '', `Scene: ${description.trim()}`, hint].filter(Boolean).join('\n')
+export const buildImagePrompt = (description: string, memorial: boolean, hint = '', language?: Language): string => {
+  const wl = worldLang(language)
+  return [language === 'en' ? IMAGE_STYLE_EN : IMAGE_STYLE, memorial ? IMAGE_STYLE_MEMORIAL : '', wl ? world(wl, 'image world') : '', `Scene: ${description.trim()}`, hint].filter(Boolean).join('\n')
+}
 
 export const IMAGE_SIZE = { width: 1080, height: 1350 }
 
@@ -277,8 +277,9 @@ export function buildCheckPrompt(descriptions: string[], memorial: boolean, lang
     DESCRIPTIONS: descriptions.map((d, i) => `Picture ${i + 1}: ${d}`).join('\n'),
   }
   const text = readPrompt().replace(/\{\{ (MEMORIAL|DESCRIPTIONS|LANGUAGE) \}\}/g, (m) => values[m.slice(3, -3).trim()])
-  // English: the buyer's world is a contemporary American or European one (the ja / zh text is exactly as before)
-  return language === 'en' ? swapOnce(text, OLD_CHECK_SETTING, western('check setting')) : text
+  // the buyer's world: the clause naming all three worlds becomes this language's world only (2026-11-16)
+  const wl = worldLang(language)
+  return wl ? swapOnce(text, OLD_CHECK_SETTING, world(wl, 'check setting')) : text
 }
 
 export function parseVerdicts(raw: string, n: number): Verdict[] | null {
@@ -423,7 +424,8 @@ export function buildRewritePrompt(description: string, reason: string, memorial
     FEEDBACK: feedback,
   }
   const text = readRewritePrompt().replace(/\{\{ (REASON|LANGUAGE|MEMORIAL|DESCRIPTION|ANGLE|FEEDBACK) \}\}/g, (m) => values[m.slice(3, -3).trim()])
-  return language === 'en' ? swapOnce(text, OLD_REWRITE_SETTING, western('rewrite setting') + ')') : text
+  const wl = worldLang(language)
+  return wl ? swapOnce(text, OLD_REWRITE_SETTING, `(${world(wl, 'rewrite setting')})`) : text
 }
 
 /**
@@ -642,7 +644,8 @@ async function renderLocked(deps: ArtDeps, input: RenderInput): Promise<ArtRecor
       const signal = callSignal(deps.signal, timeout)
       if (w === 0) tries[slot]++
       try {
-        const hint = attempt > 1 && reasons[slot] ? (input.language === 'en' && reasons[slot] === 'setting' ? western('retry setting') : (RETRY_HINT[reasons[slot]] ?? '')) : ''
+        const wl = worldLang(input.language)
+        const hint = attempt > 1 && reasons[slot] ? (wl && reasons[slot] === 'setting' ? world(wl, 'retry setting') : (RETRY_HINT[reasons[slot]] ?? '')) : ''
         const r = await image.generate(buildImagePrompt(desc(slot), input.memorial, hint, input.language), signal)
         calls++
         afterRewrite.delete(slot)

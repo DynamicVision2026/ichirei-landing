@@ -17,6 +17,8 @@ import { promoDayEnd, promoDayKey, promoOn } from '../engine/promo.ts'
 import { holdForCart, holdOfBrowser, liveCount, markHoldUsed, placeHold, reapExpired, resetPromoCache, startCheckout, type PromoDeps } from '../engine/promo-holds.ts'
 import { promoConfig, promoShopifyFrom, type PromoShopify } from '../engine/promo-shopify.ts'
 import { createCart, loadShopifyConfig } from '../engine/shopify.ts'
+import { holdRefusal } from '../src/loop/copy.ts'
+import { emailHash as emailHashOf } from '../engine/customer.ts'
 
 let failures = 0
 function check(name: string, cond: boolean, detail?: string) {
@@ -41,7 +43,7 @@ const ENV = { ICHIREI_PROMO_FROM: '2026-11-15T04:00:00-05:00', ICHIREI_PROMO_UNT
   check('(1) a promo day runs 4:00 a.m. to 3:59 a.m. Eastern: the key switches at 4:00 a.m. Eastern', promoDayKey(at('2026-11-18T03:59:59-05:00')) === '2026-11-17' && promoDayKey(at('2026-11-18T04:00:00-05:00')) === '2026-11-18' && promoDayKey(at('2026-11-18T23:30:00-05:00')) === '2026-11-18' && promoDayKey(at('2026-11-19T02:00:00-05:00')) === '2026-11-18')
   check('(1) a day ends at the next 4:00 a.m. Eastern (09:00 UTC in November)', promoDayEnd(at('2026-11-18T15:00:00Z')).toISOString() === '2026-11-19T09:00:00.000Z' && promoDayEnd(at('2026-11-19T07:00:00Z')).toISOString() === '2026-11-19T09:00:00.000Z')
   const cb = readFileSync('cloudbuild.yaml', 'utf8')
-  check('(1) cloudbuild.yaml: the owner\'s window and numbers (from 2026-11-15 04:00 ET to 2026-11-25 23:59:59 ET; 100 a day, 120-minute holds, 3 holds a day, 30 minutes of checkout grace) and the old promo line is gone', /_PROMO_FROM: '2026-11-15T04:00:00-05:00'/.test(cb) && /_PROMO_UNTIL: '2026-11-25T23:59:59-05:00'/.test(cb) && /_PROMO_DAILY: '100'/.test(cb) && /_PROMO_HOLD_MINUTES: '120'/.test(cb) && /_PROMO_HOLDS_PER_DAY: '3'/.test(cb) && /_PROMO_CHECKOUT_GRACE_MINUTES: '30'/.test(cb) && !/Have today's code/.test(readFileSync('src/demo/sizes-copy.ts', 'utf8') + readFileSync('src/demo/OrderForm.tsx', 'utf8')))
+  check('(1) cloudbuild.yaml: the owner\'s window and numbers (from 2026-11-15 04:00 ET to 2026-11-30 23:59:59 ET (owner, Nov 15); 100 a day, 120-minute holds, 3 holds a day, 30 minutes of checkout grace) and the old promo line is gone', /_PROMO_FROM: '2026-11-15T04:00:00-05:00'/.test(cb) && /_PROMO_UNTIL: '2026-11-30T23:59:59-05:00'/.test(cb) && /_PROMO_DAILY: '100'/.test(cb) && /_PROMO_HOLD_MINUTES: '120'/.test(cb) && /_PROMO_HOLDS_PER_DAY: '3'/.test(cb) && /_PROMO_CHECKOUT_GRACE_MINUTES: '30'/.test(cb) && !/Have today's code/.test(readFileSync('src/demo/sizes-copy.ts', 'utf8') + readFileSync('src/demo/OrderForm.tsx', 'utf8')))
 }
 
 // ---- 2. the customer record ----------------------------------------------------------------------------------------------------------------------------------
@@ -249,6 +251,34 @@ const usedSlots = async (store: MemoryOrderStore, day: string, n: number) => { f
   check('(4) a used gift stays used for the day (the count: 1 given, 0 held)', (await liveCount(store2, ENV, new Date(NOW.getTime() + 500 * MIN), true)).used === 1)
 }
 {
+  // (E, 2026-11-16) one free gift per person for the WHOLE promotion (Shopify: THANKS100 once per customer): an email that used its gift yesterday cannot hold today — in either language
+  resetPromoCache()
+  const DAY = 24 * 60 * MIN
+  for (const [lang, email] of [['en', 'yesterday-en@example.com'], ['ja', 'yesterday-ja@example.com']] as const) {
+    const store = new MemoryOrderStore()
+    const sh = fakeShopify()
+    const y = await placeHold(deps(store, sh.api, NOW), { email, code: '', browser: B1, language: lang })
+    await markHoldUsed(deps(store, sh.api, new Date(NOW.getTime() + 10 * MIN)), { email, holdId: y.ok ? y.hold.id : null })
+    const tomorrow = new Date(NOW.getTime() + DAY)
+    const again = await placeHold(deps(store, sh.api, tomorrow), { email, code: '', browser: B2, language: lang })
+    const fresh = await placeHold(deps(store, sh.api, tomorrow), { email: `new-${lang}@example.com`, code: '', browser: B3, language: lang })
+    check(`(E) ${lang}: an email that used its free gift yesterday cannot hold today ("already received"); a new email can`, y.ok && !again.ok && again.code === 'already_given' && fresh.ok, JSON.stringify([again, fresh.ok]))
+    // a gift used before the promotion-wide marker existed: found by reading the earlier days' holds
+    const marker = `promo/used/${emailHashOf(email)}.json`
+    const hadMarker = store.objects.has(marker)
+    store.objects.delete(marker)
+    resetPromoCache()
+    const again2 = await placeHold(deps(store, sh.api, new Date(tomorrow.getTime() + 2 * DAY)), { email, code: '', browser: B2, language: lang === 'en' ? 'ja' : 'en' })
+    check(`(E) ${lang}: the use writes a promotion-wide marker; without it (an older gift) the gift is still found on its day, and from the other language's page too`, hadMarker && !again2.ok && again2.code === 'already_given' && store.objects.has(marker), JSON.stringify(again2))
+  }
+  check('(E) the message for it (en): "This email has already received its free gift. Thank you. You can give this one for $17.50."', holdRefusal('already_given', '$17.50') === 'This email has already received its free gift. Thank you. You can give this one for $17.50.')
+  check('(E) the message for it (ja): 「このメールアドレスでは、すでに無料ギフトをお受け取りいただいています。ありがとうございます。この贈りものは ¥3,980 でお贈りいただけます。」', holdRefusal('already_given', '¥3,980', 'ja') === 'このメールアドレスでは、すでに無料ギフトをお受け取りいただいています。ありがとうございます。この贈りものは ¥3,980 でお贈りいただけます。')
+  // (E2) no customer-facing string says "per person per day" / 「1日1回」
+  const files = ['src/loop/copy.ts', 'src/gift/ceremony/copy.ts', 'src/legal/legal-copy.ts', 'src/demo/i18n.ts', 'src/reveal/copy.ts', 'src/demo/sizes-copy.ts']
+  const bad = files.filter((f) => /per person per day|1日1回|一人一日/.test(readFileSync(f, 'utf8')))
+  check('(E) no customer-facing string contains "per person per day" or 「1日1回」 (card, order section, ceremony, /legal, landing, order form)', bad.length === 0, bad.join())
+}
+{
   // two instances racing for the last gift: exactly one hold
   resetPromoCache()
   const store = new MemoryOrderStore()
@@ -285,6 +315,15 @@ const usedSlots = async (store: MemoryOrderStore, day: string, n: number) => { f
     await createCart(cfg, 'egift', [{ key: '_kanji', value: '証' }], 'IC-20261118-ABCDEFGH', fj, lang)
     const want = JSON.stringify({ query: OLD_QUERY, variables: { input: { lines: [{ merchandiseId: cfg.variants.egift, quantity: 1, attributes: [{ key: '_kanji', value: '証' }] }], attributes: [{ key: 'order_ref', value: 'IC-20261118-ABCDEFGH' }] } } })
     check(`(5) ${lang}: the cart request body is byte-identical to 258da52 (no code, no email, no hold)`, raw[0] === want, raw[0])
+  }
+  // 2026-11-16: a JAPANESE holder's cart carries THANKS100, the hold's email and the hold id (the ja cart is in JPY; the e-gift totals ¥0); a ja non-holder's cart is exactly as before (above)
+  {
+    const rawJ: string[] = []
+    const fJ = (async (_u: string, init: RequestInit) => { rawJ.push(String(init.body)); return new Response(JSON.stringify({ data: { cartCreate: { cart: { id: 'gid://shopify/Cart/x', checkoutUrl: 'https://soul-id-2.myshopify.com/cart/c/abc?key=k', cost: { totalAmount: { amount: '0', currencyCode: 'JPY' } } }, userErrors: [] } } }), { status: 200 }) }) as typeof fetch
+    const r = await createCart(cfg, 'egift', [{ key: '_kanji', value: '証' }], 'IC-20261118-ABCDEFGH', fJ, 'ja', held ? { code: held.code, email: held.rec.email, holdId: held.rec.id } : undefined)
+    const body = JSON.parse(rawJ[0]) as { query: string; variables: { input: Record<string, any> } }
+    const inJ = body.variables.input
+    check('(A) ja: a holder\'s cart carries THANKS100, the hold\'s email (buyerIdentity.email, no US country) and the hold id; it is the ja mutation (no @inContext) and Shopify totals it ¥0 in JPY', !!held && inJ.discountCodes?.[0] === 'THANKS100' && inJ.buyerIdentity?.email === 'cart@example.com' && inJ.buyerIdentity?.countryCode === undefined && inJ.attributes.some((a: { key: string; value: string }) => a.key === 'ichirei_hold') && !/@inContext/.test(body.query) && r.currency === 'JPY', rawJ[0])
   }
   // the checkout grace: 30 minutes more once the owner of the hold goes to checkout
   const late = new Date(NOW.getTime() + 110 * MIN)
@@ -379,6 +418,28 @@ const usedSlots = async (store: MemoryOrderStore, day: string, n: number) => { f
   check('ops customers: found by email and by the Shopify order name, with the timeline, the order, the Shopify admin link and the basket count', byMail.includes('ordered_paid') && byMail.includes('#1018') && byMail.includes('https://admin.shopify.com/store/soul-id-2/orders?query=1018') && byOrder.includes('seen@example.com') && byMail.includes('1件'))
   check('ops customers: no moment text, no card text, no names — never', !byMail.includes('父が駅まで') && !byMail.includes('SECRET-CARD-TEXT') && !byOrder.includes('父が駅まで') && !byMail.includes('ひとこと'))
   check('ops customers: an unknown email says so', (await (await get('nobody@example.com')).text()).includes('customer-none'))
+}
+
+// ---- 2026-11-16: ONE pool for /en and the Japanese page ------------------------------------------------------------------------------------------------------
+{
+  resetPromoCache()
+  const store = new MemoryOrderStore()
+  const sh = fakeShopify()
+  // 60 gifts given on /en and 39 on /ja today (the slots do not know the language: one pool) …
+  await usedSlots(store, '2026-11-18', 99)
+  // … and one held from the Japanese page
+  const hj = await placeHold(deps(store, sh.api, NOW), { email: 'nihon@example.com', code: '', browser: 'V' + 'j'.repeat(22), language: 'ja' })
+  const left = (await liveCount(store, ENV, NOW, true)).left
+  const he = await placeHold(deps(store, sh.api, NOW), { email: 'usa@example.com', code: '', browser: 'V' + 'u'.repeat(22), language: 'en' })
+  const { createLoopHandlers } = await import('../api/loop.ts')
+  const { visitorToken, newVisitorId } = await import('../engine/visitor.ts')
+  resetPromoCache()
+  const loop = createLoopHandlers(() => ({ store, env: ENV, now: () => NOW, shopify: sh.api }))
+  const view = async (lang: string) => (await (await loop.promoState(new Request(`https://x/api/promo?lang=${lang}`, { headers: { cookie: `ic_v=${visitorToken(newVisitorId(), ENV)}` } }))).json()) as { left: number }
+  const enView = await view('en')
+  const jaView = await view('ja')
+  check('(A) one pool: 60 given on /en + 39 on /ja + 1 held from /ja → 0 left, on both pages; the next hold from either page is refused ("all held or given")', hj.ok && left === 0 && !he.ok && he.code === 'all_held' && enView.left === 0 && jaView.left === 0, JSON.stringify({ hj: hj.ok, left, he, enView, jaView }))
+  check('(A) the Japanese hold is recorded with its language (the customer record), the count is shared', [...store.objects.keys()].some((k) => k.startsWith('customers/')) && hj.ok)
 }
 
 console.log(failures === 0 ? '\nAll customer-loop checks passed.' : `\n${failures} customer-loop checks FAILED`)

@@ -57,10 +57,10 @@ const subscribe = (l: () => void): (() => void) => {
 
 export const usePromo = (): PromoState | null => useSyncExternalStore(subscribe, () => state, () => null)
 
-/** "8:42 PM" in the visitor's own time zone. */
-export const localTime = (iso: string): string => {
+/** "8:42 PM" (en) or "20:42" (ja) in the visitor's own time zone. */
+export const localTime = (iso: string, lang: string = 'en'): string => {
   try {
-    return new Date(iso).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })
+    return new Date(iso).toLocaleTimeString(lang === 'ja' ? 'ja-JP' : 'en-US', { hour: 'numeric', minute: '2-digit' })
   } catch {
     return iso
   }
@@ -75,7 +75,7 @@ export interface HoldAnswer {
 }
 
 /** "Hold my free gift" (the card and the order section): the email and the consent tick — no code since 2026-11-15; a `?code=…` in the page address is sent along and the server ignores a wrong one. */
-export async function requestHold(email: string, marketing: boolean): Promise<HoldAnswer> {
+export async function requestHold(email: string, marketing: boolean, lang: string = 'en'): Promise<HoldAnswer> {
   let code = ''
   try {
     code = (new URLSearchParams(window.location.search).get('code') ?? '').slice(0, 40)
@@ -83,7 +83,7 @@ export async function requestHold(email: string, marketing: boolean): Promise<Ho
     // no address to read
   }
   try {
-    const r = await fetch('/api/promo/hold', { method: 'POST', headers: { 'content-type': 'application/json' }, credentials: 'same-origin', body: JSON.stringify({ email, marketing, ...(code ? { code } : {}) }) })
+    const r = await fetch('/api/promo/hold', { method: 'POST', headers: { 'content-type': 'application/json' }, credentials: 'same-origin', body: JSON.stringify({ email, marketing, language: lang === 'ja' ? 'ja' : 'en', ...(code ? { code } : {}) }) })
     const j = (await r.json().catch(() => null)) as { ok?: boolean; code?: string; hold?: PromoHold; left?: number; existing?: boolean; link?: string | null } | null
     if (r.ok && j?.ok && j.hold) {
       setPromoHold(j.hold, j.left)

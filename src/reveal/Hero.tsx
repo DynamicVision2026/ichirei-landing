@@ -10,6 +10,7 @@ import { PACKAGE_PRICE_JPY } from '../order/packages.ts'
 import { useSale, useUsd } from '../demo/useSizes.ts'
 import { UsdPriceView } from '../order/SalePrice.tsx'
 import { usdLaunchLine } from '../order/usd.ts'
+import { writeLink } from './paths'
 
 const INTERVAL_MS = 6000
 const SWAP_MS = 350
@@ -98,7 +99,7 @@ export default function Hero({ lang, currency, rates, woodOnSale = false }: { la
           <p className="lead">{woodOnSale ? t.sub : t.subS}</p>
           {lang === 'en' && <p className="heroTokyo" data-testid="hero-tokyo">Designed in Tokyo. Delivered worldwide.</p>}
           <div className="ctaRow">
-            <a className="btn primary" href="#write">
+            <a className="btn primary" href={writeLink()}>
               {t.ctaHero}
             </a>
             <span className="free">{rich(t.freeLine)}</span>

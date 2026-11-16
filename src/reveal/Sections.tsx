@@ -13,6 +13,7 @@ import { PACKAGE_PRICE_JPY } from '../order/packages.ts'
 import { PriceWithSale, SaleLine, UsdLaunchLine, UsdPriceView } from '../order/SalePrice.tsx'
 import { salePriceJpy } from '../order/sale.ts'
 import { LEGAL, rowValue } from '../legal/legal-copy.ts'
+import { writeLink } from './paths'
 
 type T = (typeof TEXT)[RevealLang]
 
@@ -219,7 +220,7 @@ export function Steps({ t, memorial = false, woodOnSale = false }: { t: T; memor
         ))}
       </ol>
       <div className="wrap center" style={{ marginTop: '2.4rem' }}>
-        <a className="btn primary" href="#write">
+        <a className="btn primary" href={writeLink()}>
           {t.ctaSteps}
         </a>
       </div>
@@ -295,7 +296,7 @@ export function Reviews({ t }: { t: T }) {
             <b>{t.rvB}</b>
             <span>{t.rvP}</span>
           </p>
-          <a className="btn ghost" href="#write">
+          <a className="btn ghost" href={writeLink()}>
             {t.rvCta}
           </a>
         </div>
@@ -383,7 +384,7 @@ export function Gifts({
                     {sc.comingSoon}
                   </button>
                 ) : (
-                  <a className="btn primary" href="#write" data-testid={`gift-cta-${c.id}`}>
+                  <a className="btn primary" href={writeLink()} data-testid={`gift-cta-${c.id}`}>
                     {c.cta}
                   </a>
                 )}
@@ -453,7 +454,7 @@ export function Closing({ t, woodOnSale = false }: { t: T; woodOnSale?: boolean 
         </span>
         <h2>{t.clH}</h2>
         <p>{woodOnSale ? t.clP : t.clPS}</p>
-        <a className="btn primary" href="#write">
+        <a className="btn primary" href={writeLink()}>
           {t.ctaClose}
         </a>
       </div>
@@ -498,7 +499,7 @@ export function Dock({ t }: { t: T }) {
   }, [])
   return (
     <div className="dock" hidden={hide || flow} data-testid="dock">
-      <a className="btn primary" href="#write">
+      <a className="btn primary" href={writeLink()}>
         {t.dock}
       </a>
     </div>

@@ -2,6 +2,7 @@ import { Suspense, lazy } from 'react'
 import RevealPage from './reveal/RevealPage.tsx'
 import { setLanguage } from './lang-store.ts'
 import { captureUtm } from './demo/utm-store.ts'
+import { writeLangOf } from './reveal/paths.ts'
 
 // Minimal path-based routing (thin, per the harness's "choose thinner" rule):
 // /demo renders the validation harness; /track the order-status page; /a/<id> the private story animation of one order (the sender's page), /g/<token> the receiver's gift page; /credits its attributions; /legal the legal notice (特定商取引法), the return rules and three short questions; /claim the page for an order paid without our site; everything else the landing page
@@ -81,5 +82,12 @@ export default function Routes() {
   if (path === '/en' || path === '/en/') setLanguage('en')
   // /zh (2026-11-15): the Traditional Chinese page (its link preview is Chinese too: the server answers /zh with its own tags)
   if (path === '/zh' || path === '/zh/') setLanguage('zh-Hant')
+  // the writing room (2026-11-16): /en/write, /write (Japanese), /zh/write — the flow on a page of its own, same tab
+  const room = writeLangOf(path)
+  if (room) {
+    // the room's language is its address's (/write is Japanese) — unless the address names one (?lang=…, as the landing's own links can)
+    if (!new URLSearchParams(window.location.search).get('lang')) setLanguage(room)
+    return <RevealPage write />
+  }
   return <RevealPage />
 }

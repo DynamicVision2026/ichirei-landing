@@ -16,6 +16,7 @@ import { browserZone } from '../order/opens-at.ts'
 import '../gift/ceremony.css'
 import { SENDER_COPY } from './sender-copy.ts'
 import { openingLabelFromRecord } from '../order/opens-at.ts'
+import MyGiftsButton from '../loop/MyGifts.tsx'
 
 // The buyer's own page /a/<id> (2026-11-06): opened from the one link in the confirmation e-mail. The person who pays is the only person we deal with. Top to bottom:
 //   A welcome (the character, its reading, the 「どんな人か」 line, one small order line) · B send the gift (LINE, WhatsApp, WeChat QR, copy, e-mail; the preview) ·
@@ -54,6 +55,7 @@ export default function BuyerPage({ view, lang, preparing, onCollected }: { view
   if (o?.confirming)
     return (
       <div className="by-page" data-testid="buyer-page" data-state="confirming">
+        <div className="by-top"><MyGiftsButton lang={lang} /></div>
         <section className="an-panel by-confirming" data-testid="buyer-confirming" role="status">
           <p>{c.confirmingPayment}</p>
         </section>
@@ -63,6 +65,7 @@ export default function BuyerPage({ view, lang, preparing, onCollected }: { view
   if (o?.finishing && !o.collected)
     return (
       <div className="by-page" data-testid="buyer-page" data-state="finishing">
+        <div className="by-top"><MyGiftsButton lang={lang} /></div>
         <section className="an-panel by-finishing" data-testid="buyer-finishing" role="status">
           <p>{c.finishingGift}</p>
         </section>
@@ -116,6 +119,7 @@ export default function BuyerPage({ view, lang, preparing, onCollected }: { view
   const waiting = !view.film || (!view.film.pictures && !view.film.deferred)
   return (
     <div className="by-page" data-testid="buyer-page" data-quiet={quiet ? 'yes' : 'no'}>
+      <div className="by-top"><MyGiftsButton lang={lang} /></div>
       <section className="by-welcome" data-testid="buyer-welcome" aria-label={c.welcome}>
         <h1 className="by-welcome-line" data-testid="buyer-welcome-line">{c.welcome}</h1>
         <p className="an-char notranslate by-char" translate="no" data-testid="buyer-glyph">{view.glyph}</p>

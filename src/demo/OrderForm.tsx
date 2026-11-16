@@ -32,7 +32,7 @@ import { CLAIM_COPY } from '../claim/copy.ts'
 import { PriceWithSale, SaleLine, UsdLaunchLine } from '../order/SalePrice.tsx'
 import { salePriceJpy } from '../order/sale.ts'
 import { usePromoOn, useSale, useUsd } from './useSizes.ts'
-import OrderLine, { EnEgiftPrice } from '../loop/OrderLine.tsx'
+import OrderLine, { EnEgiftPrice, JaEgiftPrice } from '../loop/OrderLine.tsx'
 import { cleanReading } from '../order/reading.ts'
 
 // The purchase step of the customer flow: after the sender has chosen a character, collect
@@ -373,7 +373,7 @@ export default function OrderForm({ result, story, followUps = [], promptQuestio
                   </span>
                   {!claim && (
                     <span className="pkgPrice" data-price={id}>
-                      {language === 'en' && id === 'egift' ? <EnEgiftPrice price={usdPrice} sale={priceSale} id={id} promo={promoOn && !claim} /> : <PriceWithSale yen={PACKAGE_PRICE_JPY[id]} sale={priceSale} id={id} />}
+                      {language === 'en' && id === 'egift' ? <EnEgiftPrice price={usdPrice} sale={priceSale} id={id} promo={promoOn && !claim} /> : language === 'ja' && id === 'egift' ? <JaEgiftPrice sale={priceSale} id={id} promo={promoOn && !claim} fallback={<PriceWithSale yen={PACKAGE_PRICE_JPY[id]} sale={priceSale} id={id} />} /> : <PriceWithSale yen={PACKAGE_PRICE_JPY[id]} sale={priceSale} id={id} />}
                     </span>
                   )}
                   {!claim && (language === 'en' ? <UsdLaunchLine price={usdPrice} sale={priceSale} /> : <SaleLine sale={priceSale} lang={pageLang} />)}
@@ -460,7 +460,7 @@ export default function OrderForm({ result, story, followUps = [], promptQuestio
             </label>
           </>
         )}
-        {language === 'en' && promoOn && !claim && <OrderLine />}
+        {(language === 'en' || language === 'ja') && promoOn && !claim && <OrderLine lang={language} />}
         <button type="button" data-testid="order-submit" className="btn primary" onClick={submit} disabled={!valid || busy}>
           {phase === 'submitting' ? o.submitting : phase === 'redirecting' ? o.redirecting : claim ? claimCopy.make : o.submit}
         </button>

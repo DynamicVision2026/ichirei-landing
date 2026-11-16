@@ -258,10 +258,11 @@ export function createOrderHandler(deps: () => OrderDeps) {
 
     // 3. The Shopify cart.
     try {
-      // a held free gift (English, during the promotion): the cart carries the free-gift code, the hold's email and the hold id — otherwise NO code (2026-11-15)
+      // a held free gift (English or — 2026-11-16, one shared pool — Japanese, during the promotion): the cart carries the free-gift code, the hold's email and the hold id — otherwise NO code
       let heldCart: CartPromo | undefined
       let heldRec: Awaited<ReturnType<typeof holdForCart>> = null
-      if (order.language === 'en') {
+      // the free gift is an e-gift: a wooden size never carries the code (its price stays as shown)
+      if ((order.language === 'en' || order.language === 'ja') && order.package === 'egift') {
         try {
           heldRec = await holdForCart({ store: d.store, env: d.env ?? process.env, now: d.now }, { browser: record.visitor ?? null })
           if (heldRec) heldCart = { code: heldRec.code, email: heldRec.rec.email, holdId: heldRec.rec.id }

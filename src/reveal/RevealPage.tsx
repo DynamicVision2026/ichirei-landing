@@ -13,6 +13,10 @@ import { useComingSoon, useSizes } from '../demo/useSizes'
 import { SHIPS } from '../order/packages'
 import LoopBars from '../loop/LoopBars'
 import DaysOfThanks from '../loop/DaysOfThanks'
+import MyGiftsButton from '../loop/MyGifts'
+import WelcomeBack from '../loop/WelcomeBack'
+import { LOOP } from '../loop/copy'
+import { landingPath, writeHref, writePath } from './paths'
 
 // The story flow (composer → cards → order) is the heaviest part of the page and sits below the fold: it loads
 // right after the first paint, so the hero shows without waiting for it.
@@ -25,10 +29,13 @@ function setMeta(selector: string, attr: string, value: string) {
 }
 
 /**
- * The customer site (/): the Reveal design. HERO → strip → PHILOSOPHY → STORY SHAPE → ANGLES → WRITE (the real
- * flow: DemoApp in customer mode) → STEPS → MOMENTS → REVIEWS → GIFTS → FAQ → CLOSING.
+ * The customer site (/, /en, /zh): the Reveal design. HERO → (welcome back) → strip → PHILOSOPHY → STORY SHAPE → ANGLES → STEPS → MOMENTS → REVIEWS → GIFTS → FAQ → CLOSING.
+ * With `write` (2026-11-16) it is the writing room (/write, /en/write, /zh/write): a page of its own that holds ONLY the flow (DemoApp in customer mode: the choices, the moment,
+ * the characters, the result, the order section and checkout) under a reduced header — the wordmark, "My gifts" and a quiet "← Back". Every "Write your moment" leads there in the
+ * same tab; the phone's Back and "← Back" return to the landing page, and the draft, the hold and the saved gifts are kept (they are saved already). Old links with #write / #result
+ * (and the saved gifts' ?resume=) open the writing room.
  */
-export default function RevealPage() {
+export default function RevealPage({ write = false }: { write?: boolean }) {
   const [uiLang, setUiLang] = useLanguage()
   const lang = toRevealLang(uiLang)
   const t = TEXT[lang]
@@ -68,6 +75,21 @@ export default function RevealPage() {
     return () => document.documentElement.classList.remove('rv-page')
   }, [])
 
+  // the landing page: an old #write / #result link, or a saved gift's ?resume=, opens the writing room (same tab, the query kept)
+  const toRoom = !write && (window.location.hash === '#write' || window.location.hash === '#result' || new URLSearchParams(window.location.search).has('resume'))
+  useEffect(() => {
+    if (toRoom) window.location.replace(writePath(lang) + window.location.search)
+  }, [toRoom, lang])
+  // …also when only the hash changes on an open landing page (an old in-page link to #write)
+  useEffect(() => {
+    if (write) return
+    const onHash = () => {
+      if (window.location.hash === '#write' || window.location.hash === '#result') window.location.replace(writePath(lang) + window.location.search)
+    }
+    window.addEventListener('hashchange', onHash)
+    return () => window.removeEventListener('hashchange', onHash)
+  }, [write, lang])
+
   const aside: ReactNode = (
     <>
       <span className="eyebrow">{t.wrEye}</span>
@@ -79,6 +101,45 @@ export default function RevealPage() {
       </ul>
     </>
   )
+
+  if (toRoom) return null
+
+  if (write)
+    return (
+      <div className="rv writeRoom" id="top" data-testid="write-room">
+        <header className="top writeTop">
+          <div className="wrap">
+            <a className="brand" href={landingPath(lang)} data-testid="write-brand">
+              <span className="ji notranslate" aria-hidden="true">
+                字
+              </span>
+              <b>ICHIREI</b>
+            </a>
+            <div className="topR">
+              <MyGiftsButton lang={lang} />
+              <a className="writeBack" href={landingPath(lang)} data-testid="write-back">
+                {LOOP[lang].back}
+              </a>
+            </div>
+          </div>
+        </header>
+        <main>
+          <ClaimBanner language={uiLang} />
+          <Suspense
+            fallback={
+              <section className="tintBand" id="write">
+                <div className="wrap writeGrid">
+                  <div>{aside}</div>
+                  <div className="composer" style={{ minHeight: '40rem' }} aria-busy="true" />
+                </div>
+              </section>
+            }
+          >
+            <DemoApp mode="customer" aside={aside} />
+          </Suspense>
+        </main>
+      </div>
+    )
 
   return (
     <div className="rv" id="top">
@@ -98,7 +159,8 @@ export default function RevealPage() {
                 </button>
               ))}
             </div>
-            <a className="btn primary" href="#write">
+            <MyGiftsButton lang={lang} className="topGifts" />
+            <a className="btn primary" href={writeHref(lang)}>
               {t.ctaTop}
             </a>
           </div>
@@ -109,7 +171,8 @@ export default function RevealPage() {
         <LoopBars lang={lang} />
         <ClaimBanner language={uiLang} />
         <Hero lang={lang} currency={currency} rates={rates} woodOnSale={woodOnSale} />
-        {lang === 'en' && <DaysOfThanks />}
+        <WelcomeBack lang={lang} />
+        {(lang === 'en' || lang === 'ja') && <DaysOfThanks lang={lang} />}
         <Opening t={t} />
         {lang === 'en' && <UsBanner />}
         <Strip t={t} woodOnSale={woodOnSale} />
@@ -117,18 +180,6 @@ export default function RevealPage() {
         <Philosophy t={t} lang={lang} />
         <StoryShape t={t} />
         <Angles t={t} lang={lang} />
-        <Suspense
-          fallback={
-            <section className="tintBand" id="write">
-              <div className="wrap writeGrid">
-                <div>{aside}</div>
-                <div className="composer" style={{ minHeight: '40rem' }} aria-busy="true" />
-              </div>
-            </section>
-          }
-        >
-          <DemoApp mode="customer" aside={aside} />
-        </Suspense>
         <Steps t={t} memorial={memorial} woodOnSale={woodOnSale} />
         <Moments t={t} memorial={memorial} />
         <Reviews t={t} />

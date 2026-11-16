@@ -179,7 +179,7 @@ export function createLoopHandlers(deps: () => LoopDeps) {
       const body = (await readBody(req)) as Record<string, unknown> | 'big' | null
       if (!body || body === 'big' || typeof body !== 'object') return json(400, { error: 'bad_request', code: 'bad_request' })
       const browser = visitorOf(req, d.env)
-      const r = await placeHold(promoDeps(d), { email: body.email, code: body.code, browser, ip, marketing: body.marketing === true, language: 'en' })
+      const r = await placeHold(promoDeps(d), { email: body.email, code: body.code, browser, ip, marketing: body.marketing === true, language: body.language === 'ja' ? 'ja' : 'en' }) // one shared pool for /en and /ja (2026-11-16); the language is only recorded
       if (!r.ok) return json(r.code === 'unavailable' ? 503 : 200, { ok: false, code: r.code })
       const left = (await liveCount(d.store, d.env ?? process.env, now, true)).left
       const token = browser ? await ensureBasketToken(d.store, browser, now).catch(() => null) : null

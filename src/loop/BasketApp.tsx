@@ -7,6 +7,7 @@ import { setLanguage } from '../lang-store.ts'
 import { LOOP } from './copy.ts'
 import { refreshMe, setBasketCount } from './me.ts'
 import SavePanel from './SavePanel.tsx'
+import { writePath } from '../reveal/paths.ts'
 import './loop.css'
 import '../reveal/reveal.css'
 
@@ -28,8 +29,8 @@ const dateOf = (iso: string, lang: string): string => {
 }
 
 /**
- * The basket page (/basket) and the private link (/b/<token>). Every saved gift shows its character, its reading · word, the date and a small picture strip, with "Give this gift →" (its
- * result page opens on the landing) and "×" (deleted at once). A token that is not a basket's shows the normal landing page.
+ * "My gifts" (2026-11-16; the basket page before): /basket and the private link /b/<token>. Every saved gift shows its character, its word, the date and a small picture strip, with
+ * "Give this gift →" (its result page opens in the writing room of its language) and "×" (deleted at once). A token that is not a basket's shows the normal landing page.
  */
 export default function BasketApp() {
   const [uiLang] = useLanguage()
@@ -97,7 +98,7 @@ export default function BasketApp() {
     <div className="rv basketPage" data-testid="basket-page" lang={lang}>
       <div className="wrap">
         <div className="basketTop">
-          <a className="back" href="/#write">
+          <a className="back" href={writePath(lang)}>
             {c.backToWrite}
           </a>
           <SavePanel lang={lang} />
@@ -131,7 +132,7 @@ export default function BasketApp() {
                 <button type="button" className="x" aria-label={c.removeLabel} title={c.removeLabel} data-testid="basket-remove" onClick={() => void remove(i.id)}>
                   {c.remove}
                 </button>
-                <a className="btn primary" data-testid="basket-give" href={`/?resume=${encodeURIComponent(i.id)}`}>
+                <a className="btn primary" data-testid="basket-give" href={`${writePath(toRevealLang(i.language as never))}?resume=${encodeURIComponent(i.id)}`}>
                   {c.giveThis}
                 </a>
               </div>

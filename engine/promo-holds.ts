@@ -14,7 +14,7 @@ import { analyticsDay } from './analytics.ts'
 import { casJson, customerIdOf, emailHash, normalizeEmail, readCustomer, recordCustomerEvent, saveConsent, validEmail } from './customer.ts'
 import { recordHealth } from './health.ts'
 import type { OrderStore } from './order-store.ts'
-import { promoCheckoutGraceMinutes, promoDaily, promoDayEnd, promoDayKey, promoHoldMinutes, promoHoldsPerDay, promoOn } from './promo.ts'
+import { promoCheckoutGraceMinutes, promoDaily, promoDayEnd, promoDayKey, promoHoldMinutes, promoHoldsPerDay, promoOn, promoWindow } from './promo.ts'
 import { codeAllowed, promoConfig, type PromoShopify } from './promo-shopify.ts'
 
 const MIN = 60_000
@@ -76,6 +76,29 @@ export interface PromoDeps {
 
 const slotPath = (day: string, n: number, g: number): string => `promo/${day}/slots/${n}-${g}.json`
 const holdPath = (day: string, hash: string): string => `promo/${day}/holds/${hash}.json`
+/** (2026-11-16) one free gift per person for the WHOLE promotion (Shopify: THANKS100 once per customer): an email that used its free gift on any day is marked here. */
+const usedEverPath = (hash: string): string => `promo/used/${hash}.json`
+
+/**
+ * Has this email received its free gift at any time in the promotion (any day, either language)? The marker written when a gift is used answers at once; a gift used before the marker
+ * existed is found by reading this email's hold of each earlier promotion day (at most one small read per day), and the marker is written then.
+ */
+export async function usedInPromotion(store: OrderStore, env: NodeJS.ProcessEnv, hash: string, now: Date): Promise<boolean> {
+  if (await readJson<{ day: string }>(store, usedEverPath(hash))) return true
+  const win = promoWindow(env)
+  if (!win) return false
+  const first = promoDayKey(new Date(win.from))
+  let day = promoDayKey(now)
+  for (let i = 0; i < 60 && day >= first; i++) {
+    const r = await readJson<HoldRecord>(store, holdPath(day, hash))
+    if (r && r.status === 'used') {
+      await store.putObject(usedEverPath(hash), JSON.stringify({ day, at: now.toISOString() }), 'application/json').catch(() => false)
+      return true
+    }
+    day = analyticsDayBefore(day)
+  }
+  return false
+}
 const ipPath = (day: string, ip: string, k: number): string => `promo/${day}/ip/${createHash('sha256').update(ip).digest('hex').slice(0, 16)}-${k}.json`
 const newHoldId = (): string => {
   let out = 'H-'
@@ -237,6 +260,8 @@ export async function placeHold(d: PromoDeps, input: PlaceInput): Promise<PlaceR
   const hash = emailHash(email)
   const browser = input.browser && /^V[A-Za-z0-9_-]{22}$/.test(input.browser) ? input.browser : null
   const existing = await readJson<HoldRecord>(store, holdPath(day, hash))
+  // one free gift per person for the whole promotion (2026-11-16, matching Shopify's "once per customer"): an email that received one on ANY day, in either language, holds no more
+  if (!(existing && (existing.status === 'active' || existing.status === 'checkout')) && (await usedInPromotion(store, env, hash, now))) return { ok: false, code: 'already_given' }
   if (existing) {
     const view = await viewHold(store, existing, now)
     if (view.state === 'active' || view.state === 'checkout') {
@@ -343,6 +368,7 @@ export async function markHoldUsed(d: PromoDeps, ref: { holdId?: string | null; 
   const rec = found
   await casJson<SlotRecord>(store, slotPath(rec.day, rec.slot.n, rec.slot.g), (cur) => (cur && cur.hold === rec.id ? { ...cur, state: 'used', reaped: true } : null))
   await casJson<HoldRecord>(store, holdPath(rec.day, rec.email_hash), (cur) => (cur ? { ...cur, status: 'used', used_at: now.toISOString() } : null))
+  await store.putObject(usedEverPath(rec.email_hash), JSON.stringify({ day: rec.day, at: now.toISOString() }), 'application/json').catch(() => false)
   cache.delete(rec.day)
   if (rec.shopify_customer && d.shopify) await d.shopify.removeEligible(rec.shopify_customer).catch(() => d.log?.(`[ichirei-promo] ${JSON.stringify({ event: 'remove_eligible_failed' })}`))
   await recordCustomerEvent(store, { email: rec.email, browser: rec.browsers[0] ?? null }, 'hold_used', {}, now)
