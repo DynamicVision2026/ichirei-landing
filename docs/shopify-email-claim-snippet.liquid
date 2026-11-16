@@ -1,5 +1,5 @@
 {%- comment -%}
-  ICHIREI — "your gift isn't made yet" line for an order that was paid WITHOUT going through ichirei.soul-id.jp (a store page, a ChatGPT checkout). That order has an ICHIREI
+  ICHIREI — "your gift isn't made yet" line for an order that was paid WITHOUT going through ichirei.beyondculture.ai (a store page, a ChatGPT checkout). That order has an ICHIREI
   line but none of our hidden gift properties (the order reference `_order_ref`), so there is no story and no character yet.
 
   WHERE TO PASTE IT: inside the existing ICHIREI block of the order-confirmation e-mail (docs/ichirei-order-email.liquid), directly AFTER this line of the loop:
@@ -12,7 +12,7 @@
     - an ICHIREI line WITHOUT one (a waiting order): this prints the line below + the link, and then `continue` skips the rest of the existing block for that line.
     - any other product: the first condition is false; nothing changes.
   The language is the buyer's checkout language (order.locale; Japanese when Shopify does not say). The link is
-  https://ichirei.soul-id.jp/claim?o={{ order.name | url_encode }}  — the buyer then types the order number and the e-mail used at checkout.
+  https://ichirei.beyondculture.ai/claim?o={{ order.name | url_encode }}  — the buyer then types the order number and the e-mail used at checkout.
 {%- endcomment -%}
 {%- if ichirei_ref == blank and line.sku contains 'ICHIREI-' -%}
   {%- assign claim_lang = line.properties['_language'] | default: line.properties['language'] | default: order.locale | default: order.customer_locale | default: 'ja' | downcase -%}
@@ -32,6 +32,6 @@
     {%- assign claim_text = "Your gift isn't made yet. Write your story and choose the character here:" -%}
   {%- endif -%}
   <p><strong>{{ claim_heading }}</strong></p>
-  <p>{{ claim_text }}<br><a href="https://ichirei.soul-id.jp/claim?o={{ order.name | url_encode }}">https://ichirei.soul-id.jp/claim?o={{ order.name | url_encode }}</a></p>
+  <p>{{ claim_text }}<br><a href="https://ichirei.beyondculture.ai/claim?o={{ order.name | url_encode }}">https://ichirei.beyondculture.ai/claim?o={{ order.name | url_encode }}</a></p>
   {%- continue -%}
 {%- endif -%}

@@ -41,7 +41,7 @@ const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms))
   const ids = new Set(Array.from({ length: 500 }, () => newAnimationId()))
   check('(1) ids: AN- + 20 characters from a 32-symbol alphabet (100 bits), unique, and they fit the order store\'s key rule', ids.size === 500 && [...ids].every((i) => ANIMATION_ID_PATTERN.test(i) && /^[A-Za-z0-9-]{1,64}$/.test(i)))
   check('(1) …and nothing guessable is accepted: other prefixes, short ids, upper case, path tricks', !['AN-short', 'IC-20261023-ABCDEFGH', 'an-abcdefghjkmnpqrstuvw', 'AN-../../../etc/passwd', 'AN-ABCDEFGHJKMNPQRSTUVW', ''].some((i) => ANIMATION_ID_PATTERN.test(i)))
-  check('(1) the public address: https://ichirei.soul-id.jp/a/<id> by default, ICHIREI_PUBLIC_URL overrides (a trailing slash is dropped)', animationUrl('AN-abcdefghjkmnpqrstuvw', {} as never) === 'https://ichirei.soul-id.jp/a/AN-abcdefghjkmnpqrstuvw' && publicUrl({ ICHIREI_PUBLIC_URL: 'https://x.example/' } as never) === 'https://x.example')
+  check('(1) the public address: https://ichirei.beyondculture.ai/a/<id> by default, ICHIREI_PUBLIC_URL overrides (a trailing slash is dropped)', animationUrl('AN-abcdefghjkmnpqrstuvw', {} as never) === 'https://ichirei.beyondculture.ai/a/AN-abcdefghjkmnpqrstuvw' && publicUrl({ ICHIREI_PUBLIC_URL: 'https://x.example/' } as never) === 'https://x.example')
 }
 
 const GOLD = JSON.parse(read('scripts/golden-fixture.json'))
@@ -315,7 +315,7 @@ const READY: FilmRecord = { status: 'ready', made_at: NOW.toISOString(), picture
   const attrs = carts[0].variables.input.lines[0].attributes as { key: string; value: string }[]
   const link = attrs.find((a) => a.key === '_ichirei_animation_url')?.value ?? ''
   const id = link.split('/').pop() ?? ''
-  check('(5) an order makes its film with no manual step: the response and the Shopify line item carry the private address (ichirei_animation_url), https://ichirei.soul-id.jp/a/AN-…', res.status === 200 && j.animation_url === link && /^https:\/\/ichirei\.soul-id\.jp\/a\/AN-[a-z2-9]{20}$/.test(link))
+  check('(5) an order makes its film with no manual step: the response and the Shopify line item carry the private address (ichirei_animation_url), https://ichirei.beyondculture.ai/a/AN-…', res.status === 200 && j.animation_url === link && /^https:\/\/ichirei\.beyondculture\.ai\/a\/AN-[a-z2-9]{20}$/.test(link))
   const stored = (await store.get(id)) as AnimationRecord
   const order = (await store.get(j.order_ref)) as any
   check('(5) …the film script is saved on the animation record (what the page plays) AND with the order (production.film, beside the certificate data); the order points to the animation; the pictures are NOT drawn at order time (unpaid orders cost nothing for pictures)', isAnimationRecord(stored) && stored.film?.status === 'ready' && stored.film.lines.length === 4 && order.production.film?.status === 'ready' && order.production.film.pictures.join() === READY.pictures.join() && order.animation_id === id && stored.order_ref === j.order_ref && (await store.getObject(`films/${id}/art.json`)) === null && (await store.getObject(`films/${id}/1.webp`)) === null)

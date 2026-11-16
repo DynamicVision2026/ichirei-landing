@@ -183,7 +183,7 @@ export default function BuyerPage({ view, lang, preparing, onCollected }: { view
           <a className="an-btn" data-testid="give-mail" onClick={markShared} href={`mailto:?subject=${encodeURIComponent(s.mailSubject)}&body=${encodeURIComponent(message)}`}>{s.email}</a>
         </p>
         )}
-        <Schedule animationId={view.id} lang={lang} quiet={quiet || isQuietPurpose(view.purpose)} to={g.to ?? ''} giftUrl={g.url} opensOn={g.opens_on} opensAt={g.opens_at} opensTz={g.opens_tz} />
+        <Schedule animationId={view.id} lang={lang} quiet={quiet || isQuietPurpose(view.purpose)} to={g.to ?? ''} giftUrl={g.url} senderUrl={g.sender_url} opensOn={g.opens_on} opensAt={g.opens_at} opensTz={g.opens_tz} />
         <label className="an-field">
           <span>{s.linkLabel}</span>
           <input readOnly value={g.url} onFocus={(e) => e.currentTarget.select()} data-testid="give-link" />

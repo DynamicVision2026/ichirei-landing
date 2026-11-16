@@ -42,6 +42,7 @@ import { envRunLimiter } from '../engine/rate-limit.ts'
 import { ensureVisitor } from '../engine/visitor.ts'
 import { withHeartbeat } from './heartbeat.ts'
 import { injectLandingShare, landingShare } from '../engine/landing-share.ts'
+import { oldHostRedirect } from './old-host.ts'
 
 export interface ServerConfig {
   /** Max time to receive a full request from the client (Node http server). */
@@ -104,6 +105,14 @@ export function createApp(config: ServerConfig): Hono {
     }
     await next()
   }
+
+  // The old address (server/old-host.ts, 2026-11-16): off unless ICHIREI_REDIRECT_OLD_HOST=1; then a page GET on ichirei.soul-id.jp answers 301 to the same path and query on
+  // publicUrl(). /api/* (the Shopify webhook included), /ops* and every non-GET request are never redirected. First, so nothing else runs for a redirected request.
+  app.use('*', async (c, next) => {
+    const to = oldHostRedirect(c.req.raw)
+    if (!to) return next()
+    return new Response(null, { status: 301, headers: { location: to, 'cache-control': 'public, max-age=3600' } })
+  })
 
   // The private pages (the buyer's /a/<id>, the receiver's /g/<token>) and their API routes never leak their address in a Referer header when a link, a font or an image
   // is fetched from them (2026-11-14). Registered first so it also wraps the routes below.

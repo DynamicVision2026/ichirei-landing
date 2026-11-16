@@ -24,7 +24,7 @@
       {%- assign claim_text = "Your gift isn't made yet. Write your story and choose the character here:" -%}
     {%- endif -%}
     <p><strong>{{ claim_heading }}</strong></p>
-    <p>{{ claim_text }}<br><a href="https://ichirei.soul-id.jp/claim?o={{ order.name | url_encode }}">https://ichirei.soul-id.jp/claim?o={{ order.name | url_encode }}</a></p>
+    <p>{{ claim_text }}<br><a href="https://ichirei.beyondculture.ai/claim?o={{ order.name | url_encode }}">https://ichirei.beyondculture.ai/claim?o={{ order.name | url_encode }}</a></p>
     {%- continue -%}
   {%- endif -%}
   {%- if ichirei_ref != blank or line.sku contains 'ICHIREI-' -%}

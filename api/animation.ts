@@ -109,13 +109,14 @@ export function createAnimationHandlers(deps: () => AnimationDeps) {
       const rec = await withScript(r.rec, d, false)
       const art = filmUsable(rec.film) && rec.film.status === 'ready' ? await safeArt(d.store, rec.id) : null
       const view = animationView(rec, art)
+      view.url = animationUrl(rec.id, d.env)
       // the sender's page only: what to share with the receiver and where the order stands (no price, no names)
       let legacyCollected: string | null = null // a gift from before order records existed: opens only if its own record says it was collected
       if (rec.gift_token && d.store) {
         try {
           const g = await d.store.get(rec.gift_token)
           if (isGiftRecord(g)) legacyCollected = g.collected_at ?? null
-          if (isGiftRecord(g)) view.gift = { url: giftUrl(g.token, d.env), size_code: g.size_code, ship_to: g.ship_to, egift_state: g.egift?.state ?? null, opens_on: g.opens_on ?? null, opens_at: g.opens_at ?? null, opens_tz: g.opens_tz ?? null, certificate_no: g.certificate_no ?? null, reply: g.reply ?? null, to: g.to, states: { shared_at: g.shared_at ?? null, opened_at: g.opened_at ?? null, answered_at: g.answered_at ?? g.reply?.at ?? null } }
+          if (isGiftRecord(g)) view.gift = { url: giftUrl(g.token, d.env), sender_url: animationUrl(rec.id, d.env), size_code: g.size_code, ship_to: g.ship_to, egift_state: g.egift?.state ?? null, opens_on: g.opens_on ?? null, opens_at: g.opens_at ?? null, opens_tz: g.opens_tz ?? null, certificate_no: g.certificate_no ?? null, reply: g.reply ?? null, to: g.to, states: { shared_at: g.shared_at ?? null, opened_at: g.opened_at ?? null, answered_at: g.answered_at ?? g.reply?.at ?? null } }
         } catch {
           // the page works without it
         }

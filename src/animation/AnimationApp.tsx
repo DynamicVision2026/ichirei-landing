@@ -378,7 +378,7 @@ export function Film({ view, film, copy, giftMode = false, onEnd }: { view: Anim
 
   const share = useCallback(async () => {
     // the sender's page shares the RECEIVER's link (never its own); the receiver's page and the samples share their own address
-    const url = view.gift?.url ?? window.location.href
+    const url = view.gift?.url ?? view.url ?? window.location.href
     try {
       if (navigator.share) await navigator.share({ title: copy.title, url })
       else {
@@ -389,7 +389,7 @@ export function Film({ view, film, copy, giftMode = false, onEnd }: { view: Anim
     } catch {
       // the share sheet was dismissed
     }
-  }, [copy, view.gift?.url])
+  }, [copy, view.gift?.url, view.url])
 
   const [q0, q1] = copy.quote
   void q0

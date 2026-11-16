@@ -22,7 +22,9 @@ export interface AnimationView {
   /** null = the script is still being written; pictures null = drawn on the first open (the page asks POST /api/film/<id>/render); deferred = the daily limit. */
   film: { status: 'ready' | 'fallback'; lines: string[]; pictures: string[] | null; deferred?: boolean; incomplete?: boolean; pending?: number[]; substituted?: number[]; no_pictures?: boolean } | null
   /** The sender's page only: what to share with the receiver and where the order stands. */
-  gift?: { url: string; size_code: string; ship_to: string; egift_state: 'waiting' | 'received' | null; opens_on: string | null; opens_at?: string | null; opens_tz?: string | null; certificate_no: number | null; reply: { text: string; at: string; char?: string } | null; to?: string; states?: { shared_at: string | null; opened_at: string | null; answered_at: string | null } } | null
+  /** this page's own public address (publicUrl()/a/<id>), what a sample shares */
+  url?: string
+  gift?: { url: string; /** the sender's own page (publicUrl()/a/<id>), for the calendar event */ sender_url?: string; size_code: string; ship_to: string; egift_state: 'waiting' | 'received' | null; opens_on: string | null; opens_at?: string | null; opens_tz?: string | null; certificate_no: number | null; reply: { text: string; at: string; char?: string } | null; to?: string; states?: { shared_at: string | null; opened_at: string | null; answered_at: string | null } } | null
   /** The buyer's page only: when it was ordered, the end of the 24-hour change window while it is open (else null), and the wooden gift's step (null = no wood section). */
   order?: { confirming?: boolean; finishing?: boolean; collected: boolean; ordered_at: string | null; change_until: string | null; wood: { step: 1 | 2 | 3 | 4; tracking_no: string | null; ship_to: 'me' | 'direct' } | null } | null
   /** The shop's support address, printed as plain text; null / absent = left out. */

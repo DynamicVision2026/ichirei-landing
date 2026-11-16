@@ -122,7 +122,7 @@ const mem = inflateAll(await cardsPdf([memWork]))
 check('(3) cinnabar (#C0392B) is the main character\'s and nothing else; for remembrance there is no cinnabar anywhere on the card', /0\.7529\d* 0\.2235\d* 0\.1686\d* scn/.test(one) && !/0\.7529\d* 0\.2235\d* 0\.1686\d*/.test(mem) && /0\.9372\d* 0\.9019\d* 0\.8235\d* scn/.test(one))
 check('(3) the pictures are embedded at full size (1080 × 1350 JPEGs), one per slot', (one.match(/\/I\d+ Do/g) ?? []).length >= 4 && (txt.match(/\/Width 1080/g) ?? []).length >= 4 && (txt.match(/\/Height 1350/g) ?? []).length >= 4)
 check('(3) the 「さんへ / より」 lines: blank (＿＿) when the sender hands it over; filled with the names and the message when it ships directly or as an e-gift — the artwork says so', loadArtwork !== undefined && (await loadArtwork(store, { ...a1.gift, ship_to: 'me' }, a1.anim, art)).from === '' && (await loadArtwork(store, { ...a1.gift, ship_to: 'me' }, a1.anim, art)).message === '' && (await loadArtwork(store, { ...a1.gift, ship_to: 'direct', message: 'いつも、ありがとう。' }, a1.anim, art)).from === '山田 太郎' && (await loadArtwork(store, { ...a1.gift, ship_to: 'direct', message: 'いつも、ありがとう。' }, a1.anim, art)).message === 'いつも、ありがとう。')
-check('(3) the QR code points to the RECEIVER\'s page, never the sender\'s', work.qrUrl === `https://ichirei.soul-id.jp/g/${a1.token}` && !work.qrUrl.includes(a1.animId))
+check('(3) the QR code points to the RECEIVER\'s page, never the sender\'s', work.qrUrl === `https://ichirei.beyondculture.ai/g/${a1.token}` && !work.qrUrl.includes(a1.animId))
 
 // ---- 4. /ops ----------------------------------------------------------------------------------------------------------------------------------------
 const opsStore = new MemoryOrderStore()

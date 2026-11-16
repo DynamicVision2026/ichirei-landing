@@ -253,7 +253,7 @@ let claimRef = ''
   const ja = run(NEW, [waitingLine], { name: '#1016', locale: 'ja' })
   const zh = run(NEW, [waitingLine], { name: '#1016', locale: 'zh-TW' })
   const zhs = run(NEW, [waitingLine], { name: '#1016', locale: 'zh-CN' })
-  check('(7) a waiting order (ICHIREI line, no gift reference) shows the line and the link, in en', en.includes("Your gift isn't made yet. Write your story and choose the character here:") && en.includes('https://ichirei.soul-id.jp/claim?o=%231016'))
+  check('(7) a waiting order (ICHIREI line, no gift reference) shows the line and the link, in en', en.includes("Your gift isn't made yet. Write your story and choose the character here:") && en.includes('https://ichirei.beyondculture.ai/claim?o=%231016'))
   check('(7) …in ja 「贈りものは、まだできていません。こちらから物語を書いて、字を選んでください：」 and zh-Hant 「禮物還沒有完成。請從這裡寫下故事、選出那個字：」 (zh-Hans through OpenCC)', ja.includes('贈りものは、まだできていません。こちらから物語を書いて、字を選んでください：') && zh.includes('禮物還沒有完成。請從這裡寫下故事、選出那個字：') && zhs.includes('礼物还没有完成。请从这里写下故事、选出那个字：') && ja.includes('claim?o=%231016') && zh.includes('claim?o=%231016'))
   check('(7) …and nothing of the normal block (no "your gift is ready" button, no 24-hour line, no character line) for that line', !en.includes('/a/AN-') && !/Open your order page|Within 24 hours|Character:/.test(en) && !ja.includes('ご注文ページを開く'))
   check('(7) an order number with a # is url-encoded (%23) in the link; a line with its own _language property wins over the order locale', run(NEW, [{ sku: 'ICHIREI-EGIFT', properties: { _language: 'ja' } }], { name: '#1016', locale: 'en' }).includes('贈りものは、まだできていません') && /claim\?o=%23\d+/.test(en))

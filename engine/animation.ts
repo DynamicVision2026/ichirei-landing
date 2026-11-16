@@ -16,7 +16,7 @@ import { purposeFromOccasion } from '../src/order/purpose.ts'
 
 export const ANIMATION_ID_PATTERN = /^AN-[a-z2-9]{20}$/
 const ALPHABET = 'abcdefghijkmnpqrstuvwxyz23456789' // 32 symbols → 100 bits in 20 characters; no look-alikes (l, o, 0, 1)
-export const DEFAULT_PUBLIC_URL = 'https://ichirei.soul-id.jp'
+export const DEFAULT_PUBLIC_URL = 'https://ichirei.beyondculture.ai'
 
 export const newAnimationId = (random: (n: number) => Uint8Array = randomBytes): string => {
   let id = 'AN-'
@@ -102,8 +102,10 @@ export interface AnimationView {
    * The plain washi tile is never what a customer sees as "a picture".
    */
   film: { status: 'ready' | 'fallback'; lines: string[]; pictures: string[] | null; deferred?: boolean; incomplete?: boolean; pending?: number[]; substituted?: number[]; no_pictures?: boolean } | null
+  /** This page's own address (publicUrl()/a/<id>; api/animation.ts adds it): what a sample or a page with no gift shares. */
+  url?: string
   /** The sender's page only (api/animation.ts adds it): what to share and where the order stands. */
-  gift?: { url: string; size_code: string; ship_to: string; egift_state: 'waiting' | 'received' | null; opens_on: string | null; opens_at?: string | null; opens_tz?: string | null; certificate_no: number | null; reply: { text: string; at: string; char?: string } | null; /** the receiver's name as the sender typed it (for the calendar event) */ to?: string; /** the ceremony's states (codes only): when the gift was sent, opened and answered */ states?: { shared_at: string | null; opened_at: string | null; answered_at: string | null } } | null
+  gift?: { url: string; /** the sender's own page (publicUrl()/a/<id>), for the calendar event */ sender_url?: string; size_code: string; ship_to: string; egift_state: 'waiting' | 'received' | null; opens_on: string | null; opens_at?: string | null; opens_tz?: string | null; certificate_no: number | null; reply: { text: string; at: string; char?: string } | null; /** the receiver's name as the sender typed it (for the calendar event) */ to?: string; /** the ceremony's states (codes only): when the gift was sent, opened and answered */ states?: { shared_at: string | null; opened_at: string | null; answered_at: string | null } } | null
   /** The buyer's page only (engine/buyer.ts): when it was ordered, the end of the 24-hour change window while it is open, and the wooden gift's step. */
   order?: import('./buyer.ts').BuyerOrderView | null
   /** The shop's support address (ICHIREI_SUPPORT_EMAIL), printed as plain text on the buyer's page; null when none is set. */

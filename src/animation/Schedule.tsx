@@ -12,7 +12,16 @@ import type { PageLang } from './copy.ts'
 // only until it has passed) · pick a date and time — read in the zone where the receiver will open it (the browser's by default). The moment is stored as a UTC instant with the zone, as for A8. Nothing is sent by us:
 // the calendar event carries the receiver's link and the sender's own page, and the sender can check there.
 
-export default function Schedule({ animationId, lang, quiet, to, giftUrl, opensOn, opensAt, opensTz }: { animationId: string; lang: PageLang; quiet: boolean; to: string; giftUrl: string; opensOn: string | null; opensAt?: string | null; opensTz?: string | null }) {
+/** The sender's page on the host the server named for the receiver's link (both come from publicUrl()), never the host this page happens to be open on. */
+const sameHostAs = (url: string, path: string): string => {
+  try {
+    return `${new URL(url).origin}${path}`
+  } catch {
+    return ''
+  }
+}
+
+export default function Schedule({ animationId, lang, quiet, to, giftUrl, senderUrl, opensOn, opensAt, opensTz }: { animationId: string; lang: PageLang; quiet: boolean; to: string; giftUrl: string; /** the sender's own page, as the server built it (publicUrl()) */ senderUrl?: string; opensOn: string | null; opensAt?: string | null; opensTz?: string | null }) {
   const c = CEREMONY_COPY[lang]
   const cc = CHOICE_COPY[lang]
   const cal = CAL_BUTTON[lang]
@@ -51,7 +60,7 @@ export default function Schedule({ animationId, lang, quiet, to, giftUrl, opensO
     if (!target) return
     void save({ date: target.date, time: `${String(target.hour).padStart(2, '0')}:${String(target.minute).padStart(2, '0')}` })
   }
-  const event: CalendarEvent | null = saved ? { lang, to, start: saved.at, giftUrl, senderUrl: `${window.location.origin}/a/${animationId}` } : null
+  const event: CalendarEvent | null = saved ? { lang, to, start: saved.at, giftUrl, senderUrl: senderUrl || sameHostAs(giftUrl, `/a/${animationId}`) } : null
   const google = event ? googleCalendarUrl(event) : null
   const downloadIcs = () => {
     if (!event) return

@@ -147,9 +147,14 @@ export default function Hero({ lang, currency, rates, woodOnSale = false }: { la
                 {e.k}
               </span>
               <div className="meta">
-                <span className="rd">
-                  {e.rd} <small>· {e.m}</small>
-                </span>
+                {/* English shows the English word only, never the romanized reading (owner's rule, 2026-11-16) */}
+                {lang === 'en' ? (
+                  <span className="rd" data-testid="hero-sample-word">{e.m}</span>
+                ) : (
+                  <span className="rd">
+                    {e.rd} <small>· {e.m}</small>
+                  </span>
+                )}
                 <p className="gz">{e.gz}</p>
               </div>
             </div>

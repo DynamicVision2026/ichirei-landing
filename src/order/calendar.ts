@@ -83,7 +83,7 @@ export function icsText(e: CalendarEvent, uid: string, now: Date = new Date()): 
     'CALSCALE:GREGORIAN',
     'METHOD:PUBLISH',
     'BEGIN:VEVENT',
-    `UID:${uid}@ichirei.soul-id.jp`,
+    `UID:${uid}@ichirei.beyondculture.ai`,
     `DTSTAMP:${stamp(now.getTime())}`,
     `DTSTART:${stamp(d.from)}`,
     `DTEND:${stamp(d.to)}`,

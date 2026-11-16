@@ -5358,6 +5358,33 @@ for (const [lang, locale, text] of [['en', 'en-US', 'Your gift is being finished
   }
 }
 
+// ---------- Run 36 (2026-11-16, new main address): the /en sample cards show the English word only ("the question"), never the romanized reading ("toi · the question");
+// the Japanese cards keep their reading ----------
+{
+  const EN_WORDS = ['tomoshibi', 'irodori', 'osoi', 'tatsu', 'toi', 'tate']
+  const { page, errors } = await mockPage(browser)
+  await page.setViewportSize({ width: 390, height: 844 })
+  await page.goto('http://localhost:5173/en')
+  await page.locator('.reveal .rd').first().waitFor({ timeout: 10000 })
+  const dots = page.locator('.dots button')
+  const n = await dots.count()
+  const seen = []
+  for (let i = 0; i < n; i++) {
+    await dots.nth(i).click()
+    await page.waitForTimeout(900)
+    seen.push((await page.locator('.reveal .rd').first().innerText()).trim())
+  }
+  check(`/en: all ${n} hero sample cards show the English word only (${seen.join(' | ')}), "the question" among them`, n === 6 && seen.includes('the question') && seen.every((t) => !t.includes('·') && !EN_WORDS.some((w) => new RegExp(`\\b${w}\\b`).test(t))), seen.join(' | '))
+  check('/en: the hero says "toi" nowhere', !/\btoi\b/.test(await page.locator('.hero, section').first().innerText()))
+  check('no page errors (run 36, /en hero)', errors.length === 0, errors.join('; '))
+  await page.close()
+  const ja = await mockPage(browser)
+  await ja.page.goto('http://localhost:5173/?lang=ja')
+  await ja.page.locator('.reveal .rd').first().waitFor({ timeout: 10000 })
+  check('ja: the hero card keeps its reading and its meaning (「…  · …」)', (await ja.page.locator('.reveal .rd').first().innerText()).includes('·'))
+  await ja.page.close()
+}
+
 await browser.close()
 console.log(failures === 0 ? '\nALL E2E CHECKS PASSED' : `\n${failures} CHECKS FAILED`)
 process.exit(failures === 0 ? 0 : 1)

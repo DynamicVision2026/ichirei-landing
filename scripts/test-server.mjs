@@ -56,8 +56,8 @@ try {
         h.includes('<meta name="description" content="Tell us one true moment with someone. We find the single character that holds how you see them, and seal it as a gift you can send today." />') &&
         h.includes('<meta property="og:title" content="Between you and me, one character." />') &&
         h.includes('<meta property="og:description" content="Tell us one true moment with someone. We find the single character that holds how you see them, and seal it as a gift you can send today." />') &&
-        h.includes('<meta property="og:locale" content="en_US" />') && h.includes('<meta property="og:url" content="https://ichirei.soul-id.jp/en" />') &&
-        h.includes('<meta property="og:image" content="https://ichirei.soul-id.jp/img/og/en.jpg" />') && h.includes('og:image:width" content="1200"') && h.includes('og:image:height" content="630"') &&
+        h.includes('<meta property="og:locale" content="en_US" />') && h.includes('<meta property="og:url" content="https://ichirei.beyondculture.ai/en" />') &&
+        h.includes('<meta property="og:image" content="https://ichirei.beyondculture.ai/img/og/en.jpg" />') && h.includes('og:image:width" content="1200"') && h.includes('og:image:height" content="630"') &&
         h.includes('<meta name="twitter:card" content="summary_large_image" />') && h.includes('<div id="root">') &&
         !/ja_JP|一字の贈りもの|あなたの目に映る/.test(h) && !/THANKS100|free gift|Days of Thanks|\$0/i.test(h.slice(0, h.indexOf('</head>')))
       check(`share tags: GET ${path} (no JavaScript) carries lang="en", the English title, description, og: tags and the 1200×630 picture — and no promotion wording`, ok, h.slice(0, 1600))
@@ -307,7 +307,7 @@ try {
       const file = JSON.parse(readFileSync(join(dir, `${okJ.order_ref}.json`), 'utf8'))
       check('orders: the story and the engine result are stored server-side under that order_ref (gaze line and anchor included)', file.story === STORY && file.engine_result.candidates.length === 3 && file.production.gaze_line === GOLDEN.candidates[0].one_line_gaze && file.production.story_anchor === GOLDEN.candidates[0].story_anchor && file.status === 'cart_created')
       const line = seen[0].body.variables.input.lines[0]
-      check('orders: Shopify got the Simple variant, the token header, and the line properties (two visible, the rest hidden with an underscore; _certificate_meaning_en next to the reading) plus the animation link — without the story', seen[0].url === '/api/2025-01/graphql.json' && seen[0].token === 'shpat_server_test' && line.merchandiseId.endsWith('/1111') && line.attributes.map((a) => a.key).join() === '一字,開封日,_kanji,_inscription_form,_reading,_certificate_meaning_en,_sender_name,_receiver_name,_delivery_date,_opens_on,_language,_order_ref,_ichirei_size,_ship_to,_ichirei_gift_url,_ichirei_animation_url' && line.attributes[5].value === 'proof' && okJ.certificate.meaning_en === 'proof' && okJ.certificate.line_en === 'This character is the person as seen through your eyes.' && line.attributes.find((a) => a.key === '_order_ref').value === okJ.order_ref && line.attributes.at(-1).value === okJ.animation_url && /^https:\/\/ichirei\.soul-id\.jp\/a\/AN-[a-z2-9]{20}$/.test(okJ.animation_url) && !JSON.stringify(seen[0].body).includes('口下手'))
+      check('orders: Shopify got the Simple variant, the token header, and the line properties (two visible, the rest hidden with an underscore; _certificate_meaning_en next to the reading) plus the animation link — without the story', seen[0].url === '/api/2025-01/graphql.json' && seen[0].token === 'shpat_server_test' && line.merchandiseId.endsWith('/1111') && line.attributes.map((a) => a.key).join() === '一字,開封日,_kanji,_inscription_form,_reading,_certificate_meaning_en,_sender_name,_receiver_name,_delivery_date,_opens_on,_language,_order_ref,_ichirei_size,_ship_to,_ichirei_gift_url,_ichirei_animation_url' && line.attributes[5].value === 'proof' && okJ.certificate.meaning_en === 'proof' && okJ.certificate.line_en === 'This character is the person as seen through your eyes.' && line.attributes.find((a) => a.key === '_order_ref').value === okJ.order_ref && line.attributes.at(-1).value === okJ.animation_url && /^https:\/\/ichirei\.beyondculture\.ai\/a\/AN-[a-z2-9]{20}$/.test(okJ.animation_url) && !JSON.stringify(seen[0].body).includes('口下手'))
       const invalid = await post(orders.url, '/api/order', { ...orderBody, package: 'gold' })
       check('orders: invalid package → 400 and nothing more reaches Shopify', invalid.status === 400 && (await invalid.json()).field === 'package' && seen.length === 1)
       // learning loop through the real server: a session id → "shown" (select), two browser events, "ordered" — all in <store>/analytics/
@@ -478,6 +478,69 @@ try {
       check('limits: the whole site\'s card rounds a day (2 here): the next one gets 429 limit_site — "Lots of people are writing their moments right now. Please try again in a little while."', over.status === 429 && oj.code === 'limit_site' && oj.error === "Lots of people are writing their moments right now. Please try again in a little while.", JSON.stringify(oj))
     } finally {
       await lim2.stop()
+    }
+  }
+
+  // ---- I2. two hosts (2026-11-16): ichirei.beyondculture.ai is the main address; the old ichirei.soul-id.jp answers the same until ICHIREI_REDIRECT_OLD_HOST=1 -------------
+  {
+    const OLD = 'ichirei.soul-id.jp'
+    const NEW = 'ichirei.beyondculture.ai'
+    // raw HTTP, so the Host header is exactly what Cloud Run passes for a mapped domain
+    const raw = (url, path, host, method = 'GET', body = null, headers = {}) =>
+      new Promise((resolve, reject) => {
+        const u = new URL(url)
+        const req = http.request({ hostname: u.hostname, port: u.port, path, method, headers: { host, accept: 'text/html', ...(body ? { 'content-type': 'application/json' } : {}), ...headers } }, (res) => {
+          let data = ''
+          res.on('data', (d) => (data += d))
+          res.on('end', () => resolve({ status: res.statusCode, location: res.headers.location ?? null, body: data }))
+        })
+        req.on('error', reject)
+        if (body) req.write(body)
+        req.end()
+      })
+    const strip = (h) => h.replace(/ic_v=[^;"]*/g, '')
+    // redirect OFF (the default; the main test server has no ICHIREI_REDIRECT_OLD_HOST): both hosts serve the same pages and the same API
+    const paths = ['/', '/en', '/en/write', '/write', '/zh', '/claim', '/track', '/legal', '/api/sizes', '/api/promo']
+    let same = true
+    const diffs = []
+    for (const p of paths) {
+      const a = await raw(base, p, OLD)
+      const b = await raw(base, p, NEW)
+      if (a.status !== b.status || a.location || b.location || strip(a.body) !== strip(b.body) || a.status >= 500) { same = false; diffs.push(`${p}: ${a.status}/${b.status}`) }
+    }
+    check(`hosts: with the redirect off (default) ${OLD} and ${NEW} serve the same pages and the same API (${paths.join(' ')}), no redirect`, same, diffs.join(', '))
+    const webhookOff = await raw(base, '/api/shopify/orders-paid', OLD, 'POST', '{}')
+    check('hosts: with the redirect off, POST /api/shopify/orders-paid on the old host is answered by the webhook itself (no 3xx)', webhookOff.status < 300 || webhookOff.status >= 400, String(webhookOff.status))
+    const en = await raw(base, '/en', OLD)
+    check(`hosts: /en carries og:url https://${NEW}/en even when it is opened on the old host`, en.body.includes(`<meta property="og:url" content="https://${NEW}/en" />`) && !en.body.includes('soul-id.jp'))
+    const home = await raw(base, '/', NEW)
+    check(`hosts: / carries og:url https://${NEW}/ and nothing in the page names soul-id.jp`, home.body.includes(`<meta property="og:url" content="https://${NEW}/" />`) && !home.body.includes('soul-id.jp'))
+
+    // redirect ON
+    const red = await startServer({ upstreamUrl: upstream.url, env: { ICHIREI_RATES: 'off', ICHIREI_REDIRECT_OLD_HOST: '1', ICHIREI_PUBLIC_URL: `https://${NEW}` } })
+    try {
+      const g = await raw(red.url, '/en/g/RG-abcdefghijkmnpqrstu?x=1', OLD)
+      check(`redirect on: GET /en/g/<id>?x=1 on the old host → 301 https://${NEW}/en/g/<id>?x=1`, g.status === 301 && g.location === `https://${NEW}/en/g/RG-abcdefghijkmnpqrstu?x=1`, `${g.status} ${g.location}`)
+      const pages = [['/a/AN-abcdefghijkmnpqrstuv', ''], ['/g/RG-abcdefghijkmnpqrstu', ''], ['/en', '?utm_source=line'], ['/claim', '?o=%231016'], ['/track', '?order=%231016'], ['/', '']]
+      const ok = []
+      for (const [p, q] of pages) { const r = await raw(red.url, p + q, OLD); ok.push(r.status === 301 && r.location === `https://${NEW}${p}${q}`) }
+      check('redirect on: the receiver pages /a/…, /g/…, /en, /claim, /track and / all 301 to the same path and query on the new host', ok.every(Boolean), JSON.stringify(ok))
+      const hook = await raw(red.url, '/api/shopify/orders-paid', OLD, 'POST', '{}')
+      check('redirect on: POST /api/shopify/orders-paid on the old host is NOT redirected (the webhook answers itself)', hook.status !== 301 && hook.status !== 302 && hook.status !== 307 && hook.status !== 308 && !hook.location, String(hook.status))
+      const order = await raw(red.url, '/api/order', OLD, 'POST', '{}')
+      const apiGet = await raw(red.url, '/api/sizes', OLD)
+      check('redirect on: other POST /api/* (here /api/order) and the API GETs on the old host are not redirected', !order.location && order.status !== 301 && !apiGet.location && apiGet.status === 200, `${order.status} ${apiGet.status}`)
+      const ops = await raw(red.url, '/ops', OLD)
+      const opsHome = await raw(red.url, '/ops/home', OLD)
+      const opsPost = await raw(red.url, '/ops/mark', OLD, 'POST', '{}')
+      check('redirect on: /ops, /ops/home and POST /ops/mark on the old host are not redirected', [ops, opsHome, opsPost].every((r) => r.status !== 301 && !r.location), `${ops.status} ${opsHome.status} ${opsPost.status}`)
+      const onNew = []
+      for (const p of ['/', '/en', '/en/g/RG-abcdefghijkmnpqrstu?x=1', '/a/AN-abcdefghijkmnpqrstuv', '/claim', '/ops']) { const r = await raw(red.url, p, NEW); onNew.push(r.status !== 301 && !r.location) }
+      check('redirect on: requests on the new host are never redirected', onNew.every(Boolean), JSON.stringify(onNew))
+      const other = await raw(red.url, '/en', '127.0.0.1')
+      check('redirect on: any other host (here the bare address) is never redirected', other.status === 200 && !other.location)
+    } finally {
+      await red.stop()
     }
   }
 
