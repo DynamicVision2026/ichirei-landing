@@ -24,6 +24,8 @@ export interface EnBridge {
   word_source: 'lexicon' | 'generated' | 'meaning'
   /** One plain sentence (at most 14 words) from this story. */
   line: string
+  /** The same meaning said to the receiver, with no pronoun (gift ceremony 2026-11-15, A4): shown on the receiver's character screen. Absent on gifts made before it, or when the model's line failed the checks. */
+  line_you?: string | null
   /** Reviewed rows only. */
   echo: EnEcho | null
   /** The classical line, when its row has been reviewed (it sits with the echo under "Where this word comes from"). */
@@ -35,6 +37,12 @@ export const WHERE_THIS_WORD_COMES_FROM = 'Where this word comes from'
 
 /** The line is at most this many words. */
 export const EN_LINE_MAX_WORDS = 14
+
+/** The receiver's line (`line_you`) is at most this many characters (the prompt asks for 70; a few over is kept). */
+export const LINE_YOU_MAX_CHARS = 76
+
+/** Pronouns the receiver's line and the receiver's page never use in English (they name the sender by name instead). */
+export const EN_PRONOUN = /\b(?:he|she|him|her|his|hers|himself|herself|they|them|their|theirs|themselves|i|me|my|mine|myself|we|us|our|ours)\b/i
 
 /** The sentence under the poem on the receiver page. */
 export const poemWrittenFrom = (senderName: string | null | undefined): string => {

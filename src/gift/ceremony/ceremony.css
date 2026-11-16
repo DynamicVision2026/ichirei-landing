@@ -1,0 +1,145 @@
+/* The receiver's new ceremony (2026-11-15, phase A: Classic, English). Values are the director's preview v5, copied, not re-invented:
+   one phone-sized sheet of washi; text low and left; the mark low and right; the character in the upper two thirds. Paper, ink, cinnabar.
+   Cinnabar only on the mark and the character; gold only on the certificate rule. No pills, no rounded cards, no glass, no blur. No text under 12 px.
+   Every class is prefixed cr- so nothing of the old pages (gift.css, animation.css) can reach it. */
+
+@font-face { font-family: 'ICHIREI Mincho'; src: url('/fonts/zen-old-mincho-500.woff2') format('woff2'); font-weight: 400 500; font-style: normal; font-display: swap; }
+@font-face { font-family: 'ICHIREI Mincho'; src: url('/fonts/zen-old-mincho-700.woff2') format('woff2'); font-weight: 600 700; font-style: normal; font-display: swap; }
+@font-face { font-family: 'ICHIREI Mincho'; src: url('/fonts/zen-old-mincho-900.woff2') format('woff2'); font-weight: 800 900; font-style: normal; font-display: swap; }
+@font-face { font-family: 'ICHIREI Gothic'; src: url('/fonts/zen-kaku-gothic-new-400.woff2') format('woff2'); font-weight: 400; font-style: normal; font-display: swap; }
+@font-face { font-family: 'ICHIREI Gothic'; src: url('/fonts/zen-kaku-gothic-new-500.woff2') format('woff2'); font-weight: 500; font-style: normal; font-display: swap; }
+@font-face { font-family: 'ICHIREI Hand'; src: url('/fonts/caveat-600.woff2') format('woff2'); font-weight: 600; font-style: normal; font-display: swap; }
+
+.cr {
+  --paper: #F3EFE5; --slip: #FBF8F1; --ink: #151311; --soft: #3B362F; --mute: #5C564D;
+  --red: #C0392B; --gold: #B8924A; --redfill: #BE3526; --cream: #FFF4E6; --line: rgba(21, 19, 17, .22);
+  --f-m: 'ICHIREI Mincho', 'Zen Old Mincho', 'Hiragino Mincho ProN', 'Yu Mincho', serif;
+  --f-s: 'ICHIREI Gothic', 'Zen Kaku Gothic New', 'Hiragino Sans', system-ui, sans-serif;
+  --f-h: 'ICHIREI Hand', Caveat, 'Bradley Hand', cursive;
+  --tex: url('/img/ceremony/paper.jpg');
+  position: fixed; inset: 0; overflow: hidden; box-sizing: border-box;
+  padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px));
+  padding-top: env(safe-area-inset-top, 0px); padding-bottom: env(safe-area-inset-bottom, 0px);
+  background: var(--paper) var(--tex) center / cover no-repeat; color: var(--ink); font-family: var(--f-s); font-size: 14px;
+  color-scheme: light; -webkit-text-size-adjust: 100%;
+}
+.cr *, .cr *::before, .cr *::after { box-sizing: border-box; }
+.cr :where(button, input, textarea) { font: inherit; color: inherit; }
+.cr :focus-visible { outline: 2px solid var(--ink); outline-offset: 3px; }
+.cr [hidden] { display: none !important; }
+
+.cr-stage { position: relative; z-index: 2; height: 100%; max-width: 398px; margin: 0 auto; transform-origin: 50% 0; }
+.cr-wm { position: absolute; left: 12px; top: 26px; margin: 0; font-weight: 500; font-size: 12px; letter-spacing: .34em; }
+.cr-wv { position: absolute; right: 10px; top: 22px; margin: 0; writing-mode: vertical-rl; font-family: var(--f-m); font-size: 15px; letter-spacing: .34em; }
+.cr-scr { position: absolute; inset: 0; }
+.cr-flow { overflow-y: auto; padding: 84px 12px 28px; display: flex; flex-direction: column; gap: 18px; }
+/* scrolled text fades out before it reaches the wordmark (a mask, not a blur) */
+.cr-flow { -webkit-mask-image: linear-gradient(transparent 0, transparent 56px, #000 80px); mask-image: linear-gradient(transparent 0, transparent 56px, #000 80px); }
+.cr-m { font-family: var(--f-m); }
+.cr-lab { font-size: 15px; line-height: 1.5; letter-spacing: .14em; text-transform: uppercase; color: var(--mute); margin: 0; }
+.cr-h { margin: 0; font-family: var(--f-m); font-weight: 500; font-size: 33px; line-height: 1.3; text-wrap: balance; }
+.cr-b { margin: 0; font-size: 17px; line-height: 1.55; color: var(--soft); max-width: 31ch; }
+.cr-txt { position: absolute; left: 12px; right: 12px; bottom: 94px; display: flex; flex-direction: column; gap: 10px; pointer-events: none; }
+.cr-txt button, .cr-txt a { pointer-events: auto; }
+.cr-go { display: inline-flex; align-items: center; min-height: 48px; padding: 0; border: 0; background: transparent; font-weight: 500; font-size: 16px; letter-spacing: .1em; text-transform: uppercase;
+  text-decoration: underline; text-underline-offset: 7px; text-decoration-thickness: 1px; text-align: left; cursor: pointer; color: var(--ink); }
+.cr-go:disabled { color: var(--mute); cursor: default; }
+.cr-go.cr-fix { position: absolute; left: 12px; bottom: 26px; }
+.cr-go.cr-quiet { color: var(--mute); }
+.cr-go.cr-next::after { content: '\2002\2192'; }
+.cr-blk { display: flex; align-items: center; justify-content: center; width: 100%; min-height: 58px; border: 0; background: var(--ink); color: var(--slip); font-weight: 500; font-size: 16px; letter-spacing: .12em; text-transform: uppercase; text-decoration: none; cursor: pointer; }
+.cr-blk:hover { color: var(--slip); }
+
+/* the mark: a small cinnabar square, the ring pulses every 2.4 s */
+.cr-markbtn { position: absolute; z-index: 1; left: 64%; top: min(56%, calc(var(--sh, 844px) - 376px)); width: 60px; height: 60px; margin: -30px 0 0 -30px; border: 0; padding: 0; background: transparent; cursor: pointer; }
+.cr-markbtn.cr-right { left: 88%; }
+.cr-mark { position: absolute; left: 24px; top: 24px; width: 12px; height: 12px; border-radius: 2px; background: var(--red); transform: rotate(7deg); }
+.cr-ring { position: absolute; left: 13px; top: 13px; width: 34px; height: 34px; border-radius: 50%; border: 1px solid var(--red); animation: cr-pulse 2.4s ease-out infinite; }
+@keyframes cr-pulse { 0% { scale: .35; opacity: .9 } 100% { scale: 1.7; opacity: 0 } }
+@keyframes cr-rise { from { opacity: 0; translate: 0 12px } to { opacity: 1; translate: 0 0 } }
+@keyframes cr-up { from { opacity: 0; translate: 0 90px } to { opacity: 1; translate: 0 0 } }
+.cr-rise { animation: cr-rise .7s ease-out both; }
+
+.cr-slip { background: var(--slip); box-shadow: 0 8px 18px rgba(40, 30, 15, .2); }
+.cr-note { position: absolute; left: 12px; top: 15%; width: min(292px, 84%); padding: 30px 28px 64px; transform: rotate(-1.6deg); animation: cr-up .9s cubic-bezier(.2, .8, .2, 1) both; }
+.cr-hw { font-family: var(--f-h); font-weight: 600; }
+.cr-note-text { margin: 0; line-height: 1.22; white-space: pre-line; overflow-wrap: anywhere; }
+.cr-note-from { position: absolute; right: 28px; bottom: 22px; margin: 0; font-size: 31px; color: var(--mute); }
+
+/* the character and the poem inside it: three layers (the poem in cream on cinnabar, a white sheet with the character cut out in black under
+   mix-blend-mode screen — the blend is on the WHOLE mask layer, never on the character — and the paper texture multiplied over everything) */
+.cr-gbox { position: absolute; left: 50%; top: 13%; width: min(340px, 100%, calc(var(--sh, 844px) * .4)); aspect-ratio: 1; transform: translateX(-50%); }
+.cr-cap { position: absolute; left: 8px; bottom: 128px; margin: 0; padding: 12px 18px 13px; font-family: var(--f-m); font-size: 21px; line-height: 1.4; transform: rotate(-1.2deg); opacity: 0; pointer-events: none; }
+.cr-lens { position: fixed; inset: 0; z-index: 1; background: #FFFFFF; isolation: isolate; transform-origin: 0 0; opacity: 0; pointer-events: none; }
+.cr-micro { position: absolute; overflow: hidden; white-space: pre; margin: 0; background: var(--redfill); color: var(--cream); font-family: var(--f-m); font-weight: 700; }
+.cr-mask { position: absolute; inset: 0; background: #FFFFFF; mix-blend-mode: screen; }
+.cr-glyph { position: absolute; display: flex; align-items: center; justify-content: center; font-family: var(--f-m); font-weight: 900; line-height: 1; }
+.cr-mask .cr-glyph { color: #000000; }
+.cr-lens .cr-tex { position: absolute; inset: 0; background: var(--tex) center / cover no-repeat; mix-blend-mode: multiply; }
+.cr-solid { position: fixed; z-index: 1; color: var(--red); pointer-events: none; opacity: 0; }
+.cr-meaning { opacity: 0; gap: 8px; }
+.cr-word { margin: 0; font-family: var(--f-m); font-size: 40px; font-weight: 900; line-height: 1.1; }
+.cr-word i { font-size: 19px; font-weight: 500; color: var(--mute); }
+.cr-b.cr-ink { color: var(--ink); }
+
+.cr-small { font-family: var(--f-m); font-weight: 900; line-height: 1; color: var(--red); font-size: 92px; }
+.cr-row { display: flex; flex-wrap: wrap; gap: 8px 28px; align-items: center; }
+.cr-poem p { margin: 0; font-family: var(--f-m); font-weight: 500; font-size: clamp(23px, 6.6vw, 27px); line-height: 1.8; }
+.cr-poem p.cr-gap { margin-top: 22px; }
+
+/* the film */
+.cr-frame { position: absolute; left: 12px; right: 12px; top: 11%; aspect-ratio: 4 / 5; max-height: 52%; margin: 0 auto; overflow: hidden; background: #DDD6C6; box-shadow: 0 14px 28px rgba(40, 30, 15, .24); }
+.cr-pic { position: absolute; inset: 0; background-size: cover; background-position: center; opacity: 0; display: flex; align-items: center; justify-content: center; text-align: center; font-size: 15px; line-height: 1.6; color: var(--soft); padding: 16px; }
+.cr-capt { position: absolute; left: 0; right: 0; bottom: 0; margin: 0; padding: 44px 18px 16px; background: linear-gradient(rgba(239, 232, 216, 0), rgba(239, 232, 216, .94) 55%); font-family: var(--f-m); font-weight: 700; font-size: 20px; line-height: 1.4; color: var(--ink); opacity: 0; text-wrap: balance; }
+.cr-ticks { position: absolute; left: 12px; top: calc(11% - 14px); display: flex; gap: 6px; }
+.cr-ticks i { width: 44px; height: 2px; background: var(--line); }
+.cr-ticks i.cr-on { background: var(--ink); }
+.cr-fixrow { position: absolute; left: 12px; right: 12px; bottom: 26px; display: flex; flex-wrap: nowrap; gap: 8px 18px; align-items: center; }
+.cr-status { margin: 0; font-size: 15px; color: var(--mute); }
+
+/* the certificate */
+.cr-cert { position: relative; padding: 34px 30px 30px; display: flex; flex-direction: column; gap: 14px; box-shadow: 0 18px 34px rgba(40, 30, 15, .24); }
+.cr-cert::before { content: ''; position: absolute; inset: 10px; border: 1px solid var(--gold); pointer-events: none; }
+.cr-cert-no { color: #6E561C; }
+.cr-big { font-family: var(--f-m); font-weight: 900; line-height: 1; color: var(--red); font-size: clamp(150px, 48vw, 196px); }
+.cr-pair { display: flex; gap: 40px; flex-wrap: wrap; }
+.cr-name { margin: 4px 0 0; font-family: var(--f-m); font-size: 23px; overflow-wrap: anywhere; }
+
+/* keepsakes */
+.cr-keep { display: flex; gap: 16px; align-items: center; padding: 14px; }
+.cr-thumb { flex: none; width: 76px; height: 96px; background: #DDD6C6 center / cover; display: flex; align-items: center; justify-content: center; overflow: hidden; font-size: 12px; color: var(--soft); text-align: center; }
+.cr-thumb.cr-four { align-items: stretch; display: grid; grid-template-columns: 1fr 1fr; grid-template-rows: 1fr 1fr; gap: 2px; background: var(--slip); }
+.cr-thumb.cr-four i { background: #DDD6C6 center / cover; }
+.cr-thumb.cr-white { background: #FFFFFF; box-shadow: inset 0 0 0 1px var(--line); }
+.cr-thumb.cr-goldline { background: var(--slip); box-shadow: inset 0 0 0 1px var(--gold); }
+.cr-keep h3 { margin: 0 0 4px; font-family: var(--f-m); font-weight: 700; font-size: 22px; }
+.cr-keep p { margin: 0; font-size: 16px; line-height: 1.45; color: var(--soft); }
+.cr-keep .cr-err { color: var(--ink); }
+.cr-video { display: block; width: 100%; max-height: 50vh; margin-top: 8px; background: var(--ink); }
+.cr-share h3, .cr-share .gf-label { margin: 0 0 6px; font-size: 15px; letter-spacing: .14em; text-transform: uppercase; color: var(--mute); font-weight: 400; font-family: var(--f-s); }
+.cr-share p { margin: 0; font-size: 15px; line-height: 1.5; color: var(--soft); }
+.cr-share .gf-btn, .cr-share button { min-height: 48px; padding: 0; margin-right: 24px; border: 0; background: transparent; font-weight: 500; font-size: 16px; letter-spacing: .1em; text-transform: uppercase; text-decoration: underline; text-underline-offset: 7px; text-decoration-thickness: 1px; cursor: pointer; color: var(--ink); }
+.cr-egift input, .cr-egift select { min-height: 48px; border: 0; border-bottom: 1px solid var(--ink); border-radius: 0; background: transparent; font-size: 17px; width: 100%; }
+.cr-egift button { min-height: 48px; border: 1px solid var(--ink); border-radius: 0; background: transparent; padding: 0 16px; font-size: 16px; cursor: pointer; }
+.cr-egift label, .cr-egift p { font-size: 15px; }
+
+/* send back */
+.cr-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); border-bottom: 1px solid var(--line); margin: 0; padding: 0; list-style: none; }
+.cr-ch { position: relative; width: 100%; min-height: 112px; padding: 12px 2px 6px; border: 0; border-top: 1px solid var(--line); background: transparent; display: flex; flex-direction: column; align-items: center; justify-content: flex-start; gap: 9px; cursor: pointer; }
+.cr-ch b { font-family: var(--f-m); font-weight: 900; font-size: 38px; line-height: 1; }
+.cr-ch span { font-size: 15px; line-height: 1.25; color: var(--soft); text-align: center; min-height: 38px; }
+.cr-ch[aria-pressed='true']::before { content: ''; position: absolute; left: 50%; top: 3px; width: 56px; height: 56px; margin-left: -28px; border-radius: 50%; border: 1.5px solid var(--ink); transform: rotate(-8deg) scaleY(.94); }
+.cr-ch[aria-pressed='true'] span { font-weight: 500; color: var(--ink); }
+.cr-field { width: 100%; min-height: 50px; padding: 0; border: 0; border-bottom: 1px solid var(--ink); border-radius: 0; background: transparent; font-family: var(--f-h); font-weight: 600; font-size: 27px; }
+.cr-field::placeholder { color: var(--mute); opacity: .7; }
+.cr-sent { display: flex; align-items: center; gap: 12px; }
+.cr-dot { width: 12px; height: 12px; border-radius: 2px; background: var(--ink); transform: rotate(-6deg); flex: none; }
+.cr-promo { align-self: flex-start; padding: 14px 18px 15px; transform: rotate(-1.2deg); }
+.cr-promo p { margin: 0; }
+.cr-promo .cr-promo-sub { margin-top: 8px; font-size: 13px; letter-spacing: .08em; color: var(--mute); }
+.cr-preview { position: absolute; left: 12px; right: 40px; top: 52px; margin: 0; font-size: 13px; color: var(--mute); z-index: 3; }
+
+@media (prefers-reduced-motion: reduce) {
+  .cr *, .cr *::before, .cr *::after { animation-duration: .01s !important; animation-delay: 0s !important; }
+  .cr .cr-ring { animation: none !important; opacity: .55; }
+}

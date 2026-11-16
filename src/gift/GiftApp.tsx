@@ -13,6 +13,8 @@ import { COPY as FILM_COPY, pageLang, type PageLang } from '../animation/copy.ts
 import { Film } from '../animation/AnimationApp.tsx'
 import { EgiftReceive } from '../animation/GiftPanels.tsx'
 import Keepsakes from './Keepsakes.tsx'
+import NewCeremony from './ceremony/NewCeremony.tsx'
+import { newCeremony } from './ceremony/switch.ts'
 import ShareSection from './ShareSection.tsx'
 import type { GiftLockedView, GiftView } from '../animation/types.ts'
 import { GIFT_COPY, fullDateText, openDateText, type GiftCopy } from './copy.ts'
@@ -170,6 +172,9 @@ export default function GiftApp() {
   }
 
   const view = load.view
+  // English, open, non-quiet gifts: the new ceremony (2026-11-15, phase A); every other gift keeps the ceremony below
+  if (newCeremony(view)) return <NewCeremony view={view} preview={!!preview} q={q} />
+
   const stage = (body: React.ReactNode, extra = '') => (
     <main className={`${shell}${extra}`} lang={lang} data-testid="gift-page" data-step={step} data-memorial={memorial ? 'yes' : 'no'} data-quiet={quiet ? 'yes' : 'no'}>
       {preview && <p className="gf-preview" data-testid="gift-preview-note">{copy.previewNote}</p>}

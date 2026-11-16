@@ -144,6 +144,7 @@ reading:          (romaji — pick the ONE Japanese reading that fits the charac
 meaning:          (do NOT write this for the main candidates — the system attaches the one-phrase English meaning, and the Mandarin pinyin when it has one, from its verified list)
 en_word:          (main and second candidates only: ONE English word with literary weight for the character — see THE ENGLISH BRIDGE below)
 en_line:          (main and second candidates only: ONE plain sentence of at most 14 words that explains the character to someone who has never seen kanji, from this story — see THE ENGLISH BRIDGE below)
+line_you_en:      (main and second candidates only: the same meaning as en_line, said to the receiver, with no pronoun for anyone — see THE ENGLISH BRIDGE below)
 why_this:         (ONE plain-English sentence that connects what the character means to the quoted story moment — no kanji jargon: no on/kun, radicals or stroke talk. Example: "Lamplight is the plainest thing in your story — the light you left on for me.")
 truth_type:       
 scarce_asset_it_preserves:
@@ -169,7 +170,8 @@ The sender and the receiver read English and cannot read a kanji, so the card ha
 
 * `en_word` — ONE English word, two at most, for the character. Choose an English word with literary weight (hearth, haven, keeper, steadfast, kindred, abide), never a plain word (light, warm, protect, honest). Old and still spoken; never archaic (no thou, hath, verily). American spelling. Never a brand or self-help word (journey, resilience, empower, mindful). It names the CHARACTER, not this one story: the same character always gets the same word, so choose the word you would give that character in any story (守 is "keeper" whether the receiver is a husband or a nurse). The system replaces your word with the reviewed one when the character already has one, and it logs yours otherwise.
 * `en_line` — ONE plain sentence of at most 14 words that explains the character to someone who has never seen kanji. It is in the sender's register (the direction register and the story's emotion above) and is drawn from THIS story. Example, for 燈 to a mother: "The light that is already on when everyone else wakes." It is not a definition ("a lamp"), and it is not praise of the receiver ("you are wonderful"). The same story-truth rules as the one_line_gaze apply (HARD PROCESS RULES 5 and 6): it uses only what the story states, adds no fact, and says nothing about the sender's gender, age or family role. A line that would read as well under a different story is generic: rewrite it from this story. In a remembrance it speaks of who they were, and still are, to the sender.
-* The freestyle candidate has neither field.
+* `line_you_en` — the SAME meaning as `en_line`, written for the receiver to read on their own gift page, under the words "In {sender}'s eyes, you are" and the English word. A short phrase or sentence of at most 70 characters that describes the receiver without any pronoun: no he, she, him, her, his, hers, they, them, their, and no I, me, my, we, our. Start it with "The one who…" or "Someone who…" or a noun. Example, for 労 to a neighbor: "The one who eases a burden before anyone asks." The same story-truth rules as `en_line` apply: only what the story states, no added fact, nothing about gender, age or family role.
+* The freestyle candidate has none of these fields.
 
 STEP 4 — Gates (apply to every candidate; eliminate any that fail gates 1–5; gate 6 decides who may be the primary; gate 7 decides who may be a main candidate at all)
 
@@ -285,6 +287,7 @@ Return this exact shape:
       "meaning": string,                  // FREESTYLE ONLY: one short plain English phrase, e.g. "lamplight". Omit for main and second.
       "en_word": string,                  // MAIN AND SECOND ONLY: ONE English word (two at most) with literary weight, e.g. "hearth" — see THE ENGLISH BRIDGE. Omit for the freestyle.
       "en_line": string,                  // MAIN AND SECOND ONLY: ONE plain sentence, at most 14 words, from this story, e.g. "The light that is already on when everyone else wakes." Omit for the freestyle.
+      "line_you_en": string,              // MAIN AND SECOND ONLY: the same meaning as en_line, for the receiver, NO pronouns, at most 70 characters, e.g. "The one who eases a burden before anyone asks." Omit for the freestyle.
       "why_this": string,                 // ONE short plain-English sentence tying the character's meaning to the quoted story moment; no kanji jargon
       "inscription_form": string | null,     // old-form variant, or null if none exists
       "truth_type": "Essence" | "Turning Point" | "Role" | "Hidden Cost" | "Private Symbol" | "Forward Blessing" | "Play",  // "Play" for the freestyle only

@@ -13,7 +13,7 @@ import { isQuietPurpose } from '../src/order/purpose.ts'
 import QRCode from 'qrcode'
 import { ANIMATION_ID_PATTERN, isAnimationRecord, type AnimationRecord } from '../engine/animation.ts'
 import { orderGate, type OrderGate } from '../engine/buyer.ts'
-import { GIFT_TOKEN_PATTERN, arrivingView, checkAddress, checkReply, giftUrl, giftView, isGiftRecord, isLocked, lockedView, type GiftRecord } from '../engine/gift.ts'
+import { GIFT_TOKEN_PATTERN, arrivingView, todayJst, checkAddress, checkReply, giftUrl, giftView, isGiftRecord, isLocked, lockedView, type GiftRecord } from '../engine/gift.ts'
 import { OPEN_DATE_MAX_DAYS } from '../src/order/packages.ts'
 import { readArt, picturePath, type ArtRecord } from '../engine/film-art.ts'
 import { createOrderStore, type OrderStore } from '../engine/order-store.ts'
@@ -23,7 +23,8 @@ import { filmUsable } from '../engine/animation.ts'
 import { loadArtwork, scrollReady } from '../engine/render/artwork.ts'
 import { makeScroll, scrollPdf } from '../engine/render/scroll.ts'
 import { makeOgImage } from '../engine/render/og.ts'
-import { makeKeepsakeCard } from '../engine/render/keepsake.ts'
+import { makeCertificateCard, makeKeepsakeCard } from '../engine/render/keepsake.ts'
+import { certLine, certNumber, certPlace } from '../src/order/ceremony-cert.ts'
 import { cleanReading } from '../src/order/reading.ts'
 import { injectOg, ogKey, ogMeta } from '../engine/gift-share.ts'
 import { ensureFilmVideo, ensureShareFilm, filmComplete, filmVideoPath, serveBytes, shareFilmPath } from '../engine/film-video-store.ts'
@@ -213,6 +214,28 @@ async function keepsakeCardResponse(f: Found): Promise<Response> {
   } catch (err) {
     console.error('[ichirei-keepsake-card] failed', err instanceof Error ? err.message : err)
     return json(500, { error: 'card_failed' }, { 'cache-control': 'no-store' })
+  }
+}
+
+/** The receiver's certificate as an image (the new English ceremony, screen 7). English, open, non-quiet gifts only. */
+async function certificateResponse(f: Found): Promise<Response> {
+  const g = f.gift
+  if (g.language !== 'en' || g.memorial || isQuietPurpose(g.purpose)) return json(404, { error: 'not_offered' }, { 'cache-control': 'no-store' })
+  try {
+    const png = await makeCertificateCard({
+      glyph: g.glyph,
+      reading: cleanReading(g.romanization.split(' / ')[0]),
+      word: (g.en?.word ?? g.meaning_en ?? '').trim(),
+      to: g.to,
+      from: g.from,
+      line: certLine(g.to, g.from),
+      number: certNumber(g.certificate_no ?? null),
+      place: certPlace(g.opens_on ?? todayJst(new Date(g.created_at))),
+    })
+    return new Response(new Uint8Array(png), { status: 200, headers: headers({ 'content-type': 'image/png', 'content-disposition': 'attachment; filename="ichirei-certificate.png"', 'cache-control': 'private, no-store' }) })
+  } catch (err) {
+    console.error('[ichirei-certificate] failed', err instanceof Error ? err.message : err)
+    return json(500, { error: 'certificate_failed' }, { 'cache-control': 'no-store' })
   }
 }
 
@@ -422,6 +445,14 @@ export function createGiftHandlers(deps: () => GiftDeps) {
       if (closed(r.gift, d, preview)) return json(403, { error: 'locked' }, { 'cache-control': 'no-store' })
       { const gate = await gateOf(r.gift, d); if (gate === 'cancelled') return gone(r.gift); if (gate === 'pending') return notCollected(); if (gate === 'error') return busy() }
       return keepsakeCardResponse(r)
+    },
+    async certificate(token: string, preview?: string | null): Promise<Response> {
+      const d = deps()
+      const r = await loadGift(token, d)
+      if (r.status !== 200) return json(r.status, { error: r.status === 404 ? 'not_found' : 'unavailable' }, { 'cache-control': 'no-store' })
+      if (closed(r.gift, d, preview)) return json(403, { error: 'locked' }, { 'cache-control': 'no-store' })
+      { const gate = await gateOf(r.gift, d); if (gate === 'cancelled') return gone(r.gift); if (gate === 'pending') return notCollected(); if (gate === 'error') return busy() }
+      return certificateResponse(r)
     },
     async keepsakeCardForSender(animationId: string): Promise<Response> {
       const d = deps()

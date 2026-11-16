@@ -7,11 +7,11 @@
 // The freestyle (遊び字) card is left exactly as it was.
 
 import type { Candidate, EngineResult, Language } from './contract.ts'
-import { inventedFacts } from './gaze.ts'
+import { appearanceProblem, inventedFacts } from './gaze.ts'
 import { EN_WORD_SHAPE, enReviewed } from './lexicon-en.ts'
 import { lexiconRowIn, rowShowsLine, type Lexicon, type LexiconRow } from './lexicon.ts'
 import { classicalEchoOf, type Palette } from './palette.ts'
-import { EN_LINE_MAX_WORDS, parseEcho, wordCount, type EnBridge } from '../src/order/en-bridge.ts'
+import { EN_LINE_MAX_WORDS, EN_PRONOUN, LINE_YOU_MAX_CHARS, parseEcho, wordCount, type EnBridge } from '../src/order/en-bridge.ts'
 
 // ---- the word ------------------------------------------------------------------------------------------------------------------------------------------
 // The rule in the prompt: a word with literary weight (hearth, haven, keeper, steadfast, kindred, abide), never a plain word (light, warm, protect, honest); old and still spoken, never archaic.
@@ -55,6 +55,21 @@ export function lineProblem(raw: unknown, story: string): string | null {
   if (/[.!?](?:["”’')\]]*)\s+\S/.test(line)) return 'not_one_sentence'
   if (line.includes('\n')) return 'not_one_sentence'
   if (inventedFacts(line, story, 'en').length > 0) return 'invented'
+  return null
+}
+
+/**
+ * Why the receiver's line (`line_you_en`, gift ceremony 2026-11-15 A4) is not acceptable, or null. The same checks as `en_line` (one sentence, English, no detail the
+ * story does not give) and, as it is read by the receiver under "In {sender}'s eyes, you are": no pronoun for anyone, at most LINE_YOU_MAX_CHARS characters, nothing
+ * about looks. Code never rewrites it ("he" is never turned into "you"): a line that fails is dropped and the page shows the sender's line instead.
+ */
+export function lineYouProblem(raw: unknown, story: string): string | null {
+  const base = lineProblem(raw, story)
+  if (base) return base
+  const line = (raw as string).trim()
+  if ([...line].length > LINE_YOU_MAX_CHARS) return 'too_long'
+  if (EN_PRONOUN.test(line)) return 'pronoun'
+  if (appearanceProblem(line, 'en')) return 'appearance'
   return null
 }
 
@@ -148,8 +163,9 @@ export function bridgeOf(c: Candidate, story: string, lexicon: Lexicon | null, p
   }
   if (!word) return { bridge: null, generated }
   const line = lineProblem(c.en_line, story) === null ? (c.en_line as string).trim() : (c.why_this ?? '').trim() || c.one_line_gaze.trim()
+  const lineYou = lineYouProblem(c.line_you_en, story) === null ? (c.line_you_en as string).trim() : null
   const classical = verifyClassical ? knownClassical(c, lexicon, palette) : c.classical_echo ?? null
-  return { bridge: { word, word_source: source, line, echo: reviewed?.echo ?? null, classical: classical ? withRendering({ ...c, classical_echo: classical }, lexicon, palette) ?? classical : null }, generated }
+  return { bridge: { word, word_source: source, line, ...(lineYou ? { line_you: lineYou } : {}), echo: reviewed?.echo ?? null, classical: classical ? withRendering({ ...c, classical_echo: classical }, lexicon, palette) ?? classical : null }, generated }
 }
 
 /**
@@ -161,16 +177,16 @@ export function attachEnBridge(result: EngineResult, story: string, lexicon: Lex
   const generated: GeneratedWord[] = []
   const candidates = result.candidates.map((c) => {
     if (c.slot === 'freestyle') {
-      if (c.en_word === undefined && c.en_line === undefined && c.en_echo === undefined && c.en_word_source === undefined) return c
-      const { en_word: _w, en_line: _l, en_echo: _e, en_word_source: _s, ...rest } = c
+      if (c.en_word === undefined && c.en_line === undefined && c.en_echo === undefined && c.en_word_source === undefined && c.line_you_en === undefined) return c
+      const { en_word: _w, en_line: _l, en_echo: _e, en_word_source: _s, line_you_en: _y, ...rest } = c
       return rest as Candidate
     }
     if (c.eliminated) return c
     const { bridge, generated: g } = bridgeOf(c, story, lexicon, palette)
     if (g) generated.push(g)
     const classical = withRendering(c, lexicon, palette)
-    if (!bridge) return { ...c, en_word: null, en_line: null, en_echo: null, classical_echo: classical }
-    return { ...c, en_word: bridge.word, en_word_source: bridge.word_source, en_line: bridge.line, en_echo: bridge.echo, classical_echo: classical }
+    if (!bridge) return { ...c, en_word: null, en_line: null, line_you_en: null, en_echo: null, classical_echo: classical }
+    return { ...c, en_word: bridge.word, en_word_source: bridge.word_source, en_line: bridge.line, line_you_en: bridge.line_you ?? null, en_echo: bridge.echo, classical_echo: classical }
   })
   return { result: { ...result, candidates }, generated }
 }

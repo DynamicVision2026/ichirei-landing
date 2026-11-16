@@ -30,6 +30,8 @@ export interface Candidate {
   en_word?: string | null
   en_word_source?: 'lexicon' | 'generated' | 'meaning'
   en_line?: string | null
+  /** en only: the line said to the receiver (no pronouns), for the receiver's gift page. */
+  line_you_en?: string | null
   en_echo?: { text: string; source: string } | null
   inscription_form: string | null
   truth_type: TruthType

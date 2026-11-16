@@ -423,6 +423,8 @@ export interface Candidate {
   en_word_source?: 'lexicon' | 'generated' | 'meaning'
   /** en only, main and second: ONE plain sentence (at most 14 words) that explains the character to someone who has never seen kanji, from THIS story. Written by the model, checked by code. */
   en_line?: string | null
+  /** en only, main and second (gift ceremony 2026-11-15, A4): the same meaning as `en_line`, said to the receiver, with no pronoun, at most ~70 characters. Written in the same model call, checked by code (engine/en-bridge.ts); null when it fails the checks. */
+  line_you_en?: string | null
   /** en only: the reviewed echo of `en_word` from English literature — shown only when the lexicon row is reviewed. */
   en_echo?: { text: string; source: string } | null
   /** en only, internal (never shown): every romaji reading of the palette row; `reading` is the ONE shown. */

@@ -4,6 +4,7 @@
 // mocked engine returning the §10 golden-fixture shape. Verifies the reveal,
 // condition toggle (no engine re-call), kyūjitai pairing, follow-up loop, and
 // all §6 behavioral events.
+import sharp from 'sharp'
 import { chromium } from 'playwright'
 import { readFileSync } from 'node:fs'
 import { shapeRound } from './mock-shape.mjs'
@@ -1285,6 +1286,8 @@ const mockPage = async (browser, { onExplain, result, order, track } = {}) => {
       await page.screenshot({ path: `shots/gift-locked-${lang}.png` }).catch(() => {})
       await ctx.close()
     }
+    // since 2026-11-15 an open English gift (not quiet) has the new ceremony, checked in Run 33; the sealed English envelope above stays today's
+    if (lang === 'en') continue
     {
       const { page, ctx, errs } = await open(mk(v), { locale })
       await T(page, 'gift-open').waitFor()
@@ -1408,7 +1411,8 @@ const mockPage = async (browser, { onExplain, result, order, track } = {}) => {
 
   // Part 5: 「ギフトを保存する」 — the film (made on the server the first time, then saved), the scroll, the card
   for (const [lang, locale, pkg] of [['ja', 'ja-JP', 'egift'], ['zh-Hant', 'zh-TW', 'simple'], ['en', 'en-US', 'egift']]) {
-    const { page, ctx } = await open(mk({ language: lang, package: pkg, film: { status: 'ready', lines: ['「a」', 'b', 'c', 'd'], pictures: ['/film/washi-1.webp', '/film/washi-2.webp', '/film/washi-1.webp', '/film/washi-2.webp'] } }), { locale })
+    // (en: an encouragement gift — since 2026-11-15 an English thank-you gift has the new ceremony, whose film Save is checked in Run 33)
+    const { page, ctx } = await open(mk({ language: lang, package: pkg, ...(lang === 'en' ? { purpose: 'encourage' } : {}), film: { status: 'ready', lines: ['「a」', 'b', 'c', 'd'], pictures: ['/film/washi-1.webp', '/film/washi-2.webp', '/film/washi-1.webp', '/film/washi-2.webp'] } }), { locale })
     const makes = []
     await page.route(`**/api/gift/${TOKEN}/film/make**`, (r) => { makes.push(1); return r.fulfill({ status: makes.length === 1 ? 202 : 200, json: { state: makes.length === 1 ? 'pending' : 'ready', seconds: 30, bytes: 1 } }) })
     await page.route(`**/api/gift/${TOKEN}/film.mp4**`, (r) => r.fulfill({ status: 200, contentType: 'video/mp4', body: 'x' }))
@@ -3574,6 +3578,8 @@ const SECTION_ORDER = ['.hero', '.strip', '.philo', '#shape', '#angles', '#write
   }
 
   // ---- the receiver's page, English, on a 390 px phone ----
+  // Since 2026-11-15 an English thank-you or celebration gift opens on the new ceremony (Run 33). Today's page — with the English bridge checked here — stays for the quiet
+  // English gifts, so this block uses an English encouragement gift.
   {
     const TOKEN = 'RG-testtesttesttesttest'
     const year = new Date().getFullYear()
@@ -3583,7 +3589,7 @@ const SECTION_ORDER = ['.hero', '.strip', '.philo', '#shape', '#angles', '#write
       who: 'Someone who kept the porch light on for me.', memorial: false,
       film: { status: 'ready', lines: ['She left the porch light on.', 'I never mentioned it.'], pictures: ['/film/washi-1.webp', '/film/washi-2.webp'] },
       certificate_line: 'This character is the person as seen through your eyes.', poem: { type: 'en', lines: ['Before the house wakes,', 'one lamp, left burning,', 'a quiet kind of care.'], reading: '' },
-      from: 'Emily', to: 'Margaret', message: '', egift: null, certificate_no: 12, order_date: `${year}-11-07`, opens_on: null, replied: false, package: 'egift', purpose: 'thanks', ...over,
+      from: 'Emily', to: 'Margaret', message: '', egift: null, certificate_no: 12, order_date: `${year}-11-07`, opens_on: null, replied: false, package: 'egift', purpose: 'encourage', ...over,
     })
     const open = async (v) => {
       const ctx = await browser.newContext({ locale: 'en-US', viewport: { width: 390, height: 844 }, reducedMotion: 'reduce' })
@@ -3606,7 +3612,7 @@ const SECTION_ORDER = ['.hero', '.strip', '.philo', '#shape', '#angles', '#write
     {
       const { page, ctx, errs, seen } = await open(view())
       await T(page, 'gift-envelope').waitFor()
-      check('receiver (en, phone): the envelope says "Emily chose one character for you." and the button reads "Untie"', (await T(page, 'gift-env-line').innerText()) === 'Emily chose one character for you.' && (await T(page, 'gift-open').innerText()) === 'Untie')
+      check('receiver (en, phone, an encouragement): today\'s envelope says "A letter of one character, arrived for you" and the button reads "Untie"', (await T(page, 'gift-env-line').innerText()) === 'A letter of one character, arrived for you' && (await T(page, 'gift-open').innerText()) === 'Untie')
       await T(page, 'gift-open').click()
       await T(page, 'gift-to-film').waitFor({ timeout: 8000 })
       await T(page, 'gift-to-film').click()
@@ -3641,7 +3647,7 @@ const SECTION_ORDER = ['.hero', '.strip', '.philo', '#shape', '#angles', '#write
     {
       const { page, ctx, errs } = await open(view({ from: '' }))
       await T(page, 'gift-envelope').waitFor()
-      check('receiver (en): with no sender name the envelope says "Someone chose one character for you."', (await T(page, 'gift-env-line').innerText()) === 'Someone chose one character for you.')
+      check('receiver (en): with no sender name the envelope names no one', !/Emily|undefined/.test(await T(page, 'gift-env-line').innerText()))
       await T(page, 'gift-open').click()
       await T(page, 'gift-to-film').waitFor({ timeout: 8000 })
       await T(page, 'gift-to-film').click()
@@ -4081,6 +4087,8 @@ const SECTION_ORDER = ['.hero', '.strip', '.philo', '#shape', '#angles', '#write
       await ctx.close()
     }
 
+    // since 2026-11-15 an open English thank-you gift has the new ceremony (Run 33): today's untie, note, music card, stroke reveal and answer are checked on the Japanese gift
+    if (lang === 'en') continue
     // 2. untie by press and hold (full motion): a short press does nothing, a hold of about 1.2 s opens; then the letter with the note; nothing moves on by itself
     {
       const { page, ctx, errs, seen } = await open(mk(lang), { locale: loc })
@@ -4162,10 +4170,10 @@ const SECTION_ORDER = ['.hero', '.strip', '.philo', '#shape', '#angles', '#write
       await T(page, 'gift-to-cert').click()
       await T(page, 'gift-to-keep').click()
       await T(page, 'gift-to-answer').click()
-      await T(page, 'gift-char-心').click()
+      await T(page, 'gift-char-絆').click()
       await T(page, 'gift-reply-send').click()
       await T(page, 'gift-reply-sent').waitFor()
-      check(`ceremony (${lang}): the Untie button opens it; a character alone is sent (no text)`, seen.reply.length === 1 && seen.reply[0].char === '心' && !seen.reply[0].text)
+      check(`ceremony (${lang}): the Untie button opens it; a character alone is sent (no text)`, seen.reply.length === 1 && seen.reply[0].char === '絆' && !seen.reply[0].text)
       await ctx.close()
     }
     {
@@ -4187,7 +4195,7 @@ const SECTION_ORDER = ['.hero', '.strip', '.philo', '#shape', '#angles', '#write
 
   // 5. reduced motion: the untie is a fade, the reveal does not animate strokes, and the whole path still completes
   {
-    const { page, ctx, errs } = await open(mk('en'), { reduced: true })
+    const { page, ctx, errs } = await open(mk('ja'), { reduced: true, locale: 'ja-JP' })
     await T(page, 'gift-envelope').waitFor()
     check('ceremony (reduced motion): the envelope says data-motion=fade', (await T(page, 'gift-envelope').getAttribute('data-motion')) === 'fade')
     await T(page, 'gift-open').click()
@@ -4602,6 +4610,258 @@ for (const [lang, locale, text] of [['en', 'en-US', 'Your gift is being finished
     check(`hero (${lang}): every slide shows its picture (${n} slides)`, seen.size === n - 1 && n >= 6, [...seen].join())
     check(`hero (${lang}): on a slow connection no slide ever shows an empty panel with its caption text`, emptyWithCaption === 0, String(emptyWithCaption))
     check(`no page errors (run 32, ${lang})`, errs.length === 0, errs.join('; '))
+    await ctx.close()
+  }
+}
+
+// ---------- Run 33 (2026-11-15, gift ceremony redesign phase A): the receiver's new ceremony (Classic, English) — all nine screens on 375 × 667 and 1440 × 800, with and without reduced motion; the film ends on paper, then the character (no black frame); a gift with and without the "you" line; ja, zh-Hant, remembrance, an apology and a locked gift keep today's ceremony; no AI, no he / she in the page; cinnabar only on the mark and the character; screenshots at 390 × 844 ----------
+{
+  const TOKEN = 'RG-cerecerecerecerecere'
+  const view = (over = {}) => ({
+    id: TOKEN, token: TOKEN, language: 'en', glyph: '労', reading: 'ねぎらう', romanization: 'negirau', meaning_en: 'tending',
+    en: { word: 'tending', word_source: 'lexicon', line: 'The care that mends what is about to give.', line_you: 'The one who eases a burden before anyone asks.', echo: null, classical: null },
+    who: 'Someone who fixed the bike before anyone asked.',
+    poem: { type: 'en', lines: ['The chain was back on', 'before I reached the driveway.', 'You never mention it.', 'You only notice', 'what is about to give,', 'and mend it quietly.'], reading: '' },
+    memorial: false, purpose: 'thanks', music: 'thanks',
+    film: { status: 'ready', lines: ['Sam came off his bike on your street.', 'He was trying hard not to cry.', 'By the time I got there, you had the wrench out.', 'You never said a word about it.'], pictures: ['/img/scenes/children.jpg', '/img/scenes/friends.jpg', '/img/scenes/m1.jpg', '/img/scenes/m2.jpg'] },
+    certificate_line: 'This character is the person as seen through your eyes.', from: 'Brian', to: 'Kenji', message: "Thanks for fixing Sam's bike.\nSee you Thursday.",
+    egift: null, locked: false, certificate_no: 3, order_date: '2026-11-15', opens_on: null, replied: false, package: 'egift', ...over,
+  })
+  const open = async (v, { w = 390, h = 844, reduced = false } = {}) => {
+    const ctx = await browser.newContext({ locale: 'en-US', viewport: { width: w, height: h }, reducedMotion: reduced ? 'reduce' : 'no-preference' })
+    const page = await ctx.newPage()
+    const errs = []
+    const seen = { reply: [], opened: 0, google: 0 }
+    page.on('pageerror', (e) => errs.push(String(e)))
+    page.on('request', (r) => { if (/googleapis|gstatic/.test(r.url())) seen.google++ })
+    await page.route('**/api/analytics', (r) => r.fulfill({ status: 204, body: '' }))
+    await page.route('**/api/me*', (r) => r.fulfill({ json: { basket: { count: 0 }, ready: null, hold: null } }))
+    await page.route(`**/api/gift/${TOKEN}**`, async (r) => {
+      const u = new URL(r.request().url())
+      if (u.pathname === `/api/gift/${TOKEN}/reply`) { seen.reply.push(JSON.parse(r.request().postData() ?? '{}')); return r.fulfill({ json: { ok: true } }) }
+      if (u.pathname === `/api/gift/${TOKEN}/opened`) { seen.opened++; return r.fulfill({ json: { ok: true } }) }
+      if (u.pathname === `/api/gift/${TOKEN}/render`) return r.fulfill({ json: { state: 'ready', view: v } })
+      if (u.pathname === `/api/gift/${TOKEN}`) return r.fulfill({ json: v })
+      return r.fulfill({ status: 204, body: '' })
+    })
+    await page.goto(`http://localhost:5173/g/${TOKEN}`, { waitUntil: 'networkidle' })
+    return { page, ctx, errs, seen }
+  }
+  const T = (page, id) => page.locator(`[data-testid="${id}"]`)
+  const screenOf = (page) => page.locator('main').getAttribute('data-screen')
+  const PRONOUN = /\b(he|she|his|him|her|hers|himself|herself)\b/i
+  // everything the receiver reads (the film's own lines are the engine's, written from the sender's story, so they are left out of the scan)
+  const pageText = (page) => page.evaluate(() => { let t = document.querySelector('main').innerText; for (const n of document.querySelectorAll('[data-testid=film-line]')) if (n.innerText) t = t.replace(n.innerText, ''); return t })
+  // every element painted in cinnabar (#C0392B) is the mark or the character
+  const redOnlyOnMarkAndCharacter = (page) => page.evaluate(() => {
+    const bad = []
+    for (const el of document.querySelectorAll('main *')) {
+      const cs = getComputedStyle(el)
+      const red = [cs.color, cs.backgroundColor, cs.borderTopColor].some((c) => c === 'rgb(192, 57, 43)')
+      if (!red || cs.opacity === '0' || el.closest('[hidden]')) continue
+      const own = el.className && typeof el.className === 'string' ? el.className : ''
+      if (/cr-mark|cr-ring|cr-glyph|cr-big|cr-small|cr-solid/.test(own)) continue
+      if (cs.borderTopColor === 'rgb(192, 57, 43)' && cs.borderTopWidth === '0px' && cs.color !== 'rgb(192, 57, 43)' && cs.backgroundColor !== 'rgb(192, 57, 43)') continue
+      if (cs.color === 'rgb(192, 57, 43)' && !el.textContent.trim()) continue
+      bad.push(`${el.tagName}.${own}`)
+    }
+    return bad
+  })
+
+  /** Walk all nine screens; with `play` the film plays to its end, else it is skipped. Returns what was seen. */
+  const walk = async (page, { play = false, shots = null } = {}) => {
+    const out = { screens: [], texts: [], red: [] }
+    const shot = async (n) => { if (shots) await page.screenshot({ path: `${SHOTS}/${shots}-${n}.png` }) }
+    const note = async () => { out.screens.push(await screenOf(page)); out.texts.push(await pageText(page)); out.red.push(...(await redOnlyOnMarkAndCharacter(page))) }
+    await T(page, 'cr-mark').waitFor()
+    await page.waitForTimeout(400)
+    await note(); await shot('1-mark')
+    await T(page, 'cr-markbtn').click()
+    await T(page, 'cr-note').waitFor()
+    await page.waitForTimeout(1000)
+    await note(); await shot('2-note')
+    await T(page, 'cr-to-film').click()
+    await T(page, 'cr-film').waitFor()
+    await page.waitForTimeout(300)
+    await note(); await shot('3-film')
+    if (play) {
+      await T(page, 'cr-play').click()
+      await page.waitForTimeout(3500)
+      await shot('3-film-playing')
+    } else await T(page, 'gift-skip').click()
+    await T(page, 'cr-char').waitFor({ timeout: 60000 })
+    await page.waitForTimeout(800)
+    await shot('4-character')
+    await page.waitForFunction(() => getComputedStyle(document.querySelector('[data-testid=cr-meaning]')).opacity === '1', null, { timeout: 30000 })
+    await page.waitForTimeout(300)
+    await note(); await shot('4-meaning')
+    await T(page, 'cr-to-poem').click()
+    await T(page, 'cr-poem').waitFor()
+    await page.waitForTimeout(4600)
+    await note(); await shot('5-poem')
+    await T(page, 'cr-to-cert').click()
+    await T(page, 'cr-cert').waitFor()
+    await page.waitForTimeout(400)
+    await note(); await shot('6-certificate')
+    await T(page, 'cr-to-keep').click()
+    await T(page, 'gift-keep').waitFor()
+    await page.waitForTimeout(400)
+    await note(); await shot('7-keepsakes')
+    await T(page, 'gift-to-answer').click()
+    await T(page, 'gift-answer').waitFor()
+    await T(page, 'gift-char-家').click()
+    await T(page, 'gift-reply-text').fill('You noticed. See you Thursday.')
+    await page.locator('main').evaluate(() => document.querySelector('[data-testid=gift-answer]').scrollTo(0, 0))
+    await note(); await shot('8-send-back')
+    await T(page, 'gift-reply-send').click()
+    await T(page, 'gift-reply-sent').waitFor()
+    await page.waitForTimeout(300)
+    await note(); await shot('9-sent')
+    return out
+  }
+
+  // ---- all nine screens: 375 × 667 and 1440 × 800, with and without reduced motion ----
+  for (const [w, h] of [[375, 667], [1440, 800]]) {
+    for (const reduced of [false, true]) {
+      const { page, ctx, errs, seen } = await open(view(), { w, h, reduced })
+      const label = `${w}×${h}${reduced ? ', reduced motion' : ''}`
+      check(`ceremony (${label}): an English gift opens on the new ceremony — the small mark, "For Kenji", "Brian sent you one small mark." and nothing else (no character, no moment, no note before the mark is touched)`, await (async () => { await T(page, 'cr-mark').waitFor(); const t = await pageText(page); return (await page.locator('main').getAttribute('data-ceremony')) === 'new' && t.includes('FOR KENJI') && t.includes('Brian sent you') && t.includes('one small mark.') && !t.includes('労') && !t.includes('Thursday') && !t.includes('tending') })())
+      const r = await walk(page)
+      check(`ceremony (${label}): the nine screens come in order — mark, note, film, character, poem, certificate, keepsakes, send back, sent`, r.screens.join(',') === 'mark,note,film,char,poem,cert,keep,back,sent', r.screens.join(','))
+      check(`ceremony (${label}): touching the mark is the opening (counted once)`, seen.opened === 1)
+      check(`ceremony (${label}): the answer goes once, with 家 and the words`, seen.reply.length === 1 && seen.reply[0].char === '家' && seen.reply[0].text === 'You noticed. See you Thursday.')
+      const all = r.texts.join('\n')
+      check(`ceremony (${label}): no "AI" anywhere and no he / she / his / him / her in the receiver's words`, !/\bAI\b/.test(all) && !PRONOUN.test(all), (all.match(PRONOUN) ?? [''])[0])
+      check(`ceremony (${label}): cinnabar only on the mark and the character`, r.red.length === 0, r.red.join(', '))
+      check(`ceremony (${label}): every screen fits: the button is reachable and no text is under 12 px`, await page.evaluate(() => [...document.querySelectorAll('main *')].filter((el) => el.childNodes.length && [...el.childNodes].some((n) => n.nodeType === 3 && n.textContent.trim()) && getComputedStyle(el).opacity !== '0').every((el) => parseFloat(getComputedStyle(el).fontSize) >= 12)))
+      check(`ceremony (${label}): fonts from our own server only (no Google request)`, seen.google === 0)
+      check(`no page errors (run 33, ${label})`, errs.length === 0, errs.join('; '))
+      await ctx.close()
+    }
+  }
+
+  // ---- the stage scale: 398 px, scaled by min(w/430, h/660, 1.7), never down ----
+  for (const [w, h, z] of [[375, 667, 1], [390, 844, 1], [820, 1180, 1.7], [1440, 800, 800 / 660]]) {
+    const { page, ctx } = await open(view(), { w, h })
+    await T(page, 'cr-mark').waitFor()
+    const got = Number(await page.locator('main').getAttribute('data-zoom'))
+    const width = await page.locator('.cr-stage').evaluate((el) => el.getBoundingClientRect().width)
+    check(`ceremony stage at ${w}×${h}: scale ${z.toFixed(3)} (got ${got}), the stage is ${Math.round(Math.min(398, w - 32) * z)} px wide`, Math.abs(got - z) < 0.01 && Math.abs(width - Math.min(398, w - 32) * z) < 2, `${got} ${width}`)
+    await ctx.close()
+  }
+
+  // ---- the film plays to its end: it fades to paper, never to black, then the character ----
+  {
+    const { page, ctx, errs } = await open(view(), { w: 390, h: 844 })
+    await T(page, 'cr-markbtn').click()
+    await T(page, 'cr-to-film').click()
+    await T(page, 'cr-play').click()
+    check('film: "Play the film" starts it, the four pictures go by with their lines under them, "Sound off" and "Skip" stay', await (async () => { await page.waitForTimeout(1500); const l = await T(page, 'film-line').innerText(); return l === 'Sam came off his bike on your street.' && (await T(page, 'film-sound').innerText()) === 'SOUND OFF' && (await T(page, 'gift-skip').isVisible()) })())
+    // sample the screen every 120 ms from the last picture to the character: the darkest moment must still be paper-light
+    await T(page, 'cr-frame').and(page.locator('[data-ending=yes]')).waitFor({ timeout: 40000 })
+    let darkest = 255
+    let sawChar = false
+    for (let i = 0; i < 16; i++) {
+      const png = await page.screenshot()
+      const { channels } = await sharp(png).stats()
+      const mean = (channels[0].mean + channels[1].mean + channels[2].mean) / 3
+      darkest = Math.min(darkest, mean)
+      if ((await screenOf(page)) === 'char') { sawChar = true; break }
+      await page.waitForTimeout(120)
+    }
+    check('film: at the end the picture fades to the paper and goes straight to the character — never a black frame (darkest moment stays light)', sawChar && darkest > 150, `darkest ${darkest.toFixed(0)}, char ${sawChar}`)
+    check('no page errors (run 33, film)', errs.length === 0, errs.join('; '))
+    await ctx.close()
+  }
+
+  // ---- screenshots of every screen at 390 × 844 (the film played) ----
+  {
+    const { page, ctx, errs } = await open(view(), { w: 390, h: 844 })
+    await walk(page, { play: true, shots: 'ceremony-390' })
+    check('no page errors (run 33, screenshots)', errs.length === 0, errs.join('; '))
+    await ctx.close()
+  }
+
+  // ---- with and without the "you" line ----
+  {
+    const { page, ctx } = await open(view(), { reduced: true })
+    await T(page, 'cr-markbtn').click(); await T(page, 'cr-to-film').click(); await T(page, 'gift-skip').click()
+    await page.waitForFunction(() => getComputedStyle(document.querySelector('[data-testid=cr-meaning]')).opacity === '1', null, { timeout: 20000 })
+    check('character: with line_you — "In Brian\'s eyes, you are" / tending negirau / "The one who eases a burden before anyone asks." / "This character is not a wish for you. It is how Brian already sees you."', (await T(page, 'cr-meaning-label').innerText()) === "IN BRIAN'S EYES, YOU ARE" && (await T(page, 'cr-word').innerText()).startsWith('tending') && (await T(page, 'cr-line').innerText()) === 'The one who eases a burden before anyone asks.' && (await T(page, 'cr-meaning').innerText()).includes('It is how Brian already sees you.'))
+    await ctx.close()
+  }
+  {
+    const v = view()
+    delete v.en.line_you
+    const { page, ctx } = await open(v, { reduced: true })
+    await T(page, 'cr-markbtn').click(); await T(page, 'cr-to-film').click(); await T(page, 'gift-skip').click()
+    await page.waitForFunction(() => getComputedStyle(document.querySelector('[data-testid=cr-meaning]')).opacity === '1', null, { timeout: 20000 })
+    check('character: a gift made before (no line_you) shows today\'s line under "In Brian\'s eyes"', (await T(page, 'cr-meaning-label').innerText()) === "IN BRIAN'S EYES" && (await T(page, 'cr-line').innerText()) === 'The care that mends what is about to give.' && (await T(page, 'cr-meaning').getAttribute('data-line')) === 'old')
+    await ctx.close()
+  }
+
+  // ---- the character: three layers, the blend on the whole mask layer, the carved form ----
+  {
+    const { page, ctx } = await open(view(), { w: 390, h: 844 })
+    await T(page, 'cr-markbtn').click(); await T(page, 'cr-to-film').click(); await T(page, 'gift-skip').click()
+    await T(page, 'cr-char').waitFor()
+    await page.waitForTimeout(3600)
+    const layers = await page.evaluate(() => {
+      const cs = (s) => getComputedStyle(document.querySelector(s))
+      return { lens: cs('[data-testid=cr-lens]').opacity, isolate: cs('[data-testid=cr-lens]').isolation, maskBlend: cs('[data-testid=cr-mask]').mixBlendMode, glyphBlend: getComputedStyle(document.querySelector('[data-testid=cr-mask] .cr-glyph')).mixBlendMode, micro: document.querySelector('[data-testid=cr-micro]').textContent, font: cs('[data-testid=cr-solid]').fontFamily, weight: cs('[data-testid=cr-solid]').fontWeight }
+    })
+    check('character: the poem is written inside the strokes with three layers — the poem in cream on cinnabar, a white sheet with the character cut out (screen blend on the WHOLE layer, not the character), the paper multiplied over', layers.lens === '1' && layers.isolate === 'isolate' && layers.maskBlend === 'screen' && layers.glyphBlend === 'normal' && layers.micro.includes('The chain was back on') && layers.micro.includes('and mend it quietly.'), JSON.stringify({ ...layers, micro: layers.micro.slice(0, 40) }))
+    check('character: drawn in the carved form (the certificate\'s Mincho at 900), not the thin stroke diagram', /ICHIREI Mincho/.test(layers.font) && layers.weight === '900' && (await page.locator('svg[data-testid=gift-glyph]').count()) === 0)
+    await ctx.close()
+  }
+
+  // ---- send back: the twelve, 80 characters, the sent screen and the real button ----
+  {
+    const { page, ctx, seen } = await open(view(), { reduced: true })
+    await T(page, 'cr-markbtn').click(); await T(page, 'cr-to-film').click(); await T(page, 'gift-skip').click()
+    await T(page, 'cr-to-poem').click(); await T(page, 'cr-to-cert').click(); await T(page, 'cr-to-keep').click()
+    check('keepsakes: the film (MP4), the four pictures, the card (PDF) and the certificate (PNG) — then "Answer Brian"', (await T(page, 'save-scroll').getAttribute('href')) === `/api/gift/${TOKEN}/scroll.png` && (await T(page, 'save-card').getAttribute('href')) === `/api/gift/${TOKEN}/card.pdf` && (await T(page, 'save-certificate').getAttribute('href')) === `/api/gift/${TOKEN}/certificate.png` && (await T(page, 'save-film').innerText()) === 'SAVE' && (await T(page, 'gift-to-answer').innerText()) === 'ANSWER BRIAN')
+    await T(page, 'gift-to-answer').click()
+    const chars = await page.locator('[data-testid=gift-chars] button').evaluateAll((bs) => bs.map((b) => `${b.querySelector('b').textContent} ${b.querySelector('span').textContent}`))
+    check('send back: "And how do you see Brian?" and the director\'s twelve, in order', (await T(page, 'gift-answer-title').innerText()).replace(/\n/g, ' ') === 'And how do you see Brian?' && chars.join('|') === "謝 thankful|家 family|光 you light the way|笑 made me smile|憶 remembered|温 warmed|守 I'll keep it|同 same here|友 friend|絆 bond|幸 glad|恩 I owe you", chars.join('|'))
+    check('send back: nothing chosen, nothing sent (the button waits); the words are optional and stop at 80 characters', await T(page, 'gift-reply-send').isDisabled() && await (async () => { await T(page, 'gift-reply-text').fill('x'.repeat(120)); return (await T(page, 'gift-reply-text').inputValue()).length === 80 })())
+    await T(page, 'gift-reply-text').fill('')
+    await T(page, 'gift-char-絆').click()
+    check('send back: choosing 絆 names it on the button ("Send 絆 to Brian")', (await T(page, 'gift-reply-send').innerText()) === 'SEND 絆 TO BRIAN')
+    await T(page, 'gift-reply-send').click()
+    await T(page, 'gift-reply-sent').waitFor()
+    check('sent: "Sent to Brian · 絆, bond", "One character from Brian, one from you. Now you have both said it.", the question, and a real button to /en', (await T(page, 'cr-sent-line').innerText()) === 'SENT TO BRIAN · 絆, BOND' && (await T(page, 'gift-reply-sent').innerText()).includes('One character from Brian, one from you. Now you have both said it.') && (await T(page, 'cr-ask').innerText()) === "Is there someone you've never quite said it to?" && (await T(page, 'gift-landing-line').getAttribute('href')) === '/en' && (await T(page, 'gift-landing-line').evaluate((a) => a.tagName)) === 'A' && seen.reply.length === 1 && seen.reply[0].char === '絆' && !('text' in seen.reply[0]))
+    await ctx.close()
+  }
+
+  // ---- the film keepsake: Save asks the server to make the MP4 (again while it is pending), then downloads it (the saved film itself is unchanged) ----
+  {
+    const { page, ctx } = await open(view(), { reduced: true })
+    const makes = []
+    await page.route(`**/api/gift/${TOKEN}/film/make**`, (r) => { makes.push(1); return r.fulfill({ status: makes.length === 1 ? 202 : 200, json: { state: makes.length === 1 ? 'pending' : 'ready' } }) })
+    await page.route(`**/api/gift/${TOKEN}/film.mp4**`, (r) => r.fulfill({ status: 200, contentType: 'video/mp4', body: 'x' }))
+    await T(page, 'cr-markbtn').click(); await T(page, 'cr-to-film').click(); await T(page, 'gift-skip').click()
+    await T(page, 'cr-to-poem').click(); await T(page, 'cr-to-cert').click(); await T(page, 'cr-to-keep').click()
+    const dl = page.waitForEvent('download', { timeout: 15000 }).catch(() => null)
+    await T(page, 'save-film').click()
+    const d = await dl
+    check('keepsakes (new ceremony): the film\'s Save makes the video on the server (asking again while pending), downloads ichirei-film.mp4 and shows a player', makes.length === 2 && !!d && d.suggestedFilename() === 'ichirei-film.mp4' && (await T(page, 'save-film-video').count()) === 1, JSON.stringify({ makes: makes.length, d: d && d.suggestedFilename(), video: await T(page, 'save-film-video').count() }))
+    await ctx.close()
+  }
+
+  // ---- every other gift keeps today's ceremony ----
+  for (const [label, over] of [['Japanese', { language: 'ja', en: null }], ['Chinese (zh-Hant)', { language: 'zh-Hant', en: null }], ['English remembrance', { memorial: true, purpose: 'memorial' }], ['English apology', { purpose: 'apology' }], ['English encouragement', { purpose: 'encourage' }]]) {
+    const { page, ctx } = await open(view(over), { reduced: true })
+    await T(page, 'gift-envelope').waitFor({ timeout: 8000 }).catch(() => {})
+    check(`today's ceremony stays for a ${label} gift (the sealed envelope with its cord; no new screens)`, (await T(page, 'gift-envelope').count()) === 1 && (await page.locator('[data-ceremony=new]').count()) === 0)
+    await ctx.close()
+  }
+  {
+    const locked = { locked: true, token: TOKEN, language: 'en', memorial: false, purpose: 'thanks', from: 'Brian', to: 'Kenji', opens_on: '2026-12-25', opens_at: null, opens_tz: null, days_left: 40 }
+    const { page, ctx } = await open(locked, { reduced: true })
+    await T(page, 'gift-envelope').waitFor({ timeout: 8000 }).catch(() => {})
+    const t = await page.locator('body').innerText()
+    check('today\'s sealed envelope stays for a locked English gift (names and the date only)', (await page.locator('main').getAttribute('data-locked')) === 'yes' && (await page.locator('[data-ceremony=new]').count()) === 0 && !t.includes('労'))
     await ctx.close()
   }
 }

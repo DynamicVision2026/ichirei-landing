@@ -55,8 +55,11 @@ else {
   // (2026-11-14: the later "final fix" ticket deliberately changes the receiver page, the buyer page, the legal page, the e-mail template and parts of the engine — so these checks now guard what that ticket must
   // NOT touch: the engine's CHOICE of characters (selection, cards, prompts, palette, lexicon) and the prices, compared with the moment release.)
   const GUARD = ['engine/engine.ts', 'engine/cards.ts', 'engine/slots.ts', 'engine/prompt.ja.md', 'engine/prompt.zh.md', 'engine/prompt.en.md', 'engine/review.ts']
-  const sinceMoment = execFileSync('git', ['diff', '--name-only', 'b2af257', '--', ...GUARD]).toString().trim()
-  check('the engine\'s choice of characters (selection, cards, slots, prompts, palette, lexicon, review) is untouched since the moment release — so the request an existing story fixture produces is the same', sinceMoment === '', sinceMoment)
+  // The one change since (gift ceremony 2026-11-15, A4): the English prompt also asks for `line_you_en`, the receiver's line, in the same answer. Every other guarded line is as it was.
+  const guardDiff = execFileSync('git', ['diff', '-U0', 'b2af257', '--', ...GUARD]).toString().split('\n').filter((l) => /^[-+]/.test(l) && !/^(\+\+\+|---)/.test(l))
+  const allowed = (l: string) => /line_you_en/.test(l) || l === '-* The freestyle candidate has neither field.' || l === '+* The freestyle candidate has none of these fields.'
+  const sinceMoment = guardDiff.filter((l) => !allowed(l)).join('\n')
+  check('the engine\'s choice of characters (selection, cards, slots, prompts, palette, lexicon, review) is untouched since the moment release — so the request an existing story fixture produces is the same (the English prompt only adds the receiver\'s line, line_you_en)', sinceMoment === '', sinceMoment)
   // (2026-11-15, the customer-loop ticket, item 4: the owner's English word for 修 is "mend", and the first-listed meaning of three more characters whose gift sense is not their first one is reordered — nothing else in the palette or the lexicon moves)
   const dataDiff = execFileSync('git', ['diff', '-U0', 'b2af257', '--', 'engine/palette.csv', 'engine/lexicon.csv']).toString().split('\n').filter((l) => /^[+-][^+-]/.test(l))
   check('the palette and the lexicon are untouched since the moment release except the four English meanings the owner asked to change (修 mend, 添, 寄, 送)', dataDiff.every((l) => /^[+-](ja|zh),(修|添|寄|送),|^[+-]修,verb/.test(l)), dataDiff.filter((l) => !/^[+-](ja|zh),(修|添|寄|送),|^[+-]修,verb/.test(l)).join(' | ').slice(0, 200))
