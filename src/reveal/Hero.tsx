@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState, type KeyboardEvent } from 're
 import { CATS, EXAMPLES, SCENE, TEXT, type RevealLang } from './copy.ts'
 import { rich } from './rich.tsx'
 import Picture from './Picture.tsx'
+import { preloadPicture } from './preload.ts'
 import { sceneName } from './scenes.ts'
 import { usePrefersReducedMotion } from './usePrefersReducedMotion.ts'
 import { approxShort, type Currency, type Rates } from './currency.ts'
@@ -12,6 +13,7 @@ import { usdLaunchLine } from '../order/usd.ts'
 
 const INTERVAL_MS = 6000
 const SWAP_MS = 350
+const HERO_SIZES = '(max-width: 860px) 100vw, 480px'
 
 const EXAMPLE_WORD: Record<RevealLang, string> = { en: 'Example', ja: '例', 'zh-Hant': '範例' }
 
@@ -26,20 +28,34 @@ export default function Hero({ lang, currency, rates, woodOnSale = false }: { la
   const [manual, setManual] = useState(false) // the visitor moved it themselves: announce changes to screen readers
   const timer = useRef(0)
 
+  // A slide changes only once its picture is really there (2026-11-15): the current picture stays until then, so no slide ever shows an empty panel with its caption. A picture that cannot load at
+  // all is skipped. The next slide's picture is fetched ahead of time.
+  const pending = useRef(0)
+  const [failed, setFailed] = useState<Record<string, true>>({})
   const go = useCallback(
-    (i: number) => {
+    (i: number, tries = 0) => {
       window.clearTimeout(timer.current)
-      if (reduce) {
-        setEx(i)
-        return
-      }
-      setSwap(true)
-      timer.current = window.setTimeout(() => {
-        setEx(i)
-        setSwap(false)
-      }, SWAP_MS)
+      const ticket = ++pending.current
+      const c = examples[i].c
+      void preloadPicture(sceneName(lang, c), HERO_SIZES).then((ok) => {
+        if (ticket !== pending.current) return // the visitor has already moved on
+        if (!ok) {
+          setFailed((f) => ({ ...f, [c]: true }))
+          if (tries < examples.length - 1) go((i + 1) % examples.length, tries + 1)
+          return
+        }
+        if (reduce) {
+          setEx(i)
+          return
+        }
+        setSwap(true)
+        timer.current = window.setTimeout(() => {
+          setEx(i)
+          setSwap(false)
+        }, SWAP_MS)
+      })
     },
-    [reduce],
+    [reduce, examples, lang],
   )
   useEffect(() => () => window.clearTimeout(timer.current), [])
 
@@ -52,6 +68,10 @@ export default function Hero({ lang, currency, rates, woodOnSale = false }: { la
   }, [auto, ex, go, examples.length])
 
   const e = examples[ex]
+  // the next slide's picture, fetched while this one is shown
+  useEffect(() => {
+    void preloadPicture(sceneName(lang, examples[(ex + 1) % examples.length].c), HERO_SIZES)
+  }, [ex, lang, examples])
   const pick = (i: number) => {
     setManual(true)
     go(i)
@@ -98,12 +118,12 @@ export default function Hero({ lang, currency, rates, woodOnSale = false }: { la
         </div>
 
         <div className="heroArt">
-          <figure className={`ph${swap ? ' swap' : ''}`} style={{ ['--cat' as string]: `var(--c-${e.c})` }}>
+          <figure className={`ph${swap ? ' swap' : ''}${failed[e.c] ? ' noimg' : ''}`} style={{ ['--cat' as string]: `var(--c-${e.c})` }} data-testid="hero-figure" data-slide={e.c}>
             <span className="phk notranslate" aria-hidden="true">
               {e.k}
             </span>
             <span className="phc">{SCENE[e.c][lang]}</span>
-            <Picture key={e.c} name={sceneName(lang, e.c)} width={4} height={5} eager={ex === 0} sizes="(max-width: 860px) 100vw, 480px" />
+            <Picture key={e.c} name={sceneName(lang, e.c)} width={4} height={5} eager sizes={HERO_SIZES} onFail={() => setFailed((f) => ({ ...f, [e.c]: true }))} />
           </figure>
           <div
             className={`reveal${swap ? ' swap' : ''}${auto ? ' run' : ''}`}

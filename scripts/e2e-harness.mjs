@@ -2272,7 +2272,8 @@ const SECTION_ORDER = ['.hero', '.strip', '.philo', '#shape', '#angles', '#write
   await rp.waitForTimeout(7500)
   check('reduced motion: the hero carousel does not auto-advance, and there is no progress animation', (await rp.locator('.hero .reveal .k').innerText()) === k0 && !(await rp.locator('.hero .reveal').getAttribute('class')).includes('run'))
   await rp.locator('.hero .dots button').nth(2).click()
-  check('reduced motion: the dots still work', (await rp.locator('.hero .reveal .k').innerText()) === '遅')
+  // since 2026-11-15 a slide changes once its picture has loaded (never an empty panel), so the dot's slide comes a moment later
+  check('reduced motion: the dots still work', await rp.waitForFunction(() => document.querySelector('.hero .reveal .k')?.textContent === '遅', null, { timeout: 5000 }).then(() => true, () => false))
   await rctx.close()
 }
 
@@ -4557,6 +4558,50 @@ for (const [lang, locale, text] of [['en', 'en-US', 'Your gift is being finished
     await page.route('**/api/me*', (r) => r.fulfill({ json: { basket: { count: 0 }, ready: null, hold: null } }))
     await page.goto('http://localhost:5173/en', { waitUntil: 'networkidle' })
     check('footer: the public contact info@beyondculture.ai', (await page.locator('[data-testid=footer-contact]').innerText()) === 'info@beyondculture.ai')
+    await ctx.close()
+  }
+}
+
+// ---------- Run 32 (2026-11-15, small ticket): every hero slide shows its picture, and on a slow connection no slide shows an empty panel with its caption ----------
+{
+  for (const [lang, url] of [['en', 'http://localhost:5173/en'], ['ja', 'http://localhost:5173/?lang=ja'], ['zh-Hant', 'http://localhost:5173/zh']]) {
+    const ctx = await browser.newContext({ viewport: { width: 1280, height: 900 }, locale: lang === 'en' ? 'en-US' : lang === 'ja' ? 'ja-JP' : 'zh-TW' })
+    const page = await ctx.newPage()
+    const errs = []
+    page.on('pageerror', (e) => errs.push(String(e)))
+    await page.route('**/api/analytics', (r) => r.fulfill({ status: 204, body: '' }))
+    // a slow connection: every scene picture takes 1.2 s
+    await page.route('**/img/scenes/**', async (r) => { await new Promise((res) => setTimeout(res, 1200)); await r.continue() })
+    await page.goto(url, { waitUntil: 'domcontentloaded' })
+    await page.waitForSelector('[data-testid=hero-figure] img', { timeout: 15000 })
+    const fig = page.locator('[data-testid=hero-figure]')
+    const dots = page.locator('.heroArt .dots button')
+    const n = await dots.count()
+    let emptyWithCaption = 0
+    const seen = new Set()
+    // sample the panel every 100 ms while the slides are changed one after another
+    const sampler = setInterval(async () => {
+      try {
+        const st = await fig.evaluate((el) => {
+          const img = el.querySelector('img')
+          const cap = el.querySelector('.phc')
+          const capShown = !!cap && Number(getComputedStyle(cap).opacity) > 0.05
+          const imgShown = !!img && img.complete && img.naturalWidth > 0 && Number(getComputedStyle(img).opacity) > 0.5
+          return { capShown, imgShown }
+        })
+        if (st.capShown && !st.imgShown) emptyWithCaption++
+      } catch {}
+    }, 100)
+    for (let i = 1; i < n; i++) {
+      await dots.nth(i).click()
+      await page.waitForFunction((want) => { const el = document.querySelector('[data-testid=hero-figure]'); const img = el?.querySelector('img'); return !!el && !!img && img.complete && img.naturalWidth > 0 && document.querySelectorAll('.heroArt .dots button')[want]?.getAttribute('aria-current') === 'true' }, i, { timeout: 15000 }).catch(() => {})
+      const ok = await fig.evaluate((el) => { const img = el.querySelector('img'); return !!img && img.complete && img.naturalWidth > 0 })
+      if (ok) seen.add(await fig.getAttribute('data-slide'))
+    }
+    clearInterval(sampler)
+    check(`hero (${lang}): every slide shows its picture (${n} slides)`, seen.size === n - 1 && n >= 6, [...seen].join())
+    check(`hero (${lang}): on a slow connection no slide ever shows an empty panel with its caption text`, emptyWithCaption === 0, String(emptyWithCaption))
+    check(`no page errors (run 32, ${lang})`, errs.length === 0, errs.join('; '))
     await ctx.close()
   }
 }

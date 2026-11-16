@@ -20,6 +20,7 @@ export default function Picture({
   eager = false,
   sizes = '(max-width: 860px) 100vw, 560px',
   style,
+  onFail,
 }: {
   name: string
   width: number
@@ -29,6 +30,8 @@ export default function Picture({
   eager?: boolean
   sizes?: string
   style?: CSSProperties
+  /** Called once when neither the WebP nor the JPG could be shown. */
+  onFail?: () => void
 }) {
   // 0 = WebP then JPG, 1 = JPG only (the WebP failed), 2 = nothing (the JPG failed too)
   const [stage, setStage] = useState<0 | 1 | 2>(0)
@@ -47,8 +50,12 @@ export default function Picture({
         loading={eager ? 'eager' : 'lazy'}
         decoding="async"
         {...(eager ? { fetchPriority: 'high' as const } : {})}
-        onError={() => setStage((s) => (s === 0 ? 1 : 2))}
+        onError={() => {
+          if (stage === 1) onFail?.()
+          setStage((s) => (s === 0 ? 1 : 2))
+        }}
       />
     </picture>
   )
 }
+

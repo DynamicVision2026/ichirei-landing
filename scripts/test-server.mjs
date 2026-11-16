@@ -44,6 +44,30 @@ try {
   const html = await home.text()
   check('static: / serves index.html', home.status === 200 && html.includes('<div id="root">'))
   const assetPath = html.match(/src="(\/assets\/[^"]+\.js)"/)?.[1]
+  // the link preview of the English and Chinese pages (2026-11-15): a plain GET (no JavaScript) already carries that language's tags; / is index.html byte for byte
+  {
+    const { readFileSync } = await import('node:fs')
+    const built = readFileSync('dist/index.html', 'utf8')
+    check('share tags: / is byte-identical to the built index.html (the Japanese tags, untouched)', html === built)
+    for (const path of ['/en', '/en/', '/en?code=THANKS100', '/en?utm_source=x']) {
+      const r = await fetch(base + path)
+      const h = await r.text()
+      const ok = r.status === 200 && h.includes('<html lang="en"') && h.includes('<title>ICHIREI — A Gift of One Character</title>') &&
+        h.includes('<meta name="description" content="Tell us one true moment with someone. We find the single character that holds how you see them, and seal it as a gift you can send today." />') &&
+        h.includes('<meta property="og:title" content="Between you and me, one character." />') &&
+        h.includes('<meta property="og:description" content="Tell us one true moment with someone. We find the single character that holds how you see them, and seal it as a gift you can send today." />') &&
+        h.includes('<meta property="og:locale" content="en_US" />') && h.includes('<meta property="og:url" content="https://ichirei.soul-id.jp/en" />') &&
+        h.includes('<meta property="og:image" content="https://ichirei.soul-id.jp/img/og/en.jpg" />') && h.includes('og:image:width" content="1200"') && h.includes('og:image:height" content="630"') &&
+        h.includes('<meta name="twitter:card" content="summary_large_image" />') && h.includes('<div id="root">') &&
+        !/ja_JP|一字の贈りもの|あなたの目に映る/.test(h) && !/THANKS100|free gift|Days of Thanks|\$0/i.test(h.slice(0, h.indexOf('</head>')))
+      check(`share tags: GET ${path} (no JavaScript) carries lang="en", the English title, description, og: tags and the 1200×630 picture — and no promotion wording`, ok, h.slice(0, 1600))
+    }
+    const zh = await (await fetch(base + '/zh')).text()
+    check('share tags: GET /zh carries lang="zh-Hant", the Traditional Chinese title and description, og:locale zh_TW', zh.includes('<html lang="zh-Hant"') && zh.includes('<title>ICHIREI 一字禮 — 一個字的禮物</title>') && zh.includes('og:description" content="ICHIREI（一字禮）— 把你眼中的那個人，凝成一個字。獻給重要的人的一個字的禮物。"') && zh.includes('og:locale" content="zh_TW"') && !zh.includes('ja_JP'))
+    const img = await fetch(base + '/img/og/en.jpg')
+    const buf = Buffer.from(await img.arrayBuffer())
+    check('share tags: the English picture is served (a JPEG of 1200×630)', img.status === 200 && buf[0] === 0xff && buf[1] === 0xd8 && (() => { for (let i = 2; i < buf.length - 9; i++) if (buf[i] === 0xff && (buf[i + 1] === 0xc0 || buf[i + 1] === 0xc2)) return buf.readUInt16BE(i + 5) === 630 && buf.readUInt16BE(i + 7) === 1200; return false })())
+  }
   check('static: bundle path is root-relative (/assets/…)', Boolean(assetPath), html.slice(0, 400))
   const asset = await fetch(base + assetPath)
   check('static: bundle loads as JS', asset.status === 200 && (asset.headers.get('content-type') ?? '').includes('javascript'))

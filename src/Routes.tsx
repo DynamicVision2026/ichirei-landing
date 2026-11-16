@@ -79,5 +79,7 @@ export default function Routes() {
   }
   // /en (2026-11-12): the English page for the US launch — the same page with the language set to English (a link from search or an ad keeps its ?utm_… parameters)
   if (path === '/en' || path === '/en/') setLanguage('en')
+  // /zh (2026-11-15): the Traditional Chinese page (its link preview is Chinese too: the server answers /zh with its own tags)
+  if (path === '/zh' || path === '/zh/') setLanguage('zh-Hant')
   return <RevealPage />
 }

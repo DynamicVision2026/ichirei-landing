@@ -138,6 +138,9 @@
 .rv .ph img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;max-width:100%;z-index:1;transition:opacity .8s ease}
 .rv .ph .phk{position:absolute;right:-.06em;bottom:-.18em;font-family:var(--kanji);font-weight:900;font-size:clamp(7rem,16vw,12rem);line-height:1;color:var(--cat,var(--gold));opacity:.16;z-index:0}
 .rv .ph .phc{position:absolute;left:1rem;top:1rem;z-index:0;font-size:.72rem;letter-spacing:.08em;color:color-mix(in srgb,var(--cat,var(--gold)) 80%,var(--ink));opacity:.8;max-width:70%}
+/* the hero's caption is only for a picture that could not be shown at all (2026-11-15): never over an empty panel while a picture is on its way */
+.rv .heroArt .ph .phc{opacity:0}
+.rv .heroArt .ph.noimg .phc{opacity:.8}
 .rv .heroArt{position:relative;min-width:0;padding-bottom:3rem}
 .rv .heroArt .ph{aspect-ratio:4/5;width:86%;margin-left:auto;max-width:100%}
 .rv .heroArt .reveal{position:relative;margin-top:-42%;width:82%;max-width:100%}

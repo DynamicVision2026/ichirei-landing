@@ -40,6 +40,7 @@ import { bodyLimit } from 'hono/body-limit'
 import { envRunLimiter } from '../engine/rate-limit.ts'
 import { ensureVisitor } from '../engine/visitor.ts'
 import { withHeartbeat } from './heartbeat.ts'
+import { injectLandingShare, landingShare } from '../engine/landing-share.ts'
 
 export interface ServerConfig {
   /** Max time to receive a full request from the client (Node http server). */
@@ -333,6 +334,19 @@ export function createApp(config: ServerConfig): Hono {
     }
     return (await giftHandlers.page(c.req.param('token'), indexHtml)) ?? next()
   })
+
+  // The English and Traditional Chinese landing pages, as HTML with their own link-preview tags (2026-11-15, engine/landing-share.ts): the apps that show a link's card do not run the page.
+  // `/` and the Japanese page are index.html exactly as it is.
+  for (const [path, lang] of [['/en', 'en'], ['/en/', 'en'], ['/zh', 'zh-Hant'], ['/zh/', 'zh-Hant']] as const) {
+    app.get(path, async (c, next) => {
+      try {
+        indexHtml ??= await readFile('./dist/index.html', 'utf8')
+      } catch {
+        return next()
+      }
+      return c.html(injectLandingShare(indexHtml, landingShare(lang)), 200, { 'Cache-Control': 'no-cache' })
+    })
+  }
 
   // The built bundle, stylesheet and pages are text: gzip them (Cloud Run does not). Never the API — the NDJSON
   // stream and its heartbeat must reach the browser byte by byte, so /api/* is left exactly as it was.
