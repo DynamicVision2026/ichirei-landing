@@ -32,6 +32,8 @@ export interface OrderStat {
   /** A paid order whose total was 0 (a 100%-off promotion code): counted as an order with revenue 0. `free_code` is the code's name when Shopify sent it. */
   free?: boolean
   free_code?: string | null
+  /** en orders: the English word shown with the character (the certificate's meaning_en), for the owner's dashboard. */
+  word_en?: string | null
   /** waiting orders only (paid without our site, no gift yet): whole days left before it is "refund due". */
   days_left?: number | null
   collected: boolean

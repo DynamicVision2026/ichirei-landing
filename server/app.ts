@@ -23,6 +23,7 @@ import { handlers as giftHandlers } from '../api/gift.ts'
 import { handlers as opsHandlers } from '../api/ops.ts'
 import { statsHandlers } from '../api/ops-stats.ts'
 import { customerHandlers } from '../api/ops-customers.ts'
+import { homeHandlers } from '../api/ops-home.ts'
 import { POST as analyticsPost } from '../api/analytics.ts'
 import { GET as ratesGet } from '../api/rates.ts'
 import { GET as sizesGet } from '../api/sizes.ts'
@@ -254,6 +255,9 @@ export function createApp(config: ServerConfig): Hono {
   // The owner's page (Basic Auth, ICHIREI_OPS_PASSWORD; refused outright without it). Never indexed, never cached.
   const opsLimit = envRunLimiter('ICHIREI_OPS_LIMIT', { max: 120, minutes: 10 })
   app.get('/ops', limited(opsLimit), (c) => opsHandlers.page(c.req.raw))
+  app.get('/ops/home', limited(opsLimit), (c) => homeHandlers.page(c.req.raw))
+  app.get('/ops/home/orders.csv', limited(opsLimit), (c) => homeHandlers.csv(c.req.raw))
+  app.get('/ops/home/customers.csv', limited(opsLimit), (c) => homeHandlers.customersCsv(c.req.raw))
   app.get('/ops/stats', limited(opsLimit), (c) => statsHandlers.page(c.req.raw))
   app.get('/ops/customers', limited(opsLimit), (c) => customerHandlers.page(c.req.raw))
   app.get('/ops/stats.json', limited(opsLimit), (c) => statsHandlers.json(c.req.raw))

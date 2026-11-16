@@ -82,6 +82,7 @@ export function orderStatOf(entry: OrderIndexEntry, rec: OrderRecord | null, pay
     price_jpy: paidAmount ?? (typeof p.price_jpy === 'number' ? p.price_jpy : 0),
     ...(buyerAmount ? { price_buyer: buyerAmount } : {}),
     ...(state === 'paid' && paidAmount === 0 ? { free: true, free_code: pay && pay !== 'unverified' ? (pay.free_code ?? null) : null } : {}),
+    ...(p.certificate?.meaning_en ? { word_en: p.certificate.meaning_en } : {}),
     collected: !!rec.collected_at,
     opened: !!entry.token && openedHashes.has(tokenHash(entry.token)),
     rounds: Math.max(1, ...shown.map((s) => s.set)),
