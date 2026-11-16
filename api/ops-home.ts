@@ -11,6 +11,9 @@ import { createOrderStore } from '../engine/order-store.ts'
 import { analyticsDay } from '../engine/analytics.ts'
 import { loadLexicon } from '../engine/lexicon.ts'
 import { PERIODS, type OrderStat, type Period } from '../engine/stats.ts'
+import { readCustomer, type CustomerRecord, type EventCode } from '../engine/customer.ts'
+import type { BasketItem } from '../engine/basket.ts'
+import type { OrderStore } from '../engine/order-store.ts'
 
 const DAY_MS = 86_400_000
 const headers = (type: string, extra: Record<string, string> = {}) => ({ 'content-type': type, 'x-robots-tag': 'noindex, nofollow', 'cache-control': 'no-store', ...extra })
@@ -87,7 +90,7 @@ td{padding:11px 8px;border-bottom:1px solid #EFE9DC;white-space:nowrap;font-vari
 .pill{display:inline-block;padding:3px 10px;font-size:13px;background:#151311;color:#FBF8F1}.pill.soft{background:#E6E0D3;color:#3B362F}.pill.red{background:#C0392B;color:#fff}
 .mini{display:grid;grid-template-columns:64px minmax(0,1fr) 72px;align-items:center;gap:12px;font-size:14px}.mini .bar{height:8px;background:#EFE9DC}.mini .bar i{display:block;height:8px;background:#151311}
 .chars{display:flex;flex-wrap:wrap;gap:10px}.ch{width:72px;padding:10px 0;background:#F3EFE5;text-align:center;display:flex;flex-direction:column;gap:2px}.ch b{font-size:28px;color:#C0392B;line-height:1.1;font-weight:700}.ch span{font-size:12px;color:#3B362F}.ch em{font-style:normal;font-size:12px;color:#5C564D}
-.muted{font-size:13px;color:#5C564D}footer{display:flex;flex-wrap:wrap;gap:24px;font-size:14px;color:#5C564D;border-top:1px solid #E2DBCC;padding-top:18px}
+.muted{font-size:13px;color:#5C564D}.dot{display:inline-block;width:8px;height:8px;border-radius:50%;background:#E2DBCC}.tick{font-weight:600}table.people td{padding:9px 8px}details summary{cursor:pointer}.tl{white-space:normal;padding:8px 0;min-width:280px}.tl ol{margin:6px 0 0;padding-left:18px;font-size:13px}footer{display:flex;flex-wrap:wrap;gap:24px;font-size:14px;color:#5C564D;border-top:1px solid #E2DBCC;padding-top:18px}
 @media(max-width:640px){.wrap{padding:24px 16px 48px}.step{grid-template-columns:1fr 80px}.step .bar{grid-column:1/-1;order:3}h1{font-size:28px}}`
 
 function dailyChart(daily: { day: string; visits: number; paid: number }[]): string {
@@ -112,7 +115,7 @@ function dailyChart(daily: { day: string; visits: number; paid: number }[]): str
   return `<svg class="chart" viewBox="0 0 ${W} ${H}" role="img" aria-label="Visits and gifts per day"><text x="0" y="12" font-size="11" fill="#5C564D">${max}</text><line x1="${pad}" x2="${W}" y1="${H - 20}" y2="${H - 20}" stroke="#E2DBCC"/>${bars}</svg>`
 }
 
-export function renderHome(payload: StatsPayload, p: Period, now: Date): string {
+export function renderHome(payload: StatsPayload, p: Period, now: Date, customers: CustomerRow[] = []): string {
   const s = payload.stats.periods[p]
   const f = s.funnel
   const orders = payload.orders.filter((o) => inPeriod(o, p, now))
@@ -163,6 +166,7 @@ export function renderHome(payload: StatsPayload, p: Period, now: Date): string 
     `<section class="card" aria-label="The journey"><div style="display:flex;flex-wrap:wrap;justify-content:space-between;gap:8px;align-items:baseline"><h2 class="serif">The journey</h2>${worst ? `<div class="muted">Biggest drop: <b style="color:#151311">${esc(worst)}</b></div>` : ''}</div>` +
     steps.map(([label, v]) => `<div class="step"><div>${label}</div><div class="bar"><i style="width:${Math.round((100 * v) / top)}%"></i></div><div class="v"><b>${n(v)}</b> <span>${Math.round((100 * v) / top)}%</span></div></div>`).join('') +
     `</section>` +
+    renderCustomersSection(customers) +
     `<div class="row2"><div class="main">` +
     `<section class="card" aria-label="Visits and gifts per day"><div style="display:flex;flex-wrap:wrap;justify-content:space-between;gap:8px;align-items:baseline"><h2 class="serif">Day by day</h2><div class="legend"><span><i style="background:#CFC8BA"></i>Visits</span><span><i style="background:#C0392B"></i>Gifts</span></div></div>${dailyChart(payload.stats.periods[p === 'today' ? 'd7' : p].daily)}</section>` +
     `<section class="card" aria-label="Latest gifts"><div style="display:flex;flex-wrap:wrap;justify-content:space-between;gap:8px;align-items:baseline"><h2 class="serif">Latest gifts</h2><div style="display:flex;gap:18px;font-size:14px"><a href="/ops/home/orders.csv">Download spreadsheet (CSV)</a><a href="/ops">All orders →</a></div></div>` +
@@ -174,6 +178,110 @@ export function renderHome(payload: StatsPayload, p: Period, now: Date): string 
     `</div></div>` +
     `<footer><a href="/ops/customers">Customers (search by email)</a><a href="/ops">All orders</a><a href="/ops/stats">Engine details</a><span>Numbers include our own tests.</span></footer>` +
     `</div></body></html>`
+}
+
+// ---------- customers: one row per person (browser or email), what they did, what they saved ----------
+
+/** The steps shown as columns, in the order a customer meets them. */
+export const STEP_COLUMNS: { label: string; codes: EventCode[] }[] = [
+  { label: 'Visited', codes: ['visited'] },
+  { label: 'Wrote', codes: ['tried'] },
+  { label: 'Pictures', codes: ['previewed'] },
+  { label: 'Saved', codes: ['saved'] },
+  { label: 'Held free', codes: ['held'] },
+  { label: 'Ordered', codes: ['ordered_free', 'ordered_paid'] },
+  { label: 'Collected', codes: ['collected'] },
+  { label: 'Sent', codes: ['sent'] },
+  { label: 'Opened', codes: ['opened'] },
+  { label: 'Answered', codes: ['answered'] },
+]
+
+const EVENT_WORDS: Record<EventCode, string> = {
+  visited: 'Visited the page', tried: 'Wrote a moment', previewed: 'Saw the pictures', saved: 'Saved a gift', held: 'Held a free gift', hold_expired: 'Free-gift hold ended',
+  hold_used: 'Used the free-gift hold', ordered_free: 'Ordered (free)', ordered_paid: 'Ordered (paid)', collected: 'Collected the gift', sent: 'Sent the link', opened: 'Receiver opened it',
+  answered: 'Receiver answered', cancelled: 'Cancelled', refunded: 'Refunded',
+}
+
+export interface CustomerRow {
+  rec: CustomerRecord
+  saved: { kanji: string; word: string; at: string }[]
+}
+
+/** Every customer record listed in the last `days` days (newest activity first), with the characters in their basket. Codes and characters only: never a moment's text. */
+export async function buildCustomers(store: OrderStore, now: Date, days = 45): Promise<CustomerRow[]> {
+  const ids = new Set<string>()
+  for (let i = 0; i <= days; i++) {
+    const raw = await store.getObject(`ops/customers-${analyticsDay(new Date(now.getTime() - i * DAY_MS))}.jsonl`).catch(() => null)
+    for (const line of (raw?.toString('utf8') ?? '').split('\n')) {
+      try {
+        const j = JSON.parse(line) as { id?: string }
+        if (j.id && /^[EV][A-Za-z0-9_-]{22,64}$/.test(j.id)) ids.add(j.id)
+      } catch {
+        // an empty or broken line
+      }
+    }
+  }
+  const recs: CustomerRecord[] = []
+  for (const id of ids) {
+    const r = await readCustomer(store, id).catch(() => null)
+    if (r) recs.push(r)
+  }
+  // a browser record that was merged into an email's record is shown once, under the email
+  const emailBrowsers = new Set(recs.filter((r) => r.id.startsWith('E')).flatMap((r) => r.browsers))
+  const shown = recs.filter((r) => r.id.startsWith('E') || !emailBrowsers.has(r.id))
+  shown.sort((a, b) => Date.parse(b.last_seen) - Date.parse(a.last_seen))
+  const rows: CustomerRow[] = []
+  for (const rec of shown) {
+    const saved: CustomerRow['saved'] = []
+    for (const item of rec.basket.slice(0, 8)) {
+      const buf = await store.getObject(`basket/${item}.json`).catch(() => null)
+      if (!buf) continue
+      try {
+        const b = JSON.parse(buf.toString('utf8')) as BasketItem
+        saved.push({ kanji: b.card?.kanji ?? '', word: b.card?.word ?? '', at: b.created_at })
+      } catch {
+        // unreadable item
+      }
+    }
+    rows.push({ rec, saved })
+  }
+  return rows
+}
+
+const countOf = (rec: CustomerRecord, codes: EventCode[]): number => rec.events.filter((e) => codes.includes(e.code)).length
+const lastAction = (rec: CustomerRecord): string => {
+  const e = rec.events[rec.events.length - 1]
+  return e ? EVENT_WORDS[e.code] ?? e.code : '—'
+}
+const who = (rec: CustomerRecord): string => rec.emails[0] ?? `Visitor ${rec.id.slice(1, 7).toUpperCase()}`
+
+export function renderCustomersSection(rows: CustomerRow[], limit = 50): string {
+  if (rows.length === 0) return `<section class="card" aria-label="Customers"><h2 class="serif">Customers</h2><p class="muted">No customer records yet. A record starts when someone visits the page.</p></section>`
+  const head = `<tr><th>Customer</th><th>Saved gifts</th><th>Last seen</th>${STEP_COLUMNS.map((c) => `<th style="text-align:center">${c.label}</th>`).join('')}<th>Orders</th><th>Last action</th><th>First seen</th></tr>`
+  const body = rows.slice(0, limit).map(({ rec, saved }) => {
+    const cells = STEP_COLUMNS.map((c) => {
+      const k = countOf(rec, c.codes)
+      return `<td style="text-align:center">${k === 0 ? '<span class="dot"></span>' : k === 1 ? '<span class="tick">✓</span>' : `<span class="tick">${k}</span>`}</td>`
+    }).join('')
+    const savedCell = saved.length ? saved.map((x) => `<span class="serif" style="color:#C0392B;font-size:18px" title="${esc(x.word)}">${esc(x.kanji)}</span>`).join(' ') + ` <span class="muted">${saved.length}</span>` : '<span class="muted">—</span>'
+    const orders = rec.events.filter((e) => e.order).map((e) => esc(e.order)).join(', ') || '<span class="muted">—</span>'
+    const timeline = rec.events.slice(-40).map((e) => `<li><span class="muted">${esc(whenOf(e.at))}</span> ${esc(EVENT_WORDS[e.code] ?? e.code)}${e.order ? ` · ${esc(e.order)}` : ''}</li>`).join('')
+    const link = rec.emails[0] ? `<a href="/ops/customers?q=${encodeURIComponent(rec.emails[0])}">${esc(who(rec))}</a>` : esc(who(rec))
+    return `<tr><td><details><summary>${link}</summary><div class="tl"><div class="muted">ID ${esc(rec.id.slice(0, 12))}… · ${esc(rec.language ?? '')}${rec.consent.marketing ? ' · said yes to news' : ''}${rec.basket_token ? ' · has a private basket link' : ''}</div><ol>${timeline}</ol></div></details></td>` +
+      `<td>${savedCell}</td><td>${esc(whenOf(rec.last_seen))}</td>${cells}<td>${orders}</td><td>${esc(lastAction(rec))}</td><td>${esc(whenOf(rec.first_seen))}</td></tr>`
+  }).join('')
+  return `<section class="card" aria-label="Customers"><div style="display:flex;flex-wrap:wrap;justify-content:space-between;gap:8px;align-items:baseline"><h2 class="serif">Customers</h2>` +
+    `<div style="display:flex;gap:18px;font-size:14px"><span class="muted">${rows.length} people, newest activity first</span><a href="/ops/home/customers.csv">Download spreadsheet (CSV)</a></div></div>` +
+    `<div class="scroll"><table class="people"><thead>${head}</thead><tbody>${body}</tbody></table></div>` +
+    `<div class="muted">✓ = did it once, a number = how many times. Tap a name for the full timeline. A visitor becomes an email once they hold a free gift or pay; saved gifts live in the visitor's basket on their device and on their private basket link, for 30 days.</div></section>`
+}
+
+export function customersCsv(rows: CustomerRow[]): string {
+  const q = (v: unknown) => `"${String(v ?? '').replace(/"/g, '""')}"`
+  const head = ['customer_id', 'email', 'first_seen', 'last_seen', 'language', ...STEP_COLUMNS.map((c) => c.label.toLowerCase().replace(/ /g, '_')), 'saved_characters', 'orders', 'marketing_ok', 'last_action']
+  const lines = rows.map(({ rec, saved }) => [rec.id, rec.emails.join(' '), rec.first_seen, rec.last_seen, rec.language ?? '', ...STEP_COLUMNS.map((c) => countOf(rec, c.codes)),
+    saved.map((x) => `${x.kanji} ${x.word}`.trim()).join(' | '), rec.events.filter((e) => e.order).map((e) => e.order).join(' '), rec.consent.marketing ? 'yes' : 'no', lastAction(rec)].map(q).join(','))
+  return [head.join(','), ...lines].join('\n') + '\n'
 }
 
 export function ordersCsv(payload: StatsPayload): string {
@@ -198,14 +306,20 @@ export function createHomeHandlers(deps: () => OpsDeps) {
       if (g instanceof Response) return g
       const asked = new URL(req.url).searchParams.get('p') ?? 'today'
       const p: Period = (PERIODS as readonly string[]).includes(asked) ? (asked as Period) : 'today'
-      const payload = await buildStats(g.d, g.store, g.env, g.now)
-      return new Response(renderHome(payload, p, g.now), { status: 200, headers: headers('text/html; charset=utf-8') })
+      const [payload, customers] = await Promise.all([buildStats(g.d, g.store, g.env, g.now), buildCustomers(g.store, g.now).catch(() => [] as CustomerRow[])])
+      return new Response(renderHome(payload, p, g.now, customers), { status: 200, headers: headers('text/html; charset=utf-8') })
     },
     async csv(req: Request): Promise<Response> {
       const g = await guard(req)
       if (g instanceof Response) return g
       const payload = await buildStats(g.d, g.store, g.env, g.now)
       return new Response(ordersCsv(payload), { status: 200, headers: headers('text/csv; charset=utf-8', { 'content-disposition': 'attachment; filename="ichirei-gifts.csv"' }) })
+    },
+    async customersCsv(req: Request): Promise<Response> {
+      const g = await guard(req)
+      if (g instanceof Response) return g
+      const rows = await buildCustomers(g.store, g.now)
+      return new Response(customersCsv(rows), { status: 200, headers: headers('text/csv; charset=utf-8', { 'content-disposition': 'attachment; filename="ichirei-customers.csv"' }) })
     },
   }
 }
