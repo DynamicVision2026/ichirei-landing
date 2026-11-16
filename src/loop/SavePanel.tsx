@@ -5,7 +5,8 @@ import './loop.css'
 
 /**
  * The "Save" button and its small panel (result page and basket page): the private link to copy, its QR code (the same renderer as the gift cards), and a mailto: that opens the
- * visitor's OWN mail app with the link in it — we send nothing. Anyone with the link sees the basket, so the panel says so.
+ * visitor's OWN mail app with the link in it — we send nothing. Anyone with the link sees the basket, so the panel says so. In English (2026-11-15) it first says what Save did
+ * ("Saved. This gift is in your basket on this device, for 30 days.") and how to continue on another device.
  */
 export default function SavePanel({ lang, className = 'btn ghost' }: { lang: RevealLang; className?: string }) {
   const c = LOOP[lang]
@@ -51,6 +52,8 @@ export default function SavePanel({ lang, className = 'btn ghost' }: { lang: Rev
           {state === 'none' && <p className="note">{c.empty}</p>}
           {link && (
             <>
+              {c.saved && <p className="note saved" data-testid="save-saved">{c.saved}</p>}
+              {c.elsewhere && <p className="note" data-testid="save-elsewhere">{c.elsewhere}</p>}
               <div className="row">
                 <button type="button" className="miniBtn" onClick={copy} data-testid="save-copy">
                   {copied ? c.copied : c.copyLink}
@@ -60,7 +63,7 @@ export default function SavePanel({ lang, className = 'btn ghost' }: { lang: Rev
                 </a>
               </div>
               <img src={`/api/basket/qr.svg?v=${encodeURIComponent(link.slice(-8))}`} alt="" data-testid="save-qr" width={144} height={144} />
-              <p className="note">{c.qrNote}</p>
+              {!c.elsewhere && <p className="note">{c.qrNote}</p>}
               <p className="note" data-testid="save-note">
                 {c.linkNote}
               </p>

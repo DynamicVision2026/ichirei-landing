@@ -143,6 +143,8 @@
 .gf-cert-title { margin: 0; font-family: var(--f-hero); font-weight: 700; font-size: 19px; letter-spacing: 0.2em; }
 .gf-cert-glyph { margin: 4px 0; font-family: var(--f-hero); font-weight: 900; font-size: 96px; line-height: 1.1; color: var(--cinnabar); }
 .gf-memorial .gf-cert-glyph { color: #2a221b; }
+.gf-cert-reading { margin: 0 0 6px; font-size: 14px; color: var(--mute, #6b5a3a); }
+.gf-cert-reading i { font-style: italic; }
 .gf-cert-to { margin: 0; font-size: 18px; letter-spacing: 0.14em; overflow-wrap: anywhere; }
 .gf-cert-line { margin: 4px 0; font-size: 14.5px; line-height: 1.95; color: #4a4030; overflow-wrap: anywhere; }
 .gf-cert-from { margin: 0; font-size: 15px; letter-spacing: 0.1em; overflow-wrap: anywhere; }

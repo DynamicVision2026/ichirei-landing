@@ -49,6 +49,8 @@ export interface GiftView extends AnimationView {
   opens_tz?: string | null
   /** True once the receiver has sent their one thank-you (its text is for the sender's page only). */
   replied: boolean
+  /** The receiver's own answer, shown back on their Sent screen: the character given back (if any) and whether words were sent. */
+  answer?: { char: string | null; words: boolean } | null
   package: 'egift' | 'simple' | 'standard'
 }
 

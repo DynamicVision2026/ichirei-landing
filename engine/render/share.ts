@@ -16,6 +16,9 @@ import { fontObject, fontsFor } from './fonts.ts'
 import { textPaths, wrapText } from './text.ts'
 import type { Artwork } from './artwork.ts'
 
+/** English first (2026-11-15): an English share card shows the English word where other languages show the reading. */
+export const shareWord = (a: Pick<Artwork, 'language' | 'en'>): string | null => (a.language === 'en' && a.en?.word ? a.en.word : null)
+
 /** The artwork plus the one relationship line (null = none). */
 export type ShareArtwork = Artwork & { relation: string | null }
 
@@ -53,8 +56,8 @@ export function shareTimeline(pictures: number, hasRelation: boolean, poemLines:
 }
 
 /** Every piece of TEXT the share film and the poem card draw — and nothing else is ever drawn as text: the relationship line, the character, its reading and the poem. */
-export function shareTexts(a: Pick<ShareArtwork, 'relation' | 'glyph' | 'reading' | 'poem'>): string[] {
-  return [...(a.relation ? [a.relation] : []), a.glyph, a.reading, ...a.poem.map((l) => l.replace(/\s+/g, ' ').trim()).filter(Boolean)]
+export function shareTexts(a: Pick<ShareArtwork, 'relation' | 'glyph' | 'reading' | 'poem' | 'language' | 'en'>): string[] {
+  return [...(a.relation ? [a.relation] : []), a.glyph, shareWord(a) ?? a.reading, ...a.poem.map((l) => l.replace(/\s+/g, ' ').trim()).filter(Boolean)]
 }
 
 export interface ShareFilm {
@@ -103,8 +106,12 @@ export async function makeShareFilm(a: ShareArtwork, opts: { fps?: number; ffmpe
   const kanjiSize = 44.7 * U
   const kanjiPng = await sharp(Buffer.from(`<svg xmlns="http://www.w3.org/2000/svg" width="${Math.ceil(kanjiSize * 1.2)}" height="${Math.ceil(kanjiSize * 1.2)}">${textPaths(hero, a.glyph, kanjiSize, kanjiSize * 0.6, kanjiSize * 0.99, c.kanji, 'middle', f.stroke).svg}</svg>`)).ensureAlpha().raw().toBuffer({ resolveWithObject: true })
   const kanji: Layer = { data: kanjiPng.data, w: kanjiPng.info.width, h: kanjiPng.info.height, x: Math.round(VIDEO_W / 2 - kanjiPng.info.width / 2), y: Math.round(VIDEO_H * 0.44 - kanjiPng.info.height / 2) }
-  const reading = await lineLayer(body, a.reading, 2.9 * U, VIDEO_W / 2, VIDEO_H * 0.6, c.muted, 0.3 * 2.9 * U)
-  const card = await makeEndCard({ language: a.language, glyph: a.glyph, reading: a.reading, poem: a.poem, poemType: a.poemType, quiet: a.quiet, relation: a.relation }, 'share')
+  // English first (2026-11-15): under the character, the English word (large), not the romanized reading
+  const enWord = shareWord(a)
+  const reading = enWord
+    ? await lineLayer(body, enWord, 4.6 * U, VIDEO_W / 2, VIDEO_H * 0.6, c.ivory, 0.02 * 4.6 * U, 4.6 * U * 0.035)
+    : await lineLayer(body, a.reading, 2.9 * U, VIDEO_W / 2, VIDEO_H * 0.6, c.muted, 0.3 * 2.9 * U)
+  const card = await makeEndCard({ language: a.language, glyph: a.glyph, reading: a.reading, ...(enWord ? { word: enWord } : {}), poem: a.poem, poemType: a.poemType, quiet: a.quiet, relation: a.relation }, 'share')
 
   const plain = (rgb: [number, number, number]): Buffer => {
     const b = Buffer.alloc(VIDEO_W * VIDEO_H * 4)

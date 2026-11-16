@@ -1,5 +1,5 @@
-// "Save the card" on the English receiver page (ticket 2026-11-12, C2): a square image (1080 × 1080) of the character with its reading, its word and its line under it — the same stack as every English
-// surface. No names, no story, nothing else. The reading is slanted (the embedded Japanese serif has no italic) and the word is thickened with a stroke (it has no bold).
+// "Save the card" on the English receiver page (ticket 2026-11-12, C2): a square image (1080 × 1080) of the character with its word and its line under it — the same stack as every English
+// surface. No names, no story, nothing else. English first (2026-11-15): no romanized reading; the word is large, thickened with a stroke (the embedded serif has no bold).
 
 import sharp from 'sharp'
 import { EN_LINE_MAX_WORDS, type EnBridge } from '../../src/order/en-bridge.ts'
@@ -14,7 +14,7 @@ const CINNABAR = '#C0392B'
 
 export interface KeepsakeArtwork {
   glyph: string
-  /** Latin reading (italic). */
+  /** Latin reading — kept in the record, no longer drawn on the square card (English first, 2026-11-15). */
   reading: string
   bridge: EnBridge
   /** No red: remembrance, an apology, an encouragement. */
@@ -30,14 +30,11 @@ export async function makeKeepsakeCard(a: KeepsakeArtwork): Promise<Buffer> {
   let svg = ''
   const cs = 400
   svg += textPaths(hero, a.glyph, cs, W / 2, 80 + cs * 0.82, colour, 'middle', f.stroke).svg
-  let y = 80 + cs + 70
-  // the reading, slanted
-  const read = textPaths(body, a.reading, 54, W / 2, y, MUTED, 'middle')
-  svg += `<g transform="translate(${W / 2} ${y}) skewX(-12) translate(${-W / 2} ${-y})">${read.svg}</g>`
-  y += 92
-  // the word, heavier
-  svg += textPaths(body, a.bridge.word, 84, W / 2, y, INK, 'middle', 1.6).svg
-  y += 72
+  // English first (2026-11-15): the character, then the English word large, then the line — no romanized reading (only the certificate keeps it)
+  let y = 80 + cs + 150
+  // the word, large and heavier
+  svg += textPaths(body, a.bridge.word, 96, W / 2, y, INK, 'middle', 1.8).svg
+  y += 84
   // the line, wrapped
   const size = 40
   const lines = wrapText(body, a.bridge.line, size, 860).slice(0, 3)
@@ -89,10 +86,17 @@ export async function makeCertificateCard(a: CertificateArtwork): Promise<Buffer
   svg += textPaths(body, a.number.toUpperCase(), 34, x, 170, NUMBER, 'start').svg
   const cs = 520
   svg += textPaths(hero, a.glyph, cs, x - 14, 200 + cs * 0.86, CINNABAR, 'start', f.stroke).svg
-  let y = 200 + cs + 96
-  const read = textPaths(body, a.reading, 44, x, y, MUTED, 'start')
-  svg += `<g transform="translate(${x} ${y}) skewX(-12) translate(${-x} ${-y})">${read.svg}</g>`
-  svg += textPaths(body, a.word ? `·  ${a.word}` : '', 60, x + read.width + 22, y, INK, 'start', 1.4).svg
+  // English first (2026-11-15): the certificate alone keeps the reading, in small type next to the character ("待 · matsu"); the English word leads, large, under it
+  let y = 200 + cs + 64
+  if (a.reading) {
+    const small = textPaths(hero, a.glyph, 40, x, y, MUTED, 'start', f.stroke)
+    svg += small.svg
+    const rx = x + small.width + 14
+    const read = textPaths(body, `·  ${a.reading}`, 38, rx, y, MUTED, 'start')
+    svg += `<g transform="translate(${rx} ${y}) skewX(-12) translate(${-rx} ${-y})">${read.svg}</g>`
+    y += 92
+  } else y += 32
+  svg += textPaths(body, a.word, 72, x, y, INK, 'start', 1.6).svg
   y += 120
   if (a.to) {
     svg += textPaths(body, 'FOR', 30, x, y, MUTED, 'start').svg

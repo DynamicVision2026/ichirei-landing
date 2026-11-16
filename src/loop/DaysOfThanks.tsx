@@ -2,13 +2,13 @@ import { useEffect, useRef, useState } from 'react'
 import { usePromoOn } from '../demo/useSizes.ts'
 import { useTodayPrice } from './useTodayPrice.ts'
 import { THANKS, holdRefusal } from './copy.ts'
-import { localTime, refreshPromo, setPromoHold, usePromo } from './promo.ts'
+import { localTime, requestHold, usePromo } from './promo.ts'
 import { refreshMe } from './me.ts'
 import './loop.css'
 
 const LAST_KEY = 'ichirei.promo.last'
 const safe = {
-  get: (): { email: string; code: string } | null => {
+  get: (): { email: string } | null => {
     try {
       const v = JSON.parse(sessionStorage.getItem(LAST_KEY) ?? 'null')
       return v && typeof v.email === 'string' ? v : null
@@ -16,7 +16,7 @@ const safe = {
       return null
     }
   },
-  set: (v: { email: string; code: string }): void => {
+  set: (v: { email: string }): void => {
     try {
       sessionStorage.setItem(LAST_KEY, JSON.stringify(v))
     } catch {
@@ -27,20 +27,13 @@ const safe = {
 
 /**
  * Under the hero on /en while the promotion runs: a paper-slip card — "Days of Thanks", how many of today's 100 free gifts are left (refreshed every 60 s with a soft fade), and the form that
- * holds one for an email (the free-gift code, the email, an unticked box). With a hold: "held until …". With none left: the form is gone.
+ * holds one for an email (the email and an unticked box — no code since 2026-11-15). With a hold: "held until …". With none left: the form is gone.
  */
 export default function DaysOfThanks() {
   const on = usePromoOn()
   const p = usePromo()
   const price = useTodayPrice()
   const [email, setEmail] = useState('')
-  const [code, setCode] = useState(() => {
-    try {
-      return (new URLSearchParams(window.location.search).get('code') ?? '').slice(0, 40)
-    } catch {
-      return ''
-    }
-  })
   const [marketing, setMarketing] = useState(false)
   const [busy, setBusy] = useState(false)
   const [message, setMessage] = useState<string | null>(null)
@@ -63,24 +56,16 @@ export default function DaysOfThanks() {
   if (!on || !p || !p.on) return null
   const left = p.left ?? 0
 
-  const place = async (e: string, c: string, m: boolean) => {
+  const place = async (e: string, m: boolean) => {
     setBusy(true)
     setMessage(null)
-    try {
-      const r = await fetch('/api/promo/hold', { method: 'POST', headers: { 'content-type': 'application/json' }, credentials: 'same-origin', body: JSON.stringify({ email: e, code: c, marketing: m }) })
-      const j = (await r.json().catch(() => null)) as { ok?: boolean; code?: string; hold?: { state: string; expires_at: string; minutes_left: number; email: string }; left?: number; existing?: boolean; link?: string | null } | null
-      if (r.ok && j?.ok && j.hold) {
-        safe.set({ email: e, code: c })
-        setPromoHold(j.hold, j.left)
-        setPhone(!!j.link && !j.existing)
-        void refreshMe()
-      } else setMessage(holdRefusal(r.status === 429 ? 'unavailable' : (j?.code ?? 'unavailable'), price.text))
-    } catch {
-      setMessage(THANKS.unavailable)
-    } finally {
-      setBusy(false)
-      void refreshPromo()
-    }
+    const r = await requestHold(e, m)
+    if (r.ok) {
+      safe.set({ email: e })
+      setPhone(!!r.link && !r.existing)
+      void refreshMe()
+    } else setMessage(holdRefusal(r.code ?? 'unavailable', price.text))
+    setBusy(false)
   }
 
   const n = THANKS.count(left, p.daily ?? 100)
@@ -125,7 +110,7 @@ export default function DaysOfThanks() {
               {p.ended === 'expired' && left > 0 && safe.get() && (
                 <p className="sub" data-testid="thanks-ended">
                   {THANKS.ended}{' '}
-                  <button type="button" className="miniBtn" disabled={busy} onClick={() => void place(safe.get()!.email, safe.get()!.code || code, false)} data-testid="thanks-hold-again">
+                  <button type="button" className="miniBtn" disabled={busy} onClick={() => void place(safe.get()!.email, false)} data-testid="thanks-hold-again">
                     {THANKS.holdAgain}
                   </button>
                 </p>
@@ -134,14 +119,10 @@ export default function DaysOfThanks() {
                 <form
                   onSubmit={(ev) => {
                     ev.preventDefault()
-                    void place(email.trim(), code.trim(), marketing)
+                    void place(email.trim(), marketing)
                   }}
                   data-testid="thanks-form"
                 >
-                  <label>
-                    {THANKS.codeLabel}
-                    <input type="text" name="code" value={code} onChange={(e) => setCode(e.target.value)} autoComplete="off" autoCapitalize="characters" data-testid="thanks-code" />
-                  </label>
                   <label>
                     {THANKS.emailLabel}
                     <input type="email" name="email" value={email} onChange={(e) => setEmail(e.target.value)} autoComplete="email" required data-testid="thanks-email" />

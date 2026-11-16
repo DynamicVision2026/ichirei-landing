@@ -23,6 +23,9 @@ export interface LoopCopy {
   emailBody: (link: string) => string
   linkNote: string
   loading: string
+  /** en only (2026-11-15): what Save did, and how to continue elsewhere (ja and zh-Hant keep the panel as it was). */
+  saved?: string
+  elsewhere?: string
 }
 
 export const LOOP: Record<RevealLang, LoopCopy> = {
@@ -85,6 +88,8 @@ export const LOOP: Record<RevealLang, LoopCopy> = {
     emailBody: (link) => link,
     linkNote: 'Anyone with this link can see your saved gifts. Keep it private.',
     loading: '…',
+    saved: 'Saved. This gift is in your basket on this device, for 30 days.',
+    elsewhere: 'To continue on another device (your phone, another computer), scan the code or email the link to yourself.',
   },
 }
 
@@ -93,7 +98,6 @@ export const THANKS = {
   title: 'Days of Thanks',
   count: (n: number, daily = 100) => ({ n: String(n), after: ` of today's ${daily} free gifts are still available.` }),
   sub: 'One free gift per person per day, through November 25. New gifts arrive every morning (US Eastern).',
-  codeLabel: 'Free gift code',
   emailLabel: 'Email',
   hold: 'Hold my free gift',
   holding: 'Holding…',
@@ -114,6 +118,10 @@ export const THANKS = {
   orderHeld: (time: string) => `Your free gift is held for you until ${time}. It's applied at checkout.`,
   orderOnUs: 'The first 100 gifts each day are on us.',
   orderHoldYours: 'Hold yours with your email →',
+  // the order section (2026-11-15): where the visitor stands
+  orderFree: (n: number, daily = 100) => `Free today: ${n} of today's ${daily} free gifts are left. Hold one with your email and this gift is $0.`,
+  freePrice: '$0',
+  freeLabel: 'Your free gift',
   orderNone: (price: string, sale: boolean) => `Today's free gifts are all held or given. You can give this one today for ${price}${sale ? ' (30% off for Thanksgiving)' : ''}, or come back tomorrow morning (US Eastern). Your gift is saved.`,
 }
 

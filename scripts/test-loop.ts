@@ -214,9 +214,10 @@ const usedSlots = async (store: MemoryOrderStore, day: string, n: number) => { f
   check('(4) the browser that holds finds its hold (the card then says "held until …")', a.ok && !!mine && mine.view.id === a.hold.id && mine.view.minutes_left === 90)
   check('(4) the hold lasts 120 minutes from now', a.ok && Date.parse(a.hold.expires_at) - NOW.getTime() === 120 * MIN)
   const bad = await placeHold(deps(store, sh.api, NOW), { email: 'not an email', code: 'THANKS100' })
-  const badCode = await placeHold(deps(store, sh.api, NOW), { email: 'x@example.com', code: 'WRONG' })
-  const noCode = await placeHold(deps(store, sh.api, NOW), { email: 'x@example.com', code: '' })
-  check('(5) a wrong or missing public code is refused ("Please check the free gift code."), an invalid email too', !bad.ok && bad.code === 'bad_email' && !badCode.ok && badCode.code === 'bad_code' && !noCode.ok && noCode.code === 'bad_code' && sh.eligible.size === 1)
+  // since 2026-11-15 no code is needed: a missing or wrong code still holds (the record keeps the code only when it is a configured one)
+  const badCode = await placeHold(deps(store, sh.api, NOW), { email: 'wrong-code@example.com', code: 'WRONG' })
+  const noCode = await placeHold(deps(store, sh.api, NOW), { email: 'no-code@example.com' })
+  check('(5) the free gift needs no code: no code or a wrong one still holds (code kept only when configured); an invalid email is refused', !bad.ok && bad.code === 'bad_email' && badCode.ok && badCode.hold.code === null && noCode.ok && noCode.hold.code === null, JSON.stringify([badCode, noCode]))
   const second = await placeHold(deps(store, sh.api, NOW), { email: 'x@example.com', code: 'PLATFORM2', browser: B3 })
   check('(5) a second configured public code works too (one code per platform), and the hold remembers which code it came with', second.ok && second.hold.code === 'PLATFORM2')
   const off = await placeHold(deps(store, sh.api, at('2026-11-26T15:00:00Z')), { email: 'late@example.com', code: 'THANKS100' })
@@ -344,10 +345,11 @@ const usedSlots = async (store: MemoryOrderStore, day: string, n: number) => { f
   resetPromoCache()
   const st = (await (await h.promoState(req(idA, '/api/promo'))).json()) as { on: boolean; left: number; hold: unknown }
   check('routes: GET /api/promo answers on, the count left and no hold yet', st.on === true && st.left === 100 && st.hold === null)
-  const bad = (await (await h.promoHold(req(idA, '/api/promo/hold', { method: 'POST', body: JSON.stringify({ email: 'x@example.com', code: 'NOPE' }) }))).json()) as { ok: boolean; code: string }
-  const good = await h.promoHold(req(idA, '/api/promo/hold', { method: 'POST', body: JSON.stringify({ email: 'Holder@Example.com', code: 'thanks100', marketing: true }) }))
+  const bad = (await (await h.promoHold(req(idA, '/api/promo/hold', { method: 'POST', body: JSON.stringify({ email: 'not an email' }) }))).json()) as { ok: boolean; code: string }
+  // the card sends only the email (no code since 2026-11-15)
+  const good = await h.promoHold(req(idA, '/api/promo/hold', { method: 'POST', body: JSON.stringify({ email: 'Holder@Example.com', marketing: true }) }))
   const gj = (await good.json()) as { ok: boolean; link: string | null; left: number; hold: { minutes_left: number; email: string } }
-  check('routes: POST /api/promo/hold — a wrong code is {ok:false, bad_code}; the right code (any case) holds, answers the minutes left, the count and the private link for the phone', !bad.ok && bad.code === 'bad_code' && gj.ok && gj.hold.minutes_left === 120 && gj.hold.email === 'holder@example.com' && gj.left === 99 && !!gj.link && gj.link.startsWith('https://ichirei.soul-id.jp/b/BT-'), JSON.stringify(gj))
+  check('routes: POST /api/promo/hold — a bad email is {ok:false, bad_email}; an email alone (no code) holds, answers the minutes left, the count and the private link for the phone', !bad.ok && bad.code === 'bad_email' && gj.ok && gj.hold.minutes_left === 120 && gj.hold.email === 'holder@example.com' && gj.left === 99 && !!gj.link && gj.link.startsWith('https://ichirei.soul-id.jp/b/BT-'), JSON.stringify(gj))
   const st2 = (await (await h.promoState(req(idA, '/api/promo'))).json()) as { left: number; hold: { minutes_left: number } | null }
   const st3 = (await (await h.promoState(req(idB, '/api/promo'))).json()) as { hold: unknown }
   check('routes: the browser that holds sees its hold (and the count 99); a browser with no hold sees none', st2.hold?.minutes_left === 120 && st2.left === 99 && st3.hold === null)

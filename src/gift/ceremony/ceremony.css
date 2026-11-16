@@ -79,7 +79,8 @@
 .cr-solid { position: fixed; z-index: 1; color: var(--red); pointer-events: none; opacity: 0; }
 .cr-meaning { opacity: 0; gap: 8px; }
 .cr-word { margin: 0; font-family: var(--f-m); font-size: 40px; font-weight: 900; line-height: 1.1; }
-.cr-word i { font-size: 19px; font-weight: 500; color: var(--mute); }
+.cr-cert-reading { margin: -4px 0 0; font-family: var(--f-m); font-size: 15px; font-weight: 500; color: var(--mute); letter-spacing: .02em; }
+.cr-cert-reading i { font-style: italic; }
 .cr-b.cr-ink { color: var(--ink); }
 
 .cr-small { font-family: var(--f-m); font-weight: 900; line-height: 1; color: var(--red); font-size: 92px; }

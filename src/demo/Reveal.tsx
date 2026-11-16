@@ -76,7 +76,6 @@ function InscriptionGlyph({
         <span className={`font-mincho notranslate leading-none ${customerGlyph ? 'font-black' : ''} ${size} ${color}`} data-glyph translate="no">{glyph}</span>
         <EnBridgeStack
           className="mt-3"
-          reading={cleanReading(candidate.reading)}
           word={enWord}
           line={playful ? null : candidate.en_line}
           echo={playful ? null : candidate.en_echo}

@@ -29,10 +29,10 @@ import EnBridgeStack from '../order/EnBridgeStack.tsx'
 import { getUtm } from './utm-store.ts'
 import { clearClaim, getClaim } from './claim-store.ts'
 import { CLAIM_COPY } from '../claim/copy.ts'
-import { PriceWithSale, SaleLine, UsdLaunchLine, UsdPriceView } from '../order/SalePrice.tsx'
+import { PriceWithSale, SaleLine, UsdLaunchLine } from '../order/SalePrice.tsx'
 import { salePriceJpy } from '../order/sale.ts'
 import { usePromoOn, useSale, useUsd } from './useSizes.ts'
-import OrderLine from '../loop/OrderLine.tsx'
+import OrderLine, { EnEgiftPrice } from '../loop/OrderLine.tsx'
 import { cleanReading } from '../order/reading.ts'
 
 // The purchase step of the customer flow: after the sender has chosen a character, collect
@@ -281,7 +281,7 @@ export default function OrderForm({ result, story, followUps = [], promptQuestio
           {glyph}
         </span>
         {language === 'en' && candidate.slot !== 'freestyle' && candidate.en_word ? (
-          <EnBridgeStack className="slipStack" reading={cleanReading(candidate.reading)} word={candidate.en_word} line={candidate.en_line} echo={candidate.en_echo} classical={candidate.classical_echo ?? null} />
+          <EnBridgeStack className="slipStack" word={candidate.en_word} line={candidate.en_line} echo={candidate.en_echo} classical={candidate.classical_echo ?? null} />
         ) : (
           <span className="slipReading">{copy.glyphReading(candidate, glyph)}</span>
         )}
@@ -373,7 +373,7 @@ export default function OrderForm({ result, story, followUps = [], promptQuestio
                   </span>
                   {!claim && (
                     <span className="pkgPrice" data-price={id}>
-                      {language === 'en' && id === 'egift' ? <UsdPriceView price={usdPrice} sale={priceSale} id={id} /> : <PriceWithSale yen={PACKAGE_PRICE_JPY[id]} sale={priceSale} id={id} />}
+                      {language === 'en' && id === 'egift' ? <EnEgiftPrice price={usdPrice} sale={priceSale} id={id} promo={promoOn && !claim} /> : <PriceWithSale yen={PACKAGE_PRICE_JPY[id]} sale={priceSale} id={id} />}
                     </span>
                   )}
                   {!claim && (language === 'en' ? <UsdLaunchLine price={usdPrice} sale={priceSale} /> : <SaleLine sale={priceSale} lang={pageLang} />)}

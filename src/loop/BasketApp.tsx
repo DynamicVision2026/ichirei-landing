@@ -114,7 +114,8 @@ export default function BasketApp() {
               <span className="glyph notranslate">{i.card.kanji}</span>
               <div className="meta">
                 <p className="reading">
-                  {[i.card.reading, i.card.word].filter(Boolean).join(' · ')}
+                  {/* English first (2026-11-15): the word alone when there is one; no romanized reading */}
+                  {i.card.word || i.card.reading}
                   {i.to ? ` — ${i.to}` : ''}
                 </p>
                 <p className="date">{dateOf(i.created_at, lang)}</p>

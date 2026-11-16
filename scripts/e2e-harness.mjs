@@ -2536,10 +2536,10 @@ const SECTION_ORDER = ['.hero', '.strip', '.philo', '#shape', '#angles', '#write
   const sel = calls.select[0]
   check('en payload: language en, the context and occasion_detail, and NO inscription_script', sel.language === 'en' && sel.relationship === 'parent_mother' && sel.direction === 'up' && sel.purpose === 'celebrate' && sel.occasion_detail === '70th birthday' && !('inscription_script' in sel), JSON.stringify(sel))
   const lamp = page.locator('article').filter({ has: page.locator('[data-glyph]:text-is("灯")') })
-  check('en reveal: the carved glyph is the modern Japanese form 灯 (spec v9.1 step 9), shown with the romaji reading (from the palette), and the one-phrase English meaning, in the bridge stack both cards share (reading, then word; no pinyin)', (await lamp.count()) === 1 && await lamp.locator('[data-en-bridge] >> text=akari').first().isVisible() && await lamp.locator('[data-en-bridge] >> text=lamp').first().isVisible() && !/pinyin/i.test(await lamp.innerText()))
+  check('en reveal: the carved glyph is the modern Japanese form 灯 (spec v9.1 step 9), shown with the one-phrase English meaning in the bridge stack both cards share — English first (2026-11-15): no romaji reading, no pinyin', (await lamp.count()) === 1 && (await lamp.locator('[data-en-bridge] >> text=akari').count()) === 0 && (await lamp.locator('[data-en-reading]').count()) === 0 && await lamp.locator('[data-en-bridge] >> text=lamp').first().isVisible() && !/pinyin/i.test(await lamp.innerText()))
   check('en reveal: no old-form (kyūjitai) note — only the modern form is carved', (await lamp.locator('text=kyūjitai').count()) === 0)
   const plainCard = page.locator('article').filter({ has: page.locator('[data-glyph]:text-is("待")') })
-  check('en reveal: a character with no distinct old form shows romaji and meaning only — in the very same stack as the main card', await plainCard.locator('[data-en-bridge] >> text=matsu').first().isVisible() && await plainCard.locator('[data-en-bridge] >> text=wait').first().isVisible() && (await plainCard.locator('[data-en-bridge]').count()) === 1 && !/pinyin/i.test(await plainCard.innerText()))
+  check('en reveal: a character with no distinct old form shows its meaning only (no romaji) — in the very same stack as the main card', (await plainCard.locator('[data-en-bridge] >> text=matsu').count()) === 0 && await plainCard.locator('[data-en-bridge] >> text=wait').first().isVisible() && (await plainCard.locator('[data-en-bridge]').count()) === 1 && !/pinyin/i.test(await plainCard.innerText()))
   check('en reveal: each card shows the model\'s one plain-English why_this sentence under the gaze line', (await lamp.locator('[data-why-this]').innerText()) === 'Lamplight is the light you left on for me.' && (await plainCard.locator('[data-why-this]').innerText()) === 'Waiting is what you did, and never mentioned.')
   check('learning loop: the select call carries a random session id and source "customer" — and nothing else new', /^[A-Za-z0-9_-]{16,64}$/.test(calls.select[0].session) && calls.select[0].source === 'customer')
   await lamp.click()
@@ -2554,7 +2554,7 @@ const SECTION_ORDER = ['.hero', '.strip', '.philo', '#shape', '#angles', '#write
   check('en order form: no form choice (the character is carved in its modern Japanese form 灯); never traditional/simplified', (await page.locator('input[name=inscription_style]').count()) === 0 && (await page.locator('[data-order-glyph]').innerText()) === '灯')
   // (2026-11-15: the e-gift is preselected only when it is the ONLY orderable size; here three are on sale, so nothing is picked yet)
   check('en order form: with three sizes on sale nothing is preselected', (await page.locator('input[name=package]:checked').count()) === 0)
-  check('en order form: English labels, packages and the romaji + meaning line under the glyph', (await form.innerText()).toLowerCase().includes('your order') && (await form.innerText()).includes('Requested delivery date') && (await form.innerText()).includes('akari · lamp') && (await form.innerText()).includes('¥18,850'))
+  check('en order form: English labels, packages and the English meaning under the glyph — no romaji (English first, 2026-11-15)', (await form.innerText()).toLowerCase().includes('your order') && (await form.innerText()).includes('Requested delivery date') && (await page.locator('.slip').innerText()).includes('lamp') && !/akari/.test(await form.innerText()) && (await form.innerText()).includes('¥18,850'))
   check('en certificate: "This character is the person as seen through your eyes." and the shipping line', (await page.locator('[data-certificate]').innerText()) === 'This character is the person as seen through your eyes.' && (await page.locator('[data-shipping]').innerText()) === 'Free shipping in Japan · ¥6,000 international shipping' && (await page.locator('#write [data-price=standard]').innerText()) === '¥18,850')
   await page.fill('input[name=sender_name]', 'Emily Carter')
   await page.fill('input[name=receiver_name]', 'Margaret Carter')
@@ -3527,9 +3527,9 @@ const SECTION_ORDER = ['.hero', '.strip', '.philo', '#shape', '#angles', '#write
       const q = (s) => a.querySelector(s)
       const r = (el) => el.getBoundingClientRect()
       const g = q('[data-glyph]'); const rd = q('[data-en-reading]'); const w = q('[data-en-word]'); const l = q('[data-en-line]'); const h = q('[data-en-where-heading]'); const e = q('[data-en-echo]'); const c = q('[data-en-classical]')
-      return { ok: !!(g && rd && w && l), order: [g, rd, w, l, h, e, c].filter(Boolean).map((x) => Math.round(r(x).top)), reading: rd?.textContent, word: w?.textContent, line: l?.textContent, wordWeight: w ? Number(getComputedStyle(w).fontWeight) : 0, readingStyle: rd ? getComputedStyle(rd).fontStyle : '', heading: h?.textContent, echo: e?.textContent, classical: c?.textContent, why: !!q('[data-why-this]') }
+      return { ok: !!(g && w && l), order: [g, rd, w, l, h, e, c].filter(Boolean).map((x) => Math.round(r(x).top)), reading: rd?.textContent, word: w?.textContent, line: l?.textContent, wordWeight: w ? Number(getComputedStyle(w).fontWeight) : 0, readingStyle: rd ? getComputedStyle(rd).fontStyle : '', heading: h?.textContent, echo: e?.textContent, classical: c?.textContent, why: !!q('[data-why-this]') }
     })
-    check(`/en (${tag}): the main card shows the stack in order — character, reading (italic), word (bold), line — with nothing between`, stack.ok && stack.order.every((y, i, arr) => i === 0 || y >= arr[i - 1]) && stack.reading === 'akari' && stack.word === 'hearth' && stack.line === 'The light that is already on when everyone else wakes.' && stack.wordWeight >= 600 && stack.readingStyle === 'italic' && !stack.why, JSON.stringify(stack))
+    check(`/en (${tag}): the main card shows the stack in order — character, word (bold), line — with nothing between; English first (2026-11-15): no romanized reading`, stack.ok && stack.order.every((y, i, arr) => i === 0 || y >= arr[i - 1]) && stack.reading === undefined && stack.word === 'hearth' && stack.line === 'The light that is already on when everyone else wakes.' && stack.wordWeight >= 600 && !stack.why && !/akari/.test(await main.innerText()), JSON.stringify(stack))
     check(`/en (${tag}): when the English line and "What they're like" differ, both are shown`, (await main.locator('[data-match-who]').count()) === 1 && (await main.locator('[data-en-line]').count()) === 1)
     check(`/en (${tag}): a reviewed row shows its echo and the classical line together under the one small heading "Where this word comes from"`, stack.heading === 'Where this word comes from' && stack.echo === '“Save the cricket on the hearth” — Milton, Il Penseroso' && /床前明月光/.test(stack.classical ?? '') && /Quiet Night Thoughts/.test(stack.classical ?? ''), JSON.stringify(stack))
     check(`/en (${tag}): the freestyle card is exactly as it was — no word, no line, no echo`, (await page.locator('article[data-slot=freestyle] [data-en-stack]').count()) === 0 && (await page.locator('article[data-slot=freestyle] [data-reading]').count()) === 1)
@@ -3539,10 +3539,10 @@ const SECTION_ORDER = ['.hero', '.strip', '.philo', '#shape', '#angles', '#write
     await main.click()
     await main.locator('text=Give this character').click()
     await page.locator('[data-testid=result-page]').waitFor()
-    check(`/en (${tag}): the result page carries the reading and the word together under the character (reading · word), with the line of this story under it`, (await page.locator('[data-testid=result-reading]').innerText()) === 'akari · hearth' && (await page.locator('[data-testid=result-who]').innerText()) === 'The light that is already on when everyone else wakes.')
+    check(`/en (${tag}): the result page shows the English word large under the character (no romanized reading: English first), with the line of this story under it`, (await page.locator('[data-testid=result-reading]').count()) === 0 && (await page.locator('[data-testid=result-word]').innerText()) === 'hearth' && !/akari/.test(await page.locator('[data-testid=result-char]').innerText()) && (await page.locator('[data-testid=result-who]').innerText()) === 'The light that is already on when everyone else wakes.')
     await toOrder(page)
     const slip = await page.locator('.slip').evaluate((s) => ({ stack: !!s.querySelector('[data-en-stack]'), word: s.querySelector('[data-en-word]')?.textContent, line: s.querySelector('[data-en-line]')?.textContent, heading: s.querySelector('[data-en-where-heading]')?.textContent }))
-    check(`/en (${tag}): the chosen-character page shows the same stack (reading, word, line, "Where this word comes from")`, slip.stack && slip.word === 'hearth' && slip.line === 'The light that is already on when everyone else wakes.' && slip.heading === 'Where this word comes from', JSON.stringify(slip))
+    check(`/en (${tag}): the chosen-character page shows the same stack (word, line, "Where this word comes from"; no romanized reading)`, slip.stack && slip.word === 'hearth' && slip.line === 'The light that is already on when everyone else wakes.' && slip.heading === 'Where this word comes from', JSON.stringify(slip))
     const refund = await page.locator('[data-testid=order-refund-line]').innerText()
     check(`/en (${tag}): the order step carries the owner's refund wording, word for word`, refund.startsWith("You can cancel for a full refund within 24 hours of payment, as long as you have not pressed 'Collect your gift'. After that, the gift has been made for one person and cannot be refunded. If we made a mistake, we will fix it or refund you."), refund)
     check(`/en (${tag}): the order step lists only the e-gift — no wooden size, not even as "coming soon" — and no word wood / walnut / EMS / ship`, (await page.locator('[data-testid=order-form] input[name=package]').count()) === 1 && !FORBIDDEN.test((await page.locator('[data-testid=order-form]').textContent()) ?? ''), (await page.locator('[data-testid=order-form]').textContent())?.match(FORBIDDEN)?.[0])
@@ -3620,9 +3620,9 @@ const SECTION_ORDER = ['.hero', '.strip', '.philo', '#shape', '#angles', '#write
       await T(page, 'gift-skip').click()
       await T(page, 'gift-reveal').waitFor()
       await page.waitForTimeout(500)
-      const box = await page.evaluate(() => { const r = (s) => document.querySelector(s)?.getBoundingClientRect(); const g = r('[data-testid=gift-glyph]'); const rd = r('[data-en-reading]'); const w = r('[data-en-word]'); return { glyph: g && Math.round(g.bottom), reading: rd && Math.round(rd.bottom), word: w && Math.round(w.bottom), vh: window.innerHeight, order: [g.top, rd.top, w.top, r('[data-en-line]').top].every((y, i, a) => i === 0 || y > a[i - 1]) } })
-      check('receiver (en, phone 390 × 844): the character, its reading and its word are all inside the first screen — no scrolling', box.glyph > 0 && box.word < box.vh && box.order, JSON.stringify(box))
-      check('receiver (en): after the reveal the stack is character, reading (italic), word (bold), line, then "Where this word comes from" with the echo and the classical line (original, English rendering, source in English)', await page.evaluate(() => { const q = (s) => document.querySelector(s); return q('[data-en-reading]').textContent === 'akari' && getComputedStyle(q('[data-en-reading]')).fontStyle === 'italic' && Number(getComputedStyle(q('[data-en-word]')).fontWeight) >= 600 && q('[data-en-where-heading]').textContent === 'Where this word comes from' && q('[data-en-echo]').textContent.includes('Milton') && q('[data-en-rendering]').textContent.includes('Bright moonlight') && q('[data-en-classical]').textContent.includes('Li Bai, Quiet Night Thoughts') }))
+      const box = await page.evaluate(() => { const r = (s) => document.querySelector(s)?.getBoundingClientRect(); const g = r('[data-testid=gift-glyph]'); const rd = r('[data-en-reading]'); const w = r('[data-en-word]'); return { glyph: g && Math.round(g.bottom), reading: rd ? Math.round(rd.bottom) : null, word: w && Math.round(w.bottom), vh: window.innerHeight, order: [g.top, w.top, r('[data-en-line]').top].every((y, i, a) => i === 0 || y > a[i - 1]) } })
+      check('receiver (en, phone 390 × 844): the character and its word are inside the first screen — no scrolling; no romanized reading (English first)', box.glyph > 0 && box.word < box.vh && box.order && box.reading === null, JSON.stringify(box))
+      check('receiver (en): after the reveal the stack is character, word (bold), line, then "Where this word comes from" with the echo and the classical line (original, English rendering, source in English) — no romanized reading', await page.evaluate(() => { const q = (s) => document.querySelector(s); return !q('[data-en-reading]') && !/akari/.test(q('[data-testid=gift-reveal]').textContent) && Number(getComputedStyle(q('[data-en-word]')).fontWeight) >= 600 && q('[data-en-where-heading]').textContent === 'Where this word comes from' && q('[data-en-echo]').textContent.includes('Milton') && q('[data-en-rendering]').textContent.includes('Bright moonlight') && q('[data-en-classical]').textContent.includes('Li Bai, Quiet Night Thoughts') }))
       await page.screenshot({ path: `${SHOTS}/us-receiver-phone.png` })
       const body = await page.locator('body').innerText()
       check('receiver (en): no price, no sizes, no buy link anywhere on the page', !/¥|\$\d|price|Buy|Order now|size/i.test(body) && (await page.locator('a[href*="shopify"], a[href*="checkout"]').count()) === 0)
@@ -3631,7 +3631,7 @@ const SECTION_ORDER = ['.hero', '.strip', '.philo', '#shape', '#angles', '#write
       check('receiver (en): under the poem — "Written from the story Emily told about you."', (await T(page, 'gift-poem-from').innerText()) === 'Written from the story Emily told about you.')
       await T(page, 'gift-to-cert').click()
       await T(page, 'gift-cert').waitFor()
-      check('receiver (en): the certificate shows the same stack (reading, word, line)', await page.locator('[data-testid=gift-cert] [data-en-word]').innerText() === 'hearth')
+      check('receiver (en): the certificate shows the word and the line, and only the certificate keeps the reading, in small type next to the character ("燈 · akari")', await page.locator('[data-testid=gift-cert] [data-en-word]').innerText() === 'hearth' && (await page.locator('[data-testid=gift-cert-reading]').innerText()) === '燈 · akari' && (await page.locator('[data-testid=gift-cert] [data-en-reading]').count()) === 0)
       await page.screenshot({ path: `${SHOTS}/us-certificate-phone.png` })
       await T(page, 'gift-to-keep').click()
       await T(page, 'gift-keep').waitFor()
@@ -4456,7 +4456,7 @@ for (const [lang, locale, text] of [['en', 'en-US', 'Your gift is being finished
     await page.route('**/api/promo', (r) => r.fulfill({ json: { on: true, left, daily: 100, hold: heldNow } }))
     await page.route('**/api/promo/hold', async (r) => {
       holdBody = JSON.parse(r.request().postData() ?? '{}')
-      if (String(holdBody.code).toUpperCase() !== 'THANKS100') return r.fulfill({ json: { ok: false, code: 'bad_code' } })
+      if (!/@/.test(String(holdBody.email))) return r.fulfill({ json: { ok: false, code: 'bad_email' } })
       heldNow = { state: 'active', expires_at: new Date(Date.now() + 119 * 60000).toISOString(), minutes_left: 119, email: 'a@example.com' }
       left = 36
       return r.fulfill({ json: { ok: true, existing: false, link: 'https://ichirei.soul-id.jp/b/BT-x', hold: { ...heldNow, count: 1 }, left: 36 } })
@@ -4466,20 +4466,17 @@ for (const [lang, locale, text] of [['en', 'en-US', 'Your gift is being finished
     await page.waitForTimeout(500)
     const card = page.locator('[data-testid=thanks-card]')
     check('Days of Thanks: the card shows the title, "37 of today\'s 100 free gifts are still available." and the sub-line', (await card.locator('h2').innerText()) === 'Days of Thanks' && (await card.locator('[data-testid=thanks-count]').innerText()).replace(/\s+/g, ' ') === "37 of today's 100 free gifts are still available." && (await card.innerText()).includes('One free gift per person per day, through November 25. New gifts arrive every morning (US Eastern).'))
-    check('Days of Thanks: /en?code=thanks100 fills the code field; the box "Also tell me about new seasons and offers" is not ticked; the small print is there', (await page.locator('[data-testid=thanks-code]').inputValue()) === 'thanks100' && !(await page.locator('[data-testid=thanks-marketing]').isChecked()) && (await card.innerText()).includes('We use your email only to hold your free gift and match it at checkout.') && (await card.innerText()).includes('Hold my free gift'))
-    // a wrong code
-    await page.locator('[data-testid=thanks-code]').fill('NOPE')
+    // (2026-11-15) one field: no code — the card is the count, Email, the consent tick and Hold my free gift; a ?code= link still works (sent along, ignored by the server)
+    check('Days of Thanks: no "Free gift code" field — the card is the count, Email, the consent tick (not ticked) and "Hold my free gift"; the small print is there', (await page.locator('[data-testid=thanks-code], input[name=code]').count()) === 0 && !(await card.innerText()).includes('Free gift code') && (await page.locator('[data-testid=thanks-form] input').count()) === 2 && !(await page.locator('[data-testid=thanks-marketing]').isChecked()) && (await page.locator('[data-testid=thanks-submit]').innerText()) === 'Hold my free gift' && (await card.innerText()).includes('We use your email only to hold your free gift and match it at checkout.'))
+    await card.evaluate((el) => el.scrollIntoView({ block: 'start' }))
+    await page.waitForTimeout(300)
+    await page.screenshot({ path: `${SHOTS}/polish-card-390.png` }).catch(() => {})
     await page.locator('[data-testid=thanks-email]').fill('a@example.com')
-    await page.locator('[data-testid=thanks-submit]').click()
-    await page.locator('[data-testid=thanks-message]').waitFor()
-    check('Days of Thanks: a wrong code says "Please check the free gift code."', (await page.locator('[data-testid=thanks-message]').innerText()) === 'Please check the free gift code.')
-    // the right one
-    await page.locator('[data-testid=thanks-code]').fill('THANKS100')
     await page.locator('[data-testid=thanks-marketing]').check()
     await page.locator('[data-testid=thanks-submit]').click()
     await page.locator('[data-testid=thanks-held]').waitFor()
     const heldText = await page.locator('[data-testid=thanks-held]').innerText()
-    check('Days of Thanks: after "Hold my free gift" the card says "Your free gift is held until {time} (119 min left)." with "Write your moment →", and the code, email and box were sent', /^Your free gift is held until .+ \(119 min left\)\.$/.test(heldText) && (await page.locator('[data-testid=thanks-write]').innerText()) === 'Write your moment →' && holdBody.email === 'a@example.com' && holdBody.marketing === true)
+    check('Days of Thanks: with the email alone, "Hold my free gift" holds — the card says "Your free gift is held until {time} (119 min left)." with "Write your moment →"; the email and box were sent (and the ?code= of the link, silently)', /^Your free gift is held until .+ \(119 min left\)\.$/.test(heldText) && (await page.locator('[data-testid=thanks-write]').innerText()) === 'Write your moment →' && holdBody.email === 'a@example.com' && holdBody.marketing === true && String(holdBody.code ?? '').toLowerCase() === 'thanks100')
     check('Days of Thanks: right after holding, once: "Continuing on your phone? Scan this to take your gift with you." with the QR', (await page.locator('[data-testid=thanks-phone]').innerText()).includes('Continuing on your phone? Scan this to take your gift with you.') && (await page.locator('[data-testid=thanks-phone] img').count()) === 1)
     check(`no page errors (run 31, thanks card)`, errs.length === 0, errs.join('; '))
     await ctx.close()
@@ -4522,7 +4519,12 @@ for (const [lang, locale, text] of [['en', 'en-US', 'Your gift is being finished
     await page.locator('[data-testid=save-panel]').waitFor()
     await page.waitForSelector('[data-testid=save-mail]')
     const href = (await page.locator('[data-testid=save-mail]').getAttribute('href')) ?? ''
-    check('Save panel: "Copy link", the QR code, "Scan with your phone to continue there", "Email it to myself" (a mailto with no recipient, the subject "My ICHIREI basket" and the link) and the privacy note', (await page.locator('[data-testid=save-copy]').innerText()) === 'Copy link' && (await page.locator('[data-testid=save-qr]').count()) === 1 && (await page.locator('[data-testid=save-panel]').innerText()).includes('Scan with your phone to continue there') && (await page.locator('[data-testid=save-mail]').innerText()) === 'Email it to myself' && href.startsWith('mailto:?subject=My%20ICHIREI%20basket&body=') && href.includes(encodeURIComponent('https://ichirei.soul-id.jp/b/BT-abcdefghjkmnpqrstuvwxyz2')) && (await page.locator('[data-testid=save-note]').innerText()) === 'Anyone with this link can see your saved gifts. Keep it private.', href)
+    check('Save panel: "Copy link", the QR code, "Email it to myself" (a mailto with no recipient, the subject "My ICHIREI basket" and the link) and the privacy note', (await page.locator('[data-testid=save-copy]').innerText()) === 'Copy link' && (await page.locator('[data-testid=save-qr]').count()) === 1 && (await page.locator('[data-testid=save-mail]').innerText()) === 'Email it to myself' && href.startsWith('mailto:?subject=My%20ICHIREI%20basket&body=') && href.includes(encodeURIComponent('https://ichirei.soul-id.jp/b/BT-abcdefghjkmnpqrstuvwxyz2')) && (await page.locator('[data-testid=save-note]').innerText()) === 'Anyone with this link can see your saved gifts. Keep it private.', href)
+    // (2026-11-15) the panel says what Save did and where, first
+    const saveLines = await page.locator('[data-testid=save-panel] p.note').allInnerTexts()
+    check('Save panel: it first says "Saved. This gift is in your basket on this device, for 30 days.", then "To continue on another device (your phone, another computer), scan the code or email the link to yourself.", and keeps "Anyone with this link can see your saved gifts. Keep it private."', saveLines[0] === 'Saved. This gift is in your basket on this device, for 30 days.' && saveLines[1] === 'To continue on another device (your phone, another computer), scan the code or email the link to yourself.' && saveLines.at(-1) === 'Anyone with this link can see your saved gifts. Keep it private.' && !saveLines.includes('Scan with your phone to continue there'), JSON.stringify(saveLines))
+    await page.locator('[data-testid=save-panel]').scrollIntoViewIfNeeded().catch(() => {})
+    await page.screenshot({ path: `${SHOTS}/polish-save-panel-390.png` }).catch(() => {})
     await page.locator('[data-testid=basket-remove]').first().click()
     await page.waitForTimeout(400)
     check('basket page: "×" deletes at once (no confirmation) and the item is gone', deleted === 'BK-aaaaaaaaaaaaaaaaaaaa' && (await page.locator('[data-testid=basket-item]').count()) === 1)
@@ -4787,7 +4789,7 @@ for (const [lang, locale, text] of [['en', 'en-US', 'Your gift is being finished
     const { page, ctx } = await open(view(), { reduced: true })
     await T(page, 'cr-markbtn').click(); await T(page, 'cr-to-film').click(); await T(page, 'gift-skip').click()
     await page.waitForFunction(() => getComputedStyle(document.querySelector('[data-testid=cr-meaning]')).opacity === '1', null, { timeout: 20000 })
-    check('character: with line_you — "In Brian\'s eyes, you are" / tending negirau / "The one who eases a burden before anyone asks." / "This character is not a wish for you. It is how Brian already sees you."', (await T(page, 'cr-meaning-label').innerText()) === "IN BRIAN'S EYES, YOU ARE" && (await T(page, 'cr-word').innerText()).startsWith('tending') && (await T(page, 'cr-line').innerText()) === 'The one who eases a burden before anyone asks.' && (await T(page, 'cr-meaning').innerText()).includes('It is how Brian already sees you.'))
+    check('character: with line_you — "In Brian\'s eyes, you are" / tending (no romanized reading: English first) / "The one who eases a burden before anyone asks." / "This character is not a wish for you. It is how Brian already sees you."', (await T(page, 'cr-meaning-label').innerText()) === "IN BRIAN'S EYES, YOU ARE" && (await T(page, 'cr-word').innerText()) === 'tending' && (await T(page, 'cr-line').innerText()) === 'The one who eases a burden before anyone asks.' && (await T(page, 'cr-meaning').innerText()).includes('It is how Brian already sees you.'))
     await ctx.close()
   }
   {
@@ -4862,6 +4864,208 @@ for (const [lang, locale, text] of [['en', 'en-US', 'Your gift is being finished
     await T(page, 'gift-envelope').waitFor({ timeout: 8000 }).catch(() => {})
     const t = await page.locator('body').innerText()
     check('today\'s sealed envelope stays for a locked English gift (names and the date only)', (await page.locator('main').getAttribute('data-locked')) === 'yes' && (await page.locator('[data-ceremony=new]').count()) === 0 && !t.includes('労'))
+    await ctx.close()
+  }
+}
+
+// ---------- Run 34 (2026-11-15, pre-launch polish): the order section says where the visitor stands (a hold: $0 · Your free gift; gifts left: the box with Email and Hold my free gift, and the price turns to $0 after holding without a reload; none left: one line); the ceremony shows no way on before the meaning, holds slip 2 before the dive, and shows an answered gift's character on the Sent screen; screenshots at 390 × 844 ----------
+{
+  const SALE34 = { percent: 30, from: '2026-11-15', until: '2026-11-30', starts_at: '2020-01-01T00:00:00.000Z', ends_at: '2099-11-30T14:59:59.999Z' }
+  const sizes34 = { sizes: ['egift', 'simple', 'standard'], coming_soon: ['simple', 'standard'], sale: SALE34, promo: { from: '2026-11-01T00:00:00Z', until: '2099-01-01T00:00:00Z' }, usd: { egift: 25, egift_sale: 17.5 } }
+  const enResult34 = () => {
+    const r = JSON.parse(JSON.stringify(FIXTURE))
+    r.language = 'en'
+    r.inscription_script = null
+    r.candidates = r.candidates.map((c) => ({ ...c, eliminated: false, eliminated_reason: null }))
+    r.candidates[0] = { ...r.candidates[0], reading: 'akari', meaning: 'lamp', one_line_gaze: 'Someone who kept the porch light on for me.', story_anchor: 'the porch light', why_this: 'Lamplight is the plainest thing in your story.', en_word: 'hearth', en_word_source: 'lexicon', en_line: 'The light that is already on when everyone else wakes.', en_echo: null }
+    return r
+  }
+  const held = () => ({ state: 'active', expires_at: new Date(Date.now() + 100 * 60000).toISOString(), minutes_left: 100, email: 'a@example.com' })
+  const orderPage = async (promo, { onHold } = {}) => {
+    const { page, errors } = await mockPage(browser, { result: enResult34 })
+    await page.setViewportSize({ width: 390, height: 844 })
+    let state = promo
+    await page.route('**/api/rates', (r) => r.fulfill({ json: { date: '2026-11-15', base: 'JPY', rates: { USD: 0.0066 } } }))
+    await page.route('**/api/sizes', (r) => r.fulfill({ json: sizes34 }))
+    await page.route('**/api/me*', (r) => r.fulfill({ json: { basket: { count: 0 }, ready: null, hold: null } }))
+    await page.route('**/api/basket', (r) => r.fulfill({ json: { id: 'BK-aaaaaaaaaaaaaaaaaaaa', token: 'BT-x', count: 1, created: true } }))
+    await page.route('**/api/promo', (r) => r.fulfill({ json: state }))
+    const holds = []
+    await page.route('**/api/promo/hold', async (r) => {
+      const body = JSON.parse(r.request().postData() ?? '{}')
+      holds.push(body)
+      const h = held()
+      state = { ...state, hold: h, left: (state.left ?? 1) - 1 }
+      await r.fulfill({ json: { ok: true, existing: false, link: null, hold: { ...h, count: 1 }, left: state.left } })
+      onHold?.()
+    })
+    await page.goto('http://localhost:5173/en', { waitUntil: 'networkidle' })
+    await page.locator('#write [data-testid=story-input]').fill('She left the porch light on every night until I got home, and she never once mentioned it.')
+    await pickContext(page)
+    await page.click(`#write >> text=${GO.en}`)
+    await page.waitForSelector('[data-all-revealed=yes]', { timeout: 15000 })
+    await page.locator('article[data-slot=main]').click()
+    await page.locator('article[data-slot=main]').locator(`text=${GIVE.en}`).click()
+    await toOrder(page)
+    await page.waitForTimeout(600)
+    return { page, errors, holds }
+  }
+  const pkgPrice = (page) => page.locator('label.pkg:has(input[value=egift]) .pkgPrice')
+  const shotOrder = async (page, name) => {
+    await page.locator('label.pkg:has(input[value=egift])').evaluate((el) => el.scrollIntoView({ block: 'start' }))
+    await page.evaluate(() => window.scrollBy(0, -12))
+    await page.waitForTimeout(200)
+    await page.screenshot({ path: `${SHOTS}/${name}` })
+    await page.locator('[data-testid=order-promo-line]').evaluate((el) => el.scrollIntoView({ block: 'center' }))
+    await page.waitForTimeout(200)
+    await page.screenshot({ path: `${SHOTS}/${name.replace('.png', '-line.png')}` })
+  }
+  // a holder
+  {
+    const { page, errors } = await orderPage({ on: true, left: 40, daily: 100, hold: held() })
+    await page.locator('[data-testid=order-promo-line][data-state=held]').waitFor({ timeout: 8000 })
+    const price = (await pkgPrice(page).innerText()).replace(/\s+/g, ' ').trim()
+    const struck = await pkgPrice(page).locator('s').evaluate((e) => getComputedStyle(e).textDecorationLine).catch(() => '')
+    check('order section (holder): the e-gift price reads "$0 · Your free gift" with $17.50 struck through', price === '$17.50 $0 · Your free gift' && struck === 'line-through', price)
+    check('order section (holder): "Your free gift is held for you until {time}. It\'s applied at checkout." next to the pay button', /^Your free gift is held for you until .+\. It's applied at checkout\.$/.test(await page.locator('[data-testid=order-promo-line]').innerText()))
+    await shotOrder(page, 'polish-order-holder-390.png')
+    check('no page errors (run 34, holder)', errors.length === 0, errors.join('; '))
+    await page.close()
+  }
+  // no hold, gifts left: the box, then the inline hold switches the price to $0 without reloading
+  {
+    let loads = 0
+    const { page, errors, holds } = await orderPage({ on: true, left: 37, daily: 100, hold: null })
+    page.on('load', () => loads++)
+    await page.locator('[data-testid=order-promo-line][data-state=free]').waitFor({ timeout: 8000 })
+    check('order section (no hold, gifts left): the box says "Free today: 37 of today\'s 100 free gifts are left. Hold one with your email and this gift is $0." with an Email field and "Hold my free gift"; the price is still $17.50', (await page.locator('[data-testid=order-free-line]').innerText()) === "Free today: 37 of today's 100 free gifts are left. Hold one with your email and this gift is $0." && (await page.locator('[data-testid=order-free-email]').count()) === 1 && (await page.locator('[data-testid=order-free-hold]').innerText()) === 'Hold my free gift' && (await pkgPrice(page).innerText()).trim() === '$17.50')
+    await shotOrder(page, 'polish-order-free-390.png')
+    await page.locator('[data-testid=order-free-email]').fill('b@example.com')
+    await page.locator('[data-testid=order-free-hold]').click()
+    await page.locator('[data-testid=order-promo-line][data-state=held]').waitFor({ timeout: 8000 })
+    const price = (await pkgPrice(page).innerText()).replace(/\s+/g, ' ').trim()
+    check('order section: "Hold my free gift" in the box holds with the email alone (no code), the price turns to "$0 · Your free gift" and the held line shows — without reloading', holds.length === 1 && holds[0].email === 'b@example.com' && !('code' in holds[0] && holds[0].code !== '') && price === '$17.50 $0 · Your free gift' && loads === 0, JSON.stringify({ holds, price, loads }))
+    await shotOrder(page, 'polish-order-after-hold-390.png')
+    check('no page errors (run 34, inline hold)', errors.length === 0, errors.join('; '))
+    await page.close()
+  }
+  // none left today
+  {
+    const { page, errors } = await orderPage({ on: true, left: 0, daily: 100, hold: null })
+    await page.locator('[data-testid=order-promo-line][data-state=none]').waitFor({ timeout: 8000 })
+    check('order section (none left): one line, "Today\'s free gifts are all held or given. New ones arrive tomorrow morning (US Eastern)." and the price stays $17.50', (await page.locator('[data-testid=order-promo-line]').innerText()) === "Today's free gifts are all held or given. New ones arrive tomorrow morning (US Eastern)." && (await pkgPrice(page).innerText()).trim() === '$17.50' && (await page.locator('[data-testid=order-free-email]').count()) === 0)
+    await shotOrder(page, 'polish-order-none-390.png')
+    check('no page errors (run 34, none left)', errors.length === 0, errors.join('; '))
+    await page.close()
+  }
+
+  // ---- the ceremony ----
+  const TOKEN = 'RG-polipolipolipolipoli'
+  const gift = (over = {}) => ({
+    id: TOKEN, token: TOKEN, language: 'en', glyph: '労', reading: 'ねぎらう', romanization: 'negirau', meaning_en: 'tending',
+    en: { word: 'tending', word_source: 'lexicon', line: 'The care that mends what is about to give.', line_you: 'The one who eases a burden before anyone asks.', echo: null, classical: null },
+    who: 'Someone who fixed the bike before anyone asked.', poem: { type: 'en', lines: ['The chain was back on', 'before I reached the driveway.', 'You never mention it.', 'You only notice', 'what is about to give,', 'and mend it quietly.'], reading: '' },
+    memorial: false, purpose: 'thanks', music: 'thanks', film: { status: 'ready', lines: ['a', 'b', 'c', 'd'], pictures: ['/img/scenes/children.jpg', '/img/scenes/friends.jpg', '/img/scenes/m1.jpg', '/img/scenes/m2.jpg'] },
+    certificate_line: 'x', from: 'Brian', to: 'Kenji', message: "Thanks for fixing Sam's bike.", egift: null, locked: false, certificate_no: 3, order_date: '2026-11-15', opens_on: null, replied: false, package: 'egift', ...over,
+  })
+  const openGift = async (v, reduced = false) => {
+    const ctx = await browser.newContext({ locale: 'en-US', viewport: { width: 390, height: 844 }, reducedMotion: reduced ? 'reduce' : 'no-preference' })
+    const page = await ctx.newPage()
+    const errs = []
+    page.on('pageerror', (e) => errs.push(String(e)))
+    await page.route('**/api/analytics', (r) => r.fulfill({ status: 204, body: '' }))
+    await page.route(`**/api/gift/${TOKEN}**`, (r) => (new URL(r.request().url()).pathname === `/api/gift/${TOKEN}` ? r.fulfill({ json: v }) : r.fulfill({ status: 204, body: '' })))
+    await page.goto(`http://localhost:5173/g/${TOKEN}`, { waitUntil: 'networkidle' })
+    const T = (id) => page.locator(`[data-testid="${id}"]`)
+    await T('cr-markbtn').click()
+    await T('cr-to-film').click()
+    await T('gift-skip').click()
+    await T('cr-char').waitFor()
+    return { ctx, page, errs, T }
+  }
+  // 1. no way on before the meaning
+  {
+    const { ctx, page, errs, T } = await openGift(gift())
+    const early = []
+    for (let i = 0; i < 6; i++) { early.push(await T('cr-to-poem').count()); await page.waitForTimeout(500) }
+    check('character: no "Read the poem inside it" while the character is still revealing (checked for 3 s)', early.every((n) => n === 0) && (await T('cr-char').getAttribute('data-meaning')) === 'no', early.join())
+    await page.waitForTimeout(1500)
+    await page.screenshot({ path: `${SHOTS}/polish-character-before-meaning-390.png` })
+    await page.waitForFunction(() => document.querySelector('[data-testid=cr-char]')?.getAttribute('data-meaning') === 'yes', null, { timeout: 40000 })
+    const op = await T('cr-meaning').evaluate((e) => getComputedStyle(e).opacity)
+    check('character: the button comes only once the meaning has fully risen ("In Brian\'s eyes, you are · tending · … already sees you.")', op === '1' && (await T('cr-to-poem').count()) === 1 && (await T('cr-meaning').innerText()).includes('It is how Brian already sees you.'), op)
+    await page.screenshot({ path: `${SHOTS}/polish-character-after-meaning-390.png` })
+    check('no page errors (run 34, meaning)', errs.length === 0, errs.join('; '))
+    await ctx.close()
+  }
+  // a tap speeds the sequence up to the meaning — never past it
+  {
+    const { ctx, page, T } = await openGift(gift())
+    await page.waitForTimeout(1200)
+    await page.mouse.click(195, 300)
+    await page.waitForTimeout(300)
+    check('character: a tap on the screen jumps to the meaning (fully shown) and the button appears — it does not skip past it to the poem', (await T('cr-char').getAttribute('data-meaning')) === 'yes' && (await T('cr-meaning').evaluate((e) => getComputedStyle(e).opacity)) === '1' && (await T('cr-to-poem').count()) === 1 && (await T('cr-poem').count()) === 0)
+    await ctx.close()
+  }
+  // 2. slip 2 is fully readable for at least 1.5 s before the dive
+  {
+    const { ctx, page } = await openGift(gift())
+    const s = await page.evaluate(() => new Promise((resolve) => {
+      const t0 = performance.now()
+      let firstFull = null
+      let diveAt = null
+      const tick = () => {
+        const cap = document.getElementById('cr-cap2')
+        const lens = document.querySelector('[data-testid=cr-lens]')
+        const now = performance.now() - t0
+        if (cap && Number(getComputedStyle(cap).opacity) >= 0.99 && firstFull === null) firstFull = now
+        const m = lens ? getComputedStyle(lens).transform : 'none'
+        const k = m && m !== 'none' ? Number(m.slice(7).split(',')[0]) : 1
+        if (k > 1.001 && diveAt === null) diveAt = now
+        if (diveAt !== null || now > 30000) return resolve({ firstFull, diveAt, capAtDive: cap ? Number(getComputedStyle(cap).opacity) : 0 })
+        requestAnimationFrame(tick)
+      }
+      tick()
+    }))
+    check('character: slip 2 ("Look closer. A poem is written inside it.") is fully shown at least 1.5 s before the dive starts, and is still there as it dives', s.firstFull !== null && s.diveAt !== null && s.diveAt - s.firstFull >= 1450 && s.capAtDive >= 0.99, JSON.stringify(s))
+    await ctx.close()
+  }
+  // Part 4 (English first): no romanized reading on the ceremony screens; the certificate alone keeps it, small, next to the character ("労 · negirau")
+  {
+    const { ctx, page, errs, T } = await openGift(gift(), true)
+    const seen = []
+    const clean = async (id) => { const t = await T(id).innerText(); seen.push([id, /negirau/i.test(t)]); return !/negirau/i.test(t) }
+    await T('cr-to-poem').waitFor({ timeout: 20000 })
+    const charOk = (await clean('cr-char')) && (await T('cr-word').innerText()) === 'tending' && !/negirau/i.test((await T('cr-char').innerHTML()))
+    await T('cr-to-poem').click()
+    await T('cr-poem').waitFor()
+    const poemOk = await clean('cr-poem')
+    await T('cr-to-cert').click()
+    await T('cr-cert').waitFor()
+    const cert = await T('gift-cert-reading').innerText()
+    const word = await T('gift-cert-word').innerText()
+    const small = await page.evaluate(() => { const r = document.querySelector('[data-testid=gift-cert-reading]'); const w = document.querySelector('[data-testid=gift-cert-word]'); return { r: parseFloat(getComputedStyle(r).fontSize), w: parseFloat(getComputedStyle(w).fontSize) } })
+    await page.screenshot({ path: `${SHOTS}/polish-certificate-390.png` })
+    await T('cr-to-keep').click()
+    await T('gift-keep').waitFor()
+    const keepOk = await clean('gift-keep')
+    check('English first: screen 4 shows the word alone ("tending", no "negirau"); the poem and keepsake screens carry no romanized reading', charOk && poemOk && keepOk, JSON.stringify(seen))
+    check('English first: the certificate alone keeps the reading, in small type next to the character ("労 · negirau"), the English word large under it', cert === '労 · negirau' && word === 'tending' && small.r < small.w * 0.75, JSON.stringify({ cert, word, small }))
+    check('no page errors (run 34, English first)', errs.length === 0, errs.join('; '))
+    await ctx.close()
+  }
+  // 3. coming back to an answered gift
+  {
+    const { ctx, page, errs, T } = await openGift(gift({ replied: true, answer: { char: '家', words: true } }), true)
+    await T('cr-to-poem').click({ timeout: 20000 })
+    await T('cr-to-cert').click()
+    await T('cr-to-keep').click()
+    await T('gift-to-answer').click()
+    await T('gift-reply-sent').waitFor()
+    await page.waitForTimeout(300)
+    check('answered gift: the Sent screen shows what was sent — "Sent to Brian · 家, family" and "One character from Brian, one from you."', (await T('cr-sent-line').innerText()) === 'SENT TO BRIAN · 家, FAMILY' && (await T('gift-reply-sent').innerText()).includes('One character from Brian, one from you.') && (await T('gift-answer').count()) === 0)
+    await page.screenshot({ path: `${SHOTS}/polish-sent-answered-390.png` })
+    check('no page errors (run 34, answered)', errs.length === 0, errs.join('; '))
     await ctx.close()
   }
 }

@@ -215,7 +215,7 @@ export interface PlaceInput {
 }
 
 /**
- * "Hold my free gift". A hold is placed only if: the promotion is on, the email is valid, the public code is one of the configured codes, gifts are left (a slot is won), this email has fewer than three
+ * "Hold my free gift". A hold is placed only if: the promotion is on, the email is valid (no code is needed since 2026-11-15), gifts are left (a slot is won), this email has fewer than three
  * holds today and has not received today's free gift, and the address backstop allows it. The same email while a hold is active (from any device) shows that hold: no new hold, the expiry unchanged.
  * Any Shopify failure means NO hold (and `promo_unavailable` is counted) — never a broken page.
  */
@@ -231,7 +231,8 @@ export async function placeHold(d: PromoDeps, input: PlaceInput): Promise<PlaceR
     void recordHealth(store, 'promo_unavailable', { reason: 'not_configured' }, now)
     return { ok: false, code: 'unavailable' }
   }
-  if (!codeAllowed(cfg, input.code)) return { ok: false, code: 'bad_code' }
+  // (2026-11-15) the free gift needs no code: the card asks only for an email. A code that comes with the request (a ?code=… link) is kept when it is one of the configured codes and ignored otherwise.
+  const givenCode = codeAllowed(cfg, input.code) && typeof input.code === 'string' ? input.code.trim().toUpperCase() : null
   const day = promoDayKey(now)
   const hash = emailHash(email)
   const browser = input.browser && /^V[A-Za-z0-9_-]{22}$/.test(input.browser) ? input.browser : null
@@ -277,7 +278,7 @@ export async function placeHold(d: PromoDeps, input: PlaceInput): Promise<PlaceR
     return { ok: false, code: 'unavailable' }
   }
   const rec: HoldRecord = {
-    schema: 'hold', id, day, email, email_hash: hash, browsers: browser ? [browser] : [], code: typeof input.code === 'string' ? input.code.trim().toUpperCase() : null,
+    schema: 'hold', id, day, email, email_hash: hash, browsers: browser ? [browser] : [], code: givenCode,
     created_at: now.toISOString(), expires_at: expires.toISOString(), status: 'active', count: (existing?.count ?? 0) + 1, slot, shopify_customer: customerId, consent: input.marketing === true,
   }
   if (existing) await casJson<HoldRecord>(store, holdPath(day, hash), () => ({ ...rec, browsers: [...new Set([...existing.browsers, ...rec.browsers])] }))

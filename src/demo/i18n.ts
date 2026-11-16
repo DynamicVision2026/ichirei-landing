@@ -859,7 +859,7 @@ const en: Copy = {
   chooseHint: 'Open a character and press “Choose this character” to decide',
   chooseHintCustomer: 'Choose one of the characters to continue.',
   glyphReading: (c, carved) =>
-    `${c.inscription_form && carved !== c.kanji ? `${c.kanji} · ` : ''}${cleanReading(c.reading)}${c.meaning ? ` · ${c.meaning}` : ''}`, // English (2026-11-14): reading · word — no pinyin for a US buyer
+    `${c.inscription_form && carved !== c.kanji ? `${c.kanji} · ` : ''}${c.meaning ?? ''}`, // English first (2026-11-15): the word alone — no romanized reading (only the certificate keeps it)
   inscriptionNote: () => null, // the character is carved in its modern Japanese form
   previewNote: () => null,
   slotLabels: { main: 'Main', second: 'Second', freestyle: 'Playful' },

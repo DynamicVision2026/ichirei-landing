@@ -21,7 +21,7 @@ export interface EndCardInput {
   glyph: string
   reading: string
   who?: string
-  /** English bridge (film variant only): the word under the reading and the line in the "who" slot. Absent = the card as it was. */
+  /** English bridge: the word (film: in its own slot, share: where the reading was — no romanized reading on English cards) and, on the film card, the line in the "who" slot. Absent = the card as it was. */
   word?: string | null
   line?: string | null
   poem: string[]
@@ -98,14 +98,22 @@ export async function makeEndCard(a: EndCardInput, variant: CardVariant): Promis
   // the relationship line (share film) above the character
   const relation = variant === 'share' && a.relation && L.relationY !== null ? await textBlock(body, a.relation, (en ? 5.2 : 4.8) * U, (en ? 5.2 : 4.8) * U * 1.6, CARD_W * 0.84, CARD_X + CARD_W * 0.08, cy(L.relationY) - (en ? 5.2 : 4.8) * U * 0.8, { ...textColours, ivory: CARD_COLOURS.reading }, { centre: true, width: CARD_W * 0.84 }) : null
 
-  // the reading, spaced (a long reading is kept inside the card by narrowing the space)
-  const readSize = 3.1 * U
-  let spacing = 0.3 * readSize
-  const chars = Array.from(a.reading)
-  const natural = chars.reduce((s, ch) => s + textWidth(body, ch, readSize), 0)
-  const maxW = CARD_W * 0.84
-  if (natural + spacing * (chars.length - 1) > maxW) spacing = Math.max(0, (maxW - natural) / Math.max(1, chars.length - 1))
-  const reading = await lineLayer(body, a.reading, readSize, VIDEO_W / 2, cy(L.readingY) - readSize * 0.8, CARD_COLOURS.reading, spacing)
+  // the reading, spaced (a long reading is kept inside the card by narrowing the space).
+  // English first (2026-11-15): an English card with its word draws no romanized reading — the film card has the word in its own slot; the share card puts the word where the reading was.
+  const enFirst = en && !!a.word
+  let reading: Layer | null = null
+  if (enFirst && !bridge && a.word) {
+    const wordSize = 5.2 * U
+    reading = await lineLayer(body, a.word, wordSize, VIDEO_W / 2, cy(L.readingY) - wordSize * 0.8, CARD_COLOURS.text, 0.02 * wordSize, wordSize * 0.035)
+  } else if (!enFirst) {
+    const readSize = 3.1 * U
+    let spacing = 0.3 * readSize
+    const chars = Array.from(a.reading)
+    const natural = chars.reduce((s, ch) => s + textWidth(body, ch, readSize), 0)
+    const maxW = CARD_W * 0.84
+    if (natural + spacing * (chars.length - 1) > maxW) spacing = Math.max(0, (maxW - natural) / Math.max(1, chars.length - 1))
+    reading = await lineLayer(body, a.reading, readSize, VIDEO_W / 2, cy(L.readingY) - readSize * 0.8, CARD_COLOURS.reading, spacing)
+  }
 
   // the word (English bridge): bold, under the reading
   let word: Layer | null = null
@@ -208,7 +216,7 @@ export async function makeEndCard(a: EndCardInput, variant: CardVariant): Promis
       blend(frame, paper, st.opacity, 1, dy)
       blend(frame, kanji, st.opacity, 1, dy)
       if (relation) blend(frame, relation, st.opacity, 1, dy)
-      blend(frame, reading, st.opacity * st.reading, 1, dy)
+      if (reading) blend(frame, reading, st.opacity * st.reading, 1, dy)
       if (word) blend(frame, word, st.opacity * st.reading, 1, dy)
       blend(frame, rule, st.opacity * st.rule, 1, dy)
       for (const b of who) blend(frame, b, st.opacity * st.who, 1, dy)

@@ -168,7 +168,8 @@ const musicOffset = (au: HTMLAudioElement, total: number): number => (Number.isF
 
 /** The character's reading under it: the kana reading (ja), the pinyin (zh), the romanization and meaning (en: a reader of English cannot read kana). */
 function readingLine(view: AnimationView): string {
-  if (view.language === 'en') return [cleanReading(view.romanization.split(' / ')[0]), view.en ? '' : view.meaning_en].filter(Boolean).join(' · ')
+  // English first (2026-11-15): no romanized reading — with the bridge the word has its own line; without it, the meaning
+  if (view.language === 'en') return view.en ? '' : (view.meaning_en ?? '')
   return cleanReading(view.reading)
 }
 
@@ -423,7 +424,7 @@ export function Film({ view, film, copy, giftMode = false, onEnd }: { view: Anim
           {view.glyph}
         </div>
         <div className="an-reading notranslate" translate="no" data-reading data-testid="film-reading">
-          {readingLine(view)}
+          {view.language === 'en' && view.en ? view.en.word : readingLine(view)}
         </div>
       </div>
       <EndCard view={view} copy={copy} poemLines={poemLines} />
@@ -519,7 +520,7 @@ function EndCard({ view, copy, poemLines, still = false }: { view: AnimationView
   return (
     <div className={`an-card${still ? ' an-card-still' : ''}`} data-card data-testid="film-card" data-card-aspect={CARD_ASPECT} style={{ width: `calc(var(--u) * ${CARD_WIDTH * 100})`, height: `calc(var(--u) * ${CARD_WIDTH * 100 * CARD_ASPECT})` }}>
       <div className="an-card-kanji notranslate" translate="no" data-testid="film-card-kanji" style={{ top: pct(L.charY), fontSize: `calc(var(--u) * ${L.charSize * CARD_WIDTH * 100})` }}>{view.glyph}</div>
-      <div className="an-card-reading notranslate" translate="no" data-card-reading data-testid="film-card-reading" style={{ top: pct(L.readingY) }}>{readingLine(view)}</div>
+      {readingLine(view) && <div className="an-card-reading notranslate" translate="no" data-card-reading data-testid="film-card-reading" style={{ top: pct(L.readingY) }}>{readingLine(view)}</div>}
       {bridge && L.wordY !== null && <div className="an-card-word notranslate" translate="no" data-card-word data-testid="film-card-word" style={{ top: pct(L.wordY) }}>{view.en!.word}</div>}
       <i className="an-card-rule" data-card-rule style={{ top: pct(L.ruleY) }} />
       <div className="an-card-who" data-card-who data-testid="film-who" style={{ top: pct(L.whoTop ?? 0.455) }}>

@@ -24,6 +24,8 @@ export const FILM_FADE_MS = 900
 export const FILM_END_MS = 1100
 export const MUSIC_FADE_MS = 2400
 export const GROW_MS = 2200
+/** Slip 2 ("Look closer. A poem is written inside it.") holds fully visible this long before the dive. */
+export const SLIP2_HOLD_MS = 1600
 
 const reducedMotion = (): boolean => window.matchMedia?.('(prefers-reduced-motion: reduce)').matches ?? false
 const wait = (ms: number) => new Promise<void>((r) => setTimeout(r, ms))
@@ -44,7 +46,11 @@ const scrollAvailable = (v: GiftView): boolean => filmComplete(v) && v.film!.pic
 export default function NewCeremony({ view, preview, q }: { view: GiftView; preview: boolean; q: string }) {
   const reduced = useMemo(reducedMotion, [])
   const [screen, setScreen] = useState<CeremonyScreen>('mark')
-  const [sent, setSent] = useState<{ char: string | null; text: boolean } | null>(view.replied ? { char: null, text: false } : null)
+  // an answered gift shows what was sent when the receiver comes back (the view carries their own answer)
+  const [sent, setSent] = useState<{ char: string | null; text: boolean } | null>(view.replied ? { char: view.answer?.char ?? null, text: view.answer?.words ?? false } : null)
+  const [meaningDone, setMeaningDone] = useState(false)
+  const skipRef = useRef<(() => void) | null>(null)
+  const onMeaning = useCallback(() => setMeaningDone(true), [])
   const markAt = useRef<{ x: number; y: number } | null>(null)
   const firstMark = useRef<HTMLButtonElement>(null)
   const stage = useRef<HTMLDivElement>(null)
@@ -76,6 +82,7 @@ export default function NewCeremony({ view, preview, q }: { view: GiftView; prev
       const m = firstMark.current.getBoundingClientRect()
       if (m.width) markAt.current = { x: m.left + m.width / 2, y: m.top + m.height / 2 }
     }
+    setMeaningDone(false)
     setScreen(s)
     window.scrollTo(0, 0)
   }, [])
@@ -95,7 +102,7 @@ export default function NewCeremony({ view, preview, q }: { view: GiftView; prev
 
   return (
     <main ref={root} className="cr" lang="en" data-testid="gift-page" data-ceremony="new" data-screen={screen} data-step={screen} data-motion={reduced ? 'fade' : 'full'}>
-      {screen === 'char' && <CharacterLayers view={view} reduced={reduced} markAt={markAt} stageRef={stage} />}
+      {screen === 'char' && <CharacterLayers view={view} reduced={reduced} markAt={markAt} stageRef={stage} skipRef={skipRef} onMeaning={onMeaning} />}
       <div ref={stage} className="cr-stage">
         <p className="cr-wm">ICHIREI</p>
         <p className="cr-wv" lang="ja">一字礼</p>
@@ -132,12 +139,13 @@ export default function NewCeremony({ view, preview, q }: { view: GiftView; prev
         {screen === 'film' && <FilmScreen view={view} reduced={reduced} from={from} onDone={() => go('char')} />}
 
         {screen === 'char' && (
-          <section className="cr-scr" data-testid="cr-char">
-            <div className="cr-gbox" id="cr-gbox" role="img" aria-label={CER.glyphAria(readingOf(view), wordOf(view))} />
+          <section className="cr-scr" data-testid="cr-char" data-meaning={meaningDone ? 'yes' : 'no'} onClick={() => { if (!meaningDone) skipRef.current?.() }}>
+            <div className="cr-gbox" id="cr-gbox" role="img" aria-label={CER.glyphAria('', wordOf(view))} />
             <p className="cr-slip cr-cap" id="cr-cap1">{CER.cap1(from)[0]}<br />{CER.cap1(from)[1]}</p>
             <p className="cr-slip cr-cap" id="cr-cap2">{CER.cap2[0]}<br />{CER.cap2[1]}</p>
             <Meaning view={view} from={from} />
-            <button type="button" className="cr-go cr-fix cr-next" data-testid="cr-to-poem" onClick={() => go(afterChar)}>{afterChar === 'poem' ? CER.toPoem : CER.toCertFromChar}</button>
+            {/* the way on appears only once the meaning has fully risen: the meaning is never skipped */}
+            {meaningDone && <button type="button" className="cr-go cr-fix cr-next" data-testid="cr-to-poem" onClick={() => go(afterChar)}>{afterChar === 'poem' ? CER.toPoem : CER.toCertFromChar}</button>}
           </section>
         )}
 
@@ -162,11 +170,13 @@ export default function NewCeremony({ view, preview, q }: { view: GiftView; prev
             <div className="cr-slip cr-cert" data-testid="gift-cert" data-cert-no={view.certificate_no ?? ''}>
               <p className="cr-lab cr-cert-no">{CER.certNo(view.certificate_no)}</p>
               <div className="cr-big notranslate" translate="no" role="img" aria-label={CER.certAria(readingOf(view))} data-testid="gift-cert-glyph">{view.glyph}</div>
-              <p className="cr-m" style={{ margin: 0, fontSize: 25, fontWeight: 900 }}>
-                {readingOf(view) && <i style={{ fontWeight: 500, fontSize: 16, color: 'var(--mute)' }}>{readingOf(view)}</i>}
-                {readingOf(view) && wordOf(view) ? ' · ' : ''}
-                {wordOf(view)}
-              </p>
+              {/* the certificate only: the reading, in small type next to the character ("待 · matsu"); the English word leads */}
+              {readingOf(view) && (
+                <p className="cr-cert-reading" data-testid="gift-cert-reading">
+                  <span className="notranslate" translate="no">{view.glyph}</span> · <i>{readingOf(view)}</i>
+                </p>
+              )}
+              {wordOf(view) && <p className="cr-m" style={{ margin: 0, fontSize: 25, fontWeight: 900 }} data-testid="gift-cert-word">{wordOf(view)}</p>}
               {(to || from) && (
                 <div className="cr-pair">
                   {to && <div><p className="cr-lab">{CER.certFor}</p><p className="cr-name" data-testid="gift-cert-to">{to}</p></div>}
@@ -200,14 +210,14 @@ const noteSize = (m: string): string => {
   return n <= 60 ? 'clamp(33px, 10vw, 41px)' : n <= 110 ? '30px' : n <= 160 ? '26px' : '22px'
 }
 
-/** Screen 4's words: "In Brian's eyes, you are" / the word and the reading / the line said to the receiver / "This character is not a wish for you…". */
+/** Screen 4's words: "In Brian's eyes, you are" / the English word (no reading: English first) / the line said to the receiver / "This character is not a wish for you…". */
 function Meaning({ view, from }: { view: GiftView; from: string }) {
   const lineYou = view.en?.line_you?.trim() || null
   const oldLine = (view.en?.line ?? view.who ?? '').trim()
   return (
     <div className="cr-txt cr-meaning" id="cr-meaning" data-testid="cr-meaning" data-line={lineYou ? 'you' : 'old'}>
       <p className="cr-lab" data-testid="cr-meaning-label">{lineYou ? CER.meaningYou(from) : CER.meaningOld(from)}</p>
-      <p className="cr-word notranslate" translate="no" data-testid="cr-word">{wordOf(view)} {readingOf(view) && <i>{readingOf(view)}</i>}</p>
+      <p className="cr-word" data-testid="cr-word">{wordOf(view)}</p>
       <p className="cr-b cr-ink" data-testid="cr-line">{lineYou ?? oldLine}</p>
       <p className="cr-b">{CER.notAWish(from)}</p>
     </div>
@@ -220,7 +230,7 @@ function Meaning({ view, from }: { view: GiftView; from: string }) {
  *   "… chose one character for you." → a dive ×4 into one stroke (2.4 s), along it (5.4 s) with "Look closer. A poem is written inside it.", back out (2.6 s) → the meaning rises.
  * Reduced motion: no grow and no dive; the views cross-fade.
  */
-function CharacterLayers({ view, reduced, markAt, stageRef }: { view: GiftView; reduced: boolean; markAt: React.MutableRefObject<{ x: number; y: number } | null>; stageRef: React.RefObject<HTMLDivElement | null> }) {
+function CharacterLayers({ view, reduced, markAt, stageRef, skipRef, onMeaning }: { view: GiftView; reduced: boolean; markAt: React.MutableRefObject<{ x: number; y: number } | null>; stageRef: React.RefObject<HTMLDivElement | null>; skipRef: React.MutableRefObject<(() => void) | null>; onMeaning: () => void }) {
   const lens = useRef<HTMLDivElement>(null)
   const micro = useRef<HTMLPreElement>(null)
   const mglyph = useRef<HTMLDivElement>(null)
@@ -268,8 +278,13 @@ function CharacterLayers({ view, reduced, markAt, stageRef }: { view: GiftView; 
       await play(lens.current, [{ opacity: 0 }, { opacity: 1 }], { duration: 600 })
       if (!alive) return
       lens.current.dataset.phase = 'lens'
-      void play(cap1(), [{ opacity: 0 }, { opacity: 1, offset: 0.15 }, { opacity: 1, offset: 0.85 }, { opacity: 0 }], { duration: 1900 })
-      await wait(1300)
+      await play(cap1(), [{ opacity: 0 }, { opacity: 1, offset: 0.15 }, { opacity: 1, offset: 0.85 }, { opacity: 0 }], { duration: 1900 })
+      if (!alive) return
+      // slip 2 is fully readable for at least 1.5 s before the dive begins (pre-launch fix 2026-11-15), and stays while the view travels along the stroke
+      lens.current.dataset.phase = 'slip2'
+      await play(cap2(), [{ opacity: 0 }, { opacity: 1 }], { duration: 400 })
+      if (!alive) return
+      await wait(SLIP2_HOLD_MS)
       if (!alive) return
       if (!reduced) {
         const k = 4
@@ -280,18 +295,38 @@ function CharacterLayers({ view, reduced, markAt, stageRef }: { view: GiftView; 
         lens.current.dataset.phase = 'dive'
         await play(lens.current, [{ opacity: 1, transform: 'translate(0px,0px) scale(1)' }, { opacity: 1, transform: near0 }], { duration: 2400, easing: 'ease-in-out' })
         if (!alive) return
-        void play(cap2(), [{ opacity: 0 }, { opacity: 1, offset: 0.1 }, { opacity: 1, offset: 0.9 }, { opacity: 0 }], { duration: 5600 })
         await play(lens.current, [{ opacity: 1, transform: near0 }, { opacity: 1, transform: near1 }], { duration: 5400, easing: 'ease-in-out' })
         if (!alive) return
+        void play(cap2(), [{ opacity: 1 }, { opacity: 0 }], { duration: 400 })
         await play(lens.current, [{ opacity: 1, transform: near1 }, { opacity: 1, transform: 'translate(0px,0px) scale(1)' }], { duration: 2600, easing: 'ease-in-out' })
         if (!alive) return
       } else {
-        // the close view is only said, not shown: the slip fades in and out over the whole character
-        await play(cap2(), [{ opacity: 0 }, { opacity: 1, offset: 0.15 }, { opacity: 1, offset: 0.85 }, { opacity: 0 }], { duration: 3600 })
+        // the close view is only said, not shown
+        await wait(1200)
+        if (!alive) return
+        await play(cap2(), [{ opacity: 1 }, { opacity: 0 }], { duration: 400 })
         if (!alive) return
       }
+      lens.current.dataset.phase = 'meaning'
+      await play(meaning(), [{ opacity: 0, translate: '0 12px' }, { opacity: 1, translate: '0 0' }], { duration: 900, easing: 'ease-out' })
+      if (!alive) return
       lens.current.dataset.phase = 'done'
-      void play(meaning(), [{ opacity: 0, translate: '0 12px' }, { opacity: 1, translate: '0 0' }], { duration: 900, easing: 'ease-out' })
+      onMeaning()
+    }
+    // a tap on the screen speeds the sequence up to the meaning — never past it
+    skipRef.current = () => {
+      if (!alive) return
+      alive = false
+      cancelAll([lens.current, solid.current, cap1(), cap2(), meaning()])
+      layout()
+      if (lens.current) {
+        lens.current.style.opacity = '1'
+        lens.current.style.transform = 'none'
+        lens.current.dataset.phase = 'done'
+      }
+      const m = meaning()
+      if (m) m.style.opacity = '1'
+      onMeaning()
     }
     void run()
     const onResize = () => {
@@ -302,10 +337,11 @@ function CharacterLayers({ view, reduced, markAt, stageRef }: { view: GiftView; 
     const so = solid.current
     return () => {
       alive = false
+      skipRef.current = null
       window.removeEventListener('resize', onResize)
       cancelAll([l, so, cap1(), cap2(), meaning()])
     }
-  }, [poem, reduced, markAt, stageRef])
+  }, [poem, reduced, markAt, stageRef, skipRef, onMeaning])
 
   return (
     <>

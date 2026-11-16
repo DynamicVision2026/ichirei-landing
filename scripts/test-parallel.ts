@@ -400,8 +400,8 @@ try {
   check('(D2) the engine writes the readings plain: ま-こと → まこと, あか.り → あかり, あ-さ → あさ on the result (cards, early cards and the final result)', liveOf(d2).map((c) => c.reading).sort().join() === ['あさ', 'まこと'].sort().join() && !JSON.stringify(d2).includes('ま-こと'), liveOf(d2).map((c) => c.reading).join())
   replies = { main: sel(M1(), M2()), second: sel(S1(), S2()), free: free(F1(), F2()) }
   const sh = (COPY.ja as any).glyphReading({ kanji: '慕', inscription_form: null, reading: 'した-う', meaning: null, reading_zh: null }, '慕')
-  const shEn = (COPY.en as any).glyphReading({ kanji: '慕', inscription_form: null, reading: 'shita-u', meaning: null, reading_zh: null }, '慕')
-  check('(D3) the cards show 慕 as したう (ja) and shitau (en): the display strips the markers even from a reading that was stored with them', sh === 'したう' && shEn.includes('shitau') && !shEn.includes('shita-u'), `${sh} | ${shEn}`)
+  const shEn = (COPY.en as any).glyphReading({ kanji: '慕', inscription_form: null, reading: 'shita-u', meaning: 'longing', reading_zh: null }, '慕')
+  check('(D3) the cards show 慕 as したう (ja) — the display strips the markers even from a reading that was stored with them — and, English first (2026-11-15), the English word alone on en (no romanized reading)', sh === 'したう' && shEn === 'longing' && !/shita/.test(shEn), `${sh} | ${shEn}`)
   const cert = buildCertificate({ ...cand('main', '慕', 'した-う', GOOD, '車の窓の霜'), meaning: null } as any, '慕', 'ja', palette)
   check('(D4) the certificate (and so the gift page, the card and scroll PDFs, the film, which read it) carries the reading and the romanization plain', !/[-.]/.test(cert.reading) && !/[-.]/.test(cert.romanization), JSON.stringify([cert.reading, cert.romanization]))
   // ---- /api/select?debug=1: this request's own timings, nothing else changes without it ------------------------------------------------------------------------------------

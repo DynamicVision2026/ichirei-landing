@@ -26,7 +26,7 @@ const SKU_SIZE: Record<string, 'egift' | 'simple' | 'standard'> = { 'ICHIREI-EGI
 
 /** The character's reading under it: the kana reading (ja), the pinyin (zh), the romanization and meaning (en: a reader of English cannot read kana). */
 function readingOf(view: AnimationView): string {
-  if (view.language === 'en') return [cleanReading(view.romanization.split(' / ')[0]), view.en ? view.en.word : view.meaning_en].filter(Boolean).join(' · ')
+  if (view.language === 'en') return (view.en ? view.en.word : view.meaning_en) ?? '' // English first (2026-11-15): the word, no romanized reading
   return cleanReading(view.reading)
 }
 

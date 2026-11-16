@@ -76,7 +76,11 @@ export async function makeFilmVideo(a: Artwork, opts: { fps?: number; ffmpeg?: s
   const kanjiPng = await sharp(Buffer.from(`<svg xmlns="http://www.w3.org/2000/svg" width="${Math.ceil(kanjiSize * 1.2)}" height="${Math.ceil(kanjiSize * 1.2)}">${textPaths(hero, a.glyph, kanjiSize, kanjiSize * 0.6, kanjiSize * 0.99, c.kanji, 'middle', f.stroke).svg}</svg>`)).ensureAlpha().raw().toBuffer({ resolveWithObject: true })
   const kanjiCentreY = VIDEO_H / 2 - VIDEO_W * 0.09
   const kanji: Layer = { data: kanjiPng.data, w: kanjiPng.info.width, h: kanjiPng.info.height, x: Math.round(VIDEO_W / 2 - kanjiPng.info.width / 2), y: Math.round(kanjiCentreY - kanjiPng.info.height / 2) }
-  const reading = await lineLayer(body, a.reading, 2.9 * U, VIDEO_W / 2, VIDEO_H * 0.61, c.muted, 0.3 * 2.9 * U)
+  // English first (2026-11-15): under the character, the English word, not the romanized reading
+  const enWord = a.language === 'en' && a.en?.word ? a.en.word : null
+  const reading = enWord
+    ? await lineLayer(body, enWord, 4.6 * U, VIDEO_W / 2, VIDEO_H * 0.61, c.ivory, 0.02 * 4.6 * U, 4.6 * U * 0.035)
+    : await lineLayer(body, a.reading, 2.9 * U, VIDEO_W / 2, VIDEO_H * 0.61, c.muted, 0.3 * 2.9 * U)
   const card = await makeEndCard({ language: a.language, glyph: a.glyph, reading: a.reading, who: a.who, ...(a.language === 'en' && a.en ? { word: a.en.word, line: a.en.line } : {}), poem: a.poem, poemType: a.poemType, quiet: a.quiet }, 'film')
   const credits = await lineLayer(body, credit(a.language), 1.9 * U, VIDEO_W / 2, VIDEO_H * 0.965, INK.muted)
 

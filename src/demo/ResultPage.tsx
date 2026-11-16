@@ -81,7 +81,12 @@ export default function ResultPage({ live, onMake, onAnother }: { live: ResultLi
 
         <section className="rs-char" data-testid="result-char">
           <span className="rs-glyph k notranslate" translate="no" data-testid="result-glyph">{live.glyph}</span>
-          <p className="rs-reading notranslate" data-testid="result-reading">{[live.reading, live.word].filter(Boolean).join(' · ')}</p>
+          {/* English first (2026-11-15): the English word, large; no romanized reading. ja / zh: the reading as before. */}
+          {live.language === 'en' ? (
+            live.word && <p className="rs-word" data-testid="result-word">{live.word}</p>
+          ) : (
+            <p className="rs-reading notranslate" data-testid="result-reading">{[live.reading, live.word].filter(Boolean).join(' · ')}</p>
+          )}
           {who && <p className="rs-who" data-testid="result-who">{who}</p>}
         </section>
 

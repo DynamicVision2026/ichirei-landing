@@ -252,7 +252,10 @@ export default function GiftApp() {
       <section className="gf-paper gf-cert" data-testid="gift-cert" data-cert-no={view.certificate_no ?? ''}>
         <h2 className="gf-cert-title" data-testid="gift-cert-title">{copy.certTitle(view.certificate_no ? String(view.certificate_no).padStart(4, '0') : null)}</h2>
         <p className="gf-cert-glyph notranslate" translate="no" data-testid="gift-cert-glyph">{view.glyph}</p>
-        {view.language === 'en' && view.en && <EnBridgeStack className="gf-en gf-en-cert" reading={cleanReading(view.romanization.split(' / ')[0])} word={view.en.word} line={view.en.line} echo={view.en.echo} classical={view.en.classical} />}
+        {view.language === 'en' && view.en && cleanReading(view.romanization.split(' / ')[0]) && (
+          <p className="gf-cert-reading" data-testid="gift-cert-reading"><span className="notranslate" translate="no">{view.glyph}</span> · <i>{cleanReading(view.romanization.split(' / ')[0])}</i></p>
+        )}
+        {view.language === 'en' && view.en && <EnBridgeStack className="gf-en gf-en-cert" word={view.en.word} line={view.en.line} echo={view.en.echo} classical={view.en.classical} />}
         {view.to && <p className="gf-cert-to" data-testid="gift-cert-to">{copy.certTo(view.to)}</p>}
         {view.from && <p className="gf-cert-line" data-testid="gift-cert-line">{copy.certLine(view.from)}</p>}
         {view.from && <p className="gf-cert-from" data-testid="gift-cert-from">{copy.certFrom(view.from)}</p>}
@@ -288,9 +291,9 @@ export default function GiftApp() {
   )
 }
 
-/** The character's reading under it: the kana reading (ja), the pinyin (zh), the romanization and meaning (en). */
+/** The character's reading under it: the kana reading (ja), the pinyin (zh); English first (2026-11-15): the meaning alone, no romanized reading. */
 function readingLine(view: GiftView): string {
-  if (view.language === 'en') return [cleanReading(view.romanization.split(' / ')[0]), view.meaning_en].filter(Boolean).join(' · ')
+  if (view.language === 'en') return view.meaning_en ?? ''
   return cleanReading(view.reading)
 }
 
@@ -416,7 +419,7 @@ function Reveal({ view, copy, reduced, onNext }: { view: GiftView; copy: GiftCop
       </p>
       <div className="gf-beat" data-on={on(1)} data-testid="gift-beat-reading">
         {view.language === 'en' && view.en ? (
-          <EnBridgeStack className="gf-en" reading={cleanReading(view.romanization.split(' / ')[0])} word={view.en.word} line={view.en.line} echo={view.en.echo} classical={view.en.classical} />
+          <EnBridgeStack className="gf-en" word={view.en.word} line={view.en.line} echo={view.en.echo} classical={view.en.classical} />
         ) : (
           <p className="gf-reading notranslate" translate="no" data-testid="gift-reading">{readingLine(view)}</p>
         )}

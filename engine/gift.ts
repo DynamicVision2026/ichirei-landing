@@ -259,6 +259,8 @@ export function giftView(g: GiftRecord, anim: AnimationRecord, art: ArtRecord | 
     opens_at: g.opens_at ?? null,
     opens_tz: g.opens_tz ?? null,
     replied: !!g.reply,
+    // the receiver's own answer, for their Sent screen when they come back (their own link only; the words themselves stay on the sender's page)
+    answer: g.reply ? { char: g.reply.char ?? null, words: !!g.reply.text } : null,
     package: g.package,
   }
 }

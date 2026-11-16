@@ -48,3 +48,16 @@
 .thanksCard .phoneBox img{width:8rem;height:8rem;background:#fff}
 .orderThanks{margin:.2rem 0 .8rem;font-size:.95rem}
 .orderThanks a{color:inherit;border-bottom:1px solid var(--gold,#8A6A35);text-decoration:none}
+/* the order section's free-gift box and the free price (2026-11-15) */
+.orderFree{margin:.4rem 0 .9rem;padding:.9rem 1rem;border:1px solid rgba(0,0,0,.18);background:rgba(255,255,255,.5)}
+.orderFree .orderFreeLine{margin:0 0 .6rem;font-size:1rem;line-height:1.45}
+.orderFree .orderFreeForm{display:flex;flex-wrap:wrap;gap:.5rem .75rem;align-items:flex-end}
+.orderFree label{display:flex;flex-direction:column;gap:.2rem;font-size:.85rem;flex:1 1 12rem}
+.orderFree input{min-height:44px;padding:0 .6rem;font-size:1rem;border:1px solid rgba(0,0,0,.3);border-radius:2px;background:#fff}
+.orderFree .btn{min-height:44px}
+.orderFree .small{margin:.5rem 0 0;font-size:.8rem;opacity:.75}
+.orderFree .err{margin:.5rem 0 0;font-size:.9rem}
+.priceFree s{opacity:.6}
+.priceFree b{font-weight:700}
+.savePanel .note.saved{font-weight:600;opacity:1}
+.priceFree .freeLabel{font-size:.62em;font-weight:600;white-space:nowrap}

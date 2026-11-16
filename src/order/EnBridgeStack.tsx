@@ -6,7 +6,8 @@ import { WHERE_THIS_WORD_COMES_FROM, echoText, type EnClassical, type EnEcho } f
 // The echo and the classical line sit together under one small heading, "Where this word comes from". English pages only.
 
 export interface EnStackProps {
-  reading: string
+  /** English first (2026-11-15): the pages no longer pass a reading; only the certificate shows it, next to the character. */
+  reading?: string
   word: string | null | undefined
   line: string | null | undefined
   echo?: EnEcho | null
