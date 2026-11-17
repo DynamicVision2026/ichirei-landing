@@ -28,7 +28,8 @@ import { cleanSession, cleanSource, recordEvent } from '../engine/analytics.ts'
 import { POEM_ID_PATTERN, buildRecord, lineAttributes, newOrderRef, parseOrderRequest, type OrderRecord, type StoredPoem, type ValidOrder } from '../engine/order.ts'
 import { createOrderStore, type OrderStore } from '../engine/order-store.ts'
 import type { Palette } from '../engine/palette.ts'
-import { ShopifyError, createCart, type CartPromo, loadShopifyConfig, type ShopifyConfig } from '../engine/shopify.ts'
+import { PromoCartNotFree, ShopifyError, createCart, type CartPromo, loadShopifyConfig, type ShopifyConfig } from '../engine/shopify.ts'
+import { promoShopifyFrom, type PromoShopify } from '../engine/promo-shopify.ts'
 import { checkClaimSession, claimOf, readWaiting, normalizeOrderNumber } from '../engine/waiting.ts'
 import { MAX_POEMS, POEM_TYPES, comingSoonSizes, poemTypeAllowed } from '../src/order/packages.ts'
 
@@ -55,6 +56,10 @@ export interface OrderDeps {
   palette?: Palette
   /** The site's public address for the animation link (ICHIREI_PUBLIC_URL); tests inject their own. */
   env?: NodeJS.ProcessEnv
+  /** Tests: the Admin API of the free gift (a hold made before the per-hold codes gets its code here); production reads the Tracking app's configuration. */
+  promoShopify?: PromoShopify | null
+  /** Tests: how long a held cart waits before it is made once more when Shopify did not price it at 0 (production 1.5 s). */
+  promoRetryMs?: number
   /** Tests: stands in for the film-script call (production: engine/film.ts). */
   film?: (input: FilmInput) => Promise<FilmRecord>
   /** Tests: how long the answer may wait for the film (production: ICHIREI_FILM_WAIT_MS, 8 s). */
@@ -258,24 +263,37 @@ export function createOrderHandler(deps: () => OrderDeps) {
 
     // 3. The Shopify cart.
     try {
-      // a held free gift (English or — 2026-11-16, one shared pool — Japanese, during the promotion): the cart carries the free-gift code, the hold's email and the hold id — otherwise NO code
+      // a held free gift (English or — 2026-11-16, one shared pool — Japanese, during the promotion): the cart carries the HOLD'S OWN private code, the hold's email (a prefill only) and the hold id —
+      // otherwise NO code. A holder is never sent to a full-price checkout: no code, or a cart that is not free, is the card's "taking a short break".
       let heldCart: CartPromo | undefined
       let heldRec: Awaited<ReturnType<typeof holdForCart>> = null
       // the free gift is an e-gift: a wooden size never carries the code (its price stays as shown)
       if ((order.language === 'en' || order.language === 'ja') && order.package === 'egift') {
         try {
-          heldRec = await holdForCart({ store: d.store, env: d.env ?? process.env, now: d.now }, { browser: record.visitor ?? null })
-          if (heldRec) heldCart = { code: heldRec.code, email: heldRec.rec.email, holdId: heldRec.rec.id }
+          const env = d.env ?? process.env
+          heldRec = await holdForCart({ store: d.store, env, now: d.now, shopify: d.promoShopify !== undefined ? d.promoShopify : promoShopifyFrom(env), log: (l) => console.log(l) }, { browser: record.visitor ?? null })
         } catch {
           heldRec = null // the promotion never breaks a checkout: no hold found = the normal price
         }
+        if (heldRec && !heldRec.code) {
+          console.warn(`[ichirei-promo] ${JSON.stringify({ event: 'promo_cart_not_free', hold: heldRec.rec.id, order_ref: orderRef, reason: 'no_code' })}`)
+          return promoBreak(record, orderRef, putOrder, d)
+        }
+        if (heldRec?.code) heldCart = { code: heldRec.code, email: heldRec.rec.email, holdId: heldRec.rec.id }
       }
-      const cart = await createCart(d.shopify!, order.package, lineAttributes(order, orderRef, animationLink, giftLink), orderRef, d.fetchImpl, order.language, heldCart)
+      let cart: Awaited<ReturnType<typeof createCart>>
+      try {
+        cart = await createCart(d.shopify!, order.package, lineAttributes(order, orderRef, animationLink, giftLink), orderRef, d.fetchImpl, order.language, heldCart, d.promoRetryMs)
+      } catch (err) {
+        if (err instanceof PromoCartNotFree) return promoBreak(record, orderRef, putOrder, d)
+        throw err
+      }
+      if (heldRec) record.hold = { id: heldRec.rec.id, day: heldRec.rec.day, email_hash: heldRec.rec.email_hash }
       if (heldRec) await startCheckout({ store: d.store, env: d.env ?? process.env, now: d.now }, heldRec.rec).catch(() => null)
       if (cart.mismatch) void recordHealth(d.store, 'en_cart_currency_mismatch', { ref: orderRef }, d.now?.() ?? new Date()) // counted in red on /ops/stats; the checkout still opens
       record.status = 'cart_created'
       record.updated_at = (d.now?.() ?? new Date()).toISOString()
-      record.shopify = { cart_id: cart.cartId, checkout_url: cart.checkoutUrl, variant_id: cart.variantId }
+      record.shopify = { cart_id: cart.cartId, checkout_url: withoutCode(cart.checkoutUrl), variant_id: cart.variantId } // (the stored link never keeps the hold's private code)
       // the film is written while the cart is made; give it a few seconds more at most, then let the buyer go on (it keeps being written)
       if (filmP) await raceTimeout(filmP, d.filmWaitMs ?? filmWaitMs(d.env))
       try {
@@ -316,6 +334,26 @@ export function createOrderHandler(deps: () => OrderDeps) {
       })
     }
   }
+}
+
+/** The checkout link as it is kept on the order record: without the hold's private code (discount=…), which only the buyer's own browser needs. */
+function withoutCode(link: string): string {
+  try {
+    const u = new URL(link)
+    u.searchParams.delete('discount')
+    return u.toString()
+  } catch {
+    return link
+  }
+}
+
+/** A holder whose cart could not be made free: nothing is charged, no checkout is returned, and the card's "taking a short break" shows (code `promo_unavailable`). The hold stays. */
+async function promoBreak(record: OrderRecord, orderRef: string, putOrder: () => Promise<unknown>, d: OrderDeps): Promise<Response> {
+  record.status = 'cart_failed'
+  record.error = 'free_gift_not_free'
+  record.updated_at = (d.now?.() ?? new Date()).toISOString()
+  await putOrder().catch(() => {})
+  return json(503, { error: 'Free gifts are taking a short break. Nothing was charged; please try again in a few minutes.', code: 'promo_unavailable', order_ref: orderRef })
 }
 
 /** Wired to the environment at call time (so config changes and tests need no restart). */

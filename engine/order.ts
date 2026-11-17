@@ -598,6 +598,8 @@ export interface OrderRecord {
   discount_code?: string | null
   /** The browser (ic_v id) that created this order: the "your gift is ready" bar and the basket find it by this. */
   visitor?: string | null
+  /** The free-gift hold this order's cart used (hotfix 2026-11-16): the paid webhook marks THAT hold used, whatever email the checkout had (Shop Pay, a saved account). Ids only — no code, no email. */
+  hold?: { id: string; day: string; email_hash: string } | null
   /** A gift made for an order that was paid WITHOUT going through our site (a "waiting" order, 2026-11-13): the Shopify order it was attached to. The 24-hour clock starts at `claimed_at`, not at payment. */
   claim?: import('./waiting.ts').OrderClaim
   engine_result: EngineResult

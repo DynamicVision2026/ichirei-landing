@@ -6,6 +6,7 @@
 // Shopify may refuse the address fields until the app is approved for "protected customer data" (name, address, phone). That is reported as
 // `protected_customer_data`, never worked around.
 
+import { publicCodeName } from './hold-code.ts'
 import { AdminTokenCache, TrackUnavailable, type TrackDeps } from './track.ts'
 
 export interface ShippingAddress {
@@ -215,7 +216,7 @@ export function paymentOf(o: AdminOrderPay): PaymentInfo {
   // the buyer's own-currency amount (USD for an English order): shown beside the yen amount, never summed. The yen amount above is always the SHOP's money.
   const pres = o.currentTotalPriceSet?.presentmentMoney
   const buyer = pres?.amount && pres.currencyCode && pres.currencyCode.toUpperCase() !== (money?.currencyCode ?? 'JPY').toUpperCase() ? { amount: pres.amount, currency: pres.currencyCode.toUpperCase() } : null
-  return { state: 'paid', paid_at: pick(['SALE', 'CAPTURE']) ?? pick(['AUTHORIZATION']) ?? o.createdAt ?? null, amount_jpy: amount, ...(buyer ? { amount_buyer: buyer } : {}), ...(status === 'PARTIALLY_REFUNDED' ? { partially_refunded: true } : {}), ...(amount === 0 ? { free: true, free_code: (o.discountCodes ?? []).map((c) => String(c).replace(/[^A-Za-z0-9_-]/g, '').slice(0, 40)).find(Boolean) ?? null } : {}) }
+  return { state: 'paid', paid_at: pick(['SALE', 'CAPTURE']) ?? pick(['AUTHORIZATION']) ?? o.createdAt ?? null, amount_jpy: amount, ...(buyer ? { amount_buyer: buyer } : {}), ...(status === 'PARTIALLY_REFUNDED' ? { partially_refunded: true } : {}), ...(amount === 0 ? { free: true, free_code: publicCodeName((o.discountCodes ?? []).map((c) => String(c).replace(/[^A-Za-z0-9_-]/g, '').slice(0, 40)).find(Boolean) ?? null) } : {}) }
 }
 
 export async function readPayments(refs: string[], d: TrackDeps | null, tokens: AdminTokenCache): Promise<PaymentResult> {

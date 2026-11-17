@@ -15,7 +15,7 @@ import { buildRecord, parseOrderRequest, type OrderRecord } from '../engine/orde
 import { MemoryOrderStore } from '../engine/order-store.ts'
 import { promoDayEnd, promoDayKey, promoOn } from '../engine/promo.ts'
 import { holdForCart, holdOfBrowser, liveCount, markHoldUsed, placeHold, reapExpired, resetPromoCache, startCheckout, type PromoDeps } from '../engine/promo-holds.ts'
-import { promoConfig, promoShopifyFrom, type PromoShopify } from '../engine/promo-shopify.ts'
+import { newHoldCode, promoConfig, promoShopifyFrom, type PromoShopify } from '../engine/promo-shopify.ts'
 import { createCart, loadShopifyConfig } from '../engine/shopify.ts'
 import { holdRefusal } from '../src/loop/copy.ts'
 import { emailHash as emailHashOf } from '../engine/customer.ts'
@@ -156,26 +156,31 @@ const ENV = { ICHIREI_PROMO_FROM: '2026-11-15T04:00:00-05:00', ICHIREI_PROMO_UNT
 
 // ---- 4 + 5. the live count, the email holds, and the free gift in Shopify ------------------------------------------------------------------------------
 const fakeShopify = () => {
-  const eligible = new Map<string, string>()
+  // the Admin API as Shopify keeps it: one private code per hold (discount id -> what was asked for); nothing about customers
+  const codes = new Map<string, { code: string; holdId: string; endsAt: Date; startsAt: Date }>()
   const calls: string[] = []
   let broken = false
+  let failDelete = false
+  let n = 0
   const api: PromoShopify = {
-    async addEligible(email) {
+    async createHoldCode(holdId, endsAt, now) {
       if (broken) throw new Error('scope')
-      const id = `gid://shopify/Customer/${emailCustomerId(email).slice(1, 9)}`
-      eligible.set(id, email)
-      calls.push(`add:${email}`)
-      return id
+      const code = newHoldCode()
+      const discountId = `gid://shopify/DiscountCodeNode/${++n}`
+      codes.set(discountId, { code, holdId, endsAt, startsAt: now })
+      calls.push(`create:${holdId}`)
+      return { code, discountId }
     },
-    async removeEligible(id) {
-      eligible.delete(id)
-      calls.push(`remove:${id}`)
+    async deleteHoldCode(discountId) {
+      if (failDelete) throw new Error('delete failed')
+      codes.delete(discountId)
+      calls.push(`delete:${discountId}`)
     },
     async saveConsent(email) {
       calls.push(`consent:${email}`)
     },
   }
-  return { api, eligible, calls, setBroken: (b: boolean) => (broken = b) }
+  return { api, codes, calls, setBroken: (b: boolean) => (broken = b), setFailDelete: (b: boolean) => (failDelete = b) }
 }
 const deps = (store: MemoryOrderStore, shopify: PromoShopify | null, now: Date, env = ENV): PromoDeps => ({ store, env, now: () => now, shopify })
 const usedSlots = async (store: MemoryOrderStore, day: string, n: number) => { for (let i = 1; i <= n; i++) await store.putObject(`promo/${day}/slots/${i}-1.json`, JSON.stringify({ hold: 'H-' + 'x'.repeat(16), email_hash: 'f'.repeat(32), created_at: NOW.toISOString(), expires_at: NOW.toISOString(), state: 'used' }), 'application/json') }
@@ -191,7 +196,7 @@ const usedSlots = async (store: MemoryOrderStore, day: string, n: number) => { f
   const h2 = await placeHold(deps(store, sh.api, NOW), { email: 'two@example.com', code: 'thanks100', browser: B2 })
   const h3 = await placeHold(deps(store, sh.api, NOW), { email: 'three@example.com', code: 'THANKS100', browser: B3 })
   check('(4) a second email holds the last gift; a third email sees "all held or given" (no hold)', h2.ok && !h3.ok && h3.code === 'all_held' && (await liveCount(store, ENV, NOW, true)).left === 0)
-  check('(5) a hold adds the customer to the discount\'s eligible list (and only the holders are on it)', sh.eligible.size === 2 && [...sh.eligible.values()].sort().join() === 'one@example.com,two@example.com')
+  check('(5) a hold makes ONE private code in Shopify (and only the holders have one)', sh.codes.size === 2 && [...sh.codes.values()].every((c) => /^GIFT-[A-Z2-9]{8}$/.test(c.code)) && new Set([...sh.codes.values()].map((c) => c.code)).size === 2)
   check('(4) the count is never below 0', (await liveCount(store, ENV, NOW, true)).left === 0)
   // expiry: 120 minutes later the held gifts are free again, the customers come off the eligible list, hold_expired is on the timeline
   const later = new Date(NOW.getTime() + 121 * MIN)
@@ -199,7 +204,7 @@ const usedSlots = async (store: MemoryOrderStore, day: string, n: number) => { f
   const reaped = await reapExpired(deps(store, shL.api, later))
   const c2 = await liveCount(store, ENV, later, true)
   check('(4) a hold expires at 120 minutes and the count rises again', reaped === 2 && c2.left === 2 && c2.active === 0)
-  check('(5) expiry removes the customers from the eligible list, and puts hold_expired on their timeline', sh.eligible.size === 0 && (await readCustomer(store, emailCustomerId('one@example.com')))!.events.some((e) => e.code === 'hold_expired'))
+  check('(5) expiry deletes the holds\' codes, and puts hold_expired on their timeline', sh.codes.size === 0 && (await readCustomer(store, emailCustomerId('one@example.com')))!.events.some((e) => e.code === 'hold_expired'))
   // "Your hold ended. Hold again?": one tap re-holds with the same email (the next hold of the day)
   const again = await placeHold(deps(store, sh.api, later), { email: 'one@example.com', code: 'THANKS100', browser: B1 })
   check('(4) after expiry the same email can hold again (counts as the next hold): count 2', again.ok && !again.existing && again.hold.count === 2)
@@ -246,7 +251,7 @@ const usedSlots = async (store: MemoryOrderStore, day: string, n: number) => { f
   const h = await placeHold(deps(store2, sh2.api, NOW), { email: 'given@example.com', code: 'THANKS100', browser: B1 })
   const used = await markHoldUsed(deps(store2, sh2.api, new Date(NOW.getTime() + 10 * MIN)), { email: 'given@example.com', holdId: h.ok ? h.hold.id : null })
   const after = await placeHold(deps(store2, sh2.api, new Date(NOW.getTime() + 20 * MIN)), { email: 'given@example.com', code: 'THANKS100', browser: B1 })
-  check('(5) the paid ($0) webhook marks the hold USED (by hold id or email), takes the customer off the eligible list at once, and puts hold_used on the timeline', used && sh2.eligible.size === 0 && (await readCustomer(store2, emailCustomerId('given@example.com')))!.events.some((e) => e.code === 'hold_used'))
+  check('(5) the paid ($0) webhook marks the hold USED (by hold id or email), deletes the hold\'s code at once, and puts hold_used on the timeline', used && sh2.codes.size === 0 && (await readCustomer(store2, emailCustomerId('given@example.com')))!.events.some((e) => e.code === 'hold_used'))
   check('(4) this email already received today\'s free gift: no new hold ("You\'ve already given today\'s free gift.")', !after.ok && after.code === 'already_given' && (await liveCount(store2, ENV, NOW, true)).used === 1)
   check('(4) a used gift stays used for the day (the count: 1 given, 0 held)', (await liveCount(store2, ENV, new Date(NOW.getTime() + 500 * MIN), true)).used === 1)
 }
@@ -289,7 +294,7 @@ const usedSlots = async (store: MemoryOrderStore, day: string, n: number) => { f
   const won = results.filter((x) => x.ok).length
   const slots = [...store.objects.keys()].filter((k) => k.startsWith('promo/2026-11-18/slots/100-'))
   check('(4) concurrency: twelve racers for the last gift produce exactly ONE hold (one slot object, one winner)', won === 1 && slots.length === 1, `${won} ${slots.join()}`)
-  check('(5) …and exactly one customer is on the eligible list (the others were released)', sh.eligible.size === 1, String(sh.eligible.size))
+  check('(5) …and exactly one code was made (the losers never reached Shopify)', sh.codes.size === 1, String(sh.codes.size))
 }
 {
   // the held cart carries the code, the email and the hold id; an unheld cart carries nothing; ja / zh are byte-identical
@@ -299,14 +304,17 @@ const usedSlots = async (store: MemoryOrderStore, day: string, n: number) => { f
   const h = await placeHold(deps(store, sh.api, NOW), { email: 'cart@example.com', code: 'THANKS100', browser: B1 })
   const cfg = loadShopifyConfig({ SHOPIFY_STOREFRONT_TOKEN: 't', SHOPIFY_VARIANT_EGIFT: '3' } as NodeJS.ProcessEnv).config!
   const bodies: { query: string; variables: { input: Record<string, any> } }[] = []
-  const f = ((cb: string) => (async (_u: string, init: RequestInit) => { bodies.push(JSON.parse(String(init.body))); return new Response(JSON.stringify({ data: { cartCreate: { cart: { id: 'gid://shopify/Cart/x', checkoutUrl: cb, cost: { totalAmount: { amount: '0.00', currencyCode: 'USD' } } }, userErrors: [] } } }), { status: 200 }) }) as typeof fetch)('https://soul-id-2.myshopify.com/cart/c/abc?key=k')
+  const f = ((cb: string) => (async (_u: string, init: RequestInit) => { const b = JSON.parse(String(init.body)); bodies.push(b); const sent = (b.variables.input.discountCodes ?? []) as string[]; return new Response(JSON.stringify({ data: { cartCreate: { cart: { id: 'gid://shopify/Cart/x', checkoutUrl: cb, ...(/discountCodes/.test(b.query) ? { discountCodes: sent.map((code) => ({ code, applicable: true })) } : {}), cost: { totalAmount: { amount: sent.length ? '0.00' : '17.50', currencyCode: 'USD' } } }, userErrors: [] } } }), { status: 200 }) }) as typeof fetch)('https://soul-id-2.myshopify.com/cart/c/abc?key=k')
   const held = await holdForCart(deps(store, sh.api, NOW), { browser: B1 })
-  await createCart(cfg, 'egift', [{ key: '_kanji', value: '証' }], 'IC-20261118-ABCDEFGH', f, 'en', held ? { code: held.code, email: held.rec.email, holdId: held.rec.id } : undefined)
+  const hcart = await createCart(cfg, 'egift', [{ key: '_kanji', value: '証' }], 'IC-20261118-ABCDEFGH', f, 'en', held?.code ? { code: held.code, email: held.rec.email, holdId: held.rec.id } : undefined)
   const inp = bodies[0].variables.input
-  check('(5) a held cart carries THANKS100, the hold\'s email (buyerIdentity.email) and the hold id (a cart attribute)', !!held && inp.discountCodes?.[0] === 'THANKS100' && inp.buyerIdentity.email === 'cart@example.com' && inp.buyerIdentity.countryCode === 'US' && inp.attributes.some((a: { key: string; value: string }) => a.key === 'ichirei_hold' && a.value === (h.ok ? h.hold.id : '')), JSON.stringify(inp))
+  const holdRec = JSON.parse(String(store.objects.get(`promo/2026-11-18/holds/${emailHashOf('cart@example.com')}.json`)?.body))
+  check('(5) a held cart carries the HOLD\'s own private code (GIFT-…, the one on the hold record), the hold\'s email (buyerIdentity.email, a prefill only) and the hold id (a cart attribute)', !!held && /^GIFT-[A-Z2-9]{8}$/.test(held.code ?? '') && inp.discountCodes?.length === 1 && inp.discountCodes[0] === held.code && held.code === holdRec.discount.code && inp.buyerIdentity.email === 'cart@example.com' && inp.buyerIdentity.countryCode === 'US' && inp.attributes.some((a: { key: string; value: string }) => a.key === 'ichirei_hold' && a.value === (h.ok ? h.hold.id : '')) && !JSON.stringify(inp).includes('THANKS100'), JSON.stringify(inp))
+  check('(5) the checkout link carries discount=<the hold\'s code> (Shopify applies it on load) beside every parameter Shopify put on it (key=k) and locale=en; the cart was read back (discountCodes { code applicable })', !!held && new URL(hcart.checkoutUrl).searchParams.get('discount') === held.code && new URL(hcart.checkoutUrl).searchParams.get('key') === 'k' && new URL(hcart.checkoutUrl).searchParams.get('locale') === 'en' && /discountCodes \{ code applicable \}/.test(bodies[0].query) && hcart.free === true, hcart.checkoutUrl)
+  check('(5) the hold record keeps the code and the discount id and NO customer id', !!holdRec.discount?.discountId && !('shopify_customer' in holdRec) && !JSON.stringify(holdRec).includes('gid://shopify/Customer'))
   const nobody = await holdForCart(deps(store, sh.api, NOW), { browser: B3 })
   bodies.length = 0
-  await createCart(cfg, 'egift', [{ key: '_kanji', value: '証' }], 'IC-20261118-ABCDEFGH', f, 'en', nobody ? { code: nobody.code, email: nobody.rec.email, holdId: nobody.rec.id } : undefined)
+  await createCart(cfg, 'egift', [{ key: '_kanji', value: '証' }], 'IC-20261118-ABCDEFGH', f, 'en', nobody?.code ? { code: nobody.code, email: nobody.rec.email, holdId: nobody.rec.id } : undefined)
   check('(5) an unheld cart carries no code and no email', nobody === null && bodies[0].variables.input.discountCodes === undefined && bodies[0].variables.input.buyerIdentity.email === undefined)
   const OLD_QUERY = `mutation CartCreate($input: CartInput!) {\n  cartCreate(input: $input) {\n    cart { id checkoutUrl cost { totalAmount { amount currencyCode } } }\n    userErrors { field message }\n  }\n}`
   for (const lang of ['ja', 'zh-Hant', 'zh-Hans']) {
@@ -316,41 +324,47 @@ const usedSlots = async (store: MemoryOrderStore, day: string, n: number) => { f
     const want = JSON.stringify({ query: OLD_QUERY, variables: { input: { lines: [{ merchandiseId: cfg.variants.egift, quantity: 1, attributes: [{ key: '_kanji', value: '証' }] }], attributes: [{ key: 'order_ref', value: 'IC-20261118-ABCDEFGH' }] } } })
     check(`(5) ${lang}: the cart request body is byte-identical to 258da52 (no code, no email, no hold)`, raw[0] === want, raw[0])
   }
-  // 2026-11-16: a JAPANESE holder's cart carries THANKS100, the hold's email and the hold id (the ja cart is in JPY; the e-gift totals ¥0); a ja non-holder's cart is exactly as before (above)
+  // 2026-11-16: a JAPANESE holder's cart carries the hold's own private code, the hold's email and the hold id (the ja cart is in JPY; the e-gift totals ¥0); a ja non-holder's cart is exactly as before (above)
   {
     const rawJ: string[] = []
-    const fJ = (async (_u: string, init: RequestInit) => { rawJ.push(String(init.body)); return new Response(JSON.stringify({ data: { cartCreate: { cart: { id: 'gid://shopify/Cart/x', checkoutUrl: 'https://soul-id-2.myshopify.com/cart/c/abc?key=k', cost: { totalAmount: { amount: '0', currencyCode: 'JPY' } } }, userErrors: [] } } }), { status: 200 }) }) as typeof fetch
-    const r = await createCart(cfg, 'egift', [{ key: '_kanji', value: '証' }], 'IC-20261118-ABCDEFGH', fJ, 'ja', held ? { code: held.code, email: held.rec.email, holdId: held.rec.id } : undefined)
+    const fJ = (async (_u: string, init: RequestInit) => { rawJ.push(String(init.body)); return new Response(JSON.stringify({ data: { cartCreate: { cart: { id: 'gid://shopify/Cart/x', checkoutUrl: 'https://soul-id-2.myshopify.com/cart/c/abc?key=k', discountCodes: ((JSON.parse(String(init.body)).variables.input.discountCodes ?? []) as string[]).map((code) => ({ code, applicable: true })), cost: { totalAmount: { amount: '0', currencyCode: 'JPY' } } }, userErrors: [] } } }), { status: 200 }) }) as typeof fetch
+    const r = await createCart(cfg, 'egift', [{ key: '_kanji', value: '証' }], 'IC-20261118-ABCDEFGH', fJ, 'ja', held?.code ? { code: held.code, email: held.rec.email, holdId: held.rec.id } : undefined)
     const body = JSON.parse(rawJ[0]) as { query: string; variables: { input: Record<string, any> } }
     const inJ = body.variables.input
-    check('(A) ja: a holder\'s cart carries THANKS100, the hold\'s email (buyerIdentity.email, no US country) and the hold id; it is the ja mutation (no @inContext) and Shopify totals it ¥0 in JPY', !!held && inJ.discountCodes?.[0] === 'THANKS100' && inJ.buyerIdentity?.email === 'cart@example.com' && inJ.buyerIdentity?.countryCode === undefined && inJ.attributes.some((a: { key: string; value: string }) => a.key === 'ichirei_hold') && !/@inContext/.test(body.query) && r.currency === 'JPY', rawJ[0])
+    check('(A) ja: a holder\'s cart carries the hold\'s own code, the hold\'s email (buyerIdentity.email, no US country) and the hold id; it is the ja mutation (no @inContext) and Shopify totals it ¥0 in JPY', !!held && inJ.discountCodes?.[0] === held.code && /^GIFT-/.test(held.code ?? '') && inJ.buyerIdentity?.email === 'cart@example.com' && inJ.buyerIdentity?.countryCode === undefined && inJ.attributes.some((a: { key: string; value: string }) => a.key === 'ichirei_hold') && !/@inContext/.test(body.query) && r.currency === 'JPY', rawJ[0])
   }
   // the checkout grace: 30 minutes more once the owner of the hold goes to checkout
   const late = new Date(NOW.getTime() + 110 * MIN)
   const view = held ? await startCheckout(deps(store, sh.api, late), held.rec) : null
   check('(4) at checkout the hold goes to "checkout" and lives 30 minutes more (never shorter)', !!view && view.state === 'checkout' && Date.parse(view.expires_at) === late.getTime() + 30 * MIN, JSON.stringify(view))
-  // the Admin API calls themselves (fake Admin API): the eligible list is changed with discountCodeBasicUpdate, add then remove
+  // the Admin API calls themselves (fake Admin API): ONE private code per hold, made with discountCodeBasicCreate (all customers, 100% off the e-gift variant only, once, ends with the hold), deleted with
+  // discountCodeDelete; THANKS100 and the customers are never touched
   const sent: { query: string; variables: Record<string, any> }[] = []
   const fakeAdmin = (async (_u: string, init: RequestInit) => {
     const b = JSON.parse(String(init.body)) as { query: string; variables: Record<string, any> }
     sent.push(b)
-    if (/customers\(first/.test(b.query)) return new Response(JSON.stringify({ data: { customers: { nodes: [] } } }), { status: 200 })
-    if (/customerCreate/.test(b.query)) return new Response(JSON.stringify({ data: { customerCreate: { customer: { id: 'gid://shopify/Customer/55' }, userErrors: [] } } }), { status: 200 })
-    if (/discountCodeBasicUpdate/.test(b.query)) return new Response(JSON.stringify({ data: { discountCodeBasicUpdate: { codeDiscountNode: { id: b.variables.id }, userErrors: [] } } }), { status: 200 })
+    if (/discountCodeBasicCreate/.test(b.query)) return new Response(JSON.stringify({ data: { discountCodeBasicCreate: { codeDiscountNode: { id: 'gid://shopify/DiscountCodeNode/777' }, userErrors: [] } } }), { status: 200 })
+    if (/discountCodeDelete/.test(b.query)) return new Response(JSON.stringify({ data: { discountCodeDelete: { deletedCodeDiscountId: b.variables.id, userErrors: [] } } }), { status: 200 })
     return new Response(JSON.stringify({ data: {} }), { status: 200 })
   }) as typeof fetch
-  const real = promoShopifyFrom(ENV, { get: async () => 'tok', clear() {} } as never, fakeAdmin, { config: { apiBase: 'https://shop.example', apiVersion: '2026-01' } as never, secret: async () => 's' })
-  const cid = await real!.addEligible('Real@Example.com')
-  await real!.removeEligible(cid)
-  const upd = sent.filter((x) => /discountCodeBasicUpdate/.test(x.query))
-  check('(5) the real client: customerCreate for the email, then discountCodeBasicUpdate on THANKS100\'s id with customers.add; removal with customers.remove', cid === 'gid://shopify/Customer/55' && upd.length === 2 && upd[0].variables.id === 'gid://shopify/DiscountCodeNode/987654' && upd[0].variables.input.customerSelection.customers.add[0] === cid && upd[1].variables.input.customerSelection.customers.remove[0] === cid && sent[1].variables.input.email === 'real@example.com', JSON.stringify(sent.map((x) => x.query.slice(0, 40))))
+  const adminEnv = { ...ENV, SHOPIFY_VARIANT_EGIFT: '3' } as NodeJS.ProcessEnv
+  const real = promoShopifyFrom(adminEnv, { get: async () => 'tok', clear() {} } as never, fakeAdmin, { config: { apiBase: 'https://shop.example', apiVersion: '2026-01' } as never, secret: async () => 's' })
+  const endsAt = new Date(NOW.getTime() + 150 * MIN)
+  const made = await real!.createHoldCode('H-abcdefghijklmnop', endsAt, NOW)
+  await real!.deleteHoldCode(made.discountId)
+  const dd = sent.find((x) => /discountCodeBasicCreate/.test(x.query))?.variables.d as Record<string, any> | undefined
+  check('(5) the real client makes ONE code per hold with discountCodeBasicCreate: GIFT- + 8 characters from A–Z2–9, title "ICHIREI free gift · <hold id>", 100% off the e-gift variant only, ALL customers, once per customer, usage limit 1, starts now and ends at the hold\'s end + grace, combines with nothing', !!dd && /^GIFT-[A-Z2-9]{8}$/.test(dd.code) && dd.code === made.code && dd.title === 'ICHIREI free gift · H-abcdefghijklmnop' && dd.customerSelection?.all === true && dd.customerGets?.value?.percentage === 1 && dd.customerGets?.items?.products?.productVariantsToAdd?.join() === 'gid://shopify/ProductVariant/3' && dd.appliesOncePerCustomer === true && dd.usageLimit === 1 && dd.startsAt === NOW.toISOString() && dd.endsAt === endsAt.toISOString() && !dd.combinesWith.orderDiscounts && !dd.combinesWith.productDiscounts && !dd.combinesWith.shippingDiscounts && made.discountId === 'gid://shopify/DiscountCodeNode/777', JSON.stringify(dd))
+  check('(5) …the code is deleted with discountCodeDelete on that discount; the site never edits THANKS100 (no discountCodeBasicUpdate) and never touches a customer for a hold', sent.some((x) => /discountCodeDelete/.test(x.query) && x.variables.id === made.discountId) && !sent.some((x) => /discountCodeBasicUpdate|customerCreate|customerUpdate|customers\(first/.test(x.query)) && sent.length === 2)
+  const noVariant = promoShopifyFrom({ ...ENV, SHOPIFY_VARIANT_EGIFT: '' } as NodeJS.ProcessEnv, { get: async () => 'tok', clear() {} } as never, fakeAdmin, { config: { apiBase: 'https://shop.example', apiVersion: '2026-01' } as never, secret: async () => 's' })
+  check('(5) without the e-gift variant configured no code is made (a code with no product to apply to would be useless)', await noVariant!.createHoldCode('H-x', endsAt, NOW).then(() => false, () => true))
   const denied = promoShopifyFrom(ENV, { get: async () => 'tok', clear() {} } as never, (async () => new Response(JSON.stringify({ errors: [{ message: 'Access denied for discountCodeBasicUpdate field. Required access: write_discounts' }] }), { status: 200 })) as typeof fetch, { config: { apiBase: 'https://shop.example', apiVersion: '2026-01' } as never, secret: async () => 's' })
   resetPromoCache()
   const st3 = new MemoryOrderStore()
   const noScope = await placeHold(deps(st3, denied, NOW), { email: 'noscope@example.com', code: 'THANKS100', browser: B1 })
   check('(5) if an Admin API call fails or a scope is missing: no hold is placed ("taking a short break"), the slot goes back, promo_unavailable is counted', !noScope.ok && noScope.code === 'unavailable' && (await liveCount(st3, ENV, NOW, true)).left === 100 && [...st3.lines.entries()].some(([k, v]) => k.startsWith('ops/health-') && v.join().includes('promo_unavailable')))
-  const nocfg = await placeHold(deps(new MemoryOrderStore(), fakeShopify().api, NOW, { ...ENV, ICHIREI_PROMO_DISCOUNT_ID: '' } as NodeJS.ProcessEnv), { email: 'nocfg@example.com', code: 'THANKS100' })
-  check('(5) without the discount id configured no hold is placed either (unavailable), never a broken page', !nocfg.ok && nocfg.code === 'unavailable' && promoConfig({} as NodeJS.ProcessEnv) === null)
+  const nosh = await placeHold(deps(new MemoryOrderStore(), null, NOW), { email: 'nosh@example.com', code: 'THANKS100' })
+  check('(5) without the Admin API configured no hold is placed (unavailable), never a broken page', !nosh.ok && nosh.code === 'unavailable')
+  check('(5) the promotion needs no THANKS100 id any more: the config keeps the public codes a visitor may type, nothing else is required', promoConfig({} as NodeJS.ProcessEnv).codes.join() === 'THANKS100' && promoConfig({ ICHIREI_PROMO_CODES: 'A|B' } as NodeJS.ProcessEnv).codes.join() === 'A,B')
 }
 
 // ---- the routes (api/loop.ts), with signed browser cookies and an in-memory store --------------------------------------------------------------------------------

@@ -76,21 +76,23 @@ const CART_CREATE = `mutation CartCreate($input: CartInput!) {
  */
 const CART_CREATE_EN = CART_CREATE.replace('mutation CartCreate($input: CartInput!) {', 'mutation CartCreate($input: CartInput!) @inContext(country: US, language: EN) {')
 
-/** A held free gift (English or Japanese, during the promotion — one shared pool): the cart carries the free-gift code, the hold's email and the hold id. Without one the cart carries no code. */
+/** A held cart reads back its codes (`applicable`) as well as its total: the free gift is checked before the buyer is handed the checkout. Other carts keep the query above, byte for byte. */
+const withCodes = (q: string): string => q.replace('cart { id checkoutUrl cost', 'cart { id checkoutUrl discountCodes { code applicable } cost')
+
+/** A held free gift (English or Japanese, during the promotion — one shared pool): the cart carries the hold's OWN private code (GIFT-…, engine/promo-shopify.ts), the hold's email as a prefill
+ * only, and the hold id. Without one the cart carries no code. */
 export interface CartPromo {
   code: string
   email: string
   holdId: string
 }
 
-export interface CartResult {
-  cartId: string
-  checkoutUrl: string
-  variantId: string
-  /** The currency Shopify priced the cart in (cost.totalAmount.currencyCode); null when it did not say. */
-  currency: string | null
-  /** An English cart that Shopify priced in something other than USD, also on the one retry (2026-11-14). The buyer still gets the checkout; the order API counts it for /ops/stats. */
-  mismatch?: boolean
+/** A held cart that Shopify did not price at 0 with the hold's code applicable, twice: the buyer is NOT sent to a full-price checkout (the order API answers "taking a short break"). */
+export class PromoCartNotFree extends Error {
+  constructor() {
+    super('The free-gift cart was not free')
+    this.name = 'PromoCartNotFree'
+  }
 }
 
 /** English orders (2026-11-14): the cart names the United States as the buyer's country, so the "ICHIREI English" market (English, USD, a fixed price) prices the checkout. ja / zh carts name nobody. */
@@ -112,7 +114,7 @@ async function createCartOnce(
     method: 'POST',
     headers: { 'content-type': 'application/json', 'x-shopify-storefront-access-token': config.token },
     body: JSON.stringify({
-      query: language === 'en' ? CART_CREATE_EN : CART_CREATE,
+      query: ((q) => (promoLang && promo ? withCodes(q) : q))(language === 'en' ? CART_CREATE_EN : CART_CREATE),
       variables: {
         input: {
           // The line carries the attributes (the chosen poem included); the cart repeats order_ref so it also lands on the order itself.
@@ -128,7 +130,7 @@ async function createCartOnce(
   })
   if (!res.ok) throw new ShopifyError(`Shopify answered HTTP ${res.status}`, { status: res.status })
   let json: {
-    data?: { cartCreate?: { cart?: { id?: string; checkoutUrl?: string; cost?: { totalAmount?: { amount?: string; currencyCode?: string } | null } | null } | null; userErrors?: { field?: string[]; message: string }[] } | null }
+    data?: { cartCreate?: { cart?: { id?: string; checkoutUrl?: string; discountCodes?: { code?: string; applicable?: boolean }[] | null; cost?: { totalAmount?: { amount?: string; currencyCode?: string } | null } | null } | null; userErrors?: { field?: string[]; message: string }[] } | null }
     errors?: { message: string }[]
   }
   try {
@@ -150,13 +152,19 @@ async function createCartOnce(
   // Production Shopify checkouts are https. (Tests point SHOPIFY_API_BASE at http://127.0.0.1.)
   if (url.protocol !== 'https:' && !config.apiBase.startsWith('http://')) throw new ShopifyError('Shopify returned a non-https checkout URL')
   const currency = cart.cost?.totalAmount?.currencyCode ?? null
-  // an English checkout link names its language too (locale=en), keeping every query parameter Shopify put on it; ja / zh links are returned as they came
+  // a held cart is free only when Shopify says the hold's code applies AND prices the cart at 0 (the buyer is never handed a full-price checkout by mistake)
+  const held = promoLang && promo ? promo : null
+  const total = Number(cart.cost?.totalAmount?.amount)
+  const free = held ? Number.isFinite(total) && total === 0 && (cart.discountCodes ?? []).some((c) => (c.code ?? '').toUpperCase() === held.code.toUpperCase() && c.applicable === true) : undefined
+  if (held && !free) console.warn(`[ichirei-promo] ${JSON.stringify({ event: 'promo_cart_not_free', hold: held.holdId, order_ref: orderRef, applicable: (cart.discountCodes ?? []).some((c) => c.applicable === true), total: Number.isFinite(total) ? cart.cost?.totalAmount?.amount : null, currency })}`)
+  // the checkout link names its language (English: locale=en) and, for a held cart, the code too (discount=<code>: Shopify applies it on load), keeping every query parameter Shopify put on it; other links are returned as they came
   let checkoutUrl = cart.checkoutUrl
-  if (language === 'en') {
-    url.searchParams.set('locale', 'en')
+  if (language === 'en' || held) {
+    if (language === 'en') url.searchParams.set('locale', 'en')
+    if (held) url.searchParams.set('discount', held.code)
     checkoutUrl = url.toString()
   }
-  return { cartId: cart.id, checkoutUrl, variantId, currency }
+  return { cartId: cart.id, checkoutUrl, variantId, currency, ...(held ? { free } : {}) }
 }
 
 const notUsd = (c: string | null): boolean => !!c && c.toUpperCase() !== 'USD'
@@ -164,8 +172,21 @@ const notUsd = (c: string | null): boolean => !!c && c.toUpperCase() !== 'USD'
 /**
  * Creates the cart. An English cart should be priced in dollars: if Shopify says otherwise, the cart is made ONCE more with the same buyer identity (the market is sometimes picked late);
  * if it still is not USD the buyer keeps the checkout (owner decision: never stop a sale) and the result says `mismatch` so the order API counts it in red on /ops/stats.
+ * A held free-gift cart must come back FREE (the hold's code applicable, the total 0): if not, it is made once more after a moment (a new code can take a few seconds to be known to the
+ * cart), and if it is still not free PromoCartNotFree is thrown — a holder is never sent to a full-price checkout.
  */
-export async function createCart(config: ShopifyConfig, pkg: PackageId, attributes: Attribute[], orderRef: string, fetchImpl: typeof fetch = fetch, language?: string, promo?: CartPromo): Promise<CartResult> {
+export async function createCart(config: ShopifyConfig, pkg: PackageId, attributes: Attribute[], orderRef: string, fetchImpl: typeof fetch = fetch, language?: string, promo?: CartPromo, retryDelayMs = 1500): Promise<CartResult> {
+  const first = await createCartPriced(config, pkg, attributes, orderRef, fetchImpl, language, promo)
+  const held = promo && (language === 'en' || language === 'ja')
+  if (!held || first.free) return first
+  await new Promise((r) => setTimeout(r, retryDelayMs))
+  const second = await createCartPriced(config, pkg, attributes, orderRef, fetchImpl, language, promo)
+  if (second.free) return second
+  console.warn(`[ichirei-promo] ${JSON.stringify({ event: 'promo_cart_refused', hold: promo.holdId, order_ref: orderRef })}`)
+  throw new PromoCartNotFree()
+}
+
+async function createCartPriced(config: ShopifyConfig, pkg: PackageId, attributes: Attribute[], orderRef: string, fetchImpl: typeof fetch, language?: string, promo?: CartPromo): Promise<CartResult> {
   const first = await createCartOnce(config, pkg, attributes, orderRef, fetchImpl, language, promo)
   if (language !== 'en' || !notUsd(first.currency)) return first
   console.warn(`[ichirei-order] ${JSON.stringify({ event: 'en_cart_currency_retry', order_ref: orderRef, currency: first.currency })}`)

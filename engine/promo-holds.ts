@@ -3,11 +3,12 @@
 //
 //   promo/<day>/slots/<n>-<g>.json   the day's capacity: slot n (1..100), generation g. A hold takes the lowest free slot with an IF-ABSENT create; a slot whose hold ended (expired or released)
 //                                    is taken again as the next generation (n-(g+1)), again if-absent; a slot whose gift was given stays used. Exactly one of two racing instances wins a slot.
-//   promo/<day>/holds/<email hash>.json   one record per email and day: the email, the browsers, the code, the times, the status, how many holds today, the slot, the Shopify customer.
+//   promo/<day>/holds/<email hash>.json   one record per email and day: the email, the browsers, the code, the times, the status, how many holds today, the slot, the hold's private discount code.
 //   promo/<day>/ip/<hash>-<k>.json   the address backstop: 10 holds per address per day, if-absent slots.
 //
 // A promo day runs 4:00 a.m. to 3:59 a.m. US Eastern (engine/promo.ts). {n} on the live card = daily − used − active.
-// Paying at the normal price needs no hold, and any email works at checkout; only the FREE gift is tied to the hold's email (Shopify checks that: engine/promo-shopify.ts).
+// Paying at the normal price needs no hold, and any email works at checkout. The FREE gift is one private code per hold (engine/promo-shopify.ts), valid whoever is signed in at checkout; the
+// "one per email" rule is ours (the hold, and promo/used/<hash>).
 
 import { createHash, randomBytes } from 'node:crypto'
 import { analyticsDay } from './analytics.ts'
@@ -15,7 +16,7 @@ import { casJson, customerIdOf, emailHash, normalizeEmail, readCustomer, recordC
 import { recordHealth } from './health.ts'
 import type { OrderStore } from './order-store.ts'
 import { promoCheckoutGraceMinutes, promoDaily, promoDayEnd, promoDayKey, promoHoldMinutes, promoHoldsPerDay, promoOn, promoWindow } from './promo.ts'
-import { codeAllowed, promoConfig, type PromoShopify } from './promo-shopify.ts'
+import { codeAllowed, codeTail, promoConfig, type HoldDiscount, type PromoShopify } from './promo-shopify.ts'
 
 const MIN = 60_000
 const IP_HOLDS_PER_DAY = 10
@@ -47,7 +48,8 @@ export interface HoldRecord {
   /** How many holds this email has placed today (the first is 1). */
   count: number
   slot: { n: number; g: number }
-  shopify_customer: string | null
+  /** The hold's own private code (GIFT-…) and the Shopify discount to delete when the hold ends or is used. Never shown on a page, never logged in full. Null for a hold made before 2026-11-16 (a code is made when it goes to checkout). */
+  discount?: HoldDiscount | null
   used_at?: string | null
   consent: boolean
 }
@@ -76,7 +78,7 @@ export interface PromoDeps {
 
 const slotPath = (day: string, n: number, g: number): string => `promo/${day}/slots/${n}-${g}.json`
 const holdPath = (day: string, hash: string): string => `promo/${day}/holds/${hash}.json`
-/** (2026-11-16) one free gift per person for the WHOLE promotion (Shopify: THANKS100 once per customer): an email that used its free gift on any day is marked here. */
+/** (2026-11-16) one free gift per person for the WHOLE promotion (ours alone: the private codes are open to any customer): an email that used its free gift on any day is marked here. */
 const usedEverPath = (hash: string): string => `promo/used/${hash}.json`
 
 /**
@@ -250,17 +252,13 @@ export async function placeHold(d: PromoDeps, input: PlaceInput): Promise<PlaceR
   if (!validEmail(input.email)) return { ok: false, code: 'bad_email' }
   const email = normalizeEmail(input.email)
   const cfg = promoConfig(env)
-  if (!cfg) {
-    void recordHealth(store, 'promo_unavailable', { reason: 'not_configured' }, now)
-    return { ok: false, code: 'unavailable' }
-  }
   // (2026-11-15) the free gift needs no code: the card asks only for an email. A code that comes with the request (a ?code=… link) is kept when it is one of the configured codes and ignored otherwise.
   const givenCode = codeAllowed(cfg, input.code) && typeof input.code === 'string' ? input.code.trim().toUpperCase() : null
   const day = promoDayKey(now)
   const hash = emailHash(email)
   const browser = input.browser && /^V[A-Za-z0-9_-]{22}$/.test(input.browser) ? input.browser : null
   const existing = await readJson<HoldRecord>(store, holdPath(day, hash))
-  // one free gift per person for the whole promotion (2026-11-16, matching Shopify's "once per customer"): an email that received one on ANY day, in either language, holds no more
+  // one free gift per person for the whole promotion (2026-11-16, enforced here — a private code is open to any customer): an email that received one on ANY day, in either language, holds no more
   if (!(existing && (existing.status === 'active' || existing.status === 'checkout')) && (await usedInPromotion(store, env, hash, now))) return { ok: false, code: 'already_given' }
   if (existing) {
     const view = await viewHold(store, existing, now)
@@ -291,9 +289,10 @@ export async function placeHold(d: PromoDeps, input: PlaceInput): Promise<PlaceR
     cache.delete(day)
     return { ok: false, code: 'all_held' }
   }
-  let customerId: string
+  let discount: HoldDiscount
   try {
-    customerId = await d.shopify.addEligible(email)
+    // one private code per hold: it ends with the hold plus the checkout grace
+    discount = await d.shopify.createHoldCode(id, new Date(expires.getTime() + promoCheckoutGraceMinutes(env) * MIN), now)
   } catch (err) {
     // no hold without Shopify: the slot goes back at once
     await casJson<SlotRecord>(store, slotPath(day, slot.n, slot.g), (cur) => (cur ? { ...cur, state: 'released', reaped: true } : null)).catch(() => null)
@@ -304,9 +303,12 @@ export async function placeHold(d: PromoDeps, input: PlaceInput): Promise<PlaceR
   }
   const rec: HoldRecord = {
     schema: 'hold', id, day, email, email_hash: hash, browsers: browser ? [browser] : [], code: givenCode,
-    created_at: now.toISOString(), expires_at: expires.toISOString(), status: 'active', count: (existing?.count ?? 0) + 1, slot, shopify_customer: customerId, consent: input.marketing === true,
+    created_at: now.toISOString(), expires_at: expires.toISOString(), status: 'active', count: (existing?.count ?? 0) + 1, slot, discount, consent: input.marketing === true,
   }
-  if (existing) await casJson<HoldRecord>(store, holdPath(day, hash), () => ({ ...rec, browsers: [...new Set([...existing.browsers, ...rec.browsers])] }))
+  if (existing) {
+    await casJson<HoldRecord>(store, holdPath(day, hash), () => ({ ...rec, browsers: [...new Set([...existing.browsers, ...rec.browsers])] }))
+    await dropCode(d, existing) // the earlier hold of this email ended: its code goes (the reaper would find the new hold here and never see the old one)
+  }
   else if (!(await store.putObject(holdPath(day, hash), JSON.stringify(rec), 'application/json', { ifAbsent: true }))) {
     // the same email raced itself from two devices: the other request's hold stands; ours goes back
     await casJson<SlotRecord>(store, slotPath(day, slot.n, slot.g), (cur) => (cur ? { ...cur, state: 'released', reaped: true } : null)).catch(() => null)
@@ -345,17 +347,22 @@ export async function startCheckout(d: PromoDeps, rec: HoldRecord): Promise<Hold
 }
 
 /**
- * The paid ($0) webhook: the hold is USED — by hold id, else by email. The slot stays used for the day, the customer is taken off the eligible list at once, and the timeline gets
+ * The paid ($0) webhook: the hold is USED — by hold id, else by email. The slot stays used for the day, the hold's code is deleted at once, and the timeline gets
  * `hold_used`. Returns true when a hold was marked.
  */
-export async function markHoldUsed(d: PromoDeps, ref: { holdId?: string | null; email?: string | null }): Promise<boolean> {
+export async function markHoldUsed(d: PromoDeps, ref: { holdId?: string | null; email?: string | null; day?: string | null; emailHash?: string | null }): Promise<boolean> {
   const store = d.store
   if (!store) return false
   const now = d.now?.() ?? new Date()
   const day = promoDayKey(now)
   const days = [day, analyticsDayBefore(day)]
   let found: HoldRecord | null = null
-  if (ref.email && validEmail(ref.email)) {
+  // the hold the order's own record names (the checkout's email may be another one — Shop Pay, a saved account — and the free code does not care): by day and email hash, checked against the hold id
+  if (ref.day && ref.emailHash && /^[0-9a-f]{32}$/.test(ref.emailHash) && /^\d{4}-\d{2}-\d{2}$/.test(ref.day)) {
+    const r = await readJson<HoldRecord>(store, holdPath(ref.day, ref.emailHash))
+    if (r && (!ref.holdId || r.id === ref.holdId)) found = r
+  }
+  if (!found && ref.email && validEmail(ref.email)) {
     for (const dd of days) {
       const r = await readJson<HoldRecord>(store, holdPath(dd, emailHash(ref.email)))
       if (r && (!ref.holdId || r.id === ref.holdId)) {
@@ -370,10 +377,16 @@ export async function markHoldUsed(d: PromoDeps, ref: { holdId?: string | null; 
   await casJson<HoldRecord>(store, holdPath(rec.day, rec.email_hash), (cur) => (cur ? { ...cur, status: 'used', used_at: now.toISOString() } : null))
   await store.putObject(usedEverPath(rec.email_hash), JSON.stringify({ day: rec.day, at: now.toISOString() }), 'application/json').catch(() => false)
   cache.delete(rec.day)
-  if (rec.shopify_customer && d.shopify) await d.shopify.removeEligible(rec.shopify_customer).catch(() => d.log?.(`[ichirei-promo] ${JSON.stringify({ event: 'remove_eligible_failed' })}`))
+  await dropCode(d, rec) // the code is single-use and already spent; deleting it keeps Shopify tidy
   await recordCustomerEvent(store, { email: rec.email, browser: rec.browsers[0] ?? null }, 'hold_used', {}, now)
   void recordHealth(store, 'hold_used', {}, now)
   return true
+}
+
+/** Delete a hold's private code in Shopify (the hold ended or the gift was used). A failure is logged (never the code) and breaks nothing: the code expires on its own at the end of the hold. */
+async function dropCode(d: PromoDeps, rec: HoldRecord): Promise<void> {
+  if (!rec.discount || !d.shopify) return
+  await d.shopify.deleteHoldCode(rec.discount.discountId).catch(() => d.log?.(`[ichirei-promo] ${JSON.stringify({ event: 'delete_code_failed', hold: rec.id, tail: codeTail(rec.discount?.code ?? '') })}`))
 }
 
 const analyticsDayBefore = (day: string): string => {
@@ -383,7 +396,7 @@ const analyticsDayBefore = (day: string): string => {
 }
 
 /**
- * Handle the end of holds that expired: take their customers off Shopify's eligible list and record `hold_expired` (once each). Called on a timer by the live-count endpoint and from the daily trigger.
+ * Handle the end of holds that expired: delete their private codes in Shopify and record `hold_expired` (once each). Called on a timer by the live-count endpoint and from the daily trigger.
  * Returns how many holds were handled.
  */
 export async function reapExpired(d: PromoDeps): Promise<number> {
@@ -401,7 +414,7 @@ export async function reapExpired(d: PromoDeps): Promise<number> {
       if (!claimed) continue
       const rec = await readJson<HoldRecord>(store, holdPath(day, s.slot.email_hash))
       if (!rec || rec.id !== s.slot.hold) continue
-      if (rec.shopify_customer && d.shopify) await d.shopify.removeEligible(rec.shopify_customer).catch(() => d.log?.(`[ichirei-promo] ${JSON.stringify({ event: 'remove_eligible_failed' })}`))
+      await dropCode(d, rec)
       await casJson<HoldRecord>(store, holdPath(day, rec.email_hash), (cur) => (cur && cur.id === rec.id && cur.status !== 'used' ? { ...cur, status: 'expired' } : null))
       await recordCustomerEvent(store, { email: rec.email, browser: rec.browsers[0] ?? null }, 'hold_expired', {}, now)
       void recordHealth(store, 'hold_expired', {}, now)
@@ -412,16 +425,39 @@ export async function reapExpired(d: PromoDeps): Promise<number> {
   return n
 }
 
-/** The held cart of this browser (or email): the hold and the code for the cart, or null — then the cart carries NO code. */
-export async function holdForCart(d: PromoDeps, who: { browser?: string | null; email?: string | null }): Promise<{ rec: HoldRecord; view: HoldView; code: string } | null> {
+/**
+ * The held cart of this browser (or email): the hold and ITS private code for the cart, or null — then the cart carries NO code (a visitor with no hold pays the price shown). A hold made before
+ * 2026-11-16 has no code yet: one is made now. `code` is null only when Shopify could not make one — the caller must then NOT open a full-price checkout for this holder.
+ */
+export async function holdForCart(d: PromoDeps, who: { browser?: string | null; email?: string | null }): Promise<{ rec: HoldRecord; view: HoldView; code: string | null } | null> {
   const env = d.env ?? process.env
   const now = d.now?.() ?? new Date()
   if (!d.store || !promoOn(env, now)) return null
-  const cfg = promoConfig(env)
-  if (!cfg) return null
   const h = (who.email ? await holdOfEmail(d.store, who.email, now) : null) ?? (await holdOfBrowser(d.store, who.browser ?? null, now))
   if (!h || (h.view.state !== 'active' && h.view.state !== 'checkout')) return null
-  return { ...h, code: cfg.cartCode }
+  if (h.rec.discount?.code) return { ...h, code: h.rec.discount.code }
+  const made = await ensureHoldCode(d, h.rec, now)
+  return { rec: made ?? h.rec, view: h.view, code: made?.discount?.code ?? null }
+}
+
+/** A hold with no code (made before the per-hold codes): make it one, ending with the hold and its checkout grace, and keep it on the record. Null when Shopify cannot. */
+async function ensureHoldCode(d: PromoDeps, rec: HoldRecord, now: Date): Promise<HoldRecord | null> {
+  const store = d.store
+  if (!store || !d.shopify) return null
+  const env = d.env ?? process.env
+  const until = Math.max(Date.parse(rec.expires_at), rec.checkout_until ? Date.parse(rec.checkout_until) : 0)
+  let made: HoldDiscount
+  try {
+    made = await d.shopify.createHoldCode(rec.id, new Date(until + promoCheckoutGraceMinutes(env) * MIN), now)
+  } catch {
+    d.log?.(`[ichirei-promo] ${JSON.stringify({ event: 'code_not_made', hold: rec.id })}`)
+    return null
+  }
+  const saved = await casJson<HoldRecord>(store, holdPath(rec.day, rec.email_hash), (cur) => (cur && cur.id === rec.id && !cur.discount ? { ...cur, discount: made } : null))
+  if (saved) return saved
+  const cur = await readJson<HoldRecord>(store, holdPath(rec.day, rec.email_hash)) // another request made one first: use that one, ours goes
+  await d.shopify.deleteHoldCode(made.discountId).catch(() => null)
+  return cur?.id === rec.id && cur.discount ? cur : null
 }
 
 /** For tests and /ops: the day key a moment belongs to, in the form the paths use. */
