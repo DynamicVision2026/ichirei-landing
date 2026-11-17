@@ -79,3 +79,14 @@
 .wbGive{margin-top:.2rem;font:600 .9rem var(--body,system-ui);color:var(--ink,#1F2A44);border-bottom:1px solid var(--gold,#8A6A35);text-decoration:none}
 .wbAll{display:inline-block;margin-top:.8rem;font:500 .9rem var(--body,system-ui);color:var(--ink,#1F2A44)}
 .by-top{display:flex;justify-content:flex-end;padding:.6rem max(16px,env(safe-area-inset-right,0px)) 0}
+
+/* The free-gift box in the hero (2026-11-17): right under "Write your moment", full width, then one small price line */
+.thanksCompact{margin:0;padding:0;width:100%;min-width:0}
+.thanksCompact .thanksCard{max-width:none;width:100%;box-sizing:border-box;margin:0;padding:1rem 1.1rem;text-align:left}
+.thanksCompact .thanksCard h2{font-size:1.05rem;margin:0 0 .3rem}
+.thanksCompact .thanksCard .count{font-size:1rem}
+.thanksCompact .thanksCard .count b{font-size:2rem}
+.thanksCompact .thanksCard .sub{margin:.25rem 0 .8rem}
+.thanksCompact .thanksCard form{max-width:none;margin:0}
+.rv .promoPrice{margin:-.7rem 0 0;font-size:.82rem;line-height:1.5;color:var(--mute,#5B6178)}
+.rv .promoPrice.soldOut{margin-top:-.5rem;font-size:1.02rem;color:var(--ink,#1F2A44)}

@@ -12,7 +12,6 @@ import { useMemorialSelected } from './occasion-store'
 import { useComingSoon, useSizes } from '../demo/useSizes'
 import { SHIPS } from '../order/packages'
 import LoopBars from '../loop/LoopBars'
-import DaysOfThanks from '../loop/DaysOfThanks'
 import MyGiftsButton from '../loop/MyGifts'
 import WelcomeBack from '../loop/WelcomeBack'
 import { LOOP } from '../loop/copy'
@@ -172,7 +171,6 @@ export default function RevealPage({ write = false }: { write?: boolean }) {
         <ClaimBanner language={uiLang} />
         <Hero lang={lang} currency={currency} rates={rates} woodOnSale={woodOnSale} />
         <WelcomeBack lang={lang} />
-        {(lang === 'en' || lang === 'ja') && <DaysOfThanks lang={lang} />}
         <Opening t={t} />
         {lang === 'en' && <UsBanner />}
         <Strip t={t} woodOnSale={woodOnSale} />

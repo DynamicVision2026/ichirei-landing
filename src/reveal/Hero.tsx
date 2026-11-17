@@ -7,7 +7,10 @@ import { sceneName } from './scenes.ts'
 import { usePrefersReducedMotion } from './usePrefersReducedMotion.ts'
 import { approxShort, type Currency, type Rates } from './currency.ts'
 import { PACKAGE_PRICE_JPY } from '../order/packages.ts'
-import { useSale, useUsd } from '../demo/useSizes.ts'
+import { usePromoOn, useSale, useUsd } from '../demo/useSizes.ts'
+import DaysOfThanks from '../loop/DaysOfThanks'
+import { usePromo } from '../loop/promo'
+import { promoPriceLine } from '../loop/promo-price'
 import { UsdPriceView } from '../order/SalePrice.tsx'
 import { usdLaunchLine } from '../order/usd.ts'
 import { writeLink } from './paths'
@@ -89,6 +92,13 @@ export default function Hero({ lang, currency, rates, woodOnSale = false }: { la
   // English (2026-11-14): a fixed dollar price ($25; while the sale is on only the sale price, with the launch line under it), never an "about" figure or a struck price. The other languages keep their converted line.
   const usdPrice = useUsd()
   const approx = lang === 'en' ? null : approxShort(PACKAGE_PRICE_JPY.simple, currency, rates, lang)
+  // While the promotion runs (en and ja; zh is unchanged) the hero says ONE thing: write your moment, and today the whole gift can be free. The free-gift box sits right under the button, the price
+  // shrinks to one small line under the box, and the occasion chips come last. After the promotion the hero is today's layout again, by itself (usePromoOn follows the promotion's own end).
+  const promoOn = usePromoOn()
+  const promoState = usePromo()
+  const promoLayout = (lang === 'en' || lang === 'ja') && promoOn
+  const soldOut = promoLayout && !!promoState?.on && !promoState.hold && (promoState.left ?? 1) === 0
+  const priceLine = promoLayout ? promoPriceLine(lang as 'en' | 'ja', soldOut, usdPrice, sale) : ''
 
   return (
     <section className="hero">
@@ -103,14 +113,22 @@ export default function Hero({ lang, currency, rates, woodOnSale = false }: { la
               {t.ctaHero}
             </a>
             <span className="free">{rich(t.freeLine)}</span>
-            {approx && <span className="approxHero">{approx}</span>}
-            {lang === 'en' && (
+            {!promoLayout && approx && <span className="approxHero">{approx}</span>}
+            {!promoLayout && lang === 'en' && (
               <span className="approxHero usdHero">
                 <span data-testid="usd-hero"><UsdPriceView price={usdPrice} sale={sale} id="hero" /></span>
                 {sale && <span className="usdLaunch" data-testid="usd-hero-line">{usdLaunchLine(usdPrice, sale.until)}</span>}
               </span>
             )}
           </div>
+          {promoLayout && (
+            <>
+              <DaysOfThanks lang={lang as 'en' | 'ja'} compact />
+              <p className={`promoPrice${soldOut ? ' soldOut' : ''}`} data-testid="promo-price">
+                {priceLine}
+              </p>
+            </>
+          )}
           <ul className="chips">
             {(['c1', 'c2', 'c3', 'c4', 'c5'] as const).map((k) => (
               <li key={k}>{t[k]}</li>
