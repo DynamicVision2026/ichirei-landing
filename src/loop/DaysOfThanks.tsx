@@ -30,8 +30,9 @@ const safe = {
  * Under the hero on /en and (2026-11-16) on the Japanese page while the promotion runs — the US and Japan share ONE daily pool: a paper-slip card — the title, how many of today's 100 free
  * gifts are left (refreshed every 60 s with a soft fade), and the form that holds one for an email (the email and an unticked box — no code since 2026-11-15). With a hold: "held until …".
  * With none left: the form is gone. After a hold ended: one line, "Your hold ended.", and the form as usual.
+ * `compact` (2026-11-17): the same box, placed right under "Write your moment" in the hero (no section of its own, no side margins).
  */
-export default function DaysOfThanks({ lang = 'en' }: { lang?: ThanksLang }) {
+export default function DaysOfThanks({ lang = 'en', compact = false }: { lang?: ThanksLang; compact?: boolean }) {
   const THANKS = thanksCopy(lang)
   const on = usePromoOn()
   const p = usePromo()
@@ -74,8 +75,8 @@ export default function DaysOfThanks({ lang = 'en' }: { lang?: ThanksLang }) {
   const n = THANKS.count(left, p.daily ?? 100)
   const hold = p.hold
   return (
-    <section className="thanksWrap" id="days-of-thanks" aria-labelledby="dot-title" lang={lang} data-lang={lang}>
-      <div className="wrap">
+    <section className={compact ? 'thanksWrap thanksCompact' : 'thanksWrap'} id="days-of-thanks" aria-labelledby="dot-title" lang={lang} data-lang={lang} data-testid={compact ? 'hero-thanks' : undefined}>
+      <div className={compact ? undefined : 'wrap'}>
         <div className="thanksCard" data-testid="thanks-card">
           <h2 id="dot-title">{THANKS.title}</h2>
           {hold ? (

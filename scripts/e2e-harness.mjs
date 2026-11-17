@@ -5385,6 +5385,105 @@ for (const [lang, locale, text] of [['en', 'en-US', 'Your gift is being finished
   await ja.page.close()
 }
 
+// ---------- Run 37 (2026-11-17): while the promotion runs, the free-gift box sits right under "Write your moment" in the hero (en and ja), the price shrinks to one small line under it, the chips come last;
+// sold out: the box says so and the price line is the plain, larger price line; after the promotion the hero is today's again; zh unchanged ----------
+{
+  const SALE = { percent: 30, from: '2026-11-15', until: '2026-11-30', starts_at: '2026-11-14T15:00:00.000Z', ends_at: '2026-11-30T14:59:59.999Z' }
+  const open37 = async (url, { clock = '2026-11-17T15:00:00Z', promoUntil = '2026-11-30T23:59:59-05:00', state = { on: true, left: 37, daily: 100, hold: null }, width = 390 } = {}) => {
+    const { page, errors } = await mockPage(browser)
+    await page.setViewportSize({ width, height: 844 })
+    await page.clock.setFixedTime(new Date(clock))
+    await page.route('**/api/rates', (r) => r.fulfill({ json: { date: '2026-11-17', base: 'JPY', rates: { USD: 0.0066 } } }))
+    await page.route('**/api/sizes', (r) => r.fulfill({ json: { sizes: ['egift', 'simple', 'standard'], coming_soon: ['simple', 'standard'], promo: { from: '2026-11-01T00:00:00Z', until: new Date(promoUntil).toISOString() }, usd: { egift: 25, egift_sale: 17.5 }, sale: SALE } }))
+    await page.route('**/api/me*', (r) => r.fulfill({ json: { basket: { count: 0 }, ready: null, hold: null } }))
+    await page.route('**/api/basket', (r) => r.fulfill({ json: { items: [], token: 'BT-x', link: 'https://ichirei.beyondculture.ai/b/BT-abcdefghjkmnpqrstuvwxyz2' } }))
+    await page.route('**/api/promo', (r) => r.fulfill({ json: state }))
+    await page.goto(url, { waitUntil: 'networkidle' })
+    await page.waitForTimeout(400)
+    return { page, errors }
+  }
+  const T = (page, id) => page.locator(`[data-testid=${id}]`)
+  const probe = (page) =>
+    page.evaluate(() => {
+      const hero = document.querySelector('.hero')
+      const cta = hero.querySelector('.ctaRow')
+      const box = document.querySelector('[data-testid=hero-thanks]')
+      const price = document.querySelector('[data-testid=promo-price]')
+      const chips = hero.querySelector('.chips')
+      const r = (el) => (el ? el.getBoundingClientRect() : null)
+      return {
+        boxNext: !!box && cta.nextElementSibling === box,
+        priceNext: !!box && !!price && box.nextElementSibling === price,
+        chipsNext: !!price && price.nextElementSibling === chips,
+        boxInHero: !!box && hero.contains(box),
+        sections: document.querySelectorAll('#days-of-thanks').length,
+        cards: document.querySelectorAll('[data-testid=thanks-card]').length,
+        bigPrice: document.querySelectorAll('[data-testid=usd-hero], [data-testid=usd-hero-line], .hero .approxHero').length,
+        noScroll: document.documentElement.scrollWidth <= window.innerWidth,
+        boxBelowButton: !!box && r(box).top >= r(cta).bottom - 1 && r(box).top - r(cta).bottom < 120,
+        boxWidth: box ? Math.round(r(box).width) : 0,
+        vw: window.innerWidth,
+        price: price ? price.innerText.trim() : null,
+        priceSize: price ? parseFloat(getComputedStyle(price).fontSize) : 0,
+        priceColor: price ? getComputedStyle(price).color : null,
+        count: document.querySelector('[data-testid=thanks-count]')?.innerText.replace(/\s+/g, ' ').trim() ?? null,
+        form: !!document.querySelector('[data-testid=thanks-form]'),
+        email: !!document.querySelector('[data-testid=thanks-email]'),
+        consent: !!document.querySelector('[data-testid=thanks-marketing]'),
+        submit: !!document.querySelector('[data-testid=thanks-submit]'),
+      }
+    })
+  const PRICE = {
+    en: "If today's free gifts are gone: $17.50 (Thanksgiving price). $25 from December 1.",
+    ja: '本日の無料枠が終了した場合：感謝の季節価格 ¥2,786（12月1日から ¥3,980）',
+  }
+  const PLAIN = { en: '$17.50 (Thanksgiving price). $25 from December 1.', ja: '感謝の季節価格 ¥2,786（12月1日から ¥3,980）' }
+  const URLS = { en: 'http://localhost:5173/en', ja: 'http://localhost:5173/?lang=ja' }
+  for (const lang of ['en', 'ja']) {
+    // promotion on, free gifts left
+    const on = await open37(URLS[lang])
+    const a = await probe(on.page)
+    check(`run 37 (${lang}, promotion on): the free-gift box is the very next block after the hero button; then the one small price line; then the occasion chips`, a.boxNext && a.priceNext && a.chipsNext && a.boxInHero, JSON.stringify(a))
+    check(`run 37 (${lang}): one box only — the separate free-gift section further down is gone`, a.sections === 1 && a.cards === 1, JSON.stringify({ s: a.sections, c: a.cards }))
+    check(`run 37 (${lang}): no large price in the hero (no big dollar price, no launch line, no converted price)`, a.bigPrice === 0, String(a.bigPrice))
+    check(`run 37 (${lang}): the counter, the email field, the consent box and the hold button are all in the box (the existing texts)`, a.form && a.email && a.consent && a.submit && (lang === 'en' ? a.count === "37 of today's 100 free gifts are still available." : a.count === '本日の無料ギフト 残り 37 / 100'), JSON.stringify({ count: a.count }))
+    check(`run 37 (${lang}): the small price line, with both prices from the price config: 「${PRICE[lang]}」, small and muted`, a.price === PRICE[lang] && a.priceSize <= 14 && /rgb/.test(a.priceColor ?? ''), JSON.stringify({ p: a.price, s: a.priceSize }))
+    check(`run 37 (${lang}, 390 px): the box sits right under the button, full width, no horizontal scroll`, a.boxBelowButton && a.noScroll && a.boxWidth >= a.vw - 48 && a.boxWidth <= a.vw, JSON.stringify({ w: a.boxWidth, vw: a.vw, below: a.boxBelowButton, scroll: a.noScroll }))
+    await on.page.setViewportSize({ width: 390, height: 1180 }) // (a taller phone for the picture: the whole hero, the box and the price line in one frame)
+    await on.page.waitForTimeout(250)
+    await on.page.screenshot({ path: `${SHOTS}/sg2-${lang}-promo-390.png` })
+    check(`no page errors (run 37, ${lang} promotion on)`, on.errors.length === 0, on.errors.join('; '))
+    await on.page.close()
+
+    // sold out for the day
+    const out = await open37(URLS[lang], { state: { on: true, left: 0, daily: 100, hold: null } })
+    const b = await probe(out.page)
+    check(`run 37 (${lang}, sold out): the box shows the existing "sold out, new free gifts tomorrow" line and no form; the price line is the plain price line (no "if gone" lead-in), larger and in ink, so the paid path is clear`, b.boxNext && !b.form && /./.test(b.count ?? '') && b.price === PLAIN[lang] && b.priceSize > a.priceSize && b.priceSize >= 15, JSON.stringify({ count: b.count, price: b.price, size: b.priceSize, small: a.priceSize }))
+    check(`run 37 (${lang}, sold out): the line says tomorrow (${lang === 'en' ? 'New ones arrive tomorrow morning' : '次の枠は18時'})`, lang === 'en' ? /New ones arrive tomorrow morning/.test(b.count ?? '') : /次の枠は18時/.test(b.count ?? ''), b.count ?? '')
+    await out.page.setViewportSize({ width: 390, height: 1180 }) // (a taller phone for the picture: the whole hero, the box and the price line in one frame)
+    await out.page.waitForTimeout(250)
+    await out.page.screenshot({ path: `${SHOTS}/sg2-${lang}-soldout-390.png` })
+    check(`no page errors (run 37, ${lang} sold out)`, out.errors.length === 0, out.errors.join('; '))
+    await out.page.close()
+
+    // after the promotion: today's hero again, by itself (the clock is past the promotion's end)
+    const off = await open37(URLS[lang], { clock: '2026-12-05T15:00:00Z', promoUntil: '2026-11-30T23:59:59-05:00', state: { on: false } })
+    const c = await probe(off.page)
+    check(`run 37 (${lang}, after the promotion): today's hero — no box, no small price line, the chips follow the button row${lang === 'en' ? ' and the large dollar price is back' : ''}`, !c.boxInHero && c.sections === 0 && c.cards === 0 && c.price === null && (lang === 'en' ? await T(off.page, 'usd-hero').count() === 1 : true), JSON.stringify(c))
+    await off.page.close()
+  }
+  // zh is unchanged
+  const zh = await open37('http://localhost:5173/zh')
+  const z = await probe(zh.page)
+  check('run 37 (zh): unchanged — no free-gift box and no promotion price line in the hero', !z.boxInHero && z.sections === 0 && z.price === null, JSON.stringify(z))
+  await zh.page.close()
+  // a wider screen: the box is still under the button and the page does not scroll sideways
+  const wide = await open37(URLS.en, { width: 1280 })
+  const w = await probe(wide.page)
+  check('run 37 (en, 1280 px): the box is still the next block after the button; no horizontal scroll', w.boxNext && w.priceNext && w.noScroll, JSON.stringify(w))
+  await wide.page.close()
+}
+
 await browser.close()
 console.log(failures === 0 ? '\nALL E2E CHECKS PASSED' : `\n${failures} CHECKS FAILED`)
 process.exit(failures === 0 ? 0 : 1)
