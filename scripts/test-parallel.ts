@@ -48,10 +48,12 @@ const counts = { main: 0, second: 0, free: 0, review: 0, refill: 0, gaze: 0 }
 const starts: Record<string, number[]> = {}
 const ends: Record<string, number[]> = {}
 const bodies: Record<string, any> = {}
+const freeBodies: any[] = [] // the free pick's calls in the order they arrived (hedge 1, then hedge 2 when it was sent)
 let t0 = 0
 let replyFor: ((kind: string, prompt: string) => unknown) | null = null
 let stopFor: Record<string, string> = {}
 let gazeReply: any = { gazes: [] }
+let freeReplyScript: unknown[] = [] // the free pick's replies by arrival (hedge 1 first), instead of `replies.free`
 let hedgeScript: ('ok' | 'hang')[] = [] // the free pick is asked twice: what each arriving call does
 
 const upstream = http.createServer(async (req, res) => {
@@ -64,6 +66,7 @@ const upstream = http.createServer(async (req, res) => {
   const kind = prompt.includes('Independent Review Prompt') ? 'review' : prompt.includes('Gaze Line Rewrite Prompt') ? 'gaze' : prompt.includes('Free Pick Card Prompt') ? 'free' : prompt.includes('Replacement Prompt (v9') ? 'refill' : prompt.includes('* CARD: second.') ? 'second' : prompt.includes('* CARD: main.') ? 'main' : 'other'
   ;(counts as any)[kind] = ((counts as any)[kind] ?? 0) + 1
   ;(starts[kind] ??= []).push(Date.now() - t0)
+  if (kind === 'free') freeBodies.push({ thinking: body.thinking, model: body.model, effort: body.output_config?.effort, max_tokens: body.max_tokens, at: Date.now() - t0 })
   bodies[kind] = { thinking: body.thinking, cached, blocks: Array.isArray(content) ? content.length : 0, model: body.model, effort: body.output_config?.effort, max_tokens: body.max_tokens, prompt }
   let reply: unknown
   if (kind === 'review') {
@@ -73,6 +76,7 @@ const upstream = http.createServer(async (req, res) => {
   else if (kind === 'gaze') reply = gazeReply
   else if (kind === 'main' || kind === 'second') reply = replyFor ? replyFor(kind, prompt) : (replies as any)[kind]
   else reply = (replies as any)[kind] ?? (replies as any).other ?? {}
+  if (kind === 'free' && freeReplyScript.length > 0) reply = freeReplyScript.shift()
   let ms = (delay as any)[kind] ?? 10
   if (kind === 'free' && hedgeScript.length > 0 && hedgeScript.shift() === 'hang') ms = 6000
   await new Promise((r) => setTimeout(r, ms))
@@ -93,6 +97,8 @@ process.env.ANTHROPIC_BASE_URL = `http://127.0.0.1:${(upstream.address() as { po
 process.env.ANTHROPIC_API_KEY = 'test-key-not-real'
 process.env.ICHIREI_LEXICON_MODE = 'off'
 for (const k of ['ICHIREI_CARDS', 'ICHIREI_GAZE_FIX', 'ICHIREI_REVIEW', 'REQUIRE_CLASSICAL_ECHO', 'ICHIREI_REPLACE']) delete process.env[k]
+// the free pick's fast fallback is sent after 8 s in production; this suite's older sections test the two calls as a pair, so the fallback goes out at once (section N below tests the real timing)
+process.env.ICHIREI_FREE_FALLBACK_AFTER_MS = '0'
 process.env.ICHIREI_FREE_RUNNER_UP = 'off' // (the free pick's third step — a spare card from the main/second calls — is tested in test-free-three.ts; this suite is about the first two steps)
 
 type Ctx = typeof fx.context
@@ -105,6 +111,7 @@ const run = async (ctx: Ctx = BIRTHDAY, story = STORY, extra: Record<string, unk
   for (const k of Object.keys(counts)) (counts as any)[k] = 0
   for (const o of [starts, ends]) for (const k of Object.keys(o)) delete o[k]
   logs.length = 0
+  freeBodies.length = 0
   cardEvents = []
   console.log = (...a: unknown[]) => { logs.push(a.map(String).join(' ')) }
   t0 = Date.now()
@@ -128,7 +135,7 @@ try {
   check('(1) …the main call asks for its TOP FIVE, ranked (like the free pick; the later ones are its internal fallbacks — 2026-11-07 follow-up), and the free pick for FIVE: the prompts say so; the main carries its own lens', /TOP FIVE/.test(bodies.main.prompt) && !/TOP TWO/.test(bodies.main.prompt) && /deepest truth, from the story's turning point/.test(bodies.main.prompt) && /FIVE characters for the free pick, ranked/.test(bodies.free.prompt) && !/TOP TWO/.test(bodies.free.prompt) && /\* CARD: main\./.test(bodies.main.prompt) && !bodies.second)
 
   // ---- models, effort and the free pick's prompt -----------------------------------------------------------------------------------------------------------------------------
-  check('(2) the main uses the SELECTION model at low effort; the free pick uses the small model (claude-haiku-5-5) at low effort with a short answer limit; the main does not carry the second\'s lens', bodies.main.model === 'claude-sonnet-5' && bodies.main.effort === 'low' && bodies.free.model === 'claude-haiku-5-5' && bodies.free.effort === 'low' && bodies.free.max_tokens <= 2600 && !bodies.main.prompt.includes('a different side of the person'), JSON.stringify({ m: bodies.main.model, f: bodies.free.model, e: [bodies.main.effort, bodies.free.effort] }))
+  check('(2) the main uses the SELECTION model at low effort; the free pick\'s first call uses Sonnet 5.5 at medium effort with adaptive thinking and 5,000 tokens, its fast fallback Haiku 5.5 at low effort without thinking and 2,600 tokens (2026-11-16); the main does not carry the second\'s lens', bodies.main.model === 'claude-sonnet-5-5' && bodies.main.effort === 'low' && freeBodies[0].model === 'claude-sonnet-5-5' && freeBodies[0].effort === 'medium' && freeBodies[0].max_tokens === 5000 && freeBodies[0].thinking?.type === 'adaptive' && freeBodies[1].model === 'claude-haiku-5-5' && freeBodies[1].effort === 'low' && freeBodies[1].max_tokens <= 2600 && freeBodies[1].thinking?.type === 'disabled' && !bodies.main.prompt.includes('a different side of the person'), JSON.stringify({ m: bodies.main.model, f: bodies.free.model, e: [bodies.main.effort, bodies.free.effort] }))
   check('(2) …the free pick is told: positive, a habit / place / object / saying, never a character that could read as a negative trait (寒, 冷, 頑, 怠), and not another word for warmth or care; it gets the story, the relationship and the occasion', /NEVER A NEGATIVE TRAIT/.test(bodies.free.prompt) && /寒, 冷, 頑, 怠/.test(bodies.free.prompt) && /a habit, a place, an object/.test(bodies.free.prompt) && /Not another word for the same feeling/.test(bodies.free.prompt) && bodies.free.prompt.includes('車の窓の霜') && bodies.free.prompt.includes('birthday_milestone') && bodies.free.prompt.includes('parent_father'))
   check('(2) …the main gets the whole language prompt (the rules: truth, 常用漢字, remembrance blocks) with the story and the context', bodies.main.prompt.includes('車の窓の霜') && bodies.main.prompt.includes('birthday_milestone') && bodies.main.prompt.length > 15000)
 
@@ -359,11 +366,12 @@ try {
   const freeLines = logs.filter((x) => x.startsWith('[ichirei-card-call]')).map((x) => JSON.parse(x.slice('[ichirei-card-call] '.length))).filter((o) => o.slot === 'freestyle')
   const HC = cardsLine().parallel.calls.filter((c: any) => c.slot === 'freestyle')
   check('(H1) the free pick is asked twice at the same moment: two identical calls start together (within 40 ms, with the main); two cards', counts.free === 2 && Math.abs(starts.free[0] - starts.free[1]) < 40 && Math.max(starts.main[0], starts.free[0], starts.free[1]) - Math.min(starts.main[0], starts.free[0], starts.free[1]) < 60 && sum(h1) === 'main:誠,freestyle:朝', JSON.stringify({ starts: starts.free, counts }))
-  check('(H2) no extended thinking on the free-pick call (thinking: disabled), low effort, 2,600 output tokens (five options), the small model — and none on the main call either (2026-11-07: ICHIREI_CARD_THINKING=on puts it back)', bodies.free.thinking?.type === 'disabled' && bodies.free.effort === 'low' && bodies.free.max_tokens === 2600 && bodies.free.model === 'claude-haiku-5-5' && bodies.main.thinking?.type === 'disabled')
+  check('(H2) the free pick\'s first call thinks lightly (Sonnet 5.5, adaptive thinking, medium effort, 5,000 tokens) and its fast fallback does not (Haiku 5.5, thinking: disabled, low effort, 2,600 tokens, five options) — the main call has none either (2026-11-07: ICHIREI_CARD_THINKING=on puts it back)', freeBodies[0].thinking?.type === 'adaptive' && freeBodies[0].effort === 'medium' && freeBodies[0].max_tokens === 5000 && freeBodies[0].model === 'claude-sonnet-5-5' && freeBodies[1].thinking?.type === 'disabled' && freeBodies[1].effort === 'low' && freeBodies[1].max_tokens === 2600 && freeBodies[1].model === 'claude-haiku-5-5' && bodies.main.thinking?.type === 'disabled')
   check('(H3) [ichirei-card-call] notes hedge 1 and 2 on the free-pick lines, and a line says which one won; [ichirei-cards] has both calls with hedge and won', freeLines.some((o) => o.hedge === 1) && freeLines.some((o) => o.hedge === 2) && freeLines.some((o) => o.hedged === 2 && (o.hedge_winner === 1 || o.hedge_winner === 2)) && HC.length === 2 && HC.filter((c: any) => c.won === true).length === 1 && HC.filter((c: any) => c.won === false).length === 1 && HC.every((c: any) => c.hedge === 1 || c.hedge === 2), JSON.stringify(freeLines))
 
   // one of the two calls hangs (a one-off slow call): the other answers, three cards, the slow one is cancelled
   process.env.ICHIREI_FREE_CALL_TIMEOUT_MS = '400'
+  process.env.ICHIREI_FREE_FALLBACK_CALL_TIMEOUT_MS = '400'
   hedgeScript = ['hang', 'ok']
   const h4 = await run()
   const t4 = cardsLine().ms.total
@@ -376,6 +384,7 @@ try {
 
   // both calls hang: two cards, and nothing waits beyond the existing limit (the call ceiling, here 400 ms)
   process.env.ICHIREI_FREE_CALL_TIMEOUT_MS = '250'
+  process.env.ICHIREI_FREE_FALLBACK_CALL_TIMEOUT_MS = '250'
   delay = { main: 60, second: 60, free: 40, review: 20, refill: 20 }
   hedgeScript = ['hang', 'hang']
   process.env.ICHIREI_FREE_RETRY = 'off' // (the safety net — a second pair — is tested in test-rescue.ts; this section is about the first pair\'s ceiling)
@@ -385,6 +394,7 @@ try {
   const HC5 = cardsLine().parallel.calls.filter((c: any) => c.slot === 'freestyle')
   check('(H5) both free-pick calls time out: the main stands, at most the one last-resort refill, and the request ends at the call ceiling (250 ms) — not later; both calls are logged as timeouts', sum(h5) === 'main:誠' && counts.refill <= 1 && t5 >= 240 && t5 < 420 && HC5.length === 2 && HC5.every((c: any) => c.parse === 'failed' && c.error === 'timeout' && c.won === false), JSON.stringify({ t5, HC5: HC5.map((c: any) => [c.hedge, c.won, c.error]) }))
   delete process.env.ICHIREI_FREE_CALL_TIMEOUT_MS
+  delete process.env.ICHIREI_FREE_FALLBACK_CALL_TIMEOUT_MS
   hedgeScript = []
   // the first reply that is READABLE wins: one call answers rubbish quickly, the other a card a little later
   delay = { main: 200, second: 200, free: 60, review: 20, refill: 20 }
@@ -473,6 +483,36 @@ try {
   const fa5 = liveOf(a5).find((c) => c.slot === 'freestyle')
   const ma5 = liveOf(a5).find((c) => c.slot === 'main')
   check('(A5) the normal case: the free pick (朝, 「電話ではいつも」) and the main card (誠, 「車の窓の霜をお湯で溶かして」) are anchored in different sentences', !!fa5 && !!ma5 && !anchorsClash(fa5.story_anchor, ma5.story_anchor, STORY) && sum(a5) === 'main:誠,freestyle:朝')
+
+  // ---- N. THE FREE PICK'S FAST FALLBACK: sent after the wait if the first call has not answered (2026-11-16) ---------------------------------------------------------------------------
+  process.env.ICHIREI_FREE_FALLBACK_AFTER_MS = '250'
+  replies = { main: sel(M1(), M2()), second: sel(S1(), S2()), free: free(F1(), F2()) }
+  vetoed = new Set()
+  hedgeScript = []
+  delay = { main: 120, second: 120, free: 40, review: 20, refill: 20 }
+  const n1 = await run()
+  check('(N1) the first free call (Sonnet 5.5, thinking) answers before the wait is over: the fallback is never sent — one free call, two cards, no refill, the review model never asked to write', sum(n1) === 'main:誠,freestyle:朝' && counts.free === 1 && freeBodies.length === 1 && freeBodies[0].model === 'claude-sonnet-5-5' && freeBodies[0].thinking?.type === 'adaptive' && counts.refill === 0, JSON.stringify({ counts, free: freeBodies }))
+  hedgeScript = ['hang', 'ok']
+  delay = { main: 120, second: 120, free: 40, review: 20, refill: 20 }
+  const n2 = await run()
+  const n2c = cardsLine().parallel.calls.filter((c: any) => c.slot === 'freestyle')
+  check('(N2) the first free call has not answered after the wait (250 ms here, 8 s live): the fast fallback — Haiku 5.5, no thinking, low effort — is sent THEN (not at the same moment), answers, and wins; the slow call is cancelled; two cards', sum(n2) === 'main:誠,freestyle:朝' && counts.free === 2 && freeBodies[1].model === 'claude-haiku-5-5' && freeBodies[1].thinking?.type === 'disabled' && freeBodies[1].effort === 'low' && freeBodies[1].at >= 240 && freeBodies[1].at - freeBodies[0].at >= 230 && n2c.find((c: any) => c.hedge === 2)?.won === true && n2c.find((c: any) => c.hedge === 1)?.error === 'cancelled', JSON.stringify({ at: freeBodies.map((b) => b.at), n2c: n2c.map((c: any) => [c.hedge, c.model, c.won, c.error]) }))
+  // the first call answers with nothing usable: the fallback goes out at once, without waiting for the rest of the wait
+  process.env.ICHIREI_FREE_FALLBACK_AFTER_MS = '5000'
+  hedgeScript = []
+  freeReplyScript = ['not json at all', free(F1(), F2())]
+  delay = { main: 150, second: 150, free: 30, review: 20, refill: 20 }
+  const n3 = await run()
+  check('(N3) the first free call answers with nothing usable: the fallback is sent at once (not after the 5 s wait), answers, and wins — two cards, and the request is nowhere near 5 s', sum(n3) === 'main:誠,freestyle:朝' && counts.free === 2 && freeBodies[1].model === 'claude-haiku-5-5' && freeBodies[1].at - freeBodies[0].at < 400 && cardsLine().ms.total < 2500, JSON.stringify({ at: freeBodies.map((b) => b.at), total: cardsLine().ms.total }))
+  freeReplyScript = []
+  process.env.ICHIREI_FREE_FALLBACK_AFTER_MS = '0'
+  // ICHIREI_FREE_MODEL and ICHIREI_FREE_FALLBACK_MODEL name the two free calls' models (the settings cloudbuild passes)
+  process.env.ICHIREI_FREE_MODEL = 'claude-test-free'
+  process.env.ICHIREI_FREE_FALLBACK_MODEL = 'claude-test-fast'
+  await run()
+  check('(N4) ICHIREI_FREE_MODEL sets the first free call\'s model (thinking on) and ICHIREI_FREE_FALLBACK_MODEL the fast fallback\'s (thinking off); the main call keeps ICHIREI_MODEL', freeBodies[0].model === 'claude-test-free' && freeBodies[0].thinking?.type === 'adaptive' && freeBodies[1].model === 'claude-test-fast' && freeBodies[1].thinking?.type === 'disabled' && bodies.main.model === 'claude-sonnet-5-5', JSON.stringify(freeBodies))
+  delete process.env.ICHIREI_FREE_MODEL
+  delete process.env.ICHIREI_FREE_FALLBACK_MODEL
 } finally {
   upstream.closeAllConnections?.()
   upstream.close()

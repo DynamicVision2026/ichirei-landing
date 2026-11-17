@@ -18,7 +18,7 @@ import {
   type Language,
 } from './contract.ts'
 
-const MODEL = process.env.ICHIREI_MODEL ?? 'claude-sonnet-5'
+const MODEL = process.env.ICHIREI_MODEL ?? 'claude-sonnet-5-5'
 const MAX_TOKENS = Number(process.env.ICHIREI_EXPLAIN_MAX_TOKENS ?? 6000)
 
 export interface ExplainCandidate {

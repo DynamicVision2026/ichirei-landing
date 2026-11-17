@@ -50,14 +50,25 @@ const cardHedgeMs = (): number => (process.env.ICHIREI_CARD_HEDGE_MS === undefin
 export const CARD_MAX_TOKENS = (): number => Number(process.env.ICHIREI_CARD_MAX_TOKENS ?? 6000)
 export const CARD_MAX_TOKENS_RETRY = (): number => Number(process.env.ICHIREI_CARD_MAX_TOKENS_RETRY ?? 14000)
 const num = (v: string | undefined, d: number): number => (Number.isFinite(Number(v)) && Number(v) > 0 ? Number(v) : d)
-export const FREE_CALL_MS_DEFAULT = 20_000
+/** The free pick's first call (Sonnet 5.5 with light thinking, 2026-11-16) is given this long; the fast fallback call (Haiku, no thinking) is given FREE_FALLBACK_CALL_MS from when it starts. */
+export const FREE_CALL_MS_DEFAULT = 35_000
+export const FREE_FALLBACK_CALL_MS_DEFAULT = 20_000
+/** The fast fallback is sent after this long if the first call has not answered (it is sent at once when the first answered with nothing usable). */
+export const FREE_FALLBACK_AFTER_MS_DEFAULT = 8_000
 export const FREE_LANE_MS_DEFAULT = 45_000
 /** The free pick asks for five options (it was two). */
 export const FREE_OPTIONS = 5
-export const FREE_MAX_TOKENS = 2600
+/** The free pick's first call: room for light thinking and the five options (2026-11-16; Haiku had 2,600). */
+export const FREE_MAX_TOKENS = 5000
+/** The fast fallback call keeps the old, small budget. */
+export const FREE_FALLBACK_MAX_TOKENS = 2600
+/** The first free call: effort `medium`, with adaptive thinking. Sonnet 5.5 takes no thinking-token budget (the API refuses budget_tokens): depth is set by effort and max_tokens is the hard cap. */
+export const FREE_EFFORT = (): 'low' | 'medium' | 'high' => (process.env.ICHIREI_FREE_EFFORT ?? 'medium') as 'low' | 'medium' | 'high'
 /** The time the last step (a runner-up from the main/second calls) is given for its checks, counted from when it starts. */
 export const FREE_RUNNER_MS_DEFAULT = 25_000
 const freeCallMs = () => num(process.env.ICHIREI_FREE_CALL_TIMEOUT_MS, FREE_CALL_MS_DEFAULT)
+const freeFallbackCallMs = () => num(process.env.ICHIREI_FREE_FALLBACK_CALL_TIMEOUT_MS, FREE_FALLBACK_CALL_MS_DEFAULT)
+const freeFallbackAfterMs = () => (process.env.ICHIREI_FREE_FALLBACK_AFTER_MS === undefined || process.env.ICHIREI_FREE_FALLBACK_AFTER_MS === '' ? FREE_FALLBACK_AFTER_MS_DEFAULT : Math.max(0, Number(process.env.ICHIREI_FREE_FALLBACK_AFTER_MS) || 0))
 const freeLaneMs = () => num(process.env.ICHIREI_FREE_LANE_MS, FREE_LANE_MS_DEFAULT)
 const freeRunnerMs = () => num(process.env.ICHIREI_FREE_RUNNER_MS, FREE_RUNNER_MS_DEFAULT)
 const freeRunnerOn = (): boolean => !/^(off|0|false|no)$/i.test((process.env.ICHIREI_FREE_RUNNER_UP ?? '').trim())
@@ -204,7 +215,7 @@ export interface CardsArgs {
   /** The filled language prompt (the main and second cards add the card block to it). */
   prompt: string
   tStart: number
-  models: { select: string; review: string; free: string }
+  models: { select: string; review: string; free: string; /** the free pick's fast fallback call (Haiku, no thinking) */ freeFallback?: string }
   opts: {
     apiKey?: string
     signal?: AbortSignal
@@ -479,7 +490,7 @@ export async function runCards(a: CardsArgs): Promise<CardsOut> {
   // ---- the calls: all started now ---------------------------------------------------------------------------------------------------------------------------------------------
   const room = () => runBudgetMs() - at() - RESERVE_MS
 
-  const modelCall = async (slot: CardSlot, content: string | Anthropic.TextBlockParam[], model: string, effort: string, maxTokens: number, ceilingMs: number, retryable: boolean, sig: AbortSignal, extra: { noThinking?: boolean; hedge?: 1 | 2; round?: 1 | 2 } = {}): Promise<CallOut> => {
+  const modelCall = async (slot: CardSlot, content: string | Anthropic.TextBlockParam[], model: string, effort: string, maxTokens: number, ceilingMs: number, retryable: boolean, sig: AbortSignal, extra: { noThinking?: boolean; adaptive?: boolean; hedge?: 1 | 2; round?: 1 | 2 } = {}): Promise<CallOut> => {
     const info: CardCallInfo = { slot, model, effort, ms: 0, attempts: 0, output_tokens: null, thinking_tokens: null, stop_reason: null, parse: 'failed', offered: 0, keys: [], reply_chars: 0, ...(extra.hedge ? { hedge: extra.hedge } : {}), ...(extra.round === 2 ? { round: 2 as const } : {}) }
     report.calls.push(info)
     const t0 = Date.now()
@@ -495,7 +506,7 @@ export async function runCards(a: CardsArgs): Promise<CardsOut> {
         let message: Anthropic.Message
         let seen: () => number | null
         try {
-          const stream = client.messages.stream({ model, max_tokens: tokens, output_config: { effort: effort as 'low' }, messages: [{ role: 'user', content }], ...(extra.noThinking ? { thinking: { type: 'disabled' as const } } : {}) }, { signal: callSig })
+          const stream = client.messages.stream({ model, max_tokens: tokens, output_config: { effort: effort as 'low' }, messages: [{ role: 'user', content }], ...(extra.noThinking ? { thinking: { type: 'disabled' as const } } : extra.adaptive ? { thinking: { type: 'adaptive' as const } } : {}) }, { signal: callSig })
           seen = watchThinkingTokens(stream)
           if (slot === 'main') {
             let first = true
@@ -641,16 +652,35 @@ export async function runCards(a: CardsArgs): Promise<CardsOut> {
         log(`[ichirei-card-call] ${JSON.stringify({ slot: 'freestyle', hedged: 2, ...(round === 2 ? { round } : {}), hedge_winner: winner })}`)
         resolve(out)
       }
-      ;([1, 2] as const).forEach((h, i) => {
-        void modelCall('freestyle', content, models.free, 'low', FREE_MAX_TOKENS, freeCallMs(), false, AbortSignal.any([freeSignal, stops[i].signal]), { noThinking: true, hedge: h, round }).then((out) => {
+      // hedge 1: the free model (Sonnet 5.5) with light thinking, started now. hedge 2: the fast fallback (Haiku, no thinking), sent after FREE_FALLBACK_AFTER_MS if hedge 1 has not answered,
+      // or at once when hedge 1 answered with nothing usable. The first readable answer wins and the other call is cancelled.
+      const launch = (h: 1 | 2): void => {
+        const i = h - 1
+        const call =
+          h === 1
+            ? modelCall('freestyle', content, models.free, FREE_EFFORT(), FREE_MAX_TOKENS, freeCallMs(), false, AbortSignal.any([freeSignal, stops[i].signal]), { adaptive: true, hedge: 1, round })
+            : modelCall('freestyle', content, models.freeFallback ?? models.review, 'low', FREE_FALLBACK_MAX_TOKENS, freeFallbackCallMs(), false, AbortSignal.any([freeSignal, stops[i].signal]), { noThinking: true, hedge: 2, round })
+        void call.then((out) => {
           results[i] = out
           if (decided) return
           if (out.cands.length > 0) {
             stops[1 - i].abort() // the other call is cancelled
+            clearTimeout(timer)
             done(h, out)
+          } else if (h === 1 && !started2) {
+            clearTimeout(timer)
+            launch2()
           } else if (results[0] && results[1]) done(null, results[0])
         })
-      })
+      }
+      let started2 = false
+      const launch2 = (): void => {
+        if (started2 || decided) return
+        started2 = true
+        launch(2)
+      }
+      const timer: ReturnType<typeof setTimeout> = setTimeout(launch2, freeFallbackAfterMs())
+      launch(1)
     })
   }
   const callFree = memorial ? null : hedgedFree()

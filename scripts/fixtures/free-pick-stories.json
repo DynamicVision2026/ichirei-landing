@@ -1,0 +1,25 @@
+{
+ "_note": "The two stories of scripts/free-pick-compare.mjs. thanks-2 is an internal Japanese story (engine/selftest/stories.json); en-stepdad is the English sample story of scripts/sample-world-descriptions.ts. Neither is a customer's story. Replace them with your own via --stories.",
+ "stories": [
+  {
+   "id": "en-stepdad",
+   "purpose": "thanks",
+   "relationship": "parent_father",
+   "direction": "up",
+   "state": null,
+   "occasion_detail": null,
+   "language": "en",
+   "story": "My stepdad drove me to school every morning for six years, even after his night shifts, and never once complained."
+  },
+  {
+   "id": "thanks-2",
+   "purpose": "thanks",
+   "relationship": "parent_mother",
+   "direction": "up",
+   "state": null,
+   "occasion_detail": "母の日",
+   "language": "ja",
+   "story": "母は、私が夜遅く帰る日は、玄関の電気をつけたまま、台所の椅子で眠っていた。起こすと「今来たところ」と言う。いつもそうだった。"
+  }
+ ]
+}

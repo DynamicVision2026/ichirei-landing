@@ -1,5 +1,34 @@
 ICHIREI — Free Pick Card Prompt (v9, parallel cards)
-Write the FREE PICK (遊び字) card of this gift. The main card and the second card are written by other calls at this very moment; you do not see them. Give FIVE characters for the free pick, ranked from your best to your fifth, in a single short answer. Reply with the JSON object only: no prose, no code fence. Be quick: the sender is waiting; do not deliberate at length.
+Write the FREE PICK (遊び字) card of this gift. The main card and the second card are written by other calls at this very moment; you do not see them. Give FIVE characters for the free pick, ranked from your best to your fifth, in a single short answer. Reply with the JSON object only: no prose, no code fence.
+
+THE AHA — WHAT EVERY CARD MUST DO
+The sender has just written one true moment. When they turn over a card, they
+should feel "Aha — that's exactly it." Two things at once:
+
+1. ACCURATE. The character holds what the sender actually wrote: the feeling
+   inside their moment, the way they see this person. Nothing invented. The
+   sender recognises their own moment in it at once. Accuracy comes first:
+   a surprising card that is not true to the moment is a wrong card.
+
+2. SURPRISING. It is not the first word anyone would reach for. It catches the
+   moment from an angle the sender did not expect: the detail they mentioned
+   in passing, the gesture under the words, the quality they felt but never
+   named. The surprise is in the angle, never in strangeness or rarity.
+
+THE TEST. Picture the sender reading the card. If their reaction would be
+"yes, of course" — it is accurate but flat: look again for the angle. If it
+would be "hm, why this?" — it is clever but not true: go back to their words.
+Only "Aha — that's them. I never had the word for it." is a card.
+
+Practical consequences:
+- Begin from a specific detail of the moment, not from the general feeling.
+  The general feeling (love, thanks, warmth) is where you end, not where you start.
+- The one_line_gaze names that detail and shows, in plain words, why this
+  character holds it. The sender should see the link the moment they read it.
+- A common character is fine when the angle is fresh; a rare character is
+  not a surprise by itself.
+- The three cards are three different "ahas": the deepest truth (main), another
+  side of the person (second), and the playful detail only these two share (free).
 
 CONTEXT (supplied by the harness — take it as given)
 language: {{ LANGUAGE }}
@@ -16,6 +45,16 @@ THE STORY (the sender's own words; the receiver is the person they describe)
 
 WHAT A FREE PICK IS
 The playful or raw truth of the relationship: a smile, a shared joke, a habit the two of them laugh about together (who is always late, who always pays, who always saves). It may be an ordinary or even unbeautiful character. It is never a hard memory, a hardship, a wound, a secret, or anything the receiver or the sender was ashamed of, hurt by or hid — even told kindly.
+WHAT MAKES A FREE PICK SMART
+- The sender should smile in recognition: "that's so them". The free pick catches what only these two people know, from a detail in the story, with a clever turn.
+- The clever turn can come from the character's SHAPE, one of its PARTS (radicals), a SECOND MEANING, or the OBJECT ITSELF. Example: 傘 for the father who always carries the umbrella for both. Example: 甘 for the grandmother who sneaks an extra sweet into the lunch box. Example: 走 for the friend who runs to every train.
+- It is concrete: one object, one habit, one place from the story. Never a feeling word.
+- It is something a smart friend would think of, not the first word in a dictionary.
+- WEAK PICKS TO AVOID: a character that only restates a feeling (楽, 笑, 喜); a generic "fun" word; a character tied to the story only by a vague theme.
+- In `one_line_gaze` the line must show the turn: name the detail and why this character catches it, in plain words, still completing 「その人は、」 / "They are".
+- You have room to think before you answer: look for the angle first, then check every rule below. The five options stay ranked, and candidate 1 must be the smartest one that passes every rule, not the safest.
+
+THE RULES (every one still applies)
 1. Story-anchored: `story_anchor` is a SHORT verbatim fragment of the story (about 6–20 characters / 3–8 words), exactly as written, of something the two actually shared. No anchor → none.
 2. Teasing, never insulting. Forbidden: the body, appearance, weight, intelligence, status, sexual meaning, illness, disability, cruelty, cold or hostile words — anything one person would laugh AT the other about rather than WITH them. When in doubt, leave it out. Money is NOT forbidden when the story shows a warm shared habit around it.
 3. A concrete object or action from the story (the flower, the shoes, the lunch box, the ticket) is welcome here.
@@ -38,4 +77,4 @@ CHARACTERS YOU MUST NOT USE (already shown for this story, or set aside; not one
 OUTPUT FIELDS (the customer-facing strings are written in the language given above)
 {{ FIELDS }}
 
-OUTPUT. Reply with exactly one JSON object and nothing else: {"candidates": [ <candidate 1>, <candidate 2>, <candidate 3>, <candidate 4>, <candidate 5> ]}, each candidate shaped {"slot": "freestyle", "kanji": …, "reading": …, "inscription_form": …, "truth_type": "Play", "one_line_gaze": …, "story_anchor": …{{ EXTRA }} }. Candidate 1 is your best, candidate 5 your fifth. All five are DIFFERENT characters, none on the list above, and each follows every rule above; take them from different details of the story where the story allows (a habit, an object, a place, a saying). They are tried in order and the first one that passes the checks is used, so the later ones matter: an earlier one may be removed because it was already shown, because another card chose the same character or the same place in the story, or by a check. Give five whenever you honestly can; if you find fewer that are light, kind and story-anchored, give fewer; never fill a place with a weak one. If you cannot find a light, kind, story-anchored character at all, reply exactly {"none": true}. A quick, honest answer beats a forced one.
+OUTPUT. Reply with exactly one JSON object and nothing else: {"candidates": [ <candidate 1>, <candidate 2>, <candidate 3>, <candidate 4>, <candidate 5> ]}, each candidate shaped {"slot": "freestyle", "kanji": …, "reading": …, "inscription_form": …, "truth_type": "Play", "one_line_gaze": …, "story_anchor": …{{ EXTRA }} }. Candidate 1 is your best — the smartest one that passes every rule, not the safest — and candidate 5 your fifth. All five are DIFFERENT characters, none on the list above, and each follows every rule above; take them from different details of the story where the story allows (a habit, an object, a place, a saying). They are tried in order and the first one that passes the checks is used, so the later ones matter: an earlier one may be removed because it was already shown, because another card chose the same character or the same place in the story, or by a check. Give five whenever you honestly can; if you find fewer that are light, kind and story-anchored, give fewer; never fill a place with a weak one. If you cannot find a light, kind, story-anchored character at all, reply exactly {"none": true}.

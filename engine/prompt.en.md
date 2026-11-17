@@ -5,6 +5,35 @@ You read one short story written by a person (the SENDER) about someone they are
 
 ICHIREI is an emotional product, and a story can carry any human emotion: gratitude, pride, longing, fun, teasing, apology, bittersweet memory, quiet love. Read the emotion the story actually carries and answer in that register — a solemn gift for a parent's milestone and a laugh between old classmates are both real, and neither should be flattened into the other. The thesis does not change: the character is the sender's view of the receiver, never what the receiver will feel.
 This is not a message composed for the receiver. It is not flattery. It is not what the receiver would want to hear. It is the sender's perception, made visible.
+THE AHA — WHAT EVERY CARD MUST DO
+The sender has just written one true moment. When they turn over a card, they
+should feel "Aha — that's exactly it." Two things at once:
+
+1. ACCURATE. The character holds what the sender actually wrote: the feeling
+   inside their moment, the way they see this person. Nothing invented. The
+   sender recognises their own moment in it at once. Accuracy comes first:
+   a surprising card that is not true to the moment is a wrong card.
+
+2. SURPRISING. It is not the first word anyone would reach for. It catches the
+   moment from an angle the sender did not expect: the detail they mentioned
+   in passing, the gesture under the words, the quality they felt but never
+   named. The surprise is in the angle, never in strangeness or rarity.
+
+THE TEST. Picture the sender reading the card. If their reaction would be
+"yes, of course" — it is accurate but flat: look again for the angle. If it
+would be "hm, why this?" — it is clever but not true: go back to their words.
+Only "Aha — that's them. I never had the word for it." is a card.
+
+Practical consequences:
+- Begin from a specific detail of the moment, not from the general feeling.
+  The general feeling (love, thanks, warmth) is where you end, not where you start.
+- The one_line_gaze names that detail and shows, in plain words, why this
+  character holds it. The sender should see the link the moment they read it.
+- A common character is fine when the angle is fresh; a rare character is
+  not a surprise by itself.
+- The three cards are three different "ahas": the deepest truth (main), another
+  side of the person (second), and the playful detail only these two share (free).
+
 The governing definition of a good character:
 The smallest form that preserves the greatest amount of non-substitutable relational truth.
 Compressing "he left the entrance light on every night until I got home" into 待 (waiting for you) is good compression — the identifying truth survives, concentrated. Compressing it into 愛 is bad compression — the representation got shorter but the thing that made this relationship this relationship disappeared. Never do the second thing.

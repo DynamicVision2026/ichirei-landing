@@ -84,6 +84,8 @@ process.env.ANTHROPIC_BASE_URL = `http://127.0.0.1:${(upstream.address() as { po
 process.env.ANTHROPIC_API_KEY = 'test-key-not-real'
 process.env.ICHIREI_LEXICON_MODE = 'off'
 for (const k of ['ICHIREI_CARDS', 'ICHIREI_GAZE_FIX', 'ICHIREI_REVIEW', 'REQUIRE_CLASSICAL_ECHO', 'ICHIREI_REPLACE', 'ICHIREI_FREE_RETRY', 'ICHIREI_FREE_RUNNER_UP']) delete process.env[k]
+// the free pick's fast fallback goes out after 8 s in production; this suite treats the two calls as a pair, so it goes out at once (the real timing is tested in test-parallel.ts section N)
+process.env.ICHIREI_FREE_FALLBACK_AFTER_MS = '0'
 
 type Ctx = typeof fx.context
 const BIRTHDAY: Ctx = { ...fx.context, occasion: 'birthday_milestone' }

@@ -13,7 +13,7 @@ import { STATS_KEYS, STATS_LANGS, statsDicts, ZH_HANS_KEEP } from '../engine/sta
 import { PERIODS } from '../engine/stats.ts'
 import { PURPOSES } from '../src/order/purpose.ts'
 import { toSimplified } from '../engine/script.ts'
-import { tokensUsd, PICTURE_USD, PICTURES_PER_RENDER, FILM_SCRIPT_USD, USD_JPY } from '../engine/ops-costs.ts'
+import { MODEL_PRICES, tokensUsd, PICTURE_USD, PICTURES_PER_RENDER, FILM_SCRIPT_USD, USD_JPY } from '../engine/ops-costs.ts'
 
 let failures = 0
 function check(name: string, cond: boolean, detail?: string) {
@@ -99,8 +99,9 @@ check('(2) today: 5 visits (the self-test event does not count), 2 from social, 
 check('(2) funnel counts add up: each step of the same day is never larger than the one before it where the steps are nested, and paid ≤ saw characters', T.funnel.visits >= T.funnel.chips && T.funnel.chips >= T.funnel.cards && T.funnel.cards >= T.funnel.give && T.funnel.give >= T.funnel.paid, JSON.stringify(T.funnel))
 check('(2) paid orders today: 2 (the refunded one and the unpaid cart do not count; the other shop\'s order is ignored); revenue = 18,850 + 3,980 = 22,830; 1 cancellation', T.paid === 2 && T.revenue_jpy === 22830 && T.cancelled === 1, JSON.stringify({ p: T.paid, r: T.revenue_jpy, c: T.cancelled }))
 check('(2) collected 1, receiver opened 1 (found by the hash of the gift link)', T.funnel.collected === 1 && T.funnel.opened === 1)
-const cost = 4.5 + (PICTURES_PER_RENDER * PICTURE_USD + FILM_SCRIPT_USD)
-check('(2) AI cost = logged tokens priced by engine/ops-costs.ts + the pictures of the renders, in yen', Math.abs(tokensUsd('claude-sonnet-5-5', { in: 1_000_000, out: 100_000 }) - 4.5) < 1e-9 && T.ai_cost_jpy === Math.round(cost * USD_JPY), `${T.ai_cost_jpy} vs ${Math.round(cost * USD_JPY)}`)
+const cost = 3.0 + (PICTURES_PER_RENDER * PICTURE_USD + FILM_SCRIPT_USD)
+check('(2) the price table (2026-11-16, USD per million tokens, input / output): Sonnet 5 and Sonnet 5.5 2 / 10, Opus 5.5 4 / 20, Haiku 5.5 0.10 / 0.50 (prompts up to 100k tokens)', MODEL_PRICES['claude-sonnet-5'].input === 2 && MODEL_PRICES['claude-sonnet-5'].output === 10 && MODEL_PRICES['claude-sonnet-5-5'].input === 2 && MODEL_PRICES['claude-sonnet-5-5'].output === 10 && MODEL_PRICES['claude-opus-5-5'].input === 4 && MODEL_PRICES['claude-opus-5-5'].output === 20 && MODEL_PRICES['claude-haiku-5-5'].input === 0.1 && MODEL_PRICES['claude-haiku-5-5'].output === 0.5 && Math.abs(tokensUsd('claude-haiku-5-5', { in: 1_000_000, out: 1_000_000 }) - 0.6) < 1e-9 && Math.abs(tokensUsd('claude-opus-5-5', { in: 1_000_000, out: 1_000_000 }) - 24) < 1e-9)
+check('(2) AI cost = logged tokens priced by engine/ops-costs.ts + the pictures of the renders, in yen', Math.abs(tokensUsd('claude-sonnet-5-5', { in: 1_000_000, out: 100_000 }) - 3.0) < 1e-9 && T.ai_cost_jpy === Math.round(cost * USD_JPY), `${T.ai_cost_jpy} vs ${Math.round(cost * USD_JPY)}`)
 check('(2) visits by source (direct 2, Instagram 1, X 1, other 1) and by page language (ja 3, zh-Hant 1, en 1)', T.sources.visits.direct === 2 && T.sources.visits.instagram === 1 && T.sources.visits.x === 1 && T.sources.visits.other === 1 && T.languages.visits.ja === 3 && T.languages.visits['zh-Hant'] === 1 && T.languages.visits.en === 1)
 check('(2) paid orders by source come from the order\'s own browser session (Instagram 1; the one from a direct visit 1)', T.sources.paid.instagram === 1 && T.sources.paid.direct === 1 && T.languages.paid.ja === 1 && T.languages.paid.en === 1)
 

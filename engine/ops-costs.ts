@@ -11,10 +11,11 @@ export interface ModelPrice {
 }
 
 export const MODEL_PRICES: Record<string, ModelPrice> = {
-  'claude-sonnet-5': { input: 3, output: 15 },
-  'claude-sonnet-5-5': { input: 3, output: 15 },
-  'claude-haiku-5-5': { input: 1, output: 5 },
-  'claude-opus-5-5': { input: 5, output: 25 },
+  'claude-sonnet-5': { input: 2, output: 10 },
+  'claude-sonnet-5-5': { input: 2, output: 10 },
+  // Haiku 5.5: 0.10 / 0.50 for prompts up to 100k tokens (0.50 / 2.50 above that; ours are all below)
+  'claude-haiku-5-5': { input: 0.1, output: 0.5 },
+  'claude-opus-5-5': { input: 4, output: 20 },
   'claude-fable-5-1': { input: 5, output: 25 },
   default: { input: 3, output: 15 },
 }

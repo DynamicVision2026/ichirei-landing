@@ -82,7 +82,7 @@ try {
 
   // ---- B. Health + timeouts actually applied ---------------------------
   const health = await (await fetch(base + '/api/health')).json()
-  check('health: ok + key configured + model', health.ok && health.apiKeyConfigured && health.model === 'claude-sonnet-5', JSON.stringify(health))
+  check('health: ok + key configured + model', health.ok && health.apiKeyConfigured && health.model === 'claude-sonnet-5-5', JSON.stringify(health))
   check('timeout: Node requestTimeout applied = 300000ms', health.applied?.requestTimeout === 300_000, JSON.stringify(health.applied))
   check('timeout: Node socket timeout applied = 300000ms', health.applied?.socketTimeout === 300_000, JSON.stringify(health.applied))
   check('timeout: keep-alive outlasts front end (>=600s)', (health.applied?.keepAliveTimeout ?? 0) >= 600_000)
@@ -138,7 +138,7 @@ try {
   check('health: reports the speed settings the server runs with', health.effort === 'medium' && health.maxTokens === 14000 && health.maxTokensRetry === 20000 && health.reviewModel === 'claude-haiku-5-5' && health.reviewEffort === 'low' && health.callTimeoutMs === 150000 && health.reviewTimeoutMs === 60000, JSON.stringify(health))
   check('review: the engine made a SECOND, separate model call (the review) after the selection call, with no selection reasoning in it', upstream.state.requests.some((r) => r.kind === 'review' && !String(r.body.messages[0].content).includes('Abandonment Resistance')))
   const prompt = sent?.body.messages?.[0]?.content ?? ''
-  check('engine→model: model is claude-sonnet-5, streaming, effort medium', sent?.body.model === 'claude-sonnet-5' && sent?.body.stream === true && sent?.body.output_config?.effort === 'medium', JSON.stringify({ m: sent?.body.model, s: sent?.body.stream, e: sent?.body.output_config }))
+  check('engine→model: model is claude-sonnet-5-5, streaming, effort medium', sent?.body.model === 'claude-sonnet-5-5' && sent?.body.stream === true && sent?.body.output_config?.effort === 'medium', JSON.stringify({ m: sent?.body.model, s: sent?.body.stream, e: sent?.body.output_config }))
   check('engine→model: max_tokens 14000 (default)', sent?.body.max_tokens === 14000)
   check('engine→model: prompt.ja.md loaded (skeleton + runtime contract + golden context)', prompt.includes('YOUR ROLE') && prompt.includes('OUTPUT CONTRACT (runtime)') && prompt.includes('inscription_form') && ['language: ja', 'relationship: parent_father', 'direction: up', 'occasion: parent_day', 'occasion_detail: 還暦'].every((l) => prompt.includes(l)))
   check('engine→model: story injected at the slot, slot removed', prompt.includes(STORY) && !prompt.includes('{{ Paste the story here }}'))

@@ -54,7 +54,9 @@ if (!haveBase) console.log(`SKIP  the base commit ${BASE} is not in this checkou
 else {
   // (2026-11-14: the later "final fix" ticket deliberately changes the receiver page, the buyer page, the legal page, the e-mail template and parts of the engine — so these checks now guard what that ticket must
   // NOT touch: the engine's CHOICE of characters (selection, cards, prompts, palette, lexicon) and the prices, compared with the moment release.)
-  const GUARD = ['engine/engine.ts', 'engine/cards.ts', 'engine/slots.ts', 'engine/prompt.ja.md', 'engine/prompt.zh.md', 'engine/prompt.en.md', 'engine/review.ts']
+  // (2026-11-16: the "smarter free pick" ticket deliberately changes the engine's models, the free call and the prompts — the AHA section, the free-pick prompt — so engine.ts, cards.ts and the three prompts leave this guard;
+  // the slot rules and the review stay guarded. That ticket has its own checks in test-free-pick.ts.)
+  const GUARD = ['engine/slots.ts', 'engine/review.ts']
   // The one change since (gift ceremony 2026-11-15, A4): the English prompt also asks for `line_you_en`, the receiver's line, in the same answer. Every other guarded line is as it was.
   const guardDiff = execFileSync('git', ['diff', '-U0', 'b2af257', '--', ...GUARD]).toString().split('\n').filter((l) => /^[-+]/.test(l) && !/^(\+\+\+|---)/.test(l))
   const allowed = (l: string) => /line_you_en/.test(l) || l === '-* The freestyle candidate has neither field.' || l === '+* The freestyle candidate has none of these fields.'

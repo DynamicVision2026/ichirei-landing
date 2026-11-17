@@ -49,7 +49,7 @@ import {
 } from './contract.ts'
 
 // --- Configurable in ONE place (build spec §3) ---
-const MODEL = process.env.ICHIREI_MODEL ?? 'claude-sonnet-5'
+const MODEL = process.env.ICHIREI_MODEL ?? 'claude-sonnet-5-5'
 const EFFORT = (process.env.ICHIREI_EFFORT ?? 'medium') as
   | 'low'
   | 'medium'
@@ -63,6 +63,7 @@ const MAX_TOKENS = Number(process.env.ICHIREI_MAX_TOKENS ?? 14000)
 const MAX_TOKENS_RETRY = Number(process.env.ICHIREI_MAX_TOKENS_RETRY ?? 20000)
 // The review only checks a short answer: the fastest current model at low effort (ICHIREI_REVIEW_MODEL / ICHIREI_REVIEW_EFFORT override).
 export const DEFAULT_REVIEW_MODEL = 'claude-haiku-5-5'
+export const DEFAULT_FREE_MODEL = 'claude-sonnet-5-5'
 const REVIEW_MODEL = process.env.ICHIREI_REVIEW_MODEL ?? DEFAULT_REVIEW_MODEL
 
 // Slots every prompt file must contain. The story slot is the original Phase 0
@@ -871,7 +872,8 @@ async function runCardsPipeline(a: PipelineArgs): Promise<PipelineOut> {
     prompt,
     tStart,
     settle,
-    models: { select: MODEL, review: REVIEW_MODEL, free: process.env.ICHIREI_FREE_MODEL ?? process.env.ICHIREI_REFILL_FREE_MODEL ?? REVIEW_MODEL },
+    // the free pick (遊び字, 2026-11-16): Sonnet 5.5 with light thinking; its fast fallback call is the review model (Haiku 5.5, no thinking)
+    models: { select: MODEL, review: REVIEW_MODEL, free: process.env.ICHIREI_FREE_MODEL ?? process.env.ICHIREI_REFILL_FREE_MODEL ?? DEFAULT_FREE_MODEL, freeFallback: process.env.ICHIREI_FREE_FALLBACK_MODEL ?? REVIEW_MODEL },
     opts: { apiKey: opts.apiKey, signal: opts.signal, onUsage: opts.onUsage, onStage: opts.onStage, onDelta: opts.onDelta, onCard: (p) => { for (const c of p.candidates) if (!c.eliminated) streamed[c.slot] = { kanji: c.kanji, line: c.one_line_gaze }; opts.onCard?.(p) }, exclude: opts.exclude, round: opts.round },
     deps: { extractJson, stamp: (r) => stampResult(r, context) },
     canBeMain,

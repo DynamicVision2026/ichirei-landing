@@ -19,7 +19,7 @@ export async function warmLexiconCache(opts: { apiKey?: string; signal?: AbortSi
   if (lexiconModeFromEnv(env) !== 'on') return { ran: false, skipped: 'lexicon_not_on' }
   try {
     const block = lexiconStaticBlock(loadLexicon())
-    const model = opts.model ?? env.ICHIREI_MODEL ?? 'claude-sonnet-5'
+    const model = opts.model ?? env.ICHIREI_MODEL ?? 'claude-sonnet-5-5'
     const client = opts.client ?? new Anthropic({ maxRetries: 0, ...(opts.apiKey ? { apiKey: opts.apiKey } : {}) })
     const message = await client.messages.stream({ model, max_tokens: 1, messages: [{ role: 'user', content: [{ type: 'text', text: block, cache_control: { type: 'ephemeral' } }, { type: 'text', text: 'Reply with the single word: ready.' }] }] }, { signal: opts.signal }).finalMessage()
     return { ran: true, usage: usageOf(model, message.usage) }
