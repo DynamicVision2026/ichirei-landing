@@ -1,3 +1,15 @@
 User-agent: *
 Allow: /
+Disallow: /g/
 Disallow: /a/
+Disallow: /b/
+Disallow: /basket
+Disallow: /claim
+Disallow: /track
+Disallow: /ops
+Disallow: /api/
+Disallow: /write
+Disallow: /en/write
+Disallow: /zh/write
+
+Sitemap: https://ichirei.beyondculture.ai/sitemap.xml

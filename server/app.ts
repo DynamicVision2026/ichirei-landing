@@ -18,7 +18,7 @@ import { loopHandlers } from '../api/loop.ts'
 import { handlers as animationHandlers } from '../api/animation.ts'
 import { handlers as previewHandlers } from '../api/preview.ts'
 import { handlers as selftestHandlers } from '../api/selftest.ts'
-import { readFile } from 'node:fs/promises'
+import { readFile, stat } from 'node:fs/promises'
 import { handlers as giftHandlers } from '../api/gift.ts'
 import { handlers as opsHandlers } from '../api/ops.ts'
 import { statsHandlers } from '../api/ops-stats.ts'
@@ -42,6 +42,8 @@ import { envRunLimiter } from '../engine/rate-limit.ts'
 import { ensureVisitor } from '../engine/visitor.ts'
 import { withHeartbeat } from './heartbeat.ts'
 import { injectLandingShare, landingShare } from '../engine/landing-share.ts'
+import { landingExtras, robotsTxt, sitemapXml } from '../engine/seo.ts'
+import { publicUrl } from '../engine/animation.ts'
 import { oldHostRedirect } from './old-host.ts'
 
 export interface ServerConfig {
@@ -349,19 +351,45 @@ export function createApp(config: ServerConfig): Hono {
     return (await giftHandlers.page(c.req.param('token'), indexHtml)) ?? next()
   })
 
-  // The English and Traditional Chinese landing pages, as HTML with their own link-preview tags (2026-11-15, engine/landing-share.ts): the apps that show a link's card do not run the page.
-  // `/` and the Japanese page are index.html exactly as it is.
+  // The three landing pages, as HTML with their own link-preview tags and, in the first HTML, readable text and search tags (2026-11-15 engine/landing-share.ts; 2026-11-17 engine/seo.ts): the apps
+  // that show a link's card and the crawlers do not run the page. `/` is the Japanese page. The writing rooms carry their language's link-preview tags only.
   // (2026-11-16) the writing rooms /en/write and /zh/write carry their language's tags too; /write is the Japanese one (index.html as it is, via the SPA fallback)
-  for (const [path, lang] of [['/en', 'en'], ['/en/', 'en'], ['/en/write', 'en'], ['/en/write/', 'en'], ['/zh', 'zh-Hant'], ['/zh/', 'zh-Hant'], ['/zh/write', 'zh-Hant'], ['/zh/write/', 'zh-Hant']] as const) {
+  for (const [path, lang, landing] of [
+    ['/', 'ja', true], ['/en', 'en', true], ['/en/', 'en', true], ['/zh', 'zh-Hant', true], ['/zh/', 'zh-Hant', true],
+    ['/en/write', 'en', false], ['/en/write/', 'en', false], ['/zh/write', 'zh-Hant', false], ['/zh/write/', 'zh-Hant', false],
+  ] as const) {
     app.get(path, async (c, next) => {
       try {
         indexHtml ??= await readFile('./dist/index.html', 'utf8')
       } catch {
         return next()
       }
-      return c.html(injectLandingShare(indexHtml, landingShare(lang)), 200, { 'Cache-Control': 'no-cache' })
+      const share = landingShare(lang)
+      return c.html(injectLandingShare(indexHtml, share, landing ? landingExtras(lang, share) : undefined), 200, { 'Cache-Control': 'no-cache' })
     })
   }
+
+  // The track page is the owner's tool: never listed (the gift, animation, claim and basket pages above say the same)
+  for (const p of ['/track', '/track/*']) {
+    app.use(p, async (c, next) => {
+      await next()
+      c.header('X-Robots-Tag', 'noindex, nofollow')
+    })
+  }
+
+  // /sitemap.xml and /robots.txt (2026-11-17, engine/seo.ts). lastmod is the day this build was made (the built index.html's own date).
+  let builtDay: string | null = null
+  app.get('/sitemap.xml', async (c) => {
+    if (!builtDay) {
+      try {
+        builtDay = (await stat('./dist/index.html')).mtime.toISOString().slice(0, 10)
+      } catch {
+        builtDay = new Date().toISOString().slice(0, 10)
+      }
+    }
+    return c.body(sitemapXml(publicUrl(), builtDay), 200, { 'Content-Type': 'application/xml; charset=utf-8', 'Cache-Control': 'public, max-age=3600' })
+  })
+  app.get('/robots.txt', (c) => c.body(robotsTxt(publicUrl()), 200, { 'Content-Type': 'text/plain; charset=utf-8', 'Cache-Control': 'public, max-age=3600' }))
 
   // The built bundle, stylesheet and pages are text: gzip them (Cloud Run does not). Never the API — the NDJSON
   // stream and its heartbeat must reach the browser byte by byte, so /api/* is left exactly as it was.

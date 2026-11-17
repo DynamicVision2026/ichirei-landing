@@ -48,7 +48,8 @@ try {
   {
     const { readFileSync } = await import('node:fs')
     const built = readFileSync('dist/index.html', 'utf8')
-    check('share tags: / is byte-identical to the built index.html (the Japanese tags, untouched)', html === built)
+    // (2026-11-17) / is the Japanese landing page with its readable first block and search tags (engine/seo.ts); everything else of index.html is as built
+    check('share tags: / is the built index.html with the readable block and search tags added (the module script, the font loader and the Japanese og: tags are still there)', html !== built && html.includes('<script type="module"') && html.includes('<div id="root"><div class="seo-static"') && html.includes('<h1>あなたとわたし、一字の距離。</h1>') && html.includes('<html lang="ja"') && html.includes('og:title" content="ICHIREI 一字礼 — 一字の贈りもの"') && html.includes('<link rel="canonical" href="https://ichirei.beyondculture.ai/" />') && html.includes('fonts.googleapis.com'))
     for (const path of ['/en', '/en/', '/en?code=THANKS100', '/en?utm_source=x']) {
       const r = await fetch(base + path)
       const h = await r.text()
@@ -64,6 +65,30 @@ try {
     }
     const zh = await (await fetch(base + '/zh')).text()
     check('share tags: GET /zh carries lang="zh-Hant", the Traditional Chinese title and description, og:locale zh_TW', zh.includes('<html lang="zh-Hant"') && zh.includes('<title>ICHIREI 一字禮 — 一個字的禮物</title>') && zh.includes('og:description" content="ICHIREI（一字禮）— 把你眼中的那個人，凝成一個字。獻給重要的人的一個字的禮物。"') && zh.includes('og:locale" content="zh_TW"') && !zh.includes('ja_JP'))
+    // (2026-11-17) readable without JavaScript: the raw HTML of the three pages, the sitemap and robots.txt, and the private pages still noindex
+    {
+      const enRaw = await (await fetch(base + '/en')).text()
+      const jaRaw = html
+      check('seo: GET /en (no JavaScript) has an <h1>, the paragraph, a price line and the /legal link inside the root, canonical /en, hreflang ×4, and a USD Product offer', /<div id="root"><div class="seo-static"[^>]*><h1>Between you and me, one character\.<\/h1><p>Tell us one true moment[^<]*<\/p><p>[^<]*\$[0-9][^<]*<\/p><p><a href="\/legal">Legal notice and returns<\/a><\/p><\/div><\/div>/.test(enRaw) && enRaw.includes('<link rel="canonical" href="https://ichirei.beyondculture.ai/en" />') && (enRaw.match(/rel="alternate" hreflang=/g) ?? []).length === 4 && enRaw.includes('"priceCurrency":"USD"') && enRaw.includes('"brand":{"@type":"Brand","name":"Beyond Culture"}'), enRaw.slice(enRaw.indexOf('<div id="root">'), enRaw.indexOf('<div id="root">') + 700))
+      check('seo: GET / (no JavaScript) has the Japanese <h1>, the hero sub line, a yen price line and the /legal link, and a JPY Product offer', /<h1>あなたとわたし、一字の距離。<\/h1><p>すべては、ひと場面から。[^<]*<\/p><p>[^<]*¥[0-9][^<]*<\/p><p><a href="\/legal">特定商取引法に基づく表記・返品について<\/a><\/p>/.test(jaRaw) && jaRaw.includes('"priceCurrency":"JPY"'))
+      check('seo: GET /zh (no JavaScript) has the Traditional Chinese <h1> and canonical /zh', zh.includes('<h1>你和我之間，只隔一個字。</h1>') && zh.includes('<link rel="canonical" href="https://ichirei.beyondculture.ai/zh" />'))
+      const wr = await (await fetch(base + '/en/write')).text()
+      check('seo: the writing room /en/write keeps its link-preview tags but has no landing block, canonical or product data', wr.includes('og:url') && !wr.includes('seo-static') && !wr.includes('rel="canonical"') && !wr.includes('application/ld+json'))
+      const sm = await fetch(base + '/sitemap.xml')
+      const smx = await sm.text()
+      const locs = [...smx.matchAll(/<loc>([^<]+)<\/loc>/g)].map((m) => m[1])
+      check('seo: GET /sitemap.xml is XML and lists exactly /, /en, /zh and /legal, with the alternates and a lastmod', sm.status === 200 && /^application\/xml/.test(sm.headers.get('content-type') ?? '') && locs.join(' ') === ['/', '/en', '/zh', '/legal'].map((p) => 'https://ichirei.beyondculture.ai' + p).join(' ') && (smx.match(/hreflang=/g) ?? []).length === 12 && /<lastmod>\d{4}-\d{2}-\d{2}<\/lastmod>/.test(smx), smx.slice(0, 500))
+      const rb = await fetch(base + '/robots.txt')
+      const rbt = await rb.text()
+      check('seo: GET /robots.txt allows all, disallows the private routes and ends with the Sitemap line', rb.status === 200 && /^text\/plain/.test(rb.headers.get('content-type') ?? '') && ['/g/', '/a/', '/claim', '/track', '/ops', '/api/', '/write'].every((p) => rbt.split('\n').includes(`Disallow: ${p}`)) && rbt.trimEnd().endsWith('Sitemap: https://ichirei.beyondculture.ai/sitemap.xml'), rbt)
+      const noindex = []
+      for (const p of ['/g/RG-abcdefghijkmnpqrstu', '/a/AN-abcdefghijkmnpqrstuv', '/claim', '/track', '/basket', '/b/BK-abcdefghijkmnpqrstuv']) {
+        const r = await fetch(base + p)
+        if (!/noindex/.test(r.headers.get('x-robots-tag') ?? '')) noindex.push(`${p} ${r.status}`)
+      }
+      check('seo: the gift, animation, claim, track and basket pages still answer noindex, nofollow', noindex.length === 0, noindex.join(', '))
+      check('seo: the landing pages themselves are not marked noindex', !(await fetch(base + '/en')).headers.get('x-robots-tag') && !home.headers.get('x-robots-tag'))
+    }
     const img = await fetch(base + '/img/og/en.jpg')
     const buf = Buffer.from(await img.arrayBuffer())
     check('share tags: the English picture is served (a JPEG of 1200×630)', img.status === 200 && buf[0] === 0xff && buf[1] === 0xd8 && (() => { for (let i = 2; i < buf.length - 9; i++) if (buf[i] === 0xff && (buf[i + 1] === 0xc0 || buf[i + 1] === 0xc2)) return buf.readUInt16BE(i + 5) === 630 && buf.readUInt16BE(i + 7) === 1200; return false })())
