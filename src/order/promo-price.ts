@@ -1,9 +1,9 @@
 // The one price line under the free-gift box in the hero while the promotion runs (2026-11-17). Both prices come from the existing price config (the dollar prices of /api/sizes and the sale),
 // never from the text. Plain TS with no React import so Node tests can load it.
 
-import { usd, type UsdPrice } from '../order/usd.ts'
-import { PACKAGE_PRICE_JPY, formatYen } from '../order/packages.ts'
-import { salePriceJpy, type Sale } from '../order/sale.ts'
+import { usd, type UsdPrice } from './usd.ts'
+import { PACKAGE_PRICE_JPY, formatYen } from './packages.ts'
+import { salePriceJpy, type Sale } from './sale.ts'
 
 const MONTH = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December']
 
