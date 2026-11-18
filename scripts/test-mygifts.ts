@@ -247,7 +247,7 @@ void realWrite
   const ok = await m!.send({ to: 'x@example.com', subject: 'S', html: '<p>h</p>', text: 't' })
   const post = calls.find((c) => c.url === 'https://api.resend.com/emails')
   const sentBody = JSON.parse(String(post?.init?.body ?? '{}'))
-  check('D2: one POST to Resend with the Bearer key, from "ICHIREI <gifts@beyondculture.ai>", to the one address, with the subject, html and text', ok && (post?.init?.headers as Record<string, string>).authorization === 'Bearer re_secret_value' && sentBody.from === 'ICHIREI <gifts@beyondculture.ai>' && sentBody.to.join() === 'x@example.com' && sentBody.subject === 'S' && sentBody.html === '<p>h</p>' && sentBody.text === 't')
+  check('D2: one POST to Resend with the Bearer key, from "ICHIREI <gifts@beyondculture.ai>", to the one address, with the subject, html and text', ok && ((post?.init?.headers ?? {}) as Record<string, string>).authorization === 'Bearer re_secret_value' && sentBody.from === 'ICHIREI <gifts@beyondculture.ai>' && sentBody.to.join() === 'x@example.com' && sentBody.subject === 'S' && sentBody.html === '<p>h</p>' && sentBody.text === 't')
   const before = calls.length
   await resolveMailer({ K_SERVICE: 'ichirei' } as NodeJS.ProcessEnv, Date.now(), fakeFetch)
   check('D2: a key that was found is kept (Secret Manager is not asked again)', calls.length === before)
