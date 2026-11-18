@@ -292,6 +292,8 @@ export function createApp(config: ServerConfig): Hono {
   app.post('/api/basket', limited(basketLimit), (c) => loopHandlers.basketSave(c.req.raw))
   app.get('/api/basket', limited(basketLimit), (c) => loopHandlers.basketList(c.req.raw))
   app.get('/api/basket/qr.svg', limited(basketLimit), (c) => loopHandlers.basketQr(c.req.raw))
+  app.post('/api/basket/email', limited(basketLimit), tinyBody, (c) => loopHandlers.basketEmail(c.req.raw))
+  app.post('/api/basket/email/resend', limited(basketLimit), tinyBody, (c) => loopHandlers.basketEmailResend(c.req.raw))
   app.get('/api/basket/:id', limited(basketLimit), (c) => loopHandlers.basketItem(c.req.raw, c.req.param('id')))
   app.delete('/api/basket/:id', limited(basketLimit), (c) => loopHandlers.basketDelete(c.req.raw, c.req.param('id')))
   app.get('/api/b/:token', limited(basketLimit), (c) => loopHandlers.basketLink(c.req.raw, c.req.param('token')))

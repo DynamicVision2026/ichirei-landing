@@ -2077,6 +2077,29 @@ const mockPage = async (browser, { onExplain, result, order, track } = {}) => {
     check(`label + line (${lang}): the card shows 「${cardLabel}」 and a line that does NOT repeat the opening; the result page has no label, so it shows the person's line as stored (the opening once, never doubled)`, !cardWho.startsWith(stripped) && who.split(stripped).length <= 2 && cardWho.length > 0 && who.length > 0, JSON.stringify({ cardWho, who }))
     await dp.page.close()
   }
+  // 2026-11-18: what is saved is EXACTLY the chosen card. Pick the main card (saved), go back to the cards, pick the other card (the free one): the item saved for it carries that card's
+  // character, reading, word and line — never the card chosen before — and a card that was saved earlier keeps its own.
+  for (const lang of ['ja', 'zh-Hant', 'en']) {
+    const cc = await mk(lang)
+    await pickMain(cc.page, lang)
+    await cc.page.waitForTimeout(600)
+    const mainSave = cc.bk[cc.bk.length - 1]
+    await cc.page.locator('[data-testid=result-another]').click()
+    const free = cc.page.locator('article[data-slot=freestyle]')
+    await free.waitFor({ timeout: 8000 })
+    await free.click()
+    await free.locator(`text=${GIVE[lang]}`).click()
+    await cc.page.locator('[data-testid=result-page]').waitFor()
+    await cc.page.waitForTimeout(900)
+    const who = await cc.page.locator('[data-testid=result-who]').innerText()
+    const readingText = (await cc.page.locator('[data-testid=result-reading]').count()) ? await cc.page.locator('[data-testid=result-reading]').innerText() : ''
+    const wordText = (await cc.page.locator('[data-testid=result-word]').count()) ? await cc.page.locator('[data-testid=result-word]').innerText() : ''
+    const last = cc.bk[cc.bk.length - 1]
+    const mixed = cc.bk.filter((b) => b.kanji === last.kanji && (b.line !== last.line || b.reading !== last.reading || b.word !== last.word))
+    check(`chosen card (${lang}): choosing the other card saves THAT card — its slot, its character (not the one chosen before), its own line, reading and word as the result page shows them`, mainSave && last.slot === 'freestyle' && last.kanji !== mainSave.kanji && last.line === who && last.line !== mainSave.line && (lang === 'en' ? last.word === wordText : last.reading === readingText) && mixed.length === 0, JSON.stringify({ m: [mainSave?.kanji, mainSave?.line], l: [last.kanji, last.line, last.reading, last.word], who, readingText, wordText, mixed: mixed.length }))
+    check(`chosen card (${lang}): the save carries the relationship, the reason, the round and the slot, and the card chosen first was saved with its own card (slot main)`, mainSave.slot === 'main' && typeof last.relationship === 'string' && last.relationship !== '' && typeof last.purpose === 'string' && last.purpose !== '' && last.round === 1 && mainSave.relationship === last.relationship, JSON.stringify({ r: last.relationship, p: last.purpose, rd: last.round, ms: mainSave.slot }))
+    await cc.page.close()
+  }
   // 2026-11-07: the fourth scene is slow — its place shows the waiting state with a small line, in each language; when it arrives it is replaced; the page asked again after the first render request ended
   for (const lang of ['ja', 'zh-Hant', 'en']) {
     const sl = await mk(lang, { mode: 'slow4' })
@@ -4563,7 +4586,7 @@ for (const [lang, locale, text] of [['en', 'en-US', 'Your gift is being finished
     await page.route('**/api/basket', (r) => r.fulfill({ json: { items, token: 'BT-x', link: 'https://ichirei.soul-id.jp/b/BT-abcdefghjkmnpqrstuvwxyz2' } }))
     await page.goto('http://localhost:5173/basket', { waitUntil: 'networkidle' })
     await page.waitForSelector('[data-testid=basket-item]')
-    check('My gifts page (2026-11-16, the basket page before): the heading "My gifts", "Saved for 30 days.", two items each with the character, "Give this gift →" and "×"', (await page.locator('.basketPage h1').innerText()) === 'My gifts' && (await page.locator('[data-testid=basket-saved]').innerText()) === 'Saved for 30 days.' && (await page.locator('[data-testid=basket-item]').count()) === 2 && (await page.locator('[data-testid=basket-give]').first().innerText()) === 'Give this gift →' && (await page.locator('[data-testid=basket-remove]').first().innerText()) === '×')
+    check('My ICHIREI page (2026-11-18; "My gifts" before): the heading "My ICHIREI", "Saved for 30 days.", two full cards each with the character, "Give this gift →" and "Remove"', (await page.locator('.basketPage h1').innerText()) === 'My ICHIREI' && (await page.locator('[data-testid=basket-saved]').innerText()) === 'Saved for 30 days.' && (await page.locator('[data-testid=basket-item]').count()) === 2 && (await page.locator('[data-testid=basket-give]').first().innerText()) === 'Give this gift →' && (await page.locator('[data-testid=basket-remove]').first().innerText()) === 'Remove')
     check('My gifts page: "Give this gift →" opens the writing room of the gift\'s language (2026-11-16) with the item to put back', ((await page.locator('[data-testid=basket-give]').first().getAttribute('href')) ?? '') === '/en/write?resume=BK-aaaaaaaaaaaaaaaaaaaa')
     await page.locator('[data-testid=save-button]').click()
     await page.locator('[data-testid=save-panel]').waitFor()
@@ -4576,8 +4599,11 @@ for (const [lang, locale, text] of [['en', 'en-US', 'Your gift is being finished
     await page.locator('[data-testid=save-panel]').scrollIntoViewIfNeeded().catch(() => {})
     await page.screenshot({ path: `${SHOTS}/polish-save-panel-390.png` }).catch(() => {})
     await page.locator('[data-testid=basket-remove]').first().click()
+    await page.waitForTimeout(300)
+    check('My ICHIREI: "Remove" asks once on the page (no browser dialog) — nothing is deleted yet', deleted === null && (await page.locator('[data-testid=basket-remove-ask]').count()) === 1 && (await page.locator('[data-testid=basket-item]').count()) === 2)
+    await page.locator('[data-testid=basket-remove-yes]').click()
     await page.waitForTimeout(400)
-    check('basket page: "×" deletes at once (no confirmation) and the item is gone', deleted === 'BK-aaaaaaaaaaaaaaaaaaaa' && (await page.locator('[data-testid=basket-item]').count()) === 1)
+    check('My ICHIREI: after "Remove" is confirmed the item is deleted and gone', deleted === 'BK-aaaaaaaaaaaaaaaaaaaa' && (await page.locator('[data-testid=basket-item]').count()) === 1)
     check('no page errors (run 31, basket page)', errs.length === 0, errs.join('; '))
     await ctx.close()
   }
@@ -5482,6 +5508,132 @@ for (const [lang, locale, text] of [['en', 'en-US', 'Your gift is being finished
   const w = await probe(wide.page)
   check('run 37 (en, 1280 px): the box is still the next block after the button; no horizontal scroll', w.boxNext && w.priceNext && w.noScroll, JSON.stringify(w))
   await wide.page.close()
+}
+
+
+// ---------- Run 38 (2026-11-18): "My ICHIREI" — the customer's own page: full paper cards (the character, its word — never the reading alone —, the line, who it is for, the moment collapsed and expanded, the poem, four pictures
+// with a placeholder for a missing one, the dates, Give / Remove), the masked email and the gifts sent, the empty state, "Save to my email"; en, ja and zh-Hant; screenshots at 390 and 1280 ----------
+{
+  const SVG = '<svg xmlns="http://www.w3.org/2000/svg" width="40" height="40"><rect width="40" height="40" fill="#9a8f7a"/></svg>'
+  const STORY38 = 'The first line of the moment is here.\nThe second line follows right after it.\nThe third line only shows after Read all.'
+  const item = (over = {}) => ({
+    id: 'BK-aaaaaaaaaaaaaaaaaaaa', created_at: '2026-11-17T10:00:00Z', updated_at: '2026-11-18T10:00:00Z', language: 'en', to: 'Mom',
+    card: { kanji: '恒', reading: 'kō', word: 'constant', line: 'She is the one who never changes.', meaning: 'constant' }, preview_id: 'AN-previewpreviewprev22',
+    context: { relationship: 'parent_mother', relationship_other: '', purpose: 'thanks', purpose_other: '', occasion: 'thanksgiving' }, round: 1, slot: 'main',
+    poem: { lines: ['morning light', 'a lunch box, closed'], reading: '' }, story: STORY38, saved_until: '2026-12-18T10:00:00Z', ...over,
+  })
+  const open38 = async ({ lang = 'en', items = [item()], email = null, hold = null, sent = [], mail = false, width = 390, height = 900, path = '/basket', clock = '2026-11-18T15:00:00Z' } = {}) => {
+    const ctx = await browser.newContext({ viewport: { width, height }, locale: lang === 'ja' ? 'ja-JP' : lang === 'zh-Hant' ? 'zh-TW' : 'en-US', deviceScaleFactor: 1 })
+    const page = await ctx.newPage()
+    const errs = []
+    page.on('pageerror', (e) => errs.push(String(e)))
+    await page.clock.setFixedTime(new Date(clock))
+    const posts = []
+    await page.route('**/api/me*', (r) => r.fulfill({ json: { basket: { count: items.length }, ready: null, hold: null } }))
+    await page.route('**/api/film/*/picture/*', (r) => (r.request().url().endsWith('/picture/1.webp') ? r.fulfill({ status: 404, body: '' }) : r.fulfill({ status: 200, contentType: 'image/svg+xml', body: SVG })))
+    await page.route('**/api/basket/qr.svg*', (r) => r.fulfill({ status: 200, contentType: 'image/svg+xml', body: '<svg xmlns="http://www.w3.org/2000/svg" width="10" height="10"/>' }))
+    await page.route('**/api/basket/email**', (r) => { posts.push({ url: r.request().url(), body: JSON.parse(r.request().postData() ?? '{}') }); return r.fulfill({ json: { ok: true, email: 'm•••@example.com', pending: false } }) })
+    await page.route('**/api/basket', (r) => r.fulfill({ json: { items, token: 'BT-x', link: 'https://ichirei.beyondculture.ai/b/BT-abcdefghjkmnpqrstuvwxyz2', email, hold, sent, mail, saved_days: 30 } }))
+    await page.goto(`http://localhost:5173${path}`, { waitUntil: 'networkidle' })
+    await page.waitForSelector('[data-testid=basket-page]')
+    await page.waitForTimeout(300)
+    return { page, ctx, errs, posts }
+  }
+  const T = (page, id) => page.locator(`[data-testid=${id}]`)
+  const noScroll = (page) => page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 1)
+
+  // ---- English, with an email, a hold and a sent gift; the mail box on
+  {
+    const { page, ctx, errs, posts } = await open38({ email: 'b•••@gmail.com', hold: { expires_at: '2026-11-18T23:49:00Z', minutes_left: 60 }, mail: true, sent: [{ kanji: '憶', reading: 'oku', word: 'remember', receiver: 'Kenji', at: '2026-11-16T10:00:00Z', status: 'opened', page: '/a/AN-abcdefghjkmnpqrstuvw' }] })
+    check('My ICHIREI (en): the title, the masked email with "Your gifts and orders", the free-gift hold, and "Saved for 30 days."', (await T(page, 'my-title').innerText()) === 'My ICHIREI' && (await T(page, 'my-email').innerText()).includes('b•••@gmail.com') && (await T(page, 'my-email').innerText()).includes('Your gifts and orders') && (await T(page, 'my-hold').innerText()).startsWith('Your free gift is held until') && (await T(page, 'basket-saved').innerText()) === 'Saved for 30 days.')
+    const card = T(page, 'basket-item').first()
+    check('full card (en): the character large, the English word as the headline — and NO romanized reading anywhere on the card', (await card.locator('[data-testid=mg-glyph]').innerText()) === '恒' && (await card.locator('[data-testid=mg-word]').innerText()) === 'constant' && (await card.locator('[data-testid=mg-reading]').count()) === 0 && !(await card.innerText()).includes('kō'))
+    check('full card (en): the one line, "For Mom", and the chips "Mother" and "Thank you"', (await card.locator('[data-testid=mg-line]').innerText()) === 'She is the one who never changes.' && (await card.locator('[data-testid=mg-for]').innerText()) === 'For Mom' && (await card.locator('[data-testid=mg-chip]').allInnerTexts()).join('|') === 'Mother|Thank you')
+    const story = card.locator('[data-testid=mg-story]')
+    const hCollapsed = (await story.boundingBox()).height
+    check('full card (en): "Your moment" shows the first two lines, collapsed, with "Read all"', (await card.locator('[data-testid=mg-moment] h2').textContent()) === 'Your moment' && (await story.getAttribute('class')).includes('clamped') && (await card.locator('[data-testid=mg-readall]').innerText()) === 'Read all')
+    await card.locator('[data-testid=mg-readall]').click()
+    const hOpen = (await story.boundingBox()).height
+    check('full card (en): "Read all" opens the whole text (the third line is there, the box grew), and "Show less" closes it', !(await story.getAttribute('class')).includes('clamped') && hOpen > hCollapsed + 10 && (await story.innerText()).includes('The third line only shows after Read all.') && (await card.locator('[data-testid=mg-readall]').innerText()) === 'Show less')
+    check('full card (en): the poem', (await card.locator('[data-testid=mg-poem]').innerText()).includes('morning light') && (await card.locator('[data-testid=mg-poem]').innerText()).includes('a lunch box, closed'))
+    const pics = card.locator('[data-testid=mg-pic]')
+    check('full card (en): four picture slots — the missing one (slot 2) is a soft paper placeholder, never a hole — and every slot is square', (await pics.count()) === 4 && (await pics.nth(1).getAttribute('data-state')) === 'empty' && (await pics.nth(0).getAttribute('data-state')) === 'ok' && (await Promise.all([0, 1, 2, 3].map(async (n) => { const b = await pics.nth(n).boundingBox(); return Math.abs(b.width - b.height) < 2 && b.width > 100 }))).every(Boolean))
+    await pics.nth(0).click()
+    check('a picture opens full screen, and closes again', (await T(page, 'mg-light').count()) === 1 && (await T(page, 'mg-light').locator('img').count()) === 1)
+    await T(page, 'mg-light-close').click()
+    check('…closed', (await T(page, 'mg-light').count()) === 0)
+    check('full card (en): the date saved, "Saved until Dec 18", and "Give this gift →" opens the writing room with the item', (await card.locator('[data-testid=mg-dates]').innerText()).includes('Saved Nov 18') && (await card.locator('[data-testid=mg-until]').innerText()) === 'Saved until Dec 18' && (await card.locator('[data-testid=basket-give]').innerText()) === 'Give this gift →' && (await card.locator('[data-testid=basket-give]').getAttribute('href')) === '/en/write?resume=BK-aaaaaaaaaaaaaaaaaaaa')
+    check('Gifts you\'ve sent (en, with an email): the character, "For Kenji", the status "Opened", and a button to the gift page', (await T(page, 'my-sent').locator('h2').innerText()) === "Gifts you've sent" && (await T(page, 'my-sent-item').innerText()).includes('For Kenji') && (await T(page, 'my-sent-status').innerText()) === 'Opened' && (await T(page, 'my-sent-open').getAttribute('href')) === '/a/AN-abcdefghjkmnpqrstuvw')
+    check('Save to my email (en): the box, its title, the field and "Save to my email", and "Send my link again" because the record has an email', (await T(page, 'keep-mail').count()) === 1 && (await T(page, 'keep-mail').innerText()).includes("Keep your gifts: we'll email you your private link.") && (await T(page, 'keep-mail-save').innerText()) === 'Save to my email' && (await T(page, 'keep-mail-again').innerText()) === 'Send my link again')
+    await T(page, 'keep-mail-input').fill('mia@example.com')
+    await T(page, 'keep-mail-save').click()
+    await page.waitForSelector('[data-testid=keep-mail-note]')
+    check('Save to my email: one POST with the address and the page language, and the note says it was sent', posts.length === 1 && posts[0].url.endsWith('/api/basket/email') && posts[0].body.email === 'mia@example.com' && posts[0].body.language === 'en' && (await T(page, 'keep-mail-note').innerText()).startsWith('Sent.'))
+    await T(page, 'keep-mail-again').click()
+    await page.waitForTimeout(200)
+    check('Send my link again: one POST to /resend', posts.length === 2 && posts[1].url.endsWith('/api/basket/email/resend'))
+    check('no horizontal scroll at 390 px (en)', await noScroll(page))
+    await page.evaluate(() => window.scrollTo(0, 0))
+    await page.screenshot({ path: `${SHOTS}/mygifts-en-390.png`, fullPage: true })
+    check('no page errors (run 38, en)', errs.length === 0, errs.join('; '))
+    await ctx.close()
+  }
+  // ---- English desktop: four pictures across
+  {
+    const { page, ctx, errs } = await open38({ width: 1280, height: 1000, email: 'b•••@gmail.com' })
+    const pics = T(page, 'basket-item').first().locator('[data-testid=mg-pic]')
+    const ys = await Promise.all([0, 1, 2, 3].map(async (n) => Math.round((await pics.nth(n).boundingBox()).y)))
+    check('desktop (1280 px): the four pictures sit in one row, and there is no horizontal scroll', new Set(ys).size === 1 && (await noScroll(page)))
+    await page.screenshot({ path: `${SHOTS}/mygifts-en-1280.png`, fullPage: true })
+    check('no page errors (run 38, en desktop)', errs.length === 0, errs.join('; '))
+    await ctx.close()
+  }
+  // ---- no email: neither the masked email nor the sent gifts; no mail box without a key
+  {
+    const { page, ctx } = await open38({ email: null, sent: [{ kanji: '憶', reading: '', word: '', receiver: 'Kenji', at: '2026-11-16T10:00:00Z', status: 'paid', page: null }], mail: false })
+    check('without an email on the record: no masked email and no "Gifts you\'ve sent"; with no mail key: no "Save to my email" box — the rest of the page works', (await T(page, 'my-email').count()) === 0 && (await T(page, 'my-sent').count()) === 0 && (await T(page, 'keep-mail').count()) === 0 && (await T(page, 'basket-item').count()) === 1)
+    await ctx.close()
+  }
+  // ---- the empty page
+  {
+    const { page, ctx } = await open38({ items: [] })
+    check('empty page: one warm line and "Write your moment →"', (await T(page, 'basket-empty').innerText()).includes('Nothing here yet.') && (await T(page, 'my-write').innerText()) === 'Write your moment →' && (await T(page, 'my-write').getAttribute('href')) === '/en/write')
+    await ctx.close()
+  }
+  // ---- Japanese: the line is the meaning, the reading small beside the character (never alone)
+  {
+    const { page, ctx, errs } = await open38({ lang: 'ja', items: [item({ language: 'ja', to: '母', card: { kanji: '恒', reading: 'コウ・つね', word: '', line: 'いつも変わらず、そこにいてくれる人。', meaning: '' }, context: { relationship: 'parent_mother', relationship_other: '', purpose: 'thanks', purpose_other: '', occasion: 'thanksgiving' } })], email: 'b•••@gmail.com', mail: true })
+    const card = T(page, 'basket-item').first()
+    check('My ICHIREI (ja): 「マイギフト」, the character with its reading small beside it AND the line (the reading is never alone), 「母へ」, chips 「母」「ありがとう」', (await T(page, 'my-title').innerText()) === 'マイギフト' && (await card.locator('[data-testid=mg-reading]').innerText()) === 'コウ・つね' && (await card.locator('[data-testid=mg-line]').innerText()) === 'いつも変わらず、そこにいてくれる人。' && (await card.locator('[data-testid=mg-for]').innerText()) === '母へ' && (await card.locator('[data-testid=mg-chip]').allInnerTexts()).join('|') === '母|ありがとう')
+    check('My ICHIREI (ja): 「あなたの場面」, 「この贈りものを贈る →」, 「削除」, 「保存日」と「まで保存」, and the mail box 「メールに保存」', (await card.locator('[data-testid=mg-moment] h2').textContent()) === 'あなたの場面' && (await card.locator('[data-testid=basket-give]').innerText()) === 'この贈りものを贈る →' && (await card.locator('[data-testid=basket-remove]').innerText()) === '削除' && (await card.locator('[data-testid=mg-until]').innerText()) === '12月18日まで保存' && (await T(page, 'keep-mail-save').innerText()) === 'メールに保存')
+    check('no horizontal scroll at 390 px (ja)', await noScroll(page))
+    await page.screenshot({ path: `${SHOTS}/mygifts-ja-390.png`, fullPage: true })
+    await page.setViewportSize({ width: 1280, height: 1000 })
+    check('no horizontal scroll at 1280 px (ja)', await noScroll(page))
+    await page.screenshot({ path: `${SHOTS}/mygifts-ja-1280.png`, fullPage: true })
+    check('no page errors (run 38, ja)', errs.length === 0, errs.join('; '))
+    await ctx.close()
+  }
+  // ---- Chinese (Traditional)
+  {
+    const { page, ctx, errs } = await open38({ lang: 'zh-Hant', items: [item({ language: 'zh-Hant', to: '媽媽', card: { kanji: '恒', reading: 'héng', word: '', line: '那個始終如一、一直都在的人。', meaning: '' }, context: { relationship: 'parent_mother', relationship_other: '', purpose: 'thanks', purpose_other: '', occasion: 'thanksgiving' } })], email: 'b•••@gmail.com', mail: true })
+    const card = T(page, 'basket-item').first()
+    check('My ICHIREI (zh-Hant): 「我的禮物」, the reading small beside the character with the line, 「給媽媽」, chips 「母親」「謝謝」, 「存到我的信箱」', (await T(page, 'my-title').innerText()) === '我的禮物' && (await card.locator('[data-testid=mg-reading]').innerText()) === 'héng' && (await card.locator('[data-testid=mg-line]').innerText()) === '那個始終如一、一直都在的人。' && (await card.locator('[data-testid=mg-for]').innerText()) === '給媽媽' && (await card.locator('[data-testid=mg-chip]').allInnerTexts()).join('|') === '母親|謝謝' && (await T(page, 'keep-mail-save').innerText()) === '存到我的信箱')
+    check('no horizontal scroll at 390 px (zh-Hant)', await noScroll(page))
+    await page.screenshot({ path: `${SHOTS}/mygifts-zh-390.png`, fullPage: true })
+    await page.setViewportSize({ width: 1280, height: 1000 })
+    check('no horizontal scroll at 1280 px (zh-Hant)', await noScroll(page))
+    await page.screenshot({ path: `${SHOTS}/mygifts-zh-1280.png`, fullPage: true })
+    check('no page errors (run 38, zh-Hant)', errs.length === 0, errs.join('; '))
+    await ctx.close()
+  }
+  // ---- an English gift with no word at all: the headline is not the reading
+  {
+    const { page, ctx } = await open38({ items: [item({ card: { kanji: '乂', reading: 'yì', word: '', line: 'A quiet kind of care.', meaning: '' } })] })
+    const card = T(page, 'basket-item').first()
+    check('an English card with no word shows no reading at all ("yì" is never the headline)', (await card.locator('[data-testid=mg-reading]').count()) === 0 && (await card.locator('[data-testid=mg-word]').count()) === 0 && !(await card.innerText()).includes('yì'))
+    await ctx.close()
+  }
 }
 
 await browser.close()

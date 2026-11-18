@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import type { RevealLang } from '../reveal/copy.ts'
 import { LOOP } from './copy.ts'
+import KeepByEmail from './KeepByEmail.tsx'
 import './loop.css'
 
 /**
@@ -14,6 +15,7 @@ export default function SavePanel({ lang, className = 'btn ghost' }: { lang: Rev
   const [link, setLink] = useState<string | null>(null)
   const [state, setState] = useState<'idle' | 'loading' | 'none'>('idle')
   const [copied, setCopied] = useState(false)
+  const [mail, setMail] = useState<{ on: boolean; has: boolean }>({ on: false, has: false })
 
   const toggle = async () => {
     const next = !open
@@ -22,7 +24,8 @@ export default function SavePanel({ lang, className = 'btn ghost' }: { lang: Rev
     setState('loading')
     try {
       const r = await fetch('/api/basket', { credentials: 'same-origin' })
-      const j = (await r.json()) as { link?: string | null }
+      const j = (await r.json()) as { link?: string | null; mail?: boolean; email?: string | null }
+      setMail({ on: j.mail === true, has: typeof j.email === 'string' && j.email !== '' })
       if (j.link) {
         setLink(j.link)
         setState('idle')
@@ -67,6 +70,7 @@ export default function SavePanel({ lang, className = 'btn ghost' }: { lang: Rev
               <p className="note" data-testid="save-note">
                 {c.linkNote}
               </p>
+              {mail.on && <KeepByEmail lang={lang} hasEmail={mail.has} />}
             </>
           )}
         </div>

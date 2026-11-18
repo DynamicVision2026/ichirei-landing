@@ -97,6 +97,7 @@ export function createCustomerHandlers(deps: () => OpsDeps) {
             `<tr><th>言語</th><td>${esc(rec.language ?? '—')}</td></tr>` +
             `<tr><th>お知らせの同意</th><td>${rec.consent.marketing ? `あり（${esc(rec.consent.at ? jst(rec.consent.at) : '')}）` : 'なし'}</td></tr>` +
             `<tr><th>入口のコード</th><td>${esc(rec.from_code ?? '—')}</td></tr>` +
+            `<tr><th>メールに保存</th><td data-testid="customer-mailed">${rec.mailed_at ? `✓（${esc(jst(rec.mailed_at))}）` : '—'}</td></tr>` +
             `<tr><th>保存した贈りもの</th><td data-testid="customer-basket">${items.length}件${items.length ? `（${esc(items.map(jst).join(' / '))}）` : ''}</td></tr>` +
             `</tbody></table>` +
             `<h2>ご注文</h2>` +

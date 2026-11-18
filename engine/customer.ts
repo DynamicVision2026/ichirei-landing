@@ -52,6 +52,8 @@ export interface CustomerRecord {
   basket_browsers?: string[]
   /** True once an order exists: the record is then kept with the order. */
   has_order: boolean
+  /** The time the private link was last sent to the customer's own email ("Save to my email", 2026-11-18). The dashboard shows only that it was (a tick), never the address. */
+  mailed_at?: string | null
   events: CustomerEvent[]
 }
 
@@ -204,7 +206,9 @@ export async function linkEmail(store: OrderStore, browser: string, email: strin
       if (from.consent.marketing && !rec.consent.marketing) rec.consent = from.consent
       rec.basket_token = rec.basket_token ?? from.basket_token
       for (const item of from.basket) if (!rec.basket.includes(item)) rec.basket.push(item)
-      rec.basket_browsers = [...new Set([...(rec.basket_browsers ?? []), ...(from.basket_browsers ?? [])])]
+      // An email alone never opens a basket (2026-11-18): when the email's record already existed, the browser that only typed the address does not become one of its basket browsers
+      // (it may be somebody else's address). Only the link in the mail does that (engine/basket.ts openBasketLink).
+      if (!cur) rec.basket_browsers = [...new Set([...(rec.basket_browsers ?? []), ...(from.basket_browsers ?? [])])]
       rec.has_order = rec.has_order || from.has_order
       rec.events = [...rec.events, ...from.events].sort((a, b) => Date.parse(a.at) - Date.parse(b.at)).slice(-MAX_EVENTS)
     }

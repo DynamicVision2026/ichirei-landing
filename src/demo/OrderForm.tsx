@@ -132,6 +132,9 @@ export default function OrderForm({ result, story, followUps = [], promptQuestio
   const enBridge = language === 'en'
   useEffect(() => {
     onLive?.({
+      kanji: candidate.kanji,
+      slot: candidate.slot,
+      meaning: enBridge ? (candidate.meaning ?? '') : '',
       glyph,
       reading: enBridge ? cleanReading(candidate.reading) : copy.glyphReading(candidate, glyph),
       word: enBridge ? (candidate.en_word ?? candidate.meaning ?? null) : null,

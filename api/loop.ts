@@ -2,11 +2,13 @@
 //
 //   GET    /api/me                  → { basket: { count }, ready: { id, name } | null, hold: HoldView | null }      (the landing's bars; one cheap read)
 //   POST   /api/basket              → save (or update) the basket item of a result page            { id, token, count, created }
-//   GET    /api/basket              → the browser's basket (newest first) and its private-link token   { items, token }
+//   GET    /api/basket              → the browser's own page (2026-11-18): { items (each with its story, poem, context), token, link, email (masked), hold, sent, mail, saved_days }
+//   POST   /api/basket/email        → "Save to my email" { email, language }: sends ONE mail with the private link (503 `off` while RESEND_API_KEY is not set)
+//   POST   /api/basket/email/resend → "Send my link again" (at most 3 mails a day per address, saving and resending together)
 //   GET    /api/basket/<id>         → one item in full, to open its result page again
 //   DELETE /api/basket/<id>         → "×"
 //   GET    /api/basket/qr.svg       → the QR of the private link
-//   GET    /api/b/<token>           → open a basket by its private link (a wrong token is a plain 404: the page then shows the normal landing)
+//   GET    /api/b/<token>[?m=]      → open a page by its private link (a wrong token is a plain 404: the page then shows the normal landing); ?m= is the mail token of a new address
 //   GET    /api/promo               → the live card: { on, left, daily, hold }          (cached 8 s per instance; the page asks every 60 s)
 //   POST   /api/promo/hold          → "Hold my free gift" { email, code, marketing? }
 //
@@ -17,6 +19,9 @@ import { createOrderStore, type OrderStore } from '../engine/order-store.ts'
 import { SlidingWindowLimiter, clientIp } from '../engine/rate-limit.ts'
 import { visitorOf } from '../engine/visitor.ts'
 import { deleteBasketItem, ensureBasketToken, listBasket, openBasketLink, readBasketItem, saveBasketItem, BASKET_TOKEN_PATTERN, type SaveInput } from '../engine/basket.ts'
+import { myPage } from '../engine/mygifts.ts'
+import { resolveMailer, type Mailer } from '../engine/mailer.ts'
+import { resendLink, saveToEmail } from '../engine/basket-mail.ts'
 import { customerIdOf, readCustomer, recordCustomerEvent } from '../engine/customer.ts'
 import { promoDaily, promoHoldsPerDay, promoOn } from '../engine/promo.ts'
 import { holdOfBrowser, liveCount, placeHold, reapExpired, type PromoDeps } from '../engine/promo-holds.ts'
@@ -34,6 +39,8 @@ export interface LoopDeps {
   env?: NodeJS.ProcessEnv
   now?: () => Date
   shopify?: PromoShopify | null
+  /** The outgoing mailer (Resend); undefined = from RESEND_API_KEY, null = none (the "Save to my email" box is hidden). */
+  mailer?: Mailer | null
 }
 
 async function readBody(req: Request): Promise<unknown | 'big' | null> {
@@ -66,6 +73,10 @@ async function readyGift(store: OrderStore, browser: string): Promise<{ id: stri
 
 export function createLoopHandlers(deps: () => LoopDeps) {
   const holdLimiter = new SlidingWindowLimiter(12, 60 * 60_000)
+  const mailLimiter = new SlidingWindowLimiter(10, 60 * 60_000) // per IP; the 3-a-day limit per address is in engine/basket-mail.ts
+  const mailOf = async (d: LoopDeps): Promise<Mailer | null> => (d.mailer === undefined ? resolveMailer(d.env ?? process.env) : d.mailer)
+  const mailAnswer = (r: Awaited<ReturnType<typeof saveToEmail>>): Response =>
+    r.ok ? json(200, { ok: true, email: r.email, pending: r.pending }) : json(r.code === 'off' || r.code === 'no_store' ? 503 : r.code === 'limit' ? 429 : r.code === 'send_failed' ? 502 : r.code === 'no_browser' ? 400 : 200, { ok: false, code: r.code })
   const promoDeps = (d: LoopDeps): PromoDeps => ({ store: d.store, env: d.env ?? process.env, ...(d.now ? { now: d.now } : {}), shopify: d.shopify === undefined ? promoShopifyFrom(d.env ?? process.env) : d.shopify })
   let lastReap = 0
 
@@ -101,6 +112,15 @@ export function createLoopHandlers(deps: () => LoopDeps) {
         to: str(body.to, 40),
         from: str(body.from, 40),
         preview_id: typeof body.preview_id === 'string' ? body.preview_id : null,
+        meaning: str(body.meaning, 60),
+        relationship: str(body.relationship, 24),
+        relationship_other: str(body.relationship_other, 60),
+        purpose: str(body.purpose, 24),
+        purpose_other: str(body.purpose_other, 60),
+        occasion: str(body.occasion, 24),
+        round: typeof body.round === 'number' ? body.round : undefined,
+        slot: str(body.slot, 12),
+        poem: body.poem && typeof body.poem === 'object' ? (body.poem as SaveInput['poem']) : null,
       }
       const now = d.now?.() ?? new Date()
       const r = await saveBasketItem(d.store, browser, input, now)
@@ -113,9 +133,10 @@ export function createLoopHandlers(deps: () => LoopDeps) {
     async basketList(req: Request): Promise<Response> {
       const d = deps()
       const browser = visitorOf(req, d.env)
-      if (!browser) return json(200, { items: [], token: null })
-      const l = await listBasket(d.store, browser)
-      return json(200, { items: l.items, token: l.token, link: l.token ? `${publicUrl(d.env)}/b/${l.token}` : null })
+      const mail = (await mailOf(d)) !== null
+      if (!browser) return json(200, { items: [], token: null, link: null, email: null, hold: null, sent: [], mail, saved_days: 30 })
+      const p = await myPage(d.store, browser, d.now?.() ?? new Date())
+      return json(200, { ...p, link: p.token ? `${publicUrl(d.env)}/b/${p.token}` : null, mail })
     },
 
     async basketItem(req: Request, id: string): Promise<Response> {
@@ -145,11 +166,33 @@ export function createLoopHandlers(deps: () => LoopDeps) {
       const d = deps()
       const browser = visitorOf(req, d.env)
       if (!browser || !BASKET_TOKEN_PATTERN.test(token)) return json(404, { error: 'not_found', code: 'not_found' })
-      const r = await openBasketLink(d.store, browser, token)
-      if (!r) return json(404, { error: 'not_found', code: 'not_found' })
       const now = d.now?.() ?? new Date()
+      const m = new URL(req.url, 'http://localhost').searchParams.get('m')
+      const r = await openBasketLink(d.store, browser, token, m, now)
+      if (!r) return json(404, { error: 'not_found', code: 'not_found' })
       void recordHealth(d.store, 'basket_link_opened', {}, now)
-      return json(200, { items: r.items, token: r.token })
+      const p = await myPage(d.store, browser, now)
+      return json(200, { ...p, link: p.token ? `${publicUrl(d.env)}/b/${p.token}` : null, mail: (await mailOf(d)) !== null })
+    },
+
+    /** "Save to my email": one mail with the private link to the address typed. Answers only a code; the address is never echoed and never logged. */
+    async basketEmail(req: Request): Promise<Response> {
+      const d = deps()
+      const now = d.now?.() ?? new Date()
+      if (!mailLimiter.hit(clientIp(req), now.getTime())) return json(429, { ok: false, code: 'rate_limited' }, { 'Retry-After': '600' })
+      const body = (await readBody(req)) as Record<string, unknown> | 'big' | null
+      if (!body || body === 'big' || typeof body !== 'object') return json(400, { ok: false, code: 'bad_request' })
+      const r = await saveToEmail({ store: d.store, mailer: await mailOf(d), env: d.env, now }, visitorOf(req, d.env), body.email, body.language)
+      return mailAnswer(r)
+    },
+
+    async basketEmailResend(req: Request): Promise<Response> {
+      const d = deps()
+      const now = d.now?.() ?? new Date()
+      if (!mailLimiter.hit(clientIp(req), now.getTime())) return json(429, { ok: false, code: 'rate_limited' }, { 'Retry-After': '600' })
+      const body = (await readBody(req)) as Record<string, unknown> | 'big' | null
+      const r = await resendLink({ store: d.store, mailer: await mailOf(d), env: d.env, now }, visitorOf(req, d.env), body && body !== 'big' && typeof body === 'object' ? body.language : null)
+      return mailAnswer(r)
     },
 
     async promoState(req: Request): Promise<Response> {

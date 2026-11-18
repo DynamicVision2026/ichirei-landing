@@ -14,6 +14,11 @@ import './result.css'
 // every block fills in place as it arrives. No "sample" label: this is the sender's own result; nothing here is downloadable and no receiver link exists before payment.
 
 export interface ResultLive {
+  /** The card this describes (its character as the engine named it, and its slot): the basket saves only a report that belongs to the card that was chosen. */
+  kanji: string
+  slot: 'main' | 'second' | 'freestyle'
+  /** en cards: the English core meaning of the character ("" otherwise) */
+  meaning: string
   glyph: string
   /** the reading under the character (ja / zh: the kana or pinyin; en: the Latin reading) */
   reading: string

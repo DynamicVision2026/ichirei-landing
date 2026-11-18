@@ -328,8 +328,12 @@ export default function DemoApp({ mode = 'harness', aside }: { mode?: Mode; asid
   const savedKey = useRef('')
   useEffect(() => {
     if (!customer || phase !== 'result' || !live || !chosen || !result) return
+    // The form reports one render AFTER a card is chosen (and a report from the card chosen before is still in `live` until then): save only a report that belongs to the card that was chosen,
+    // so the character, its word, its line and its pictures can never come from two different cards (2026-11-18).
+    if (live.kanji !== chosen.kanji || live.slot !== chosen.slot) return
     const set = sets[chosenSet] ?? result
-    const key = JSON.stringify([chosen.kanji, live.receiverName, live.preview.draftId])
+    const purpose = purposeOf(context)
+    const key = JSON.stringify([chosen.kanji, chosen.slot, chosenSet, live.reading, live.word, live.line, live.receiverName, live.preview.draftId, live.poem?.lines ?? null, context.relationship, purpose, context.language])
     if (savedKey.current === key) return
     savedKey.current = key
     const resume = { v: 1, story, followUps, context, questionId, result: set, kanji: chosen.kanji, receiver: live.receiverName }
@@ -337,7 +341,11 @@ export default function DemoApp({ mode = 'harness', aside }: { mode?: Mode; asid
       method: 'POST',
       headers: { 'content-type': 'application/json' },
       credentials: 'same-origin',
-      body: JSON.stringify({ resume, story, language: context.language, kanji: chosen.kanji, reading: live.reading, word: live.word ?? '', line: live.line, to: live.receiverName, preview_id: live.preview.draftId }),
+      body: JSON.stringify({
+        resume, story, language: context.language, kanji: chosen.kanji, reading: live.reading, word: live.word ?? '', line: live.line, to: live.receiverName, preview_id: live.preview.draftId,
+        meaning: live.meaning, relationship: context.relationship, relationship_other: context.relationshipOther ?? '', purpose, purpose_other: context.purposeOther ?? '', occasion: occasionOf(context),
+        round: chosenSet + 1, slot: chosen.slot, poem: live.poem,
+      }),
     })
       .then((r) => (r.ok ? (r.json() as Promise<{ count: number }>) : null))
       .then((j) => {
@@ -364,7 +372,7 @@ export default function DemoApp({ mode = 'harness', aside }: { mode?: Mode; asid
         const rs = item.resume
         const cand = rs?.result?.candidates?.find((c) => c.kanji === rs.kanji)
         if (!rs || !rs.story || !rs.context || !rs.result || !cand) return
-        savedKey.current = JSON.stringify([cand.kanji, rs.receiver ?? '', null]) // (already saved: the page does not save it again until something changes)
+        savedKey.current = '' // (the same card saves the same item again: nothing is duplicated)
         setLanguage(rs.context.language)
         setStory(rs.story)
         setFollowUps(Array.isArray(rs.followUps) ? rs.followUps : [])
@@ -854,7 +862,7 @@ export default function DemoApp({ mode = 'harness', aside }: { mode?: Mode; asid
         </div>
       )}
 
-      {customer && phase === 'result' && live && <ResultPage live={live} onMake={() => leaveResult('order')} onAnother={() => leaveResult('reveal')} />}
+      {customer && phase === 'result' && live && chosen && live.kanji === chosen.kanji && live.slot === chosen.slot && <ResultPage live={live} onMake={() => leaveResult('order')} onAnother={() => leaveResult('reveal')} />}
 
       {customer && (phase === 'order' || phase === 'result') && result && chosen && (
         <div hidden={phase === 'result'}>

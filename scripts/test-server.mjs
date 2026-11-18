@@ -89,6 +89,13 @@ try {
       check('seo: the gift, animation, claim, track and basket pages still answer noindex, nofollow', noindex.length === 0, noindex.join(', '))
       check('seo: the landing pages themselves are not marked noindex', !(await fetch(base + '/en')).headers.get('x-robots-tag') && !home.headers.get('x-robots-tag'))
     }
+    // (2026-11-18) "Save to my email": the route exists; with no RESEND_API_KEY it answers 503 `off` and sends nothing, and GET /api/basket says mail:false so the box is hidden
+    {
+      const r = await fetch(base + '/api/basket/email', { method: 'POST', headers: { 'content-type': 'application/json' }, body: '{"email":"a@example.com","language":"en"}' })
+      const j = await r.json()
+      const g = await (await fetch(base + '/api/basket')).json()
+      check('save to my email: with no key the route answers 503 off, and the basket answer says mail:false (the box stays hidden)', r.status === 503 && j.code === 'off' && g.mail === false && Array.isArray(g.items) && !JSON.stringify(j).includes('a@example.com'))
+    }
     const img = await fetch(base + '/img/og/en.jpg')
     const buf = Buffer.from(await img.arrayBuffer())
     check('share tags: the English picture is served (a JPEG of 1200×630)', img.status === 200 && buf[0] === 0xff && buf[1] === 0xd8 && (() => { for (let i = 2; i < buf.length - 9; i++) if (buf[i] === 0xff && (buf[i + 1] === 0xc0 || buf[i + 1] === 0xc2)) return buf.readUInt16BE(i + 5) === 630 && buf.readUInt16BE(i + 7) === 1200; return false })())
