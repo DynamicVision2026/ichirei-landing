@@ -74,13 +74,14 @@ else {
 {
   const src = readFileSync('src/reveal/UsSections.tsx', 'utf8').replace(/&rsquo;/g, '’').replace(/\s+/g, ' ')
   check('/en: "What is a kanji?" — the owner\'s paragraph, with 恒 and its word', src.includes('What is a kanji?') && src.includes('Kanji are the characters of written Japanese, carried from China more than 1,500 years ago. Each one holds a meaning, not just a sound.') && src.includes('means <b data-testid="us-kanji-word">{KANJI_EXAMPLE.word}</b>: the one who never changes. One character can hold what a long card can’t.'))
-  const lines = ['Their character, with its reading and its meaning in English', 'A short poem written from your moment', 'Four ink-wash pictures of the moment you wrote', 'A short film (about 30 seconds) with music, made to share', 'A certificate, and a card to print at home (PDF)']
-  check('/en: "What they receive" — the five lines in order, then the private-link line', lines.every((x) => src.includes(`title: '${x}'`)) && lines.map((x) => src.indexOf(x)).every((v, i, a) => i === 0 || v > a[i - 1]) && src.includes('Everything arrives as one private link, the same day. Send it by text, email or WhatsApp. Nothing is mailed.'))
+  // (2026-11-18) five small labelled points under the `receive` picture
+  const lines = ['The character (its English word and meaning)', 'A poem from your moment', 'Four ink pictures', 'A short film with music', 'A certificate and a card to print']
+  check('/en: "What they receive" — the five points in order, then the private-link line', lines.every((x) => src.includes(`title: '${x}'`)) && lines.map((x) => src.indexOf(x)).every((v, i, a) => i === 0 || v > a[i - 1]) && src.includes('Everything arrives as one private link, the same day. Send it by text, email or WhatsApp. Nothing is mailed.'))
   const order = readFileSync('src/demo/OrderForm.tsx', 'utf8')
   check('/en: "Or set it to open on Christmas morning." is there because the opening date IS offered on the English order step (its field carries the same Christmas hint)', src.includes('Or set it to open on Christmas morning.') && /data-testid="open-date-hint">Set it to open on Christmas morning\./.test(order))
   check('/en: "Who it\'s for" — the owner\'s paragraph', src.includes('For Mom, Dad, your partner, a grandparent, a brother or sister, a friend, a mentor or a colleague. For Thanksgiving, Christmas, a birthday, an anniversary, a thank-you, or no reason at all. And for someone you’ve lost, it keeps how you saw them.'))
   const page = readFileSync('src/reveal/RevealPage.tsx', 'utf8')
-  check('/en: the blocks come in the owner\'s order — kanji, what they receive, who it\'s for — and the footer line is the short one', page.indexOf('<UsKanji />') < page.indexOf('<UsReceive />') && page.indexOf('<UsReceive />') < page.indexOf('<UsWho />') && readFileSync('src/reveal/Sections.tsx', 'utf8').includes("EN_FOOTER_LINE = 'Designed in Tokyo. Delivered worldwide.'"))
+  check('/en: the blocks come in the owner\'s order — kanji, what they receive, who it\'s for — and the footer line is the short one', page.indexOf('<UsKanji />') < page.indexOf('<Receive lang={lang} />') && page.indexOf('<Receive lang={lang} />') < page.indexOf('<UsWho />') && readFileSync('src/reveal/Sections.tsx', 'utf8').includes("EN_FOOTER_LINE = 'Designed in Tokyo. Delivered worldwide.'"))
   // the word next to 恒 is the one the card shows: the reviewed lexicon word, else the palette's plain meaning
   const lexicon = loadLexicon()
   const palette = loadPalette()

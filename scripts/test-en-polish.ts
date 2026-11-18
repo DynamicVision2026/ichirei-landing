@@ -25,7 +25,7 @@ check('scenes: every language uses public/img/scenes/<category> — English has 
 check('scenes: public/img/scenes/en/ and scripts/make-en-scenes.mjs are gone, and no source names them', !existsSync('public/img/scenes/en') && !existsSync('scripts/make-en-scenes.mjs') && !/scenes\/en|EN_SCENE|make-en-scenes/.test(['src/reveal/scenes.ts', 'src/reveal/UsSections.tsx', 'src/reveal/Sections.tsx', 'src/reveal/Hero.tsx'].map((f) => readFileSync(f, 'utf8')).join('\n')))
 const have = new Set(readdirSync('public/img/scenes').map((f) => f.replace(/(-\d+)?\.(webp|jpg)$/, '')))
 check('scenes: the 12 real images are there (parents, partner, children, friends, mentor, work, m1–m6)', ['parents', 'partner', 'children', 'friends', 'mentor', 'work', 'm1', 'm2', 'm3', 'm4', 'm5', 'm6'].every((n) => have.has(n)))
-check('scenes: the "What they receive" picture is one of them (scenes/m1)', /name="scenes\/m1"/.test(readFileSync('src/reveal/UsSections.tsx', 'utf8')))
+check('scenes: "What they receive" shows the owner\'s `receive` picture (package/receive, 2026-11-18; it replaced scenes/m1)', /name="package\/receive"/.test(readFileSync('src/reveal/UsSections.tsx', 'utf8')))
 
 // ---- wording ---------------------------------------------------------------------------------------------------------------------------------------
 const en = SIZE_COPY.en
