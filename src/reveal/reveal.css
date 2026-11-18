@@ -483,3 +483,5 @@
 .rv .closing .promoNote{color:inherit;opacity:.85}
 .rv .promoNote .linkBtn{background:none;border:0;padding:0;font:inherit;font-weight:600;color:var(--ink);text-decoration:underline;text-underline-offset:3px;cursor:pointer}
 .rv .closing .promoNote .linkBtn{color:inherit}
+/* where the e-gift sits in a row with the wooden sizes (ja, zh) its picture keeps the cards' frame, so the three prices line up; alone (en) it is square */
+.rv #gifts .gifts:not(.single) .gift[data-size=egift] img{aspect-ratio:16/10;object-position:50% 40%}
