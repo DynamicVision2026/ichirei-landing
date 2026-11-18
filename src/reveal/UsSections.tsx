@@ -4,6 +4,8 @@ import Picture from './Picture'
 import { UsdLaunchLine, UsdPriceView } from '../order/SalePrice.tsx'
 import { useSale, useUsd } from '../demo/useSizes'
 import { KANJI_EXAMPLE } from './kanji-example.ts'
+import PromoOffer from './PromoOffer.tsx'
+import { freeLine, usePromoView } from './promo-view.ts'
 
 // The English landing page's own sections (ticket 2026-11-12, C1): the one-line delivery banner and the "What they receive" strip. English only — RevealPage mounts them for the English page and nothing else.
 
@@ -39,14 +41,15 @@ export function UsBanner() {
   )
 }
 
-/** What the receiver gets — only what is live today, in the order they meet it (2026-11-14 wording). */
+/** What the receiver gets — only what is live today, in the order they meet it: five small labelled points under the picture (2026-11-18). */
 const RECEIVE_ITEMS: readonly { key: string; title: string }[] = [
-  { key: 'character', title: 'Their character, with its reading and its meaning in English' },
-  { key: 'poem', title: 'A short poem written from your moment' },
-  { key: 'pictures', title: 'Four ink-wash pictures of the moment you wrote' },
-  { key: 'film', title: 'A short film (about 30 seconds) with music, made to share' },
-  { key: 'certificate', title: 'A certificate, and a card to print at home (PDF)' },
+  { key: 'character', title: 'The character (its English word and meaning)' },
+  { key: 'poem', title: 'A poem from your moment' },
+  { key: 'pictures', title: 'Four ink pictures' },
+  { key: 'film', title: 'A short film with music' },
+  { key: 'certificate', title: 'A certificate and a card to print' },
 ]
+const RECEIVE_ALT = 'The character card, a poem, four ink pictures, a short film and a certificate.'
 
 /** "What is a kanji?" — one short block before the rest of the page (English only). */
 export function UsKanji() {
@@ -77,29 +80,85 @@ export function UsWho() {
   )
 }
 
+/** The `receive` picture: the character, the poem, the pictures, the film and the certificate, on the site's dark ink ground (sample art, 640 / 1280 WebP with a JPG fallback). */
+function ReceiveArt({ alt }: { alt: string }) {
+  return (
+    <figure className="receiveArt" data-testid="receive-art">
+      <Picture name="package/receive" width={1600} height={1600} alt={alt} sizes="(max-width: 860px) 100vw, 760px" />
+    </figure>
+  )
+}
+
 export function UsReceive() {
   const price = useUsd()
   const sale = useSale('en')
+  const pv = usePromoView('en')
   return (
     <section className="usReceive" id="receive" data-testid="us-receive">
       <div className="wrap center">
         <span className="eyebrow">What they receive</span>
-        <ol className="usReceiveList">
+        <ReceiveArt alt={RECEIVE_ALT} />
+        <ul className="usReceiveList" data-testid="us-receive-list">
           {RECEIVE_ITEMS.map((it, i) => (
             <li key={it.key} data-receive={it.key}>
               <span className="usReceiveN" aria-hidden="true">{i + 1}</span>
               <b>{it.title}</b>
             </li>
           ))}
-        </ol>
+        </ul>
         <p className="usReceiveNote" data-testid="us-receive-note">
           Everything arrives as one private link, the same day. Send it by text, email or WhatsApp. Nothing is mailed. Or set it to open on Christmas morning.
         </p>
-        <p className="usReceivePrice"><span data-testid="us-receive-price"><UsdPriceView price={price} sale={sale} id="receive" /></span><UsdLaunchLine price={price} sale={sale} /></p>
-        <figure className="usReceiveArt ph" aria-hidden="true">
-          <Picture name="scenes/m1" width={4} height={5} sizes="(max-width: 860px) 60vw, 240px" />
-        </figure>
+        {pv.on && !pv.soldOut ? (
+          <PromoOffer lang="en" variant="receive" id="receive" />
+        ) : (
+          <>
+            {pv.soldOut && <p className="promoFree" data-testid="promo-free-receive">{freeLine('en', pv)}</p>}
+            <p className="usReceivePrice"><span data-testid="us-receive-price"><UsdPriceView price={price} sale={sale} id="receive" /></span><UsdLaunchLine price={price} sale={sale} /></p>
+          </>
+        )}
       </div>
     </section>
   )
+}
+
+const RECEIVE_JA: readonly string[] = ['一字', '詩', '四枚の絵', 'ショートフィルム', '証書']
+
+/** The Japanese page's "what they receive" (2026-11-18): the picture, the five points (the words of the picture itself) and, while the promotion runs, the free gift. */
+export function JaReceive() {
+  const pv = usePromoView('ja')
+  return (
+    <section className="usReceive" id="receive" data-testid="ja-receive">
+      <div className="wrap center">
+        <span className="eyebrow">届くもの</span>
+        <ReceiveArt alt="一字のカード、詩、四枚の絵、ショートフィルム、証書。" />
+        <ul className="usReceiveList" data-testid="ja-receive-list">
+          {RECEIVE_JA.map((t, i) => (
+            <li key={t} data-receive={i}>
+              <span className="usReceiveN" aria-hidden="true">{i + 1}</span>
+              <b>{t}</b>
+            </li>
+          ))}
+        </ul>
+        {pv.on && !pv.soldOut && <PromoOffer lang="ja" variant="receive" id="receive" />}
+        {pv.soldOut && <p className="promoFree" data-testid="promo-free-receive">{freeLine('ja', pv)}</p>}
+      </div>
+    </section>
+  )
+}
+
+/** The Chinese page: the picture only (no promotion lines). */
+export function ZhReceive() {
+  return (
+    <section className="usReceive" id="receive" data-testid="zh-receive">
+      <div className="wrap center">
+        <ReceiveArt alt="一字卡片、詩、四幅畫、短片與證書。" />
+      </div>
+    </section>
+  )
+}
+
+/** "What they receive" for the page's language. */
+export function Receive({ lang }: { lang: 'ja' | 'en' | 'zh-Hant' | 'zh-Hans' }) {
+  return lang === 'en' ? <UsReceive /> : lang === 'ja' ? <JaReceive /> : <ZhReceive />
 }

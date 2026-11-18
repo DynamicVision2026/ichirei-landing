@@ -5,7 +5,7 @@ import { DOCUMENT, REVEAL_LANGS, TEXT, type RevealLang } from './copy'
 import { Angles, Closing, Dock, Faq, Footer, Gifts, Moments, Opening, Philosophy, Reviews, Steps, StoryShape, Strip } from './Sections'
 import Hero from './Hero'
 import ClaimBanner from '../claim/ClaimBanner'
-import { UsBanner, UsKanji, UsReceive, UsWho } from './UsSections'
+import { Receive, UsBanner, UsKanji, UsWho } from './UsSections'
 import { useCurrency } from './useCurrency'
 import { toRevealLang } from './lang'
 import { useMemorialSelected } from './occasion-store'
@@ -178,14 +178,14 @@ export default function RevealPage({ write = false }: { write?: boolean }) {
         <Philosophy t={t} lang={lang} />
         <StoryShape t={t} />
         <Angles t={t} lang={lang} />
-        <Steps t={t} memorial={memorial} woodOnSale={woodOnSale} />
+        <Steps t={t} lang={lang} memorial={memorial} woodOnSale={woodOnSale} />
         <Moments t={t} memorial={memorial} />
         <Reviews t={t} />
-        {lang === 'en' && <UsReceive />}
+        <Receive lang={lang} />
         {lang === 'en' && <UsWho />}
         <Gifts t={t} lang={lang} currency={currency} rates={rates} onCurrency={setCurrency} woodOnSale={woodOnSale} />
         <Faq t={t} lang={lang} woodOnSale={woodOnSale} />
-        <Closing t={t} woodOnSale={woodOnSale} />
+        <Closing t={t} lang={lang} woodOnSale={woodOnSale} />
       </main>
       <Footer t={t} lang={lang} />
       <Dock t={t} />

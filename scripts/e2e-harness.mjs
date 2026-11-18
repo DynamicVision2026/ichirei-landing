@@ -5636,6 +5636,192 @@ for (const [lang, locale, text] of [['en', 'en-US', 'Your gift is being finished
   }
 }
 
+
+// ---------- Run 39 (2026-11-18): the landing page shows the real gift and the free gift beside every start button: the e-gift section is one centered card with the `card` picture (the free line, Hold my free
+// gift and Write your moment, the price as a small line; sold out: the price is the main line with "Start with the e-gift"; promotion off: today's layout), "What they receive" has the `receive` picture and five
+// small points, "How it works" has the `moment` picture; ja the same; zh pictures only; 390 and 1280 px screenshots ----------
+{
+  const SALE39 = { percent: 30, from: '2026-11-15', until: '2026-11-30', starts_at: '2026-11-14T15:00:00.000Z', ends_at: '2026-11-30T14:59:59.999Z' }
+  const open39 = async (url, { clock = '2026-11-18T15:00:00Z', promoUntil = '2026-11-30T23:59:59-05:00', state = { on: true, left: 37, daily: 100, hold: null }, width = 390, height = 844, locale } = {}) => {
+    const { page, errors } = await mockPage(browser)
+    await page.setViewportSize({ width, height })
+    await page.clock.setFixedTime(new Date(clock))
+    await page.route('**/api/rates', (r) => r.fulfill({ json: { date: '2026-11-18', base: 'JPY', rates: { USD: 0.0066 } } }))
+    await page.route('**/api/sizes', (r) => r.fulfill({ json: { sizes: ['egift', 'simple', 'standard'], coming_soon: ['simple', 'standard'], promo: { from: '2026-11-01T00:00:00Z', until: new Date(promoUntil).toISOString() }, usd: { egift: 25, egift_sale: 17.5 }, sale: SALE39 } }))
+    await page.route('**/api/me*', (r) => r.fulfill({ json: { basket: { count: 0 }, ready: null, hold: null } }))
+    await page.route('**/api/basket', (r) => r.fulfill({ json: { items: [], token: 'BT-x', link: 'https://ichirei.beyondculture.ai/b/BT-abcdefghjkmnpqrstuvwxyz2' } }))
+    await page.route('**/api/promo', (r) => r.fulfill({ json: state }))
+    await page.goto(url, { waitUntil: 'networkidle' })
+    await page.waitForTimeout(500)
+    void locale
+    return { page, errors }
+  }
+  const T = (page, id) => page.locator(`[data-testid=${id}]`)
+  const noScroll39 = (page) => page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 1)
+  const centered = async (loc, vw) => { const b = await loc.boundingBox(); return Math.abs(b.x + b.width / 2 - vw / 2) < 6 }
+
+  // ---- /en, promotion on
+  {
+    const { page, errors } = await open39('http://localhost:5173/en', { width: 1280, height: 900 })
+    await T(page, 'promo-offer-gifts').scrollIntoViewIfNeeded(); await new Promise((r) => setTimeout(r, 350))
+    const card = page.locator('#gifts .gift[data-size=egift]')
+    const bb = await card.boundingBox()
+    check('e-gift section (en, promotion on, 1280 px): ONE card, centered on the page, at most 520 px wide', (await page.locator('#gifts .gift').count()) === 1 && (await centered(card, 1280)) && bb.width <= 521 && bb.width > 400, JSON.stringify(bb))
+    const src = await card.locator('img').evaluate((i) => i.currentSrc || i.src)
+    check('e-gift section (en): the picture is the `card` image (webp with a jpg fallback), square, lazy, with width and height set', /package\/card(-\d+\.webp|\.jpg)/.test(src) && (await card.locator('picture source[type="image/webp"]').count()) === 1 && (await card.locator('img').getAttribute('loading')) === 'lazy' && (await card.locator('img').getAttribute('width')) === '1600' && (await card.locator('img').getAttribute('height')) === '1600' && Math.abs((await card.locator('img').boundingBox()).width - (await card.locator('img').boundingBox()).height) < 3)
+    check('e-gift section (en): under "ICHIREI e-gift" the free line, "Hold my free gift" (primary) and "Write your moment →" (secondary)', (await card.locator('h3').innerText()).length > 0 && (await T(page, 'promo-free-gifts').innerText()) === "Free today with Days of Thanks: 37 of today's 100 free gifts left. One per person, through November 30." && (await T(page, 'promo-hold-gifts').innerText()) === 'Hold my free gift' && (await T(page, 'promo-hold-gifts').getAttribute('class')).includes('primary') && (await T(page, 'promo-write-gifts').innerText()) === 'Write your moment →' && (await T(page, 'promo-write-gifts').getAttribute('class')).includes('ghost'))
+    check('e-gift section (en): the big price is gone — the price is the small line under the buttons — and the two bullets stay', (await card.locator('[data-price=egift]').count()) === 0 && (await T(page, 'promo-price-gifts').innerText()) === "If today's free gifts are gone: $17.50 (Thanksgiving price). $25 from December 1." && (await card.locator('ul li').count()) === 2 && (await card.locator('ul').innerText()).includes('private link') && (await card.locator('ul').innerText()).includes('nothing is mailed'))
+    const fs = await T(page, 'promo-price-gifts').evaluate((e) => parseFloat(getComputedStyle(e).fontSize))
+    check('e-gift section (en): the price line is small (under 16 px)', fs < 16, String(fs))
+    check('e-gift section (en): one primary button in the section (Hold my free gift); the section has no second start button', (await page.locator('#gifts .btn.primary').count()) === 1)
+    await T(page, 'promo-note-steps').scrollIntoViewIfNeeded(); await new Promise((r) => setTimeout(r, 350))
+    check('the other start buttons carry the free gift too (en): under "Try it free" (How it works) and under the closing button — one quiet line and a "Hold my free gift" link', (await T(page, 'promo-note-steps').innerText()).startsWith('Free today with Days of Thanks: 37 of today') && (await T(page, 'promo-note-hold-steps').innerText()) === 'Hold my free gift' && (await T(page, 'promo-note-closing').count()) === 1)
+    await T(page, 'promo-hold-gifts').click()
+    await page.waitForTimeout(900)
+    const focus = await page.evaluate(() => { const a = document.activeElement; const box = document.querySelector('[data-testid=hero-thanks]'); const r = box.getBoundingClientRect(); return { onEmail: a?.getAttribute('data-testid') === 'thanks-email', inBox: !!a && box.contains(a), visible: r.top >= -2 && r.bottom <= window.innerHeight + 2 } })
+    check('"Hold my free gift" scrolls to the hero\'s free-gift box and puts the cursor in its email field', focus.onEmail && focus.inBox && focus.visible, JSON.stringify(focus))
+    await page.screenshot({ path: `${SHOTS}/landing-en-hold-1280.png` })
+    check('no page errors (run 39, en promotion on)', errors.length === 0, errors.join('; '))
+    await page.close()
+  }
+  // ---- /en, 390 px: the whole page, centered sections, full-width buttons, no horizontal scroll
+  {
+    const { page, errors } = await open39('http://localhost:5173/en', { width: 390 })
+    await T(page, 'promo-offer-gifts').scrollIntoViewIfNeeded(); await new Promise((r) => setTimeout(r, 350))
+    const card = page.locator('#gifts .gift[data-size=egift]')
+    const btnW = await T(page, 'promo-hold-gifts').evaluate((e) => Math.round(e.getBoundingClientRect().width))
+    const cardW = Math.round((await card.boundingBox()).width)
+    check('phone (390 px, en): the e-gift card and its picture fill the width with the side gutter, the buttons are full width, and there is no horizontal scroll', cardW >= 340 && btnW >= cardW - 60 && (await noScroll39(page)), JSON.stringify({ btnW, cardW }))
+    await page.screenshot({ path: `${SHOTS}/landing-en-gift-390.png` })
+    await page.locator('#receive').scrollIntoViewIfNeeded(); await new Promise((r) => setTimeout(r, 350))
+    await page.screenshot({ path: `${SHOTS}/landing-en-receive-390.png` })
+    await page.locator('#how').scrollIntoViewIfNeeded(); await new Promise((r) => setTimeout(r, 350))
+    await page.screenshot({ path: `${SHOTS}/landing-en-how-390.png` })
+    await page.evaluate(() => window.scrollTo(0, 0))
+    await page.screenshot({ path: `${SHOTS}/landing-en-hero-390.png` })
+    await page.screenshot({ path: `${SHOTS}/landing-en-full-390.png`, fullPage: true })
+    check('no page errors (run 39, en phone)', errors.length === 0, errors.join('; '))
+    await page.close()
+  }
+  // ---- What they receive + How it works (en)
+  {
+    const { page } = await open39('http://localhost:5173/en', { width: 1280, height: 900 })
+    const rc = T(page, 'us-receive')
+    await rc.scrollIntoViewIfNeeded(); await new Promise((r) => setTimeout(r, 350))
+    const art = rc.locator('[data-testid=receive-art]')
+    const ab = await art.boundingBox()
+    check('What they receive (en): the `receive` picture above the list, centered, at most 760 px wide, with the alt text that says what is in it', /package\/receive(-\d+\.webp|\.jpg)/.test(await art.locator('img').evaluate((i) => i.currentSrc || i.src)) && (await centered(art, 1280)) && ab.width <= 761 && ab.width > 500 && (await art.locator('img').getAttribute('alt')) === 'The character card, a poem, four ink pictures, a short film and a certificate.' && (await art.boundingBox()).y < (await rc.locator('[data-testid=us-receive-list]').boundingBox()).y)
+    const pts = await rc.locator('[data-testid=us-receive-list] li b').allInnerTexts()
+    { const ok = await Promise.all([
+      (async () => (pts.join('|') === 'The character (its English word and meaning)|A poem from your moment|Four ink pictures|A short film with music|A certificate and a card to print'))(),
+      (async () => ((await (async () => { const ys = await Promise.all([0, 1, 2, 3, 4].map(async (n) => Math.round((await rc.locator('[data-testid=us-receive-list] li').nth(n).boundingBox()).y))); return new Set(ys).size === 1 })())))(),
+      (async () => ((await rc.locator('[data-testid=us-receive-list] li').first().boundingBox()).height < 140))(),
+    ]); check('What they receive (en): five small labelled points (not five big boxes), in a row on desktop', ok.every(Boolean), JSON.stringify(ok)) }
+    check('What they receive (en): "Everything arrives as one private link, the same day…" stays', (await T(page, 'us-receive-note').innerText()).startsWith('Everything arrives as one private link, the same day.'))
+    check('What they receive (en, promotion on): the free-gift line and "Hold my free gift" (the only button), the price as the small line', (await T(page, 'promo-free-receive').innerText()).startsWith('Free today with Days of Thanks: 37 of today') && (await T(page, 'promo-hold-receive').innerText()) === 'Hold my free gift' && (await rc.locator('.btn').count()) === 1 && (await T(page, 'promo-price-receive').innerText()).startsWith("If today's free gifts are gone: $17.50") && (await T(page, 'us-receive-price').count()) === 0)
+    await rc.screenshot({ path: `${SHOTS}/landing-en-receive-1280.png` })
+    const how = page.locator('#how')
+    await how.scrollIntoViewIfNeeded(); await new Promise((r) => setTimeout(r, 350))
+    const sa = await how.locator('[data-testid=steps-art]').boundingBox()
+    const so = await how.locator('.steps').boundingBox()
+    check('How it works (en): the `moment` picture sits beside the steps on desktop (at most 560 px wide), and the three steps are there', /package\/moment(-\d+\.webp|\.jpg)/.test(await how.locator('[data-testid=steps-art] img').evaluate((i) => i.currentSrc || i.src)) && sa.width <= 561 && sa.x + sa.width <= so.x + 4 && (await how.locator('.steps li').count()) === 3)
+    await how.screenshot({ path: `${SHOTS}/landing-en-how-1280.png` })
+    await page.close()
+    const m = await open39('http://localhost:5173/en', { width: 390 })
+    const hm = m.page.locator('#how')
+    await hm.scrollIntoViewIfNeeded(); await new Promise((r) => setTimeout(r, 350))
+    check('How it works (en, phone): the picture is above the steps, full width', (await hm.locator('[data-testid=steps-art]').boundingBox()).y < (await hm.locator('.steps').boundingBox()).y && (await hm.locator('[data-testid=steps-art]').boundingBox()).width >= 340 && (await noScroll39(m.page)))
+    const rm = m.page.locator('#receive')
+    await rm.scrollIntoViewIfNeeded(); await new Promise((r) => setTimeout(r, 350))
+    const cols = await rm.locator('[data-testid=us-receive-list] li').evaluateAll((els) => new Set(els.map((e) => Math.round(e.getBoundingClientRect().x))).size)
+    check('What they receive (en, phone): the five points sit in two columns', cols === 2)
+    await m.page.close()
+  }
+  // ---- /en, sold out for the day, and the promotion off
+  {
+    const { page } = await open39('http://localhost:5173/en', { state: { on: true, left: 0, daily: 100, hold: null }, width: 1280, height: 900 })
+    await T(page, 'promo-free-gifts').scrollIntoViewIfNeeded(); await new Promise((r) => setTimeout(r, 350))
+    { const ok = await Promise.all([
+      (async () => ((await T(page, 'promo-free-gifts').innerText()).startsWith("Today's free gifts are all held or given.")))(),
+      (async () => ((await page.locator('#gifts [data-price=egift]').count()) === 1))(),
+      (async () => ((await T(page, 'gift-cta-egift').innerText()) === 'Start with the e-gift'))(),
+      (async () => ((await T(page, 'promo-hold-gifts').count()) === 0))(),
+      (async () => ((await T(page, 'promo-write-gifts').count()) === 0))(),
+    ]); check('sold out (en): the free line says so, the price becomes the main line, and the button is "Start with the e-gift"', ok.every(Boolean), JSON.stringify(ok)) }
+    check('sold out (en): "What they receive" has no Hold button and shows the price as the main line', (await T(page, 'promo-hold-receive').count()) === 0 && (await T(page, 'us-receive-price').count()) === 1 && (await T(page, 'promo-free-receive').count()) === 1)
+    await page.close()
+    const off = await open39('http://localhost:5173/en', { clock: '2026-12-05T15:00:00Z', promoUntil: '2026-11-30T23:59:59-05:00', width: 1280, height: 900 })
+    await off.page.locator('#gifts').scrollIntoViewIfNeeded(); await new Promise((r) => setTimeout(r, 350))
+    const oc = off.page.locator('#gifts .gift[data-size=egift]')
+    { const ok = await Promise.all([
+      (async () => ((await oc.locator('[data-price=egift]').count()) === 1))(),
+      (async () => ((await T(off.page, 'gift-cta-egift').innerText()) === 'Start with the e-gift'))(),
+      (async () => (/package\/card/.test(await oc.locator('img').evaluate((i) => i.currentSrc || i.src))))(),
+      (async () => ((await centered(oc, 1280))))(),
+      (async () => ((await off.page.locator('[data-testid^=promo-offer]').count()) === 0))(),
+      (async () => ((await off.page.locator('[data-testid^=promo-free]').count()) === 0))(),
+    ]); check('promotion off (en): today\'s layout — the price and "Start with the e-gift" — with the new `card` picture, one centered card, no promotion lines', ok.every(Boolean), JSON.stringify(ok)) }
+    check('promotion off (en): "What they receive" is the picture, the five points and the price — no promotion lines', (await off.page.locator('[data-testid=us-receive-price]').count()) === 1 && (await off.page.locator('[data-testid=receive-art]').count()) === 1)
+    await off.page.close()
+  }
+  // ---- / (Japanese), promotion on
+  {
+    const { page, errors } = await open39('http://localhost:5173/', { width: 1280, height: 900 })
+    await page.evaluate(() => localStorage.setItem('ichirei.lang', 'ja')).catch(() => {})
+    await page.goto('http://localhost:5173/', { waitUntil: 'networkidle' })
+    await page.waitForTimeout(500)
+    const lang = await page.evaluate(() => document.documentElement.lang)
+    await T(page, 'promo-offer-gifts').scrollIntoViewIfNeeded(); await new Promise((r) => setTimeout(r, 350))
+    { const ok = await Promise.all([
+      (async () => (lang === 'ja'))(),
+      (async () => (/package\/card/.test(await page.locator('#gifts .gift[data-size=egift] img').evaluate((i) => i.currentSrc || i.src))))(),
+      (async () => ((await T(page, 'promo-free-gifts').innerText()) === '感謝の季節：本日の無料ギフト　残り 37 / 100。お一人様1回限り、11月30日まで。'))(),
+      (async () => ((await T(page, 'promo-hold-gifts').innerText()) === '無料ギフトを確保する'))(),
+      (async () => ((await T(page, 'promo-write-gifts').innerText()) === '一字を探す →'))(),
+      (async () => ((await T(page, 'promo-price-gifts').innerText()).startsWith('本日の無料枠が終了した場合：感謝の季節価格')))(),
+    ]); check('/ (ja, promotion on): the e-gift card has the `card` picture, the free-gift line from the existing copy, 「無料ギフトを確保する」 (primary) and 「一字を探す →」, and the price as a small line', ok.every(Boolean), JSON.stringify(ok)) }
+    await T(page, 'promo-hold-gifts').click()
+    await page.waitForTimeout(900)
+    check('/ (ja): 「無料ギフトを確保する」 takes the visitor to the hero\'s box and focuses its email field', await page.evaluate(() => document.activeElement?.getAttribute('data-testid') === 'thanks-email'))
+    await page.locator('#receive').scrollIntoViewIfNeeded(); await new Promise((r) => setTimeout(r, 350))
+    { const ok = await Promise.all([
+      (async () => ((await T(page, 'ja-receive').locator('[data-testid=receive-art] img').count()) === 1))(),
+      (async () => ((await T(page, 'ja-receive-list').locator('li').count()) === 5))(),
+      (async () => ((await T(page, 'promo-hold-receive').innerText()) === '無料ギフトを確保する'))(),
+      (async () => ((await page.locator('#how [data-testid=steps-art] img').count()) === 1))(),
+    ]); check('/ (ja): 「届くもの」 has the `receive` picture, the five points and the free gift; "How it works" has the `moment` picture', ok.every(Boolean), JSON.stringify(ok)) }
+    check('/ (ja, 1280 px): no horizontal scroll', await noScroll39(page))
+    await page.screenshot({ path: `${SHOTS}/landing-ja-receive-1280.png` })
+    check('no page errors (run 39, ja)', errors.length === 0, errors.join('; '))
+    await page.close()
+    const m = await open39('http://localhost:5173/', { width: 390 })
+    await m.page.evaluate(() => localStorage.setItem('ichirei.lang', 'ja')).catch(() => {})
+    await m.page.goto('http://localhost:5173/', { waitUntil: 'networkidle' })
+    await m.page.waitForTimeout(500)
+    check('/ (ja, 390 px): no horizontal scroll', await noScroll39(m.page))
+    await m.page.locator('#gifts').scrollIntoViewIfNeeded(); await new Promise((r) => setTimeout(r, 350))
+    await m.page.screenshot({ path: `${SHOTS}/landing-ja-gift-390.png` })
+    await m.page.screenshot({ path: `${SHOTS}/landing-ja-full-390.png`, fullPage: true })
+    await m.page.close()
+  }
+  // ---- /zh: pictures only
+  {
+    const { page } = await open39('http://localhost:5173/zh', { width: 1280, height: 900 })
+    check('/zh: the `receive` and `moment` pictures, and no promotion line anywhere', (await T(page, 'zh-receive').locator('[data-testid=receive-art] img').count()) === 1 && (await page.locator('#how [data-testid=steps-art] img').count()) === 1 && (await page.locator('[data-testid^=promo-]').count()) === 0 && (await noScroll39(page)))
+    await page.close()
+    const m = await open39('http://localhost:5173/zh', { width: 390 })
+    check('/zh (390 px): no horizontal scroll', await noScroll39(m.page))
+    await m.page.close()
+  }
+  // ---- /en at 1280 px, one full screenshot
+  {
+    const { page } = await open39('http://localhost:5173/en', { width: 1280, height: 900 })
+    await page.screenshot({ path: `${SHOTS}/landing-en-full-1280.png`, fullPage: true })
+    check('/en (1280 px): no horizontal scroll', await noScroll39(page))
+    await page.close()
+  }
+}
+
 await browser.close()
 console.log(failures === 0 ? '\nALL E2E CHECKS PASSED' : `\n${failures} CHECKS FAILED`)
 process.exit(failures === 0 ? 0 : 1)

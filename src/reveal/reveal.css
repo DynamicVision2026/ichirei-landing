@@ -444,3 +444,42 @@
 .rv .usKanjiText,.rv .usWhoText{margin:.6rem auto 0;max-width:52ch;font-size:1.05rem;line-height:1.85;color:var(--ink);text-wrap:pretty}
 .rv .usKanjiGlyph{font-size:1.5em;font-weight:900;vertical-align:-.08em;color:var(--ink)}
 .rv .usReceiveNote{margin:1.1rem auto .4rem;max-width:46ch;font-size:1rem;line-height:1.8;color:var(--mute)}
+
+/* ---- the landing page shows the real gift, and the free gift beside every start button (2026-11-18) ---- */
+.rv #gifts .gifts.single{grid-template-columns:minmax(0,520px);justify-content:center}
+.rv #gifts .gift[data-size=egift] picture{display:block;background:#1A1410}
+.rv #gifts .gift[data-size=egift] img{aspect-ratio:1/1;object-fit:cover;background:#1A1410}
+.rv #gifts .gift[data-size=egift] .body{gap:.8rem}
+.rv .promoOffer{display:grid;gap:.8rem}
+.rv .promoFree{margin:0;font:600 1.02rem/1.55 var(--display);color:var(--ink);text-wrap:pretty}
+.rv .promoBtns{display:grid;grid-template-columns:1fr;gap:.6rem}
+.rv .promoBtns .btn{justify-content:center;text-align:center}
+.rv .promoPriceSmall{margin:0;font-size:.86rem;line-height:1.5;color:var(--mute)}
+@media (min-width:560px){.rv .promoBtns{grid-template-columns:repeat(2,max-content)}}
+.rv .usReceive .promoOffer{justify-items:center;text-align:center;max-width:38rem;margin:1.2rem auto 0}
+.rv .usReceive .promoBtns{justify-content:center}
+.rv .usReceive .promoFree{margin:1.2rem auto 0;max-width:38rem}
+.rv .receiveArt{margin:1.4rem auto 0;max-width:760px;width:100%;border-radius:6px;overflow:hidden;background:#1A1410;box-shadow:0 26px 48px -28px rgba(26,20,16,.65)}
+.rv .receiveArt picture,.rv .receiveArt img{display:block;width:100%;height:auto}
+/* five small labelled points, not five big boxes: two columns on phones, one row on desktop */
+.rv .usReceiveList{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:.8rem 1rem;max-width:56rem;margin:1.6rem auto 1.2rem;text-align:center}
+.rv .usReceiveList li{display:grid;grid-template-columns:1fr;justify-items:center;gap:.2rem;padding:.7rem .4rem 0;background:none;border:0;border-top:2px solid #C9A96E;border-radius:0}
+.rv .usReceiveList li:last-child{grid-column:1/-1}
+.rv .usReceiveN{grid-row:auto;font-size:.85rem;color:var(--gold)}
+.rv .usReceiveList b{font-size:.94rem;line-height:1.4;font-weight:600}
+@media (min-width:760px){.rv .usReceiveList{grid-template-columns:repeat(5,minmax(0,1fr))}.rv .usReceiveList li:last-child{grid-column:auto}}
+.rv .usReceiveNote{max-width:40rem;margin-inline:auto}
+/* how it works: the picture beside the steps on desktop, above them on phones */
+.rv .stepsSplit{display:grid;grid-template-columns:1fr;gap:1.6rem;align-items:center;max-width:1080px;margin:2.6rem auto 0}
+@media (min-width:900px){.rv .stepsSplit{grid-template-columns:minmax(0,560px) minmax(0,1fr);gap:2.6rem}}
+.rv .stepsArt{margin:0 auto;width:100%;max-width:560px;border-radius:6px;overflow:hidden;background:#1A1410;box-shadow:0 26px 48px -28px rgba(26,20,16,.65)}
+.rv .stepsArt picture,.rv .stepsArt img{display:block;width:100%;height:auto}
+.rv .stepsSplit .steps{margin:0;padding:0;max-width:none;grid-template-columns:1fr}
+/* sections share one width and one rhythm */
+.rv #receive .wrap,.rv #how .wrap,.rv #gifts .wrap{max-width:1080px}
+.rv .usKanji,.rv .usWho,.rv .usReceive{padding-block:clamp(2.5rem,6vw,4rem)}
+@media (max-width:560px){.rv .promoBtns .btn{width:100%}}
+.rv .promoNote{margin:1rem auto 0;max-width:36rem;font-size:.92rem;line-height:1.55;color:var(--mute);text-align:center;text-wrap:pretty}
+.rv .closing .promoNote{color:inherit;opacity:.85}
+.rv .promoNote .linkBtn{background:none;border:0;padding:0;font:inherit;font-weight:600;color:var(--ink);text-decoration:underline;text-underline-offset:3px;cursor:pointer}
+.rv .closing .promoNote .linkBtn{color:inherit}

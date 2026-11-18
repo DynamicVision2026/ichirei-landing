@@ -14,6 +14,8 @@ import { PriceWithSale, SaleLine, UsdLaunchLine, UsdPriceView } from '../order/S
 import { salePriceJpy } from '../order/sale.ts'
 import { LEGAL, rowValue } from '../legal/legal-copy.ts'
 import { writeLink } from './paths'
+import PromoOffer, { PromoNote } from './PromoOffer.tsx'
+import { freeLine, usePromoView } from './promo-view.ts'
 
 type T = (typeof TEXT)[RevealLang]
 
@@ -193,7 +195,7 @@ export function Angles({ t, lang }: { t: T; lang: RevealLang }) {
   )
 }
 
-export function Steps({ t, memorial = false, woodOnSale = false }: { t: T; memorial?: boolean; woodOnSale?: boolean }) {
+export function Steps({ t, lang = 'en', memorial = false, woodOnSale = false }: { t: T; lang?: RevealLang; memorial?: boolean; woodOnSale?: boolean }) {
   // remembrance (偲ぶ picked in the form): two cards, no free pick
   const steps = [
     [t.st1, t.st1p, t.st1t],
@@ -207,22 +209,29 @@ export function Steps({ t, memorial = false, woodOnSale = false }: { t: T; memor
         <span className="eyebrow">{t.stEye}</span>
         <h2>{t.stH}</h2>
       </div>
-      <ol className="wrap steps">
-        {steps.map(([h, p, time], i) => (
-          <li key={i}>
-            <span className="n" aria-hidden="true">
-              {i + 1}
-            </span>
-            <h3>{h}</h3>
-            {p && <p>{p}</p>}
-            {time && <span className="time">{time}</span>}
-          </li>
-        ))}
-      </ol>
+      {/* the `moment` picture (2026-11-18): one moment → three ink pictures → the character. Beside the steps on desktop, above them on phones. */}
+      <div className="wrap stepsSplit">
+        <figure className="stepsArt" data-testid="steps-art">
+          <Picture name="package/moment" width={1600} height={1600} alt={lang === 'ja' ? 'ひと場面から、墨の絵が三枚、そして一字へ。母の家の玄関の灯りと、恒。（見本）' : lang === 'en' ? "One moment, three ink pictures, and the character that holds it: a mother's porch light, and 恒, constant. Sample." : '從一個片刻，到三幅水墨畫，再到那個字：母親家門口的燈，與「恒」。（樣本）'} sizes="(max-width: 860px) 100vw, 560px" />
+        </figure>
+        <ol className="steps">
+          {steps.map(([h, p, time], i) => (
+            <li key={i}>
+              <span className="n" aria-hidden="true">
+                {i + 1}
+              </span>
+              <h3>{h}</h3>
+              {p && <p>{p}</p>}
+              {time && <span className="time">{time}</span>}
+            </li>
+          ))}
+        </ol>
+      </div>
       <div className="wrap center" style={{ marginTop: '2.4rem' }}>
         <a className="btn primary" href={writeLink()}>
           {t.ctaSteps}
         </a>
+        {(lang === 'en' || lang === 'ja') && <PromoNote lang={lang} id="steps" />}
       </div>
     </section>
   )
@@ -308,7 +317,7 @@ export function Reviews({ t }: { t: T }) {
 const GIFT_ALT = {
   simple: 'Wooden tag with the character in gold colour, red-and-white mizuhiki cord, certificate card and gift box',
   standard: 'Carved wooden block, rubbing ink, tampo, washi paper, certificate card and pouch',
-  egift: 'A sealed washi envelope with a gold seal, on a dark ground',
+  egift: 'The gift itself: a card with the character 恒, "constant", made for Mom — one moment, one character. Sample.',
 } as const
 
 /** The three sizes. Prices are the ones the order form uses (src/order/packages.ts); the approximate line is display only. */
@@ -337,10 +346,12 @@ export function Gifts({
   const sc = SIZE_COPY[lang]
   // English (US launch): nothing physical is offered, so while the wooden sizes are "coming soon" they are not listed at all — only the e-gift
   const enOnly = lang === 'en' && soon.length > 0
+  const pv = usePromoView(lang)
   const cards = PACKAGE_DISPLAY_ORDER.filter((id) => (sizes ?? []).includes(id) && !(enOnly && soon.includes(id))).map((id) => ({
     id,
     title: sc.names[id],
-    img: id === 'simple' ? 'simple-hero' : id === 'standard' ? 'standard-hero' : 'egift-hero',
+    // the e-gift shows the gift itself (2026-11-18): the 恒 card, on the site's dark ink ground
+    img: id === 'simple' ? 'simple-hero' : id === 'standard' ? 'standard-hero' : 'package/card',
     // a size that is "coming soon" is listed by its name and price only: nothing about carving, printing or posting while it cannot be ordered
     items: soon.includes(id) ? [] : id === 'simple' ? [t.sp1, t.sp2, t.sp3, t.sp4] : id === 'standard' ? [t.dp1, t.dp2, t.dp3, t.dp4] : [momentWording(sc.includes[id], lang), sc.ship[id]],
     cta: id === 'simple' ? t.buy1 : id === 'standard' ? t.buy2 : t.buy0,
@@ -356,24 +367,37 @@ export function Gifts({
           {t.gfP}
         </p>
       </div>
-      <div className="wrap gifts">
+      <div className={`wrap gifts${cards.length === 1 ? ' single' : ''}`}>
         {cards.map((c) => {
           const onSale = c.id === 'egift' ? sale : null
           const approx = lang === 'en' ? null : approxLine(onSale ? salePriceJpy(PACKAGE_PRICE_JPY[c.id], onSale.percent) : PACKAGE_PRICE_JPY[c.id], currency, rates, lang)
           return (
             <article className="gift" key={c.id} data-size={c.id} data-coming-soon={c.soon ? 'yes' : undefined}>
-              <Picture name={c.img} width={1600} height={1000} alt={c.soon ? c.title : GIFT_ALT[c.id]} sizes="(max-width: 860px) 100vw, 380px" />
+              <Picture name={c.img} width={c.id === 'egift' ? 1600 : 1600} height={c.id === 'egift' ? 1600 : 1000} alt={c.soon ? c.title : GIFT_ALT[c.id]} sizes="(max-width: 860px) 100vw, 520px" />
               <div className="body">
                 {/* badge line (reserved even when there is no badge), then the name, then the price: the same stack in all three cards at every width */}
-                <div className="row">
-                  <span className="badgeSlot">{c.badge && <span className="badge" data-badge={c.soon ? 'soon' : c.id === 'egift' ? 'now' : 'recommended'}>{c.badge}</span>}</span>
-                  <h3>{c.title}</h3>
-                  <span className="price" data-price={c.id}>
-                    {lang === 'en' && c.id === 'egift' ? <UsdPriceView price={usdPrice} sale={onSale} id={c.id} /> : <PriceWithSale yen={PACKAGE_PRICE_JPY[c.id]} sale={onSale} id={c.id} />}
-                  </span>
-                </div>
-                {lang === 'en' ? <UsdLaunchLine price={usdPrice} sale={onSale} /> : <SaleLine sale={onSale} lang={lang} />}
-                {approx && <span className="approx">{approx}</span>}
+                {/* while the promotion runs the e-gift leads with the free gift (2026-11-18): the free line in place of the big price, two buttons, the price as one small line */}
+                {(() => {
+                  const promoCard = c.id === 'egift' && pv.on && !c.soon
+                  const showPrice = !promoCard || pv.soldOut
+                  return (
+                    <>
+                      <div className="row">
+                        <span className="badgeSlot">{c.badge && <span className="badge" data-badge={c.soon ? 'soon' : c.id === 'egift' ? 'now' : 'recommended'}>{c.badge}</span>}</span>
+                        <h3>{c.title}</h3>
+                        {showPrice && (
+                          <span className="price" data-price={c.id}>
+                            {lang === 'en' && c.id === 'egift' ? <UsdPriceView price={usdPrice} sale={onSale} id={c.id} /> : <PriceWithSale yen={PACKAGE_PRICE_JPY[c.id]} sale={onSale} id={c.id} />}
+                          </span>
+                        )}
+                      </div>
+                      {promoCard && pv.soldOut && <p className="promoFree" data-testid="promo-free-gifts">{freeLine(lang as 'en' | 'ja', pv)}</p>}
+                      {promoCard && !pv.soldOut && <PromoOffer lang={lang as 'en' | 'ja'} variant="gifts" id="gifts" />}
+                      {showPrice && (lang === 'en' ? <UsdLaunchLine price={usdPrice} sale={onSale} /> : <SaleLine sale={onSale} lang={lang} />)}
+                      {showPrice && approx && <span className="approx">{approx}</span>}
+                    </>
+                  )
+                })()}
                 <ul>
                   {c.items.map((x) => (
                     <li key={x}>{x}</li>
@@ -383,7 +407,7 @@ export function Gifts({
                   <button type="button" className="btn primary" disabled aria-disabled="true" data-testid={`gift-cta-${c.id}`}>
                     {sc.comingSoon}
                   </button>
-                ) : (
+                ) : c.id === 'egift' && pv.on && !pv.soldOut ? null : (
                   <a className="btn primary" href={writeLink()} data-testid={`gift-cta-${c.id}`}>
                     {c.cta}
                   </a>
@@ -445,7 +469,7 @@ export function Faq({ t, lang, woodOnSale = false }: { t: T; lang: RevealLang; w
   )
 }
 
-export function Closing({ t, woodOnSale = false }: { t: T; woodOnSale?: boolean }) {
+export function Closing({ t, lang = 'en', woodOnSale = false }: { t: T; lang?: RevealLang; woodOnSale?: boolean }) {
   return (
     <section className="closing">
       <div className="wrap">
@@ -457,6 +481,7 @@ export function Closing({ t, woodOnSale = false }: { t: T; woodOnSale?: boolean 
         <a className="btn primary" href={writeLink()}>
           {t.ctaClose}
         </a>
+        {(lang === 'en' || lang === 'ja') && <PromoNote lang={lang} id="closing" />}
       </div>
     </section>
   )
