@@ -64,7 +64,7 @@ export default function RevealPage({ write = false }: { write?: boolean }) {
     const description = woodOnSale ? d.description : (d.descriptionS ?? d.description) // (nothing about carving while the wooden sizes are "coming soon")
     setMeta('meta[name=description]', 'content', description)
     setMeta('meta[property="og:title"]', 'content', d.title)
-    setMeta('meta[property="og:description"]', 'content', description)
+    setMeta('meta[property="og:description"]', 'content', woodOnSale ? d.description : (d.ogS ?? d.descriptionS ?? d.description))
     setMeta('meta[property="og:locale"]', 'content', lang === 'ja' ? 'ja_JP' : lang === 'zh-Hant' ? 'zh_TW' : 'en_US')
   }, [lang, woodOnSale])
 

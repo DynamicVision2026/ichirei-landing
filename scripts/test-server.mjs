@@ -54,9 +54,9 @@ try {
       const r = await fetch(base + path)
       const h = await r.text()
       const ok = r.status === 200 && h.includes('<html lang="en"') && h.includes('<title>ICHIREI — A Gift of One Character</title>') &&
-        h.includes('<meta name="description" content="Tell us one true moment with someone. We find the single character that holds how you see them, and seal it as a gift you can send today." />') &&
+        h.includes('<meta name="description" content="Tell us one moment with them you\'ve never forgotten. A few lines are enough." />') &&
         h.includes('<meta property="og:title" content="Between you and me, one character." />') &&
-        h.includes('<meta property="og:description" content="Tell us one true moment with someone. We find the single character that holds how you see them, and seal it as a gift you can send today." />') &&
+        h.includes('<meta property="og:description" content="Tell us one moment with them you\'ve never forgotten. A few lines are enough. Then choose the single character that holds how you see them, sealed as a gift you can send today." />') &&
         h.includes('<meta property="og:locale" content="en_US" />') && h.includes('<meta property="og:url" content="https://ichirei.beyondculture.ai/en" />') &&
         h.includes('<meta property="og:image" content="https://ichirei.beyondculture.ai/img/og/en.jpg" />') && h.includes('og:image:width" content="1200"') && h.includes('og:image:height" content="630"') &&
         h.includes('<meta name="twitter:card" content="summary_large_image" />') && h.includes('<div id="root">') &&
@@ -64,13 +64,13 @@ try {
       check(`share tags: GET ${path} (no JavaScript) carries lang="en", the English title, description, og: tags and the 1200×630 picture — and no promotion wording`, ok, h.slice(0, 1600))
     }
     const zh = await (await fetch(base + '/zh')).text()
-    check('share tags: GET /zh carries lang="zh-Hant", the Traditional Chinese title and description, og:locale zh_TW', zh.includes('<html lang="zh-Hant"') && zh.includes('<title>ICHIREI 一字禮 — 一個字的禮物</title>') && zh.includes('og:description" content="ICHIREI（一字禮）— 把你眼中的那個人，凝成一個字。獻給重要的人的一個字的禮物。"') && zh.includes('og:locale" content="zh_TW"') && !zh.includes('ja_JP'))
+    check('share tags: GET /zh carries lang="zh-Hant", the Traditional Chinese title and description, og:locale zh_TW', zh.includes('<html lang="zh-Hant"') && zh.includes('<title>ICHIREI 一字禮 — 一個字的禮物</title>') && zh.includes('og:description" content="告訴我們一個你和他之間、至今忘不了的片刻，幾行就夠了。再選出代表你眼中的他的那個字，封成一份今天就能送出的禮物。"') && zh.includes('og:locale" content="zh_TW"') && !zh.includes('ja_JP'))
     // (2026-11-17) readable without JavaScript: the raw HTML of the three pages, the sitemap and robots.txt, and the private pages still noindex
     {
       const enRaw = await (await fetch(base + '/en')).text()
       const jaRaw = html
-      check('seo: GET /en (no JavaScript) has an <h1>, the paragraph, a price line and the /legal link inside the root, canonical /en, hreflang ×4, and a USD Product offer', /<div id="root"><div class="seo-static"[^>]*><h1>Between you and me, one character\.<\/h1><p>Tell us one true moment[^<]*<\/p><p>[^<]*\$[0-9][^<]*<\/p><p><a href="\/legal">Legal notice and returns<\/a><\/p><\/div><\/div>/.test(enRaw) && enRaw.includes('<link rel="canonical" href="https://ichirei.beyondculture.ai/en" />') && (enRaw.match(/rel="alternate" hreflang=/g) ?? []).length === 4 && enRaw.includes('"priceCurrency":"USD"') && enRaw.includes('"brand":{"@type":"Brand","name":"Beyond Culture"}'), enRaw.slice(enRaw.indexOf('<div id="root">'), enRaw.indexOf('<div id="root">') + 700))
-      check('seo: GET / (no JavaScript) has the Japanese <h1>, the hero sub line, a yen price line and the /legal link, and a JPY Product offer', /<h1>あなたとわたし、一字の距離。<\/h1><p>すべては、ひと場面から。[^<]*<\/p><p>[^<]*¥[0-9][^<]*<\/p><p><a href="\/legal">特定商取引法に基づく表記・返品について<\/a><\/p>/.test(jaRaw) && jaRaw.includes('"priceCurrency":"JPY"'))
+      check('seo: GET /en (no JavaScript) has an <h1>, the paragraph, a price line and the /legal link inside the root, canonical /en, hreflang ×4, and a USD Product offer', /<div id="root"><div class="seo-static"[^>]*><h1>Between you and me, one character\.<\/h1><p>Tell us one moment with them[^<]*<\/p><p>[^<]*\$[0-9][^<]*<\/p><p><a href="\/legal">Legal notice and returns<\/a><\/p><\/div><\/div>/.test(enRaw) && enRaw.includes('<link rel="canonical" href="https://ichirei.beyondculture.ai/en" />') && (enRaw.match(/rel="alternate" hreflang=/g) ?? []).length === 4 && enRaw.includes('"priceCurrency":"USD"') && enRaw.includes('"brand":{"@type":"Brand","name":"ICHIREI"}'), enRaw.slice(enRaw.indexOf('<div id="root">'), enRaw.indexOf('<div id="root">') + 700))
+      check('seo: GET / (no JavaScript) has the Japanese <h1>, the hero sub line, a yen price line and the /legal link, and a JPY Product offer', /<h1>あなたとわたし、一字の距離。<\/h1><p>その人との、忘れられないひと場面[^<]*<\/p><p>[^<]*¥[0-9][^<]*<\/p><p><a href="\/legal">特定商取引法に基づく表記・返品について<\/a><\/p>/.test(jaRaw) && jaRaw.includes('"priceCurrency":"JPY"'))
       check('seo: GET /zh (no JavaScript) has the Traditional Chinese <h1> and canonical /zh', zh.includes('<h1>你和我之間，只隔一個字。</h1>') && zh.includes('<link rel="canonical" href="https://ichirei.beyondculture.ai/zh" />'))
       const wr = await (await fetch(base + '/en/write')).text()
       check('seo: the writing room /en/write keeps its link-preview tags but has no landing block, canonical or product data', wr.includes('og:url') && !wr.includes('seo-static') && !wr.includes('rel="canonical"') && !wr.includes('application/ld+json'))

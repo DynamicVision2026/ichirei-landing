@@ -48,6 +48,8 @@ export interface LandingPrice {
   regular: string
   /** While the sale is on: when it starts and ends, as local times with their offset (ja / zh: Japan time; en: US Eastern time, the zone the English launch line names), and the first day of the regular price. */
   sale: { from: string; through: string; regularFrom: string } | null
+  /** When the price in `amount` took effect, for the Offer itself: the sale's start while the sale is on, the day after the sale once it is over, nothing before the sale starts or when none is configured. */
+  validFrom: string | null
   /** The market this page's prices and checkout are in (Google's merchant-listing fields): JPY / JP for / and /zh, USD / US for /en. */
   country: 'JP' | 'US'
 }
@@ -65,9 +67,17 @@ export function isoIn(ms: number, timeZone: string): string {
 }
 const dayAfter = (day: string): string => new Date(Date.parse(`${day}T00:00:00Z`) + 86_400_000).toISOString().slice(0, 10)
 
+/** Once a configured sale is over, the regular price has been in force since the day after its last day (YYYY-MM-DD); null while the sale has not started, is on, or was never configured. */
+function afterSale(env: NodeJS.ProcessEnv, parsed: ReturnType<typeof parseSale>): string | null {
+  const until = (env.SALE_UNTIL ?? '').trim()
+  if (parsed || !/^\d{4}-\d{2}-\d{2}$/.test(until) || !/^\d{1,2}$/.test((env.SALE_PERCENT ?? '').trim().replace(/%$/, ''))) return null
+  return Number.isFinite(Date.parse(`${until}T00:00:00Z`)) ? dayAfter(until) : null
+}
+
 /** The yen pages' regular price, sale window (Japan time) and market. */
-function jpyFacts(sale: ReturnType<typeof saleOn>): Pick<LandingPrice, 'regular' | 'sale' | 'country'> {
+function jpyFacts(sale: ReturnType<typeof saleOn>, after: string | null): Pick<LandingPrice, 'regular' | 'sale' | 'country' | 'validFrom'> {
   return {
+    validFrom: sale ? isoIn(Date.parse(sale.starts_at), 'Asia/Tokyo') : after,
     regular: String(PACKAGE_PRICE_JPY.egift),
     sale: sale ? { from: isoIn(Date.parse(sale.starts_at), 'Asia/Tokyo'), through: isoIn(Date.parse(sale.ends_at), 'Asia/Tokyo'), regularFrom: dayAfter(sale.until) } : null,
     country: 'JP',
@@ -92,15 +102,16 @@ export function landingPrice(lang: LandingLang, env: NodeJS.ProcessEnv = process
       validUntil: sale?.until ?? null,
       regular: dollars.egift.toFixed(2),
       sale: sale ? { from: isoIn(Date.parse(sale.starts_at), tz), through: isoIn(Date.parse(sale.en_ends_at ?? sale.ends_at), tz), regularFrom: dayAfter(sale.until) } : null,
+      validFrom: sale ? isoIn(Date.parse(sale.starts_at), tz) : afterSale(env, parsed),
       country: 'US',
     }
   }
   const yen = sale ? salePriceJpy(PACKAGE_PRICE_JPY.egift, sale.percent) : PACKAGE_PRICE_JPY.egift
   if (lang === 'ja') {
     const line = promoPriceLine('ja', !freeGifts, dollars, sale)
-    return { amount: String(yen), currency: 'JPY', line: freeGifts ? `${LANDING_WORDS.ja.freeLine}${line}` : line, validUntil: sale?.until ?? null, ...jpyFacts(sale) }
+    return { amount: String(yen), currency: 'JPY', line: freeGifts ? `${LANDING_WORDS.ja.freeLine}${line}` : line, validUntil: sale?.until ?? null, ...jpyFacts(sale, afterSale(env, parsed)) }
   }
-  return { amount: String(yen), currency: 'JPY', line: sale ? `${formatYen(yen)}　${saleLine(sale, 'zh-Hant')}` : formatYen(yen), validUntil: sale?.until ?? null, ...jpyFacts(sale) }
+  return { amount: String(yen), currency: 'JPY', line: sale ? `${formatYen(yen)}　${saleLine(sale, 'zh-Hant')}` : formatYen(yen), validUntil: sale?.until ?? null, ...jpyFacts(sale, afterSale(env, parsed)) }
 }
 
 const HREFLANG: ReadonlyArray<readonly [string, LandingLang | 'x-default', string]> = [
@@ -125,7 +136,9 @@ export function landingExtras(lang: LandingLang, s: LandingShare, env: NodeJS.Pr
     priceCurrency: price.currency,
     availability: 'https://schema.org/InStock',
   }
+  if (price.validFrom) offer.validFrom = price.validFrom
   if (price.validUntil) offer.priceValidUntil = price.validUntil
+  offer.seller = { '@type': 'Organization', name: 'Beyond Culture' }
   // Google's merchant-listing fields (2026-11-19): the e-gift is digital and arrives the same day, and is not returnable (the 24-hour cancellation stays in the page text and on /legal)
   offer.shippingDetails = {
     '@type': 'OfferShippingDetails',
@@ -151,7 +164,7 @@ export function landingExtras(lang: LandingLang, s: LandingShare, env: NodeJS.Pr
     name: s.title,
     description: s.paragraph,
     image: [s.image],
-    brand: { '@type': 'Brand', name: 'Beyond Culture' },
+    brand: { '@type': 'Brand', name: 'ICHIREI' },
     offers: offer,
   }
   const head = [

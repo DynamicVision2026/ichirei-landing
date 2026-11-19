@@ -34,7 +34,8 @@ const CLAIMS_REPLACED = new Set(['sub', 's1', 'st3', 'st3p', 'sp1'])
 // st3t / fa4 (2026-11-06 follow-up): the delivery wording follows /legal (2–3 weeks for wood; the e-gift part is "right after payment"); the page shows the wooden part only while wood is on sale.
 // cSent / st2 / st2p / mmNote (2026-11-07): two characters a round — a 本命 and a 遊び字 — instead of the reference's three
 // 2026-11-14 ("write one moment"): the sender writes one moment, not a story — these keys follow the owner's new words (scripts/test-moment.ts checks them word for word)
-const MOMENT_CHANGED = ['ctaTop', 'eyebrow', 'ctaHero', 'phEye', 'ph3', 'shEye', 'anH', 'exL', 'tp5', 'cGo', 'st1', 'st1p', 'st1t', 'st2t', 'mmEye', 'ctaClose', 'dock', 'sub', 'subS']
+// 2026-11-19: the closing line 'clP' follows the brand rule (the giver chooses the character; no line says we find it)
+const MOMENT_CHANGED = ['clP', 'ctaTop', 'eyebrow', 'ctaHero', 'phEye', 'ph3', 'shEye', 'anH', 'exL', 'tp5', 'cGo', 'st1', 'st1p', 'st1t', 'st2t', 'mmEye', 'ctaClose', 'dock', 'sub', 'subS']
 const OWNER_CHANGED = new Set(['gfH', 'fa3', 'tp4', 'fa2', 'st3t', 'fa4', 'cSent', 'st2', 'st2p', 'mmNote', ...MOMENT_CHANGED])
 const keysUsed = [...ref.matchAll(/data-i="(\w+)"/g)].map((m) => m[1]).filter((k) => !DROPPED.has(k) && !CLAIMS_REPLACED.has(k) && !OWNER_CHANGED.has(k))
 

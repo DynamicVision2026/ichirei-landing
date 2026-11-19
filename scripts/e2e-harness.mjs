@@ -728,8 +728,8 @@ const mockPage = async (browser, { onExplain, result, order, track } = {}) => {
   const first = await qEl.getAttribute('data-question-id')
   const headline = page.locator('#write [data-testid=story-headline]')
   const fs = (loc) => loc.evaluate((el) => parseFloat(getComputedStyle(el).fontSize))
-  check('story box (2026-11-01): a LARGE headline names what the box is for — 「その人との、いちばん心に残っている場面を。」 — and it labels the textarea', (await headline.innerText()) === 'その人との、いちばん心に残っている場面を。' && (await fs(headline)) >= 20 && (await headline.getAttribute('for')) === 'moment')
-  check('story box: the random question is a small HINT under the headline — 「ヒント：」 + a question of the "up" set — much smaller than the headline, and the box placeholder is 「例：母は、私が帰るまで毎晩玄関の灯りをつけて待っていた。二十代になってからも。」', first in QJA && (await qEl.innerText()) === QJA[first] && (await page.locator('#write .qHintLabel').innerText()) === 'ヒント：' && (await fs(qEl)) <= 16 && (await fs(qEl)) < (await fs(headline)) && (await box.getAttribute('placeholder')) === '例：母は、私が帰るまで毎晩玄関の灯りをつけて待っていた。二十代になってからも。')
+  check('story box (2026-11-01): a LARGE headline names what the box is for — 「忘れられない、ひと場面」 — and it labels the textarea', (await headline.innerText()) === '忘れられない、ひと場面' && (await fs(headline)) >= 20 && (await headline.getAttribute('for')) === 'moment')
+  check('story box: the random question is a small HINT under the headline — 「ヒント：」 + a question of the "up" set — much smaller than the headline, and the box placeholder is 「どこで、その人は何をして、何と言いましたか。数行で十分です。」', first in QJA && (await qEl.innerText()) === QJA[first] && (await page.locator('#write .qHintLabel').innerText()) === 'ヒント：' && (await fs(qEl)) <= 16 && (await fs(qEl)) < (await fs(headline)) && (await box.getAttribute('placeholder')) === 'どこで、その人は何をして、何と言いましたか。数行で十分です。')
   check('story box: the line 「ヒントに答えなくても大丈夫。…」 sits under the hint (and its 「別のヒントにする」 link), before the box', (await page.locator('#write [data-testid=question-optional]').innerText()) === 'ヒントに答えなくても大丈夫。思い浮かぶ場面を、そのまま書いてください。' && (await page.evaluate(() => { const order = ['story-headline', 'story-hint-line', 'question-switch', 'question-optional', 'story-input'].map((id) => document.querySelector(`#write [data-testid=${id}]`)); return order.every((el, i) => el && (i === 0 || (order[i - 1].compareDocumentPosition(el) & Node.DOCUMENT_POSITION_FOLLOWING) !== 0)) })) && (await page.locator('#write [data-testid=question-switch]').innerText()) === '別のヒントにする')
   const seenIds = [first]
   for (let i = 0; i < 4; i++) { await page.click('#write [data-testid=question-switch]'); seenIds.push(await qEl.getAttribute('data-question-id')) }
@@ -817,7 +817,7 @@ const mockPage = async (browser, { onExplain, result, order, track } = {}) => {
     let found = false
     for (let i = 0; i < 4 && !found; i++) { found = (await e.page.locator('#write [data-testid=story-question]').innerText()) === q0; if (!found) await e.page.click('#write [data-testid=question-switch]') }
     check(`opener (${lang}): the "up" set is shown in the page language (the habit question found within four angles)`, found)
-    const HL = { en: ['The moment with them you remember most.', 'Hint:', 'Another hint', "You don't have to answer the hint. Write the scene that comes to mind, just as it is.", 'e.g. My mom left the porch light on every night until I got home, even in my twenties.', 'Not a whole story, a few lines are enough. The more true detail, the truer the character.'], 'zh-Hant': ['寫下你和那個人之間，最難忘的一個場景。', '提示：', '換一個提示', '不必回答提示。想到的場景，直接寫下來就好。', '例如：媽媽每天晚上都留著門口那盞燈，等我回家。即使我已經二十幾歲了。', '不必是完整的故事，幾行就夠了。寫得越真實、越具體，選出的字就越貼近。'] }[lang]
+    const HL = { en: ["One moment you've never forgotten", 'Hint:', 'Another hint', "You don't have to answer the hint. Write the scene that comes to mind, just as it is.", 'Where were you? What did they do or say? A few lines are enough.', 'Not a whole story, a few lines are enough. The more true detail, the truer the character.'], 'zh-Hant': ['一個忘不了的片刻', '提示：', '換一個提示', '不必回答提示。想到的場景，直接寫下來就好。', '在哪裡？他做了什麼、說了什麼？幾行就夠了。', '不必是完整的故事，幾行就夠了。寫得越真實、越具體，選出的字就越貼近。'] }[lang]
     check(`story box (${lang}): headline, 「${HL[1]}」 label, switch link, the "you don't have to answer" line, placeholder and length line, exactly as specified`, (await e.page.locator('#write [data-testid=story-headline]').innerText()) === HL[0] && (await e.page.locator('#write .qHintLabel').innerText()) === HL[1] && (await e.page.locator('#write [data-testid=question-switch]').innerText()) === HL[2] && (await e.page.locator('#write [data-testid=question-optional]').innerText()) === HL[3] && (await e.page.locator('#write [data-testid=story-input]').getAttribute('placeholder')) === HL[4] && (await e.page.locator('#write [data-testid=story-hint]').innerText()) === HL[5], `${await e.page.locator('#write [data-testid=story-headline]').innerText()} | ${await e.page.locator('#write .qHintLabel').innerText()}`)
     await e.page.close()
   }
@@ -2576,7 +2576,7 @@ const SECTION_ORDER = ['.hero', '.strip', '.philo', '#shape', '#angles', '#how',
   await page.click('.hero a.btn.primary')
   await page.waitForURL(/\/en\/write/)
   await page.waitForSelector('#write #moment')
-  check('en customer page: the flow is English, no language pills inside it, no test controls', (await page.locator('#write').innerText()).includes('The moment with them you remember most.') && (await page.locator('#write [data-language]').count()) === 0 && (await page.locator('text=VALIDATION HARNESS').count()) === 0)
+  check('en customer page: the flow is English, no language pills inside it, no test controls', (await page.locator('#write').innerText()).includes("One moment you've never forgotten") && (await page.locator('#write [data-language]').count()) === 0 && (await page.locator('text=VALIDATION HARNESS').count()) === 0)
   check('en: the chips are English (relationship, direction, occasion)', (await page.locator('[data-chip="relationship:parent_mother"]').innerText()) === 'Mom' && (await page.locator('[data-chip="purpose:celebrate"]').innerText()) === 'Birthday')
   await page.locator('#moment').fill('My mum left the porch light on every night until I got home.')
   await pickContext(page, { relationship: 'parent_mother', direction: 'up', occasion: 'birthday_milestone' })
@@ -3984,9 +3984,9 @@ const SECTION_ORDER = ['.hero', '.strip', '.philo', '#shape', '#angles', '#how',
 // ---------- Run 26 (2026-11-14): "write one moment" — the new opening lines, the three steps, the hint and the placeholder, the English-only blocks; phone screenshots ----------
 {
   const W = {
-    ja: { path: '/?lang=ja', cta: 'ひと場面を書く →', open1: '面と向かっては言えないことも、一字なら言える。', open2: '多くの贈りものが伝えるのは『想っている』。一字礼が伝えるのは『あなたが、こう見えている』。', steps: ['ひと場面を書く。数行で十分です。', 'その場面から浮かぶ字を、無料で見る。あなたの目に映る一字を選ぶ。', '選んでから、お支払い。リンクで送るか、カードを印刷して渡す。'], hint: '物語でなくていい。数行で十分です。本当のことを細かく書くほど、字も本当になります。', ph: '例：母は、私が帰るまで毎晩玄関の灯りをつけて待っていた。二十代になってからも。', story: /物語|ストーリー/ },
-    'zh-Hant': { path: '/?lang=zh-Hant', cta: '寫下一個片刻 →', open1: '當面說不出口的話，一個字可以替你說。', open2: '大多數禮物說的是「我想著你」。一字禮說的是「在我眼裡，你是這樣的人」。', steps: ['寫下一個片刻。幾行就夠了。', '免費看看這個片刻帶出的字，選出你眼中的那一個。', '選好之後才付款。用連結傳送，或印出卡片親手交給對方。'], hint: '不必是完整的故事，幾行就夠了。寫得越真實、越具體，選出的字就越貼近。', ph: '例如：媽媽每天晚上都留著門口那盞燈，等我回家。即使我已經二十幾歲了。', story: /故事/ },
-    en: { path: '/en', cta: 'Write your moment →', open1: 'Some things are hard to say face to face. One character can say them.', open2: 'Most gifts say I thought of you. ICHIREI says this is how I see you.', steps: ['Write one moment. A few lines are enough.', 'See the characters your moment brings up, free, and choose the one that fits how you see them.', "Pay only once you've chosen. Then send the link, or print the card."], hint: 'Not a whole story, a few lines are enough. The more true detail, the truer the character.', ph: 'e.g. My mom left the porch light on every night until I got home, even in my twenties.', story: /\bstor(y|ies)\b/i },
+    ja: { path: '/?lang=ja', cta: 'ひと場面を書く →', open1: '面と向かっては言えないことも、一字なら言える。', open2: '多くの贈りものが伝えるのは『想っている』。一字礼が伝えるのは『あなたが、こう見えている』。', steps: ['忘れられないひと場面を、数行で書く。', 'その場面から浮かぶ字を、無料で見る。あなたの目に映る一字を選ぶ。', '選んでから、お支払い。リンクで送るか、カードを印刷して渡す。'], hint: '物語でなくていい。数行で十分です。本当のことを細かく書くほど、字も本当になります。', ph: 'どこで、その人は何をして、何と言いましたか。数行で十分です。', story: /物語|ストーリー/ },
+    'zh-Hant': { path: '/?lang=zh-Hant', cta: '寫下一個片刻 →', open1: '當面說不出口的話，一個字可以替你說。', open2: '大多數禮物說的是「我想著你」。一字禮說的是「在我眼裡，你是這樣的人」。', steps: ['寫下一個忘不了的片刻，幾行就夠了。', '免費看看這個片刻帶出的字，選出你眼中的那一個。', '選好之後才付款。用連結傳送，或印出卡片親手交給對方。'], hint: '不必是完整的故事，幾行就夠了。寫得越真實、越具體，選出的字就越貼近。', ph: '在哪裡？他做了什麼、說了什麼？幾行就夠了。', story: /故事/ },
+    en: { path: '/en', cta: 'Write your moment →', open1: 'Some things are hard to say face to face. One character can say them.', open2: 'Most gifts say I thought of you. ICHIREI says this is how I see you.', steps: ["Write one moment you've never forgotten. A few lines are enough.", 'See the characters your moment brings up, free, and choose the one that fits how you see them.', "Pay only once you've chosen. Then send the link, or print the card."], hint: 'Not a whole story, a few lines are enough. The more true detail, the truer the character.', ph: 'Where were you? What did they do or say? A few lines are enough.', story: /\bstor(y|ies)\b/i },
   }
   for (const [lang, w] of Object.entries(W)) {
     const { page, errors } = await mockPage(browser)
@@ -5865,6 +5865,33 @@ for (const [lang, locale, text] of [['en', 'en-US', 'Your gift is being finished
     const { page } = await open39('http://localhost:5173/en', { width: 1280, height: 900 })
     await page.screenshot({ path: `${SHOTS}/landing-en-full-1280.png`, fullPage: true })
     check('/en (1280 px): no horizontal scroll', await noScroll39(page))
+    await page.close()
+  }
+}
+
+// ---------- Run 40 (2026-11-19): "one unforgettable moment, the giver chooses" — the hero sub line on the three landing pages, and the three writing pages' heading and hint ----------
+{
+  const SUB = {
+    // (the test server has the wooden sizes on sale, so the hero shows the wood variant of the same line; the e-gift line is checked word for word in scripts/test-moment.ts and test-seo.ts)
+    '/': 'その人との、忘れられないひと場面を教えてください。数行で十分です。あなたの目に映るその人を表す一字を選び、',
+    '/en': "Tell us one moment with them you've never forgotten. A few lines are enough. Then choose the single character that holds how you see them,",
+    '/zh': '告訴我們一個你和他之間、至今忘不了的片刻，幾行就夠了。再選出代表你眼中的他的那個字',
+  }
+  for (const [path, sub] of Object.entries(SUB)) {
+    const { page, errors } = await mockPage(browser)
+    await page.goto(`http://localhost:5173${path}`, { waitUntil: 'networkidle' })
+    const lead = (await page.locator('.lead').first().innerText()).trim()
+    const body = await page.locator('body').innerText()
+    check(`landing (${path}): the hero sub line is the new one, and no line on the page says we find the character`, lead.startsWith(sub) && !/we find the single character|一字にして|我們找出/.test(body), lead)
+    check(`landing (${path}): no page errors`, errors.length === 0, errors.join('; '))
+    await page.close()
+  }
+  const WRITE = { '/write': ['忘れられない、ひと場面', 'どこで、その人は何をして、何と言いましたか。数行で十分です。'], '/en/write': ["One moment you've never forgotten", 'Where were you? What did they do or say? A few lines are enough.'], '/zh/write': ['一個忘不了的片刻', '在哪裡？他做了什麼、說了什麼？幾行就夠了。'] }
+  for (const [path, [h, hint]] of Object.entries(WRITE)) {
+    const { page, errors } = await mockPage(browser)
+    await page.goto(`http://localhost:5173${path}`, { waitUntil: 'networkidle' })
+    check(`writing page (${path}): heading 「${h}」 and the hint inside the box`, (await page.locator('#write [data-testid=story-headline]').innerText()) === h && (await page.locator('#write [data-testid=story-input]').getAttribute('placeholder')) === hint)
+    check(`writing page (${path}): no page errors`, errors.length === 0, errors.join('; '))
     await page.close()
   }
 }

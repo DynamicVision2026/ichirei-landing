@@ -39,9 +39,9 @@ const rich = (s: string) => s.replace(/<[^>]+>/g, '')
   check('(1) the first block\'s headlines are the hero headlines of src/reveal/copy.ts (without their emphasis), in all three languages',
     rich(TEXT.ja.h1) === LANDING_WORDS.ja.h1 && rich(TEXT.en.h1) === LANDING_WORDS.en.h1 && rich(TEXT['zh-Hant'].h1) === LANDING_WORDS['zh-Hant'].h1)
   check('(1) the legal link text is the footer link text of each language', TEXT.ja.legal === LANDING_WORDS.ja.legal && TEXT.en.legal === LANDING_WORDS.en.legal && TEXT['zh-Hant'].legal === LANDING_WORDS['zh-Hant'].legal)
-  check('(1) the Japanese and Traditional Chinese paragraphs are the hero sub lines', landingShare('ja', NO_ENV).paragraph === TEXT.ja.subS && landingShare('zh-Hant', NO_ENV).paragraph === TEXT['zh-Hant'].subS)
-  check('(1) the English paragraph is the page\'s share sentence (the hero sub line is 179 characters, over the 160 a search result keeps)', TEXT.en.subS.length > 160 && landingShare('en', NO_ENV).paragraph === landingShare('en', NO_ENV).description)
-  check('(1) every meta description is at most 160 characters', (['ja', 'en', 'zh-Hant'] as const).every((l) => landingShare(l, NO_ENV).paragraph.length <= 160), (['ja', 'en', 'zh-Hant'] as const).map((l) => landingShare(l, NO_ENV).paragraph.length).join(','))
+  check('(1) the three paragraphs (first HTML, product data) are the hero sub lines, and so are the link-preview descriptions', (['ja', 'en', 'zh-Hant'] as const).every((l) => landingShare(l, NO_ENV).paragraph === TEXT[l].subS && landingShare(l, NO_ENV).description === TEXT[l].subS))
+  check('(1) the English meta description is the hero sub line without its last sentence (the whole line is over the 160 a search result keeps)', TEXT.en.subS.length > 160 && landingShare('en', NO_ENV).metaDescription === TEXT.en.subS.split('. ').slice(0, 2).join('. ') + '.')
+  check('(1) every meta description is at most 160 characters', (['ja', 'en', 'zh-Hant'] as const).every((l) => (landingShare(l, NO_ENV).metaDescription ?? landingShare(l, NO_ENV).paragraph).length <= 160), (['ja', 'en', 'zh-Hant'] as const).map((l) => (landingShare(l, NO_ENV).metaDescription ?? landingShare(l, NO_ENV).paragraph).length).join(','))
   // the free-gift line is the order-section line with the live count taken out
   const en = thanksCopy('en').orderFree(1, 100)
   const ja = thanksCopy('ja').orderFree(1, 100)
@@ -53,15 +53,15 @@ const rich = (s: string) => s.replace(/<[^>]+>/g, '')
   const h = page('en')
   const hd = head(h)
   const r = root(h)
-  check('(2) /en root starts with the plain block: <h1>, the paragraph, the price line, the /legal link — in English', r.includes('<h1>Between you and me, one character.</h1>') && r.includes('<p>Tell us one true moment with someone.') && r.includes('<a href="/legal">Legal notice and returns</a>'), r)
+  check('(2) /en root starts with the plain block: <h1>, the paragraph, the price line, the /legal link — in English', r.includes('<h1>Between you and me, one character.</h1>') && r.includes(`<p>${TEXT.en.subS}</p>`) && r.includes('<a href="/legal">Legal notice and returns</a>'), r)
   check('(2) /en during the promotion: the free-gift line, then the sale price', r.includes("Days of Thanks: hold one of today's free gifts with your email and this gift is $0.") && r.includes('If today\'s free gifts are gone: $17.50 (Thanksgiving price). $25 from December 1.'), r)
-  check('(2) /en <meta name="description"> is the paragraph, canonical and og:url are https://…/en', hd.includes('<meta name="description" content="Tell us one true moment with someone. We find the single character that holds how you see them, and seal it as a gift you can send today." />') && hd.includes(`<link rel="canonical" href="${BASE}/en" />`) && hd.includes(`og:url" content="${BASE}/en"`) && hd.includes('og:title" content="Between you and me, one character."'))
+  check('(2) /en <meta name="description"> is the first two sentences of the hero line, canonical and og:url are https://…/en', hd.includes(`<meta name="description" content="${landingShare('en', LIVE).metaDescription}" />`) && hd.includes(`<link rel="canonical" href="${BASE}/en" />`) && hd.includes(`og:url" content="${BASE}/en"`) && hd.includes('og:title" content="Between you and me, one character."'))
   check('(2) /en has exactly one description, one canonical and one <h1>', (hd.match(/name="description"/g) ?? []).length === 1 && (hd.match(/rel="canonical"/g) ?? []).length === 1 && (h.match(/<h1>/g) ?? []).length === 1)
   check('(2) hreflang ja, en, zh-Hant and x-default point at /, /en, /zh and /', hd.includes(`hreflang="ja" href="${BASE}/"`) && hd.includes(`hreflang="en" href="${BASE}/en"`) && hd.includes(`hreflang="zh-Hant" href="${BASE}/zh"`) && hd.includes(`hreflang="x-default" href="${BASE}/"`))
   const ld = /<script type="application\/ld\+json">(.*?)<\/script>/s.exec(hd)?.[1] ?? ''
   const j = JSON.parse(ld || '{}')
-  check('(2) JSON-LD Product on /en: name, description, image (the share card), brand Beyond Culture, Offer in USD (17.50, InStock, url)',
-    j['@type'] === 'Product' && j.name === 'ICHIREI — A Gift of One Character' && j.description === landingShare('en', LIVE).paragraph && j.image[0] === `${BASE}/img/og/en.jpg` && j.brand.name === 'Beyond Culture' &&
+  check('(2) JSON-LD Product on /en: name, description, image (the share card), brand ICHIREI, seller Beyond Culture, Offer in USD (17.50, InStock, url)',
+    j['@type'] === 'Product' && j.name === 'ICHIREI — A Gift of One Character' && j.description === landingShare('en', LIVE).paragraph && j.image[0] === `${BASE}/img/og/en.jpg` && j.brand.name === 'ICHIREI' && j.offers.seller.name === 'Beyond Culture' &&
       j.offers['@type'] === 'Offer' && j.offers.price === '17.50' && j.offers.priceCurrency === 'USD' && j.offers.availability === 'https://schema.org/InStock' && j.offers.url === `${BASE}/en`, ld)
   check('(2) the block is hidden for people who run scripts and shown for people who do not (a <style> and a <noscript><style>)', hd.includes('.seo-static{position:absolute') && /<noscript><style>\.seo-static\{position:static/.test(hd))
   check('(2) the rest of index.html is untouched: the module script and the font loader are still there', h.includes('<script type="module" src="/src/main.tsx"></script>') && h.includes('fonts.googleapis.com'))
@@ -74,7 +74,7 @@ const rich = (s: string) => s.replace(/<[^>]+>/g, '')
   const j = JSON.parse(/<script type="application\/ld\+json">(.*?)<\/script>/s.exec(head(h))?.[1] ?? '{}')
   check('(3) / root: <h1> 「あなたとわたし、一字の距離。」, the hero sub line, the price line and the /legal link', r.includes('<h1>あなたとわたし、一字の距離。</h1>') && r.includes(`<p>${TEXT.ja.subS}</p>`) && r.includes('<a href="/legal">特定商取引法に基づく表記・返品について</a>'), r)
   check('(3) / during the promotion: the free-gift line and 「感謝の季節価格 ¥2,786（12月1日から ¥3,980）」', r.includes('本日の無料枠が終了した場合：感謝の季節価格 ¥2,786（12月1日から ¥3,980）') && r.includes('この贈りものは ¥0 になります。'), r)
-  check('(3) / canonical and og:url are https://…/ , lang="ja", and its og: tags are the ones index.html had', head(h).includes(`<link rel="canonical" href="${BASE}/" />`) && head(h).includes(`og:url" content="${BASE}/"`) && h.includes('<html lang="ja"') && head(h).includes('og:title" content="ICHIREI 一字礼 — 一字の贈りもの"') && head(h).includes('og:description" content="ICHIREI（一字礼）— あなたの目に映る、その人を、一文字に。大切な人への、一字の贈りもの。"') && head(h).includes('og:site_name" content="ICHIREI 一字礼"') && head(h).includes('og:locale" content="ja_JP"'))
+  check('(3) / canonical and og:url are https://…/ , lang="ja", and its og: tags are the ones index.html had', head(h).includes(`<link rel="canonical" href="${BASE}/" />`) && head(h).includes(`og:url" content="${BASE}/"`) && h.includes('<html lang="ja"') && head(h).includes('og:title" content="ICHIREI 一字礼 — 一字の贈りもの"') && head(h).includes(`og:description" content="${TEXT.ja.subS}"`) && head(h).includes('og:site_name" content="ICHIREI 一字礼"') && head(h).includes('og:locale" content="ja_JP"'))
   check('(3) / JSON-LD Offer is in JPY: 2786 now, validity through the sale\'s last day', j.offers.priceCurrency === 'JPY' && j.offers.price === '2786' && j.offers.priceValidUntil === '2026-11-30' && j.offers.url === `${BASE}/`, JSON.stringify(j.offers))
 
   const z = page('zh-Hant')
@@ -126,6 +126,25 @@ const rich = (s: string) => s.replace(/<[^>]+>/g, '')
   const shifted = ld('en', DURING, { ...LIVE, SALE_UNTIL: '2026-12-05', SALE_UNTIL_EN: '', SALE_FROM: '2026-11-16', USD_PRICE_EGIFT: '30', USD_PRICE_EGIFT_SALE: '21' } as NodeJS.ProcessEnv).j.offers
   check('(4b) nothing is hard-coded: another end date, start date and prices in the settings change the dates and the amounts', shifted.priceValidUntil === '2026-12-05' && shifted.priceSpecification[0].price === '21.00' && shifted.priceSpecification[1].price === '30.00' && shifted.priceSpecification[1].validFrom === '2026-12-06' && shifted.priceSpecification[0].validFrom === '2026-11-15T10:00:00-05:00' && shifted.priceSpecification[0].validThrough === '2026-12-05T09:59:59-05:00', JSON.stringify(shifted))
   check('(4b) the free-gift line of the page text is untouched and free gifts are not a price in the data', rich(page('en')).includes("hold one of today's free gifts") && !JSON.stringify(ld('en', DURING).j).includes('"price":"0') && !JSON.stringify(ld('ja', DURING).j).includes('"price":"0"'))
+}
+
+// ---- 4c. 2026-11-19: validFrom on the Offer itself, brand ICHIREI, seller Beyond Culture, and no line says the site finds the character ----------------------------------
+{
+  const offerOf = (lang: LandingLang, now: Date) => JSON.parse(/<script type="application\/ld\+json">(.*?)<\/script>/s.exec(head(page(lang, LIVE, now)))?.[1] ?? '{}')
+  for (const lang of ['ja', 'en', 'zh-Hant'] as const) {
+    const during = offerOf(lang, DURING)
+    const after = offerOf(lang, new Date('2026-12-02T12:00:00Z'))
+    check(`(4c) ${lang}: validFrom is on the Offer itself — during the sale the same value as the current price entry, after the sale the regular price's 2026-12-01`, typeof during.offers.validFrom === 'string' && during.offers.validFrom === during.offers.priceSpecification[0].validFrom && after.offers.validFrom === '2026-12-01', JSON.stringify([during.offers.validFrom, after.offers.validFrom]))
+    check(`(4c) ${lang}: brand.name is ICHIREI and offers.seller is the Organization Beyond Culture (during and after the sale)`, [during, after].every((j) => j.brand.name === 'ICHIREI' && j.offers.seller?.['@type'] === 'Organization' && j.offers.seller.name === 'Beyond Culture'))
+    check(`(4c) ${lang}: the JSON-LD description is the hero sub line`, during.description === TEXT[lang].subS)
+  }
+  const real = { ...LIVE, SALE_FROM: '2026-11-15' } as NodeJS.ProcessEnv
+  const enReal = JSON.parse(/<script type="application\/ld\+json">(.*?)<\/script>/s.exec(head(page('en', real, DURING)))?.[1] ?? '{}').offers
+  const jaReal = JSON.parse(/<script type="application\/ld\+json">(.*?)<\/script>/s.exec(head(page('ja', real, DURING)))?.[1] ?? '{}').offers
+  check('(4c) with the live dates the Offer starts: /en 2026-11-14T10:00:00-05:00; / (and /zh) 2026-11-15T00:00:00+09:00', enReal.validFrom === '2026-11-14T10:00:00-05:00' && jaReal.validFrom === '2026-11-15T00:00:00+09:00', JSON.stringify([enReal.validFrom, jaReal.validFrom]))
+  const texts = [JSON.stringify(TEXT), JSON.stringify(LANDING_WORDS), ...(['ja', 'en', 'zh-Hant'] as const).flatMap((l) => [JSON.stringify(landingShare(l, LIVE)), page(l)])].join('\n')
+  check('(4c) no landing or SEO text says the site picks or finds the character: not "we find the single character", not 一字にして, not 我們找出 / 我们找出', !/we find the single character/i.test(texts) && !texts.includes('一字にして') && !texts.includes('我們找出') && !texts.includes('我们找出'))
+  check('(4c) the old hero sub lines are gone (the "true moment with someone" line, すべては、ひと場面から。, 一切從一個片刻開始。告訴我們)', !texts.includes('Tell us one true moment with someone') && !texts.includes('It all starts with one moment. Tell us') && !texts.includes('すべては、ひと場面から。その人との本当の場面') && !texts.includes('一切從一個片刻開始。告訴我們你和某人之間'))
 }
 
 // ---- 5. escaping -----------------------------------------------------------------------------------------------------------------------------------------------

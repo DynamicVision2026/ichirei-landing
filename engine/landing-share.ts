@@ -12,8 +12,10 @@ export interface LandingShare {
   ogTitle: string
   /** The og:/twitter: description (link previews). */
   description: string
-  /** <meta name="description"> and the short paragraph of the first HTML: at most 160 characters. */
+  /** The short paragraph of the first HTML and the product data's description (the hero's sub line). */
   paragraph: string
+  /** <meta name="description"> on the landing pages: at most 160 characters (absent = the paragraph, which must then fit). */
+  metaDescription?: string
   siteName: string
   locale: string
   url: string
@@ -30,8 +32,8 @@ export function landingShare(lang: LandingLang, env: NodeJS.ProcessEnv = process
       lang: 'ja',
       title: 'ICHIREI 一字礼 — 一字の贈りもの',
       ogTitle: 'ICHIREI 一字礼 — 一字の贈りもの',
-      description: 'ICHIREI（一字礼）— あなたの目に映る、その人を、一文字に。大切な人への、一字の贈りもの。',
-      paragraph: 'すべては、ひと場面から。その人との本当の場面をひとつ教えてください。あなたの目に映るその人を一字にして、封をした贈りものにします。',
+      description: 'その人との、忘れられないひと場面を教えてください。数行で十分です。あなたの目に映るその人を表す一字を選び、今日贈れる贈りものにします。',
+      paragraph: 'その人との、忘れられないひと場面を教えてください。数行で十分です。あなたの目に映るその人を表す一字を選び、今日贈れる贈りものにします。',
       siteName: 'ICHIREI 一字礼',
       locale: 'ja_JP',
       url: `${base}/`,
@@ -45,9 +47,10 @@ export function landingShare(lang: LandingLang, env: NodeJS.ProcessEnv = process
       lang: 'en',
       title: 'ICHIREI — A Gift of One Character',
       ogTitle: 'Between you and me, one character.',
-      description: 'Tell us one true moment with someone. We find the single character that holds how you see them, and seal it as a gift you can send today.',
-      // the hero's sub line is 179 characters; the same sentence as the link preview already fits in 160
-      paragraph: 'Tell us one true moment with someone. We find the single character that holds how you see them, and seal it as a gift you can send today.',
+      description: "Tell us one moment with them you've never forgotten. A few lines are enough. Then choose the single character that holds how you see them, sealed as a gift you can send today.",
+      // the hero's sub line is over the 160 characters a search result keeps: the paragraph, the product data and the link preview carry all of it, the meta description only its first two sentences
+      paragraph: "Tell us one moment with them you've never forgotten. A few lines are enough. Then choose the single character that holds how you see them, sealed as a gift you can send today.",
+      metaDescription: "Tell us one moment with them you've never forgotten. A few lines are enough.",
       siteName: 'ICHIREI',
       locale: 'en_US',
       url: `${base}/en`,
@@ -61,8 +64,8 @@ export function landingShare(lang: LandingLang, env: NodeJS.ProcessEnv = process
     lang: 'zh-Hant',
     title: 'ICHIREI 一字禮 — 一個字的禮物',
     ogTitle: 'ICHIREI 一字禮 — 一個字的禮物',
-    description: 'ICHIREI（一字禮）— 把你眼中的那個人，凝成一個字。獻給重要的人的一個字的禮物。',
-    paragraph: '一切從一個片刻開始。告訴我們你和某人之間一個真實的場景，我們找出那個代表你眼中的他的字，再封成一份可以立刻送出的禮物。',
+    description: '告訴我們一個你和他之間、至今忘不了的片刻，幾行就夠了。再選出代表你眼中的他的那個字，封成一份今天就能送出的禮物。',
+    paragraph: '告訴我們一個你和他之間、至今忘不了的片刻，幾行就夠了。再選出代表你眼中的他的那個字，封成一份今天就能送出的禮物。',
     siteName: 'ICHIREI',
     locale: 'zh_TW',
     url: `${base}/zh`,
@@ -84,7 +87,7 @@ export interface LandingExtras {
  * pages) the head also gets canonical, hreflang and the product data, and the root element starts with the plain readable block the page replaces as soon as it runs. */
 export function injectLandingShare(html: string, s: LandingShare, extras?: LandingExtras): string {
   const tags = [
-    `<meta name="description" content="${esc(extras ? s.paragraph : s.description)}" />`,
+    `<meta name="description" content="${esc(extras ? (s.metaDescription ?? s.paragraph) : s.description)}" />`,
     `<meta property="og:type" content="website" />`,
     `<meta property="og:site_name" content="${esc(s.siteName)}" />`,
     `<meta property="og:title" content="${esc(s.ogTitle)}" />`,

@@ -30,11 +30,11 @@ export const STORY_MIN = 10
 
 export const OPENER: Record<RevealLang, OpenerCopy> = {
   ja: {
-    headline: 'その人との、いちばん心に残っている場面を。',
+    headline: '忘れられない、ひと場面',
     hintLabel: 'ヒント：',
     switchQuestion: '別のヒントにする',
     optionalNote: 'ヒントに答えなくても大丈夫。思い浮かぶ場面を、そのまま書いてください。',
-    answerHint: '例：母は、私が帰るまで毎晩玄関の灯りをつけて待っていた。二十代になってからも。',
+    answerHint: 'どこで、その人は何をして、何と言いましたか。数行で十分です。',
     tooShort: '10字以上で送れます。',
     draftBanner: '書きかけの場面があります',
     draftContinue: '続ける',
@@ -44,11 +44,11 @@ export const OPENER: Record<RevealLang, OpenerCopy> = {
     readerOptions: { '': 'わたしと同じ', ja: '日本', zh: '台湾・香港・マカオ', en: '英語圏', other: 'その他' },
   },
   'zh-Hant': {
-    headline: '寫下你和那個人之間，最難忘的一個場景。',
+    headline: '一個忘不了的片刻',
     hintLabel: '提示：',
     switchQuestion: '換一個提示',
     optionalNote: '不必回答提示。想到的場景，直接寫下來就好。',
-    answerHint: '例如：媽媽每天晚上都留著門口那盞燈，等我回家。即使我已經二十幾歲了。',
+    answerHint: '在哪裡？他做了什麼、說了什麼？幾行就夠了。',
     tooShort: '寫滿 10 個字即可送出。',
     draftBanner: '有一個還沒寫完的片刻',
     draftContinue: '繼續',
@@ -58,11 +58,11 @@ export const OPENER: Record<RevealLang, OpenerCopy> = {
     readerOptions: { '': '和我相同', ja: '日本', zh: '台灣・香港・澳門', en: '英語圈', other: '其他' },
   },
   en: {
-    headline: 'The moment with them you remember most.',
+    headline: "One moment you've never forgotten",
     hintLabel: 'Hint:',
     switchQuestion: 'Another hint',
     optionalNote: "You don't have to answer the hint. Write the scene that comes to mind, just as it is.",
-    answerHint: 'e.g. My mom left the porch light on every night until I got home, even in my twenties.',
+    answerHint: 'Where were you? What did they do or say? A few lines are enough.',
     tooShort: 'At least 10 characters to send.',
     draftBanner: 'You have a moment in progress',
     draftContinue: 'Continue',
