@@ -231,7 +231,7 @@ export function Steps({ t, lang = 'en', memorial = false, woodOnSale = false }: 
         <a className="btn primary" href={writeLink()}>
           {t.ctaSteps}
         </a>
-        {(lang === 'en' || lang === 'ja') && <PromoNote lang={lang} id="steps" />}
+        <PromoNote lang={lang} id="steps" />
       </div>
     </section>
   )
@@ -391,8 +391,8 @@ export function Gifts({
                           </span>
                         )}
                       </div>
-                      {promoCard && pv.soldOut && <p className="promoFree" data-testid="promo-free-gifts">{freeLine(lang as 'en' | 'ja', pv)}</p>}
-                      {promoCard && !pv.soldOut && <PromoOffer lang={lang as 'en' | 'ja'} variant="gifts" id="gifts" />}
+                      {promoCard && pv.soldOut && <p className="promoFree" data-testid="promo-free-gifts">{freeLine(lang, pv)}</p>}
+                      {promoCard && !pv.soldOut && <PromoOffer lang={lang} variant="gifts" id="gifts" />}
                       {showPrice && (lang === 'en' ? <UsdLaunchLine price={usdPrice} sale={onSale} /> : <SaleLine sale={onSale} lang={lang} />)}
                       {showPrice && approx && <span className="approx">{approx}</span>}
                     </>
@@ -481,7 +481,7 @@ export function Closing({ t, lang = 'en', woodOnSale = false }: { t: T; lang?: R
         <a className="btn primary" href={writeLink()}>
           {t.ctaClose}
         </a>
-        {(lang === 'en' || lang === 'ja') && <PromoNote lang={lang} id="closing" />}
+        <PromoNote lang={lang} id="closing" />
       </div>
     </section>
   )

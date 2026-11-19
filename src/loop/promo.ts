@@ -2,6 +2,7 @@
 // section is on screen (/api/promo; the server caches the count for a few seconds). A failed read keeps the last answer.
 
 import { useSyncExternalStore } from 'react'
+import { thanksLocale } from './copy.ts'
 
 export interface PromoHold {
   state: string
@@ -60,7 +61,7 @@ export const usePromo = (): PromoState | null => useSyncExternalStore(subscribe,
 /** "8:42 PM" (en) or "20:42" (ja) in the visitor's own time zone. */
 export const localTime = (iso: string, lang: string = 'en'): string => {
   try {
-    return new Date(iso).toLocaleTimeString(lang === 'ja' ? 'ja-JP' : 'en-US', { hour: 'numeric', minute: '2-digit' })
+    return new Date(iso).toLocaleTimeString(thanksLocale(lang), { hour: 'numeric', minute: '2-digit' })
   } catch {
     return iso
   }
@@ -83,7 +84,7 @@ export async function requestHold(email: string, marketing: boolean, lang: strin
     // no address to read
   }
   try {
-    const r = await fetch('/api/promo/hold', { method: 'POST', headers: { 'content-type': 'application/json' }, credentials: 'same-origin', body: JSON.stringify({ email, marketing, language: lang === 'ja' ? 'ja' : 'en', ...(code ? { code } : {}) }) })
+    const r = await fetch('/api/promo/hold', { method: 'POST', headers: { 'content-type': 'application/json' }, credentials: 'same-origin', body: JSON.stringify({ email, marketing, language: lang === 'ja' || lang === 'zh-Hant' || lang === 'zh-Hans' ? lang : 'en', ...(code ? { code } : {}) }) })
     const j = (await r.json().catch(() => null)) as { ok?: boolean; code?: string; hold?: PromoHold; left?: number; existing?: boolean; link?: string | null } | null
     if (r.ok && j?.ok && j.hold) {
       setPromoHold(j.hold, j.left)

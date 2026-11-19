@@ -19,7 +19,7 @@ export function dayAfter(until: string): [number, number] | null {
  * en: "If today's free gifts are gone: $17.50 (Thanksgiving price). $25 from December 1."  ja: 「本日の無料枠が終了した場合：感謝の季節価格 ¥2,786（12月1日から ¥3,980）」.
  * `soldOut`: the free gifts of the day are gone, so the line is the plain price line (no "if …" lead-in). Without a sale only the regular price is named.
  */
-export function promoPriceLine(lang: 'en' | 'ja', soldOut: boolean, usdPrice: UsdPrice, sale: Sale | null): string {
+export function promoPriceLine(lang: 'en' | 'ja' | 'zh-Hant', soldOut: boolean, usdPrice: UsdPrice, sale: Sale | null, twd?: (yen: number) => string | null): string {
   const next = sale ? dayAfter(sale.until) : null
   if (lang === 'en') {
     const lead = soldOut ? '' : "If today's free gifts are gone: "
@@ -27,6 +27,17 @@ export function promoPriceLine(lang: 'en' | 'ja', soldOut: boolean, usdPrice: Us
     return `${lead}${usd(usdPrice.egift_sale)} (Thanksgiving price).${next ? ` ${usd(usdPrice.egift)} from ${MONTH[next[0] - 1]} ${next[1]}.` : ''}`
   }
   const regular = formatYen(PACKAGE_PRICE_JPY.egift)
+  if (lang === 'zh-Hant') {
+    // 「若今日免費名額已滿：感恩季價格 ¥2,786（約 NT$890），12月1日起 ¥3,980。」 — the NT$ figure is the page's own approximation (null = no rate: the bracket is left out)
+    const zlead = soldOut ? '' : '若今日免費名額已滿：'
+    const approx = (yen: number) => {
+      const a = twd?.(yen)
+      return a ? `（約 ${a}）` : ''
+    }
+    if (!sale) return `${zlead}${regular}${approx(PACKAGE_PRICE_JPY.egift)}。`
+    const saleYen = salePriceJpy(PACKAGE_PRICE_JPY.egift, sale.percent)
+    return `${zlead}感恩季價格 ${formatYen(saleYen)}${approx(saleYen)}${next ? `，${next[0]}月${next[1]}日起 ${regular}` : ''}。`
+  }
   const lead = soldOut ? '' : '本日の無料枠が終了した場合：'
   if (!sale) return `${lead}${regular}`
   return `${lead}感謝の季節価格 ${formatYen(salePriceJpy(PACKAGE_PRICE_JPY.egift, sale.percent))}${next ? `（${next[0]}月${next[1]}日から ${regular}）` : ''}`

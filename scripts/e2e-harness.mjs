@@ -5266,7 +5266,7 @@ for (const [lang, locale, text] of [['en', 'en-US', 'Your gift is being finished
   {
     const { page, errors } = await open35('http://localhost:5173/zh', { on: true, left: 37, daily: 100, hold: null })
     await page.waitForTimeout(600)
-    check('zh-Hant: no free-gift card (the pool is the US and Japan only)', (await T(page, 'thanks-card').count()) === 0 && (await page.getAttribute('html', 'lang')) === 'zh-Hant')
+    check('zh-Hant (2026-11-19): the free-gift card is there too — the same pool as en and ja', (await T(page, 'thanks-card').count()) === 1 && (await page.getAttribute('html', 'lang')) === 'zh-Hant')
     check('no page errors (run 35, zh)', errors.length === 0, errors.join('; '))
     await page.close()
   }
@@ -5546,7 +5546,7 @@ for (const [lang, locale, text] of [['en', 'en-US', 'Your gift is being finished
   // zh is unchanged
   const zh = await open37('http://localhost:5173/zh')
   const z = await probe(zh.page)
-  check('run 37 (zh): unchanged — no free-gift box and no promotion price line in the hero', !z.boxInHero && z.sections === 0 && z.price === null, JSON.stringify(z))
+  check('run 37 (zh, 2026-11-19): the free-gift box is the very next block after the hero button, then the one small price line, then the chips — like en and ja', z.boxNext && z.priceNext && z.chipsNext && z.boxInHero && z.sections === 1 && z.noScroll, JSON.stringify(z))
   await zh.page.close()
   // a wider screen: the box is still under the button and the page does not scroll sideways
   const wide = await open37(URLS.en, { width: 1280 })
@@ -5854,7 +5854,7 @@ for (const [lang, locale, text] of [['en', 'en-US', 'Your gift is being finished
   // ---- /zh: pictures only
   {
     const { page } = await open39('http://localhost:5173/zh', { width: 1280, height: 900 })
-    check('/zh: the `receive` and `moment` pictures, and no promotion line anywhere', (await T(page, 'zh-receive').locator('[data-testid=receive-art] img').count()) === 1 && (await page.locator('#how [data-testid=steps-art] img').count()) === 1 && (await page.locator('[data-testid^=promo-]').count()) === 0 && (await noScroll39(page)))
+    check('/zh (2026-11-19): the `receive` and `moment` pictures, and the free gift in the e-gift card and in "What they receive" like the other pages', (await T(page, 'zh-receive').locator('[data-testid=receive-art] img').count()) === 1 && (await page.locator('#how [data-testid=steps-art] img').count()) === 1 && (await T(page, 'promo-offer-gifts').count()) === 1 && (await T(page, 'promo-offer-receive').count()) === 1 && (await noScroll39(page)))
     await page.close()
     const m = await open39('http://localhost:5173/zh', { width: 390 })
     check('/zh (390 px): no horizontal scroll', await noScroll39(m.page))
@@ -5892,6 +5892,115 @@ for (const [lang, locale, text] of [['en', 'en-US', 'Your gift is being finished
     await page.goto(`http://localhost:5173${path}`, { waitUntil: 'networkidle' })
     check(`writing page (${path}): heading 「${h}」 and the hint inside the box`, (await page.locator('#write [data-testid=story-headline]').innerText()) === h && (await page.locator('#write [data-testid=story-input]').getAttribute('placeholder')) === hint)
     check(`writing page (${path}): no page errors`, errors.length === 0, errors.join('; '))
+    await page.close()
+  }
+}
+
+// ---------- Run 41 (2026-11-19): the free gift on the Chinese page — the same promotion, the same pool, the same layout as ja and en ----------
+{
+  const SHOTS41 = process.env.E2E_SHOTS_DIR || '/tmp/e2e-shots'
+  const open41 = async (url, { clock = '2026-11-18T15:00:00Z', state = { on: true, left: 37, daily: 100, hold: null }, promoUntil = '2026-11-30T23:59:59-05:00', width = 390, height = 844 } = {}) => {
+    const { page, errors } = await mockPage(browser)
+    await page.setViewportSize({ width, height })
+    await page.clock.setFixedTime(new Date(clock))
+    let st = state
+    const holds = []
+    await page.route('**/api/rates', (r) => r.fulfill({ json: { date: '2026-11-18', base: 'JPY', rates: { USD: 0.0066, TWD: 0.22 } } }))
+    await page.route('**/api/sizes', (r) => r.fulfill({ json: { sizes: ['egift', 'simple', 'standard'], coming_soon: ['simple', 'standard'], promo: { from: '2026-11-01T00:00:00Z', until: new Date(promoUntil).toISOString() }, usd: { egift: 25, egift_sale: 17.5 }, sale: { percent: 30, from: '2026-11-15', until: '2026-11-30', starts_at: '2026-11-14T15:00:00.000Z', ends_at: '2026-11-30T14:59:59.999Z' } } }))
+    await page.route('**/api/me*', (r) => r.fulfill({ json: { basket: { count: 0 }, ready: null, hold: null } }))
+    await page.route('**/api/basket', (r) => r.fulfill({ json: { items: [], token: 'BT-x', link: 'https://ichirei.beyondculture.ai/b/BT-abcdefghjkmnpqrstuvwxyz2' } }))
+    await page.route('**/api/promo', (r) => r.fulfill({ json: st }))
+    await page.route('**/api/promo/hold', async (r) => {
+      holds.push(JSON.parse(r.request().postData() ?? '{}'))
+      const h = { state: 'active', expires_at: new Date(Date.parse(clock) + 120 * 60_000).toISOString(), minutes_left: 120, email: 'z***@example.com' }
+      st = { ...st, hold: h, left: (st.left ?? 1) - 1, ended: null }
+      await r.fulfill({ json: { ok: true, existing: false, link: null, hold: { ...h, count: 1 }, left: st.left } })
+    })
+    await page.goto(url, { waitUntil: 'networkidle' })
+    await page.waitForTimeout(500)
+    return { page, errors, holds }
+  }
+  const T = (page, id) => page.locator(`[data-testid=${id}]`)
+  const tx = async (page, id) => ((await T(page, id).first().innerText()) ?? '').replace(/\s+/g, ' ').trim()
+  const noScroll = (page) => page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 1)
+
+  // promotion on, gifts left
+  {
+    const { page, errors, holds } = await open41('http://localhost:5173/zh')
+    const probe = await page.evaluate(() => {
+      const hero = document.querySelector('.hero')
+      const cta = hero.querySelector('.ctaRow')
+      const box = document.querySelector('[data-testid=hero-thanks]')
+      const price = document.querySelector('[data-testid=promo-price]')
+      return { under: !!box && cta.nextElementSibling === box && price?.previousElementSibling === box, big: document.querySelectorAll('.hero .approxHero').length }
+    })
+    check('/zh, promotion on: the free-gift box sits directly under the hero button, one small price line under the box, no large price in the hero', probe.under && probe.big === 0, JSON.stringify(probe))
+    check('/zh box: title 「感恩季」, counter 「今日的100份免費禮物，還剩 37 份。」, the rule line', (await page.locator('[data-testid=hero-thanks] h2').innerText()) === '感恩季' && (await tx(page, 'thanks-count')) === '今日的100份免費禮物，還剩 37 份。' && (await page.locator('[data-testid=hero-thanks] .sub').first().innerText()).trim() === '每人限一次，至11月30日止。每天早上（美東時間）／晚上6點（日本時間）更新名額。')
+    check('/zh box: email label 「電子郵件」, consent 「也告訴我新的季節與優惠」 (unticked), button 「保留我的免費禮物」, the line under it', (await page.locator('[data-testid=thanks-form] label').first().innerText()).trim().startsWith('電子郵件') && (await page.locator('[data-testid=thanks-form] .check span').innerText()) === '也告訴我新的季節與優惠' && !(await T(page, 'thanks-marketing').isChecked()) && (await tx(page, 'thanks-submit')) === '保留我的免費禮物' && (await page.locator('[data-testid=thanks-form] .small').innerText()).trim() === '你的電子郵件只用來保留免費禮物，並在結帳時對應。')
+    check('/zh price line: 「若今日免費名額已滿：感恩季價格 ¥2,786（約 NT$610），12月1日起 ¥3,980。」 from the price config and the page\'s own NT$ approximation', (await tx(page, 'promo-price')) === '若今日免費名額已滿：感恩季價格 ¥2,786（約 NT$610），12月1日起 ¥3,980。', await tx(page, 'promo-price'))
+    check('/zh (390 px): no horizontal scroll, the box is full width', (await noScroll(page)) && (await T(page, 'hero-thanks').boundingBox()).width >= 342)
+    await page.setViewportSize({ width: 390, height: 1180 })
+    await page.waitForTimeout(250)
+    await page.screenshot({ path: `${SHOTS41}/sg3-zh-hero-390.png` })
+    // Hold places a hold (for zh-Hant), the card turns to the held line, the pool goes down by one
+    await T(page, 'thanks-email').fill('zh-visitor@example.com')
+    await T(page, 'thanks-submit').click()
+    await page.waitForSelector('[data-testid=thanks-held]')
+    check('/zh: "保留我的免費禮物" places ONE hold for the email with language zh-Hant, and the card says it is held (「你的免費禮物已保留至 … 」)', holds.length === 1 && holds[0].email === 'zh-visitor@example.com' && holds[0].language === 'zh-Hant' && /^你的免費禮物已保留至 .+（還剩 \d+ 分鐘）。$/.test(await tx(page, 'thanks-held')), JSON.stringify(holds))
+    await page.waitForTimeout(300)
+    check('/zh: the shared counter in the pool went down by one after the hold (36 left)', (await page.evaluate(async () => (await (await fetch('/api/promo')).json()).left)) === 36)
+    check('/zh: no page errors (promotion on)', errors.length === 0, errors.join('; '))
+    await page.close()
+  }
+
+  // the e-gift card, "What they receive" and the notes
+  {
+    const { page, errors } = await open41('http://localhost:5173/zh')
+    await T(page, 'promo-offer-gifts').scrollIntoViewIfNeeded()
+    await page.waitForTimeout(350)
+    check('/zh e-gift card: the free line, 「保留我的免費禮物」 (primary) and the write button, then the one small price line; the big price is gone', (await tx(page, 'promo-free-gifts')) === '感恩季：今日的100份免費禮物，還剩 37 份。每人限一次，至11月30日止。' && (await tx(page, 'promo-hold-gifts')) === '保留我的免費禮物' && (await T(page, 'promo-write-gifts').count()) === 1 && (await tx(page, 'promo-price-gifts')) === '若今日免費名額已滿：感恩季價格 ¥2,786（約 NT$610），12月1日起 ¥3,980。' && (await page.locator('#gifts .gift [data-price=egift]').count()) === 0)
+    await page.screenshot({ path: `${SHOTS41}/sg3-zh-egift-390.png` })
+    await T(page, 'promo-offer-receive').scrollIntoViewIfNeeded()
+    check('/zh "What they receive": the free line and the hold button', (await tx(page, 'promo-free-receive')).startsWith('感恩季：今日的100份免費禮物，還剩 37 份') && (await tx(page, 'promo-hold-receive')) === '保留我的免費禮物')
+    await T(page, 'promo-note-steps').scrollIntoViewIfNeeded()
+    await page.waitForTimeout(350)
+    check('/zh: the free note under the other start buttons (the steps and the closing), each with 「保留我的免費禮物」', (await tx(page, 'promo-note-steps')).startsWith('感恩季：今日的100份免費禮物') && (await tx(page, 'promo-note-hold-steps')) === '保留我的免費禮物' && (await T(page, 'promo-note-closing').count()) === 1)
+    await T(page, 'promo-hold-gifts').click()
+    let focus = { onEmail: false, inBox: false, visible: false }
+    for (let k = 0; k < 24 && !(focus.onEmail && focus.inBox && focus.visible); k++) {
+      await page.waitForTimeout(250)
+      focus = await page.evaluate(() => { const a = document.activeElement; const box = document.querySelector('[data-testid=hero-thanks]'); const r = box.getBoundingClientRect(); return { onEmail: a?.getAttribute('data-testid') === 'thanks-email', inBox: !!a && box.contains(a), visible: r.top >= -2 && r.bottom <= window.innerHeight + 2 } })
+    }
+    check('/zh: "保留我的免費禮物" in the card scrolls to the hero box and puts the cursor in its email field', focus.onEmail && focus.inBox && focus.visible, JSON.stringify(focus))
+    check('/zh: no page errors (card)', errors.length === 0, errors.join('; '))
+    await page.close()
+  }
+
+  // sold out
+  {
+    const { page, errors } = await open41('http://localhost:5173/zh', { state: { on: true, left: 0, daily: 100, hold: null } })
+    check('/zh sold out: 「今日的免費禮物已送完，明天會有新的名額。」, no form; the price line is the plain one (no "if gone" lead-in)', (await tx(page, 'thanks-count')) === '今日的免費禮物已送完，明天會有新的名額。' && (await T(page, 'thanks-form').count()) === 0 && (await tx(page, 'promo-price')) === '感恩季價格 ¥2,786（約 NT$610），12月1日起 ¥3,980。')
+    check('/zh sold out (390 px): no horizontal scroll', await noScroll(page))
+    check('/zh sold out: no page errors', errors.length === 0, errors.join('; '))
+    await page.close()
+  }
+
+  // after the promotion: today's hero again
+  {
+    const { page, errors } = await open41('http://localhost:5173/zh', { clock: '2026-12-05T15:00:00Z', state: { on: false } })
+    check('/zh after the promotion: the hero is today\'s again — no box, no small price line, no promotion line anywhere', (await T(page, 'hero-thanks').count()) === 0 && (await T(page, 'promo-price').count()) === 0 && (await page.locator('[data-testid^=promo-]').count()) === 0 && (await noScroll(page)))
+    check('/zh after the promotion: no page errors', errors.length === 0, errors.join('; '))
+    await page.close()
+  }
+
+  // the order step on the Chinese page: the free line above the order button
+  {
+    const { page, errors } = await open41('http://localhost:5173/zh/write')
+    await T(page, 'story-input').fill('爸爸不太會說話，卻每年過年都開車到車站接我，回去時也一定送我。')
+    await page.click('[data-chip="relationship:parent_father"]')
+    await page.click('[data-chip="direction:up"]')
+    await page.click('[data-chip="purpose:thanks"]')
+    check('/zh/write: the writing page loads with the promotion on and no page error', (await T(page, 'story-input').count()) === 1 && errors.length === 0, errors.join('; '))
     await page.close()
   }
 }

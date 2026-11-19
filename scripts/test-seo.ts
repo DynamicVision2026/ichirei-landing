@@ -45,6 +45,8 @@ const rich = (s: string) => s.replace(/<[^>]+>/g, '')
   // the free-gift line is the order-section line with the live count taken out
   const en = thanksCopy('en').orderFree(1, 100)
   const ja = thanksCopy('ja').orderFree(1, 100)
+  const zh = thanksCopy('zh-Hant').orderFree(1, 100)
+  check('(1) the Chinese free-gift line is the order-section line without the live count', zh.includes('用電子郵件保留一份，這份禮物就是 ¥0。') && LANDING_WORDS['zh-Hant'].freeLine.includes('用電子郵件保留今日的免費禮物，這份禮物就是 ¥0。'))
   check('(1) the free-gift lines are the existing order-section lines without the live count', en.includes('Hold one with your email and this gift is $0.') && LANDING_WORDS.en.freeLine.endsWith('with your email and this gift is $0.') && ja.includes('メールアドレスで確保すると、この贈りものは ¥0 になります。') && LANDING_WORDS.ja.freeLine.includes('メールアドレスで確保すると、この贈りものは ¥0 になります。'))
 }
 
@@ -79,8 +81,10 @@ const rich = (s: string) => s.replace(/<[^>]+>/g, '')
 
   const z = page('zh-Hant')
   const zr = root(z)
-  check('(3) /zh root: <h1> in Traditional Chinese, the hero sub line, ¥ price with the sale line, /legal link; canonical /zh; Offer JPY', zr.includes('<h1>你和我之間，只隔一個字。</h1>') && zr.includes(`<p>${TEXT['zh-Hant'].subS}</p>`) && zr.includes('¥2,786') && zr.includes('感恩季節，七折優惠（至11月30日）') && zr.includes('<a href="/legal">特定商取引法標示・退換貨說明</a>') && head(z).includes(`<link rel="canonical" href="${BASE}/zh" />`) && head(z).includes('"priceCurrency":"JPY"'), zr)
-  check('(3) /zh has no free-gift line (the free gifts are on / and /en only)', !zr.includes('¥0') && !/free/i.test(zr))
+  check('(3) /zh root: <h1> in Traditional Chinese, the hero sub line, ¥ price with the sale line, /legal link; canonical /zh; Offer JPY', zr.includes('<h1>你和我之間，只隔一個字。</h1>') && zr.includes(`<p>${TEXT['zh-Hant'].subS}</p>`) && zr.includes('¥2,786') && zr.includes('感恩季價格 ¥2,786') && zr.includes('<a href="/legal">特定商取引法標示・退換貨說明</a>') && head(z).includes(`<link rel="canonical" href="${BASE}/zh" />`) && head(z).includes('"priceCurrency":"JPY"'), zr)
+  check('(3) /zh during the promotion (2026-11-19): the free-gift line, then 「若今日免費名額已滿：感恩季價格 ¥2,786，12月1日起 ¥3,980。」 — the same shape as / and /en', zr.includes(LANDING_WORDS['zh-Hant'].freeLine) && zr.includes('若今日免費名額已滿：感恩季價格 ¥2,786，12月1日起 ¥3,980。') && zr.includes('這份禮物就是 ¥0'), zr)
+  const zAfter = root(page('zh-Hant', LIVE, AFTER))
+  check('(3) /zh after the promotion and the sale: no free-gift line, just ¥3,980', !zAfter.includes('¥0') && zAfter.includes('¥3,980'), zAfter)
 }
 
 // ---- 4. the price follows the clock and the settings ---------------------------------------------------------------------------------------------------------

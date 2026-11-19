@@ -379,7 +379,7 @@ export default function OrderForm({ result, story, followUps = [], promptQuestio
                   </span>
                   {!claim && (
                     <span className="pkgPrice" data-price={id}>
-                      {language === 'en' && id === 'egift' ? <EnEgiftPrice price={usdPrice} sale={priceSale} id={id} promo={promoOn && !claim} /> : language === 'ja' && id === 'egift' ? <JaEgiftPrice sale={priceSale} id={id} promo={promoOn && !claim} fallback={<PriceWithSale yen={PACKAGE_PRICE_JPY[id]} sale={priceSale} id={id} />} /> : <PriceWithSale yen={PACKAGE_PRICE_JPY[id]} sale={priceSale} id={id} />}
+                      {language === 'en' && id === 'egift' ? <EnEgiftPrice price={usdPrice} sale={priceSale} id={id} promo={promoOn && !claim} /> : (language === 'ja' || language === 'zh-Hant' || language === 'zh-Hans') && id === 'egift' ? <JaEgiftPrice lang={language} sale={priceSale} id={id} promo={promoOn && !claim} fallback={<PriceWithSale yen={PACKAGE_PRICE_JPY[id]} sale={priceSale} id={id} />} /> : <PriceWithSale yen={PACKAGE_PRICE_JPY[id]} sale={priceSale} id={id} />}
                     </span>
                   )}
                   {!claim && (language === 'en' ? <UsdLaunchLine price={usdPrice} sale={priceSale} /> : <SaleLine sale={priceSale} lang={pageLang} />)}
@@ -466,7 +466,7 @@ export default function OrderForm({ result, story, followUps = [], promptQuestio
             </label>
           </>
         )}
-        {(language === 'en' || language === 'ja') && promoOn && !claim && <OrderLine lang={language} />}
+        {(language === 'en' || language === 'ja' || language === 'zh-Hant' || language === 'zh-Hans') && promoOn && !claim && <OrderLine lang={language} />}
         <button type="button" data-testid="order-submit" className="btn primary" onClick={submit} disabled={!valid || busy}>
           {phase === 'submitting' ? o.submitting : phase === 'redirecting' ? o.redirecting : claim ? claimCopy.make : o.submit}
         </button>

@@ -85,7 +85,7 @@ export default function DaysOfThanks({ lang = 'en', compact = false }: { lang?: 
                 {THANKS.held(localTime(hold.expires_at, lang), hold.minutes_left)}
               </p>
               <p className="sub">
-                <a href={writeHref(lang)} data-testid="thanks-write">
+                <a href={writeHref(lang === 'zh-Hans' ? 'zh-Hant' : lang)} data-testid="thanks-write">
                   {THANKS.write}
                 </a>
               </p>
@@ -119,7 +119,7 @@ export default function DaysOfThanks({ lang = 'en', compact = false }: { lang?: 
               )}
               {left > 0 && p.ended !== 'used' && p.ended !== 'three_holds' && (
                 <form
-                  className={lang === 'ja' ? 'ja' : undefined}
+                  className={lang === 'ja' ? 'ja' : lang === 'zh-Hant' || lang === 'zh-Hans' ? 'zh' : undefined}
                   onSubmit={(ev) => {
                     ev.preventDefault()
                     void place(email.trim(), marketing)

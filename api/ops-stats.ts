@@ -158,14 +158,15 @@ export async function buildStats(d: OpsDeps, store: OrderStore, env: NodeJS.Proc
   // "Free gifts today": the orders paid today (Japan time) with a total of 0 — shown at the top of the page only while the promotion runs
   const env2 = d.env ?? process.env
   const win = promoWindow(env2)
-  let promoDays: { day: string; given: number; held: number; left: number }[] = []
+  let promoDays: { day: string; given: number; held: number; left: number; by_lang: { en: number; ja: number; zh: number } }[] = []
   if (win) {
     const daily = promoDaily(env2)
     const last = promoDayKey(new Date(Math.min(now.getTime(), win.until)))
     let key = promoDayKey(new Date(win.from))
     for (let n = 0; n < 16 && key <= last; n++) {
       const sc = await scanDay(store, key, daily, now).catch(() => null)
-      if (sc) promoDays.push({ day: key, given: sc.used, held: sc.active, left: Math.max(0, daily - sc.used - sc.active) })
+      // the one shared pool counted by the page language the hold was made on (a slot without a language, from before 2026-11-19, is not counted in any of the three)
+      if (sc) promoDays.push({ day: key, given: sc.used, held: sc.active, left: Math.max(0, daily - sc.used - sc.active), by_lang: sc.slots.reduce((o, x) => (x.state !== 'free' && x.slot.lang ? { ...o, [x.slot.lang]: o[x.slot.lang] + 1 } : o), { en: 0, ja: 0, zh: 0 }) })
       const nx = new Date(`${key}T12:00:00Z`)
       nx.setUTCDate(nx.getUTCDate() + 1)
       key = nx.toISOString().slice(0, 10)

@@ -28,6 +28,9 @@ export function formatApprox(yen: number, currency: Currency, rates: Rates | nul
   return SYMBOL[currency] + (Math.round((yen * rate) / step) * step).toLocaleString('en-US')
 }
 
+/** The NT$ approximation of a yen amount ("NT$890"), or null with no rate table: the free-gift price line on the Chinese page. */
+export const twdApprox = (rates: Rates | null) => (yen: number): string | null => formatApprox(yen, 'TWD', rates)
+
 /** The line next to a yen price, always marked as approximate: "≈ US$65 approx." / "目安 NT$2,060" / "約 NT$2,060". Null = show nothing. */
 export function approxLine(yen: number, currency: Currency, rates: Rates | null, lang: RevealLang): string | null {
   const amount = formatApprox(yen, currency, rates)

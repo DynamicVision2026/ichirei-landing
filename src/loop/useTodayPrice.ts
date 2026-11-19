@@ -6,8 +6,9 @@ import { salePriceJpy } from '../order/sale.ts'
 /** The e-gift price a customer pays today: en "$17.50" while the sale runs, else "$25"; ja the yen price (with the sale, if one runs). */
 export function useTodayPrice(lang: string = 'en'): { text: string; sale: boolean; regular: string } {
   const price = useUsd()
-  const sale = useSale(lang === 'ja' ? 'ja' : 'en')
-  if (lang === 'ja') {
+  const yenPage = lang === 'ja' || lang === 'zh-Hant' || lang === 'zh-Hans' // the Chinese pages sell in yen like the Japanese one
+  const sale = useSale(yenPage ? 'ja' : 'en')
+  if (yenPage) {
     const yen = PACKAGE_PRICE_JPY.egift
     return { text: formatYen(sale ? salePriceJpy(yen, sale.percent) : yen), sale: !!sale, regular: formatYen(sale ? salePriceJpy(yen, sale.percent) : yen) }
   }

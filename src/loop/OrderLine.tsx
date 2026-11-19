@@ -108,9 +108,9 @@ export function EnEgiftPrice({ price, sale, id, promo }: { price: UsdPrice; sale
 }
 
 /** The Japanese e-gift price (2026-11-16): with a hold, "¥0 · 無料ギフト" with the regular price struck through; otherwise `fallback` (today's price as before). */
-export function JaEgiftPrice({ sale, id, promo, fallback }: { sale: Sale | null; id: string; promo: boolean; fallback: ReactNode }) {
+export function JaEgiftPrice({ lang = 'ja', sale, id, promo, fallback }: { lang?: ThanksLang; sale: Sale | null; id: string; promo: boolean; fallback: ReactNode }) {
   const p = usePromo()
-  const THANKS = thanksCopy('ja')
+  const THANKS = thanksCopy(lang)
   if (promo && p?.on && p.hold) {
     const yen = PACKAGE_PRICE_JPY.egift
     return (

@@ -2,11 +2,13 @@ import { useSale, useUsd } from '../demo/useSizes.ts'
 import { thanksCopy } from '../loop/copy.ts'
 import { promoPriceLine } from '../order/promo-price.ts'
 import { writeHref } from './paths.ts'
+import { twdApprox } from './currency.ts'
+import { useCurrency } from './useCurrency.ts'
 import { freeLine, goToFreeGiftBox, usePromoView, type PromoLang } from './promo-view.ts'
 
 // The free gift wherever there is a button to start (2026-11-18): while the promotion runs, the e-gift section and "What they receive" lead with the free gift — how many are left, a "Hold my free
 // gift" button that takes the visitor to the free-gift box in the hero and puts the cursor in its email field, and the price as one small line. Same box, same pool, same words as the hero
-// (src/loop/copy.ts). en and ja only; the Chinese page has no promotion.
+// (src/loop/copy.ts). en, ja and zh-Hant.
 
 /**
  * The promotion's block: the free-gift line, the buttons and the price as one small line. `variant` "gifts" has the secondary "Write your moment →"; "receive" has only the hold button.
@@ -16,6 +18,7 @@ export default function PromoOffer({ lang, variant, id }: { lang: PromoLang; var
   const v = usePromoView(lang)
   const usdPrice = useUsd()
   const sale = useSale(lang)
+  const { rates } = useCurrency(lang)
   const T = thanksCopy(lang)
   if (!v.on || v.soldOut) return null
   return (
@@ -33,7 +36,7 @@ export default function PromoOffer({ lang, variant, id }: { lang: PromoLang; var
           </a>
         )}
       </div>
-      <p className="promoPriceSmall" data-testid={`promo-price-${id}`}>{promoPriceLine(lang, false, usdPrice, sale)}</p>
+      <p className="promoPriceSmall" data-testid={`promo-price-${id}`}>{promoPriceLine(lang, false, usdPrice, sale, twdApprox(rates))}</p>
     </div>
   )
 }

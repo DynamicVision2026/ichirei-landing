@@ -317,10 +317,75 @@ const THANKS_JA: typeof THANKS_EN = {
   orderNone: (price: string) => `本日の無料ギフトはすべて確保・お渡し済みです。この贈りものを本日 ${price} で贈るか、18時（日本時間）以降にまたお越しください。贈りものは保存されています。`,
 }
 
-/** The languages that show free gifts (zh-Hant: none). */
-export type ThanksLang = 'en' | 'ja'
+/**
+ * The Traditional Chinese card and order-section lines (2026-11-19): the Chinese page takes part in the same promotion and the same ONE daily pool (en, ja and zh share the 100 a day; the day
+ * changes at 4:00 a.m. US Eastern = 18:00 Japan time). The zh-Hans block below is this one converted with OpenCC (never typed by hand).
+ */
+// <zh-hant>
+const THANKS_ZH_HANT: typeof THANKS_EN = {
+  title: '感恩季',
+  count: (n: number, daily = 100) => ({ before: `今日的${daily}份免費禮物，還剩 `, n: String(n), after: ' 份。' }),
+  sub: '每人限一次，至11月30日止。每天早上（美東時間）／晚上6點（日本時間）更新名額。',
+  emailLabel: '電子郵件',
+  hold: '保留我的免費禮物',
+  holding: '保留中…',
+  marketing: '也告訴我新的季節與優惠',
+  small: '你的電子郵件只用來保留免費禮物，並在結帳時對應。',
+  none: '今日的免費禮物已送完，明天會有新的名額。',
+  held: (time: string, m: number) => `你的免費禮物已保留至 ${time}（還剩 ${m} 分鐘）。`,
+  write: '寫下一個片刻 →',
+  phone: '想在手機上繼續？掃描這個代碼，把禮物帶在身邊。',
+  ended: '保留時間已結束。',
+  badEmail: '請再確認一下電子郵件。',
+  badCode: '請再確認一下免費禮物的代碼。',
+  unavailable: '免費禮物暫時休息一下，請幾分鐘後再試一次。',
+  threeHolds: (price: string) => `今天的三次保留已經用完。明天早上（美東時間）／晚上6點（日本時間）起可以再保留，也可以今天以 ${price} 送出這份禮物。`,
+  alreadyGiven: (price: string) => `這個電子郵件已經領過免費禮物了，謝謝你。這份禮物可以用 ${price} 送出。`,
+  orderHeld: (time: string) => `免費禮物已為你保留至 ${time}，結帳時會自動套用。`,
+  orderOnUs: '每天前100份禮物免費送出。',
+  orderHoldYours: '用電子郵件保留 →',
+  orderFree: (n: number, daily = 100) => `今日免費禮物：還剩 ${n} / ${daily} 份。用電子郵件保留一份，這份禮物就是 ¥0。`,
+  freePrice: '¥0',
+  freeLabel: '免費禮物',
+  orderNone: (price: string) => `今日的免費禮物已送完。這份禮物今天可以用 ${price} 送出，或明天再來。你的禮物已保存。`,
+}
+// </zh-hant>
+// <zh-hans>
+const THANKS_ZH_HANS: typeof THANKS_EN = {
+  title: '感恩季',
+  count: (n: number, daily = 100) => ({ before: `今日的${daily}份免费礼物，还剩 `, n: String(n), after: ' 份。' }),
+  sub: '每人限一次，至11月30日止。每天早上（美东时间）／晚上6点（日本时间）更新名额。',
+  emailLabel: '电子邮件',
+  hold: '保留我的免费礼物',
+  holding: '保留中…',
+  marketing: '也告诉我新的季节与优惠',
+  small: '你的电子邮件只用来保留免费礼物，并在结帐时对应。',
+  none: '今日的免费礼物已送完，明天会有新的名额。',
+  held: (time: string, m: number) => `你的免费礼物已保留至 ${time}（还剩 ${m} 分钟）。`,
+  write: '写下一个片刻 →',
+  phone: '想在手机上继续？扫描这个代码，把礼物带在身边。',
+  ended: '保留时间已结束。',
+  badEmail: '请再确认一下电子邮件。',
+  badCode: '请再确认一下免费礼物的代码。',
+  unavailable: '免费礼物暂时休息一下，请几分钟后再试一次。',
+  threeHolds: (price: string) => `今天的三次保留已经用完。明天早上（美东时间）／晚上6点（日本时间）起可以再保留，也可以今天以 ${price} 送出这份礼物。`,
+  alreadyGiven: (price: string) => `这个电子邮件已经领过免费礼物了，谢谢你。这份礼物可以用 ${price} 送出。`,
+  orderHeld: (time: string) => `免费礼物已为你保留至 ${time}，结帐时会自动套用。`,
+  orderOnUs: '每天前100份礼物免费送出。',
+  orderHoldYours: '用电子邮件保留 →',
+  orderFree: (n: number, daily = 100) => `今日免费礼物：还剩 ${n} / ${daily} 份。用电子邮件保留一份，这份礼物就是 ¥0。`,
+  freePrice: '¥0',
+  freeLabel: '免费礼物',
+  orderNone: (price: string) => `今日的免费礼物已送完。这份礼物今天可以用 ${price} 送出，或明天再来。你的礼物已保存。`,
+}
+// </zh-hans>
+
+/** The languages that show free gifts. */
+export type ThanksLang = 'en' | 'ja' | 'zh-Hant' | 'zh-Hans'
 export const THANKS = THANKS_EN
-export const thanksCopy = (lang: string | null | undefined): typeof THANKS_EN => (lang === 'ja' ? THANKS_JA : THANKS_EN)
+export const thanksCopy = (lang: string | null | undefined): typeof THANKS_EN => (lang === 'ja' ? THANKS_JA : lang === 'zh-Hant' ? THANKS_ZH_HANT : lang === 'zh-Hans' ? THANKS_ZH_HANS : THANKS_EN)
+/** The locale a time is written in on a page of this language. */
+export const thanksLocale = (lang: string | null | undefined): string => (lang === 'ja' ? 'ja-JP' : lang === 'zh-Hant' ? 'zh-TW' : lang === 'zh-Hans' ? 'zh-CN' : 'en-US')
 
 /** The message for a refused hold, by the server's code. */
 export function holdRefusal(code: string, price: string, lang: string = 'en'): string {

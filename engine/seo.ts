@@ -32,7 +32,7 @@ export const LANDING_WORDS: Record<LandingLang, { h1: string; legal: string; fre
   'zh-Hant': {
     h1: '你和我之間，只隔一個字。',
     legal: '特定商取引法標示・退換貨說明',
-    freeLine: '',
+    freeLine: '感恩季：用電子郵件保留今日的免費禮物，這份禮物就是 ¥0。',
   },
 }
 
@@ -89,7 +89,7 @@ export function landingPrice(lang: LandingLang, env: NodeJS.ProcessEnv = process
   const parsed = parseSale(env.SALE_PERCENT, env.SALE_UNTIL, now, env.SALE_FROM, env.SALE_UNTIL_EN)
   const sale = saleOn(parsed, now, lang === 'en' ? 'en' : undefined)
   const dollars = parseUsdPrice(env.USD_PRICE_EGIFT, env.USD_PRICE_EGIFT_SALE, parsed?.percent ?? null)
-  const freeGifts = lang !== 'zh-Hant' && promoOn(env, now) // the free gifts are on the English and Japanese pages only
+  const freeGifts = promoOn(env, now) // the free gifts are on all three pages (the Chinese one joined the same pool on 2026-11-19)
   if (lang === 'en') {
     const price = sale ? dollars.egift_sale : dollars.egift
     // the second argument is the plain price line: while the free gifts are on, the line leads with "If today's free gifts are gone"
@@ -110,6 +110,10 @@ export function landingPrice(lang: LandingLang, env: NodeJS.ProcessEnv = process
   if (lang === 'ja') {
     const line = promoPriceLine('ja', !freeGifts, dollars, sale)
     return { amount: String(yen), currency: 'JPY', line: freeGifts ? `${LANDING_WORDS.ja.freeLine}${line}` : line, validUntil: sale?.until ?? null, ...jpyFacts(sale, afterSale(env, parsed)) }
+  }
+  if (freeGifts) {
+    const line = promoPriceLine('zh-Hant', !freeGifts, dollars, sale)
+    return { amount: String(yen), currency: 'JPY', line: `${LANDING_WORDS['zh-Hant'].freeLine}${line}`, validUntil: sale?.until ?? null, ...jpyFacts(sale, afterSale(env, parsed)) }
   }
   return { amount: String(yen), currency: 'JPY', line: sale ? `${formatYen(yen)}　${saleLine(sale, 'zh-Hant')}` : formatYen(yen), validUntil: sale?.until ?? null, ...jpyFacts(sale, afterSale(env, parsed)) }
 }

@@ -28,7 +28,7 @@ import { cleanSession, cleanSource, recordEvent } from '../engine/analytics.ts'
 import { POEM_ID_PATTERN, buildRecord, lineAttributes, newOrderRef, parseOrderRequest, type OrderRecord, type StoredPoem, type ValidOrder } from '../engine/order.ts'
 import { createOrderStore, type OrderStore } from '../engine/order-store.ts'
 import type { Palette } from '../engine/palette.ts'
-import { PromoCartNotFree, ShopifyError, createCart, type CartPromo, loadShopifyConfig, type ShopifyConfig } from '../engine/shopify.ts'
+import { PromoCartNotFree, ShopifyError, createCart, isPromoLanguage, type CartPromo, loadShopifyConfig, type ShopifyConfig } from '../engine/shopify.ts'
 import { promoShopifyFrom, type PromoShopify } from '../engine/promo-shopify.ts'
 import { checkClaimSession, claimOf, readWaiting, normalizeOrderNumber } from '../engine/waiting.ts'
 import { MAX_POEMS, POEM_TYPES, comingSoonSizes, poemTypeAllowed } from '../src/order/packages.ts'
@@ -268,7 +268,7 @@ export function createOrderHandler(deps: () => OrderDeps) {
       let heldCart: CartPromo | undefined
       let heldRec: Awaited<ReturnType<typeof holdForCart>> = null
       // the free gift is an e-gift: a wooden size never carries the code (its price stays as shown)
-      if ((order.language === 'en' || order.language === 'ja') && order.package === 'egift') {
+      if (isPromoLanguage(order.language) && order.package === 'egift') {
         try {
           const env = d.env ?? process.env
           heldRec = await holdForCart({ store: d.store, env, now: d.now, shopify: d.promoShopify !== undefined ? d.promoShopify : promoShopifyFrom(env), log: (l) => console.log(l) }, { browser: record.visitor ?? null })

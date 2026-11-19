@@ -142,8 +142,8 @@ export const STATS_CLIENT_JS = String.raw`
     var P = D.promo; if (!P || !P.on) return '';
     var h = '<p class="note" data-testid="promo-free-today"><b>' + esc(t('free_today', { n: P.free_today })) + '</b></p>';
     if (P.days && P.days.length) {
-      h += '<h2>' + esc(t('promo_days_title')) + '</h2><div class="wide"><table data-testid="promo-days"><thead><tr><th>' + esc(t('promo_day')) + '</th><th class="n">' + esc(t('promo_given')) + '</th><th class="n">' + esc(t('h_held')) + '</th><th class="n">' + esc(t('promo_left')) + '</th></tr></thead><tbody>';
-      P.days.forEach(function (r) { h += '<tr data-day="' + esc(r.day) + '"><td>' + esc(r.day) + '</td><td class="n">' + r.given + '</td><td class="n">' + r.held + '</td><td class="n">' + r.left + '</td></tr>'; });
+      h += '<h2>' + esc(t('promo_days_title')) + '</h2><div class="wide"><table data-testid="promo-days"><thead><tr><th>' + esc(t('promo_day')) + '</th><th class="n">' + esc(t('promo_given')) + '</th><th class="n">' + esc(t('h_held')) + '</th><th class="n">' + esc(t('promo_left')) + '</th><th class="n">' + esc(t('promo_langs')) + '</th></tr></thead><tbody>';
+      P.days.forEach(function (r) { h += '<tr data-day="' + esc(r.day) + '"><td>' + esc(r.day) + '</td><td class="n">' + r.given + '</td><td class="n">' + r.held + '</td><td class="n">' + r.left + '</td><td class="n" data-testid="promo-day-langs">' + (r.by_lang ? 'ja ' + r.by_lang.ja + ' · en ' + r.by_lang.en + ' · zh ' + r.by_lang.zh : '—') + '</td></tr>'; });
       h += '</tbody></table></div>';
     }
     var bc = (D.health && D.health.held_by_code) || {}, ks = Object.keys(bc).sort(function (a, b) { return bc[b] - bc[a]; });

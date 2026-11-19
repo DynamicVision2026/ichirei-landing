@@ -28,6 +28,8 @@ export interface SlotRecord {
   created_at: string
   expires_at: string
   state: 'active' | 'used' | 'released'
+  /** The page language the hold was made on (en, ja or zh): only for the owner's dashboard, which counts the one shared pool by language. Absent on older slots. */
+  lang?: 'en' | 'ja' | 'zh'
   /** True once the end of this hold was handled (eligibility removed, `hold_expired` recorded). */
   reaped?: boolean
 }
@@ -131,6 +133,9 @@ async function latestSlot(store: OrderStore, day: string, n: number): Promise<{ 
   return last
 }
 
+/** The language family of a page language, as kept on a slot: en, ja or zh (zh-Hant and zh-Hans). */
+export const slotLang = (language?: string | null): SlotRecord['lang'] | undefined => (language === 'en' ? 'en' : language === 'ja' ? 'ja' : language === 'zh-Hant' || language === 'zh-Hans' ? 'zh' : undefined)
+
 /** The day's capacity at this moment: how many gifts are given and how many are held. Slots are taken in order, so the scan stops at the first slot never taken. */
 export async function scanDay(store: OrderStore, day: string, daily: number, now: Date): Promise<{ used: number; active: number; slots: { n: number; g: number; slot: SlotRecord; state: 'used' | 'active' | 'free' }[] }> {
   let used = 0
@@ -170,8 +175,8 @@ export async function liveCount(store: OrderStore | null, env: NodeJS.ProcessEnv
   return { daily, used: s.used, active: s.active, left: Math.max(0, daily - s.used - s.active) }
 }
 
-async function claimSlot(store: OrderStore, day: string, daily: number, hold: string, hash: string, now: Date, expires: Date): Promise<{ n: number; g: number } | null> {
-  const fresh = (): SlotRecord => ({ hold, email_hash: hash, created_at: now.toISOString(), expires_at: expires.toISOString(), state: 'active' })
+async function claimSlot(store: OrderStore, day: string, daily: number, hold: string, hash: string, now: Date, expires: Date, lang?: SlotRecord['lang']): Promise<{ n: number; g: number } | null> {
+  const fresh = (): SlotRecord => ({ hold, email_hash: hash, created_at: now.toISOString(), expires_at: expires.toISOString(), state: 'active', ...(lang ? { lang } : {}) })
   for (let n = 1; n <= daily; n++) {
     for (let attempt = 0; attempt < 4; attempt++) {
       const l = await latestSlot(store, day, n)
@@ -284,7 +289,7 @@ export async function placeHold(d: PromoDeps, input: PlaceInput): Promise<PlaceR
   if (input.ip && !(await claimIp(store, day, input.ip))) return { ok: false, code: 'ip_limit' }
   const expires = new Date(Math.min(now.getTime() + promoHoldMinutes(env) * MIN, promoDayEnd(now).getTime()))
   const id = newHoldId()
-  const slot = await claimSlot(store, day, promoDaily(env), id, hash, now, expires)
+  const slot = await claimSlot(store, day, promoDaily(env), id, hash, now, expires, slotLang(input.language))
   if (!slot) {
     cache.delete(day)
     return { ok: false, code: 'all_held' }

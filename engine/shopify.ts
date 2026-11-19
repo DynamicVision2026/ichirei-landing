@@ -109,7 +109,7 @@ async function createCartOnce(
 ): Promise<CartResult> {
   const variantId = config.variants[pkg]
   if (!variantId) throw new ShopifyError(`The size "${pkg}" has no Shopify variant configured`, { code: 'size_unavailable' })
-  const promoLang = language === 'en' || language === 'ja'
+  const promoLang = isPromoLanguage(language)
   const res = await fetchImpl(`${config.apiBase}/api/${config.apiVersion}/graphql.json`, {
     method: 'POST',
     headers: { 'content-type': 'application/json', 'x-shopify-storefront-access-token': config.token },
@@ -121,7 +121,7 @@ async function createCartOnce(
           lines: [{ merchandiseId: variantId, quantity: 1, attributes }],
           attributes: [{ key: 'order_ref', value: orderRef }, ...(promoLang && promo ? [{ key: 'ichirei_hold', value: promo.holdId }] : [])],
           // English: the US buyer (and the hold's email). Japanese (2026-11-16, one shared pool): only a holder's cart names the hold's email; a non-holder's ja cart is exactly as before.
-          ...(language === 'en' ? { buyerIdentity: { countryCode: EN_BUYER_COUNTRY, ...(promo ? { email: promo.email } : {}) } } : language === 'ja' && promo ? { buyerIdentity: { email: promo.email } } : {}),
+          ...(language === 'en' ? { buyerIdentity: { countryCode: EN_BUYER_COUNTRY, ...(promo ? { email: promo.email } : {}) } } : isYenPromoLanguage(language) && promo ? { buyerIdentity: { email: promo.email } } : {}),
           ...(promoLang && promo ? { discountCodes: [promo.code] } : {}),
         },
       },
@@ -167,6 +167,13 @@ async function createCartOnce(
   return { cartId: cart.id, checkoutUrl, variantId, currency, ...(held ? { free } : {}) }
 }
 
+/**
+ * The free-gift promotion's languages (2026-11-19): English (a US dollar cart) and the yen pages — Japanese and, since the Chinese page joined the same pool, Chinese. A Chinese cart is made
+ * exactly as the Japanese one (the store's own market and currency, no @inContext; a holder's cart names the hold's email and carries the hold's private code).
+ */
+export const isYenPromoLanguage = (language?: string): boolean => language === 'ja' || language === 'zh-Hant' || language === 'zh-Hans'
+export const isPromoLanguage = (language?: string): boolean => language === 'en' || isYenPromoLanguage(language)
+
 const notUsd = (c: string | null): boolean => !!c && c.toUpperCase() !== 'USD'
 
 /**
@@ -177,7 +184,7 @@ const notUsd = (c: string | null): boolean => !!c && c.toUpperCase() !== 'USD'
  */
 export async function createCart(config: ShopifyConfig, pkg: PackageId, attributes: Attribute[], orderRef: string, fetchImpl: typeof fetch = fetch, language?: string, promo?: CartPromo, retryDelayMs = 1500): Promise<CartResult> {
   const first = await createCartPriced(config, pkg, attributes, orderRef, fetchImpl, language, promo)
-  const held = promo && (language === 'en' || language === 'ja')
+  const held = promo && isPromoLanguage(language)
   if (!held || first.free) return first
   await new Promise((r) => setTimeout(r, retryDelayMs))
   const second = await createCartPriced(config, pkg, attributes, orderRef, fetchImpl, language, promo)

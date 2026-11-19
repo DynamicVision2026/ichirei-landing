@@ -147,12 +147,15 @@ export function JaReceive() {
   )
 }
 
-/** The Chinese page: the picture only (no promotion lines). */
+/** The Chinese page: the picture and, while the promotion runs (2026-11-19), the free gift like the other two pages. */
 export function ZhReceive() {
+  const pv = usePromoView('zh-Hant')
   return (
     <section className="usReceive" id="receive" data-testid="zh-receive">
       <div className="wrap center">
         <ReceiveArt alt="一字卡片、詩、四幅畫、短片與證書。" />
+        {pv.on && !pv.soldOut && <PromoOffer lang="zh-Hant" variant="receive" id="receive" />}
+        {pv.soldOut && <p className="promoFree" data-testid="promo-free-receive">{freeLine('zh-Hant', pv)}</p>}
       </div>
     </section>
   )
