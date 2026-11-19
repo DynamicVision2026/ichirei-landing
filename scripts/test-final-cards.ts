@@ -127,9 +127,9 @@ try {
   // ---- (4) no extended thinking on the main and second calls; the switch puts it back ----------------------------------------------------------------------------------------------------
   reset()
   await run()
-  check('(4) the main and second calls are sent with thinking disabled (the 110 s case: thinking used the 6,000-token budget, the answer was cut off and the call repeated)', bodies.main?.[0].thinking?.type === 'disabled' && counts.main === 1 && !counts.second, JSON.stringify(bodies.main))
+  check('(4) the main and second calls are sent with thinking disabled (the 110 s case: thinking used the 6,000-token budget, the answer was cut off and the call repeated)', ['disabled', 'between_tools'].includes(bodies.main?.[0].thinking?.type) && counts.main === 1 && !counts.second, JSON.stringify(bodies.main))
   await run(fx.context) // remembrance: the second (次点) call exists and is sent without thinking too
-  check('(4) …and in remembrance the second call is also sent with thinking disabled (it is the only occasion with a second call)', bodies.second?.[0].thinking?.type === 'disabled' && counts.second === 1 && !counts.free, JSON.stringify(bodies.second))
+  check('(4) …and in remembrance the second call is also sent with thinking disabled (it is the only occasion with a second call)', ['disabled', 'between_tools'].includes(bodies.second?.[0].thinking?.type) && counts.second === 1 && !counts.free, JSON.stringify(bodies.second))
   reset()
   process.env.ICHIREI_CARD_THINKING = 'on'
   await run()
@@ -142,7 +142,7 @@ try {
   const r5 = await run()
   const tm = timing()
   const mainEntries = (tm?.calls ?? []).filter((c: any) => c.slot === 'main')
-  check('(5) a main call that has not answered after the hedge time is asked again (no thinking); the faster answer wins: both cards are out long before the stalled call would have answered, and every shown card is final', counts.main === 2 && bodies.main[1].thinking?.type === 'disabled' && events[0].at < 800 && live(r5).length === 2 && shownIsFinal(r5), JSON.stringify({ counts, events: events.map((e) => e.at) }))
+  check('(5) a main call that has not answered after the hedge time is asked again (no thinking); the faster answer wins: both cards are out long before the stalled call would have answered, and every shown card is final', counts.main === 2 && ['disabled', 'between_tools'].includes(bodies.main[1].thinking?.type) && events[0].at < 800 && live(r5).length === 2 && shownIsFinal(r5), JSON.stringify({ counts, events: events.map((e) => e.at) }))
   check('(5) …the log says so: card_hedge, and the timing line names the second call as the winner', logs.some((l) => l.startsWith('[ichirei-engine] card_hedge') && l.includes('"slot":"main"')) && mainEntries.some((c: any) => c.hedge === 2 && c.won === true), JSON.stringify(mainEntries))
   reset()
   process.env.ICHIREI_CARD_HEDGE_MS = '0'

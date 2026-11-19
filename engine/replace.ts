@@ -7,6 +7,7 @@
 // Env: ICHIREI_REPLACE=off disables it; ICHIREI_REPLACE_MODEL, ICHIREI_REPLACE_EFFORT (default medium), ICHIREI_REPLACE_MAX_TOKENS (default 9000: up to three candidates),
 // ICHIREI_REPLACE_PROMPT_PATH.
 
+import { thinkingOff } from './thinking-off.ts'
 import { usageOf } from './cache-usage.ts'
 import { purposeFrame, toneLine } from './purpose.ts'
 import { thinkingTokensOf, watchThinkingTokens } from './usage.ts'
@@ -329,7 +330,7 @@ export async function completeMains(
         const timer = setTimeout(() => {
           if (opts.signal?.aborted) return reject(new Error('aborted'))
           callInfo.hedged = true
-          client.messages.stream({ ...params, thinking: { type: 'disabled' as const } }, { signal: AbortSignal.any([callSignal(opts.signal, limitMs - hedgeMs), ctl2.signal]) }).finalMessage().then(resolve, reject)
+          client.messages.stream({ ...params, thinking: thinkingOff(params.model) }, { signal: AbortSignal.any([callSignal(opts.signal, limitMs - hedgeMs), ctl2.signal]) }).finalMessage().then(resolve, reject)
         }, hedgeMs)
         first.then(() => clearTimeout(timer), () => undefined)
         ctl1.signal.addEventListener('abort', () => clearTimeout(timer))

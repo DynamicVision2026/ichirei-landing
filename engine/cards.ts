@@ -12,6 +12,7 @@
 // candidate of this round's main/second calls — so a third card is shown in every round except remembrance (two cards). Pure plumbing: this file chooses no character; it orders, checks and
 // joins what the calls wrote, with the same referee, review and gaze code as the single-call engine.
 
+import { thinkingOff } from './thinking-off.ts'
 import { usageOf } from './cache-usage.ts'
 import Anthropic from '@anthropic-ai/sdk'
 import { readFileSync } from 'node:fs'
@@ -506,7 +507,7 @@ export async function runCards(a: CardsArgs): Promise<CardsOut> {
         let message: Anthropic.Message
         let seen: () => number | null
         try {
-          const stream = client.messages.stream({ model, max_tokens: tokens, output_config: { effort: effort as 'low' }, messages: [{ role: 'user', content }], ...(extra.noThinking ? { thinking: { type: 'disabled' as const } } : extra.adaptive ? { thinking: { type: 'adaptive' as const } } : {}) }, { signal: callSig })
+          const stream = client.messages.stream({ model, max_tokens: tokens, output_config: { effort: effort as 'low' }, messages: [{ role: 'user', content }], ...(extra.noThinking ? { thinking: thinkingOff(model) } : extra.adaptive ? { thinking: { type: 'adaptive' as const } } : {}) }, { signal: callSig })
           seen = watchThinkingTokens(stream)
           if (slot === 'main') {
             let first = true
