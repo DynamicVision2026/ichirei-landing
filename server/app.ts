@@ -408,8 +408,10 @@ export function createApp(config: ServerConfig): Hono {
       onFound: (path, c) => {
         c.header(
           'Cache-Control',
-          path.includes('/assets/') ? 'public, max-age=31536000, immutable' : path.includes('/img/') ? 'public, max-age=3600' : 'no-cache',
+          path.includes('/assets/') ? 'public, max-age=31536000, immutable' : path.includes('/img/') || path.includes('/music/') ? 'public, max-age=3600' : 'no-cache',
         )
+        // the film's music (2026-11-19): a media element needs to know it may ask for a range from the very first answer (the static handler only says so on a ranged one), and the file is never revalidated on each request
+        if (path.includes('/music/')) c.header('Accept-Ranges', 'bytes')
       },
     }),
   )

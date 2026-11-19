@@ -6,7 +6,9 @@ import { cleanReading } from '../../order/reading.ts'
 import { usePromoOn } from '../../demo/useSizes'
 import { trackReceiverOpened, trackUs } from '../../demo/analytics'
 import ShareSection from '../ShareSection.tsx'
-import { CER } from './copy.ts'
+import { pageLang } from '../../animation/copy.ts'
+import { CER, cerLang } from './copy.ts'
+import { thanksCopy } from '../../loop/copy.ts'
 import './ceremony.css'
 
 // The receiver's new ceremony (gift ceremony redesign 2026-11-15, phase A: Classic, English). Nine screens, one at a time, each waits for a tap:
@@ -44,6 +46,7 @@ const filmComplete = (v: GiftView): boolean => !!v.film && v.film.status === 're
 const scrollAvailable = (v: GiftView): boolean => filmComplete(v) && v.film!.pictures!.length === 4 && v.film!.pictures!.every((u) => !u.startsWith('/film/washi-')) && !v.film!.substituted?.length && !v.film!.no_pictures
 
 export default function NewCeremony({ view, preview, q }: { view: GiftView; preview: boolean; q: string }) {
+  const C = CER[cerLang(view.language)]
   const reduced = useMemo(reducedMotion, [])
   const [screen, setScreen] = useState<CeremonyScreen>('mark')
   // an answered gift shows what was sent when the receiver comes back (the view carries their own answer)
@@ -101,22 +104,22 @@ export default function NewCeremony({ view, preview, q }: { view: GiftView; prev
   const afterChar = view.poem && view.poem.lines.length ? 'poem' : 'cert'
 
   return (
-    <main ref={root} className="cr" lang="en" data-testid="gift-page" data-ceremony="new" data-screen={screen} data-step={screen} data-motion={reduced ? 'fade' : 'full'}>
+    <main ref={root} className="cr" lang={view.language === 'zh-Hans' ? 'zh-Hans' : view.language} data-cl={C.lang} data-testid="gift-page" data-ceremony="new" data-screen={screen} data-step={screen} data-motion={reduced ? 'fade' : 'full'}>
       {screen === 'char' && <CharacterLayers view={view} reduced={reduced} markAt={markAt} stageRef={stage} skipRef={skipRef} onMeaning={onMeaning} />}
       <div ref={stage} className="cr-stage">
         <p className="cr-wm">ICHIREI</p>
         <p className="cr-wv" lang="ja">一字礼</p>
-        {preview && <p className="cr-preview" data-testid="gift-preview-note">{CER.previewNote}</p>}
+        {preview && <p className="cr-preview" data-testid="gift-preview-note">{C.previewNote}</p>}
 
         {screen === 'mark' && (
           <section className="cr-scr" data-testid="cr-mark">
-            <button ref={firstMark} type="button" className="cr-markbtn" data-testid="cr-markbtn" aria-label={CER.markAria} onClick={open}><span className="cr-ring" /><span className="cr-mark" /></button>
+            <button ref={firstMark} type="button" className="cr-markbtn" data-testid="cr-markbtn" aria-label={C.markAria} onClick={open}><span className="cr-ring" /><span className="cr-mark" /></button>
             <div className="cr-txt">
-              {CER.markLabel(to) && <p className="cr-lab" data-testid="cr-for">{CER.markLabel(to)}</p>}
-              <h1 className="cr-h" data-testid="cr-mark-title">{CER.markTitle(from)[0]}<br />{CER.markTitle(from)[1]}</h1>
-              <p className="cr-b">{CER.markBody}</p>
+              {C.markLabel(to) && <p className="cr-lab" data-testid="cr-for">{C.markLabel(to)}</p>}
+              <h1 className="cr-h" data-testid="cr-mark-title">{C.markTitle(from)[0]}<br />{C.markTitle(from)[1]}</h1>
+              <p className="cr-b">{C.markBody}</p>
             </div>
-            <button type="button" className="cr-go cr-fix cr-next" data-testid="cr-open" onClick={open}>{CER.markButton}</button>
+            <button type="button" className="cr-go cr-fix cr-next" data-testid="cr-open" onClick={open}>{C.markButton}</button>
           </section>
         )}
 
@@ -124,15 +127,15 @@ export default function NewCeremony({ view, preview, q }: { view: GiftView; prev
           <section className="cr-scr" data-testid="cr-note">
             <div className="cr-slip cr-note">
               <p className="cr-hw cr-note-text" data-testid="gift-message" style={{ fontSize: noteSize(view.message) }}>{view.message}</p>
-              {from && <p className="cr-hw cr-note-from">{from}</p>}
+              {from && <p className="cr-hw cr-note-from">{C.certLines ? C.certFromLine(from) : from}</p>}
             </div>
-            <button type="button" className="cr-markbtn cr-right" aria-label={CER.markAria} onClick={() => go('film')}><span className="cr-ring" /><span className="cr-mark" /></button>
+            <button type="button" className="cr-markbtn cr-right" aria-label={C.markAria} onClick={() => go('film')}><span className="cr-ring" /><span className="cr-mark" /></button>
             <div className="cr-txt">
-              <p className="cr-lab">{CER.noteLabel(from)}</p>
-              <h2 className="cr-h">{CER.noteTitle}</h2>
-              <p className="cr-b">{CER.noteBody}</p>
+              <p className="cr-lab">{C.noteLabel(from)}</p>
+              <h2 className="cr-h">{C.noteTitle}</h2>
+              <p className="cr-b">{C.noteBody}</p>
             </div>
-            <button type="button" className="cr-go cr-fix cr-next" data-testid="cr-to-film" onClick={() => go('film')}>{CER.noteButton}</button>
+            <button type="button" className="cr-go cr-fix cr-next" data-testid="cr-to-film" onClick={() => go('film')}>{C.noteButton}</button>
           </section>
         )}
 
@@ -140,12 +143,12 @@ export default function NewCeremony({ view, preview, q }: { view: GiftView; prev
 
         {screen === 'char' && (
           <section className="cr-scr" data-testid="cr-char" data-meaning={meaningDone ? 'yes' : 'no'} onClick={() => { if (!meaningDone) skipRef.current?.() }}>
-            <div className="cr-gbox" id="cr-gbox" role="img" aria-label={CER.glyphAria('', wordOf(view))} />
-            <p className="cr-slip cr-cap" id="cr-cap1">{CER.cap1(from)[0]}<br />{CER.cap1(from)[1]}</p>
-            <p className="cr-slip cr-cap" id="cr-cap2">{CER.cap2[0]}<br />{CER.cap2[1]}</p>
+            <div className="cr-gbox" id="cr-gbox" role="img" aria-label={C.glyphAria(C.showReading ? readingOf(view) : '', wordOf(view))} />
+            <p className="cr-slip cr-cap" id="cr-cap1">{C.cap1(from)[0]}<br />{C.cap1(from)[1]}</p>
+            <p className="cr-slip cr-cap" id="cr-cap2">{C.cap2[0]}<br />{C.cap2[1]}</p>
             <Meaning view={view} from={from} />
             {/* the way on appears only once the meaning has fully risen: the meaning is never skipped */}
-            {meaningDone && <button type="button" className="cr-go cr-fix cr-next" data-testid="cr-to-poem" onClick={() => go(afterChar)}>{afterChar === 'poem' ? CER.toPoem : CER.toCertFromChar}</button>}
+            {meaningDone && <button type="button" className="cr-go cr-fix cr-next" data-testid="cr-to-poem" onClick={() => go(afterChar)}>{afterChar === 'poem' ? C.toPoem : C.toCertFromChar}</button>}
           </section>
         )}
 
@@ -153,23 +156,23 @@ export default function NewCeremony({ view, preview, q }: { view: GiftView; prev
           <section className="cr-scr cr-flow" data-testid="cr-poem">
             <div className="cr-row" style={{ gap: 16 }}>
               <div className="cr-small notranslate" translate="no" aria-hidden="true">{view.glyph}</div>
-              <p className="cr-lab" style={{ lineHeight: 1.7 }}>{CER.poemLabel[0]}<br />{CER.poemLabel[1]}</p>
+              <p className="cr-lab" style={{ lineHeight: 1.7 }}>{C.poemLabel[0]}<br />{C.poemLabel[1]}</p>
             </div>
-            <div className="cr-poem" data-testid="gift-poem" data-poem-type={view.poem.type}>
+            <div className={`cr-poem${C.vertical ? ' cr-vert' : ''}`} data-testid="gift-poem" data-poem-type={view.poem.type} data-vertical={C.vertical ? 'yes' : 'no'}>
               {view.poem.lines.map((l, i) => (
                 <p key={i} className={`cr-rise notranslate${i === 3 && view.poem!.lines.length === 6 ? ' cr-gap' : ''}`} translate="no" style={{ animationDelay: `${0.3 + i * 0.6 + (i > 2 ? 0.4 : 0)}s` }}>{l}</p>
               ))}
             </div>
-            <p className="cr-b" style={{ fontSize: 15, color: 'var(--mute)' }} data-testid="gift-poem-from">{CER.poemFrom(from)}</p>
-            <button type="button" className="cr-go cr-next" style={{ marginTop: 'auto' }} data-testid="cr-to-cert" onClick={() => go('cert')}>{CER.toCert}</button>
+            <p className="cr-b" style={{ fontSize: 15, color: 'var(--mute)' }} data-testid="gift-poem-from">{C.poemFrom(from)}</p>
+            <button type="button" className="cr-go cr-next" style={{ marginTop: 'auto' }} data-testid="cr-to-cert" onClick={() => go('cert')}>{C.toCert}</button>
           </section>
         )}
 
         {screen === 'cert' && (
           <section className="cr-scr cr-flow" data-testid="cr-cert">
             <div className="cr-slip cr-cert" data-testid="gift-cert" data-cert-no={view.certificate_no ?? ''}>
-              <p className="cr-lab cr-cert-no">{CER.certNo(view.certificate_no)}</p>
-              <div className="cr-big notranslate" translate="no" role="img" aria-label={CER.certAria(readingOf(view))} data-testid="gift-cert-glyph">{view.glyph}</div>
+              <p className="cr-lab cr-cert-no">{C.certNo(view.certificate_no)}</p>
+              <div className="cr-big notranslate" translate="no" role="img" aria-label={C.certAria(readingOf(view))} data-testid="gift-cert-glyph">{view.glyph}</div>
               {/* the certificate only: the reading, in small type next to the character ("待 · matsu"); the English word leads */}
               {readingOf(view) && (
                 <p className="cr-cert-reading" data-testid="gift-cert-reading">
@@ -178,15 +181,22 @@ export default function NewCeremony({ view, preview, q }: { view: GiftView; prev
               )}
               {wordOf(view) && <p className="cr-m" style={{ margin: 0, fontSize: 25, fontWeight: 900 }} data-testid="gift-cert-word">{wordOf(view)}</p>}
               {(to || from) && (
-                <div className="cr-pair">
-                  {to && <div><p className="cr-lab">{CER.certFor}</p><p className="cr-name" data-testid="gift-cert-to">{to}</p></div>}
-                  {from && <div><p className="cr-lab">{CER.certFrom}</p><p className="cr-name" data-testid="gift-cert-from">{from}</p></div>}
-                </div>
+                C.certLines ? (
+                  <div className="cr-pair cr-pair-lines">
+                    {to && <p className="cr-name" data-testid="gift-cert-to">{C.certToLine(to)}</p>}
+                    {from && <p className="cr-name" data-testid="gift-cert-from">{C.certFromLine(from)}</p>}
+                  </div>
+                ) : (
+                  <div className="cr-pair">
+                    {to && <div><p className="cr-lab">{C.certFor}</p><p className="cr-name" data-testid="gift-cert-to">{to}</p></div>}
+                    {from && <div><p className="cr-lab">{C.certFrom}</p><p className="cr-name" data-testid="gift-cert-from">{from}</p></div>}
+                  </div>
+                )
               )}
-              <p className="cr-m" style={{ margin: 0, fontSize: 16, lineHeight: 1.55, fontStyle: 'italic', maxWidth: '24ch' }} data-testid="gift-cert-line">{CER.certLine(to, from)}</p>
-              <p className="cr-lab">{CER.certPlace(view.opens_on ?? view.order_date)}</p>
+              <p className="cr-m" style={{ margin: 0, fontSize: 16, lineHeight: 1.55, fontStyle: 'italic', maxWidth: '24ch' }} data-testid="gift-cert-line">{C.certLine(to, from)}</p>
+              <p className="cr-lab">{C.certPlace(view.opens_on ?? view.order_date)}</p>
             </div>
-            <button type="button" className="cr-go cr-next" style={{ marginTop: 'auto' }} data-testid="cr-to-keep" onClick={() => go('keep')}>{CER.toKeep}</button>
+            <button type="button" className="cr-go cr-next" style={{ marginTop: 'auto' }} data-testid="cr-to-keep" onClick={() => go('keep')}>{C.toKeep}</button>
           </section>
         )}
 
@@ -195,15 +205,17 @@ export default function NewCeremony({ view, preview, q }: { view: GiftView; prev
         {screen === 'back' && <BackScreen view={view} from={from} onSent={(r) => { setSent(r); go('sent') }} />}
 
         {screen === 'sent' && (
-          <SentScreen from={from} sent={sent} onBack={() => go('keep')} />
+          <SentScreen lang={cerLang(view.language)} from={from} sent={sent} onBack={() => go('keep')} />
         )}
       </div>
     </main>
   )
 }
 
-const readingOf = (v: GiftView): string => cleanReading((v.romanization ?? '').split(' / ')[0] ?? '')
-const wordOf = (v: GiftView): string => (v.en?.word ?? v.meaning_en ?? '').trim()
+/** The reading under the character: English the romaji, Japanese the kana reading as on the order page, Chinese none. */
+const readingOf = (v: GiftView): string => (v.language === 'en' ? cleanReading((v.romanization ?? '').split(' / ')[0] ?? '') : v.language === 'ja' ? (v.reading ?? '').split(' / ')[0].trim() : '')
+/** The English word of the character (English gifts only: a Japanese or Chinese ceremony shows no English). */
+const wordOf = (v: GiftView): string => (v.language === 'en' ? (v.en?.word ?? v.meaning_en ?? '').trim() : '')
 /** The note in the hand of the preview, smaller as it gets longer (never under 22 px). */
 const noteSize = (m: string): string => {
   const n = [...(m ?? '')].length
@@ -212,14 +224,17 @@ const noteSize = (m: string): string => {
 
 /** Screen 4's words: "In Brian's eyes, you are" / the English word (no reading: English first) / the line said to the receiver / "This character is not a wish for you…". */
 function Meaning({ view, from }: { view: GiftView; from: string }) {
-  const lineYou = view.en?.line_you?.trim() || null
+  const C = CER[cerLang(view.language)]
+  // English: the line said to the receiver (line_you_en) when there is one. Japanese and Chinese: the sender's own line from the gift (view.who), under "in <name>'s eyes, you are"; there is no line_you in ja or zh
+  const lineYou = view.language === 'en' ? view.en?.line_you?.trim() || null : (view.who ?? '').trim() || null
   const oldLine = (view.en?.line ?? view.who ?? '').trim()
+  const under = C.showReading ? readingOf(view) : wordOf(view) // under the character: the reading (ja) or the English word (en); Chinese shows nothing
   return (
     <div className="cr-txt cr-meaning" id="cr-meaning" data-testid="cr-meaning" data-line={lineYou ? 'you' : 'old'}>
-      <p className="cr-lab" data-testid="cr-meaning-label">{lineYou ? CER.meaningYou(from) : CER.meaningOld(from)}</p>
-      <p className="cr-word" data-testid="cr-word">{wordOf(view)}</p>
+      <p className="cr-lab" data-testid="cr-meaning-label">{lineYou ? C.meaningYou(from) : C.meaningOld(from)}</p>
+      {under && <p className="cr-word" data-testid="cr-word">{under}</p>}
       <p className="cr-b cr-ink" data-testid="cr-line">{lineYou ?? oldLine}</p>
-      <p className="cr-b">{CER.notAWish(from)}</p>
+      <p className="cr-b">{C.notAWish(from)}</p>
     </div>
   )
 }
@@ -357,6 +372,7 @@ function CharacterLayers({ view, reduced, markAt, stageRef, skipRef, onMeaning }
 
 /** Screen 3: today's four engine pictures and four lines with the purpose's music, in the director's motion. It never ends on black: it fades to paper. */
 function FilmScreen({ view, reduced, from, onDone }: { view: GiftView; reduced: boolean; from: string; onDone: () => void }) {
+  const C = CER[cerLang(view.language)]
   const pictures = view.film?.pictures ?? null
   const lines = view.film?.lines ?? []
   const frame = useRef<HTMLDivElement>(null)
@@ -367,28 +383,74 @@ function FilmScreen({ view, reduced, from, onDone }: { view: GiftView; reduced: 
   const [playing, setPlaying] = useState(false)
   const [tick, setTick] = useState(-1)
   const [muted, setMuted] = useState(false)
+  // 2026-11-19 (the film's sound): the music and the four pictures are fully loaded and decoded BEFORE 「再生する」 is active; ONE audio element plays the whole film (a Blob of the whole file, so a seek never
+  // needs the network), started by the visitor's tap and never restarted between pictures; if the browser blocks the sound the pictures still play and a "sound on" button appears.
+  const [ready, setReady] = useState(false)
+  const [blocked, setBlocked] = useState(false)
   const run = useRef(0)
   const audio = useRef<HTMLAudioElement | null>(null)
+  const objUrl = useRef<string | null>(null)
+  const preRef = useRef<HTMLImageElement[]>([])
+  const ctxRef = useRef<AudioContext | null>(null)
+  const gainRef = useRef<GainNode | null>(null)
+  const startedAt = useRef(0)
   const fadeT = useRef<ReturnType<typeof setInterval> | undefined>(undefined)
   const count = Math.min(4, pictures?.length ?? 0)
   const hold = reduced ? FILM_REDUCED_HOLD_MS : FILM_HOLD_MS
 
+  // loading: the whole music file as a Blob (one audio element made from it) and the four pictures decoded; the film can start only when both are in
   useEffect(() => {
-    if (!view.music) return
-    const au = new Audio(`/music/${view.music}.mp3`)
-    au.preload = 'auto'
-    audio.current = au
-    return () => {
-      clearInterval(fadeT.current)
-      au.pause()
-      audio.current = null
+    let dead = false
+    setReady(false)
+    const decodeAll = async () => {
+      const imgs = (pictures ?? []).slice(0, 4).map((src) => { const im = new Image(); im.src = src; return im })
+      preRef.current = imgs // kept, so the decoded pictures stay in memory
+      await Promise.all(imgs.map((im) => (im.decode ? im.decode().catch(() => undefined) : Promise.resolve())))
     }
-  }, [view.music])
+    const loadAudio = async () => {
+      if (!view.music) return
+      try {
+        const ctl = new AbortController()
+        const t = setTimeout(() => ctl.abort(), 12000)
+        const res = await fetch(`/music/${view.music}.mp3`, { signal: ctl.signal })
+        clearTimeout(t)
+        if (!res.ok) throw new Error('music')
+        const blob = await res.blob()
+        if (dead) return
+        const url = URL.createObjectURL(blob)
+        objUrl.current = url
+        const au = new Audio()
+        au.preload = 'auto'
+        au.src = url
+        audio.current = au
+        await new Promise<void>((resolve) => {
+          const done = () => resolve()
+          au.addEventListener('canplaythrough', done, { once: true })
+          au.addEventListener('error', done, { once: true })
+          setTimeout(done, 4000)
+          au.load()
+        })
+      } catch {
+        audio.current = null // no music (it could not be loaded): the pictures still play
+      }
+    }
+    void Promise.all([decodeAll(), loadAudio()]).then(() => { if (!dead) setReady(true) })
+    return () => {
+      dead = true
+      clearInterval(fadeT.current)
+      audio.current?.pause()
+      audio.current = null
+      if (objUrl.current) URL.revokeObjectURL(objUrl.current)
+      objUrl.current = null
+      try { void ctxRef.current?.close() } catch { /* nothing to close */ }
+      ctxRef.current = null
+      gainRef.current = null
+    }
+  }, [view.music, pictures])
 
-  // the first picture waits, faint, before the film is played; the pictures are fetched ahead so the film does not stutter
+  // the first picture waits, faint, before the film is played
   useEffect(() => {
     if (!pictures?.length) return
-    pictures.forEach((src) => { const im = new Image(); im.src = src })
     if (picA.current && !playing) {
       picA.current.style.backgroundImage = `url("${pictures[0]}")`
       picA.current.style.opacity = '0.38'
@@ -401,6 +463,17 @@ function FilmScreen({ view, reduced, from, onDone }: { view: GiftView; reduced: 
     const au = audio.current
     if (!au) return
     clearInterval(fadeT.current)
+    const g = gainRef.current
+    const ctx = ctxRef.current
+    if (g && ctx) {
+      // a fade through the Web Audio gain: iPad and iPhone ignore audio.volume, a gain ramp works everywhere
+      const t = ctx.currentTime
+      g.gain.cancelScheduledValues(t)
+      g.gain.setValueAtTime(g.gain.value, t)
+      g.gain.linearRampToValueAtTime(0, t + ms / 1000)
+      fadeT.current = setInterval(() => { clearInterval(fadeT.current); au.pause() }, ms + 80)
+      return
+    }
     const step = au.volume / Math.max(1, ms / 60)
     fadeT.current = setInterval(() => {
       if (au.volume - step <= 0.01) {
@@ -417,15 +490,32 @@ function FilmScreen({ view, reduced, from, onDone }: { view: GiftView; reduced: 
     setPlaying(true)
     void play(txt.current, [{ opacity: 1 }, { opacity: 0 }], { duration: 500 })
     const au = audio.current
+    startedAt.current = performance.now()
     if (au) {
       clearInterval(fadeT.current)
       try {
         const total = (count * hold + FILM_END_MS) / 1000
         au.currentTime = Number.isFinite(au.duration) ? Math.max(0, au.duration - total) : 0
-      } catch { /* not loaded yet: it starts from the beginning */ }
-      au.volume = 1
+      } catch { /* the file is whole in memory, so this does not fail; if it does, the music starts from its beginning */ }
       au.muted = muted
-      void au.play().catch(() => {})
+      try {
+        if (!gainRef.current) {
+          const Ctx = window.AudioContext ?? (window as unknown as { webkitAudioContext?: typeof AudioContext }).webkitAudioContext
+          if (Ctx) {
+            const ctx = new Ctx()
+            const g = ctx.createGain()
+            ctx.createMediaElementSource(au).connect(g).connect(ctx.destination)
+            ctxRef.current = ctx
+            gainRef.current = g
+          }
+        }
+        if (gainRef.current && ctxRef.current) {
+          gainRef.current.gain.cancelScheduledValues(0)
+          gainRef.current.gain.value = 1
+          void ctxRef.current.resume().catch(() => undefined)
+        } else au.volume = 1
+      } catch { au.volume = 1 }
+      void au.play().then(() => setBlocked(false), () => setBlocked(true)) // blocked by the browser: the pictures play on and "sound on" appears
     }
     const layers = [picA.current, picB.current]
     for (let i = 0; i < count; i++) {
@@ -458,6 +548,17 @@ function FilmScreen({ view, reduced, from, onDone }: { view: GiftView; reduced: 
     onDone()
   }
   const toggle = () => {
+    const au = audio.current
+    if (blocked && au) {
+      // the browser blocked the sound: this tap is allowed to play it, from where the film is now
+      const total = (count * hold + FILM_END_MS) / 1000
+      const elapsed = playing ? (performance.now() - startedAt.current) / 1000 : 0
+      try { au.currentTime = Number.isFinite(au.duration) ? Math.min(Math.max(0, au.duration - total + elapsed), Math.max(0, au.duration - 0.1)) : 0 } catch { /* from the start */ }
+      au.muted = false
+      void ctxRef.current?.resume().catch(() => undefined)
+      void au.play().then(() => { setBlocked(false); setMuted(false) }, () => undefined)
+      return
+    }
     setMuted((m) => {
       if (audio.current) audio.current.muted = !m
       return !m
@@ -465,23 +566,23 @@ function FilmScreen({ view, reduced, from, onDone }: { view: GiftView; reduced: 
   }
 
   return (
-    <section className="cr-scr" data-testid="cr-film" data-playing={playing ? 'yes' : 'no'}>
-      <div ref={frame} className="cr-slip cr-frame" data-testid="cr-frame" role="img" aria-label={CER.filmTitle}>
+    <section className="cr-scr" data-testid="cr-film" data-playing={playing ? 'yes' : 'no'} data-ready={ready ? 'yes' : 'no'} data-sound={blocked ? 'blocked' : muted ? 'muted' : 'on'}>
+      <div ref={frame} className="cr-slip cr-frame" data-testid="cr-frame" role="img" aria-label={C.filmTitle}>
         <div ref={picA} className="cr-pic" data-testid="cr-pic" />
         <div ref={picB} className="cr-pic" data-testid="cr-pic" />
         <p ref={capt} className="cr-capt" aria-live="polite" data-testid="film-line" />
       </div>
       <div className="cr-ticks" aria-hidden="true">{[0, 1, 2, 3].map((n) => <i key={n} className={n <= tick ? 'cr-on' : ''} />)}</div>
       <div ref={txt} className="cr-txt" style={{ bottom: 94 }}>
-        <h2 className="cr-h">{CER.filmTitle}</h2>
-        <p className="cr-b">{CER.filmBody(from, !!view.music)}</p>
-        {!pictures && !view.film?.deferred && <p className="cr-status" role="status" data-testid="animation-preparing">{CER.preparing}</p>}
-        {!pictures && view.film?.deferred && <p className="cr-status" role="status" data-testid="animation-deferred">{CER.deferred}</p>}
+        <h2 className="cr-h">{C.filmTitle}</h2>
+        <p className="cr-b">{C.filmBody(from, !!view.music)}</p>
+        {!pictures && !view.film?.deferred && <p className="cr-status" role="status" data-testid="animation-preparing">{C.preparing}</p>}
+        {!pictures && view.film?.deferred && <p className="cr-status" role="status" data-testid="animation-deferred">{C.deferred}</p>}
       </div>
       <div className="cr-fixrow">
-        {!playing && <button type="button" className="cr-go" data-testid="cr-play" disabled={!pictures?.length} onClick={() => void start()}>{CER.play}</button>}
-        {view.music && <button type="button" className="cr-go cr-quiet" data-testid="film-sound" aria-pressed={muted} onClick={toggle}>{muted ? CER.soundOn : CER.soundOff}</button>}
-        <button type="button" className="cr-go cr-quiet" data-testid="gift-skip" onClick={skip}>{CER.skip}</button>
+        {!playing && <button type="button" className="cr-go" data-testid="cr-play" disabled={!pictures?.length || !ready} onClick={() => void start()}>{pictures?.length && !ready ? C.getting : C.play}</button>}
+        {view.music && audio.current !== null && <button type="button" className="cr-go cr-quiet" data-testid="film-sound" aria-pressed={muted || blocked} onClick={toggle}>{muted || blocked ? C.soundOn : C.soundOff}</button>}
+        <button type="button" className="cr-go cr-quiet" data-testid="gift-skip" onClick={skip}>{C.skip}</button>
       </div>
     </section>
   )
@@ -491,6 +592,7 @@ type SavePhase = 'idle' | 'making' | 'ready' | 'failed'
 
 /** Screen 7: the film (MP4, unchanged), the four pictures (the story scroll), the card (the print-at-home PDF) and the certificate (PNG). */
 function KeepScreen({ view, preview, q, from, onAnswer }: { view: GiftView; preview: boolean; q: string; from: string; onAnswer: () => void }) {
+  const C = CER[cerLang(view.language)]
   const base = `/api/gift/${view.token}`
   const [film, setFilm] = useState<SavePhase>('idle')
   const alive = useRef(true)
@@ -528,31 +630,31 @@ function KeepScreen({ view, preview, q, from, onAnswer }: { view: GiftView; prev
   }
   return (
     <section className="cr-scr cr-flow" data-testid="gift-keep">
-      <h2 className="cr-h">{CER.keepTitle}</h2>
+      <h2 className="cr-h">{C.keepTitle}</h2>
       {complete && (
         <div className="cr-slip cr-keep" data-testid="keep-film">
           <div className="cr-thumb" style={pics[0] ? { backgroundImage: `url("${pics[0]}")` } : undefined} />
           <div>
-            <h3>{CER.keepFilm}</h3>
-            <p>{CER.keepFilmLine(from, !!view.music)}</p>
-            {!preview && <button type="button" className="cr-go" data-testid="save-film" disabled={film === 'making'} onClick={() => void saveFilm()}>{film === 'making' ? CER.saving : film === 'ready' ? CER.saved : CER.save}</button>}
-            {film === 'failed' && <p role="alert" className="cr-err" data-testid="save-film-failed">{CER.saveFailed}</p>}
+            <h3>{C.keepFilm}</h3>
+            <p>{C.keepFilmLine(from, !!view.music)}</p>
+            {!preview && <button type="button" className="cr-go" data-testid="save-film" disabled={film === 'making'} onClick={() => void saveFilm()}>{film === 'making' ? C.saving : film === 'ready' ? C.saved : C.save}</button>}
+            {film === 'failed' && <p role="alert" className="cr-err" data-testid="save-film-failed">{C.saveFailed}</p>}
           </div>
         </div>
       )}
       {film === 'ready' && (
         <div>
           <video className="cr-video" data-testid="save-film-video" src={`${base}/film.mp4${q}`} controls playsInline preload="metadata" />
-          <p className="cr-b" style={{ fontSize: 15 }}>{CER.filmHint}</p>
+          <p className="cr-b" style={{ fontSize: 15 }}>{C.filmHint}</p>
         </div>
       )}
       {scroll && (
         <div className="cr-slip cr-keep" data-testid="keep-pictures">
           <div className="cr-thumb cr-four">{pics.slice(0, 4).map((p, i) => <i key={i} style={{ backgroundImage: `url("${p}")` }} />)}</div>
           <div>
-            <h3>{CER.keepPictures}</h3>
-            <p>{CER.keepPicturesLine}</p>
-            {!preview && <a className="cr-go" data-testid="save-scroll" href={`${base}/scroll.png${q}`} download>{CER.save}</a>}
+            <h3>{C.keepPictures}</h3>
+            <p>{C.keepPicturesLine}</p>
+            {!preview && <a className="cr-go" data-testid="save-scroll" href={`${base}/scroll.png${q}`} download>{C.save}</a>}
           </div>
         </div>
       )}
@@ -560,30 +662,31 @@ function KeepScreen({ view, preview, q, from, onAnswer }: { view: GiftView; prev
         <div className="cr-slip cr-keep" data-testid="keep-card">
           <div className="cr-thumb cr-white"><span className="cr-small notranslate" translate="no" style={{ fontSize: 54 }}>{view.glyph}</span></div>
           <div>
-            <h3>{CER.keepCard}</h3>
-            <p>{CER.keepCardLine(!!view.poem)}</p>
-            {!preview && <a className="cr-go" data-testid="save-card" href={`${base}/card.pdf${q}`} download>{CER.save}</a>}
+            <h3>{C.keepCard}</h3>
+            <p>{C.keepCardLine(!!view.poem)}</p>
+            {!preview && <a className="cr-go" data-testid="save-card" href={`${base}/card.pdf${q}`} download>{C.save}</a>}
           </div>
         </div>
       )}
       <div className="cr-slip cr-keep" data-testid="keep-cert">
         <div className="cr-thumb cr-goldline"><span className="cr-small notranslate" translate="no" style={{ fontSize: 44 }}>{view.glyph}</span></div>
         <div>
-          <h3>{CER.keepCert}</h3>
-          <p>{CER.keepCertLine(view.certificate_no, !!(view.to && view.from))}</p>
-          {!preview && <a className="cr-go" data-testid="save-certificate" href={`${base}/certificate.png${q}`} download onClick={() => trackUs('receiver_saved_card')}>{CER.save}</a>}
+          <h3>{C.keepCert}</h3>
+          <p>{C.keepCertLine(view.certificate_no, !!(view.to && view.from))}</p>
+          {!preview && <a className="cr-go" data-testid="save-certificate" href={`${base}/certificate.png${q}`} download onClick={() => trackUs('receiver_saved_card')}>{C.save}</a>}
         </div>
       </div>
-      {!preview && complete && <div className="cr-share"><ShareSection lang="en" base={base} role="receiver" /></div>}
-      {view.egift && !preview && <div className="cr-egift"><EgiftReceive view={view} lang="en" /></div>}
-      {!preview && <button type="button" className="cr-go cr-next" style={{ marginTop: 'auto' }} data-testid="gift-to-answer" onClick={onAnswer}>{CER.toAnswer(from)}</button>}
-      <a className="cr-go cr-quiet" href="/credits" data-testid="animation-credits-link">{CER.credits}</a>
+      {!preview && complete && <div className="cr-share"><ShareSection lang={pageLang(view.language)} base={base} role="receiver" /></div>}
+      {view.egift && !preview && <div className="cr-egift"><EgiftReceive view={view} lang={pageLang(view.language)} /></div>}
+      {!preview && <button type="button" className="cr-go cr-next" style={{ marginTop: 'auto' }} data-testid="gift-to-answer" onClick={onAnswer}>{C.toAnswer(from)}</button>}
+      <a className="cr-go cr-quiet" href="/credits" data-testid="animation-credits-link">{C.credits}</a>
     </section>
   )
 }
 
 /** Screen 8: one of the twelve, and/or a few words (80 characters), sent once. */
 function BackScreen({ view, from, onSent }: { view: GiftView; from: string; onSent: (r: { char: string | null; text: boolean }) => void }) {
+  const C = CER[cerLang(view.language)]
   const [char, setChar] = useState<string | null>(null)
   const [text, setText] = useState('')
   const [phase, setPhase] = useState<'idle' | 'sending' | 'error'>('idle')
@@ -602,47 +705,49 @@ function BackScreen({ view, from, onSent }: { view: GiftView; from: string; onSe
   }
   return (
     <section className="cr-scr cr-flow" data-testid="gift-answer">
-      <h2 className="cr-h" data-testid="gift-answer-title">{CER.backTitle(from)[0]}<br />{CER.backTitle(from)[1]}</h2>
-      <p className="cr-b">{CER.backBody}</p>
+      <h2 className="cr-h" data-testid="gift-answer-title">{C.backTitle(from)[0]}<br />{C.backTitle(from)[1]}</h2>
+      <p className="cr-b">{C.backBody}</p>
       <ul className="cr-grid" data-testid="gift-chars">
         {RETURN_CHARS.map((r) => (
           <li key={r.char}>
             <button type="button" className="cr-ch" aria-pressed={char === r.char} data-testid={`gift-char-${r.char}`} onClick={() => setChar((c) => (c === r.char ? null : r.char))}>
               <b className="notranslate" translate="no">{r.char}</b>
-              <span>{r.en}</span>
+              <span>{r[C.lang]}</span>
             </button>
           </li>
         ))}
       </ul>
       <div>
-        <label htmlFor="cr-reply" className="cr-lab" style={{ display: 'block', marginBottom: 6 }}>{CER.wordsLabel}</label>
-        <input id="cr-reply" className="cr-field" type="text" maxLength={80} placeholder={CER.wordsPlaceholder} value={text} onChange={(e) => setText([...e.target.value].slice(0, 80).join(''))} data-testid="gift-reply-text" />
+        <label htmlFor="cr-reply" className="cr-lab" style={{ display: 'block', marginBottom: 6 }}>{C.wordsLabel}</label>
+        <input id="cr-reply" className="cr-field" type="text" maxLength={80} placeholder={C.wordsPlaceholder} value={text} onChange={(e) => setText([...e.target.value].slice(0, 80).join(''))} data-testid="gift-reply-text" />
       </div>
-      {phase === 'error' && <p role="alert" className="cr-b cr-ink">{CER.sendError}</p>}
+      {phase === 'error' && <p role="alert" className="cr-b cr-ink">{C.sendError}</p>}
       <button type="button" className="cr-go cr-next" style={{ marginTop: 'auto' }} data-testid="gift-reply-send" disabled={(!char && !text.trim()) || phase === 'sending'} onClick={() => void send()}>
-        {phase === 'sending' ? CER.sending : CER.send(char, from)}
+        {phase === 'sending' ? C.sending : C.send(char, from)}
       </button>
     </section>
   )
 }
 
 /** Screen 9: sent; then "Is there someone you've never quite said it to?" with a real button to /en (and the free-gift card while the promotion runs). */
-function SentScreen({ from, sent, onBack }: { from: string; sent: { char: string | null; text: boolean } | null; onBack: () => void }) {
+function SentScreen({ lang, from, sent, onBack }: { lang: ReturnType<typeof cerLang>; from: string; sent: { char: string | null; text: boolean } | null; onBack: () => void }) {
+  const C = CER[lang]
+  const T = thanksCopy(lang)
   const promoOn = usePromoOn()
   const char = sent?.char ?? null
   return (
     <section className="cr-scr cr-flow" data-testid="gift-reply-sent">
-      <div className="cr-sent"><span className="cr-dot" aria-hidden="true" /><p className="cr-lab" role="status" data-testid="cr-sent-line">{CER.sentLine(from, char, char ? returnWord(char, 'en') : '')}</p></div>
-      {char ? <p className="cr-b cr-ink">{CER.bothSaid(from)}</p> : sent?.text ? <p className="cr-b cr-ink">{CER.wordsSent(from)}</p> : null}
-      <h2 className="cr-h" style={{ fontSize: 'clamp(28px, 8.6vw, 35px)' }} data-testid="cr-ask">{CER.ask}</h2>
+      <div className="cr-sent"><span className="cr-dot" aria-hidden="true" /><p className="cr-lab" role="status" data-testid="cr-sent-line">{C.sentLine(from, char, char ? returnWord(char, lang) : '')}</p></div>
+      {char ? <p className="cr-b cr-ink">{C.bothSaid(from)}</p> : sent?.text ? <p className="cr-b cr-ink">{C.wordsSent(from)}</p> : null}
+      <h2 className="cr-h" style={{ fontSize: 'clamp(28px, 8.6vw, 35px)' }} data-testid="cr-ask">{C.ask}</h2>
       {promoOn && (
         <div className="cr-slip cr-promo" data-testid="gift-landing-promo">
-          <p className="cr-m" style={{ fontSize: 18, lineHeight: 1.4 }}>{CER.promo}</p>
-          <p className="cr-promo-sub">{CER.promoSub}</p>
+          <p className="cr-m" style={{ fontSize: 18, lineHeight: 1.4 }}>{T.orderOnUs}</p>
+          <p className="cr-promo-sub">{T.sub}</p>
         </div>
       )}
-      <a className="cr-blk" href="/en" data-testid="gift-landing-line">{CER.giveOwn}</a>
-      <button type="button" className="cr-go cr-quiet" onClick={onBack}>{CER.backToGift}</button>
+      <a className="cr-blk" href={C.landing} data-testid="gift-landing-line">{C.giveOwn}</a>
+      <button type="button" className="cr-go cr-quiet" onClick={onBack}>{C.backToGift}</button>
     </section>
   )
 }

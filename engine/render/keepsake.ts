@@ -73,17 +73,23 @@ export interface CertificateArtwork {
   number: string
   /** e.g. "November 15, 2026 · Tokyo" */
   place: string
+  /** Japanese and Chinese (2026-11-19): the page's language. The certificate then has no English: the reading small beside the character (Japanese), the names as single lines (「〈name〉へ」/「〈name〉より」), no FOR / FROM, no upper-casing. */
+  lang?: 'en' | 'ja' | 'zh-Hant' | 'zh-Hans'
+  toLine?: string
+  fromLine?: string
 }
 
 export async function makeCertificateCard(a: CertificateArtwork): Promise<Buffer> {
-  const f = fontsFor('en')
+  const cjk = !!a.lang && a.lang !== 'en'
+  const f = fontsFor(a.lang ?? 'en')
   const body = fontObject(f.body)
   const hero = fontObject(f.character)
+  const up = (t: string): string => (cjk ? t : t.toUpperCase())
   const W = CERT_W
   const H = CERT_H
   const x = 120
   let svg = `<rect x="36" y="36" width="${W - 72}" height="${H - 72}" fill="${SLIP}"/><rect x="66" y="66" width="${W - 132}" height="${H - 132}" fill="none" stroke="${GOLD}" stroke-width="3"/>`
-  svg += textPaths(body, a.number.toUpperCase(), 34, x, 170, NUMBER, 'start').svg
+  svg += textPaths(body, up(a.number), 34, x, 170, NUMBER, 'start').svg
   const cs = 520
   svg += textPaths(hero, a.glyph, cs, x - 14, 200 + cs * 0.86, CINNABAR, 'start', f.stroke).svg
   // English first (2026-11-15): the certificate alone keeps the reading, in small type next to the character ("待 · matsu"); the English word leads, large, under it
@@ -93,27 +99,35 @@ export async function makeCertificateCard(a: CertificateArtwork): Promise<Buffer
     svg += small.svg
     const rx = x + small.width + 14
     const read = textPaths(body, `·  ${a.reading}`, 38, rx, y, MUTED, 'start')
-    svg += `<g transform="translate(${rx} ${y}) skewX(-12) translate(${-rx} ${-y})">${read.svg}</g>`
+    svg += cjk ? read.svg : `<g transform="translate(${rx} ${y}) skewX(-12) translate(${-rx} ${-y})">${read.svg}</g>`
     y += 92
   } else y += 32
-  svg += textPaths(body, a.word, 72, x, y, INK, 'start', 1.6).svg
-  y += 120
-  if (a.to) {
+  if (a.word) {
+    svg += textPaths(body, a.word, 72, x, y, INK, 'start', 1.6).svg
+    y += 120
+  }
+  if (cjk) {
+    const names = [a.toLine ?? '', a.fromLine ?? ''].filter(Boolean)
+    names.forEach((n, i) => {
+      svg += textPaths(body, n, 54, x, y + i * 84, INK, 'start', f.stroke ? 1.4 : 0).svg
+    })
+    y += names.length ? names.length * 84 + 40 : 0
+  } else if (a.to) {
     svg += textPaths(body, 'FOR', 30, x, y, MUTED, 'start').svg
     svg += textPaths(body, a.to, 54, x, y + 70, INK, 'start').svg
   }
-  if (a.from) {
+  if (!cjk && a.from) {
     const fx = a.to ? x + 420 : x
     svg += textPaths(body, 'FROM', 30, fx, y, MUTED, 'start').svg
     svg += textPaths(body, a.from, 54, fx, y + 70, INK, 'start').svg
   }
-  if (a.to || a.from) y += 160
+  if (!cjk && (a.to || a.from)) y += 160
   const lines = wrapText(body, a.line, 40, W - 2 * x).slice(0, 3)
   lines.forEach((l, i) => {
     const t = textPaths(body, l, 40, x, y + i * 60, INK, 'start')
-    svg += `<g transform="translate(${x} ${y + i * 60}) skewX(-10) translate(${-x} ${-(y + i * 60)})">${t.svg}</g>`
+    svg += cjk ? t.svg : `<g transform="translate(${x} ${y + i * 60}) skewX(-10) translate(${-x} ${-(y + i * 60)})">${t.svg}</g>`
   })
-  svg += textPaths(body, a.place.toUpperCase(), 30, x, H - 120, MUTED, 'start').svg
+  svg += textPaths(body, up(a.place), 30, x, H - 120, MUTED, 'start').svg
   return sharp({ create: { width: W, height: H, channels: 3, background: '#F3EFE5' } })
     .composite([{ input: Buffer.from(`<svg xmlns="http://www.w3.org/2000/svg" width="${W}" height="${H}" viewBox="0 0 ${W} ${H}">${svg}</svg>`), left: 0, top: 0 }])
     .png({ compressionLevel: 9 })

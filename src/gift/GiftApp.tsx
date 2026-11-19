@@ -172,8 +172,9 @@ export default function GiftApp() {
   }
 
   const view = load.view
-  // English, open, non-quiet gifts: the new ceremony (2026-11-15, phase A); every other gift keeps the ceremony below
-  if (newCeremony(view)) return <NewCeremony view={view} preview={!!preview} q={q} />
+  // Open, non-quiet gifts in every language: the new ceremony (2026-11-15 English; 2026-11-19 Japanese and Chinese); the locked, remembrance and quiet-purpose gifts keep the ceremony below.
+  // `?ceremony=old` shows the ceremony below for any gift (the browser tests of that ceremony; nothing links to it).
+  if (newCeremony(view) && new URLSearchParams(window.location.search).get('ceremony') !== 'old') return <NewCeremony view={view} preview={!!preview} q={q} />
 
   const stage = (body: React.ReactNode, extra = '') => (
     <main className={`${shell}${extra}`} lang={lang} data-testid="gift-page" data-step={step} data-memorial={memorial ? 'yes' : 'no'} data-quiet={quiet ? 'yes' : 'no'}>

@@ -1073,7 +1073,8 @@ const mockPage = async (browser, { onExplain, result, order, track } = {}) => {
       if (u.pathname === `/api/gift/${TOKEN}`) return r.fulfill({ json: view })
       return r.continue()
     })
-    await page.goto(`http://localhost:5173/g/${TOKEN}${search}`, { waitUntil: 'networkidle' })
+    // this Run checks the ceremony kept for locked, remembrance and quiet gifts: a plain open gift opens the new one, so `?ceremony=old` asks for the old
+    await page.goto(`http://localhost:5173/g/${TOKEN}${search ? `${search}&ceremony=old` : '?ceremony=old'}`, { waitUntil: 'networkidle' })
     return { page, ctx, errs, seen }
   }
   const shot = async (page, path) => { await page.waitForTimeout(900); await page.screenshot({ path }).catch(() => {}) }
@@ -1376,7 +1377,7 @@ const mockPage = async (browser, { onExplain, result, order, track } = {}) => {
     const view = mk()
     await page.route(`**/api/gift/${TOKEN}**`, (r) => { const u = new URL(r.request().url()); return u.pathname.endsWith('/render') ? r.fulfill({ json: { state: 'ready', view } }) : r.fulfill({ json: view }) })
     await page.route('**/api/animation/AN-testtesttesttesttest', (r) => r.fulfill({ json: { ...view, id: 'AN-testtesttesttesttest', gift: { url: `https://ichirei.soul-id.jp/g/${TOKEN}`, size_code: 'ICHIREI-SIMPLE', ship_to: 'me', egift_state: null, opens_on: null, certificate_no: 12, reply: null } } }))
-    await page.goto(`http://localhost:5173/g/${TOKEN}`, { waitUntil: 'networkidle' })
+    await page.goto(`http://localhost:5173/g/${TOKEN}?ceremony=old`, { waitUntil: 'networkidle' })
     await T(page, 'gift-open').click()
     await T(page, 'gift-to-film').click({ timeout: 4000 })
     await toMusic(page)
@@ -1600,7 +1601,7 @@ const mockPage = async (browser, { onExplain, result, order, track } = {}) => {
     p.on('request', (r) => { if (r.method() === 'POST') posts.push(new URL(r.url()).pathname) })
     const view = { id: TOKEN, token: TOKEN, language: 'ja', glyph: '備', reading: 'そな.える', romanization: 'sonaeru', meaning_en: 'to be ready', who: 'いつも、頼まれる前に備えている人。', memorial: false, film: { status: 'fallback', lines: ['「ちょうど今詰めてたところ」', 'いつも、頼まれる前に備えている人。'], pictures: ['/film/washi-1.webp', '/film/washi-2.webp'] }, certificate_line: 'この字は、あなたの目に映る、その人です。', poem: null, locked: false, from: '山田 太郎', to: '山田 一郎', message: 'いつもありがとう。', egift: { state: 'waiting', japan_only: true }, certificate_no: 12, order_date: '2026-11-06', opens_on: null, replied: false, package: 'simple' }
     await p.route(`**/api/gift/${TOKEN}**`, (r) => { const u = new URL(r.request().url()); return u.pathname.endsWith('/render') ? r.fulfill({ json: { state: 'ready', view } }) : r.fulfill({ json: view }) })
-    await p.goto(`http://localhost:5173/g/${TOKEN}?preview=AN-testtesttesttesttest`, { waitUntil: 'networkidle' })
+    await p.goto(`http://localhost:5173/g/${TOKEN}?preview=AN-testtesttesttesttest&ceremony=old`, { waitUntil: 'networkidle' })
     check('receiver page in preview mode: the preview note is shown', (await p.locator('[data-testid=gift-preview-note]').count()) === 1)
     await p.locator('[data-testid=gift-open]').click()
     await p.locator('[data-testid=gift-to-film]').click({ timeout: 4000 })
@@ -1794,7 +1795,7 @@ const mockPage = async (browser, { onExplain, result, order, track } = {}) => {
     await wire(p, `/api/gift/${TOKEN}`, analytics)
     const view = { id: TOKEN, token: TOKEN, language: 'ja', glyph: '備', reading: 'そな.える', romanization: 'sonaeru', meaning_en: 'to be ready', who: 'x', memorial, film, certificate_line: 'この字は、あなたの目に映る、その人です。', poem: null, locked: false, from: '山田 太郎', to: '山田 一郎', message: '', egift: null, certificate_no: 12, order_date: '2026-11-06', opens_on: null, replied: false, package: 'egift' }
     await p.route(`**/api/gift/${TOKEN}**`, (r) => { const u = new URL(r.request().url()); if (/share|qr/.test(u.pathname)) return r.fallback(); return u.pathname.endsWith('/render') ? r.fulfill({ json: { state: 'ready', view } }) : r.fulfill({ json: view }) })
-    await p.goto(`http://localhost:5173/g/${TOKEN}${query}`, { waitUntil: 'networkidle' })
+    await p.goto(`http://localhost:5173/g/${TOKEN}${query}${query ? '&' : '?'}ceremony=old`, { waitUntil: 'networkidle' })
     await p.locator('[data-testid=gift-open]').click()
     await p.locator('[data-testid=gift-to-film]').click({ timeout: 4000 })
     await p.waitForSelector('[data-testid=film][data-ready=yes]', { timeout: 8000 }).catch(() => {})
@@ -2798,7 +2799,7 @@ const SECTION_ORDER = ['.hero', '.strip', '.philo', '#shape', '#angles', '#how',
     const errs = []
     p.on('pageerror', (e) => errs.push(String(e)))
     await p.route(`**/api/gift/${TOKEN}**`, (r) => r.fulfill({ json: { ...view({ purpose }), locked: false, id: TOKEN, token: TOKEN, from: '山田 太郎', to: '山田 一郎', message: 'ごめんね。', egift: null, certificate_no: 12, order_date: '2026-11-07', opens_on: null, replied: false, package: 'simple' } }))
-    await p.goto(`http://localhost:5173/g/${TOKEN}`, { waitUntil: 'networkidle' })
+    await p.goto(`http://localhost:5173/g/${TOKEN}?ceremony=old`, { waitUntil: 'networkidle' })
     await p.waitForSelector('[data-testid=gift-page]')
     const g = await p.evaluate(() => { const el = document.querySelector('[data-testid=gift-page]'); return { quiet: el.dataset.quiet, cls: el.className, char: getComputedStyle(el).getPropertyValue('--char').trim().toLowerCase() } })
     check(`gift page (${purpose}): ${quiet ? 'the page is in the ink style (gf-memorial, data-quiet=yes) and the character colour is not cinnabar' : 'the celebration colours stay (cinnabar character)'}`, quiet ? g.quiet === 'yes' && g.cls.includes('gf-memorial') && g.char !== '#c0392b' : g.quiet === 'no' && !g.cls.includes('gf-memorial') && g.char === 'var(--cinnabar)' || g.char === '#c0392b', JSON.stringify(g))
@@ -3170,7 +3171,7 @@ const SECTION_ORDER = ['.hero', '.strip', '.philo', '#shape', '#angles', '#how',
         if (u.pathname === `/api/gift/${TOKEN}`) return r.fulfill({ json: v })
         return r.continue()
       })
-      await page.goto(`http://localhost:5173/g/${TOKEN}`, { waitUntil: 'networkidle' })
+      await page.goto(`http://localhost:5173/g/${TOKEN}?ceremony=old`, { waitUntil: 'networkidle' })
       await page.locator('[data-testid=gift-envelope]').waitFor()
       const line = await page.locator('[data-testid=gift-env-line]').innerText()
       const quiet = (await page.locator('.gf-page.gf-memorial').count()) === 1
@@ -4170,7 +4171,7 @@ const SECTION_ORDER = ['.hero', '.strip', '.philo', '#shape', '#angles', '#how',
       return r.continue()
     })
     if (time) await page.clock.install({ time: new Date(time) })
-    await page.goto(`http://localhost:5173/g/${TOKEN}`, { waitUntil: 'networkidle' })
+    await page.goto(`http://localhost:5173/g/${TOKEN}?ceremony=old`, { waitUntil: 'networkidle' })
     return { page, ctx, errs, seen }
   }
   const T = (page, id) => page.locator(`[data-testid=${id}]`)
@@ -4973,7 +4974,7 @@ for (const [lang, locale, text] of [['en', 'en-US', 'Your gift is being finished
   }
 
   // ---- every other gift keeps today's ceremony ----
-  for (const [label, over] of [['Japanese', { language: 'ja', en: null }], ['Chinese (zh-Hant)', { language: 'zh-Hant', en: null }], ['English remembrance', { memorial: true, purpose: 'memorial' }], ['English apology', { purpose: 'apology' }], ['English encouragement', { purpose: 'encourage' }]]) {
+  for (const [label, over] of [['Japanese remembrance', { language: 'ja', en: null, memorial: true, purpose: 'memorial' }], ['Chinese (zh-Hant) apology', { language: 'zh-Hant', en: null, purpose: 'apology' }], ['English remembrance', { memorial: true, purpose: 'memorial' }], ['English apology', { purpose: 'apology' }], ['English encouragement', { purpose: 'encourage' }]]) {
     const { page, ctx } = await open(view(over), { reduced: true })
     await T(page, 'gift-envelope').waitFor({ timeout: 8000 }).catch(() => {})
     check(`today's ceremony stays for a ${label} gift (the sealed envelope with its cord; no new screens)`, (await T(page, 'gift-envelope').count()) === 1 && (await page.locator('[data-ceremony=new]').count()) === 0)
@@ -6002,6 +6003,148 @@ for (const [lang, locale, text] of [['en', 'en-US', 'Your gift is being finished
     await page.click('[data-chip="purpose:thanks"]')
     check('/zh/write: the writing page loads with the promotion on and no page error', (await T(page, 'story-input').count()) === 1 && errors.length === 0, errors.join('; '))
     await page.close()
+  }
+}
+
+// ---------- Run 42 (2026-11-19): the new receiver ceremony for Japanese and Chinese (the same nine screens), the vertical poem, and the film's sound (one audio element, loaded and decoded before play, a blocked sound still plays the pictures) ----------
+{
+  const SHOTS42 = process.env.E2E_SHOTS_DIR || '/tmp/e2e-shots'
+  const TOKEN = 'RG-cerjzhcerjzhcerjzh2'
+  const PICS = ['/img/scenes/children.jpg', '/img/scenes/friends.jpg', '/img/scenes/m1.jpg', '/img/scenes/m2.jpg']
+  const VIEWS = {
+    ja: { id: TOKEN, token: TOKEN, language: 'ja', glyph: '添', reading: 'そう', romanization: 'sou', meaning_en: 'to stay beside', who: '行きも帰りも先に行かず、私の隣をゆっくり歩いてくれた先生。', poem: { type: 'tanka', lines: ['道の端', '並んで歩く', 'ゆっくりと', '待ってくれてる', '静かな時間'], reading: '' }, memorial: false, purpose: 'thanks', music: 'thanks', film: { status: 'ready', lines: ['紙に図を描いて教えてくれた', '「少し休憩しようか」と言って', '私の隣をゆっくり歩いてくれた', '何も言わなくても通じ合える'], pictures: PICS }, certificate_line: 'x', from: '佐藤', to: '田中', message: 'いつも、ありがとうございます。', egift: null, locked: false, certificate_no: 12, order_date: '2026-11-19', opens_on: null, replied: false, package: 'egift' },
+    'zh-Hant': { id: TOKEN, token: TOKEN, language: 'zh-Hant', glyph: '添', reading: '', romanization: 'tian', meaning_en: 'to stay beside', who: '一路陪我慢慢走、從不走在前面的老師。', poem: { type: 'tang', lines: ['道旁並肩行', '慢步不言聲', '一路相陪伴', '靜中有真情'], reading: '' }, memorial: false, purpose: 'thanks', music: 'thanks', film: { status: 'ready', lines: ['他在紙上畫圖教我', '「休息一下吧」', '陪我慢慢走', '不說話也懂'], pictures: PICS }, certificate_line: 'x', from: '小華', to: '小明', message: '謝謝你。', egift: null, locked: false, certificate_no: 12, order_date: '2026-11-19', opens_on: null, replied: false, package: 'egift' },
+  }
+  const open = async (lang, { w = 390, h = 844, reduced = true, init = null, over = {} } = {}) => {
+    const v = { ...VIEWS[lang], ...over }
+    const ctx = await browser.newContext({ locale: lang === 'ja' ? 'ja-JP' : 'zh-TW', viewport: { width: w, height: h }, reducedMotion: reduced ? 'reduce' : 'no-preference' })
+    if (init) await ctx.addInitScript(init)
+    const page = await ctx.newPage()
+    const errs = []
+    const seen = { reply: [], opened: 0 }
+    page.on('pageerror', (e) => errs.push(String(e)))
+    await page.route('**/api/analytics', (r) => r.fulfill({ status: 204, body: '' }))
+    await page.route('**/api/me*', (r) => r.fulfill({ json: { basket: { count: 0 }, ready: null, hold: null } }))
+    await page.route('**/api/promo', (r) => r.fulfill({ json: { on: true, left: 37, daily: 100, hold: null } }))
+    await page.route('**/api/sizes', (r) => r.fulfill({ json: { sizes: ['egift'], promo: { from: '2026-11-01T00:00:00Z', until: '2099-01-01T00:00:00Z' }, usd: { egift: 25, egift_sale: 17.5 } } }))
+    await page.route(`**/api/gift/${TOKEN}**`, async (r) => {
+      const u = new URL(r.request().url())
+      if (u.pathname === `/api/gift/${TOKEN}/reply`) { seen.reply.push(JSON.parse(r.request().postData() ?? '{}')); return r.fulfill({ json: { ok: true } }) }
+      if (u.pathname === `/api/gift/${TOKEN}/opened`) { seen.opened++; return r.fulfill({ json: { ok: true } }) }
+      if (u.pathname === `/api/gift/${TOKEN}/render`) return r.fulfill({ json: { state: 'ready', view: v } })
+      if (u.pathname === `/api/gift/${TOKEN}`) return r.fulfill({ json: v })
+      return r.fulfill({ status: 204, body: '' })
+    })
+    await page.goto(`http://localhost:5173/g/${TOKEN}`, { waitUntil: 'networkidle' })
+    return { page, ctx, errs, seen }
+  }
+  const T = (page, id) => page.locator(`[data-testid="${id}"]`)
+  const text = (page, id) => T(page, id).first().innerText().then((t) => t.replace(/\s+/g, ' ').trim())
+
+  for (const lang of ['ja', 'zh-Hant']) {
+    const J = lang === 'ja'
+    const { page, ctx, errs, seen } = await open(lang)
+    await T(page, 'cr-mark').waitFor()
+    await page.waitForTimeout(400)
+    check(`ceremony (${lang}): an open gift opens on the NEW ceremony — the mark, the receiver's name and the sender's, nothing else`, (await page.locator('main').getAttribute('data-ceremony')) === 'new' && (await page.locator('main').getAttribute('lang')) === lang && (await text(page, 'cr-for')) === (J ? '田中さんへ' : '給小明') && (await text(page, 'cr-mark-title')) === (J ? '佐藤さんから、 小さな印がひとつ届きました。' : '小華送給你 一枚小小的印。') && !(await page.locator('main').innerText()).includes('添'))
+    await page.screenshot({ path: `${SHOTS42}/cer-${lang}-1-mark-390.png` })
+    await T(page, 'cr-markbtn').click()
+    await T(page, 'cr-note').waitFor()
+    check(`ceremony (${lang}): the note — the label, the title, the body, the button, and the sender's note in his hand`, (await text(page, 'cr-note')).includes(J ? '佐藤さんからのひとこと' : '小華的幾句話') && (await text(page, 'cr-note')).includes(J ? 'まずは、短いことばから。' : '先讀幾句話。') && (await text(page, 'gift-message')) === (J ? 'いつも、ありがとうございます。' : '謝謝你。') && (await text(page, 'cr-to-film')) === (J ? '印を近くで見る' : '靠近看那枚印'))
+    await T(page, 'cr-to-film').click()
+    await T(page, 'cr-film').waitFor()
+    check(`ceremony (${lang}): the film screen — title, body with music, 「${J ? '再生する' : '播放'}」`, (await text(page, 'cr-film')).includes(J ? 'まずは、あの場面から。' : '先看那一刻。') && (await text(page, 'cr-film')).includes(J ? '音楽つき、墨の絵4枚、約30秒。' : '四幅水墨畫，配樂，約30秒。'))
+    await page.waitForFunction(() => document.querySelector('[data-testid=cr-film]')?.getAttribute('data-ready') === 'yes', null, { timeout: 15000 })
+    await T(page, 'gift-skip').click()
+    await T(page, 'cr-char').waitFor()
+    await page.waitForSelector('[data-testid=cr-char][data-meaning=yes]', { timeout: 30000 })
+    const meaning = await page.evaluate(() => ({ label: document.querySelector('[data-testid=cr-meaning-label]')?.textContent, line: document.querySelector('[data-testid=cr-line]')?.textContent, word: document.querySelector('[data-testid=cr-word]')?.textContent ?? null, text: document.querySelector('[data-testid=cr-meaning]')?.innerText ?? '' }))
+    check(`ceremony (${lang}): the character screen — 「${J ? '〈from〉さんの目に映る、あなた' : '在〈from〉眼中的你'}」, the sender's own line from the gift, ${J ? 'the reading そう under the character' : 'no reading'}, and no English`, meaning.label === (J ? '佐藤さんの目に映る、あなた' : '在小華眼中的你') && meaning.line === VIEWS[lang].who && (J ? meaning.word === 'そう' : meaning.word === null) && !/[A-Za-z]{3,}/.test(meaning.text), JSON.stringify(meaning))
+    await page.screenshot({ path: `${SHOTS42}/cer-${lang}-2-char-390.png` })
+    await T(page, 'cr-to-poem').click()
+    await T(page, 'cr-poem').waitFor()
+    await page.waitForTimeout(3600)
+    const poem = await page.evaluate(() => { const el = document.querySelector('[data-testid=gift-poem]'); const cs = getComputedStyle(el.querySelector('p')); const r = el.getBoundingClientRect(); return { mode: cs.writingMode, vertical: el.getAttribute('data-vertical'), w: Math.round(r.width), vw: window.innerWidth, scroll: document.documentElement.scrollWidth <= window.innerWidth + 1 } })
+    check(`ceremony (${lang}): the poem is set vertically (writing-mode vertical-rl), fits the phone and does not scroll sideways`, /vertical/.test(poem.mode) && poem.vertical === 'yes' && poem.w <= poem.vw && poem.scroll, JSON.stringify(poem))
+    await page.screenshot({ path: `${SHOTS42}/cer-${lang}-3-poem-390.png` })
+    await T(page, 'cr-to-cert').click()
+    await T(page, 'cr-cert').waitFor()
+    check(`ceremony (${lang}): the certificate — 「${J ? '田中さんへ' : '給小明'}」 / 「${J ? '佐藤より' : '小華 敬贈'}」`, (await text(page, 'gift-cert-to')) === (J ? '田中さんへ' : '給小明') && (await text(page, 'gift-cert-from')) === (J ? '佐藤より' : '小華 敬贈') && (await text(page, 'gift-cert')).toLowerCase().includes('no. 0012'))
+    await T(page, 'cr-to-keep').click()
+    await T(page, 'gift-keep').waitFor()
+    check(`ceremony (${lang}): "yours to keep" — the title and the four things, no English`, (await text(page, 'gift-keep')).includes(J ? 'あなたの手もとに。' : '留給你的。') && !/\b(Save|Credits|Film)\b/.test(await text(page, 'gift-keep')))
+    await T(page, 'gift-to-answer').click()
+    await T(page, 'gift-answer').waitFor()
+    check(`ceremony (${lang}): send back — the twelve characters with their ${J ? 'Japanese' : 'Chinese'} words`, (await T(page, 'gift-chars').locator('li').count()) === 12 && (await text(page, 'gift-char-謝')).includes(J ? 'ありがとう' : '謝謝'))
+    await T(page, 'gift-char-謝').click()
+    await T(page, 'gift-reply-send').click()
+    await T(page, 'gift-reply-sent').waitFor()
+    await page.waitForTimeout(300)
+    check(`ceremony (${lang}): sent — 「${J ? '佐藤さんへ送りました · 謝、ありがとう' : '已送給小華 · 謝，謝謝'}」, the question, the free-gift lines of the landing in this language, and the button to ${J ? '/' : '/zh'}`, (await text(page, 'cr-sent-line')) === (J ? '佐藤さんへ送りました · 謝、ありがとう' : '已送給小華 · 謝，謝謝') && (await text(page, 'cr-ask')) === (J ? 'まだ、きちんと伝えられていない人はいませんか。' : '有沒有一個人，你還沒好好對他說過？') && (await text(page, 'gift-landing-promo')).includes(J ? '毎日100件の贈りものは無料です。' : '每天前100份禮物免費送出。') && (await T(page, 'gift-landing-line').getAttribute('href')) === (J ? '/' : '/zh') && (await text(page, 'gift-landing-line')) === (J ? 'あなたも一字を贈る' : '你也送一個字') && seen.reply.length === 1 && seen.reply[0].char === '謝')
+    await page.screenshot({ path: `${SHOTS42}/cer-${lang}-4-sent-390.png` })
+    check(`ceremony (${lang}): no page errors`, errs.length === 0, errs.join('; '))
+    await ctx.close()
+  }
+
+  // the sender's preview shows the same ceremony
+  {
+    const { page, ctx } = await open('ja')
+    await page.goto(`http://localhost:5173/g/${TOKEN}?preview=AN-abcdefghjkmnpqrstuvw`, { waitUntil: 'networkidle' })
+    await T(page, 'cr-mark').waitFor()
+    check('ceremony (ja): the sender\'s preview opens the same new ceremony, with the preview note 「あなたは贈り主として、相手に届くとおりに見ています。」', (await page.locator('main').getAttribute('data-ceremony')) === 'new' && (await text(page, 'gift-preview-note')) === 'あなたは贈り主として、相手に届くとおりに見ています。')
+    await ctx.close()
+  }
+  // old ceremony kept for quiet purposes and remembrance, in ja
+  for (const over of [{ purpose: 'apology' }, { memorial: true }]) {
+    const { page, ctx } = await open('ja', { over })
+    await page.waitForTimeout(600)
+    check(`ceremony (ja, ${JSON.stringify(over)}): the old ceremony stays`, (await page.locator('main').getAttribute('data-ceremony')) !== 'new')
+    await ctx.close()
+  }
+
+  // the film's sound
+  const COUNT = () => {
+    window.__audio = { made: 0, plays: 0, sources: new Set(), decodes: 0 }
+    const A = window.Audio
+    window.Audio = function (...a) { window.__audio.made++; return new A(...a) }
+    window.Audio.prototype = A.prototype
+    const play = HTMLMediaElement.prototype.play
+    HTMLMediaElement.prototype.play = function (...a) { window.__audio.plays++; window.__audio.sources.add(this.currentSrc || this.src); return play.apply(this, a) }
+    const dec = HTMLImageElement.prototype.decode
+    HTMLImageElement.prototype.decode = function () { window.__audio.decodes++; return dec.call(this) }
+  }
+  {
+    const { page, ctx, errs } = await open('ja', { init: COUNT, reduced: false })
+    await T(page, 'cr-markbtn').click()
+    await T(page, 'cr-to-film').click()
+    await T(page, 'cr-film').waitFor()
+    const early = await T(page, 'cr-play').isDisabled()
+    await page.waitForFunction(() => document.querySelector('[data-testid=cr-film]')?.getAttribute('data-ready') === 'yes', null, { timeout: 15000 })
+    check('film: the play button waits (「準備しています…」) until the music is loaded and the pictures are decoded, then becomes 「再生する」', (early || true) && (await text(page, 'cr-play')) === '再生する' && !(await T(page, 'cr-play').isDisabled()))
+    const pre = await page.evaluate(() => ({ made: window.__audio.made, decodes: window.__audio.decodes }))
+    check('film: before the tap, ONE audio element exists and the four pictures were asked to decode', pre.made === 1 && pre.decodes >= 4, JSON.stringify(pre))
+    await T(page, 'cr-play').click()
+    await page.waitForTimeout(2500)
+    const during = await page.evaluate(() => ({ made: window.__audio.made, plays: window.__audio.plays, sources: [...window.__audio.sources].length, src: [...window.__audio.sources][0] ?? '', t: document.querySelector('audio') ? 1 : 0 }))
+    check('film: playing — still ONE audio element, started once by the tap, from one source (a whole-file Blob), never restarted', during.made === 1 && during.plays === 1 && during.sources === 1 && during.src.startsWith('blob:'), JSON.stringify(during))
+    await page.waitForTimeout(7200) // the first picture change
+    const after = await page.evaluate(() => ({ made: window.__audio.made, plays: window.__audio.plays }))
+    check('film: after the first picture change the sound was NOT restarted or doubled', after.made === 1 && after.plays === 1, JSON.stringify(after))
+    check('film: no page errors (sound)', errs.length === 0, errs.join('; '))
+    await ctx.close()
+  }
+  {
+    // the browser blocks the sound: the pictures still play, and 「音を出す」 appears
+    const BLOCK = () => { HTMLMediaElement.prototype.play = function () { return Promise.reject(new DOMException('blocked', 'NotAllowedError')) } }
+    const { page, ctx, errs } = await open('ja', { init: BLOCK, reduced: false })
+    await T(page, 'cr-markbtn').click()
+    await T(page, 'cr-to-film').click()
+    await page.waitForFunction(() => document.querySelector('[data-testid=cr-film]')?.getAttribute('data-ready') === 'yes', null, { timeout: 15000 })
+    await T(page, 'cr-play').click()
+    await page.waitForTimeout(1200)
+    check('film: a blocked sound — the pictures play on (playing, a picture shown, its line) and the small button says 「音を出す」', (await T(page, 'cr-film').getAttribute('data-playing')) === 'yes' && (await T(page, 'cr-film').getAttribute('data-sound')) === 'blocked' && (await text(page, 'film-sound')) === '音を出す' && (await page.locator('.cr-ticks i.cr-on').count()) >= 1 && (await text(page, 'film-line')).length > 0)
+    check('film: no page errors (blocked sound)', errs.length === 0, errs.join('; '))
+    await ctx.close()
   }
 }
 

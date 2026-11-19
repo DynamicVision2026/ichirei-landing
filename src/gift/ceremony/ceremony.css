@@ -90,7 +90,7 @@
 
 /* the film */
 .cr-frame { position: absolute; left: 12px; right: 12px; top: 11%; aspect-ratio: 4 / 5; max-height: 52%; margin: 0 auto; overflow: hidden; background: #DDD6C6; box-shadow: 0 14px 28px rgba(40, 30, 15, .24); }
-.cr-pic { position: absolute; inset: 0; background-size: cover; background-position: center; opacity: 0; display: flex; align-items: center; justify-content: center; text-align: center; font-size: 15px; line-height: 1.6; color: var(--soft); padding: 16px; }
+.cr-pic { will-change: opacity, transform; backface-visibility: hidden; position: absolute; inset: 0; background-size: cover; background-position: center; opacity: 0; display: flex; align-items: center; justify-content: center; text-align: center; font-size: 15px; line-height: 1.6; color: var(--soft); padding: 16px; }
 .cr-capt { position: absolute; left: 0; right: 0; bottom: 0; margin: 0; padding: 44px 18px 16px; background: linear-gradient(rgba(239, 232, 216, 0), rgba(239, 232, 216, .94) 55%); font-family: var(--f-m); font-weight: 700; font-size: 20px; line-height: 1.4; color: var(--ink); opacity: 0; text-wrap: balance; }
 .cr-ticks { position: absolute; left: 12px; top: calc(11% - 14px); display: flex; gap: 6px; }
 .cr-ticks i { width: 44px; height: 2px; background: var(--line); }
@@ -144,3 +144,14 @@
   .cr *, .cr *::before, .cr *::after { animation-duration: .01s !important; animation-delay: 0s !important; }
   .cr .cr-ring { animation: none !important; opacity: .55; }
 }
+
+/* 2026-11-19: Japanese and Chinese ceremonies. Titles and the character stay Zen Old Mincho; the body is Noto Serif JP (Chinese: Noto Serif TC); nothing under 12 px. */
+.cr[data-cl='ja'] { --f-s: 'Noto Serif JP', 'ICHIREI Gothic', 'Hiragino Mincho ProN', 'Yu Mincho', serif; }
+.cr[data-cl='zh-Hant'], .cr[data-cl='zh-Hans'] { --f-s: 'Noto Serif TC', 'Songti TC', 'PMingLiU', serif; --f-m: 'ICHIREI Mincho', 'Noto Serif TC', 'Songti TC', serif; }
+.cr[data-cl='zh-Hans'] { --f-s: 'Noto Serif SC', 'Noto Serif TC', 'Songti SC', serif; --f-m: 'ICHIREI Mincho', 'Noto Serif SC', 'Songti SC', serif; }
+.cr[data-cl='ja'] .cr-h, .cr[data-cl='zh-Hant'] .cr-h, .cr[data-cl='zh-Hans'] .cr-h { line-height: 1.45; letter-spacing: .02em; }
+/* the poem, set vertically (right to left): one line per column */
+.cr-poem.cr-vert { writing-mode: vertical-rl; -webkit-writing-mode: vertical-rl; display: block; height: 300px; margin: 6px auto 0; width: max-content; max-width: 100%; text-align: start; }
+.cr-poem.cr-vert p { font-size: clamp(22px, 6.2vw, 25px); line-height: 1.9; letter-spacing: .16em; margin: 0 0 0 14px; white-space: nowrap; }
+.cr-poem.cr-vert p.cr-gap { margin-top: 0; margin-left: 30px; }
+.cr-pair-lines { display: flex; flex-direction: column; gap: 6px; align-items: center; }

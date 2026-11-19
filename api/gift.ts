@@ -24,7 +24,8 @@ import { loadArtwork, scrollReady } from '../engine/render/artwork.ts'
 import { makeScroll, scrollPdf } from '../engine/render/scroll.ts'
 import { makeOgImage } from '../engine/render/og.ts'
 import { makeCertificateCard, makeKeepsakeCard } from '../engine/render/keepsake.ts'
-import { certLine, certNumber, certPlace } from '../src/order/ceremony-cert.ts'
+import { CERT_WORDS, type CertLang } from '../src/order/ceremony-cert.ts'
+import { toTraditional } from '../engine/script.ts'
 import { cleanReading } from '../src/order/reading.ts'
 import { injectOg, ogKey, ogMeta } from '../engine/gift-share.ts'
 import { ensureFilmVideo, ensureShareFilm, filmComplete, filmVideoPath, serveBytes, shareFilmPath } from '../engine/film-video-store.ts'
@@ -220,17 +221,27 @@ async function keepsakeCardResponse(f: Found): Promise<Response> {
 /** The receiver's certificate as an image (the new English ceremony, screen 7). English, open, non-quiet gifts only. */
 async function certificateResponse(f: Found): Promise<Response> {
   const g = f.gift
-  if (g.language !== 'en' || g.memorial || isQuietPurpose(g.purpose)) return json(404, { error: 'not_offered' }, { 'cache-control': 'no-store' })
+  if (g.memorial || isQuietPurpose(g.purpose)) return json(404, { error: 'not_offered' }, { 'cache-control': 'no-store' })
   try {
+    const lang: CertLang = g.language === 'ja' || g.language === 'zh-Hant' || g.language === 'zh-Hans' ? g.language : 'en'
+    const C = CERT_WORDS[lang]
+    const date = g.opens_on ?? todayJst(new Date(g.created_at))
+    const english = lang === 'en'
+    // The server's Chinese font is Traditional only (Big5): a Simplified gift's certificate image is drawn in the Traditional forms of the same text (the page itself stays Simplified).
+    const t = (v: string): string => (lang === 'zh-Hans' ? toTraditional(v) : v)
     const png = await makeCertificateCard({
-      glyph: g.glyph,
-      reading: cleanReading(g.romanization.split(' / ')[0]),
-      word: (g.en?.word ?? g.meaning_en ?? '').trim(),
-      to: g.to,
-      from: g.from,
-      line: certLine(g.to, g.from),
-      number: certNumber(g.certificate_no ?? null),
-      place: certPlace(g.opens_on ?? todayJst(new Date(g.created_at))),
+      glyph: t(g.glyph),
+      // English the romaji; Japanese the kana reading; Chinese none (2026-11-19)
+      reading: english ? cleanReading(g.romanization.split(' / ')[0]) : lang === 'ja' ? cleanReading((g.reading ?? '').split(' / ')[0]) : '',
+      word: english ? (g.en?.word ?? g.meaning_en ?? '').trim() : '',
+      to: t(g.to ?? ''),
+      from: t(g.from ?? ''),
+      line: t(C.line(g.to, g.from)),
+      number: C.number(g.certificate_no ?? null),
+      place: t(C.place(date)),
+      lang,
+      toLine: english ? '' : t(C.toLine(g.to ?? '')),
+      fromLine: english ? '' : t(C.fromLine(g.from ?? '')),
     })
     return new Response(new Uint8Array(png), { status: 200, headers: headers({ 'content-type': 'image/png', 'content-disposition': 'attachment; filename="ichirei-certificate.png"', 'cache-control': 'private, no-store' }) })
   } catch (err) {

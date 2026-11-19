@@ -12,7 +12,9 @@ import type { EngineResult } from '../engine/contract.ts'
 import { LEGACY_RETURN_CHARS, RETURN_CHARS, isReturnChar, returnWord } from '../src/order/return-chars.ts'
 import { certLine, certNumber, certPlace } from '../src/order/ceremony-cert.ts'
 import { newCeremony } from '../src/gift/ceremony/switch.ts'
-import { CER, allCeremonyText } from '../src/gift/ceremony/copy.ts'
+import { CER as CERS, allCeremonyText } from '../src/gift/ceremony/copy.ts'
+
+const CER = CERS.en
 import type { GiftView } from '../src/animation/types.ts'
 
 let failures = 0
@@ -52,7 +54,7 @@ function check(name: string, cond: boolean, detail?: string) {
 {
   const base = { locked: false, language: 'en', memorial: false, purpose: 'thanks' } as unknown as GiftView
   check('switch: an English, open, non-quiet gift gets the new ceremony', newCeremony(base) === true && newCeremony({ ...base, purpose: 'celebrate' }) === true && newCeremony({ ...base, purpose: null }) === true)
-  check('switch: Japanese and Chinese gifts keep today\'s ceremony', newCeremony({ ...base, language: 'ja' }) === false && newCeremony({ ...base, language: 'zh-Hant' }) === false && newCeremony({ ...base, language: 'zh-Hans' } as unknown as GiftView) === false)
+  check('switch (2026-11-19): Japanese and Chinese open gifts open on the new ceremony too — one product, three languages', newCeremony({ ...base, language: 'ja' }) === true && newCeremony({ ...base, language: 'zh-Hant' }) === true && newCeremony({ ...base, language: 'zh-Hans' } as unknown as GiftView) === true)
   check('switch: remembrance and the quiet purposes (apology, encouragement) keep today\'s ceremony', newCeremony({ ...base, memorial: true }) === false && newCeremony({ ...base, purpose: 'apology' }) === false && newCeremony({ ...base, purpose: 'encourage' }) === false && newCeremony({ ...base, purpose: 'memorial' }) === false)
   check('switch: a locked gift keeps today\'s sealed envelope', newCeremony({ locked: true, language: 'en', memorial: false } as never) === false)
 }
