@@ -5722,8 +5722,10 @@ for (const [lang, locale, text] of [['en', 'en-US', 'Your gift is being finished
     await T(page, 'promo-note-steps').scrollIntoViewIfNeeded(); await new Promise((r) => setTimeout(r, 350))
     check('the other start buttons carry the free gift too (en): under "Try it free" (How it works) and under the closing button — one quiet line and a "Hold my free gift" link', (await T(page, 'promo-note-steps').innerText()).startsWith('Free today with Days of Thanks: 37 of today') && (await T(page, 'promo-note-hold-steps').innerText()) === 'Hold my free gift' && (await T(page, 'promo-note-closing').count()) === 1)
     await T(page, 'promo-hold-gifts').click()
-    await page.waitForTimeout(900)
-    const focus = await page.evaluate(() => { const a = document.activeElement; const box = document.querySelector('[data-testid=hero-thanks]'); const r = box.getBoundingClientRect(); return { onEmail: a?.getAttribute('data-testid') === 'thanks-email', inBox: !!a && box.contains(a), visible: r.top >= -2 && r.bottom <= window.innerHeight + 2 } })
+    // the page scrolls smoothly: wait until the box is in view (up to 6 s) instead of a fixed pause, so a slow machine does not fail a scroll that is still on its way
+    const readFocus = () => page.evaluate(() => { const a = document.activeElement; const box = document.querySelector('[data-testid=hero-thanks]'); const r = box.getBoundingClientRect(); return { onEmail: a?.getAttribute('data-testid') === 'thanks-email', inBox: !!a && box.contains(a), visible: r.top >= -2 && r.bottom <= window.innerHeight + 2 } })
+    let focus = await readFocus()
+    for (let k = 0; k < 24 && !(focus.onEmail && focus.inBox && focus.visible); k++) { await page.waitForTimeout(250); focus = await readFocus() }
     check('"Hold my free gift" scrolls to the hero\'s free-gift box and puts the cursor in its email field', focus.onEmail && focus.inBox && focus.visible, JSON.stringify(focus))
     await page.screenshot({ path: `${SHOTS}/landing-en-hold-1280.png` })
     check('no page errors (run 39, en promotion on)', errors.length === 0, errors.join('; '))

@@ -101,6 +101,33 @@ const rich = (s: string) => s.replace(/<[^>]+>/g, '')
   check('(4) English keeps the sale until SALE_UNTIL_EN (a US buyer\'s evening of the last day), Japanese ends with SALE_UNTIL', enLast.amount === '17.50' && jaLast.amount === '3980', `${enLast.amount} ${jaLast.amount}`)
 }
 
+// ---- 4b. Google merchant-listing fields (2026-11-19): shipping, return policy, the sale price with its dates ----------------------------------------------------
+{
+  const ld = (lang: LandingLang, now: Date, env = LIVE) => {
+    const h = head(page(lang, env, now))
+    return { raw: h, j: JSON.parse(/<script type="application\/ld\+json">(.*?)<\/script>/s.exec(h)?.[1] ?? '{}') }
+  }
+  const MARKET = { ja: { cur: 'JPY', country: 'JP', sale: '2786', regular: '3980' }, en: { cur: 'USD', country: 'US', sale: '17.50', regular: '25.00' }, 'zh-Hant': { cur: 'JPY', country: 'JP', sale: '2786', regular: '3980' } } as const
+  for (const lang of ['ja', 'en', 'zh-Hant'] as const) {
+    const m = MARKET[lang]
+    const { j, raw } = ld(lang, DURING)
+    const o = j.offers
+    check(`(4b) ${lang}: the JSON-LD parses and offers carries shippingDetails — rate 0 in ${m.cur}, destination ${m.country}, handling and transit 0 days`, o?.shippingDetails?.['@type'] === 'OfferShippingDetails' && o.shippingDetails.shippingRate.value === 0 && o.shippingDetails.shippingRate.currency === m.cur && o.shippingDetails.shippingRate['@type'] === 'MonetaryAmount' && o.shippingDetails.shippingDestination['@type'] === 'DefinedRegion' && o.shippingDetails.shippingDestination.addressCountry === m.country && ['handlingTime', 'transitTime'].every((k) => o.shippingDetails.deliveryTime[k].minValue === 0 && o.shippingDetails.deliveryTime[k].maxValue === 0 && o.shippingDetails.deliveryTime[k].unitCode === 'DAY' && o.shippingDetails.deliveryTime[k]['@type'] === 'QuantitativeValue') && o.shippingDetails.deliveryTime['@type'] === 'ShippingDeliveryTime', JSON.stringify(o?.shippingDetails))
+    check(`(4b) ${lang}: hasMerchantReturnPolicy is MerchantReturnNotPermitted for ${m.country}`, o.hasMerchantReturnPolicy?.['@type'] === 'MerchantReturnPolicy' && o.hasMerchantReturnPolicy.applicableCountry === m.country && o.hasMerchantReturnPolicy.returnPolicyCategory === 'https://schema.org/MerchantReturnNotPermitted', JSON.stringify(o.hasMerchantReturnPolicy))
+    const ps = o.priceSpecification
+    check(`(4b) ${lang}: during the sale price is ${m.sale}, priceValidUntil is 2026-11-30, and priceSpecification has TWO entries: the sale price with validFrom / validThrough, then the regular ${m.regular} from 2026-12-01 as the ListPrice`, o.price === m.sale && o.priceValidUntil === '2026-11-30' && Array.isArray(ps) && ps.length === 2 && ps.every((x: any) => x['@type'] === 'UnitPriceSpecification' && x.priceCurrency === m.cur) && ps[0].price === m.sale && typeof ps[0].validFrom === 'string' && typeof ps[0].validThrough === 'string' && ps[1].price === m.regular && ps[1].validFrom === '2026-12-01' && ps[1].priceType === 'https://schema.org/ListPrice' && !('validThrough' in ps[1]), JSON.stringify(ps))
+    const after = ld(lang, new Date('2026-12-02T12:00:00Z')).j.offers
+    check(`(4b) ${lang}: on 2026-12-02 one regular price ${m.regular}, no priceValidUntil, no sale entry; shipping and returns stay`, after.price === m.regular && !('priceValidUntil' in after) && !('priceSpecification' in after) && !!after.shippingDetails && !!after.hasMerchantReturnPolicy, JSON.stringify(after))
+    check(`(4b) ${lang}: no aggregateRating and no review anywhere in the page's data`, !/aggregateRating|"review"|"Review"|"Rating"/.test(raw) && !('aggregateRating' in j) && !('review' in j) && !('aggregateRating' in o) && !('review' in o))
+  }
+  const en = ld('en', DURING).j.offers.priceSpecification
+  const ja = ld('ja', DURING).j.offers.priceSpecification
+  check('(4b) the sale\'s dates are real local times with their offset: English from the sale\'s start to 2026-11-30 23:59:59 US Eastern; Japanese and Chinese from 2026-11-13 00:00 to 2026-11-30 23:59:59 Japan time', en[0].validFrom === '2026-11-12T10:00:00-05:00' && en[0].validThrough === '2026-11-30T23:59:59-05:00' && ja[0].validFrom === '2026-11-13T00:00:00+09:00' && ja[0].validThrough === '2026-11-30T23:59:59+09:00', JSON.stringify([en[0], ja[0]]))
+  const shifted = ld('en', DURING, { ...LIVE, SALE_UNTIL: '2026-12-05', SALE_UNTIL_EN: '', SALE_FROM: '2026-11-16', USD_PRICE_EGIFT: '30', USD_PRICE_EGIFT_SALE: '21' } as NodeJS.ProcessEnv).j.offers
+  check('(4b) nothing is hard-coded: another end date, start date and prices in the settings change the dates and the amounts', shifted.priceValidUntil === '2026-12-05' && shifted.priceSpecification[0].price === '21.00' && shifted.priceSpecification[1].price === '30.00' && shifted.priceSpecification[1].validFrom === '2026-12-06' && shifted.priceSpecification[0].validFrom === '2026-11-15T10:00:00-05:00' && shifted.priceSpecification[0].validThrough === '2026-12-05T09:59:59-05:00', JSON.stringify(shifted))
+  check('(4b) the free-gift line of the page text is untouched and free gifts are not a price in the data', rich(page('en')).includes("hold one of today's free gifts") && !JSON.stringify(ld('en', DURING).j).includes('"price":"0') && !JSON.stringify(ld('ja', DURING).j).includes('"price":"0"'))
+}
+
 // ---- 5. escaping -----------------------------------------------------------------------------------------------------------------------------------------------
 {
   const share = { ...landingShare('en', NO_ENV), paragraph: 'A <b>bold</b> "claim" & </script><script>alert(1)</script>', title: 'T </script>' }

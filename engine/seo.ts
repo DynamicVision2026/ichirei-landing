@@ -44,6 +44,34 @@ export interface LandingPrice {
   line: string
   /** The last day of the sale (YYYY-MM-DD) while one is on. */
   validUntil: string | null
+  /** The regular price, in the same form as `amount` ("25.00", "3980"): what the page asks outside the sale. */
+  regular: string
+  /** While the sale is on: when it starts and ends, as local times with their offset (ja / zh: Japan time; en: US Eastern time, the zone the English launch line names), and the first day of the regular price. */
+  sale: { from: string; through: string; regularFrom: string } | null
+  /** The market this page's prices and checkout are in (Google's merchant-listing fields): JPY / JP for / and /zh, USD / US for /en. */
+  country: 'JP' | 'US'
+}
+
+/** A moment as a local ISO time with its offset in `timeZone` ("2026-11-30T23:59:59-05:00"). Whole seconds. */
+export function isoIn(ms: number, timeZone: string): string {
+  const whole = Math.floor(ms / 1000) * 1000
+  const f = new Intl.DateTimeFormat('en-CA', { timeZone, hourCycle: 'h23', year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', second: '2-digit' })
+  const p: Record<string, string> = {}
+  for (const x of f.formatToParts(new Date(whole))) p[x.type] = x.value
+  const local = Date.UTC(Number(p.year), Number(p.month) - 1, Number(p.day), Number(p.hour), Number(p.minute), Number(p.second))
+  const off = Math.round((local - whole) / 60000)
+  const a = Math.abs(off)
+  return `${p.year}-${p.month}-${p.day}T${p.hour}:${p.minute}:${p.second}${off < 0 ? '-' : '+'}${String(Math.floor(a / 60)).padStart(2, '0')}:${String(a % 60).padStart(2, '0')}`
+}
+const dayAfter = (day: string): string => new Date(Date.parse(`${day}T00:00:00Z`) + 86_400_000).toISOString().slice(0, 10)
+
+/** The yen pages' regular price, sale window (Japan time) and market. */
+function jpyFacts(sale: ReturnType<typeof saleOn>): Pick<LandingPrice, 'regular' | 'sale' | 'country'> {
+  return {
+    regular: String(PACKAGE_PRICE_JPY.egift),
+    sale: sale ? { from: isoIn(Date.parse(sale.starts_at), 'Asia/Tokyo'), through: isoIn(Date.parse(sale.ends_at), 'Asia/Tokyo'), regularFrom: dayAfter(sale.until) } : null,
+    country: 'JP',
+  }
 }
 
 /** What the landing page of this language asks right now: the sale and the promotion by the clock, the prices from the settings. */
@@ -56,14 +84,23 @@ export function landingPrice(lang: LandingLang, env: NodeJS.ProcessEnv = process
     const price = sale ? dollars.egift_sale : dollars.egift
     // the second argument is the plain price line: while the free gifts are on, the line leads with "If today's free gifts are gone"
     const line = promoPriceLine('en', !freeGifts, dollars, sale)
-    return { amount: price.toFixed(2), currency: 'USD', line: freeGifts ? `${LANDING_WORDS.en.freeLine} ${line}` : line, validUntil: sale?.until ?? null }
+    const tz = 'America/New_York'
+    return {
+      amount: price.toFixed(2),
+      currency: 'USD',
+      line: freeGifts ? `${LANDING_WORDS.en.freeLine} ${line}` : line,
+      validUntil: sale?.until ?? null,
+      regular: dollars.egift.toFixed(2),
+      sale: sale ? { from: isoIn(Date.parse(sale.starts_at), tz), through: isoIn(Date.parse(sale.en_ends_at ?? sale.ends_at), tz), regularFrom: dayAfter(sale.until) } : null,
+      country: 'US',
+    }
   }
   const yen = sale ? salePriceJpy(PACKAGE_PRICE_JPY.egift, sale.percent) : PACKAGE_PRICE_JPY.egift
   if (lang === 'ja') {
     const line = promoPriceLine('ja', !freeGifts, dollars, sale)
-    return { amount: String(yen), currency: 'JPY', line: freeGifts ? `${LANDING_WORDS.ja.freeLine}${line}` : line, validUntil: sale?.until ?? null }
+    return { amount: String(yen), currency: 'JPY', line: freeGifts ? `${LANDING_WORDS.ja.freeLine}${line}` : line, validUntil: sale?.until ?? null, ...jpyFacts(sale) }
   }
-  return { amount: String(yen), currency: 'JPY', line: sale ? `${formatYen(yen)}　${saleLine(sale, 'zh-Hant')}` : formatYen(yen), validUntil: sale?.until ?? null }
+  return { amount: String(yen), currency: 'JPY', line: sale ? `${formatYen(yen)}　${saleLine(sale, 'zh-Hant')}` : formatYen(yen), validUntil: sale?.until ?? null, ...jpyFacts(sale) }
 }
 
 const HREFLANG: ReadonlyArray<readonly [string, LandingLang | 'x-default', string]> = [
@@ -89,6 +126,25 @@ export function landingExtras(lang: LandingLang, s: LandingShare, env: NodeJS.Pr
     availability: 'https://schema.org/InStock',
   }
   if (price.validUntil) offer.priceValidUntil = price.validUntil
+  // Google's merchant-listing fields (2026-11-19): the e-gift is digital and arrives the same day, and is not returnable (the 24-hour cancellation stays in the page text and on /legal)
+  offer.shippingDetails = {
+    '@type': 'OfferShippingDetails',
+    shippingRate: { '@type': 'MonetaryAmount', value: 0, currency: price.currency },
+    shippingDestination: { '@type': 'DefinedRegion', addressCountry: price.country },
+    deliveryTime: {
+      '@type': 'ShippingDeliveryTime',
+      handlingTime: { '@type': 'QuantitativeValue', minValue: 0, maxValue: 0, unitCode: 'DAY' },
+      transitTime: { '@type': 'QuantitativeValue', minValue: 0, maxValue: 0, unitCode: 'DAY' },
+    },
+  }
+  offer.hasMerchantReturnPolicy = { '@type': 'MerchantReturnPolicy', applicableCountry: price.country, returnPolicyCategory: 'https://schema.org/MerchantReturnNotPermitted' }
+  // while the sale price runs: the sale price with its dates, then the regular price from the day after (by the clock, like the price line); outside the sale there is just the regular price
+  if (price.sale) {
+    offer.priceSpecification = [
+      { '@type': 'UnitPriceSpecification', price: price.amount, priceCurrency: price.currency, validFrom: price.sale.from, validThrough: price.sale.through },
+      { '@type': 'UnitPriceSpecification', price: price.regular, priceCurrency: price.currency, validFrom: price.sale.regularFrom, priceType: 'https://schema.org/ListPrice' },
+    ]
+  }
   const product = {
     '@context': 'https://schema.org',
     '@type': 'Product',
