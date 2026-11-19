@@ -1,4 +1,4 @@
-ICHIREI — Film Script Prompt (v2, spec v9.4)
+ICHIREI — Film Script Prompt (v3, spec v9.4; the sender's named moment, the story's own places and the people, 2026-11-19)
 
 This prompt writes the SCRIPT of a 30-second film that retells the sender's own story in four short scenes: four lines of text and, for each, a description of the picture a painter will paint for it. The film ends with the chosen character as the answer. Nothing here picks a character; it tells the story that leads to it. Reply with one JSON object only.
 
@@ -9,8 +9,12 @@ direction: {{ DIRECTION }}
 occasion: {{ OCCASION }}
 occasion_detail: {{ OCCASION_DETAIL }}
 remembrance: {{ MEMORIAL }}
+receiver_gender: {{ RECEIVER_GENDER }}
+sender_gender: {{ SENDER_GENDER }}
 
 relationship and direction describe who the RECEIVER is to the SENDER (direction: up = older or senior, down = younger or in the sender's care, across = an equal). `unspecified` is not to be guessed.
+
+receiver_gender and sender_gender are `man`, `woman` or `unknown`. The harness has already decided them in this order: what the sender chose themselves, then a clear word of the story (he / she, mother / father, wife / husband, son / daughter; 彼 / 彼女, 父 / 母, 夫 / 妻, 息子 / 娘; 他 / 她, 爸爸 / 媽媽 …), and otherwise `unknown`. Take them as given (rule 7, PEOPLE).
 
 THE CHARACTER THAT WILL BE SHOWN AT THE END (do not write it, do not hint at it)
 character: {{ KANJI }}
@@ -24,11 +28,12 @@ THE STORY (the sender's own words; the receiver is the person they describe)
 
 WHAT TO WRITE
 STEP 1 — READ THE WHOLE STORY, TO ITS LAST WORD, BEFORE YOU CHOOSE ANYTHING. A long story is not its first half. Then name the TURNING POINT: the moment the sender saw who this person really was — a discovery, an act, a sentence. Return it as `turning_point`: ONE short line, in the language of the lines, using the story's own words (no names). It is kept in a log and never shown.
+  THE MOMENT THE SENDER NAMES WINS. When the sender says which moment stays with them — ja 最も心に残っている / 一番覚えている / 忘れられない / 今でも思い出す; en "what I remember most", "I'll never forget", "the moment …"; zh 最難忘 / 印象最深 / 最記得 (and 最难忘 / 印象最深 / 最记得) — THAT moment is the turning point, whatever else the story holds. It gets scene 3 (the act itself) and scene 4 (its after: what the sender did or saw next), and both pictures keep that moment's own place and objects exactly as the story names them (the road crossed, the place waited at, the thing held) — never a different place that merely fits the feeling.
 STEP 2 — FOUR SCENES, FOLLOWING THIS ARC (not just "the first four things that happen"):
   1. BEFORE — the relationship as it seemed, before the turning point.
   2. LEAD-UP — the moment that leads to the discovery.
-  3. THE TURNING POINT (required) — scene 3 shows `turning_point` directly: the discovery, the act or the sentence itself.
-  4. AFTER — the image the story ends on, or what remains. Scene 4 must be RESOLVED: never end on a setup, a question, a cliff-hanger or an object still waiting to be opened, developed or answered. If the story ends on such a moment, scene 4 is the answer the story gives afterwards.
+  3. THE TURNING POINT (required) — scene 3 shows `turning_point` directly: the discovery, the act or the sentence itself (when the sender named the moment that stays with them, this is that moment's act, in its own place).
+  4. AFTER — the image the story ends on, or what remains (when the sender named the moment that stays with them, what comes right after it, in the same place). Scene 4 must be RESOLVED: never end on a setup, a question, a cliff-hanger or an object still waiting to be opened, developed or answered. If the story ends on such a moment, scene 4 is the answer the story gives afterwards.
   A SHORT STORY (one or two sentences, fewer than four different moments) has no arc to find, and it STILL gets four pictures. FOUR PICTURES FROM ANY MOMENT: always plan exactly four pictures. When the moment has four distinct steps, follow them in order. When it has fewer (often only one or two sentences), show the same moment from different angles, in this order of preference:
     1. the place: a wide, quiet view of where it happened;
     2. the hands or the object: a close view of the thing at the heart of the moment (the bag of orange slices, the porch light, the steering wheel), with no writing on it;
@@ -54,6 +59,10 @@ RULES
 7. FOUR PICTURES, FOUR DIFFERENT MOMENTS. For each line write one picture description, in ENGLISH whatever the language of the lines, 15–40 words. It describes ONE moment from the story, the moment of its line, for an ink-wash painter: the people (only as silhouettes, as hands, or seen from behind), the key object or action, the place, the season and the light. Example: "a mother's hand placing one spring flower on an open bento box, soft morning window light". Rules for the pictures:
    - ONLY WHAT THE STORY SAYS. No new object, place or person.
    - CONCRETE, STORY-SPECIFIC OBJECTS. Each description names at least one object or place that appears in the story's own words (for example "a stack of prints with handwritten place names", "a flat rock at the edge of an inlet", "an old film camera on a boat shelf"). No generic props (a window, a table, a cup of tea, flowers, a path, a sunset) unless the story itself names them.
+   - THE STORY'S OWN PLACES, NEVER A SUBSTITUTE. Every place in a picture is a place the story names; when the story names none, the place stays plain and unnamed (soft light on a wall, a quiet path). The world text below only says how a NAMED place looks in the buyer's country; it never decides what is shown. Never put a genkan, shoes at the step, a vending machine, a bus stop, a convenience store, a park or a station in a picture unless the story names it. The place where the story's key moment happens is the place of that picture, with the objects the story gives it.
+   - A FEELING GETS A CONCRETE ACT. When a line states a feeling (feeling safe, grateful, reassured, understood), its picture shows what the sender DID or SAW that made them feel it — an act, a hand, an object, a place from the story — never a mood picture alone (an empty street, a view, a sky, light, weather).
+   - PEOPLE: COUNT, ROLE, GENDER, ROUGH AGE. Whenever a person is in a picture, the description says how many people there are, who each is (the sender, the receiver, a role the story gives) and, when it is known, whether a man or a woman and roughly how old (a child, a young adult, a middle-aged or an older person): for example "two figures seen from behind, an older man and a younger man, side by side". Gender comes ONLY from receiver_gender / sender_gender above or from the story's own pronouns and relation words (he, she, mother, father, wife, husband, son, daughter; 彼, 彼女, 父, 母, 夫, 妻; 他, 她, 爸爸, 媽媽). NEVER guess it from a job, a role or a word that does not tell: ja 先生, 上司, 先輩, 友達, 同僚, パートナー, 恋人; en friend, teacher, boss, partner; zh 老師, 朋友, 同事 (and 老师, 同事). When the gender is `unknown`, the figure is drawn so that it reads as neither a woman nor a man — "a person", or "a figure seen from far behind in a plain coat, with short hair and no skirt", with no beard and no gendered clothing — and the description does not say man or woman. When a person is a man or a woman, say so, and keep the same for every picture.
+   - ORDINARY ADULT THINGS ARE DRAWN PLAINLY. A cigarette, a smoking area, a glass of beer or wine, a cup of sake: when the story has them, the picture shows them plainly and with taste, as one ordinary part of the moment (a hand with a cigarette, a standing ashtray, a can on a table). Never leave out the place or the object that makes the moment because it is a smoking area or a drink. Write the place and the object first and the angle second, so that if the painter refuses a picture the rewrite can keep the place and change only the angle or the distance.
    - CLOTHES AND SETTING. People wear contemporary everyday clothes — never a kimono, yukata, hanbok, qipao or any other traditional dress unless the story mentions it. The setting is the buyer's own modern world, by the language above: ja → a modern Japanese home and town; zh-Hant / zh-Hans → a modern Taiwanese, Hong Kong or Chinese home and street (never Japanese houses, paper lanterns, tatami, shoji or torii); en → a neutral modern home. If the story names a place or a culture, follow the story.
    - NO RELIGIOUS SYMBOLS: no cross (also not one made by a window frame or a shadow), no Buddhist altar, shrine, temple, torii, prayer beads or any other religious sign — unless the story itself mentions it. This matters most in a remembrance film: show a quiet table, a window, hands, a chair, never an altar.
    - NO FACES. A person appears ONLY as hands, or seen from behind, or from far away as a small silhouette — never close enough to show a face. Never show a face, not even in profile. Never write smile, eyes, expression, profile, looking at, facing or any feature of a face.
@@ -63,6 +72,13 @@ RULES
    - NO knife, blade, weapon, fight or quarrel in a picture, in word or in image (a work tool is a plane, a chisel, sandpaper, a ruler; a quarrel is told by its quiet aftermath: a table laid for one more, a door left unlatched, two cups).
    - Four different moments, following the arc above (a short story: four views of its one moment, as in step 2). Do not name or hint at the chosen character.
    - NOTHING ADDED: a person, an animal or an object that the story does not name is never in a picture (no extra child, no dog, no bicycle, no umbrella "for atmosphere").
+
+EXAMPLE (how the rules work together, not a template: its places and objects belong to THAT story only and are never copied into another). A story about an older accountant who patiently explained things and drew diagrams for the sender, and about the moment the sender remembers most: when the sender wanted a cigarette the accountant said "let's take a short break", walked slowly beside the sender to the smoking area across the road, waited quietly outside, and walked back with them. receiver_gender: man; sender_gender: man. The turning point is that break, so scenes 3 and 4 are the walk and the waiting:
+  1. BEFORE — "an older man's hand drawing a diagram on paper for a younger man, a phone beside them, at a desk in an office"
+  2. LEAD-UP — "an older man standing beside a younger man's desk, as if saying let's take a short break, both men rising, rows of office desks"
+  3. TURNING POINT — "two men seen from behind crossing a narrow road side by side at a slow pace, the older one in a suit walking at the younger one's pace, a small smoking shelter on the far side"
+  4. AFTER — "the older man standing quietly outside a small smoking shelter, hands folded, while the younger man smokes inside, a thin line of smoke, late afternoon light"
+(a feeling line such as "the silence was warm" would get the picture of the two men walking back side by side, never an empty street or a bystander; had sender_gender been unknown, the younger man would be "a younger person".)
 {{ FEEDBACK }}
 
 OUTPUT. Reply with exactly one JSON object and nothing else (no code fence, no commentary):

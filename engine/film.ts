@@ -15,7 +15,8 @@ import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { callSignal, timedOut } from './limits.ts'
 import { DEFAULT_REVIEW_MODEL } from './engine.ts'
-import type { Language } from './contract.ts'
+import type { Gender, Language } from './contract.ts'
+import { peopleOf } from './film-people.ts'
 import { loadPalette, type Palette } from './palette.ts'
 import { kanaFixWords, loadTokenizer } from './kana.ts'
 import { EN_FORBIDDEN } from './poem-check.ts'
@@ -71,6 +72,9 @@ export interface FilmInput {
   forms: string[]
   /** The forms of the gift character ONLY, when the film is made for a known pick (the preview's draft). Without it every form in `forms` counts as the gift character. */
   chosen?: string[]
+  /** The sender's optional taps of the optional form row (2026-11-19): who is in the pictures. Only for drawing the people of the film; never logged. Absent = not given. */
+  receiver_gender?: Gender | null
+  sender_gender?: Gender | null
   /** "Who they are": the card's one line. */
   who: string
   /** "Your moment": the sender's own words as the card quotes them (the fallback script's first line). */
@@ -306,14 +310,14 @@ export function parseArcVerdict(raw: Record<string, unknown> | null): ArcVerdict
 
 export function arcFeedback(v: ArcVerdict): string {
   const what: Record<string, string> = {
-    scene3: 'Scene 3 must show the turning point itself (the discovery, the act or the sentence where the sender saw who this person really was), in both its line and its picture.',
-    scene4: 'Scene 4 must be resolved: the image the story ends on or what remains — never a setup, a question, a cliff-hanger or something still waiting to be opened or developed; and it must come from the END of the story, not the first half.',
-    concrete: 'Each picture description must name at least one concrete object or place from the story\'s own words — no generic props.',
+    scene3: 'Scene 3 must show the turning point itself (the discovery, the act or the sentence where the sender saw who this person really was), in both its line and its picture. When the sender named the moment that stays with them (最も心に残っている, 一番覚えている, 忘れられない, "what I remember most", "I\'ll never forget", 最難忘, 印象最深 …), that moment is the turning point: its act, in the place and with the objects the story gives it.',
+    scene4: 'Scene 4 must be resolved: the image the story ends on or what remains — never a setup, a question, a cliff-hanger or something still waiting to be opened or developed; and it must come from the END of the story, not the first half. When the sender named the moment that stays with them, scene 4 is that moment\'s after, in the same place.',
+    concrete: 'Each picture description must name at least one concrete object or place from the story\'s own words — no generic props, and never a place the story does not name (a genkan with shoes, a vending machine, a bus stop, a convenience store, a park, a station). A line that states a feeling gets a picture of what the sender did or saw, not a mood picture.',
   }
   return `\nA SECOND READER CHECKED YOUR SCRIPT AGAINST THE STORY'S ARC AND IT FAILED — write a new script (read the whole story to its last word again) that fixes this:\n${v.failed.map((f) => `- ${what[f]}`).join('\n')}\n${v.reason ? `- The reader's note: ${v.reason}\n` : ''}`
 }
 
-export const FILM_SLOTS = ['LANGUAGE', 'RELATIONSHIP', 'DIRECTION', 'OCCASION', 'OCCASION_DETAIL', 'MEMORIAL', 'KANJI', 'WHO', 'STORY', 'LINE_LIMITS', 'FEEDBACK'] as const
+export const FILM_SLOTS = ['LANGUAGE', 'RELATIONSHIP', 'DIRECTION', 'OCCASION', 'OCCASION_DETAIL', 'MEMORIAL', 'RECEIVER_GENDER', 'SENDER_GENDER', 'KANJI', 'WHO', 'STORY', 'LINE_LIMITS', 'FEEDBACK'] as const
 
 export function loadFilmPrompt(): string {
   const text = readSibling('film-prompt.md', process.env.ICHIREI_FILM_PROMPT_PATH)
@@ -334,6 +338,8 @@ export function buildFilmPrompt(input: FilmInput, feedback = ''): string {
     OCCASION: input.occasion ?? 'unspecified',
     OCCASION_DETAIL: input.occasion_detail ?? 'unspecified',
     MEMORIAL: input.memorial ? 'yes — the receiver has died; tell the story in the remembering voice' : 'no',
+    RECEIVER_GENDER: peopleOf(input).receiver,
+    SENDER_GENDER: peopleOf(input).sender,
     KANJI: input.glyph,
     WHO: input.who,
     STORY: input.story,
@@ -420,7 +426,7 @@ interface Scene {
   picture: string
 }
 
-export const SCENE_SLOTS = ['LANGUAGE', 'LINE_LIMITS', 'STORY', 'SCENES', 'INDEX', 'FAILED', 'DROP', 'SAFE', 'FORBIDDEN'] as const
+export const SCENE_SLOTS = ['LANGUAGE', 'RECEIVER_GENDER', 'SENDER_GENDER', 'LINE_LIMITS', 'STORY', 'SCENES', 'INDEX', 'FAILED', 'DROP', 'SAFE', 'FORBIDDEN'] as const
 export function loadScenePrompt(): string {
   const text = readSibling('film-scene-prompt.md', process.env.ICHIREI_FILM_SCENE_PROMPT_PATH)
   const missing = SCENE_SLOTS.filter((x) => !text.includes(`{{ ${x} }}`))
@@ -480,6 +486,8 @@ export async function makeFilm(input: FilmInput, opts: FilmOptions = {}): Promis
       const listed = scenes.map((sc, k) => `${k + 1}${k === i ? ' (FAILED)' : ''}. line: ${sc.line.replace(/\n/g, ' ')}\n   picture: ${sc.picture}`).join('\n')
       const built = (input.tone ? `${input.tone}\n\n` : '') + fill(loadScenePrompt(), {
         LANGUAGE: input.language,
+        RECEIVER_GENDER: peopleOf(input).receiver,
+        SENDER_GENDER: peopleOf(input).sender,
         LINE_LIMITS: lineLimitText(input.language),
         STORY: input.story,
         SCENES: listed,

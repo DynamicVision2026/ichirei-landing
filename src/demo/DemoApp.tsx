@@ -433,7 +433,7 @@ export default function DemoApp({ mode = 'harness', aside }: { mode?: Mode; asid
       else saveDraft(draftOf(story, context, questionId))
     }, 400)
     return () => window.clearTimeout(id)
-  }, [customer, draftOffer, story, context.relationship, context.direction, context.occasion, context.purpose, context.purposeOther, context.state, context.stateOther, context.relationshipOther, context.occasionDetail, context.reader, questionId]) // eslint-disable-line react-hooks/exhaustive-deps
+  }, [customer, draftOffer, story, context.relationship, context.direction, context.occasion, context.purpose, context.purposeOther, context.state, context.stateOther, context.relationshipOther, context.receiverGender, context.senderGender, context.occasionDetail, context.reader, questionId]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const changeCondition = (c: Condition) => {
     if (c === condition) return
@@ -644,7 +644,7 @@ export default function DemoApp({ mode = 'harness', aside }: { mode?: Mode; asid
             data-testid="draft-continue"
             onClick={() => {
               setStory(draftOffer.story)
-              setContextState((c) => ({ ...c, relationship: draftOffer.relationship, direction: draftOffer.direction, occasion: draftOffer.occasion, purpose: (draftOffer.purpose ?? '') as GiftContext['purpose'], purposeOther: draftOffer.purposeOther ?? '', state: (draftOffer.state ?? '') as GiftContext['state'], stateOther: draftOffer.stateOther ?? '', relationshipOther: draftOffer.relationshipOther ?? '', occasionDetail: draftOffer.occasionDetail, reader: draftOffer.reader as GiftContext['reader'] }))
+              setContextState((c) => ({ ...c, relationship: draftOffer.relationship, direction: draftOffer.direction, occasion: draftOffer.occasion, purpose: (draftOffer.purpose ?? '') as GiftContext['purpose'], purposeOther: draftOffer.purposeOther ?? '', state: (draftOffer.state ?? '') as GiftContext['state'], stateOther: draftOffer.stateOther ?? '', relationshipOther: draftOffer.relationshipOther ?? '', receiverGender: (draftOffer.receiverGender ?? '') as GiftContext['receiverGender'], senderGender: (draftOffer.senderGender ?? '') as GiftContext['senderGender'], occasionDetail: draftOffer.occasionDetail, reader: draftOffer.reader as GiftContext['reader'] }))
               setQuestionId(draftOffer.questionId)
               trackFlow('draft_restored', { language: context.language })
               setDraftOffer(null)

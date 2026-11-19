@@ -21,12 +21,15 @@ export interface Draft {
   state?: string
   stateOther?: string
   relationshipOther?: string
+  /** 2026-11-19: the optional taps of who is in the pictures ('' = not given). Kept only in this browser with the draft. */
+  receiverGender?: string
+  senderGender?: string
   /** Part B: where the receiver will read it ('' = same as the sender). */
   reader: string
   questionId: string | null
 }
 
-export const draftOf = (story: string, ctx: Pick<GiftContext, 'relationship' | 'direction' | 'occasion' | 'occasionDetail' | 'reader' | 'purpose' | 'purposeOther' | 'state' | 'stateOther' | 'relationshipOther'>, questionId: string | null, now: number = Date.now()): Draft => ({
+export const draftOf = (story: string, ctx: Pick<GiftContext, 'relationship' | 'direction' | 'occasion' | 'occasionDetail' | 'reader' | 'purpose' | 'purposeOther' | 'state' | 'stateOther' | 'relationshipOther' | 'receiverGender' | 'senderGender'>, questionId: string | null, now: number = Date.now()): Draft => ({
   v: 1,
   savedAt: now,
   story,
@@ -39,6 +42,8 @@ export const draftOf = (story: string, ctx: Pick<GiftContext, 'relationship' | '
   state: ctx.state ?? '',
   stateOther: ctx.stateOther ?? '',
   relationshipOther: ctx.relationshipOther ?? '',
+  receiverGender: ctx.receiverGender ?? '',
+  senderGender: ctx.senderGender ?? '',
   reader: ctx.reader ?? '',
   questionId,
 })
@@ -83,6 +88,8 @@ export function loadDraft(now: number = Date.now(), storage: Pick<Storage, 'getI
       state: typeof d.state === 'string' ? d.state : '',
       stateOther: typeof d.stateOther === 'string' ? d.stateOther : '',
       relationshipOther: typeof d.relationshipOther === 'string' ? d.relationshipOther : '',
+      receiverGender: d.receiverGender === 'man' || d.receiverGender === 'woman' ? d.receiverGender : '',
+      senderGender: d.senderGender === 'man' || d.senderGender === 'woman' ? d.senderGender : '',
       reader: typeof d.reader === 'string' ? d.reader : '',
       questionId: typeof d.questionId === 'string' ? d.questionId : null,
     }

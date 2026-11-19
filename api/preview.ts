@@ -110,6 +110,8 @@ export function createPreviewHandlers(deps: () => PreviewApiDeps) {
           occasion: ctx.context.occasion,
           occasion_detail: ctx.context.occasion_detail || null,
           memorial: ctx.context.occasion === 'memorial',
+          ...(ctx.context.receiver_gender ? { receiver_gender: ctx.context.receiver_gender } : {}),
+          ...(ctx.context.sender_gender ? { sender_gender: ctx.context.sender_gender } : {}),
           tone: toneLine(ctx.context),
           quiet: noCelebration(ctx.context as never),
           shown: shown.exclude,

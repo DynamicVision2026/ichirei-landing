@@ -13,6 +13,8 @@ export interface PurposeCopy {
   stateLabel: string
   states: Record<StateCode, string>
   stateOtherPlaceholder: string
+  /** 2026-11-19, optional: who is in the pictures. Two rows (the receiver, the sender) of a man / a woman / skip, and one muted line under them. Never required, never selected by default. */
+  people: { receiverLabel: string; senderLabel: string; man: string; woman: string; skip: string; note: string }
   /** Shown beside a free-text field: how many characters are left. */
   limit: (max: number) => string
 }
@@ -38,6 +40,7 @@ export const PURPOSE_COPY: Record<UiLanguage, PurposeCopy> = {
     stateLabel: '今のふたりは（任意）',
     states: { close: 'いつも近く', apart: '離れて暮らす', lapsed: 'しばらく会っていない', strained: 'すれ違ったまま', lost: 'もう会えない', other: 'その他' },
     stateOtherPlaceholder: '例：連絡は取っている',
+    people: { receiverLabel: 'その人は：', senderLabel: 'あなたは：', man: '男性', woman: '女性', skip: '選ばない', note: '絵の人物を描くためだけに使います（任意）' },
     limit: (max) => `${max}字まで`,
   },
   'zh-Hant': {
@@ -60,6 +63,7 @@ export const PURPOSE_COPY: Record<UiLanguage, PurposeCopy> = {
     stateLabel: '現在的兩人（選填）',
     states: { close: '常在身邊', apart: '分隔兩地', lapsed: '很久沒見', strained: '還有心結', lost: '已無法相見', other: '其他' },
     stateOtherPlaceholder: '例如：還有聯絡',
+    people: { receiverLabel: '對方是：', senderLabel: '你是：', man: '男性', woman: '女性', skip: '不選', note: '只用於畫出圖中的人物（可不選）' },
     limit: (max) => `最多${max}字`,
   },
   'zh-Hans': {
@@ -82,6 +86,7 @@ export const PURPOSE_COPY: Record<UiLanguage, PurposeCopy> = {
     stateLabel: '现在的两人（选填）',
     states: { close: '常在身边', apart: '分隔两地', lapsed: '很久没见', strained: '还有心结', lost: '已无法相见', other: '其他' },
     stateOtherPlaceholder: '例如：还有联系',
+    people: { receiverLabel: '对方是：', senderLabel: '你是：', man: '男性', woman: '女性', skip: '不选', note: '只用于画出图中的人物（可不选）' },
     limit: (max) => `最多${max}字`,
   },
   en: {
@@ -104,6 +109,7 @@ export const PURPOSE_COPY: Record<UiLanguage, PurposeCopy> = {
     stateLabel: 'Where the two of you stand now (optional)',
     states: { close: 'Close', apart: 'Living apart', lapsed: "Haven't met in a while", strained: 'Something unresolved', lost: 'No longer here', other: 'Other' },
     stateOtherPlaceholder: 'e.g. we still write',
+    people: { receiverLabel: 'They are:', senderLabel: 'You are:', man: 'a man', woman: 'a woman', skip: 'skip', note: 'Only used to draw the people in your pictures (optional)' },
     limit: (max) => `up to ${max} characters`,
   },
 }

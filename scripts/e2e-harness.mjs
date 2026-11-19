@@ -3111,6 +3111,51 @@ const SECTION_ORDER = ['.hero', '.strip', '.philo', '#shape', '#angles', '#how',
     await page.close()
   }
 
+  // 2026-11-19: who is in the pictures — two optional rows under the relationship chips (a man / a woman / skip) and one muted line; nothing selected by default, nothing required,
+  // and a tap travels with the story (receiver_gender / sender_gender) while no tap sends nothing
+  for (const [lang, w] of Object.entries({
+    ja: { r: 'その人は：', s: 'あなたは：', chips: ['男性', '女性', '選ばない'], note: '絵の人物を描くためだけに使います（任意）' },
+    en: { r: 'They are:', s: 'You are:', chips: ['a man', 'a woman', 'skip'], note: 'Only used to draw the people in your pictures (optional)' },
+    'zh-Hant': { r: '對方是：', s: '你是：', chips: ['男性', '女性', '不選'], note: '只用於畫出圖中的人物（可不選）' },
+  })) {
+    const { page, errors, calls } = await mockPage(browser)
+    await page.goto(`http://localhost:5173/write?lang=${lang}`, { waitUntil: 'networkidle' })
+    const rows = async (name) => page.locator(`[data-chip^="${name}:"]`).evaluateAll((els) => els.map((e) => e.innerText.trim()))
+    check(`gender rows (${lang}): both rows are there with the owner's words — 「${w.r}」 / 「${w.s}」 and ${w.chips.join(' · ')}`, (await rows('receiver_gender')).join('|') === w.chips.join('|') && (await rows('sender_gender')).join('|') === w.chips.join('|') && (await page.locator('[data-testid=gender-receiver_gender] .clab').innerText()).trim() === w.r && (await page.locator('[data-testid=gender-sender_gender] .clab').innerText()).trim() === w.s)
+    check(`gender rows (${lang}): the muted line reads 「${w.note}」, below the relationship chips and above the direction chips`, (await page.locator('[data-testid=gender-note]').innerText()).trim() === w.note && (await page.evaluate(() => { const rel = document.querySelector('[data-chip^="relationship:"]'); const note = document.querySelector('[data-testid=gender-note]'); const dir = document.querySelector('[data-chip^="direction:"]'); return !!rel && !!note && !!dir && !!(rel.compareDocumentPosition(note) & Node.DOCUMENT_POSITION_FOLLOWING) && !!(note.compareDocumentPosition(dir) & Node.DOCUMENT_POSITION_FOLLOWING) })))
+    check(`gender rows (${lang}): nothing is selected by default`, (await page.locator('[data-chip^="receiver_gender:"][aria-pressed=true], [data-chip^="sender_gender:"][aria-pressed=true]').count()) === 0)
+    await page.locator('#write [data-testid=story-input]').fill('彼は、駅の改札でいつも黙って手を振った。そのうしろ姿を、私はずっと覚えている。')
+    await page.click('[data-chip="relationship:parent_father"]')
+    await page.click('[data-chip="direction:up"]')
+    await page.click('[data-chip="purpose:thanks"]')
+    check(`gender rows (${lang}): the form is complete without them — the button is on and a story with 彼 needs no row`, await page.locator('#write button[type=submit]').isEnabled())
+    // a tap, a second tap clears, "skip" clears
+    await page.click('[data-chip="receiver_gender:man"]')
+    await page.click('[data-chip="sender_gender:woman"]')
+    check(`gender rows (${lang}): a tap presses its chip (and only that one in its row)`, (await page.locator('[data-chip="receiver_gender:man"][aria-pressed=true]').count()) === 1 && (await page.locator('[data-chip="receiver_gender:woman"][aria-pressed=true]').count()) === 0 && (await page.locator('[data-chip="sender_gender:woman"][aria-pressed=true]').count()) === 1)
+    await page.click('[data-chip="receiver_gender:man"]')
+    check(`gender rows (${lang}): the same chip again clears it`, (await page.locator('[data-chip="receiver_gender:man"][aria-pressed=true]').count()) === 0)
+    await page.click('[data-chip="sender_gender:skip"]')
+    check(`gender rows (${lang}): 「${w.chips[2]}」 clears the row and is never shown as the chosen one`, (await page.locator('[data-chip^="sender_gender:"][aria-pressed=true]').count()) === 0)
+    await page.click('#write button[type=submit]')
+    await page.waitForSelector('article', { timeout: 15000 })
+    const none = calls.select.at(-1)
+    check(`gender rows (${lang}): with no tap the request carries neither field`, !('receiver_gender' in none) && !('sender_gender' in none))
+    await page.reload({ waitUntil: 'networkidle' })
+    await page.locator('#write [data-testid=story-input]').fill('先生は、会計の仕事を一から丁寧に教えてくれた。')
+    await page.click('[data-chip="relationship:parent_father"]')
+    await page.click('[data-chip="direction:up"]')
+    await page.click('[data-chip="purpose:thanks"]')
+    await page.click('[data-chip="receiver_gender:man"]')
+    await page.click('[data-chip="sender_gender:woman"]')
+    await page.click('#write button[type=submit]')
+    await page.waitForSelector('article', { timeout: 15000 })
+    const tapped = calls.select.at(-1)
+    check(`gender rows (${lang}): a tap travels with the story as receiver_gender / sender_gender (man, woman)`, tapped.receiver_gender === 'man' && tapped.sender_gender === 'woman')
+    check(`gender rows (${lang}): no page errors`, errors.length === 0, errors.join('; '))
+    await page.close()
+  }
+
   // the gift page: 「おめでとう」 only for celebrate; apology / encourage / remembrance are quiet (ink class) and carry no celebration word
   {
     const TOKEN = 'RG-testtesttesttesttest'

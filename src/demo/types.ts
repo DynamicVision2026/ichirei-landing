@@ -67,6 +67,9 @@ export interface EngineResult {
   purpose?: string | null
   state?: string | null
   occasion_detail?: string | null
+  /** 2026-11-19: the sender's optional taps (a man / a woman), echoed by the server; only for drawing the people of the film's pictures. */
+  receiver_gender?: 'man' | 'woman' | null
+  sender_gender?: 'man' | 'woman' | null
   status: 'sufficient' | 'insufficient'
   follow_up_question: string | null
   particulars: string[]

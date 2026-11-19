@@ -71,6 +71,10 @@ export function appendSpoken(current: string, spoken: string, max = STORY_MAX): 
   return { text: joined, over: n > max, full: n >= max }
 }
 
+/** 2026-11-19, optional: a man or a woman, tapped by the sender — only to draw the people of the film's pictures. '' = not given (the default). */
+export type GenderChoice = '' | 'man' | 'woman'
+export const GENDER_CHOICES: readonly Exclude<GenderChoice, ''>[] = ['man', 'woman']
+
 /** The gift's context as the sender fills it in. '' = not chosen yet. */
 export interface GiftContext {
   language: UiLanguage
@@ -90,6 +94,9 @@ export interface GiftContext {
   inscriptionScript: InscriptionScript
   /** Where the receiver will READ the gift when that differs from the sender (Part B): '' = the same. Never asked for remembrance. */
   reader?: ReaderChoice
+  /** Who is in the pictures (optional; see GenderChoice): the person written about and the sender. Sent with the story to the film script and nowhere else. */
+  receiverGender?: GenderChoice
+  senderGender?: GenderChoice
 }
 export type ReaderChoice = '' | 'ja' | 'zh' | 'en' | 'other'
 export const READER_CHOICES: readonly ReaderChoice[] = ['', 'ja', 'zh', 'en', 'other']
@@ -944,6 +951,9 @@ export function contextToPayload(ctx: GiftContext): Record<string, string> {
   if (isChineseUi(ctx.language)) out.inscription_script = ctx.inscriptionScript
   // Remembrance never asks where the receiver will read it (nothing is given).
   if (ctx.reader && occasionOf(ctx) !== 'memorial') out.reader = ctx.reader
+  // who is in the pictures: only what the sender tapped (the rows are optional; no tap = nothing is sent)
+  if (ctx.receiverGender === 'man' || ctx.receiverGender === 'woman') out.receiver_gender = ctx.receiverGender
+  if (ctx.senderGender === 'man' || ctx.senderGender === 'woman') out.sender_gender = ctx.senderGender
   return out
 }
 

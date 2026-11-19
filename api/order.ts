@@ -175,7 +175,7 @@ export function createOrderHandler(deps: () => OrderDeps) {
       const draftId = typeof (body as { draft_id?: unknown } | null)?.draft_id === 'string' && ANIMATION_ID_PATTERN.test((body as { draft_id: string }).draft_id) ? (body as { draft_id: string }).draft_id : null
       const built = buildAnimationRecord(record, newAnimationId(), now)
       const adopted: AnimationRecord | null = draftId
-        ? await adoptDraft(d.store, draftId, record, built, { story: mergeStory(order.story, order.follow_ups), language: order.language, memorial: order.certificate.memorial === true }).catch(() => null)
+        ? await adoptDraft(d.store, draftId, record, built, { story: mergeStory(order.story, order.follow_ups), language: order.language, memorial: order.certificate.memorial === true, receiver_gender: order.engine_result.receiver_gender ?? null, sender_gender: order.engine_result.sender_gender ?? null }).catch(() => null)
         : null
       const anim = adopted ?? built
       const animationId = anim.id

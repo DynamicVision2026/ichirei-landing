@@ -16,6 +16,7 @@ import {
   contextComplete,
   storyLength,
   type Copy,
+  type GenderChoice,
   type GiftContext,
 } from '../demo/i18n.ts'
 import { PURPOSE_COPY } from '../demo/purpose-copy.ts'
@@ -86,6 +87,31 @@ function Chips<T extends string>({
             {labels[c]}
           </button>
         ))}
+      </div>
+    </div>
+  )
+}
+
+/**
+ * Who is in the pictures (2026-11-19): an OPTIONAL row of a man / a woman / skip. Nothing is selected by default; "skip" (and pressing the chosen chip again) clears the choice, and no tap is sent at all.
+ * It is only used to draw the people of the film's pictures.
+ */
+function GenderRow({ name, label, man, woman, skip, value, onPick }: { name: string; label: string; man: string; woman: string; skip: string; value: GenderChoice; onPick: (v: GenderChoice) => void }) {
+  return (
+    <div className="cgroup cgender" role="group" aria-labelledby={`cg-${name}`} data-testid={`gender-${name}`}>
+      <span className="clab" id={`cg-${name}`}>
+        {label}
+      </span>
+      <div className="cchips">
+        <button type="button" className="cchip" data-chip={`${name}:man`} aria-pressed={value === 'man'} onClick={() => onPick(value === 'man' ? '' : 'man')}>
+          {man}
+        </button>
+        <button type="button" className="cchip" data-chip={`${name}:woman`} aria-pressed={value === 'woman'} onClick={() => onPick(value === 'woman' ? '' : 'woman')}>
+          {woman}
+        </button>
+        <button type="button" className="cchip" data-chip={`${name}:skip`} aria-pressed={false} onClick={() => onPick('')}>
+          {skip}
+        </button>
       </div>
     </div>
   )
@@ -349,6 +375,9 @@ export default function Composer({ story, onStoryChange, onSubmit, copy, lang, c
         <Chips name="relationship" label={copy.relationshipLabel} codes={[...RELATIONSHIP_CODES, 'other'] as const} labels={{ ...copy.relationships, other: pc.other }} value={context.relationship} onPick={(c) => pickRelationship(c)} />
       )}
       {context.relationship === 'other' && <OtherText name="relationship_other" value={context.relationshipOther ?? ''} max={RELATIONSHIP_OTHER_MAX} placeholder={pc.relationshipOtherPlaceholder} onChange={(v) => setCtx({ relationshipOther: v })} />}
+      <GenderRow name="receiver_gender" label={pc.people.receiverLabel} man={pc.people.man} woman={pc.people.woman} skip={pc.people.skip} value={context.receiverGender ?? ''} onPick={(v) => setCtx({ receiverGender: v })} />
+      <GenderRow name="sender_gender" label={pc.people.senderLabel} man={pc.people.man} woman={pc.people.woman} skip={pc.people.skip} value={context.senderGender ?? ''} onPick={(v) => setCtx({ senderGender: v })} />
+      <p className="cnote cgender-note" data-testid="gender-note">{pc.people.note}</p>
       <Chips name="direction" label={memorial ? copy.memorial.directionLabel : copy.directionLabel} codes={DIRECTION_CODES} labels={memorial ? copy.memorial.directions : copy.directions} value={context.direction} onPick={(c) => setCtx({ direction: c })} />
       {lang === 'en' ? (
         <ChipRow

@@ -35,7 +35,7 @@ export function usePreview(args: { result: EngineResult; story: string; followUp
   const { result, story, followUps, shown, picked, draftRef } = args
   const [state, setState] = useState<PreviewState>({ phase: 'script', lines: [], pictures: EMPTY, slots: PENDING, draftId: draftRef.current?.id ?? null })
   const memorial = result.occasion === 'memorial'
-  const key = JSON.stringify([result.language, memorial, story.trim(), followUps])
+  const key = JSON.stringify([result.language, memorial, story.trim(), followUps, result.receiver_gender ?? '', result.sender_gender ?? ''])
 
   useEffect(() => {
     let alive = true
@@ -65,6 +65,9 @@ export function usePreview(args: { result: EngineResult; story: string; followUp
             // v9.6: why the gift is given and where the two stand — the film and its pictures take the purpose's tone (quiet for an apology, an encouragement, a remembrance)
             ...(result.purpose ? { purpose: result.purpose } : {}),
             ...(result.state ? { state: result.state } : {}),
+            // who is in the pictures (the sender's optional taps, kept on the result): only for drawing the people of the film
+            ...(result.receiver_gender ? { receiver_gender: result.receiver_gender } : {}),
+            ...(result.sender_gender ? { sender_gender: result.sender_gender } : {}),
             shown,
             ...(picked?.length ? { picked } : {}),
             ...(known ? { draft_id: known } : {}),

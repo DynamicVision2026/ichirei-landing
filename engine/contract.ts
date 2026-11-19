@@ -89,6 +89,13 @@ export const OCCASIONS = [
 ] as const
 export type Occasion = (typeof OCCASIONS)[number]
 
+/**
+ * Who is in the pictures (2026-11-19): the sender's own optional tap, "a man" or "a woman" (no tap = not given). Used ONLY to draw the people of the film's four pictures: it travels with the story to the film
+ * script and nowhere else — never in a log line, the dashboard, a CSV, Shopify or a marketing tag.
+ */
+export const GENDERS = ['man', 'woman'] as const
+export type Gender = (typeof GENDERS)[number]
+
 /** What the engine knows about the gift. `null` = not supplied (prompted as "unspecified"). */
 export interface EngineContext {
   language: Language
@@ -110,6 +117,9 @@ export interface EngineContext {
   state_other?: string | null
   /** The sender's own words behind the relationship chip 「その他」 (max 20); `relationship` then holds the nearest code, or null. */
   relationship_other?: string | null
+  /** The sender's optional tap for the person they write about / for themselves (see GENDERS): only for drawing the people of the pictures. Absent = not given. */
+  receiver_gender?: Gender | null
+  sender_gender?: Gender | null
 }
 
 /** Longest occasion_detail accepted — it is a short label, not a second story. */
@@ -167,6 +177,8 @@ export function parseContext(input: {
   state?: unknown
   state_other?: unknown
   relationship_other?: unknown
+  receiver_gender?: unknown
+  sender_gender?: unknown
 }): Parsed {
   const pick = <T extends string>(
     name: string,
@@ -203,6 +215,10 @@ export function parseContext(input: {
   if ('error' in purposeOther) return { ok: false, error: purposeOther.error }
   const stateOther = other('state_other', input.state_other, STATE_OTHER_MAX)
   if ('error' in stateOther) return { ok: false, error: stateOther.error }
+  const receiverGender = pick('receiver_gender', input.receiver_gender, GENDERS)
+  if ('error' in receiverGender) return { ok: false, error: receiverGender.error }
+  const senderGender = pick('sender_gender', input.sender_gender, GENDERS)
+  if ('error' in senderGender) return { ok: false, error: senderGender.error }
   const direction = pick('direction', input.direction, DIRECTIONS)
   if ('error' in direction) return { ok: false, error: direction.error }
   const occasion = pick('occasion', input.occasion, OCCASIONS)
@@ -250,6 +266,8 @@ export function parseContext(input: {
       ...(stateIn.value !== null ? { state: stateIn.value } : {}),
       ...(purposeFacts.state_other ? { state_other: purposeFacts.state_other } : {}),
       ...(relationshipIsOther && relationshipOther.value ? { relationship_other: relationshipOther.value } : {}),
+      ...(receiverGender.value ? { receiver_gender: receiverGender.value } : {}),
+      ...(senderGender.value ? { sender_gender: senderGender.value } : {}),
       // Chinese: the supplied script, else traditional. ja and en: not applicable, so a supplied value is ignored.
       inscription_script: isChinese(resolvedLanguage) ? (script.value ?? DEFAULT_INSCRIPTION_SCRIPT) : null,
       // Remembrance never asks where the receiver will read it (nothing is given): the choice is dropped there.
@@ -526,6 +544,9 @@ export interface EngineResult {
   occasion_detail: string | null
   /** Part B: where the receiver will read the gift when that differs from the buyer's language (echo of the context); absent = the same. */
   reader?: Reader | null
+  /** 2026-11-19: the sender's optional tap, kept with the result so the order's film can draw the right people (never logged, never in a CSV, the dashboard or Shopify). Absent = not given. */
+  receiver_gender?: Gender | null
+  sender_gender?: Gender | null
   /** v5: echo of the inscription script (Chinese: traditional | simplified; ja: null). */
   inscription_script: InscriptionScript | null
   status: 'sufficient' | 'insufficient'

@@ -14,7 +14,7 @@
 import { createHash } from 'node:crypto'
 import type Anthropic from '@anthropic-ai/sdk'
 import { ANIMATION_ID_PATTERN, isAnimationRecord, newAnimationId, pictureUrl, type AnimationRecord } from './animation.ts'
-import type { Language } from './contract.ts'
+import type { Gender, Language } from './contract.ts'
 import { ensureArt, readArt, renderBudgetMs, type ArtRecord, type ImageClient } from './film-art.ts'
 import { checkPictures, makeFilm, type FilmInput, type FilmRecord } from './film.ts'
 import type { OrderRecord } from './order.ts'
@@ -46,6 +46,9 @@ export interface PreviewStart {
   occasion: string | null
   occasion_detail: string | null
   memorial: boolean
+  /** 2026-11-19: the sender's optional taps (a man / a woman), only for drawing the people of the pictures; never logged. */
+  receiver_gender?: Gender | null
+  sender_gender?: Gender | null
   /** v9.6: the tone line of the purpose, and whether the gift is a quiet one (apology, encouragement, remembrance). */
   tone?: string
   quiet?: boolean
@@ -58,8 +61,9 @@ export interface PreviewStart {
 }
 
 /** One story, one set: the hash of the story text, the language and whether it is a remembrance (the pictures' style). Never stored with the text. */
-export const storyHash = (story: string, language: Language, memorial: boolean): string =>
-  createHash('sha256').update(`${language}\n${memorial ? 'm' : 'l'}\n${story.replace(/\r\n?/g, '\n').trim()}`).digest('hex')
+export const storyHash = (story: string, language: Language, memorial: boolean, people?: { receiver_gender?: Gender | null; sender_gender?: Gender | null }): string =>
+  // (2026-11-19) the sender's optional taps belong to the set: another tap draws another set. With no tap the hash is exactly what it always was.
+  createHash('sha256').update(`${language}\n${memorial ? 'm' : 'l'}${people?.receiver_gender || people?.sender_gender ? `\n${people.receiver_gender ?? '-'}${people.sender_gender ?? '-'}` : ''}\n${story.replace(/\r\n?/g, '\n').trim()}`).digest('hex')
 
 const read = async (store: OrderStore, id: string): Promise<AnimationRecord | null> => {
   if (!ANIMATION_ID_PATTERN.test(id)) return null
@@ -83,7 +87,7 @@ export type StartOutcome =
  */
 export async function startPreview(deps: PreviewDeps, input: PreviewStart, allowNew: () => boolean = () => true): Promise<StartOutcome> {
   const pickedAt = (deps.now?.() ?? new Date()).toISOString()
-  const hash = storyHash(input.story, input.language, input.memorial)
+  const hash = storyHash(input.story, input.language, input.memorial, input)
   if (input.draft_id) {
     const old = await read(deps.store, input.draft_id)
     if (isDraft(old) && old.draft.story_hash === hash && old.language === input.language) {
@@ -104,6 +108,8 @@ export async function startPreview(deps: PreviewDeps, input: PreviewStart, allow
     occasion: input.occasion,
     occasion_detail: input.occasion_detail,
     memorial: input.memorial,
+    ...(input.receiver_gender ? { receiver_gender: input.receiver_gender } : {}),
+    ...(input.sender_gender ? { sender_gender: input.sender_gender } : {}),
     ...(input.tone ? { tone: input.tone } : {}),
     ...(input.quiet ? { quiet: true } : {}),
     glyph: NOT_CHOSEN,
@@ -281,10 +287,10 @@ export async function renderPreview(deps: PreviewDeps, id: string): Promise<Prev
  * At order time: the draft the buyer saw becomes the order's film. It is adopted only if it is a draft, it is for this very story and language, its script is
  * a real one, and none of its lines contains the chosen character. Returns the adopted animation record, or null (the order then makes its film as usual).
  */
-export async function adoptDraft(store: OrderStore, draftId: string, record: OrderRecord, built: AnimationRecord, expect: { story: string; language: Language; memorial: boolean }): Promise<AnimationRecord | null> {
+export async function adoptDraft(store: OrderStore, draftId: string, record: OrderRecord, built: AnimationRecord, expect: { story: string; language: Language; memorial: boolean; receiver_gender?: Gender | null; sender_gender?: Gender | null }): Promise<AnimationRecord | null> {
   const old = await read(store, draftId)
   if (!isDraft(old)) return null
-  if (old.draft.story_hash !== storyHash(expect.story, expect.language, expect.memorial) || old.language !== expect.language) return null
+  if (old.draft.story_hash !== storyHash(expect.story, expect.language, expect.memorial, expect) || old.language !== expect.language) return null
   const film = old.film
   if (!film || film.status !== 'ready' || film.lines.length !== 4) return null
   const p = record.production

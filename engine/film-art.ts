@@ -58,6 +58,10 @@ const RETRY_HINT: Record<string, string> = {
   clothing: 'People wear contemporary everyday clothes; no kimono or traditional dress.',
   setting: 'A modern, ordinary home and street; no traditional Japanese interior, lanterns or shrine architecture.',
   religious: 'No religious symbol of any kind: no cross (not even one made by a window frame), altar, shrine or temple.',
+  // 2026-11-19: the three new reasons ask for the SAME description drawn again as written: who is there, where it is, and the one thing the moment is about
+  people: 'Draw exactly the people the description names: the same number, the same men, women, children or older people, each seen from behind, as hands or as small silhouettes. No extra person.',
+  added_place: 'Draw only the place and the objects the description names. No genkan, shoes, vending machine, bus stop, convenience store, park or station unless the description names it; the named place is the whole picture.',
+  missed_moment: 'The key object, place or action the description names must be the clear subject of the picture, drawn plainly in the middle of it.',
   off_story: 'Follow the description exactly; keep it a simple ink-wash painting.',
 }
 
@@ -254,7 +258,7 @@ export interface Verdict {
   ok: boolean
   reason: string
 }
-const REASONS = new Set(['ok', 'face', 'text', 'illness', 'celebration', 'unsafe', 'clothing', 'setting', 'religious', 'empty', 'off_story'])
+const REASONS = new Set(['ok', 'face', 'text', 'illness', 'celebration', 'unsafe', 'clothing', 'setting', 'religious', 'empty', 'people', 'added_place', 'missed_moment', 'off_story'])
 type Messages = Pick<Anthropic, 'messages'>
 
 function readPrompt(): string {
@@ -411,6 +415,9 @@ export const ANGLE_TEXT: Record<RewriteAngle, string> = {
 /** Extra instructions for the reason the picture failed (the text-bearing object must go; an English setting must be stated in Western terms, with the figure's hair colour). */
 function reasonFeedback(reason: string, language: Language): string {
   if (reason === 'text') return 'The object that carried writing (anything with a label, a brand, a number, a sign or lettering on it) must NOT be in the new scene at all — leave it out entirely.'
+  if (reason === 'people') return 'Say plainly how many people there are and who each is (a man, a woman, a child, an older person — exactly as the description already says, never a new guess; a person it leaves neutral stays neutral). Each person is seen from behind, as hands or as a small silhouette.'
+  if (reason === 'added_place') return 'The picture drew a place the description does not name. Name the place and the object of the moment first, and put nothing else in the scene: no genkan, shoes, vending machine, bus stop, convenience store, park or station.'
+  if (reason === 'missed_moment') return 'The picture missed the key object or action. Say it first and plainly (the thing held, the place walked to, the act itself) and keep the view close enough that it is clearly the subject. Keep the place, change only the angle or the distance.'
   if (reason === 'setting' && language === 'en') return 'State the Western home or street explicitly (for example a porch, a kitchen, a suburban street with parked cars) and, if a figure appears, name their hair colour (for example brown hair, grey hair, blond hair).'
   return ''
 }
@@ -819,7 +826,7 @@ async function renderLocked(deps: ArtDeps, input: RenderInput): Promise<ArtRecor
   // The order of protection (2026-11-14): a clean description (above) → the first draw → the targeted second try (a `text` failure redraws the object smaller / further away) → a rewrite to the safest
   // angle (the place) → a second rewrite (the hands or the object) → only then washi, which shows another passed picture of the story. Each pass draws what failed its check or hit a transient error
   // other than quota; a description rewritten in the last pass is drawn from its new view in the next one. Whatever the window has no room for stays pending for the next open.
-  const failureReasons = ['face', 'text', 'illness', 'celebration', 'unsafe', 'clothing', 'setting', 'religious', 'empty', 'off_story']
+  const failureReasons = ['face', 'text', 'illness', 'celebration', 'unsafe', 'clothing', 'setting', 'religious', 'empty', 'people', 'added_place', 'missed_moment', 'off_story']
   const transient = ['', 'http', 'timeout', 'network', 'no_image', 'blocked', 'image']
   for (let pass = 2; pass <= 5; pass++) {
     if (Date.now() >= deadline - 15_000) break

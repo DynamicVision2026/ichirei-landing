@@ -25,6 +25,8 @@ export function filmInputFromRecord(record: OrderRecord): FilmInput {
     occasion: result.occasion ?? null,
     occasion_detail: result.occasion_detail ?? null,
     memorial: p.certificate.memorial === true,
+    ...(result.receiver_gender ? { receiver_gender: result.receiver_gender } : {}),
+    ...(result.sender_gender ? { sender_gender: result.sender_gender } : {}),
     tone: toneLine({ purpose: (result.purpose as never) ?? null, state: (result.state as never) ?? null }),
     quiet: p.certificate.memorial === true || isQuietPurpose(result.purpose),
     glyph: p.glyph_to_carve,

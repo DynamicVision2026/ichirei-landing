@@ -266,6 +266,9 @@
 .rv .cchips{display:flex;flex-wrap:wrap;gap:.45rem}
 .rv .cchip{font:500 .88rem var(--body);color:var(--ink);background:var(--paper);border:1px solid var(--line);border-radius:999px;padding:.5rem .95rem;min-height:2.5rem;cursor:pointer;transition:border-color .15s,background .15s}
 .rv .cchip:hover{border-color:var(--ink)}
+/* who is in the pictures (optional rows under the relationship chips): the two rows sit close together and the one muted line follows them */
+.rv .composer .cgender{gap:.35rem}
+.rv .composer .cnote{margin:-.3rem 0 0;font:400 .82rem/1.6 var(--body);color:var(--mute)}
 .rv .cchip[aria-pressed="true"]{background:var(--ink);color:var(--paper);border-color:var(--ink)}
 .rv .composer .btn.voice{align-self:flex-start;padding:.55rem 1.1rem;font-size:.9rem}
 /* the story opener (Part A): one specific question in large type above the box, a quiet link for another angle, the draft banner */
