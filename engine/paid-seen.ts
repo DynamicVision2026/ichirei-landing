@@ -10,7 +10,7 @@ import type { ShopifyOrderFacts } from './waiting.ts'
 export const ORDER_REF_PATTERN = /^IC-\d{8}-[A-Z0-9]{8}$/
 
 /** True once the payment of this order was seen (an order claimed from a waiting Shopify order was paid there: Shopify's own record showed it paid). */
-export const paidSeen = (rec: OrderRecord | null | undefined): boolean => !!rec && (!!rec.paid_seen_at || !!rec.claim || !!rec.collected_at)
+export const paidSeen = (rec: OrderRecord | null | undefined): boolean => !!rec && (!!rec.paid_seen_at || !!rec.claim || !!rec.collected_at || rec.source === 'reply')
 
 /** Whether a payment lookup counts as PAID for this order: `paid`, and a partial refund only when the payment was already seen (`paid_seen_at`) — a first sighting needs PAID itself. */
 export const paidIn = (pay: PaymentInfo | null | undefined, rec: OrderRecord | null | undefined): boolean => !!pay && pay.state === 'paid' && (!pay.partially_refunded || !!rec?.paid_seen_at)

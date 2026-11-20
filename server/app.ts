@@ -247,6 +247,8 @@ export function createApp(config: ServerConfig): Hono {
   app.get('/api/gift/:token/card.pdf', limited(scrollLimit), (c) => giftHandlers.cardPdf(c.req.param('token'), c.req.query('preview')))
   app.get('/api/gift/:token/gift.pdf', limited(scrollLimit), (c) => giftHandlers.giftPdf(c.req.param('token'), c.req.query('preview')))
   app.get('/api/animation/:id/gift.pdf', limited(scrollLimit), (c) => giftHandlers.giftPdfForSender(c.req.param('id')))
+  app.post('/api/gift/:token/back', limited(animationLimit), (c) => giftHandlers.back(c.req.param('token')))
+  app.get('/api/reply/:ticket', limited(animationLimit), (c) => giftHandlers.replyInfo(c.req.param('ticket')))
   app.get('/api/gift/:token/keep-qr.png', limited(scrollLimit), (c) => giftHandlers.keepQr(c.req.param('token'), c.req.query('preview')))
   app.get('/api/animation/:id/keep-qr.png', limited(scrollLimit), (c) => giftHandlers.keepQrForSender(c.req.param('id')))
   app.get('/api/gift/:token/keepsake-card.png', limited(scrollLimit), (c) => giftHandlers.keepsakeCard(c.req.param('token'), c.req.query('preview')))

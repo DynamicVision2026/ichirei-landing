@@ -13,6 +13,9 @@ import { isQuietPurpose } from '../src/order/purpose.ts'
 import QRCode from 'qrcode'
 import { ANIMATION_ID_PATTERN, isAnimationRecord, type AnimationRecord } from '../engine/animation.ts'
 import { orderGate, type OrderGate } from '../engine/buyer.ts'
+import { backStateOf, openTicket, readTicket, replyEnabled } from '../engine/reply.ts'
+import { recordReply } from '../engine/engine-log.ts'
+import { isOrderRecord } from '../engine/buyer.ts'
 import { GIFT_TOKEN_PATTERN, arrivingView, todayJst, checkAddress, checkReply, giftUrl, giftView, isGiftRecord, isLocked, lockedView, type GiftRecord } from '../engine/gift.ts'
 import { OPEN_DATE_MAX_DAYS } from '../src/order/packages.ts'
 import { readArt, picturePath, type ArtRecord } from '../engine/film-art.ts'
@@ -311,6 +314,10 @@ export function createGiftHandlers(deps: () => GiftDeps) {
       if (closed(r.gift, d, preview)) return json(200, lockedView(r.gift, d.now?.() ?? new Date()), noStore)
       const art = filmUsable(r.anim.film) && r.anim.film.status === 'ready' ? await safeArt(d.store, r.anim.id) : null
       const v = giftView(r.gift, r.anim, art)
+      // Part 14: the free gift back the receiver is offered on the last screen (the sender's own preview never gets the link to the gift that was sent back)
+      { const oo = r.gift.order_ref && d.store ? await d.store.get(r.gift.order_ref).catch(() => null) : null
+        const back = backStateOf(r.gift, isOrderRecord(oo) ? oo : null, d.env ?? process.env)
+        if (back) v.back = back.state === 'used' && senderPreview(r.gift, preview) ? { ...back, page: null } : back }
       // the sender's own preview of a gift that is still locked: the page shows the waiting screen first (Part 11)
       if (senderPreview(r.gift, preview) && isLocked(r.gift, d.now?.() ?? new Date())) v.waiting = { opens_on: r.gift.opens_on ?? null, opens_at: r.gift.opens_at ?? null, opens_tz: r.gift.opens_tz ?? null }
       return json(200, senderPreview(r.gift, preview) ? withPreview(v, r.gift.animation_id) : v, noStore)
@@ -493,6 +500,38 @@ export function createGiftHandlers(deps: () => GiftDeps) {
       { const gate = await gateOf(r.gift, d); if (gate === 'cancelled') return gone(r.gift); if (gate === 'pending') return notCollected(); if (gate === 'error') return busy() }
       return keepsakeCardResponse(r)
     },
+    /**
+     * Part 14 (2026-11-20): the receiver presses 「〈from〉さんに一字を贈り返す（無料）」. A reply ticket (server-side, tied to this gift) is made — only for a gift that has been opened and may be answered (not a remembrance, not
+     * a quiet purpose, not a reply itself, not switched off). The page then opens the normal writing page with the ticket; the order step uses it up.
+     */
+    async back(token: string): Promise<Response> {
+      const d = deps()
+      const r = await loadGift(token, d)
+      if (r.status !== 200) return json(r.status, { error: r.status === 404 ? 'not_found' : 'unavailable' }, { 'cache-control': 'no-store' })
+      if (!d.store) return busy()
+      if (closed(r.gift, d)) return json(403, { error: 'locked' }, { 'cache-control': 'no-store' })
+      { const gate = await gateOf(r.gift, d); if (gate === 'cancelled') return gone(r.gift); if (gate === 'pending') return notCollected(); if (gate === 'error') return busy() }
+      const oo = r.gift.order_ref ? await d.store.get(r.gift.order_ref).catch(() => null) : null
+      const state = backStateOf(r.gift, isOrderRecord(oo) ? oo : null, d.env ?? process.env)
+      if (!state) return json(403, { error: 'not_offered', code: 'reply_off' }, { 'cache-control': 'no-store' })
+      if (state.state === 'used') return json(409, { error: 'used', code: 'reply_used' }, { 'cache-control': 'no-store' })
+      const { ticket, created } = await openTicket(d.store, r.gift, d.now?.() ?? new Date())
+      if (created) recordReply('started', d.store, d.now?.() ?? new Date())
+      return json(200, { ok: true, ticket: ticket.id }, { 'cache-control': 'no-store' })
+    },
+
+    /** The writing page asks what the ticket is for: the sender's name (the person the gift goes to) and the receiver's own (who it is from). Nothing else leaves the server. */
+    async replyInfo(ticketId: string): Promise<Response> {
+      const d = deps()
+      if (!d.store) return busy()
+      if (!replyEnabled(d.env ?? process.env)) return json(403, { error: 'off', code: 'reply_off' }, { 'cache-control': 'no-store' })
+      const t = await readTicket(d.store, ticketId)
+      const g = t ? await d.store.get(t.gift_token).catch(() => null) : null
+      if (!t || !isGiftRecord(g)) return json(404, { error: 'not_found', code: 'reply_invalid' }, { 'cache-control': 'no-store' })
+      if (t.status === 'used' || g.back) return json(409, { error: 'used', code: 'reply_used' }, { 'cache-control': 'no-store' })
+      return json(200, { ok: true, to: g.from, from: g.to, language: g.language }, { 'cache-control': 'no-store' })
+    },
+
     async certificate(token: string, preview?: string | null): Promise<Response> {
       const d = deps()
       const r = await loadGift(token, d)

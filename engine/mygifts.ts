@@ -42,7 +42,7 @@ export interface SentGift {
   opens_tz: string | null
   opened_at: string | null
   /** The character the receiver sent back, and its word in the gift's language. */
-  answer: { char: string; word: string } | null
+  answer: { char: string; word: string; /** the gift sent back (Part 14): its receiver page, opened in the new ceremony */ page?: string } | null
   /** The sender's own page of this gift (/a/<id>), when it has one. */
   page: string | null
 }
@@ -82,8 +82,8 @@ export async function sentGifts(store: OrderStore, rec: CustomerRecord, now: Dat
         opens_at: opensAt,
         opens_tz: gift?.opens_tz ?? null,
         opened_at: openedAt,
-        answer: answeredAt && char ? { char, word: returnWord(char, lang) } : null,
-        page: o.animation_id ? `/a/${o.animation_id}` : null,
+        answer: answeredAt && char ? { char, word: gift?.reply?.gift ? '' : returnWord(char, lang), ...(gift?.reply?.gift ? { page: `/g/${gift.reply.gift}` } : {}) } : null,
+        page: gift?.reply?.gift && answeredAt ? `/g/${gift.reply.gift}` : o.animation_id ? `/a/${o.animation_id}` : null,
       })
     } catch {
       // an order that cannot be read is simply not listed

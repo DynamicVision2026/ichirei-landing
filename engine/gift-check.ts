@@ -64,7 +64,7 @@ export function needsAttention(o: OrderRecord, check: GiftCheck, now: Date): boo
   if (check.complete) return false
   if (o.gift_check?.attention) return true
   if (exhausted(o)) return true
-  const seen = o.paid_at_seen ?? o.paid_seen_at ?? o.claim?.claimed_at ?? null
+  const seen = o.paid_at_seen ?? o.paid_seen_at ?? o.claim?.claimed_at ?? (o.source === 'reply' ? o.created_at : null)
   return !!seen && now.getTime() - Date.parse(seen) >= ATTENTION_AFTER_MS
 }
 

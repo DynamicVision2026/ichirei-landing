@@ -5,6 +5,7 @@ import { AnimatePresence, motion, useReducedMotion } from 'framer-motion'
 import type { Candidate, Condition, EngineResult } from './types'
 import Elicitation from './Elicitation'
 import Reveal from './Reveal'
+import { REPLY_COPY } from './reply-copy.ts'
 import OrderForm from './OrderForm'
 import Composer from '../reveal/Composer'
 import { toRevealLang } from '../reveal/lang'
@@ -273,7 +274,11 @@ export default function DemoApp({ mode = 'harness', aside }: { mode?: Mode; asid
   }, [customer, memorialNow])
   // while the wooden sizes are "coming soon" the lines about the carved form and the shipping say nothing about wood (src/demo/egift-copy.ts)
   const woodOnSale = useWoodOnSale()
-  const maxRounds = useMaxRounds() // how many sets of characters one story gets (ICHIREI_MAX_ROUNDS, 2 by default)
+  // Part 14 (2026-11-20): `?reply=<ticket>` — the writing page of a gift sent back, free. The ticket says who it goes to; the person is prefilled, the chips are left to the receiver, and there is ONE round of characters.
+  const [reply, setReply] = useState<{ ticket: string; from: string; to: string } | null>(null)
+  const [replyErr, setReplyErr] = useState<'invalid' | 'used' | 'off' | null>(null)
+  const maxRoundsServer = useMaxRounds() // how many sets of characters one story gets (ICHIREI_MAX_ROUNDS, 2 by default)
+  const maxRounds = reply ? 1 : maxRoundsServer
   const baseCopy = COPY[context.language]
   const copy = useMemo(() => (woodOnSale ? baseCopy : egiftCopy(baseCopy, context.language)), [woodOnSale, baseCopy, context.language])
   const [chosen, setChosen] = useState<Candidate | null>(null)
@@ -334,6 +339,27 @@ export default function DemoApp({ mode = 'harness', aside }: { mode?: Mode; asid
   // the result page has its own address state (#result): the browser's back button returns to the cards with the rounds as they were
   const [live, setLive] = useState<ResultLive | null>(null)
   const [receiverName, setReceiverName] = useState('')
+  useEffect(() => {
+    if (!customer) return
+    let t: string | null = null
+    try { t = new URLSearchParams(window.location.search).get('reply') } catch { t = null }
+    if (!t || !/^RT-[a-z2-9]{24}$/.test(t)) return
+    let alive = true
+    void (async () => {
+      try {
+        const r = await fetch(`/api/reply/${encodeURIComponent(t as string)}`)
+        const j = (await r.json().catch(() => ({}))) as { to?: string; from?: string; code?: string }
+        if (!alive) return
+        if (r.ok) {
+          setReply({ ticket: t as string, to: j.to ?? '', from: j.from ?? '' })
+          setReceiverName(j.to ?? '')
+        } else setReplyErr(j.code === 'reply_used' ? 'used' : j.code === 'reply_off' ? 'off' : 'invalid')
+      } catch {
+        if (alive) setReplyErr('invalid')
+      }
+    })()
+    return () => { alive = false }
+  }, [customer])
 
   // The basket (2026-11-15): every time a result page opens, it is saved to the server under this browser's record — the chosen card, the story it came from, the names and the draft's id. Opening the
   // same result again is the same item; nothing is asked of a model. What is saved is exactly what the page needs to open the result page again.
@@ -648,6 +674,8 @@ export default function DemoApp({ mode = 'harness', aside }: { mode?: Mode; asid
   const phrases = useMemo(() => storyPhrases(story), [story])
   const body = (
     <>
+      {customer && reply && phase === 'elicit' && <p className="replyBanner" data-testid="reply-banner">{REPLY_COPY[context.language].banner(reply.to)}</p>}
+      {customer && replyErr && phase === 'elicit' && <p className="replyBanner" role="alert" data-testid="reply-error">{REPLY_COPY[context.language][replyErr]}</p>}
       {error && (
         <div role="alert" className="font-label mb-6 rounded-sm border border-seal/60 bg-seal/10 p-4 text-sm text-fg">
           <p>{error}</p>
@@ -857,8 +885,8 @@ export default function DemoApp({ mode = 'harness', aside }: { mode?: Mode; asid
                   {pc.another(maxRounds - 1 - retryCount)}
                 </button>
               ) : (
-                <p className="sent" role="status" data-testid="retry-cap">
-                  {retryCount >= maxRounds - 1 ? pc.noMore : pc.addDetail}
+                <p className="sent" role="status" data-testid={reply ? 'reply-round-note' : 'retry-cap'}>
+                  {reply ? REPLY_COPY[context.language].roundNote : retryCount >= maxRounds - 1 ? pc.noMore : pc.addDetail}
                 </p>
               )}
               {sets.length > 1 && (
@@ -891,7 +919,7 @@ export default function DemoApp({ mode = 'harness', aside }: { mode?: Mode; asid
 
       {customer && (phase === 'order' || phase === 'result') && result && chosen && (
         <div hidden={phase === 'result'}>
-        <OrderForm pageLanguage={context.language} onLive={setLive} receiverName={receiverName} onReceiver={setReceiverName} result={customer && sets[chosenSet] ? sets[chosenSet] : result} draftRef={draftRef} shown={sets.flatMap((r, i) => r.candidates.filter((c) => !c.eliminated).map((c) => ({ set: (i + 1) as 1 | 2 | 3, candidate: c })))} story={story} followUps={followUps} promptQuestionId={customer ? questionId : null} candidate={chosen} copy={copy} onBack={() => setPhase('reveal')} />
+        <OrderForm pageLanguage={context.language} reply={reply} onLive={setLive} receiverName={receiverName} onReceiver={setReceiverName} result={customer && sets[chosenSet] ? sets[chosenSet] : result} draftRef={draftRef} shown={sets.flatMap((r, i) => r.candidates.filter((c) => !c.eliminated).map((c) => ({ set: (i + 1) as 1 | 2 | 3, candidate: c })))} story={story} followUps={followUps} promptQuestionId={customer ? questionId : null} candidate={chosen} copy={copy} onBack={() => setPhase('reveal')} />
         </div>
       )}
 

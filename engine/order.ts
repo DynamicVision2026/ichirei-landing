@@ -509,7 +509,7 @@ export interface OrderOps {
   log?: OpsLogEntry[]
 }
 
-export type OrderStatus = 'pending' | 'cart_created' | 'cart_failed' | 'claimed'
+export type OrderStatus = 'pending' | 'cart_created' | 'cart_failed' | 'claimed' | 'reply'
 
 export interface GiftCheckState {
   /** Background tries made so far (at most 5, over about 6 hours). */
@@ -532,6 +532,10 @@ export interface OrderRecord {
   schema: 1
   order_ref: string
   status: OrderStatus
+  /** Part 14 (2026-11-20): `reply` = a gift sent back, free, by a receiver: an e-gift at 0 with no Shopify order and no checkout (it is not part of the promotion and not counted in the daily 100). */
+  source?: 'reply'
+  price?: number
+  reply?: { ticket: string; of: string; held: boolean }
   created_at: string
   updated_at: string
   /** Part 6 (2026-11-20): the language the story is written in (the gift's) and the language of the page it was ordered on (the menus, prices, checkout). Older records have neither: both are `production.language`. */

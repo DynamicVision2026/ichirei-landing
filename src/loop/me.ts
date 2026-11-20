@@ -13,6 +13,8 @@ export interface HoldInfo {
 }
 export interface Me {
   basket: { count: number }
+  /** The browser holds something of its own (a saved gift or an order). */
+  has?: boolean
   ready: { id: string; name: string } | null
   hold: HoldInfo | null
 }

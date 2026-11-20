@@ -15,7 +15,14 @@ import { animationUrl, buildAnimationRecord, newAnimationId, publicUrl, type Ani
 import { adoptDraft } from '../engine/preview.ts'
 import { mergeStory } from '../engine/contract.ts'
 import { ANIMATION_ID_PATTERN } from '../engine/animation.ts'
-import { buildGiftRecord, giftUrl, newGiftToken } from '../engine/gift.ts'
+import { buildGiftRecord, giftUrl, isGiftRecord, newGiftToken } from '../engine/gift.ts'
+import { backStateOf, claimPair, holdReply, pairHash, readTicket, releasePair, replyEnabled, senderEmailOf, type ReplyTicket } from '../engine/reply.ts'
+import { deliverReply } from '../engine/reply-delivery.ts'
+import { recordReply } from '../engine/engine-log.ts'
+import { resolveMailer, type Mailer } from '../engine/mailer.ts'
+import { saveToEmail } from '../engine/basket-mail.ts'
+import { normalizeEmail, recordCustomerEvent, validEmail } from '../engine/customer.ts'
+import { isOrderRecord } from '../engine/buyer.ts'
 import { allocateCertificateNo } from '../engine/certificate-no.ts'
 import { recordHealth } from '../engine/health.ts'
 import { visitorOf } from '../engine/visitor.ts'
@@ -42,6 +49,14 @@ export const ORDER_RECORD_FAILED: Record<string, string> = {
   'zh-Hans': '目前系统繁忙，请稍后再试一次。',
   en: 'Something went wrong on our side. Please try again in a moment.',
 }
+
+/** The calm lines of the free gift back (Part 14): what the page shows when a pair has used its gift back, when it is switched off, or when the ticket is not good any more. */
+export const REPLY_MESSAGES: Record<string, { used: string; off: string; invalid: string; email: string }> = {
+  ja: { used: 'このおふたりの贈り返しは、すでに使われています。', off: '贈り返しは、いまお休みしています。', invalid: 'この贈り返しは、もう使えません。', email: 'メールアドレスをご確認ください。' },
+  en: { used: 'The gift back between you two has already been used.', off: 'Sending a gift back is paused right now.', invalid: 'This gift back can no longer be used.', email: 'Please check your email address.' },
+  'zh-Hant': { used: '你們之間的回贈已經用過了。', off: '回贈目前暫停。', invalid: '這個回贈已經無法使用。', email: '請確認你的電子郵件地址。' },
+  'zh-Hans': { used: '你们之间的回赠已经用过了。', off: '回赠目前暂停。', invalid: '这个回赠已经无法使用。', email: '请确认你的电子邮件地址。' },
+}
 const json = (status: number, body: unknown) =>
   new Response(JSON.stringify(body), { status, headers: { 'content-type': 'application/json; charset=utf-8', 'cache-control': 'no-store' } })
 
@@ -64,6 +79,8 @@ export interface OrderDeps {
   film?: (input: FilmInput) => Promise<FilmRecord>
   /** Tests: how long the answer may wait for the film (production: ICHIREI_FILM_WAIT_MS, 8 s). */
   filmWaitMs?: number
+  /** Tests: the mailer for a gift sent back (production: the one resolved from RESEND_API_KEY; null = none, nothing is held or sent). */
+  mailer?: Mailer | null
 }
 
 /**
@@ -113,6 +130,30 @@ export function createOrderHandler(deps: () => OrderDeps) {
     if (!d.store) {
       return json(503, { error: 'Order storage is not configured on the server (set ORDER_BUCKET — see DEPLOY.md).', code: 'store_not_configured' })
     }
+    // The free gift back (Part 14, 2026-11-20): an e-gift sent back by a receiver, free, with a ticket made when they pressed the button on the gift they opened. No Shopify, no cart: the ticket, the pair of
+    // e-mails (the sender's and this one) and the switch are checked here; the pair is taken first (one gift back per pair, ever) and given back if anything fails before the gift is made.
+    const replyBody = (body as { reply?: { ticket?: unknown } } | null)?.reply
+    let replyCtx: { ticket: ReplyTicket; email: string; pair: string; sender: string } | null = null
+    if (replyBody !== undefined && replyBody !== null) {
+      const msg = REPLY_MESSAGES[parsed.order.page_language] ?? REPLY_MESSAGES.en
+      const env = d.env ?? process.env
+      if (!replyEnabled(env)) return json(403, { error: msg.off, code: 'reply_off' })
+      const ticket = typeof replyBody.ticket === 'string' ? await readTicket(d.store, replyBody.ticket) : null
+      const og = ticket ? await d.store.get(ticket.gift_token).catch(() => null) : null
+      const oo = isGiftRecord(og) && og.order_ref ? await d.store.get(og.order_ref).catch(() => null) : null
+      if (!ticket || !isGiftRecord(og)) return json(403, { error: msg.invalid, code: 'reply_invalid' })
+      if (ticket.status === 'used' || og.back) { recordReply('pair_used', d.store, now); return json(409, { error: msg.used, code: 'reply_used' }) }
+      const offer = backStateOf(og, isOrderRecord(oo) ? oo : null, env)
+      if (!offer || offer.state !== 'available') return json(403, { error: msg.invalid, code: 'reply_invalid' })
+      if (parsed.order.package !== 'egift') return json(400, { error: 'A gift back is an e-gift.', code: 'reply_egift_only', field: 'package' })
+      const email = typeof (body as { sender_email?: unknown }).sender_email === 'string' ? (body as { sender_email: string }).sender_email : ''
+      if (!validEmail(email)) return json(400, { error: msg.email, code: 'bad_email', field: 'sender_email' })
+      const sender = senderEmailOf(isOrderRecord(oo) ? oo : null, og)
+      if (!sender) return json(403, { error: msg.invalid, code: 'reply_invalid' })
+      const pair = pairHash(sender, email, env)
+      if (!(await claimPair(d.store, pair, now))) { recordReply('pair_used', d.store, now); return json(409, { error: msg.used, code: 'reply_used' }) }
+      replyCtx = { ticket, email: normalizeEmail(email), pair, sender }
+    }
     // A waiting order (paid without going through our site): the buyer passed /claim and holds a claim token. The chosen character is attached to the EXISTING order — no cart,
     // no second payment. Nothing else about the flow changes.
     const claimBody = (body as { claim?: { order?: unknown; token?: unknown } } | null)?.claim
@@ -133,11 +174,12 @@ export function createOrderHandler(deps: () => OrderDeps) {
       claim = claimOf(w, now)
     }
     const releaseClaim = async () => {
+      if (replyCtx && d.store) await releasePair(d.store, replyCtx.pair)
       if (!waitingId || !d.store) return
       const w = (await readWaiting(d.store, waitingId.replace(/^WO-/, '')).catch(() => null))
       if (w && w.status === 'claimed' && !w.order_ref) await d.store.put(w.id, { ...w, status: 'waiting', claimed_at: undefined }).catch(() => {})
     }
-    if (!claim && !d.shopify) {
+    if (!claim && !replyCtx && !d.shopify) {
       return json(503, { error: `Shopify is not configured on the server (missing: ${d.shopifyMissing.join(', ')}).`, code: 'shopify_not_configured', missing: d.shopifyMissing })
     }
 
@@ -145,7 +187,7 @@ export function createOrderHandler(deps: () => OrderDeps) {
     // E-gift-first launch: with ICHIREI_WOOD_SIZES=coming_soon the wooden sizes are shown as 「近日公開」 and cannot be ordered (whatever the page sent).
     if (comingSoonSizes((d.env ?? process.env).ICHIREI_WOOD_SIZES).includes(order.package)) { await releaseClaim(); return json(400, { error: `The size "${order.package}" is coming soon.`, code: 'size_coming_soon', field: 'package' }) }
     // A size whose Shopify variant is not configured cannot be ordered (a claimed order has its payment already: it needs no variant).
-    if (!claim && !d.shopify!.variants[order.package]) return json(400, { error: `The size "${order.package}" is not on sale yet.`, code: 'size_unavailable', field: 'package' })
+    if (!claim && !replyCtx && !d.shopify!.variants[order.package]) return json(400, { error: `The size "${order.package}" is not on sale yet.`, code: 'size_unavailable', field: 'package' })
     const resolved = await resolvePoems((body as { poems?: unknown } | null)?.poems, d.store, order)
     if (!resolved.ok) { await releaseClaim(); return json(400, { error: resolved.error, code: resolved.code, field: 'poems' }) }
     const poems = resolved.poems
@@ -154,6 +196,16 @@ export function createOrderHandler(deps: () => OrderDeps) {
     const record: OrderRecord = buildRecord(order, orderRef, now, poems)
     record.visitor = visitorOf(req) // the browser that makes the order: the customer record, the basket and the "your gift is ready" bar find it by this
     if (claim) record.claim = claim
+    if (replyCtx) {
+      // a gift sent back: free and made on the spot — an e-gift at 0 with no Shopify order, nothing to collect first (it is delivered to the sender as soon as it is made)
+      record.status = 'reply'
+      record.source = 'reply'
+      record.price = 0
+      record.buyer_email = replyCtx.email
+      record.collect_required = false
+      record.collected_at = now.toISOString()
+      record.reply = { ticket: replyCtx.ticket.id, of: replyCtx.ticket.gift_token, held: false }
+    }
 
     // Writes of the order record go one after the other, so a film that finishes late can never be overwritten by an older write.
     let chain: Promise<unknown> = Promise.resolve()
@@ -259,6 +311,35 @@ export function createOrderHandler(deps: () => OrderDeps) {
         animation_url: animationLink,
         gift_url: giftLink,
       })
+    }
+
+    // 3b. A gift sent back: no cart. It is made exactly like any e-gift; then it is delivered to the sender (or, with a mailer, held until the receiver's own address has opened its inbox link).
+    if (replyCtx) {
+      const rc = replyCtx
+      try {
+        if (filmP) await raceTimeout(filmP, d.filmWaitMs ?? filmWaitMs(d.env))
+        const env = d.env ?? process.env
+        const mailer = d.mailer !== undefined ? d.mailer : await resolveMailer(env).catch(() => null)
+        // the usual inbox-link check, once there is a mailer and a browser to send the link to; before that the e-mail is taken as entered
+        let held = false
+        if (mailer && record.visitor && record.gift_token) {
+          const sent = await saveToEmail({ store: d.store, mailer, env, now: d.now?.() ?? new Date() }, record.visitor, rc.email, order.page_language).catch(() => null)
+          held = !!sent && sent.ok
+          if (held) await holdReply(d.store, rc.email, { gift_token: record.gift_token, ticket: rc.ticket.id, at: (d.now?.() ?? new Date()).toISOString() })
+        }
+        if (record.reply) record.reply.held = held
+        await d.store.put(rc.ticket.id, { ...rc.ticket, status: 'used', used_at: now.toISOString() })
+        await putOrder()
+        void recordCustomerEvent(d.store, { email: rc.email, browser: record.visitor ?? null }, 'ordered_free', { ref: orderRef }, now)
+        if (!held && record.gift_token) await deliverReply({ store: d.store, mailer, env, now: d.now?.() ?? new Date() }, rc.ticket.id, record.gift_token)
+        recordReply('sent', d.store, now)
+        console.log('[ichirei-order]', JSON.stringify({ order_ref: orderRef, status: record.status, package: order.package, language: order.language, reply: true, held }))
+        return json(200, { order_ref: orderRef, reply: true, held, glyph: order.glyph, certificate_text: record.production.certificate_text, certificate: record.production.certificate, animation_url: animationLink, gift_url: giftLink })
+      } catch (err) {
+        console.error('[ichirei-order] reply failed', orderRef, err instanceof Error ? err.message : err)
+        await releasePair(d.store, rc.pair)
+        return json(503, { error: ORDER_RECORD_FAILED[order.page_language] ?? ORDER_RECORD_FAILED.en, code: 'order_record_failed' })
+      }
     }
 
     // 3. The Shopify cart.

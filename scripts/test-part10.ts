@@ -33,7 +33,7 @@ for (const [language, story] of [['ja', '母は毎朝、お弁当に庭の花を
   check(`(2) a ${language} order with UTM parameters carries them through (utm on the order and the hidden _utm_… cart properties)`, parsed.ok && JSON.stringify(parsed.order.utm) === JSON.stringify(UTM) && keys.some(([k, v]) => k === '_utm_source' && v === 'chatgpt.com') && keys.some(([k]) => k === '_utm_campaign'), JSON.stringify(parsed))
 }
 const form = readFileSync('src/demo/OrderForm.tsx', 'utf8')
-check('(2) the page sends the UTM parameters and fires egift_scheduled whatever the language (no language condition left)', form.includes("...(Object.keys(getUtm()).length > 0 ? { utm: getUtm() } : {})") && form.includes("if (res.ok && landing && openDate) trackUs('egift_scheduled')") && !/language === 'en' && Object\.keys\(getUtm/.test(form))
+check('(2) the page sends the UTM parameters and fires egift_scheduled whatever the language (no language condition left)', /\.\.\.\(Object\.keys\(getUtm\(\)\)\.length > 0[^?]*\? \{ utm: getUtm\(\) \} : \{\}\)/.test(form) && form.includes("if (res.ok && landing && openDate) trackUs('egift_scheduled')") && !/language === 'en' && Object\.keys\(getUtm/.test(form))
 check('(2) the schedule on the sender page already reports egift_scheduled for every language, and the server counts the event', readFileSync('src/animation/Schedule.tsx', 'utf8').includes("trackUs('egift_scheduled')") && (US_EVENTS as readonly string[]).includes('egift_scheduled'))
 check('(2) the order code no longer limits UTM to English', !/lang === 'en' && Object\.keys\(cleanUtm/.test(readFileSync('engine/order.ts', 'utf8')) && !/order\.language === 'en' && order\.utm/.test(readFileSync('engine/order.ts', 'utf8')))
 

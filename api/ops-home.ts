@@ -14,7 +14,7 @@ import { PERIODS, type OrderStat, type Period } from '../engine/stats.ts'
 import { readCustomer, type CustomerRecord, type EventCode } from '../engine/customer.ts'
 import type { BasketItem } from '../engine/basket.ts'
 import type { OrderStore } from '../engine/order-store.ts'
-import { checkNow, countsOf, lastErrorOf, lightOf, modelsOf, plainWords, readEngineLines, type Counts, type EngineLine, type LastError, type LightState } from '../engine/engine-log.ts'
+import { checkNow, countsOf, lastErrorOf, lightOf, modelsOf, plainWords, readEngineLines, replyCountsOf, type ReplyCounts, type Counts, type EngineLine, type LastError, type LightState } from '../engine/engine-log.ts'
 import { ENGINE_CONFIG, DEFAULT_FREE_MODEL } from '../engine/engine.ts'
 import Anthropic from '@anthropic-ai/sdk'
 
@@ -139,6 +139,8 @@ export interface EngineCardData {
   last: LastError | null
   /** What each kind of call last used (seen in the last 24 hours; the configured models fill the rest). */
   models: Record<string, string>
+  /** The free gift back in the last 24 hours (Part 14): tickets started, gifts sent back, second ones refused. */
+  reply: ReplyCounts
 }
 
 /** The models the site is set to use (the environment, as the engine reads it). */
@@ -149,7 +151,7 @@ export const configuredModels = (env: NodeJS.ProcessEnv = process.env): Record<s
 })
 
 export function engineCardData(lines: EngineLine[], now: Date, configured: Record<string, string> = {}): EngineCardData {
-  return { light: lightOf(lines, now), hour: countsOf(lines, now, 3_600_000), day: countsOf(lines, now, 24 * 3_600_000), last: lastErrorOf(lines), models: modelsOf(lines, configured) }
+  return { light: lightOf(lines, now), hour: countsOf(lines, now, 3_600_000), day: countsOf(lines, now, 24 * 3_600_000), last: lastErrorOf(lines), models: modelsOf(lines, configured), reply: replyCountsOf(lines, now, 24 * 3_600_000) }
 }
 
 const LIGHT_LOOK: Record<LightState['light'], { color: string; en: string; zh: string }> = {
@@ -171,12 +173,15 @@ export function renderEngineCard(d: EngineCardData, now: Date): string {
       })()
     : `<p class="muted">No errors in the last 24 hours. 過去 24 小時沒有錯誤。</p>`
   const models = Object.entries(d.models).filter(([k]) => k !== 'check').map(([k, v]) => `<span class="eng-model">${esc(KIND_LABEL[k] ?? k)}: <b>${esc(v)}</b></span>`).join('')
+  const rc = d.reply ?? { started: 0, sent: 0, pairsUsed: 0 }
+  const replyLine = `<p class="muted" data-testid="reply-counts" style="margin:10px 0 0">Gift back 贈り返し・回贈 (24 h): started 開始 <b>${n(rc.started)}</b> · sent 送出 <b>${n(rc.sent)}</b> · pairs used 已用的組合 <b>${n(rc.pairsUsed)}</b></p>`
   return `<section class="card" id="engine-status" data-light="${d.light.light}" aria-label="Engine status">` +
     `<div style="display:flex;flex-wrap:wrap;justify-content:space-between;gap:8px;align-items:center"><h2 class="serif">Engine status <span class="muted" style="font-weight:500">引擎狀態</span></h2>` +
     `<div class="eng-light"><i class="eng-dot" data-testid="engine-light" data-light="${d.light.light}" style="background:${look.color}"></i><span><b data-testid="engine-light-word">${look.en} ${look.zh}</b><br><span class="muted">${esc(d.light.why)} · ${n(d.light.total)} card calls in 30 min</span></span></div></div>` +
     `<div class="scroll"><table class="eng"><thead><tr><th></th><th>Card rounds 卡片</th><th>Pictures 圖片</th></tr></thead><tbody>${row('Last hour 最近 1 小時', d.hour)}${row('Last 24 h 最近 24 小時', d.day)}</tbody></table></div>` +
     `<div><div class="eyebrow">Last error 最近一次錯誤</div>${last}</div>` +
     (models ? `<div><div class="eyebrow">Models in use 使用中的模型</div><div class="eng-models">${models}</div></div>` : '') +
+    replyLine +
     `<div class="eng-check"><button type="button" id="engine-check" class="eng-btn">Check now 立即檢查</button><span id="engine-check-result" role="status" aria-live="polite" class="muted">One tiny call to the AI, at most once a minute. 只呼叫一次，每分鐘最多一次。</span></div>` +
     `<script>(function(){var b=document.getElementById('engine-check'),o=document.getElementById('engine-check-result');if(!b)return;b.addEventListener('click',function(){b.disabled=true;o.textContent='Checking… 檢查中…';fetch('/ops/home/engine-check',{method:'POST',credentials:'same-origin'}).then(function(r){return r.json()}).then(function(j){if(j.limited){o.textContent='Please wait '+j.wait+' s. 請等 '+j.wait+' 秒。'}else if(j.ok){o.textContent='OK 正常 · '+j.model+' · '+(j.ms/1000).toFixed(1)+' s'}else{o.textContent='Failed 失敗: '+j.words.en+' / '+j.words.zh+' ('+j.cls+')'}}).catch(function(){o.textContent='Could not check. 無法檢查。'}).then(function(){b.disabled=false})})})()</script>` +
     `</section>`

@@ -3,7 +3,6 @@ import { useStageFit } from './stage-fit.ts'
 import { WaitBody, useNow } from './Waiting.tsx'
 import type { GiftView } from '../../animation/types.ts'
 import { EgiftReceive } from '../../animation/GiftPanels.tsx'
-import { RETURN_CHARS, returnWord } from '../../order/return-chars.ts'
 import { cleanReading } from '../../order/reading.ts'
 import { usePromoOn } from '../../demo/useSizes'
 import { trackReceiverOpened, trackUs } from '../../demo/analytics'
@@ -21,7 +20,7 @@ import MyGiftsButton from '../../loop/MyGifts.tsx'
 // The motion and the numbers are the director's preview (v5). Reduced motion: cross-fades only (no push-in, no grow, no dive into the stroke).
 // The data is today's gift view; nothing new is asked of the sender. Before the mark is touched the page shows the two names and nothing else.
 
-export type CeremonyScreen = 'wait' | 'mark' | 'note' | 'film' | 'char' | 'poem' | 'cert' | 'keep' | 'back' | 'sent'
+export type CeremonyScreen = 'wait' | 'mark' | 'note' | 'film' | 'char' | 'poem' | 'cert' | 'keep' | 'back'
 
 /** The director's film: 6.6 s a picture, a 0.9 s cross-fade, a slow push-in 1 → 1.07; then it fades to paper over 1.1 s while the music fades over 2.4 s. */
 export const FILM_HOLD_MS = 6600
@@ -54,8 +53,6 @@ export default function NewCeremony({ view, preview, q }: { view: GiftView; prev
   const reduced = useMemo(reducedMotion, [])
   const [screen, setScreen] = useState<CeremonyScreen>(preview && view.waiting ? 'wait' : 'mark')
   const now = useNow()
-  // an answered gift shows what was sent when the receiver comes back (the view carries their own answer)
-  const [sent, setSent] = useState<{ char: string | null; text: boolean } | null>(view.replied ? { char: view.answer?.char ?? null, text: view.answer?.words ?? false } : null)
   const [meaningDone, setMeaningDone] = useState(false)
   const skipRef = useRef<(() => void) | null>(null)
   const onMeaning = useCallback(() => setMeaningDone(true), [])
@@ -197,13 +194,9 @@ export default function NewCeremony({ view, preview, q }: { view: GiftView; prev
           </section>
         )}
 
-        {screen === 'keep' && <KeepScreen view={view} preview={preview} q={q} from={from} onAnswer={() => go(sent ? 'sent' : 'back')} />}
+        {screen === 'keep' && <KeepScreen view={view} preview={preview} q={q} from={from} onAnswer={() => go('back')} />}
 
-        {screen === 'back' && <BackScreen view={view} from={from} onSent={(r) => { setSent(r); go('sent') }} />}
-
-        {screen === 'sent' && (
-          <SentScreen lang={cerLang(view.language)} from={from} sent={sent} onBack={() => go('keep')} />
-        )}
+        {screen === 'back' && <LastScreen view={view} from={from} preview={preview} onBackToGift={() => go('keep')} />}
       </div>
     </main>
   )
@@ -637,69 +630,62 @@ function KeepScreen({ view, preview, q, from, onAnswer }: { view: GiftView; prev
         <GiftActions lang={pageLang(view.language)} role="receiver" base={base} q={q} giftUrl={`${window.location.origin}/g/${view.token}`} complete={complete} scroll={scroll} memorial={view.memorial} enCard={view.language === 'en' && !!view.en} track preview={preview} hint={inApp ? <p className="cr-inapp" data-testid="keep-inapp" role="note">{C.inAppLine}</p> : undefined} />
       </div>
       {view.egift && !preview && <div className="cr-egift"><EgiftReceive view={view} lang={pageLang(view.language)} /></div>}
-      {!preview && <button type="button" className="cr-go cr-next" style={{ marginTop: 'auto' }} data-testid="gift-to-answer" onClick={onAnswer}>{C.toAnswer(from)}</button>}
+      {!preview && <button type="button" className="cr-go cr-next" style={{ marginTop: 'auto' }} data-testid="gift-to-answer" onClick={onAnswer}>{view.back?.state === 'available' ? C.toAnswer(from) : C.toLast}</button>}
       <a className="cr-go cr-quiet" href="/credits" data-testid="animation-credits-link">{C.credits}</a>
     </section>
   )
 }
 
-/** Screen 8: one of the twelve, and/or a few words (80 characters), sent once. */
-function BackScreen({ view, from, onSent }: { view: GiftView; from: string; onSent: (r: { char: string | null; text: boolean }) => void }) {
-  const C = CER[cerLang(view.language)]
-  const [char, setChar] = useState<string | null>(null)
-  const [text, setText] = useState('')
-  const [phase, setPhase] = useState<'idle' | 'sending' | 'error'>('idle')
-  const send = async () => {
-    if (!char && !text.trim()) return
-    setPhase('sending')
+/**
+ * Screen 8 (Part 14, 2026-11-20) — the free gift back; it replaces the twelve characters and their sent screen. One choice, offered and never pushed:
+ *   · `available`: 「あなたの目に、〈from〉さんはどう映っていますか。」, the line, ONE button (the writing page opens with a reply ticket);
+ *   · `used`: this gift was answered — 「〈from〉さんに、一字を贈り返しました。」, the character in ink and the way to its page, no button;
+ *   · nothing offered (a remembrance, a quiet purpose, a reply itself, switched off): only the question below.
+ * Under it, unchanged: 「まだ、きちんと伝えられていない人はいませんか。」 with 「あなたも一字を贈る」 (and the promotion box only while it runs).
+ */
+function LastScreen({ view, from, preview, onBackToGift }: { view: GiftView; from: string; preview: boolean; onBackToGift: () => void }) {
+  const lang = cerLang(view.language)
+  const C = CER[lang]
+  const T = thanksCopy(lang)
+  const promoOn = usePromoOn()
+  const back = view.back ?? null
+  const [phase, setPhase] = useState<'idle' | 'busy' | 'error'>('idle')
+  const start = async () => {
+    if (phase === 'busy' || preview) return
+    setPhase('busy')
     try {
-      const res = await fetch(`/api/gift/${view.token}/reply`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ ...(text.trim() ? { text: text.trim() } : {}), ...(char ? { char } : {}) }) })
-      if (res.ok || res.status === 409) {
-        if (res.ok) trackUs('receiver_replied')
-        onSent({ char, text: !!text.trim() })
-      } else setPhase('error')
+      const res = await fetch(`/api/gift/${view.token}/back`, { method: 'POST' })
+      const j = (await res.json().catch(() => ({}))) as { ticket?: string }
+      if (!res.ok || !j.ticket) return setPhase('error')
+      trackUs('receiver_replied')
+      // the normal writing page, in the language of this gift's page, with the ticket
+      window.location.assign(`${C.landing === '/' ? '' : C.landing}/write?reply=${encodeURIComponent(j.ticket)}`)
     } catch {
       setPhase('error')
     }
   }
+  const title = back?.state === 'used' ? [C.backUsedTitle(from)] : C.backTitle(from)
   return (
-    <section className="cr-scr cr-flow" data-testid="gift-answer">
-      <h2 className="cr-h" data-testid="gift-answer-title">{C.backTitle(from)[0]}<br />{C.backTitle(from)[1]}</h2>
-      <p className="cr-b">{C.backBody}</p>
-      <ul className="cr-grid" data-testid="gift-chars">
-        {RETURN_CHARS.map((r) => (
-          <li key={r.char}>
-            <button type="button" className="cr-ch" aria-pressed={char === r.char} data-testid={`gift-char-${r.char}`} onClick={() => setChar((c) => (c === r.char ? null : r.char))}>
-              <b className="notranslate" translate="no">{r.char}</b>
-              <span>{r[C.lang]}</span>
-            </button>
-          </li>
-        ))}
-      </ul>
-      <div>
-        <label htmlFor="cr-reply" className="cr-lab" style={{ display: 'block', marginBottom: 6 }}>{C.wordsLabel}</label>
-        <input id="cr-reply" className="cr-field" type="text" maxLength={80} placeholder={C.wordsPlaceholder} value={text} onChange={(e) => setText([...e.target.value].slice(0, 80).join(''))} data-testid="gift-reply-text" />
-      </div>
-      {phase === 'error' && <p role="alert" className="cr-b cr-ink">{C.sendError}</p>}
-      <button type="button" className="cr-go cr-next" style={{ marginTop: 'auto' }} data-testid="gift-reply-send" disabled={(!char && !text.trim()) || phase === 'sending'} onClick={() => void send()}>
-        {phase === 'sending' ? C.sending : C.send(char, from)}
-      </button>
-    </section>
-  )
-}
-
-/** Screen 9: sent; then "Is there someone you've never quite said it to?" with a real button to /en (and the free-gift card while the promotion runs). */
-function SentScreen({ lang, from, sent, onBack }: { lang: ReturnType<typeof cerLang>; from: string; sent: { char: string | null; text: boolean } | null; onBack: () => void }) {
-  const C = CER[lang]
-  const T = thanksCopy(lang)
-  const promoOn = usePromoOn()
-  const char = sent?.char ?? null
-  return (
-    <section className="cr-scr cr-flow" data-testid="gift-reply-sent">
+    <section className="cr-scr cr-flow" data-testid="gift-last" data-back={back?.state ?? 'none'}>
       {/* Part 8 (2026-11-20): the receiver's own マイギフト, in the same corner as on every other page */}
-      <div className="cr-mygifts-top" data-testid="cr-mygifts-top"><MyGiftsButton lang={lang === 'zh-Hans' ? 'zh-Hant' : lang} /></div>
-      <div className="cr-sent"><span className="cr-dot" aria-hidden="true" /><p className="cr-lab" role="status" data-testid="cr-sent-line">{C.sentLine(from, char, char ? returnWord(char, lang) : '')}</p></div>
-      {char ? <p className="cr-b cr-ink">{C.bothSaid(from)}</p> : sent?.text ? <p className="cr-b cr-ink">{C.wordsSent(from)}</p> : null}
+      <div className="cr-mygifts-top" data-testid="cr-mygifts-top"><MyGiftsButton lang={lang === 'zh-Hans' ? 'zh-Hant' : lang} receiver /></div>
+      {back && (
+        <>
+          <h2 className="cr-h" data-testid="gift-back-title">{title[0]}{title[1] && <><br />{title[1]}</>}</h2>
+          {back.state === 'available' ? (
+            <>
+              <p className="cr-b" data-testid="gift-back-line">{C.backLine(from)}</p>
+              {!preview && <button type="button" className="cr-blk cr-backbtn" data-testid="gift-back-button" disabled={phase === 'busy'} onClick={() => void start()}>{phase === 'busy' ? C.backBusy : C.backButton(from)}</button>}
+              {phase === 'error' && <p role="alert" className="cr-b cr-ink" data-testid="gift-back-error">{C.backError}</p>}
+            </>
+          ) : (
+            <>
+              <p className="cr-char-ink notranslate" translate="no" data-testid="gift-back-char">{back.char}</p>
+              {back.page && !preview && <a className="cr-go cr-next" data-testid="gift-back-page" href={back.page}>{C.backUsedLink}</a>}
+            </>
+          )}
+        </>
+      )}
       <h2 className="cr-h" style={{ fontSize: 'clamp(28px, 8.6vw, 35px)' }} data-testid="cr-ask">{C.ask}</h2>
       {promoOn && (
         <div className="cr-slip cr-promo" data-testid="gift-landing-promo">
@@ -708,7 +694,7 @@ function SentScreen({ lang, from, sent, onBack }: { lang: ReturnType<typeof cerL
         </div>
       )}
       <a className="cr-blk" href={C.landing} data-testid="gift-landing-line">{C.giveOwn}</a>
-      <button type="button" className="cr-go cr-quiet" onClick={onBack}>{C.backToGift}</button>
+      <button type="button" className="cr-go cr-quiet" onClick={onBackToGift}>{C.backToGift}</button>
     </section>
   )
 }

@@ -459,7 +459,7 @@ function AnswerBox({ token, lang, copy, from, replied, memorial }: { token: stri
     return (
       <>
         {/* Part 8 (2026-11-20): the receiver's own マイギフト in the same corner */}
-        <div className="gf-mygifts-top" data-testid="gf-mygifts-top"><MyGiftsButton lang={lang} /></div>
+        <div className="gf-mygifts-top" data-testid="gf-mygifts-top"><MyGiftsButton lang={lang} receiver /></div>
         <p className="gf-sent-line" role="status" data-testid="gift-reply-sent">{copy.replySent(from)}</p>
         {!memorial && <p className="gf-landing-line" data-testid="gift-landing-line"><a className="gf-landing-btn" href={landing}>{copy.answerLanding}</a></p>}
         {!memorial && promoOn && lang === 'en' && copy.answerPromo && <p className="gf-landing-promo" data-testid="gift-landing-promo">{copy.answerPromo}</p>}

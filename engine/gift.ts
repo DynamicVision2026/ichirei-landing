@@ -97,7 +97,13 @@ export interface GiftRecord {
   /** 「一字礼　第 NNNN 号」 — the running number (engine/certificate-no.ts); null on gifts made before numbers existed. */
   certificate_no?: number | null
   /** The receiver's one answer (2026-11-14): a written reply, one of the twelve characters given back, or both — sent once, shown on the sender's page. `text` is '' when only a character came. */
-  reply?: { text: string; at: string; char?: string } | null
+  reply?: { text: string; at: string; char?: string; /** Part 14: the reply gift's token when the answer is a gift sent back (not one of the old twelve characters). */ gift?: string } | null
+  /** Part 14 (2026-11-20): `reply` = this gift was sent back, free, by a receiver (it never gets a reply of its own); the original gift it answers. */
+  source?: 'reply' | null
+  reply_of?: string | null
+  /** The original gift: the gift sent back for it (the character and the sender page of the reply gift, for the receiver's own last screen), and the one open reply ticket. */
+  back?: { char: string; at: string; gift: string; page?: string | null } | null
+  reply_ticket?: string | null
   /** The ceremony's states (codes, no text): when the sender first used a copy / share button, when the receiver untied the envelope, when an answer came. */
   shared_at?: string | null
   opened_at?: string | null
@@ -137,6 +143,7 @@ export function buildGiftRecord(record: OrderRecord, animationId: string, token:
     ...(p.open_at && p.open_tz ? { opens_at: p.open_at, opens_tz: p.open_tz } : {}),
     certificate_no: record.certificate_no ?? null,
     reply: null,
+    ...(record.source === 'reply' ? { source: 'reply' as const, reply_of: record.reply?.of ?? null } : {}),
   }
 }
 
@@ -170,6 +177,8 @@ export interface GiftView extends AnimationView {
   package: PackageId
   /** Only on the sender's own preview of a gift that is still locked: when it opens (so the preview shows the waiting screen first). */
   waiting?: { opens_on: string | null; opens_at: string | null; opens_tz: string | null } | null
+  /** Part 14: what the receiver is offered on the last screen — `available` (send a gift back, free), `used` (this gift was answered: its character and the sender page of the gift sent back), or absent (nothing). */
+  back?: { state: 'available' } | { state: 'used'; char: string; page: string | null } | null
 }
 
 /** The closed envelope: names and the date only. Nothing of the film, the character, the poem or the message leaves the server before the day. */

@@ -489,3 +489,9 @@
 .rv .closing .promoNote .linkBtn{color:inherit}
 /* where the e-gift sits in a row with the wooden sizes (ja, zh) its picture keeps the cards' frame, so the three prices line up; alone (en) it is square */
 .rv #gifts .gifts:not(.single) .gift[data-size=egift] img{aspect-ratio:16/10;object-position:50% 40%}
+
+/* Part 14 (2026-11-20): the order step of a gift sent back — the price line: ¥0 / $0 and its tag */
+.replyPrice { display: flex; align-items: baseline; gap: 10px; margin: 0 0 14px; }
+.replyPrice b { font-size: 1.7rem; font-weight: 600; }
+.replyPrice span { font-size: .95rem; color: var(--mute, #6B5F4E); letter-spacing: .06em; }
+.replyBanner { margin: 0 0 14px; padding: 8px 12px; border-left: 2px solid var(--accent, #B3331F); font-size: .95rem; line-height: 1.6; }

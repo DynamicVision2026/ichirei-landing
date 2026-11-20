@@ -179,3 +179,7 @@
 
 /* Part 13 (2026-11-20): the in-app browser line above the two buttons */
 .cr-inapp { margin: 0; font-size: 14px; line-height: 1.5; color: #6B5F4E; border-left: 2px solid #B8924A; padding-left: 10px; align-self: stretch; }
+
+/* Part 14 (2026-11-20): the free gift back — one button, and (once it is used) the character that was sent, in ink */
+.cr-backbtn { align-self: flex-start; }
+.cr-char-ink { margin: 0; font-family: var(--f-m); font-weight: 900; font-size: 96px; line-height: 1.1; color: var(--ink); }

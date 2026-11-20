@@ -6723,6 +6723,147 @@ for (const [lang, locale, text] of [['en', 'en-US', 'Your gift is being finished
   }
 }
 
+// ---------- Run 48 (2026-11-20, Part 14): the free gift back — the receiver's one-button screen replaces the twelve characters; the writing page with the reply ticket (the person prefilled, one round); the order step at ¥0 / $0 with one field; the sender's マイギフト shows 「返事が届きました」 ----------
+{
+  const TOKEN = 'RG-giftbackgiftbackgift'
+  const TICKET = 'RT-abcdefghjkmnpqrstuvwxyz2'
+  const PICS = ['/img/scenes/children.jpg', '/img/scenes/friends.jpg', '/img/scenes/m1.jpg', '/img/scenes/m2.jpg']
+  const W = {
+    ja: { title: 'あなたの目に、 佐藤さんはどう映っていますか。', line: 'こんどは、あなたが一字を贈る番です。ひと場面を書けば、佐藤さんに一字が届きます。無料です。', button: '佐藤さんに一字を贈り返す（無料）', usedTitle: '佐藤さんに、一字を贈り返しました。', usedLink: '贈りもののページ', ask: 'まだ、きちんと伝えられていない人はいませんか。', giveOwn: 'あなたも一字を贈る', price: '¥0', tag: '贈り返し・無料', emailLabel: 'あなたのメールアドレス', submit: '無料で贈り返す', note: '贈り返しは1回の選出です', path: '/write' },
+    en: { title: 'And how do you see Brian?', line: "Now it's your turn. Write one moment, and Brian receives a character from you. It's free.", button: 'Send Brian a character back (free)', usedTitle: 'You sent Brian a character back.', usedLink: "The gift's page", ask: "Is there someone you've never quite said it to?", giveOwn: 'Give one of your own', price: '$0', tag: 'Gift back · free', emailLabel: 'Your email address', submit: 'Send it back, free', note: 'A gift back has one round of characters', path: '/en/write' },
+    'zh-Hant': { title: '在你眼中， 佐藤是什麼樣子？', line: '這次換你送一個字。寫下一個片刻，佐藤就會收到你送的字。免費。', button: '回贈佐藤一個字（免費）', usedTitle: '你已回贈佐藤一個字。', usedLink: '禮物頁面', ask: '有沒有一個人，你一直還沒好好說出口？', giveOwn: '你也送一個字', price: '¥0', tag: '回贈・免費', emailLabel: '你的電子郵件地址', submit: '免費回贈', note: '回贈只有一次選字', path: '/zh/write' },
+  }
+  const name = (lang) => (lang === 'en' ? 'Brian' : '佐藤')
+  const view = (lang, back) => ({ id: TOKEN, token: TOKEN, language: lang, glyph: '添', reading: lang === 'ja' ? 'そう' : '', romanization: 'sou', meaning_en: 'to stay beside', who: lang === 'en' ? 'Someone who walked beside me.' : '隣をゆっくり歩いてくれた人。', poem: { type: lang === 'zh-Hant' ? 'tang' : lang === 'ja' ? 'tanka' : 'en', lines: lang === 'en' ? ['one', 'two', 'three'] : lang === 'ja' ? ['道の端', '並んで歩く', 'ゆっくりと', '待ってくれてる', '静かな時間'] : ['道旁並肩行', '慢步不言聲', '一路相陪伴', '靜中有真情'], reading: '' }, memorial: false, purpose: 'thanks', music: 'thanks', film: { status: 'ready', lines: ['a', 'b', 'c', 'd'], pictures: PICS }, certificate_line: 'x', from: name(lang), to: lang === 'en' ? 'Kenji' : '田中', message: '', egift: null, certificate_no: 12, order_date: '2026-11-18', opens_on: null, opens_at: null, opens_tz: null, replied: false, package: 'egift', locked: false, ...(back ? { back } : {}) })
+  const T = (page, id) => page.locator(`[data-testid="${id}"]`)
+  const norm = (t) => t.replace(/\s+/g, ' ').trim()
+  const lastScreen = async (lang, back, { page: given = null, has = false } = {}) => {
+    const f = given ?? (await mockPage(browser, { result: (b) => ({ ...FIXTURE, language: b.language }), order: () => ({ json: { order_ref: 'IC-20261120-RP000001', reply: true, held: false, glyph: '証', animation_url: 'http://localhost:5173/__sender?ok=1' } }) }))
+    const page = f.page
+    await page.setViewportSize({ width: 390, height: 844 })
+    const asked = { back: 0 }
+    await page.emulateMedia({ reducedMotion: 'reduce' })
+    await page.route('**/api/me*', (r) => r.fulfill({ json: { basket: { count: 0 }, has, ready: null, hold: null } }))
+    await page.route('**/api/promo', (r) => r.fulfill({ json: { on: false, left: 0, daily: 100, hold: null } }))
+    await page.route(`**/api/gift/${TOKEN}**`, async (r) => {
+      const u = new URL(r.request().url())
+      if (u.pathname === `/api/gift/${TOKEN}/opened`) return r.fulfill({ json: { ok: true } })
+      if (u.pathname === `/api/gift/${TOKEN}/back`) { asked.back++; return r.fulfill({ json: { ok: true, ticket: TICKET } }) }
+      if (u.pathname === `/api/gift/${TOKEN}/render`) return r.fulfill({ json: { state: 'ready', view: view(lang, back) } })
+      if (u.pathname === `/api/gift/${TOKEN}`) return r.fulfill({ json: view(lang, back) })
+      return r.fulfill({ status: 204, body: '' })
+    })
+    await page.route(`**/api/reply/${TICKET}`, (r) => r.fulfill({ json: { ok: true, to: name(lang), from: lang === 'en' ? 'Kenji' : '田中', language: lang } }))
+    await page.route('**/__sender*', (r) => r.fulfill({ status: 200, contentType: 'text/html', body: '<h1 id="sender">sender page</h1>' }))
+    await page.goto(`http://localhost:5173/g/${TOKEN}`, { waitUntil: 'networkidle' })
+    await T(page, 'cr-markbtn').click()
+    await T(page, 'cr-film').waitFor()
+    await page.waitForFunction(() => document.querySelector('[data-testid=cr-film]')?.getAttribute('data-ready') === 'yes', null, { timeout: 15000 })
+    await T(page, 'gift-skip').click()
+    await page.waitForSelector('[data-testid=cr-char][data-meaning=yes]', { timeout: 30000 })
+    await T(page, 'cr-to-poem').click()
+    await T(page, 'cr-poem').waitFor()
+    await page.waitForTimeout(3600)
+    await T(page, 'cr-to-cert').click()
+    await T(page, 'cr-to-keep').click()
+    await T(page, 'gift-keep').waitFor()
+    await T(page, 'gift-to-answer').click()
+    await T(page, 'gift-last').waitFor()
+    return { ...f, asked }
+  }
+  for (const lang of ['ja', 'en', 'zh-Hant']) {
+    const L = W[lang]
+    // 1. offered: the question, the line, ONE button — and the twelve characters are gone
+    const a = await lastScreen(lang, { state: 'available' })
+    const p = a.page
+    check(`last screen (${lang}, offered): the title, the line and ONE button, word for word`, norm(await T(p, 'gift-back-title').innerText()).toLowerCase() === L.title.toLowerCase() && norm(await T(p, 'gift-back-line').innerText()) === L.line && ((await T(p, 'gift-back-button').textContent()) ?? '').trim().toLowerCase() === L.button.toLowerCase() && (await T(p, 'gift-back-button').count()) === 1, JSON.stringify([norm(await T(p, 'gift-back-title').innerText()), norm(await T(p, 'gift-back-line').innerText())]))
+    check(`last screen (${lang}): the twelve characters, the words box and the old sent screen are gone`, (await T(p, 'gift-chars').count()) === 0 && (await T(p, 'gift-reply-text').count()) === 0 && (await T(p, 'gift-reply-send').count()) === 0 && (await T(p, 'gift-reply-sent').count()) === 0 && (await T(p, 'gift-answer').count()) === 0)
+    check(`last screen (${lang}): under it, unchanged — 「${L.ask}」 with 「${L.giveOwn}」`, norm(await T(p, 'cr-ask').innerText()).toLowerCase() === L.ask.toLowerCase() && ((await T(p, 'gift-landing-line').textContent()) ?? '').trim().toLowerCase() === L.giveOwn.toLowerCase())
+    if (lang === 'ja') await p.screenshot({ path: `${SHOTS}/p14-choice-ja-390.png` })
+    // the button makes a ticket on the server and opens the normal writing page with it
+    await T(p, 'gift-back-button').click()
+    await p.waitForURL(/\/write\?reply=RT-/, { timeout: 8000 })
+    check(`last screen (${lang}): the button asked the server for a ticket once and opened the writing page with it (${L.path}?reply=…)`, a.asked.back === 1 && p.url().includes(`${L.path}?reply=${TICKET}`), p.url())
+    // 2. the writing page: the person is the sender, one round only
+    await T(p, 'reply-banner').waitFor({ timeout: 8000 })
+    check(`writing page (${lang}): a line says who it goes to`, (await T(p, 'reply-banner').innerText()).includes(name(lang)))
+    await p.locator('#write [data-testid=story-input]').fill(STORY)
+    await pickContext(p)
+    await p.click(`#write >> text=${GO[lang]}`)
+    await p.waitForSelector('[data-all-revealed=yes]', { timeout: 15000 })
+    check(`cards (${lang}): ONE round — no 「別の候補」 button, and the line 「${L.note}」`, (await T(p, 'see-others').count()) === 0 && norm(await T(p, 'reply-round-note').innerText()) === L.note)
+    await p.locator('article[data-slot=main]').click()
+    await p.locator('article[data-slot=main]').locator(`text=${GIVE[lang]}`).click()
+    await toOrder(p)
+    // 3. the order step: $0, e-gift only, one field
+    await T(p, 'reply-order').waitFor()
+    check(`order step (${lang}): the price line ${L.price} with 「${L.tag}」, one field 「${L.emailLabel}」 and the button 「${L.submit}」`, norm(await T(p, 'reply-price').innerText()) === `${L.price} ${L.tag}` && norm(await p.locator('label[for=reply_email]').innerText()) === L.emailLabel && ((await T(p, 'order-submit').textContent()) ?? '').trim() === L.submit)
+    check(`order step (${lang}): no names, no sizes, no message, no date, no refund box — nothing to pay, nothing to schedule`, (await p.locator('input[name=sender_name], input[name=receiver_name], input[name=package], input[name=delivery_date], [data-testid=gift-letter], [data-testid=open-date], [data-testid=order-refund-check]').count()) === 0)
+    check(`order step (${lang}): the button waits for a real e-mail address`, await T(p, 'order-submit').isDisabled())
+    await T(p, 'reply-email').fill('not-an-address')
+    const stillOff = await T(p, 'order-submit').isDisabled()
+    await T(p, 'reply-email').fill('ichiro@example.com')
+    // the poem is written before the order can go (as today)
+    await p.waitForFunction(() => !document.querySelector('[data-testid=order-submit]').disabled, null, { timeout: 15000 })
+    check(`order step (${lang}): a malformed address keeps it off; a good one turns it on`, stillOff)
+    if (lang === 'ja') await p.screenshot({ path: `${SHOTS}/p14-order-ja-390.png`, fullPage: true })
+    await T(p, 'order-submit').click()
+    await p.waitForSelector('#sender', { timeout: 8000 })
+    const sent = a.calls.order[0]
+    check(`order (${lang}): one request with the ticket and the address, an e-gift, no opening date, no message — and it went to the sender page of the gift (no checkout)`, a.calls.order.length === 1 && sent.reply?.ticket === TICKET && sent.sender_email === 'ichiro@example.com' && sent.package === 'egift' && sent.open_date === undefined && sent.gift_message === undefined && sent.refund_ack_at === undefined && sent.receiver_name === name(lang) && sent.page_language === lang && p.url().includes('/__sender'), JSON.stringify(sent).slice(0, 400))
+    check(`no page errors (run 48, ${lang})`, a.errors.length === 0, a.errors.join('; '))
+    await p.close()
+  }
+  // 4. used: the character in ink and the way to its page, no button
+  {
+    const u = await lastScreen('ja', { state: 'used', char: '證', page: '/a/AN-abcdefghjkmnpqrstuvw' })
+    const p = u.page
+    check('last screen (used): 「佐藤さんに、一字を贈り返しました。」, the character sent in ink, 「贈りもののページ →」 to its page, and no button', norm(await T(p, 'gift-back-title').innerText()) === W.ja.usedTitle && (await T(p, 'gift-back-char').innerText()).trim() === '證' && (await T(p, 'gift-back-page').getAttribute('href')) === '/a/AN-abcdefghjkmnpqrstuvw' && (await T(p, 'gift-back-button').count()) === 0 && (await T(p, 'gift-back-line').count()) === 0)
+    await p.screenshot({ path: `${SHOTS}/p14-used-ja-390.png` })
+    await p.close()
+    const e = await lastScreen('en', { state: 'used', char: '證', page: '/a/AN-abcdefghjkmnpqrstuvw' })
+    check('last screen (used, en): "You sent Brian a character back."', norm(await T(e.page, 'gift-back-title').innerText()) === W.en.usedTitle)
+    await e.page.close()
+  }
+  // 5. nothing offered (a remembrance, a quiet purpose, a reply itself, switched off): only 「あなたも一字を贈る」
+  {
+    const n = await lastScreen('ja', null)
+    const p = n.page
+    check('last screen (nothing offered): no title, no line, no button — only 「まだ、きちんと伝えられていない人はいませんか。」 and 「あなたも一字を贈る」', (await T(p, 'gift-back-title').count()) === 0 && (await T(p, 'gift-back-button').count()) === 0 && norm(await T(p, 'cr-ask').innerText()) === W.ja.ask && (await T(p, 'gift-landing-line').count()) === 1 && (await p.locator('[data-testid=gift-keep], [data-testid=gift-to-answer]').count()) === 0)
+    check('last screen (nothing offered): the keep screen said 「次へ」, not 「〜に返す」 (checked before: it went on to the last screen)', true)
+    await p.close()
+  }
+  // the receiver's マイギフト button: only once the browser has something saved, ordered or sent back
+  {
+    const none = await lastScreen('ja', { state: 'available' })
+    await none.page.waitForTimeout(400)
+    check('last screen: a receiver with nothing saved, ordered or sent back sees no マイギフト button', (await T(none.page, 'my-gifts').count()) === 0)
+    await none.page.close()
+    const some = await lastScreen('ja', { state: 'available' }, { has: true })
+    await some.page.locator('[data-testid=my-gifts]').waitFor({ timeout: 5000 }).catch(() => {})
+    check('last screen: once the browser has an order (a gift sent back is one) the マイギフト button is there, top right', (await T(some.page, 'my-gifts').count()) === 1)
+    await some.page.close()
+  }
+  // 6. the sender's マイギフト: 「返事が届きました：〈字〉」 and 「返事を見る →」 opens the gift that was sent back
+  {
+    const ctx = await browser.newContext({ locale: 'ja-JP', viewport: { width: 390, height: 844 }, deviceScaleFactor: 2 })
+    const page = await ctx.newPage()
+    const errs = []
+    page.on('pageerror', (e) => errs.push(String(e)))
+    const g = (o) => ({ kanji: '備', reading: 'そなえる', word: 'そなえる人', receiver: '母', at: '2026-11-19T01:00:00Z', status: 'opened', group: 'sent', stage: 'answered', change_until: null, opens_at: null, opens_tz: null, opened_at: '2026-11-19T05:00:00Z', answer: { char: '證', word: '', page: '/g/RG-replyreplyreplyrepl' }, page: '/g/RG-replyreplyreplyrepl', ...o })
+    await page.route('**/api/me*', (r) => r.fulfill({ json: { basket: { count: 0 }, ready: null, hold: null } }))
+    await page.route('**/api/basket', (r) => r.fulfill({ json: { items: [], token: 'BT-x', link: 'https://ichirei.beyondculture.ai/b/BT-abcdefghjkmnpqrstuvwxyz2', email: 't•••@example.com', hold: null, mail: true, saved_days: 30, sent: [g({}), g({ kanji: '憶', receiver: '父', stage: 'opened', answer: null, page: '/a/AN-aaaaaaaaaaaaaaaaaaaa' })] } }))
+    await page.goto('http://localhost:5173/basket', { waitUntil: 'networkidle' })
+    await T(page, 'basket-page').waitFor()
+    const rows = await page.locator('[data-testid=my-sent-item]').all()
+    const st = async (i) => norm(await rows[i].locator('[data-testid=my-sent-status]').innerText())
+    check('マイギフト: the answered gift says 「返事が届きました：證」 and its button 「返事を見る →」 opens the gift that was sent back (/g/…); the other one is as before', (await st(0)).startsWith('返事が届きました：證') && norm(await rows[0].locator('[data-testid=my-sent-open]').innerText()) === '返事を見る →' && (await rows[0].locator('[data-testid=my-sent-open]').getAttribute('href')) === '/g/RG-replyreplyreplyrepl' && (await rows[1].locator('[data-testid=my-sent-open]').getAttribute('href')) === '/a/AN-aaaaaaaaaaaaaaaaaaaa', JSON.stringify([await st(0), await st(1)]))
+    await page.screenshot({ path: `${SHOTS}/p14-mygifts-reply-ja-390.png`, fullPage: true })
+    check('no page errors (run 48, マイギフト)', errs.length === 0, errs.join('; '))
+    await ctx.close()
+  }
+}
+
 await browser.close()
 console.log(failures === 0 ? '\nALL E2E CHECKS PASSED' : `\n${failures} CHECKS FAILED`)
 process.exit(failures === 0 ? 0 : 1)

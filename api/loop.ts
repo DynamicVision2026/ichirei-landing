@@ -22,6 +22,7 @@ import { deleteBasketItem, ensureBasketToken, listBasket, openBasketLink, readBa
 import { myPage } from '../engine/mygifts.ts'
 import { resolveMailer, type Mailer } from '../engine/mailer.ts'
 import { resendLink, saveToEmail } from '../engine/basket-mail.ts'
+import { deliverHeldFor } from '../engine/reply-delivery.ts'
 import { customerIdOf, readCustomer, recordCustomerEvent } from '../engine/customer.ts'
 import { promoDaily, promoHoldsPerDay, promoOn } from '../engine/promo.ts'
 import { holdOfBrowser, liveCount, placeHold, reapExpired, type PromoDeps } from '../engine/promo-holds.ts'
@@ -90,7 +91,10 @@ export function createLoopHandlers(deps: () => LoopDeps) {
       const lang = new URL(req.url, 'http://localhost').searchParams.get('l')
       if (await readCustomer(d.store, await customerIdOf(d.store, browser))) void recordCustomerEvent(d.store, { browser }, 'visited', { language: lang && /^[a-zA-Z-]{2,8}$/.test(lang) ? lang : null }, now)
       const [list, ready, hold] = await Promise.all([listBasket(d.store, browser), readyGift(d.store, browser), holdOfBrowser(d.store, browser, now)])
-      return json(200, { basket: { count: list.items.length }, ready, hold: hold && (hold.view.state === 'active' || hold.view.state === 'checkout') ? hold.view : null })
+      // `has`: the browser holds something of its own — a saved gift or an order (a gift it sent back is an order): the receiver's pages show 「マイギフト」 only then (Part 14, 2026-11-20)
+      const rec = await readCustomer(d.store, await customerIdOf(d.store, browser)).catch(() => null)
+      const has = list.items.length > 0 || !!rec?.events.some((e) => e.code === 'ordered_free' || e.code === 'ordered_paid')
+      return json(200, { basket: { count: list.items.length }, has, ready, hold: hold && (hold.view.state === 'active' || hold.view.state === 'checkout') ? hold.view : null })
     },
 
     async basketSave(req: Request): Promise<Response> {
@@ -171,6 +175,8 @@ export function createLoopHandlers(deps: () => LoopDeps) {
       const r = await openBasketLink(d.store, browser, token, m, now)
       if (!r) return json(404, { error: 'not_found', code: 'not_found' })
       void recordHealth(d.store, 'basket_link_opened', {}, now)
+      // Part 14: a gift sent back that waited for this address's inbox link is delivered now (the link was opened, so the address is the receiver's)
+      if (d.store) { try { const rec = await readCustomer(d.store, await customerIdOf(d.store, browser)); if (rec && rec.emails.length > 0) await deliverHeldFor({ store: d.store, mailer: await mailOf(d), env: d.env, now }, rec.emails) } catch { /* delivery is retried the next time the link is opened */ } }
       const p = await myPage(d.store, browser, now)
       return json(200, { ...p, link: p.token ? `${publicUrl(d.env)}/b/${p.token}` : null, mail: (await mailOf(d)) !== null })
     },

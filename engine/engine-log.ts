@@ -14,7 +14,7 @@ import { createOrderStore, type OrderStore } from './order-store.ts'
 import { thinkingOff } from './thinking-off.ts'
 
 /** What a call was for. `main` `second` `free` are the card calls; `review` checks them; `replace` refills; `film_script` writes the film; `pictures` draws the four pictures; `pictures_check` looks at them; `poem`; `gaze` (the who-line); `explain`. */
-export const ENGINE_KINDS = ['main', 'second', 'free', 'review', 'replace', 'film_script', 'pictures', 'pictures_check', 'poem', 'gaze', 'explain', 'check'] as const
+export const ENGINE_KINDS = ['main', 'second', 'free', 'review', 'replace', 'film_script', 'pictures', 'pictures_check', 'poem', 'gaze', 'explain', 'check', 'reply'] as const
 export type EngineKind = (typeof ENGINE_KINDS)[number]
 /** The calls that make a visitor's cards: the light is about these. */
 export const CARD_KINDS: readonly EngineKind[] = ['main', 'second', 'free']
@@ -256,6 +256,27 @@ export function countsOf(lines: EngineLine[], now: Date, windowMs: number): Coun
   return c
 }
 
+/**
+ * The free gift back (Part 14, 2026-11-20) leaves one line per step in the same file, kind `reply`: the model field says what happened — `started` (a ticket was made), `sent` (a gift was sent back) or `pair_used`
+ * (a second one was refused). Never a failure: these lines never turn the light or raise the alert.
+ */
+export type ReplyStep = 'started' | 'sent' | 'pair_used'
+export function recordReply(step: ReplyStep, store: OrderStore | null = null, now: Date = new Date()): void {
+  recordOutcome({ kind: 'reply', model: step, ok: true, ms: 0 }, store, now)
+}
+export interface ReplyCounts { started: number; sent: number; pairsUsed: number }
+export function replyCountsOf(lines: EngineLine[], now: Date, windowMs: number): ReplyCounts {
+  const from = now.getTime() - windowMs
+  const c: ReplyCounts = { started: 0, sent: 0, pairsUsed: 0 }
+  for (const l of lines) {
+    if (l.kind !== 'reply' || Date.parse(l.ts) < from) continue
+    if (l.model === 'started') c.started++
+    else if (l.model === 'sent') c.sent++
+    else if (l.model === 'pair_used') c.pairsUsed++
+  }
+  return c
+}
+
 export interface LastError {
   cls: string
   at: string
@@ -274,7 +295,7 @@ export function lastErrorOf(lines: EngineLine[]): LastError | null {
 /** The models seen in the last 24 hours, by kind; `configured` fills the kinds that had no call. */
 export function modelsOf(lines: EngineLine[], configured: Record<string, string> = {}): Record<string, string> {
   const out: Record<string, string> = { ...configured }
-  for (const l of lines) if (l.model && l.kind !== 'check') out[l.kind] = l.model
+  for (const l of lines) if (l.model && l.kind !== 'check' && l.kind !== 'reply') out[l.kind] = l.model
   return out
 }
 

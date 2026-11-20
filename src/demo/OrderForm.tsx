@@ -35,6 +35,7 @@ import { salePriceJpy } from '../order/sale.ts'
 import { usePromoOn, useSale, useUsd } from './useSizes.ts'
 import OrderLine, { EnEgiftPrice, JaEgiftPrice } from '../loop/OrderLine.tsx'
 import { cleanReading } from '../order/reading.ts'
+import { REPLY_COPY } from './reply-copy.ts'
 
 // The purchase step of the customer flow: after the sender has chosen a character, collect
 // sender name, receiver name, delivery date, inscription form and package, show the paper slip
@@ -64,6 +65,8 @@ type Props = {
   onReceiver?: (name: string) => void
   /** The language of the page the customer is on (Part 6): the menus, prices and checkout. Defaults to the story's language. */
   pageLanguage?: UiLanguage
+  /** Part 14 (2026-11-20): this is a gift sent back, free — the reply ticket, and the two names it carries (the receiver's own and the person it goes to). */
+  reply?: { ticket: string; from: string; to: string } | null
 }
 
 const pad = (n: number) => String(n).padStart(2, '0')
@@ -80,7 +83,7 @@ const daysUntil = (iso: string) => {
 
 const FIELD_KEYS: readonly OrderField[] = ['sender_name', 'receiver_name', 'delivery_date', 'inscription_style', 'package']
 
-export default function OrderForm({ result, story, followUps = [], promptQuestionId = null, candidate, copy, onBack, draftRef, shown, onLive, receiverName = '', onReceiver, pageLanguage }: Props) {
+export default function OrderForm({ result, story, followUps = [], promptQuestionId = null, candidate, copy, onBack, draftRef, shown, onLive, receiverName = '', onReceiver, pageLanguage, reply = null }: Props) {
   const reduceMotion = useReducedMotion()
   // Two languages (Part 6, 2026-11-20). The GIFT's language is the language of the story (the engine ran in it): the character, its reading and meaning, the line, the poem, the certificate and the receiver's
   // ceremony follow it. The PAGE's language decides the menus, the prices and currency, the zone, the checkout. `language` below is the page's; `giftLanguage` is the story's.
@@ -93,7 +96,9 @@ export default function OrderForm({ result, story, followUps = [], promptQuestio
   const quiet = memorial || isQuietPurpose(result.purpose)
   const distinct = hasFormChoice(giftLanguage, candidate) // (ja and en carve the modern form only: no choice to show)
 
-  const [sender, setSender] = useState('')
+  const replyMode = !!reply
+  const R = REPLY_COPY[pageLanguage ?? (result.language ?? 'ja')]
+  const [sender, setSender] = useState(reply?.from ?? '')
   const [receiver, setReceiverState] = useState(receiverName)
   const setReceiver = (v: string) => {
     setReceiverState(v)
@@ -107,7 +112,7 @@ export default function OrderForm({ result, story, followUps = [], promptQuestio
   const usdPrice = useUsd() // English: a fixed dollar price, never an "about" figure
   const promoOn = usePromoOn() // "Days of Thanks" (US, English only): one line above the order button while it runs
   const sale = useSale(language) // the Thanksgiving sale shown beside the e-gift's price (Shopify's discount sets the real price)
-  const [pkg, setPkg] = useState<PackageId | ''>(claim ? 'egift' : '')
+  const [pkg, setPkg] = useState<PackageId | ''>(claim || reply ? 'egift' : '')
   const sizes = useSizes() // the sizes on sale right now (Part C): a size without a Shopify variant is not shown
   const soon = useComingSoon() // e-gift-first launch: listed with 「近日公開」, not selectable
   const sc = SIZE_COPY[language]
@@ -168,7 +173,7 @@ export default function OrderForm({ result, story, followUps = [], promptQuestio
   const dateOk = pkg === 'egift' || (/^\d{4}-\d{2}-\d{2}$/.test(date) && date >= today)
   // (switching the carved form can make Simple unavailable after it was picked: the Standard set is then the only choice)
   if (pkg === 'simple' && !simpleOk) setTimeout(() => setPkg(''), 0)
-  const onSale = pkg !== '' && (claim ? pkg === 'egift' : (sizes ?? []).includes(pkg))
+  const onSale = pkg !== '' && (claim || replyMode ? pkg === 'egift' : (sizes ?? []).includes(pkg))
   // The e-gift has no printed card (2026-11-07): when it is the selected gift — or, while the wooden sizes are not on sale, the only gift there is — the poem note and the card-preview line say it
   // comes as a PDF the receiver prints at home. The printed-card wording stays for 木札 / 版木 (shown only while wood is on sale).
   const woodOnSale = (sizes ?? []).some((id) => WOODEN[id] && !soon.includes(id))
@@ -182,14 +187,14 @@ export default function OrderForm({ result, story, followUps = [], promptQuestio
   const openTzOk = openDate === '' || isValidZone(openTz)
   const todayThere = isValidZone(openTz) ? todayIn(openTz, new Date()) : today
   const openDateOk = openDate === '' || (/^\d{4}-\d{2}-\d{2}$/.test(openDate) && openDate >= todayThere && openDate <= lastOpenDay && openTzOk)
-  const emailOk = shipTo !== 'egift' || pkg === '' || !SHIPS[pkg] || /^[^\s@]{1,64}@[^\s@]{1,190}\.[^\s@]{2,}$/.test(senderEmail.trim())
-  const valid = (refundAckAt !== null || !!claim) && senderOk && receiverOk && dateOk && pkg !== '' && onSale && messageOk && openDateOk && emailOk && !(pkg === 'simple' && !simpleOk) && poemStep !== 'loading'
+  const emailOk = replyMode ? /^[^\s@]{1,64}@[^\s@]{1,190}\.[^\s@]{2,}$/.test(senderEmail.trim()) : shipTo !== 'egift' || pkg === '' || !SHIPS[pkg] || /^[^\s@]{1,64}@[^\s@]{1,190}\.[^\s@]{2,}$/.test(senderEmail.trim())
+  const valid = (refundAckAt !== null || !!claim || replyMode) && senderOk && receiverOk && dateOk && pkg !== '' && onSale && messageOk && openDateOk && emailOk && !(pkg === 'simple' && !simpleOk) && poemStep !== 'loading'
 
   // The one plain line under the button that says what is missing (2026-11-15): the button never looks dead without a reason.
-  const hint = valid || phase !== 'edit' ? null : pkg === '' || !onSale ? (memorial ? o.hints.giftMemorial : o.hints.gift) : refundAckAt === null && !claim ? o.hints.tick : null
+  const hint = valid || phase !== 'edit' ? null : pkg === '' || !onSale ? (memorial ? o.hints.giftMemorial : o.hints.gift) : refundAckAt === null && !claim && !replyMode ? o.hints.tick : null
   // The e-gift is preselected when it is the only gift that can be ordered (English: always, while the wooden sizes are "coming soon" or off): the pay button then works right after the refund box is ticked.
   useEffect(() => {
-    if (pkg !== '' || claim || sizes === null) return
+    if (pkg !== '' || claim || replyMode || sizes === null) return
     const orderable = sizes.filter((id) => !soon.includes(id))
     if (orderable.length === 1) setPkg(orderable[0])
   }, [pkg, claim, sizes, soon, language])
@@ -218,27 +223,29 @@ export default function OrderForm({ result, story, followUps = [], promptQuestio
           inscription_style: style,
           package: pkg,
           ...(SHIPS[pkg as PackageId] ? { ship_to: shipTo, ...(shipTo === 'egift' ? { sender_email: senderEmail.trim() } : {}) } : {}),
-          ...(giftMessage.trim() ? { gift_message: giftMessage.trim() } : {}),
+          ...(replyMode ? { sender_email: senderEmail.trim(), reply: { ticket: reply!.ticket } } : {}), // a gift back: the receiver's own address (the pair) and the ticket; no Shopify
+          ...(giftMessage.trim() && !replyMode ? { gift_message: giftMessage.trim() } : {}),
           ...(openDate ? { open_date: openDate, open_tz: openTz } : {}),
           ...(poemIds.length ? { poems: poemIds.map((poem_id) => ({ poem_id })) } : {}),
           ...(refundAckAt ? { refund_ack_at: refundAckAt } : {}),
           ...(claim ? { claim: { order: claim.order, token: claim.token } } : {}),
-          ...(Object.keys(getUtm()).length > 0 ? { utm: getUtm() } : {}), // (every language since 2026-11-20)
+          ...(Object.keys(getUtm()).length > 0 && !replyMode ? { utm: getUtm() } : {}), // (every language since 2026-11-20; not for a gift back)
           session: sessionId,
           source: 'customer',
         }),
       })
-      let data: { checkout_url?: string; animation_url?: string; claimed?: boolean; order_ref?: string; code?: string; field?: string } | null = null
+      let data: { checkout_url?: string; animation_url?: string; claimed?: boolean; reply?: boolean; order_ref?: string; code?: string; field?: string; error?: string } | null = null
       try {
         data = await res.json()
       } catch {
         data = null
       }
-      const landing = claim ? data?.animation_url : data?.checkout_url // a claimed order goes to its own page, a normal one to Shopify checkout
+      const landing = claim || replyMode ? data?.animation_url : data?.checkout_url // a claimed order goes to its own page, a normal one to Shopify checkout
       if (res.ok && landing && openDate) trackUs('egift_scheduled') // (the buyer scheduled the opening day — counted for ja, zh and en since 2026-11-20)
       if (!res.ok || !landing) {
         const field = FIELD_KEYS.find((f) => f === data?.field)
-        const message = field
+        const replyLine = replyMode && data?.error && ['reply_used', 'reply_off', 'reply_invalid', 'bad_email'].includes(data.code ?? '') ? data.error : null // the server's own calm line, in this page's language
+        const message = replyLine ? replyLine : field
           ? memorial && field === 'receiver_name'
             ? o.errors.field(field).replace(o.receiverLabel, copy.memorial.receiverLabel)
             : o.errors.field(field)
@@ -308,6 +315,7 @@ export default function OrderForm({ result, story, followUps = [], promptQuestio
         <PoemAddOn egift={egiftCopy} result={result} story={story} followUps={followUps} candidate={candidate} copy={copy} language={giftLanguage} onChange={(ids, step, poem) => { setPoemIds(ids); setPoemStep(step); setPoemShown(poem ?? null) }} disabled={busy} />
 
         {/* Inscription form: only a real choice when the character has a distinct old/traditional form */}
+{!replyMode && (
         <fieldset className="cgroup">
           <legend className="clab">{o.inscriptionLabel}</legend>
           {distinct ? (
@@ -324,8 +332,10 @@ export default function OrderForm({ result, story, followUps = [], promptQuestio
             <p className="sent">{o.inscriptionSame}</p>
           )}
         </fieldset>
+        )}
 
 
+{!replyMode && (
         <div className="orderGrid">
           <div>
             <label className="clab" htmlFor="sender_name">{memorial ? copy.memorial.senderLabel : o.senderLabel}</label>
@@ -368,7 +378,9 @@ export default function OrderForm({ result, story, followUps = [], promptQuestio
           </div>
           )}
         </div>
+        )}
 
+{!replyMode && (
         <fieldset className="cgroup">
           <legend className="clab">{o.packageLabel}</legend>
           <div className="optRow pkgRow">
@@ -407,6 +419,7 @@ export default function OrderForm({ result, story, followUps = [], promptQuestio
             </p>
           )}
         </fieldset>
+        )}
 
         {/* Where it goes (sizes that ship): to me, directly to them, or as an e-gift */}
         {pkg !== '' && SHIPS[pkg] && (
@@ -433,7 +446,7 @@ export default function OrderForm({ result, story, followUps = [], promptQuestio
         )}
 
         {/* The letter of the gift page: a short message and, if wanted, the day the envelope opens (every size) */}
-        {pkg !== '' && (
+        {pkg !== '' && !replyMode && (
           <fieldset className="cgroup" data-testid="gift-letter">
             <div>
               <label className="clab" htmlFor="gift_message">{sc.messageLabel}</label>
@@ -455,13 +468,25 @@ export default function OrderForm({ result, story, followUps = [], promptQuestio
           </fieldset>
         )}
 
+        {/* Part 14 (2026-11-20): a gift sent back — an e-gift at 0 with no checkout: the price line, the one field, the button. It opens at once; there is no date to choose. */}
+        {replyMode && (
+          <fieldset className="cgroup" data-testid="reply-order">
+            <p className="replyPrice" data-testid="reply-price"><b>{R.price}</b> <span data-testid="reply-tag">{R.tag}</span></p>
+            <div>
+              <label className="clab" htmlFor="reply_email">{R.emailLabel}</label>
+              <input id="reply_email" name="email" type="email" autoComplete="email" inputMode="email" maxLength={254} value={senderEmail} onChange={(e) => setSenderEmail(e.target.value)} data-testid="reply-email" />
+              <span className="sent block" data-testid="reply-email-note">{R.emailNote}</span>
+            </div>
+          </fieldset>
+        )}
+
         {error && (
           <p role="alert" data-testid="order-error" className="orderError">
             {error}
           </p>
         )}
 
-        {claim ? (
+        {replyMode ? null : claim ? (
           <p className="sent orderNote" data-testid="claim-order-note">{claimCopy.banner.replace('{order}', claim.order)} {claimCopy.note}</p>
         ) : (
           <>
@@ -472,9 +497,9 @@ export default function OrderForm({ result, story, followUps = [], promptQuestio
             </label>
           </>
         )}
-        {(language === 'en' || language === 'ja' || language === 'zh-Hant' || language === 'zh-Hans') && promoOn && !claim && <OrderLine lang={language} />}
+        {(language === 'en' || language === 'ja' || language === 'zh-Hant' || language === 'zh-Hans') && promoOn && !claim && !replyMode && <OrderLine lang={language} />}
         <button type="button" data-testid="order-submit" className="btn primary" onClick={submit} disabled={!valid || busy}>
-          {phase === 'submitting' ? o.submitting : phase === 'redirecting' ? o.redirecting : claim ? claimCopy.make : o.submit}
+          {phase === 'submitting' ? (replyMode ? R.submitting : o.submitting) : phase === 'redirecting' ? o.redirecting : claim ? claimCopy.make : replyMode ? R.submit : o.submit}
         </button>
         {hint && <p className="sent orderHint" role="status" data-testid="order-hint">{hint}</p>}
         {claim && <p className="sent" data-testid="claim-window-note">{claimCopy.window24}</p>}

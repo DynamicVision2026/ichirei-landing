@@ -56,6 +56,8 @@ export interface GiftView extends AnimationView {
   package: 'egift' | 'simple' | 'standard'
   /** Only on the sender's own preview of a gift that is still locked: when it opens (so the preview shows the waiting screen first). */
   waiting?: { opens_on: string | null; opens_at: string | null; opens_tz: string | null } | null
+  /** Part 14 (2026-11-20): what the receiver is offered on the last screen. `available`: one button, send a gift back, free. `used`: this gift was answered (its character, and the sender page of that gift). Absent: nothing. */
+  back?: { state: 'available' } | { state: 'used'; char: string; page: string | null } | null
 }
 
 /** The closed envelope before the opening date: the two names and the date, nothing else. */
