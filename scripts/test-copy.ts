@@ -35,7 +35,7 @@ function check(name: string, cond: boolean, detail?: string) {
 
 // Every string a Copy can show, with sample arguments for the function-valued entries.
 const SAMPLE = { kanji: '灯', inscription_form: '燈', reading: 'dēng', meaning: 'lamp' }
-const CALLS: Record<string, unknown[]> = {
+const CALLS: Record<string, unknown[]> = { left: [2],
   simpleUnavailable: [20],
   note: ['¥1,980', 2],
   total: [2, '¥3,960'],

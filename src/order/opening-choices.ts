@@ -19,9 +19,9 @@ export interface ChoiceTarget {
 
 /** Words of the four choices. zh-Hans reads as zh-Hant on the page, like every customer page. */
 export const CHOICE_COPY: Record<'ja' | 'zh-Hant' | 'en', { label: string; now: string; christmas: string; thanksgiving: string; pick: string; zone: string }> = {
-  ja: { label: 'いつ開けますか', now: 'すぐに開ける', christmas: 'クリスマスの朝（12月25日 午前7時）', thanksgiving: '', pick: '日時を選ぶ', zone: '受け取る方の場所' },
-  'zh-Hant': { label: '什麼時候開啟', now: '立即開啟', christmas: '聖誕節早上（12月25日 上午7點）', thanksgiving: '', pick: '選擇日期與時間', zone: '對方所在的時區' },
-  en: { label: 'When should it open?', now: 'Now', christmas: 'Christmas morning (Dec 25, 7:00 a.m.)', thanksgiving: 'Thanksgiving dinner (Nov 26, 6:00 p.m.)', pick: 'Pick a date and time', zone: 'Where will they open it?' },
+  ja: { label: 'いつ開けますか', now: 'すぐに開ける', christmas: 'クリスマスの朝（12月25日 午前7時）', thanksgiving: '', pick: '日時を選ぶ', zone: '受け取る方の時間帯' },
+  'zh-Hant': { label: '什麼時候開啟', now: '立即開啟', christmas: '聖誕節早上（12月25日 上午7點）', thanksgiving: '', pick: '選擇日期與時間', zone: '收禮人的時區' },
+  en: { label: 'When should it open?', now: 'Now', christmas: 'Christmas morning (Dec 25, 7:00 a.m.)', thanksgiving: 'Thanksgiving dinner (Nov 26, 6:00 p.m.)', pick: 'Pick a date and time', zone: "Receiver's time zone" },
 }
 
 const pad = (n: number): string => String(n).padStart(2, '0')

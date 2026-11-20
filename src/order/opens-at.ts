@@ -11,17 +11,20 @@ export interface ZoneChoice {
   ja: string
   zh: string
   hans: string
+  /** Pages whose picker does not list it (Shanghai is a Japanese / Chinese page choice; the English picker has US, UK, Japan and Taipei). */
+  hideIn?: OpensLang[]
 }
 
 /** The short list in the zone picker; any other IANA zone is accepted as "other". */
 export const ZONE_CHOICES: readonly ZoneChoice[] = [
-  { id: 'America/New_York', en: 'Eastern', ja: '米国東部時間', zh: '美東時間', hans: '美东时间' },
-  { id: 'America/Chicago', en: 'Central', ja: '米国中部時間', zh: '美中時間', hans: '美中时间' },
-  { id: 'America/Denver', en: 'Mountain', ja: '米国山岳部時間', zh: '美山區時間', hans: '美山区时间' },
-  { id: 'America/Los_Angeles', en: 'Pacific', ja: '米国太平洋時間', zh: '美西時間', hans: '美西时间' },
-  { id: 'Europe/London', en: 'UK', ja: '英国時間', zh: '英國時間', hans: '英国时间' },
-  { id: 'Asia/Tokyo', en: 'Japan', ja: '日本時間', zh: '日本時間', hans: '日本时间' },
-  { id: 'Asia/Taipei', en: 'Taipei', ja: '台北時間', zh: '台北時間', hans: '台北时间' },
+  { id: 'America/New_York', en: 'US Eastern', ja: '米国東部時間', zh: '美東時間', hans: '美东时间' },
+  { id: 'America/Chicago', en: 'US Central', ja: '米国中部時間', zh: '美中時間', hans: '美中时间' },
+  { id: 'America/Denver', en: 'US Mountain', ja: '米国山岳部時間', zh: '美山區時間', hans: '美山区时间' },
+  { id: 'America/Los_Angeles', en: 'US Pacific', ja: '米国西部時間', zh: '美西時間', hans: '美西时间' },
+  { id: 'Europe/London', en: 'UK time', ja: '英国時間', zh: '英國時間', hans: '英国时间' },
+  { id: 'Asia/Tokyo', en: 'Japan time', ja: '日本時間', zh: '日本時間', hans: '日本时间' },
+  { id: 'Asia/Taipei', en: 'Taipei time', ja: '台北時間', zh: '台北時間', hans: '台北时间' },
+  { id: 'Asia/Shanghai', en: 'Shanghai time', ja: '上海時間', zh: '上海時間', hans: '上海时间', hideIn: ['en'] },
 ]
 
 export const isValidZone = (tz: unknown): tz is string => {
@@ -80,7 +83,14 @@ export type OpensLang = 'ja' | 'zh-Hant' | 'zh-Hans' | 'en'
 export function zoneName(lang: OpensLang, tz: string): string {
   const hit = ZONE_CHOICES.find((z) => z.id === tz)
   if (hit) return lang === 'en' ? hit.en : lang === 'ja' ? hit.ja : lang === 'zh-Hans' ? hit.hans : hit.zh
-  return tz.split('/').pop()!.replace(/_/g, ' ')
+  // any other zone: the system's own name for it in the PAGE's language ("Australian Eastern Standard Time", 「オーストラリア東部標準時」) — never the raw IANA name
+  try {
+    const part = new Intl.DateTimeFormat(lang === 'en' ? 'en-US' : lang === 'ja' ? 'ja-JP' : lang === 'zh-Hans' ? 'zh-CN' : 'zh-TW', { timeZone: tz, timeZoneName: 'long' }).formatToParts(new Date(Date.UTC(2026, 0, 15))).find((p) => p.type === 'timeZoneName')?.value
+    if (part && !/^GMT|^UTC/.test(part) ) return part
+  } catch {
+    // an unknown zone name falls through
+  }
+  return lang === 'en' ? 'Local time' : lang === 'ja' ? '現地時間' : lang === 'zh-Hans' ? '当地时间' : '當地時間'
 }
 
 const EN_MONTH = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
@@ -156,12 +166,10 @@ export function openingLabelFromRecord(lang: OpensLang, opensAt: string | null |
   return d && c ? openingLabelAt(lang, d, c.hour, c.minute, opensTz) : null
 }
 
-/** The zone of the visitor's browser when it is usable, else Japan. */
-export function browserZone(): string {
-  try {
-    const tz = Intl.DateTimeFormat().resolvedOptions().timeZone
-    return isValidZone(tz) ? tz : DEFAULT_ZONE
-  } catch {
-    return DEFAULT_ZONE
-  }
+/**
+ * The zone a page opens in by default: the page's own market, NEVER anything from the visitor's device (2026-11-20). ja → Japan time (Asia/Tokyo), zh → Taipei time (Asia/Taipei), en → US Eastern
+ * (America/New_York). Nothing here reads the browser's zone, and nothing about the device is stored or logged.
+ */
+export function marketZone(lang: OpensLang | string | null | undefined): string {
+  return lang === 'en' ? 'America/New_York' : lang === 'zh-Hant' || lang === 'zh-Hans' ? 'Asia/Taipei' : DEFAULT_ZONE
 }

@@ -3,7 +3,7 @@ import { trackUs } from '../demo/analytics.ts'
 import ZoneSelect from '../demo/ZoneSelect.tsx'
 import { SIZE_COPY } from '../demo/sizes-copy.ts'
 import { availableChoices, christmasTarget, pickTarget, thanksgivingTarget, CHOICE_COPY, type ChoiceId } from '../order/opening-choices.ts'
-import { browserZone, isValidZone, openingLabelAt, openingLabelFromRecord, todayIn } from '../order/opens-at.ts'
+import { isValidZone, marketZone, openingLabelAt, openingLabelFromRecord, todayIn } from '../order/opens-at.ts'
 import { CAL_BUTTON, googleCalendarUrl, icsText, type CalendarEvent } from '../order/calendar.ts'
 import { CEREMONY_COPY } from './ceremony-copy.ts'
 import type { PageLang } from './copy.ts'
@@ -27,7 +27,7 @@ export default function Schedule({ animationId, lang, quiet, to, giftUrl, sender
   const cal = CAL_BUTTON[lang]
   const sc = SIZE_COPY[lang]
   const [open, setOpen] = useState(false)
-  const [tz, setTz] = useState(opensTz && isValidZone(opensTz) ? opensTz : browserZone)
+  const [tz, setTz] = useState(opensTz && isValidZone(opensTz) ? opensTz : marketZone(lang))
   const [choice, setChoice] = useState<ChoiceId>('now')
   const [date, setDate] = useState(opensOn ?? '')
   const [time, setTime] = useState('07:00')
@@ -35,7 +35,7 @@ export default function Schedule({ animationId, lang, quiet, to, giftUrl, sender
   const [phase, setPhase] = useState<'idle' | 'saving' | 'error'>('idle')
   const [calOpen, setCalOpen] = useState(false)
   const now = useMemo(() => new Date(), [])
-  const zone = isValidZone(tz) ? tz : browserZone()
+  const zone = isValidZone(tz) ? tz : marketZone(lang)
   const choices = availableChoices(now, zone, lang === 'zh-Hant' ? 'zh-Hant' : lang, quiet)
   const target =
     choice === 'christmas' ? christmasTarget(now, zone) : choice === 'thanksgiving' ? thanksgivingTarget(now, zone) : choice === 'pick' && date ? pickTarget(date, time, zone) : null

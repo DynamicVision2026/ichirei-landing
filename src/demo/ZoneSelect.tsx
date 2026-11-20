@@ -1,15 +1,15 @@
-import { useMemo, useState } from 'react'
-import { ZONE_CHOICES, browserZone, isValidZone, zoneName, type OpensLang } from '../order/opens-at.ts'
+import { useState } from 'react'
+import { ZONE_CHOICES, isValidZone, zoneName, type OpensLang } from '../order/opens-at.ts'
 
-// The time zone the opening time (7:00 a.m.) is read in (2026-11-14): US Eastern / Central / Mountain / Pacific, UK, Japan, Taipei, the visitor's own zone, or any other IANA name typed in.
+// The time zone the opening time (7:00 a.m.) is read in (2026-11-14): US Eastern / Central / Mountain / Pacific, UK, Japan, Taipei, Shanghai, or any other zone typed in. Never the device's own zone, and never a raw IANA name on screen.
 // `tz` is '' while a typed name is not a valid zone (the parent then keeps the order from being sent).
 
 export default function ZoneSelect({ tz, onTz, lang, label, otherLabel, otherPlaceholder, id }: { tz: string; onTz: (tz: string) => void; lang: OpensLang; label: string; otherLabel: string; otherPlaceholder: string; id: string }) {
-  const browser = useMemo(browserZone, [])
   const inList = ZONE_CHOICES.some((z) => z.id === tz)
   const [other, setOther] = useState(false)
   const [text, setText] = useState('')
-  const extra = !ZONE_CHOICES.some((z) => z.id === browser) ? browser : null
+  // a zone saved with an older order that is not in the list stays selectable under its name in the page's language
+  const extra = tz && !inList && isValidZone(tz) && !other ? tz : null
   const value = other ? '__other' : inList || tz === extra ? tz : '__other'
   return (
     <div className="zoneField" data-testid={`${id}-wrap`}>
@@ -28,7 +28,7 @@ export default function ZoneSelect({ tz, onTz, lang, label, otherLabel, otherPla
           }
         }}
       >
-        {ZONE_CHOICES.map((z) => <option key={z.id} value={z.id}>{zoneName(lang, z.id)}</option>)}
+        {ZONE_CHOICES.filter((z) => !z.hideIn?.includes(lang)).map((z) => <option key={z.id} value={z.id}>{zoneName(lang, z.id)}</option>)}
         {extra && <option value={extra}>{zoneName(lang, extra)}</option>}
         <option value="__other">{otherLabel}</option>
       </select>

@@ -12,7 +12,7 @@ import StrokeGlyph from '../gift/StrokeGlyph.tsx'
 import { CEREMONY_COPY, stateTime } from './ceremony-copy.ts'
 import { returnWord } from '../order/return-chars.ts'
 import { isQuietPurpose } from '../order/purpose.ts'
-import { browserZone } from '../order/opens-at.ts'
+import { marketZone } from '../order/opens-at.ts'
 import '../gift/ceremony.css'
 import { SENDER_COPY } from './sender-copy.ts'
 import { openingLabelFromRecord } from '../order/opens-at.ts'
@@ -205,7 +205,7 @@ export default function BuyerPage({ view, lang, preparing, onCollected }: { view
         <p className="an-buttons" data-testid="give-preview">
           <a className="an-btn" href={`${g.url}?preview=${view.id}`} target="_blank" rel="noopener noreferrer">{c.preview}</a>
         </p>
-        <GiftStates lang={lang} states={g.states ?? null} tz={g.opens_tz || browserZone()} />
+        <GiftStates lang={lang} states={g.states ?? null} tz={g.opens_tz || marketZone(lang)} />
         {g.reply && (
           <>
             <h3>{s.replyTitle}</h3>

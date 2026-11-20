@@ -46,6 +46,20 @@ export interface PoemInput {
   /** The line printed on the card: the sense the character is used in. */
   gaze: string
   type: PoemType
+  /** A rewrite (2026-11-20): the lines of the versions the customer has already seen for this character and story. The new poem must differ in wording: none of these lines is reused. */
+  previous?: string[][]
+}
+
+/** The squeezed form of a line, for "is this the same line?": no spaces and no punctuation. */
+const lineKey = (l: string): string => l.replace(/[\s、。，,．.！!？?；;：:・「」『』"'“”‘’（）()—―-]/g, '').toLowerCase()
+
+/** A rewrite must differ in wording: a line that is the same as a line of an earlier version (or the same poem) is a failed check. */
+export function repeatProblems(lines: string[], previous: string[][]): string[] {
+  const seen = new Map<string, number>()
+  previous.forEach((v, i) => v.forEach((l) => { const k = lineKey(l); if (k) seen.set(k, i + 1) }))
+  const same = lines.filter((l) => seen.has(lineKey(l)))
+  if (same.length === 0) return []
+  return [`it reuses ${same.length === lines.length ? 'every line' : `${same.length} line${same.length > 1 ? 's' : ''}`} of an earlier version (${same.slice(0, 2).map((l) => `"${l.slice(0, 20)}"`).join(', ')}): write a DIFFERENT poem, with different images and different wording`]
 }
 
 export interface Poem {
@@ -224,6 +238,11 @@ export async function generatePoem(input: PoemInput, palette: Palette, opts: Gen
     BUYER_AIDS: buyerAids(input.type, input.language),
   }
   const template = loadPoemPrompt(input.type)
+  // a rewrite: the earlier versions go to the model so it writes something else
+  const previous = (input.previous ?? []).filter((v) => Array.isArray(v) && v.length > 0).slice(-3)
+  const rewriteNote = previous.length
+    ? `THIS IS A REWRITE. The customer has already seen ${previous.length === 1 ? 'this poem' : 'these poems'} for the same character and the same story. Write a DIFFERENT poem: a different image from the story and different wording. Do not reuse any of these lines, and do not just reorder them:\n${previous.map((v, i) => `Version ${i + 1}:\n${v.map((l) => `  ${l}`).join('\n')}`).join('\n')}\n\n`
+    : ''
   const callText = async (stage: 'poem' | 'review', mdl: string, prompt: string, maxTokens: number, eff: 'low' | 'medium' | 'high'): Promise<string> => {
     const stream = tracked('poem', client).messages.stream({ model: mdl, max_tokens: maxTokens, output_config: { effort: eff }, messages: [{ role: 'user', content: prompt }] }, { signal })
     const message = await stream.finalMessage()
@@ -252,7 +271,7 @@ export async function generatePoem(input: PoemInput, palette: Palette, opts: Gen
   let spareSoft: string[] = []
   for (let attempt = 1; attempt <= 2; attempt++) {
     try {
-      const prompt = (input.tone ? `${input.tone}\n\n` : '') + fill(template, { ...base, FEEDBACK: feedback })
+      const prompt = (input.tone ? `${input.tone}\n\n` : '') + rewriteNote + fill(template, { ...base, FEEDBACK: feedback })
       const raw = parseJson(await callText('poem', model, prompt, Number(process.env.ICHIREI_POEM_MAX_TOKENS ?? 4000), effort))
       if (!raw) throw new Error('the reply was not a JSON object')
       if (raw.declined === true) {
@@ -272,6 +291,7 @@ export async function generatePoem(input: PoemInput, palette: Palette, opts: Gen
         ...[checkCharacterOnce(draft, forms), checkForcedLabel(draft, forms)].filter((x): x is string => x !== null),
         ...checkPalette(draft, palette, input.occasion ?? (input.quiet ? 'memorial' : null), families, [...exempt, ...forms.flatMap((f) => [...f])]),
         ...(wantsG && !freeText(raw.gendaigo) ? ['gendaigo is missing: add a short modern Japanese 現代語訳 of the whole poem'] : []),
+        ...(previous.length > 0 ? repeatProblems(lines, previous) : []),
       ]
       let imageNote: string | null = null // the quality rules (story_image, character, kanji): one rewrite is asked for, then the better poem is kept
       // a wrong kanji (same sound, wrong meaning: 侘び for 詫び) — certain cases are found in code, the rest by the second reader (rule `kanji`)

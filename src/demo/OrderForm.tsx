@@ -8,7 +8,7 @@ import { clearDraft } from './draft'
 import { EGIFT_JAPAN_ONLY, GIFT_MESSAGE_MAX, OPEN_DATE_MAX_DAYS, PACKAGE_DISPLAY_ORDER, PACKAGE_PRICE_JPY, RECOMMENDED_PACKAGE, SHIPS, SHIP_TO, WOODEN, type ShipTo } from '../order/packages.ts'
 import { SIZE_COPY } from './sizes-copy.ts'
 import ZoneSelect from './ZoneSelect.tsx'
-import { browserZone, isValidZone, openingLabel, todayIn } from '../order/opens-at.ts'
+import { isValidZone, marketZone, openingLabel, todayIn } from '../order/opens-at.ts'
 import { LEGAL } from '../legal/legal-copy.ts'
 import { useComingSoon, useSizes } from './useSizes.ts'
 import { isMemorial } from '../order/memorial.ts'
@@ -110,7 +110,7 @@ export default function OrderForm({ result, story, followUps = [], promptQuestio
   const [shipTo, setShipTo] = useState<ShipTo>('me')
   const [giftMessage, setGiftMessage] = useState('')
   const [openDate, setOpenDate] = useState('') // the day the receiver's envelope opens (empty = at once)
-  const [openTz, setOpenTz] = useState(browserZone) // the zone it opens in, at 7:00 a.m. (the visitor's own by default)
+  const [openTz, setOpenTz] = useState(() => marketZone(language)) // the zone it opens in, at 7:00 a.m.: the page's own market by default (ja Japan time, zh Taipei time, en US Eastern) — never the device's zone
   const [senderEmail, setSenderEmail] = useState('')
   const [poemIds, setPoemIds] = useState<string[]>([]) // the included poem of this order (zero or one); the server reads it back by id
   const [poemShown, setPoemShown] = useState<{ lines: string[]; reading: string; type?: string } | null>(null)

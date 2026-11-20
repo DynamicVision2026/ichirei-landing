@@ -254,6 +254,14 @@ export interface Copy {
       /** After two failed tries: polite, and the order goes ahead without a poem. */
       failedFinal: string
       tryAgain: string
+      /** Rewrites (2026-11-20): the quiet link under the poem, its count, the limit line, the mark on the version that is shown, and the polite line when a rewrite could not be written (the poem on screen stays). */
+      rewrite: string
+      left: (n: number) => string
+      limit: string
+      use: string
+      rewriteFailed: string
+      prev: string
+      next: string
     }
     packageLabel: string
     packages: Record<PackageId, string>
@@ -406,7 +414,7 @@ const ja: Copy = {
     inscriptionStyles: { kyujitai: '古体字（旧字体）', modern: '現代字', traditional: '繁体字', simplified: '簡体字' },
     inscriptionSame: 'この字は、現代の字体（新字体）で刻みます。',
     simpleUnavailable: (n) => `この字は画数が${n}画を超えるため、スタンダードのみお選びいただけます。`,
-    poem: { heading: 'この一字に、歌を一首添えます', note: 'お好きな形をひとつお選びください。ご注文に含まれています（追加料金はありません）。', types: {tanka:'短歌（五七五七七）',haiku:'俳句（五七五）',tang:'漢詩（唐詩の形・五言／七言絶句）',ci:'宋詞',en:'自由詩'}, loading: '歌を詠んでいます…', printedOnCard: 'この歌が、カードに印刷されます', printedOnCardEgift: 'この歌は、贈りものページと、ご自宅で印刷できるカードPDFに入ります。', failedFinal: '申し訳ありません。今回は歌をお作りできませんでした。歌なしで、そのままご注文いただけます（一字とカードはいつもどおりお届けします）。', tryAgain: 'もう一度試す' },
+    poem: { heading: 'この一字に、歌を一首添えます', note: 'お好きな形をひとつお選びください。ご注文に含まれています（追加料金はありません）。', types: {tanka:'短歌（五七五七七）',haiku:'俳句（五七五）',tang:'漢詩（唐詩の形・五言／七言絶句）',ci:'宋詞',en:'自由詩'}, loading: '歌を詠んでいます…', printedOnCard: 'この歌が、カードに印刷されます', printedOnCardEgift: 'この歌は、贈りものページと、ご自宅で印刷できるカードPDFに入ります。', failedFinal: '申し訳ありません。今回は歌をお作りできませんでした。歌なしで、そのままご注文いただけます（一字とカードはいつもどおりお届けします）。', tryAgain: 'もう一度試す', rewrite: '別の歌にする', left: (n) => `あと${n}回`, limit: 'この形はここまでです', use: 'この歌にする', rewriteFailed: '申し訳ありません。今回は新しい歌をお作りできませんでした。いまの歌のまま、ご注文いただけます。', prev: '前の歌', next: '次の歌' },
     packageLabel: 'パッケージ',
     packages: SIZE_COPY['ja'].names,
     shippingNote: '国内送料無料・海外送料 ¥6,000',
@@ -568,7 +576,7 @@ const zhHans: Copy = {
     inscriptionStyles: { kyujitai: '古体字', modern: '现代字', traditional: '繁體字', simplified: '简体字' },
     inscriptionSame: '这个字的繁体与简体写法相同。',
     simpleUnavailable: (n) => `这个字的笔画超过${n}画，仅能选择标准款。`,
-    poem: { heading: '为这个字添一首诗', note: '请选一种喜欢的形式。已包含在订单中，不另收费。', types: {tanka:'短歌（五七五七七）',haiku:'俳句（五七五）',tang:'唐诗（五言／七言绝句）',ci:'宋词',en:'自由诗'}, loading: '正在写诗…', printedOnCard: '这首诗将印在卡片上', printedOnCardEgift: '这首诗会出现在礼物页面，以及可在家打印的卡片PDF上。', failedFinal: '很抱歉，这次没能写成。您可以不带诗直接下单（一字与卡片照常寄出）。', tryAgain: '再试一次' },
+    poem: { heading: '为这个字添一首诗', note: '请选一种喜欢的形式。已包含在订单中，不另收费。', types: {tanka:'短歌（五七五七七）',haiku:'俳句（五七五）',tang:'唐诗（五言／七言绝句）',ci:'宋词',en:'自由诗'}, loading: '正在写诗…', printedOnCard: '这首诗将印在卡片上', printedOnCardEgift: '这首诗会出现在礼物页面，以及可在家打印的卡片PDF上。', failedFinal: '很抱歉，这次没能写成。您可以不带诗直接下单（一字与卡片照常寄出）。', tryAgain: '再试一次', rewrite: '换一首', left: (n) => `还可${n}次`, limit: '这个形式到此为止', use: '用这首', rewriteFailed: '很抱歉，这次没能写出新的诗。现在这首仍可使用。', prev: '上一首', next: '下一首' },
     packageLabel: '套餐',
     packages: SIZE_COPY['zh-Hans'].names,
     shippingNote: '日本国内免运费・海外运费 ¥6,000',
@@ -728,7 +736,7 @@ const zhHant: Copy = {
     inscriptionStyles: { kyujitai: '古體字', modern: '現代字', traditional: '繁體字', simplified: '簡體字' },
     inscriptionSame: '這個字的繁體與簡體寫法相同。',
     simpleUnavailable: (n) => `這個字的筆畫超過${n}畫，僅能選擇標準款。`,
-    poem: { heading: '為這個字添一首詩', note: '請選一種喜歡的形式。已包含在訂單中，不另收費。', types: {tanka:'短歌（五七五七七）',haiku:'俳句（五七五）',tang:'唐詩（五言／七言絕句）',ci:'宋詞',en:'自由詩'}, loading: '正在寫詩…', printedOnCard: '這首詩將印在卡片上', printedOnCardEgift: '這首詩會出現在禮物頁面，以及可在家列印的卡片PDF上。', failedFinal: '很抱歉，這次沒能寫成。您可以不帶詩直接下單（一字與卡片照常寄出）。', tryAgain: '再試一次' },
+    poem: { heading: '為這個字添一首詩', note: '請選一種喜歡的形式。已包含在訂單中，不另收費。', types: {tanka:'短歌（五七五七七）',haiku:'俳句（五七五）',tang:'唐詩（五言／七言絕句）',ci:'宋詞',en:'自由詩'}, loading: '正在寫詩…', printedOnCard: '這首詩將印在卡片上', printedOnCardEgift: '這首詩會出現在禮物頁面，以及可在家列印的卡片PDF上。', failedFinal: '很抱歉，這次沒能寫成。您可以不帶詩直接下單（一字與卡片照常寄出）。', tryAgain: '再試一次', rewrite: '換一首', left: (n) => `還可${n}次`, limit: '這個形式到此為止', use: '用這首', rewriteFailed: '很抱歉，這次沒能寫出新的詩。目前這首仍可使用。', prev: '上一首', next: '下一首' },
     packageLabel: '方案',
     packages: SIZE_COPY['zh-Hant'].names,
     shippingNote: '日本國內免運費・海外運費 ¥6,000',
@@ -894,7 +902,7 @@ const en: Copy = {
     },
     inscriptionSame: 'This character is carved in its modern Japanese form.',
     simpleUnavailable: (n) => `This character has more than ${n} strokes, so only the Standard set can carve it.`,
-    poem: { heading: 'A poem for this character', note: 'Choose the form you like. It is included with your order — no extra charge.', types: {tanka:'Tanka (5-7-5-7-7)',haiku:'Haiku (5-7-5)',tang:'Tang-style quatrain (5 or 7 characters per line)',ci:'Song-dynasty ci',en:'Free verse'}, loading: 'Writing the poem…', printedOnCard: 'This poem is printed on your card', printedOnCardEgift: 'This poem appears on the gift page and on the card PDF you can print at home.', failedFinal: 'We are sorry — we could not write the poem this time. You can order without it (the character and the card arrive as usual).', tryAgain: 'Try again' },
+    poem: { heading: 'A poem for this character', note: 'Choose the form you like. It is included with your order — no extra charge.', types: {tanka:'Tanka (5-7-5-7-7)',haiku:'Haiku (5-7-5)',tang:'Tang-style quatrain (5 or 7 characters per line)',ci:'Song-dynasty ci',en:'Free verse'}, loading: 'Writing the poem…', printedOnCard: 'This poem is printed on your card', printedOnCardEgift: 'This poem appears on the gift page and on the card PDF you can print at home.', failedFinal: 'We are sorry — we could not write the poem this time. You can order without it (the character and the card arrive as usual).', tryAgain: 'Try again', rewrite: 'Write another', left: (n) => `${n} left`, limit: "That's all for this style", use: 'Use this poem', rewriteFailed: "We're sorry — we couldn't write another poem this time. You can keep this one.", prev: 'Previous poem', next: 'Next poem' },
     packageLabel: 'Your gift',
     packages: SIZE_COPY['en'].names,
     shippingNote: 'Free shipping in Japan · ¥6,000 international shipping',

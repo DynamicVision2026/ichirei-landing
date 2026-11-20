@@ -9,7 +9,7 @@
 // Web-standard handler like api/order.ts. Cost brake: the server mounts it behind ICHIREI_POEM_LIMIT (20 per hour per IP).
 
 import { noCelebration, toneLine } from '../engine/purpose.ts'
-import { randomBytes } from 'node:crypto'
+import { createHash, randomBytes } from 'node:crypto'
 import { cleanSession, cleanSource, recordEvent } from '../engine/analytics.ts'
 import { costCollector } from '../engine/ai-cost.ts'
 import { STORY_MAX, countChars, mergeStory, parseContext, parseFollowUps, type Language } from '../engine/contract.ts'
@@ -31,6 +31,42 @@ export interface PoemDeps {
   generate?: typeof generatePoem
   generateOptions?: GenerateOptions
   now?: () => Date
+}
+
+// Rewrites (2026-11-20): a style is written once, then at most TWICE more per result — three versions in all. The count is the server's, keyed by the result (the story, the character, the
+// language and the style), so a page that is reloaded, or a request that leaves out the "rewrite" flag, cannot get a fourth. The record keeps the poem ids of the versions (their lines go to
+// the model as "do not reuse these") and nothing else: no story, no name.
+export const MAX_REWRITES = 2
+const MAX_VERSIONS = MAX_REWRITES + 1
+export const rewriteKey = (story: string, language: string, kanji: string, type: string): string => createHash('sha256').update(`${story}\n${language}\n${kanji}\n${type}`).digest('hex').slice(0, 32)
+const rewritePath = (key: string): string => `poems/rw-${key}.json`
+interface RewriteRecord { ids: string[] }
+async function readRewrites(store: OrderStore, key: string): Promise<RewriteRecord> {
+  try {
+    const raw = await store.getObject(rewritePath(key))
+    const j = raw ? (JSON.parse(raw.toString('utf8')) as RewriteRecord) : null
+    return { ids: Array.isArray(j?.ids) ? j!.ids.filter((x) => typeof x === 'string' && POEM_ID_PATTERN.test(x)).slice(0, MAX_VERSIONS) : [] }
+  } catch {
+    return { ids: [] }
+  }
+}
+/** Adds the new version, unless the result already has all three (a second request that raced the first): then false and nothing changes. */
+async function addVersion(store: OrderStore, key: string, id: string): Promise<boolean> {
+  if (store.casObject) {
+    let added = false
+    await store.casObject(rewritePath(key), (cur) => {
+      const rec = cur ? (JSON.parse(cur.toString('utf8')) as RewriteRecord) : { ids: [] }
+      const ids = Array.isArray(rec.ids) ? rec.ids : []
+      if (ids.length >= MAX_VERSIONS) return null
+      added = true
+      return JSON.stringify({ ids: [...ids, id] })
+    })
+    return added
+  }
+  const rec = await readRewrites(store, key)
+  if (rec.ids.length >= MAX_VERSIONS) return false
+  await store.putObject(rewritePath(key), JSON.stringify({ ids: [...rec.ids, id] }), 'application/json')
+  return true
 }
 
 export const newPoemId = (now: Date = new Date(), random: (n: number) => Uint8Array = randomBytes): string => {
@@ -82,10 +118,25 @@ export function createPoemHandler(deps: () => PoemDeps) {
     if (occasion === 'memorial' && palette.memorialCategory([kanji])) return json(400, { error: 'This character cannot carry a poem for this gift.', code: 'character_not_allowed', field: 'kanji' })
     const forms = [...new Set([kanji, row?.inscription_form, row?.kanji].filter((x): x is string => Boolean(x)))]
 
+    // the result's earlier versions of this style (the server's own record): at the limit the request is refused, and otherwise their lines go to the model as "do not reuse these"
+    const story = mergeStory(body.story, fu.followUps)
+    const rwKey = rewriteKey(story, language, kanji, type)
+    const known = await readRewrites(d.store, rwKey)
+    if (known.ids.length >= MAX_VERSIONS) return json(429, { error: 'That is all the versions of this style for this character.', code: 'rewrite_limit', type, rewrites_left: 0, version: known.ids.length })
+    const previous: string[][] = []
+    for (const id of known.ids) {
+      try {
+        const old = (await d.store.get(id)) as StoredPoem | null
+        if (old && old.schema === 'poem' && old.type === type && Array.isArray(old.lines)) previous.push(old.lines.map(String))
+      } catch {
+        // a version that cannot be read is simply not passed on
+      }
+    }
+
     const gen = d.generate ?? generatePoem
     const cost = costCollector('poem', cleanSource(body.source))
     const result = await gen(
-      { story: mergeStory(body.story, fu.followUps), language: language as Language, relationship, direction, occasion, occasion_detail, tone: toneLine(ctx.context), quiet: noCelebration(ctx.context), kanji, inscription_form: forms.find((f) => f !== kanji) ?? null, gaze, type: type as PoemType },
+      { story: mergeStory(body.story, fu.followUps), language: language as Language, relationship, direction, occasion, occasion_detail, tone: toneLine(ctx.context), quiet: noCelebration(ctx.context), kanji, ...(previous.length ? { previous } : {}), inscription_form: forms.find((f) => f !== kanji) ?? null, gaze, type: type as PoemType },
       palette,
       { ...d.generateOptions, onUsage: (stage: 'poem' | 'review', u: { model: string; input_tokens: number; output_tokens: number }) => cost.add(stage, u) },
     )
@@ -104,10 +155,15 @@ export function createPoemHandler(deps: () => PoemDeps) {
       console.error('[ichirei-poem] store failed', err instanceof Error ? err.message : err)
       return json(503, { error: 'Could not save the poem. Nothing was charged; please try again.', code: 'store_failed' })
     }
+    // the version is counted only once it is stored: a failed rewrite costs the customer nothing
+    const counted = await addVersion(d.store, rwKey, poemId).catch(() => true)
+    const version = known.ids.length + 1
+    const rewritesLeft = Math.max(0, MAX_REWRITES - (version - 1))
+    if (!counted) return json(429, { error: 'That is all the versions of this style for this character.', code: 'rewrite_limit', type, rewrites_left: 0, version: MAX_VERSIONS })
     // Learning loop: which types were previewed — the session id and the type only, never the poem or the story.
     const sessionId = cleanSession(body.session)
     if (sessionId) void recordEvent({ ts: now.toISOString(), session: sessionId, source: cleanSource(body.source), event: 'poem_previewed', poem_type: poem.type }, d.store, now)
-    return json(200, { poem_id: poemId, type: poem.type, lines: poem.lines, pattern: poem.pattern, reading: poem.reading, aids: poem.aids, preview: poem.lines[0] })
+    return json(200, { poem_id: poemId, type: poem.type, lines: poem.lines, pattern: poem.pattern, reading: poem.reading, aids: poem.aids, preview: poem.lines[0], version, rewrites_left: rewritesLeft })
   }
 }
 

@@ -328,7 +328,12 @@ function count(k: 'poem' | 'review') { return seen.filter((s) => s.kind === k).l
 const store = new MemoryOrderStore()
 const handler = (extra: object = {}) => createPoemHandler(() => ({ store, palette, now: () => new Date('2026-10-28T03:00:00Z'), ...extra }))
 const body = (c: typeof C20, type: string, more: object = {}) => ({ session: 'abcdefghijklmnop1234', story: c.story, language: c.context.language, relationship: c.context.relationship, direction: c.context.direction, occasion: c.context.occasion, kanji: c.kanji, gaze: c.gaze, type, ...more })
-const post = (h: (r: Request) => Promise<Response>, b: unknown) => h(new Request('http://x/api/poem', { method: 'POST', body: JSON.stringify(b) }))
+// (2026-11-20: a style of one result may be written three times at most; these checks ask for the same story and character over and over, so the rewrite record is cleared after each request)
+const post = async (h: (r: Request) => Promise<Response>, b: unknown) => {
+  const res = await h(new Request('http://x/api/poem', { method: 'POST', body: JSON.stringify(b) }))
+  for (const k of [...store.objects.keys()]) if (k.startsWith('poems/rw-')) store.objects.delete(k)
+  return res
+}
 let poemId20 = ''
 let poemIdEn = ''
 {
@@ -453,7 +458,7 @@ const postOrder = (h: (r: Request) => Promise<Response>, b: unknown) => h(new Re
   check('(8) the order form mounts the step, sends only the poem_id with the order, and waits while the poem is being written', form.includes('<PoemAddOn') && form.includes("poems: poemIds.map((poem_id) => ({ poem_id }))") && !/poems:.*lines/.test(form) && form.includes("poemStep !== 'loading'"))
   check('(8) the step is always visible: the formats of the story\'s language as radio buttons, no call to a type list, no price', addon.includes('offered.map') && addon.includes('type="radio"') && !addon.includes('/api/poem-types') && !addon.includes('formatYen'))
   check('(8) the default format follows the story\'s language: ja → tanka, zh → tang / 漢詩 (both scripts), en → en; the step offers poemTypesFor(...)', DEFAULT_POEM_TYPE.ja === 'tanka' && DEFAULT_POEM_TYPE['zh-Hans'] === 'tang' && DEFAULT_POEM_TYPE['zh-Hant'] === 'tang' && DEFAULT_POEM_TYPE.en === 'en' && addon.includes('poemTypesFor(language') && addon.includes('defaultPoemType(language'))
-  check('(8) the whole poem is shown before checkout (every line, then the reading aids), not just a first line', addon.includes('data-poem-full') && addon.includes('st.lines.join') && !addon.includes('.preview') && addon.includes('data-poem-reading'))
+  check('(8) the whole poem is shown before checkout (every line, then the reading aids), not just a first line', addon.includes('data-poem-full') && addon.includes('shown.lines.join') && !addon.includes('.preview') && addon.includes('data-poem-reading'))
   check('(8) a poem that fails is tried twice, then given up politely and the order goes ahead without one (the step reports "none", not "loading")', addon.includes('const TRIES = 2') && addon.includes("'none'") && addon.includes('failedFinal'))
   check('(8) the copy exists in all four languages: the heading, "included, no extra charge", the four format names, the failure note and the retry button — and mentions no price', (['ja', 'zh-Hans', 'zh-Hant', 'en'] as const).every((l) => { const c = COPY[l].order.poem; return c.heading.length > 3 && c.note.length > 10 && POEM_TYPES.every((t) => c.types[t].length > 1) && c.loading.length > 2 && c.printedOnCard.length > 3 && c.failedFinal.length > 15 && c.tryAgain.length > 1 && !/[¥￥]|円|\d{3,}|yen/i.test(c.note + c.heading) }))
   // spec v9.5: every label is shown in the PAGE language; the Tang quatrain is never called 漢詩 on a zh page (it is the normal word only in Japanese)

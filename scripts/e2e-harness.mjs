@@ -2340,6 +2340,89 @@ check('included poem: the Japanese site starts with the tanka (the default forma
   await g.page.close()
 }
 
+// ---------- Run 43 (2026-11-20): poem rewrites (「別の歌にする」, two per style, every version kept) and the opening time zone from the page's market, never the device ----------
+{
+  const reach = async (lang, { shanghai = false } = {}) => {
+    const pcalls = []
+    const versions = {}
+    const f = await mockPage(browser, { result: (b) => ({ ...FIXTURE, language: b.language }), order: () => ({ json: { order_ref: 'IC-20261120-RW000001', checkout_url: 'http://localhost:5173/__checkout?cart=rw', glyph: '証', certificate_text: 'x' } }) })
+    if (shanghai) {
+      // the device's own zone is Asia/Shanghai: nothing on the page may take it
+      const cdp = await f.page.context().newCDPSession(f.page)
+      await cdp.send('Emulation.setTimezoneOverride', { timezoneId: 'Asia/Shanghai' })
+    }
+    await f.page.route('**/api/poem', async (route) => {
+      const b = JSON.parse(route.request().postData() ?? '{}')
+      pcalls.push(b)
+      const n = b.rewrite ? (versions[b.type] = (versions[b.type] ?? 1) + 1) : (versions[b.type] ?? 1)
+      if (b.rewrite && n > 3) { versions[b.type] = 3; return route.fulfill({ status: 429, json: { code: 'rewrite_limit', rewrites_left: 0 } }) }
+      const lines = b.type === 'en' ? [`v${n} first line here`, `v${n} second line`, `v${n} third line`, `v${n} fourth line`] : [`${b.type} 第${n}版 一行目`, `${b.type} 第${n}版 二行目`, `${b.type} 第${n}版 三行目`]
+      await route.fulfill({ json: { poem_id: `PM-20261120-${b.type.slice(0, 3)}${'abcdefghjk'.slice(0, 7)}${n}`.slice(0, 22), type: b.type, lines, reading: '', aids: {}, preview: lines[0], version: n, rewrites_left: Math.max(0, 3 - n) } })
+    })
+    const path = lang === 'ja' ? '/write' : lang === 'en' ? '/en/write' : '/zh/write'
+    await f.page.goto(`http://localhost:5173${path}`, { waitUntil: 'networkidle' })
+    await f.page.locator('#write [data-testid=story-input]').fill(STORY)
+    await pickContext(f.page)
+    await f.page.click(`#write >> text=${GO[lang]}`)
+    await f.page.waitForSelector('[data-all-revealed=yes]', { timeout: 15000 })
+    await f.page.locator('article[data-slot=main]').click()
+    await f.page.locator('article[data-slot=main]').locator(`text=${GIVE[lang]}`).click()
+    await f.page.locator('[data-testid=result-poem]').waitFor({ timeout: 8000 })
+    await toOrder(f.page)
+    return { ...f, pcalls, versions }
+  }
+  // the poem: 「別の歌にする」 and the count; the versions; the limit; the version on screen is the one ordered
+  const r = await reach('ja')
+  const addon = r.page.locator('[data-testid=poem-addon]')
+  await addon.waitFor({ timeout: 5000 })
+  await addon.locator('[data-poem-result=tanka][data-state=ready]').waitFor({ timeout: 6000 })
+  const row = (l) => addon.locator(`[data-testid=${l}]`)
+  check('poem rewrite (ja): under the poem one quiet link 「別の歌にする」 with 「あと2回」, and no arrows yet (one version)', (await row('poem-rewrite').innerText()) === '別の歌にする' && (await row('poem-left').innerText()) === 'あと2回' && (await row('poem-nav').count()) === 0)
+  const idOf = () => addon.locator('[data-poem-full]').getAttribute('data-poem-id')
+  const id1 = await idOf()
+  await row('poem-rewrite').click()
+  check('poem rewrite (ja): while it is written the order button waits (as today)', (await r.page.evaluate(() => document.querySelector('[data-testid=order-submit]').disabled)) === true)
+  await addon.locator('[data-version="2"]').waitFor({ timeout: 6000 })
+  check('poem rewrite (ja): the new poem is shown, ‹ 2 / 2 ›, 「あと1回」, 「✓ この歌にする」 is on, and the request said rewrite', (await row('poem-position').innerText()) === '2 / 2' && (await row('poem-left').innerText()) === 'あと1回' && (await row('poem-use').innerText()).includes('この歌にする') && r.pcalls.at(-1).rewrite === true && (await addon.locator('[data-poem-full]').innerText()).includes('第2版'))
+  await row('poem-rewrite').click()
+  await addon.locator('[data-version="3"]').waitFor({ timeout: 6000 })
+  check('poem rewrite (ja): at the limit (3 versions) the link is gone and the line says 「この形はここまでです」', (await row('poem-rewrite').count()) === 0 && (await row('poem-limit').innerText()) === 'この形はここまでです' && (await row('poem-position').innerText()) === '3 / 3')
+  const callsBefore = r.pcalls.length
+  await row('poem-prev').click()
+  await row('poem-prev').click()
+  const back = { v: await addon.locator('[data-poem-full]').getAttribute('data-version'), pos: await row('poem-position').innerText(), text: await addon.locator('[data-poem-full]').innerText(), id: await idOf() }
+  check('poem rewrite (ja): ‹ › moves between the versions with no new call; going back to version 1 shows version 1 (nothing is rewritten)', back.v === '1' && back.pos === '1 / 3' && back.text.includes('第1版') && back.id === id1 && r.pcalls.length === callsBefore, JSON.stringify(back))
+  await r.page.fill('input[name=sender_name]', '山田 太郎')
+  await r.page.fill('input[name=receiver_name]', '山田 一郎')
+  const od = new Date(); od.setDate(od.getDate() + 20)
+  await r.page.fill('input[name=delivery_date]', `${od.getFullYear()}-${String(od.getMonth() + 1).padStart(2, '0')}-${String(od.getDate()).padStart(2, '0')}`)
+  await r.page.click('label:has(input[name=package][value=standard])')
+  await tickRefund(r.page)
+  await r.page.click('[data-testid=order-submit]')
+  await r.page.waitForSelector('#co', { timeout: 8000 })
+  check('poem rewrite (ja): ordering from version 1 sends version 1\'s poem_id (the poem on screen is the one ordered), and the arrows asked the model for nothing', r.calls.order.length === 1 && JSON.stringify(r.calls.order[0].poems ?? r.calls.order[0]).includes(id1) && r.pcalls.length === callsBefore && r.pcalls.filter((c) => c.rewrite).length === 2, JSON.stringify(r.calls.order[0]).slice(0, 300))
+  check('no page errors (poem rewrite, ja)', r.errors.length === 0, JSON.stringify(r.errors))
+  await r.page.close()
+
+  // the zone: with the device's zone set to Asia/Shanghai the page still starts from its own market, and shows no raw zone name
+  const D = new Date(); D.setDate(D.getDate() + 20)
+  const date = `${D.getFullYear()}-${String(D.getMonth() + 1).padStart(2, '0')}-${String(D.getDate()).padStart(2, '0')}`
+  for (const [lang, want, label] of [['ja', 'Asia/Tokyo', '受け取る方の時間帯'], ['en', 'America/New_York', "Receiver's time zone"], ['zh-Hant', 'Asia/Taipei', '收禮人的時區']]) {
+    const z = await reach(lang, { shanghai: true })
+    const hiddenBefore = (await z.page.locator('[data-testid=open-zone-wrap]').count()) === 0 && !(await z.page.locator('[data-testid=open-date-label]').count())
+    await z.page.click('label:has(input[name=package][value=egift])') // the opening date belongs to the e-gift
+    await z.page.fill('input[name=open_date]', date)
+    await z.page.locator('[data-testid=open-zone]').waitFor({ timeout: 5000 })
+    const got = await z.page.evaluate(() => { const s = document.querySelector('[data-testid=open-zone]'); return { value: s.value, shown: s.selectedOptions[0].textContent, label: document.querySelector('label[for=open-zone]')?.textContent ?? '', text: document.body.innerText } })
+    const TXT = { ja: '日本時間', en: 'US Eastern', 'zh-Hant': '台北時間' }
+    check(`opening zone (${lang}, device zone Asia/Shanghai): the row is hidden until a date is chosen, then defaults to ${TXT[lang]} (${want}), labelled 「${label}」`, hiddenBefore && got.value === want && got.shown === TXT[lang] && got.label.trim() === label, JSON.stringify({ hiddenBefore, ...got, text: undefined }))
+    check(`opening zone (${lang}): no "Shanghai" and no IANA name (Asia/…, America/…) anywhere in the page text`, !/Shanghai|Asia\/|America\/|Europe\//.test(got.text), got.text.match(/[\s\S]{0,30}(Shanghai|Asia\/|America\/|Europe\/)[\s\S]{0,30}/)?.[0] ?? '')
+    check(`opening zone (${lang}): the refund block shows no zone`, !/(日本時間|台北時間|US Eastern|美東時間|米国東部時間)/.test(await z.page.locator('[data-testid=order-refund-line]').innerText()))
+    if (lang === 'ja') await z.page.screenshot({ path: `${SHOTS}/e2e-open-zone-ja.png`, fullPage: false })
+    await z.page.close()
+  }
+}
+
 // ---------- Run 9: the Reveal landing page — sections, copy per language, honesty, no test controls ----------
 // (2026-11-16) the flow is no longer on the landing page: it has a page of its own, the writing room (/write, /en/write, /zh/write)
 const SECTION_ORDER = ['.hero', '.strip', '.philo', '#shape', '#angles', '#how', '#moments', '.reviewsEmpty', '#gifts', '.faq', '.closing']
