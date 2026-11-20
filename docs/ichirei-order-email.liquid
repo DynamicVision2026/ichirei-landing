@@ -1,6 +1,6 @@
 {%- comment -%}
   ICHIREI — block for the order-confirmation e-mail. Prints ONLY for an ICHIREI line item (its SKU starts with ICHIREI-, or it carries the hidden property _order_ref);
-  an order of any other product gets exactly the e-mail it gets today. One welcoming link, to the BUYER'S OWN private page (/a/AN-…, from the hidden property
+  an order of any other product gets exactly the e-mail it gets today. 2026-11-20: Shopify already says thank you, so this block does not; it says the next step, the contact address and a link to My gifts (the private /b/<token> link carried as _ichirei_mygifts_url, else /basket), and tells the buyer to reply to the e-mail to cancel. One welcoming link, to the BUYER'S OWN private page (/a/AN-…, from the hidden property
   _ichirei_animation_url, which the order already carries when the cart is made) — never to the receiver's gift page (/g/…). Reads the hidden "_" properties (and the old names, for orders made before 2026-11-05).
 {%- endcomment -%}
 {%- for line in subtotal_line_items -%}
@@ -36,41 +36,53 @@
     {%- unless ichirei_link contains '/a/' -%}{%- assign ichirei_link = '' -%}{%- endunless -%}
     {%- case ichirei_lang -%}
       {%- when 'ja' -%}
-        {%- assign t_heading = '一字礼のご注文ありがとうございます。' -%}
-        {%- assign t_lead = 'あなたの贈りものの準備ができました。下のボタンから、ご注文ページを開いてください。' -%}
+        {%- assign t_heading = '一字礼の贈りものが整いました。' -%}
+        {%- assign t_lead = '下のボタンからご注文ページを開き、「贈りものを受け取る」を押すと、お相手に送れるようになります。' -%}
         {%- assign t_button = 'ご注文ページを開く' -%}
-        {%- assign t_under = 'このページから、贈りものを相手に送れます。このリンクはご自身用です。相手には送らないでください。' -%}
-        {%- assign t_change = 'お支払い完了から24時間以内で、「贈りものを受け取る」を押す前なら、確認メールにご返信いただくとキャンセル（全額返金）ができます。' -%}
+        {%- assign t_under = 'このリンクはあなた専用です。お相手には転送しないでください。いつでもこのボタンから戻れます。お問い合わせ：info@beyondculture.ai' -%}
+        {%- assign t_my_pre = 'すべての贈りものは' -%}
+        {%- assign t_my_link = 'マイギフト' -%}
+        {%- assign t_my_post = 'で確認できます。' -%}
+        {%- assign t_change = 'キャンセル（全額返金）は、お支払いから24時間以内、かつ「贈りものを受け取る」を押す前に限ります。ご希望の場合は、このメールにご返信ください。' -%}
         {%- assign t_char = '一字' -%}
         {%- assign t_size = '贈り方' -%}
         {%- if ichirei_size contains 'STANDARD' -%}{%- assign t_size_value = '版木' -%}{%- elsif ichirei_size contains 'SIMPLE' -%}{%- assign t_size_value = '木札' -%}{%- else -%}{%- assign t_size_value = 'eギフト' -%}{%- endif -%}
         {%- assign t_colon = '：' -%}
       {%- when 'zh-Hant' -%}
-        {%- assign t_heading = '感謝你訂購一字禮。' -%}
-        {%- assign t_lead = '你的禮物已經準備好了。請點下方按鈕，打開你的訂單頁面。' -%}
+        {%- assign t_heading = '你的一字禮已經準備好了。' -%}
+        {%- assign t_lead = '請點下方按鈕打開訂單頁面，按下「領取禮物」後，就能把禮物送給對方。' -%}
         {%- assign t_button = '打開訂單頁面' -%}
-        {%- assign t_under = '你可以在這個頁面把禮物送給對方。這個連結是你自己專用的，請不要轉傳給對方。' -%}
-        {%- assign t_change = '付款完成後24小時內、按下「領取禮物」之前，回覆確認郵件即可取消並全額退款。' -%}
+        {%- assign t_under = '這個連結是你專用的，請不要轉傳給對方。隨時都能從這個按鈕回來。聯絡我們：info@beyondculture.ai' -%}
+        {%- assign t_my_pre = '所有禮物都可以在' -%}
+        {%- assign t_my_link = '我的禮物' -%}
+        {%- assign t_my_post = '查看。' -%}
+        {%- assign t_change = '付款後24小時內、且尚未按下「領取禮物」前，可取消並全額退款。請直接回覆這封郵件。' -%}
         {%- assign t_char = '一字' -%}
         {%- assign t_size = '方案' -%}
         {%- if ichirei_size contains 'STANDARD' -%}{%- assign t_size_value = '版木' -%}{%- elsif ichirei_size contains 'SIMPLE' -%}{%- assign t_size_value = '木牌' -%}{%- else -%}{%- assign t_size_value = 'e禮物' -%}{%- endif -%}
         {%- assign t_colon = '：' -%}
       {%- when 'zh-Hans' -%}
-        {%- assign t_heading = '感谢你订购一字礼。' -%}
-        {%- assign t_lead = '你的礼物已经准备好了。请点下方按钮，打开你的订单页面。' -%}
+        {%- assign t_heading = '你的一字礼已经准备好了。' -%}
+        {%- assign t_lead = '请点下方按钮打开订单页面，按下「领取礼物」后，就能把礼物送给对方。' -%}
         {%- assign t_button = '打开订单页面' -%}
-        {%- assign t_under = '你可以在这个页面把礼物送给对方。这个链接是你自己专用的，请不要转传给对方。' -%}
-        {%- assign t_change = '付款完成后24小时内、按下「领取礼物」之前，回复确认邮件即可取消并全额退款。' -%}
+        {%- assign t_under = '这个链接是你专用的，请不要转传给对方。随时都能从这个按钮回来。联系我们：info@beyondculture.ai' -%}
+        {%- assign t_my_pre = '所有礼物都可以在' -%}
+        {%- assign t_my_link = '我的礼物' -%}
+        {%- assign t_my_post = '查看。' -%}
+        {%- assign t_change = '付款后24小时内、且尚未按下「领取礼物」前，可取消并全额退款。请直接回复这封邮件。' -%}
         {%- assign t_char = '一字' -%}
         {%- assign t_size = '方案' -%}
         {%- if ichirei_size contains 'STANDARD' -%}{%- assign t_size_value = '版木' -%}{%- elsif ichirei_size contains 'SIMPLE' -%}{%- assign t_size_value = '木牌' -%}{%- else -%}{%- assign t_size_value = 'e礼物' -%}{%- endif -%}
         {%- assign t_colon = '：' -%}
       {%- else -%}
-        {%- assign t_heading = 'Thank you for your ICHIREI order.' -%}
-        {%- assign t_lead = 'Your gift is ready. Open your order page with the button below.' -%}
-        {%- assign t_button = 'Open your order page' -%}
-        {%- assign t_under = "Send your gift from this page. This link is for you only; please don't forward it." -%}
-        {%- assign t_change = "Within 24 hours of payment, and before you press 'Collect your gift', reply to the confirmation email to cancel for a full refund." -%}
+        {%- assign t_heading = 'Your ICHIREI gift is ready.' -%}
+        {%- assign t_lead = 'Open your order page with the button below, then press "Collect your gift" to send it.' -%}
+        {%- assign t_button = 'Open your gift' -%}
+        {%- assign t_under = "This link is for you only; please don't forward it. You can always come back from this button. Questions: info@beyondculture.ai" -%}
+        {%- assign t_my_pre = 'All your gifts are in ' -%}
+        {%- assign t_my_link = 'My gifts' -%}
+        {%- assign t_my_post = '.' -%}
+        {%- capture t_change -%}You can cancel for a full refund within 24 hours of payment, as long as you haven't pressed "Collect your gift". Just reply to this email.{%- endcapture -%}
         {%- assign t_char = 'Character' -%}
         {%- assign t_size = 'Gift' -%}
         {%- if ichirei_size contains 'STANDARD' -%}{%- assign t_size_value = 'Carved block' -%}{%- elsif ichirei_size contains 'SIMPLE' -%}{%- assign t_size_value = 'Wooden tag' -%}{%- else -%}{%- assign t_size_value = 'E-gift' -%}{%- endif -%}
@@ -83,6 +95,9 @@
     <p>{{ t_under }}</p>
     {%- endif %}
     <p>{{ t_char }}{{ t_colon }}{{ ichirei_glyph | escape }}<br>{{ t_size }}{{ t_colon }}{{ t_size_value }}</p>
+    {%- assign ichirei_mine = line.properties['_ichirei_mygifts_url'] -%}
+    {%- unless ichirei_mine contains '/b/' or ichirei_mine contains '/basket' -%}{%- assign ichirei_mine = 'https://ichirei.beyondculture.ai/basket' -%}{%- endunless -%}
+    <p>{{ t_my_pre }}<a href="{{ ichirei_mine | escape }}">{{ t_my_link }}</a>{{ t_my_post }}</p>
     <p>{{ t_change }}</p>
   {%- endif -%}
 {%- endfor -%}

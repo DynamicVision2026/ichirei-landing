@@ -177,7 +177,7 @@ Orders contain **personal data** (names, the sender's story): keep the bucket pr
 
 ## Step 8 — `/track`: order status (read-only)
 
-`https://ichirei.soul-id.jp/track` (the order confirmation email links to `/track?order=%231016`) takes an **order number + email** and shows 制作中 / 発送済み (+ carrier, tracking number, link) / お届け完了, or a short cancellation notice, with an estimated arrival (Japan: within 10 business days, weekends skipped; elsewhere: within one month) and the line 「ご不明な点は、ご注文確認メールにご返信ください。」 in ja / zh-Hans / zh-Hant / en. No new database: the status is derived from Shopify.
+`https://ichirei.beyondculture.ai/track` (the order confirmation email links to `/track?order=%231016`) takes an **order number + email** and shows 制作中 / 発送済み (+ carrier, tracking number, link) / お届け完了, or a short cancellation notice, with an estimated arrival (Japan: within 10 business days, weekends skipped; elsewhere: within one month) and the line 「ご不明な点は、ご注文確認メールにご返信ください。」 in ja / zh-Hans / zh-Hant / en. No new database: the status is derived from Shopify.
 
 **What it can see and say.** The **read-only** Dev Dashboard app **ICHIREI Tracking** (client id `394a8e955f7e28104f3e2089630bb3a5`, scope `read_orders` only). The server asks Shopify for the **one** order named, answers **only if the email on the order matches** and the order has an `ICHIREI…` SKU, and returns **only** order date, status, SKU(s), carrier, tracking number, tracking URL and the estimated date. Never a name, an address or an email. A wrong number, a wrong email, an order without an email and an order without an ICHIREI SKU all give the same “not found”. It never writes anything to Shopify and registers no webhook.
 
@@ -359,7 +359,7 @@ gcloud projects add-iam-policy-binding ichirei --member="serviceAccount:$(gcloud
 
 (The second command finds the service account the `ichirei` Cloud Run service runs as — or, when none was set, the project's default compute account — and gives it **Vertex AI User**. Changing the new env vars is done in `cloudbuild.yaml`, not on the console.) If the account running Cloud Shell cannot do this, the error says which permission is missing.
 
-**First run.** Open `https://ichirei.soul-id.jp/a/AN-sampleja222222222222` on the phone. It shows 「映像を準備しています」 for roughly 10–40 seconds, then the film with four pictures of the lunchbox story. If it plays with plain washi pictures instead, look in Cloud Logging for `film_image_error` (`code`: `permission` = the role is not there yet or takes a few minutes; `model_not_found` = change `_FILM_IMAGE_MODEL` / `_FILM_IMAGE_LOCATION`; `quota` = Vertex quota (the film then plays with washi and is retried — see "Quota"; to get more room ask for a higher quota for the model in the Google Cloud console, IAM & Admin → Quotas, filter "Gemini" / "online prediction requests per minute" and "image"); `blocked` = the image model refused a prompt) or `film_check_error` — then open it again (an incomplete film retries by itself on the next open).
+**First run.** Open `https://ichirei.beyondculture.ai/a/AN-sampleja222222222222` on the phone. It shows 「映像を準備しています」 for roughly 10–40 seconds, then the film with four pictures of the lunchbox story. If it plays with plain washi pictures instead, look in Cloud Logging for `film_image_error` (`code`: `permission` = the role is not there yet or takes a few minutes; `model_not_found` = change `_FILM_IMAGE_MODEL` / `_FILM_IMAGE_LOCATION`; `quota` = Vertex quota (the film then plays with washi and is retried — see "Quota"; to get more room ask for a higher quota for the model in the Google Cloud console, IAM & Admin → Quotas, filter "Gemini" / "online prediction requests per minute" and "image"); `blocked` = the image model refused a prompt) or `film_check_error` — then open it again (an incomplete film retries by itself on the next open).
 
 ### Tests
 
@@ -472,7 +472,7 @@ both the page and the server need lives in `src/order/` (for example `film-timel
   - **The owner's actions** (`POST /ops/change`, same password, same-site only; available only inside the window and only for an order that is paid and not cancelled): **change character** (only from `shown_characters` of the order; the poem is rewritten with the same format by the same code as the page's poem step; a poem that cannot be written changes nothing; the Simple set's stroke limit still applies; a film line that contains the new character stops the change); **change poem format** (once per order); **edit the printed names and message** (message at most 60 characters, only for a gift that goes to the receiver); **mark cancelled** (a flag on our record: the order leaves the print list and the CSV — **the refund is made by the owner in Shopify; nothing here touches Shopify**). Each change is written to the order's log (`ops.log`: who = the user name typed at the `/ops` prompt, when, what — the character change as 「証 → 憶」, names as which fields, never story text). The film page and the receiver's page update at once; the film's pictures and lines are never redrawn. **Shopify's own order keeps the character, poem and names that were sent at checkout** (line attributes): production reads our record, so the owner should treat `/ops` as the truth and the Shopify attributes as the original order.
   - **Where the customer reads the rule:** the sender's page `/a/<id>` (the page the order's link opens; there is no thank-you page of ours — the checkout and its thank-you page are Shopify's, which this repo does not touch), the note above the order button, `/legal`, and **Shopify's order-confirmation e-mail, which we do not edit: paste the snippet below there yourself.**
   - **Liquid snippet for the order-confirmation e-mail:** replaced on 2026-11-05 — see the section **「Order-confirmation e-mail block」** at the end of this file (one block in the order's own language, only for ICHIREI items, with the paste instructions).
-- **Legal notice `/legal` and three FAQ entries (2026-10-30).** `https://ichirei.soul-id.jp/legal` (ja / zh-Hant / en, linked from the footer of the landing and from beside the order button) holds the 特定商取引法 table, the return/change/cancel rules (24 hours; our mistakes within 14 days; digital) and three short questions (the same three are also on the landing's FAQ). **Before this repo, ICHIREI had no such page and no link to one** (the footer had only `/track`); what exists on soul-id.jp or in the Shopify store's own policy pages was not checked and is not touched. **The seller's own details (2026-11-06) are the owner's real ones** — Beyond Culture 獨歩文化株式会社, the representative, the address, the e-mail info@beyondculture.ai (plain, selectable text), how and when payment is taken — word for word in `src/legal/legal-copy.ts`; no 【 】 may remain on the page (`scripts/test-legal.ts`). The telephone number is not published: the page says it is disclosed by e-mail on request. The old line about "days to make and ship" was removed because no figure was supplied. Prices, EMS ¥6,000 and the rules come from the product definition. Have the legal wording read by someone qualified before launch.
+- **Legal notice `/legal` and three FAQ entries (2026-10-30).** `https://ichirei.beyondculture.ai/legal` (ja / zh-Hant / en, linked from the footer of the landing and from beside the order button) holds the 特定商取引法 table, the return/change/cancel rules (24 hours; our mistakes within 14 days; digital) and three short questions (the same three are also on the landing's FAQ). **Before this repo, ICHIREI had no such page and no link to one** (the footer had only `/track`); what exists on soul-id.jp or in the Shopify store's own policy pages was not checked and is not touched. **The seller's own details (2026-11-06) are the owner's real ones** — Beyond Culture 獨歩文化株式会社, the representative, the address, the e-mail info@beyondculture.ai (plain, selectable text), how and when payment is taken — word for word in `src/legal/legal-copy.ts`; no 【 】 may remain on the page (`scripts/test-legal.ts`). The telephone number is not published: the page says it is disclosed by e-mail on request. The old line about "days to make and ship" was removed because no figure was supplied. Prices, EMS ¥6,000 and the rules come from the product definition. Have the legal wording read by someone qualified before launch.
   - **E-gift reminders:** `POST /ops/egift/run` (the button on `/ops`) sends the 7-day reminders, flags 30-day orders and deletes addresses 90 days after shipping. To run it daily without opening the page, a Cloud Scheduler job would need to call it with the same Basic Auth — optional, not created by us. Mail: still `ICHIREI_MAIL_WEBHOOK_URL` (a Make / Zapier / own function that receives `{to, subject, text}`); without it nothing is sent.
 - **Tests:** `scripts/test-money.ts` (the lists, the prompts, three money stories — `scripts/fixtures-v92/m1-friend-pays-dinner.json` freestyle 奢, `m2-thrifty-mother-school.json` 貯, `m3-colleague-lent-money.json` 貸 — through the real engine with a fake model, every money character surviving the referee and the review, and the dignity verdict still removing a debt-shaming card). **The model is a fake: the real model's choices and the real reviewer's judgement of money cards are unmeasured** — run the three stories through the real engine and read the result.
 
@@ -639,7 +639,7 @@ What it prints, only for an ICHIREI item (SKU `ICHIREI-…` or a `_order_ref` pr
 ```liquid
 {%- comment -%}
   ICHIREI — block for the order-confirmation e-mail. Prints ONLY for an ICHIREI line item (its SKU starts with ICHIREI-, or it carries the hidden property _order_ref);
-  an order of any other product gets exactly the e-mail it gets today. One welcoming link, to the BUYER'S OWN private page (/a/AN-…, from the hidden property
+  an order of any other product gets exactly the e-mail it gets today. 2026-11-20: Shopify already says thank you, so this block does not; it says the next step, the contact address and a link to My gifts (the private /b/<token> link carried as _ichirei_mygifts_url, else /basket), and tells the buyer to reply to the e-mail to cancel. One welcoming link, to the BUYER'S OWN private page (/a/AN-…, from the hidden property
   _ichirei_animation_url, which the order already carries when the cart is made) — never to the receiver's gift page (/g/…). Reads the hidden "_" properties (and the old names, for orders made before 2026-11-05).
 {%- endcomment -%}
 {%- for line in subtotal_line_items -%}
@@ -675,41 +675,53 @@ What it prints, only for an ICHIREI item (SKU `ICHIREI-…` or a `_order_ref` pr
     {%- unless ichirei_link contains '/a/' -%}{%- assign ichirei_link = '' -%}{%- endunless -%}
     {%- case ichirei_lang -%}
       {%- when 'ja' -%}
-        {%- assign t_heading = '一字礼のご注文ありがとうございます。' -%}
-        {%- assign t_lead = 'あなたの贈りものの準備ができました。下のボタンから、ご注文ページを開いてください。' -%}
+        {%- assign t_heading = '一字礼の贈りものが整いました。' -%}
+        {%- assign t_lead = '下のボタンからご注文ページを開き、「贈りものを受け取る」を押すと、お相手に送れるようになります。' -%}
         {%- assign t_button = 'ご注文ページを開く' -%}
-        {%- assign t_under = 'このページから、贈りものを相手に送れます。このリンクはご自身用です。相手には送らないでください。' -%}
-        {%- assign t_change = 'お支払い完了から24時間以内で、「贈りものを受け取る」を押す前なら、確認メールにご返信いただくとキャンセル（全額返金）ができます。' -%}
+        {%- assign t_under = 'このリンクはあなた専用です。お相手には転送しないでください。いつでもこのボタンから戻れます。お問い合わせ：info@beyondculture.ai' -%}
+        {%- assign t_my_pre = 'すべての贈りものは' -%}
+        {%- assign t_my_link = 'マイギフト' -%}
+        {%- assign t_my_post = 'で確認できます。' -%}
+        {%- assign t_change = 'キャンセル（全額返金）は、お支払いから24時間以内、かつ「贈りものを受け取る」を押す前に限ります。ご希望の場合は、このメールにご返信ください。' -%}
         {%- assign t_char = '一字' -%}
         {%- assign t_size = '贈り方' -%}
         {%- if ichirei_size contains 'STANDARD' -%}{%- assign t_size_value = '版木' -%}{%- elsif ichirei_size contains 'SIMPLE' -%}{%- assign t_size_value = '木札' -%}{%- else -%}{%- assign t_size_value = 'eギフト' -%}{%- endif -%}
         {%- assign t_colon = '：' -%}
       {%- when 'zh-Hant' -%}
-        {%- assign t_heading = '感謝你訂購一字禮。' -%}
-        {%- assign t_lead = '你的禮物已經準備好了。請點下方按鈕，打開你的訂單頁面。' -%}
+        {%- assign t_heading = '你的一字禮已經準備好了。' -%}
+        {%- assign t_lead = '請點下方按鈕打開訂單頁面，按下「領取禮物」後，就能把禮物送給對方。' -%}
         {%- assign t_button = '打開訂單頁面' -%}
-        {%- assign t_under = '你可以在這個頁面把禮物送給對方。這個連結是你自己專用的，請不要轉傳給對方。' -%}
-        {%- assign t_change = '付款完成後24小時內、按下「領取禮物」之前，回覆確認郵件即可取消並全額退款。' -%}
+        {%- assign t_under = '這個連結是你專用的，請不要轉傳給對方。隨時都能從這個按鈕回來。聯絡我們：info@beyondculture.ai' -%}
+        {%- assign t_my_pre = '所有禮物都可以在' -%}
+        {%- assign t_my_link = '我的禮物' -%}
+        {%- assign t_my_post = '查看。' -%}
+        {%- assign t_change = '付款後24小時內、且尚未按下「領取禮物」前，可取消並全額退款。請直接回覆這封郵件。' -%}
         {%- assign t_char = '一字' -%}
         {%- assign t_size = '方案' -%}
         {%- if ichirei_size contains 'STANDARD' -%}{%- assign t_size_value = '版木' -%}{%- elsif ichirei_size contains 'SIMPLE' -%}{%- assign t_size_value = '木牌' -%}{%- else -%}{%- assign t_size_value = 'e禮物' -%}{%- endif -%}
         {%- assign t_colon = '：' -%}
       {%- when 'zh-Hans' -%}
-        {%- assign t_heading = '感谢你订购一字礼。' -%}
-        {%- assign t_lead = '你的礼物已经准备好了。请点下方按钮，打开你的订单页面。' -%}
+        {%- assign t_heading = '你的一字礼已经准备好了。' -%}
+        {%- assign t_lead = '请点下方按钮打开订单页面，按下「领取礼物」后，就能把礼物送给对方。' -%}
         {%- assign t_button = '打开订单页面' -%}
-        {%- assign t_under = '你可以在这个页面把礼物送给对方。这个链接是你自己专用的，请不要转传给对方。' -%}
-        {%- assign t_change = '付款完成后24小时内、按下「领取礼物」之前，回复确认邮件即可取消并全额退款。' -%}
+        {%- assign t_under = '这个链接是你专用的，请不要转传给对方。随时都能从这个按钮回来。联系我们：info@beyondculture.ai' -%}
+        {%- assign t_my_pre = '所有礼物都可以在' -%}
+        {%- assign t_my_link = '我的礼物' -%}
+        {%- assign t_my_post = '查看。' -%}
+        {%- assign t_change = '付款后24小时内、且尚未按下「领取礼物」前，可取消并全额退款。请直接回复这封邮件。' -%}
         {%- assign t_char = '一字' -%}
         {%- assign t_size = '方案' -%}
         {%- if ichirei_size contains 'STANDARD' -%}{%- assign t_size_value = '版木' -%}{%- elsif ichirei_size contains 'SIMPLE' -%}{%- assign t_size_value = '木牌' -%}{%- else -%}{%- assign t_size_value = 'e礼物' -%}{%- endif -%}
         {%- assign t_colon = '：' -%}
       {%- else -%}
-        {%- assign t_heading = 'Thank you for your ICHIREI order.' -%}
-        {%- assign t_lead = 'Your gift is ready. Open your order page with the button below.' -%}
-        {%- assign t_button = 'Open your order page' -%}
-        {%- assign t_under = "Send your gift from this page. This link is for you only; please don't forward it." -%}
-        {%- assign t_change = "Within 24 hours of payment, and before you press 'Collect your gift', reply to the confirmation email to cancel for a full refund." -%}
+        {%- assign t_heading = 'Your ICHIREI gift is ready.' -%}
+        {%- assign t_lead = 'Open your order page with the button below, then press "Collect your gift" to send it.' -%}
+        {%- assign t_button = 'Open your gift' -%}
+        {%- assign t_under = "This link is for you only; please don't forward it. You can always come back from this button. Questions: info@beyondculture.ai" -%}
+        {%- assign t_my_pre = 'All your gifts are in ' -%}
+        {%- assign t_my_link = 'My gifts' -%}
+        {%- assign t_my_post = '.' -%}
+        {%- capture t_change -%}You can cancel for a full refund within 24 hours of payment, as long as you haven't pressed "Collect your gift". Just reply to this email.{%- endcapture -%}
         {%- assign t_char = 'Character' -%}
         {%- assign t_size = 'Gift' -%}
         {%- if ichirei_size contains 'STANDARD' -%}{%- assign t_size_value = 'Carved block' -%}{%- elsif ichirei_size contains 'SIMPLE' -%}{%- assign t_size_value = 'Wooden tag' -%}{%- else -%}{%- assign t_size_value = 'E-gift' -%}{%- endif -%}
@@ -722,6 +734,9 @@ What it prints, only for an ICHIREI item (SKU `ICHIREI-…` or a `_order_ref` pr
     <p>{{ t_under }}</p>
     {%- endif %}
     <p>{{ t_char }}{{ t_colon }}{{ ichirei_glyph | escape }}<br>{{ t_size }}{{ t_colon }}{{ t_size_value }}</p>
+    {%- assign ichirei_mine = line.properties['_ichirei_mygifts_url'] -%}
+    {%- unless ichirei_mine contains '/b/' or ichirei_mine contains '/basket' -%}{%- assign ichirei_mine = 'https://ichirei.beyondculture.ai/basket' -%}{%- endunless -%}
+    <p>{{ t_my_pre }}<a href="{{ ichirei_mine | escape }}">{{ t_my_link }}</a>{{ t_my_post }}</p>
     <p>{{ t_change }}</p>
   {%- endif -%}
 {%- endfor -%}

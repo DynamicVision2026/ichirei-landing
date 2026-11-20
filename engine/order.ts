@@ -413,7 +413,7 @@ export const VISIBLE_PROPERTY: Record<Language, { character: string; opens: stri
  * form, `_inscription_form` the glyph to CARVE, `_reading`, `_certificate_meaning_en` (next to them so the workshop can print a bilingual card), the two names (may be empty), `_delivery_date`,
  * `_opens_on`, `_language`, `_order_ref`, `_ichirei_size`, and the optional ones. Orders made before this change carry the same keys without the underscore; readers accept both (see `attrOf`).
  */
-export function lineAttributes(order: ValidOrder, orderRef: string, animationLink?: string | null, giftLink?: string | null): Attribute[] {
+export function lineAttributes(order: ValidOrder, orderRef: string, animationLink?: string | null, giftLink?: string | null, myGiftsLink?: string | null): Attribute[] {
   const opensOn = order.open_date ?? order.delivery_date
   const v = VISIBLE_PROPERTY[order.page_language ?? order.language] // what the customer reads on the cart: the page's language
   return [
@@ -443,6 +443,8 @@ export function lineAttributes(order: ValidOrder, orderRef: string, animationLin
     // The receiver's page (/g/<token>): the QR code on the printed card points here; and the sender's own private page.
     // English orders: where the buyer came from (utm_source=chatgpt.com when ChatGPT sent them) — hidden, for the order report
     ...(order.language === 'en' && order.utm ? Object.entries(order.utm).map(([k, v]) => ({ key: `_${k}`, value: v as string })) : []),
+    // Part 9 (2026-11-20): the customer's private My gifts link (/b/<token>), for the confirmation e-mail's "All your gifts are in My gifts" — it opens the dashboard in one tap on any device
+    ...(myGiftsLink ? [{ key: '_ichirei_mygifts_url', value: myGiftsLink }] : []),
     ...(giftLink ? [{ key: '_ichirei_gift_url', value: giftLink }] : []),
     ...(animationLink ? [{ key: '_ichirei_animation_url', value: animationLink }] : []),
   ]

@@ -11,7 +11,7 @@
 //
 // Web-standard handler (like api/select.ts): mounted directly by server/app.ts and usable on Vercel.
 
-import { animationUrl, buildAnimationRecord, newAnimationId, type AnimationRecord } from '../engine/animation.ts'
+import { animationUrl, buildAnimationRecord, newAnimationId, publicUrl, type AnimationRecord } from '../engine/animation.ts'
 import { adoptDraft } from '../engine/preview.ts'
 import { mergeStory } from '../engine/contract.ts'
 import { ANIMATION_ID_PATTERN } from '../engine/animation.ts'
@@ -20,7 +20,7 @@ import { allocateCertificateNo } from '../engine/certificate-no.ts'
 import { recordHealth } from '../engine/health.ts'
 import { visitorOf } from '../engine/visitor.ts'
 import { holdForCart, startCheckout } from '../engine/promo-holds.ts'
-import { removeOrderedItem } from '../engine/basket.ts'
+import { ensureBasketToken, removeOrderedItem } from '../engine/basket.ts'
 import { recordOrderIndex } from '../engine/egift-ops.ts'
 import { filmInputFromRecord, filmWaitMs, raceTimeout, trackFilm } from '../engine/film-store.ts'
 import { makeFilm, type FilmInput, type FilmRecord } from '../engine/film.ts'
@@ -283,7 +283,16 @@ export function createOrderHandler(deps: () => OrderDeps) {
       }
       let cart: Awaited<ReturnType<typeof createCart>>
       try {
-        cart = await createCart(d.shopify!, order.package, lineAttributes(order, orderRef, animationLink, giftLink), orderRef, d.fetchImpl, order.page_language, heldCart, d.promoRetryMs)
+        // the customer's private My gifts link, known now: this browser's own basket token (made if it has none) — carried on the order like the order-page link. A cart made with no browser id (an order from a
+        // tool) carries none, and the e-mail then links to the plain /basket address (which opens in the same browser only).
+        let myGiftsLink: string | null = null
+        try {
+          const tok = record.visitor && d.store ? await ensureBasketToken(d.store, record.visitor, d.now?.() ?? new Date()) : null
+          if (tok) myGiftsLink = `${publicUrl(d.env)}/b/${tok}`
+        } catch {
+          myGiftsLink = null
+        }
+        cart = await createCart(d.shopify!, order.package, lineAttributes(order, orderRef, animationLink, giftLink, myGiftsLink), orderRef, d.fetchImpl, order.page_language, heldCart, d.promoRetryMs)
       } catch (err) {
         if (err instanceof PromoCartNotFree) return promoBreak(record, orderRef, putOrder, d)
         throw err
