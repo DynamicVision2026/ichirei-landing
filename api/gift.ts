@@ -23,7 +23,8 @@ import { filmUsable } from '../engine/animation.ts'
 import { loadArtwork, scrollReady } from '../engine/render/artwork.ts'
 import { makeScroll, scrollPdf } from '../engine/render/scroll.ts'
 import { makeOgImage } from '../engine/render/og.ts'
-import { makeCertificateCard, makeKeepsakeCard } from '../engine/render/keepsake.ts'
+import { makeCertificateCard, makeKeepsakeCard, makeQrSlip } from '../engine/render/keepsake.ts'
+import { giftPdf } from '../engine/render/giftpdf.ts'
 import { CERT_WORDS, type CertLang } from '../src/order/ceremony-cert.ts'
 import { toTraditional } from '../engine/script.ts'
 import { cleanReading } from '../src/order/reading.ts'
@@ -218,31 +219,64 @@ async function keepsakeCardResponse(f: Found): Promise<Response> {
   }
 }
 
+/** The certificate's image from the gift record (shared by the certificate route and the whole-gift PDF). */
+async function certificatePng(g: GiftRecord): Promise<Buffer> {
+  const lang: CertLang = g.language === 'ja' || g.language === 'zh-Hant' || g.language === 'zh-Hans' ? g.language : 'en'
+  const C = CERT_WORDS[lang]
+  const date = g.opens_on ?? todayJst(new Date(g.created_at))
+  const english = lang === 'en'
+  // The server's Chinese font is Traditional only (Big5): a Simplified gift's certificate image is drawn in the Traditional forms of the same text (the page itself stays Simplified).
+  const t = (v: string): string => (lang === 'zh-Hans' ? toTraditional(v) : v)
+  return makeCertificateCard({
+    glyph: t(g.glyph),
+    reading: english ? cleanReading(g.romanization.split(' / ')[0]) : lang === 'ja' ? cleanReading((g.reading ?? '').split(' / ')[0]) : '',
+    word: english ? (g.en?.word ?? g.meaning_en ?? '').trim() : '',
+    to: t(g.to ?? ''),
+    from: t(g.from ?? ''),
+    line: t(C.line(g.to, g.from)),
+    number: C.number(g.certificate_no ?? null),
+    place: t(C.place(date)),
+    lang,
+    toLine: english ? '' : t(C.toLine(g.to ?? '')),
+    fromLine: english ? '' : t(C.fromLine(g.from ?? '')),
+  })
+}
+
+/** 「まとめて保存」 (Part 12): the whole gift in one PDF. Works for any gift whose film is complete; the picture pages are left out when the four pictures are not all real. */
+async function wholeGiftResponse(f: Found, d: GiftDeps): Promise<Response> {
+  const art = await safeArt(d.store, f.anim.id)
+  if (!filmComplete(f.anim, art)) return json(404, { error: 'not_ready' }, { 'cache-control': 'no-store' })
+  try {
+    const work = await loadArtwork(d.store!, f.gift, f.anim, art, d.env)
+    const quiet = f.gift.memorial || isQuietPurpose(f.gift.purpose)
+    const pdf = await giftPdf(work, quiet ? null : await certificatePng(f.gift), d.env)
+    return new Response(new Uint8Array(pdf), { status: 200, headers: headers({ 'content-type': 'application/pdf', 'content-disposition': 'attachment; filename="ichirei-gift.pdf"', 'cache-control': 'private, no-store' }) })
+  } catch (err) {
+    console.error('[ichirei-gift-pdf] failed', err instanceof Error ? err.message : err)
+    return json(500, { error: 'gift_pdf_failed' }, { 'cache-control': 'no-store' })
+  }
+}
+
+/** The way back to this gift page as an image: the QR of the receiver's page on an Ivory slip with the character and 「ICHIREI 一字礼」. No moment text, no names. */
+async function qrSlipResponse(f: Found, d: GiftDeps): Promise<Response> {
+  try {
+    const g = f.gift
+    const lang = g.language === 'ja' ? 'ja' : g.language === 'zh-Hant' ? 'zh-Hant' : g.language === 'zh-Hans' ? 'zh-Hans' : 'en'
+    const glyph = lang === 'zh-Hans' ? toTraditional(g.glyph) : g.glyph
+    const png = await makeQrSlip({ url: giftUrl(g.token, d.env), glyph, lang, quiet: g.memorial || isQuietPurpose(g.purpose) })
+    return new Response(new Uint8Array(png), { status: 200, headers: headers({ 'content-type': 'image/png', 'content-disposition': 'attachment; filename="ichirei-qr.png"', 'cache-control': 'private, no-store', 'x-robots-tag': 'noindex, nofollow' }) })
+  } catch (err) {
+    console.error('[ichirei-keep-qr] failed', err instanceof Error ? err.message : err)
+    return json(500, { error: 'qr_failed' }, { 'cache-control': 'no-store' })
+  }
+}
+
 /** The receiver's certificate as an image (the new English ceremony, screen 7). English, open, non-quiet gifts only. */
 async function certificateResponse(f: Found): Promise<Response> {
   const g = f.gift
   if (g.memorial || isQuietPurpose(g.purpose)) return json(404, { error: 'not_offered' }, { 'cache-control': 'no-store' })
   try {
-    const lang: CertLang = g.language === 'ja' || g.language === 'zh-Hant' || g.language === 'zh-Hans' ? g.language : 'en'
-    const C = CERT_WORDS[lang]
-    const date = g.opens_on ?? todayJst(new Date(g.created_at))
-    const english = lang === 'en'
-    // The server's Chinese font is Traditional only (Big5): a Simplified gift's certificate image is drawn in the Traditional forms of the same text (the page itself stays Simplified).
-    const t = (v: string): string => (lang === 'zh-Hans' ? toTraditional(v) : v)
-    const png = await makeCertificateCard({
-      glyph: t(g.glyph),
-      // English the romaji; Japanese the kana reading; Chinese none (2026-11-19)
-      reading: english ? cleanReading(g.romanization.split(' / ')[0]) : lang === 'ja' ? cleanReading((g.reading ?? '').split(' / ')[0]) : '',
-      word: english ? (g.en?.word ?? g.meaning_en ?? '').trim() : '',
-      to: t(g.to ?? ''),
-      from: t(g.from ?? ''),
-      line: t(C.line(g.to, g.from)),
-      number: C.number(g.certificate_no ?? null),
-      place: t(C.place(date)),
-      lang,
-      toLine: english ? '' : t(C.toLine(g.to ?? '')),
-      fromLine: english ? '' : t(C.fromLine(g.from ?? '')),
-    })
+    const png = await certificatePng(g)
     return new Response(new Uint8Array(png), { status: 200, headers: headers({ 'content-type': 'image/png', 'content-disposition': 'attachment; filename="ichirei-certificate.png"', 'cache-control': 'private, no-store' }) })
   } catch (err) {
     console.error('[ichirei-certificate] failed', err instanceof Error ? err.message : err)
@@ -466,6 +500,38 @@ export function createGiftHandlers(deps: () => GiftDeps) {
       if (closed(r.gift, d, preview)) return json(403, { error: 'locked' }, { 'cache-control': 'no-store' })
       { const gate = await gateOf(r.gift, d); if (gate === 'cancelled') return gone(r.gift); if (gate === 'pending') return notCollected(); if (gate === 'error') return busy() }
       return certificateResponse(r)
+    },
+    /** 「まとめて保存」: the whole gift as one PDF — the receiver's own link (a preview with the sender's id works before the day), and the sender's page by its id. */
+    async giftPdf(token: string, preview?: string | null): Promise<Response> {
+      const d = deps()
+      const r = await loadGift(token, d)
+      if (r.status !== 200) return json(r.status, { error: r.status === 404 ? 'not_found' : 'unavailable' }, { 'cache-control': 'no-store' })
+      if (closed(r.gift, d, preview)) return json(403, { error: 'locked' }, { 'cache-control': 'no-store' })
+      { const gate = await gateOf(r.gift, d); if (gate === 'cancelled') return gone(r.gift); if (gate === 'pending') return notCollected(); if (gate === 'error') return busy() }
+      return wholeGiftResponse(r, d)
+    },
+    async giftPdfForSender(animationId: string): Promise<Response> {
+      const d = deps()
+      const f = await bySender(animationId, d)
+      if (f instanceof Response) return f
+      { const gate = await gateOf(f.gift, d); if (gate === 'cancelled') return gone(f.gift); if (gate === 'pending') return notCollected(); if (gate === 'error') return busy() }
+      return wholeGiftResponse(f, d)
+    },
+    /** The QR of the receiver's page as an image (the receiver's own link; the sender's page by its id). */
+    async keepQr(token: string, preview?: string | null): Promise<Response> {
+      const d = deps()
+      const r = await loadGift(token, d)
+      if (r.status !== 200) return json(r.status, { error: r.status === 404 ? 'not_found' : 'unavailable' }, { 'cache-control': 'no-store' })
+      if (closed(r.gift, d, preview)) return json(403, { error: 'locked' }, { 'cache-control': 'no-store' })
+      { const gate = await gateOf(r.gift, d); if (gate === 'cancelled') return gone(r.gift); if (gate === 'pending') return notCollected(); if (gate === 'error') return busy() }
+      return qrSlipResponse(r, d)
+    },
+    async keepQrForSender(animationId: string): Promise<Response> {
+      const d = deps()
+      const f = await bySender(animationId, d)
+      if (f instanceof Response) return f
+      { const gate = await gateOf(f.gift, d); if (gate === 'cancelled') return gone(f.gift); if (gate === 'pending') return notCollected(); if (gate === 'error') return busy() }
+      return qrSlipResponse(f, d)
     },
     async keepsakeCardForSender(animationId: string): Promise<Response> {
       const d = deps()

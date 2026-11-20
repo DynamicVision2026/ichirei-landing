@@ -4,8 +4,7 @@ import { cleanReading } from '../order/reading.ts'
 import type { PageLang } from './copy.ts'
 import { BUYER_COPY, dayText, deadlineText, orderedText } from './buyer-copy.ts'
 import type { AnimationView } from './types.ts'
-import Keepsakes from '../gift/Keepsakes.tsx'
-import ShareSection from '../gift/ShareSection.tsx'
+import GiftActions from '../gift/GiftActions.tsx'
 import Schedule from './Schedule.tsx'
 import Cord from '../gift/Cord.tsx'
 import StrokeGlyph from '../gift/StrokeGlyph.tsx'
@@ -35,11 +34,10 @@ function readingOf(view: AnimationView): string {
 const filmComplete = (v: AnimationView): boolean => !!v.film && v.film.status === 'ready' && !v.film.incomplete && !!v.film.pictures && !v.film.deferred
 const scrollAvailable = (v: AnimationView): boolean => !!v.film && v.film.status === 'ready' && !v.film.incomplete && !!v.film.pictures && v.film.pictures.length === 4 && v.film.pictures.every((u) => !u.startsWith('/film/washi-')) && !v.film.substituted?.length && !v.film.no_pictures
 
-export default function BuyerPage({ view, lang, preparing, onCollected }: { view: AnimationView; lang: PageLang; preparing: string; onCollected: () => void }) {
+export default function BuyerPage({ view, lang, onCollected }: { view: AnimationView; lang: PageLang; preparing?: string; onCollected: () => void }) {
   const c = BUYER_COPY[lang]
   const s = SENDER_COPY[lang]
   const g = view.gift
-  const [copied, setCopied] = useState(false)
   const [qr, setQr] = useState(false)
   const [wechat, setWechat] = useState(false)
   const [confirming, setConfirming] = useState(false)
@@ -84,16 +82,6 @@ export default function BuyerPage({ view, lang, preparing, onCollected }: { view
   const message = `${view.memorial ? s.sentLineMemorial : s.sentLine}\n${g.url}`
   // the first copy or share is kept as `shared_at` (the states line shows "Sent"); a failed call changes nothing
   const markShared = () => { try { void fetch(`/api/animation/${view.id}/shared`, { method: 'POST', keepalive: true }).catch(() => {}) } catch { /* the page works without it */ } }
-  const copyLink = async () => {
-    markShared()
-    try {
-      await navigator.clipboard.writeText(g.url)
-      setCopied(true)
-      setTimeout(() => setCopied(false), 2400)
-    } catch {
-      // the link is shown as selectable text too
-    }
-  }
   const until = o?.change_until && Date.parse(o.change_until) > now ? o.change_until : null
   const wood = o?.wood ?? null
   // before the buyer presses 「贈りものを受け取る」 nothing can be sent or saved; a view with no order data (an older record) is treated as collected
@@ -117,6 +105,42 @@ export default function BuyerPage({ view, lang, preparing, onCollected }: { view
   const tap = () => (until ? setConfirming(true) : void collect())
   // the film is still being written / drawn (the first open draws it): the save section says so; a still-washi or deferred film has nothing to save
   const waiting = !view.film || (!view.film.pictures && !view.film.deferred)
+  // The send options (LINE, WhatsApp, WeChat, copy, QR, e-mail) live in the share sheet now (Part 12, 2026-11-20): one 「シェアする」 button on the page; the device's own share sheet when it has one.
+  const senderOptions = (done: boolean, copy: () => void) => (
+    <>
+        {lang === 'en' && !view.memorial ? (
+          <>
+            <p className="an-buttons" data-testid="en-share-sheet">
+              <button type="button" className="an-btn an-btn-hot" data-testid="give-copy" onClick={copy}>{done ? s.copied : 'Copy link'}</button>
+              <a className="an-btn" data-testid="give-mail" onClick={markShared} href={`mailto:?subject=${encodeURIComponent(s.mailSubject)}&body=${encodeURIComponent(message)}`}>Email</a>
+              <a className="an-btn" data-testid="give-whatsapp" onClick={markShared} href={`https://wa.me/?text=${encodeURIComponent(message)}`} target="_blank" rel="noopener noreferrer">WhatsApp</a>
+              <a className="an-btn" data-testid="give-messages" onClick={markShared} href={`sms:?&body=${encodeURIComponent(message)}`}>Messages</a>
+            </p>
+          </>
+        ) : (
+        <p className="an-buttons">
+          <a className="an-btn an-btn-hot" data-testid="give-line" onClick={markShared} href={`https://line.me/R/share?text=${encodeURIComponent(message)}`} target="_blank" rel="noopener noreferrer">{s.line}</a>
+          <a className="an-btn" data-testid="give-whatsapp" onClick={markShared} href={`https://wa.me/?text=${encodeURIComponent(message)}`} target="_blank" rel="noopener noreferrer">{s.whatsapp}</a>
+          <button type="button" className="an-btn" data-testid="give-wechat" onClick={() => { markShared(); setWechat((v) => !v) }} aria-expanded={wechat}>{s.wechat}</button>
+          <button type="button" className="an-btn" data-testid="give-copy" onClick={copy}>{done ? s.copied : s.copyLink}</button>
+          <button type="button" className="an-btn" data-testid="give-qr" onClick={() => { markShared(); setQr((v) => !v) }} aria-expanded={qr}>{s.qr}</button>
+          <a className="an-btn" data-testid="give-mail" onClick={markShared} href={`mailto:?subject=${encodeURIComponent(s.mailSubject)}&body=${encodeURIComponent(message)}`}>{s.email}</a>
+        </p>
+        )}
+        {(qr || wechat) && token && (
+          <p className="an-qr" data-testid="give-qr-img">
+            <img src={`/api/gift/${token}/qr.svg`} alt="QR" width={200} height={200} />
+            <span>{s.qrNote}</span>
+            {wechat && (
+              <>
+                <span data-testid="give-wechat-note">{s.wechatNote}</span>
+                <a className="an-btn" data-testid="give-qr-save" href={`/api/gift/${token}/qr.png`} download="ichirei-qr.png">{s.saveQr}</a>
+              </>
+            )}
+          </p>
+        )}
+    </>
+  )
   return (
     <div className="by-page" data-testid="buyer-page" data-quiet={quiet ? 'yes' : 'no'}>
       <div className="by-top"><MyGiftsButton lang={lang} /></div>
@@ -164,25 +188,19 @@ export default function BuyerPage({ view, lang, preparing, onCollected }: { view
       <section className="an-panel by-send" data-testid="sender-panel" aria-label={view.memorial ? c.sendTitleMemorial : c.sendTitle}>
         <h2 data-testid="buyer-send-title">{view.memorial ? c.sendTitleMemorial : c.sendTitle}</h2>
         <p data-testid="buyer-send-line">{c.sendLine}</p>
-        {lang === 'en' && !view.memorial ? (
-          <>
-            <p className="an-buttons" data-testid="en-share-sheet">
-              <button type="button" className="an-btn an-btn-hot" data-testid="give-copy" onClick={copyLink}>{copied ? s.copied : 'Copy link'}</button>
-              <a className="an-btn" data-testid="give-mail" onClick={markShared} href={`mailto:?subject=${encodeURIComponent(s.mailSubject)}&body=${encodeURIComponent(message)}`}>Email</a>
-              <a className="an-btn" data-testid="give-whatsapp" onClick={markShared} href={`https://wa.me/?text=${encodeURIComponent(message)}`} target="_blank" rel="noopener noreferrer">WhatsApp</a>
-              <a className="an-btn" data-testid="give-messages" onClick={markShared} href={`sms:?&body=${encodeURIComponent(message)}`}>Messages</a>
-            </p>
-          </>
-        ) : (
-        <p className="an-buttons">
-          <a className="an-btn an-btn-hot" data-testid="give-line" onClick={markShared} href={`https://line.me/R/share?text=${encodeURIComponent(message)}`} target="_blank" rel="noopener noreferrer">{s.line}</a>
-          <a className="an-btn" data-testid="give-whatsapp" onClick={markShared} href={`https://wa.me/?text=${encodeURIComponent(message)}`} target="_blank" rel="noopener noreferrer">{s.whatsapp}</a>
-          <button type="button" className="an-btn" data-testid="give-wechat" onClick={() => { markShared(); setWechat((v) => !v) }} aria-expanded={wechat}>{s.wechat}</button>
-          <button type="button" className="an-btn" data-testid="give-copy" onClick={copyLink}>{copied ? s.copied : s.copyLink}</button>
-          <button type="button" className="an-btn" data-testid="give-qr" onClick={() => { markShared(); setQr((v) => !v) }} aria-expanded={qr}>{s.qr}</button>
-          <a className="an-btn" data-testid="give-mail" onClick={markShared} href={`mailto:?subject=${encodeURIComponent(s.mailSubject)}&body=${encodeURIComponent(message)}`}>{s.email}</a>
-        </p>
-        )}
+        <GiftActions
+          lang={lang}
+          role="sender"
+          base={`/api/animation/${view.id}`}
+          giftUrl={g.url}
+          complete={filmComplete(view) && !waiting}
+          scroll={scrollAvailable(view)}
+          waiting={waiting}
+          memorial={view.memorial}
+          enCard={lang === 'en' && !!view.en}
+          onShared={markShared}
+          senderOptions={({ copied: done, copyLink: copy }) => senderOptions(done, copy)}
+        />
         {/* Part 8 (2026-11-20): where people stop — sending can wait, and the gift stays in My gifts */}
         <p className="by-later" data-testid="send-later">
           <span data-testid="send-later-line">{s.sendLater}</span>{' '}
@@ -193,19 +211,6 @@ export default function BuyerPage({ view, lang, preparing, onCollected }: { view
           <span>{s.linkLabel}</span>
           <input readOnly value={g.url} onFocus={(e) => e.currentTarget.select()} data-testid="give-link" />
         </label>
-        {(qr || wechat) && token && (
-          <p className="an-qr" data-testid="give-qr-img">
-            <img src={`/api/gift/${token}/qr.svg`} alt="QR" width={200} height={200} />
-            <span>{s.qrNote}</span>
-            {wechat && (
-              <>
-                <span data-testid="give-wechat-note">{s.wechatNote}</span>
-                {filmComplete(view) && <a className="an-btn" data-testid="give-wechat-video" href="#keepsakes">{s.wechatVideo}</a>}
-                <a className="an-btn" data-testid="give-qr-save" href={`/api/gift/${token}/qr.png`} download="ichirei-qr.png">{s.saveQr}</a>
-              </>
-            )}
-          </p>
-        )}
         {g.opens_on && <p className="by-opens" data-testid="status-opens">{openingLabelFromRecord(lang, g.opens_at, g.opens_tz) ?? c.opensOn(dayText(lang, g.opens_on))}</p>}
         <p className="an-buttons" data-testid="give-preview">
           <a className="an-btn" href={`${g.url}?preview=${view.id}`} target="_blank" rel="noopener noreferrer">{c.preview}</a>
@@ -238,20 +243,6 @@ export default function BuyerPage({ view, lang, preparing, onCollected }: { view
           </ol>
           <p data-testid="wood-ship">{c.woodShip[wood.ship_to]}</p>
           {g.egift_state && <p className="an-small" data-testid="status-egift">{g.egift_state === 'received' ? s.egiftReceived : s.egiftWaiting}</p>}
-        </section>
-      )}
-
-      {collected && (filmComplete(view) || scrollAvailable(view) || waiting) && (
-        <section className="an-panel by-save" id="keepsakes" data-testid="buyer-save">
-          {waiting ? (
-            <>
-              <h3 className="gf-label" data-testid="keepsakes-title">{c.saveTitle}</h3>
-              <p className="an-small an-preparing" role="status" data-testid="animation-preparing">{preparing}<span className="an-dots" aria-hidden="true" /></p>
-            </>
-          ) : (
-            <Keepsakes lang={lang} base={`/api/animation/${view.id}`} complete={filmComplete(view)} scroll={scrollAvailable(view)} egift={g.size_code === 'ICHIREI-EGIFT'} title={c.saveTitle} enCard={lang === 'en' && !!view.en} />
-          )}
-          {!waiting && !view.memorial && filmComplete(view) && <ShareSection lang={lang} base={`/api/animation/${view.id}`} role="sender" />}
         </section>
       )}
 

@@ -2,6 +2,7 @@
 // surface. No names, no story, nothing else. English first (2026-11-15): no romanized reading; the word is large, thickened with a stroke (the embedded serif has no bold).
 
 import sharp from 'sharp'
+import QRCode from 'qrcode'
 import { EN_LINE_MAX_WORDS, type EnBridge } from '../../src/order/en-bridge.ts'
 import { fontObject, fontsFor } from './fonts.ts'
 import { textPaths, wrapText } from './text.ts'
@@ -130,6 +131,58 @@ export async function makeCertificateCard(a: CertificateArtwork): Promise<Buffer
   svg += textPaths(body, up(a.place), 30, x, H - 120, MUTED, 'start').svg
   return sharp({ create: { width: W, height: H, channels: 3, background: '#F3EFE5' } })
     .composite([{ input: Buffer.from(`<svg xmlns="http://www.w3.org/2000/svg" width="${W}" height="${H}" viewBox="0 0 ${W} ${H}">${svg}</svg>`), left: 0, top: 0 }])
+    .png({ compressionLevel: 9 })
+    .toBuffer()
+}
+
+// ---- the way back to the gift page, as an image (Part 12 / 13, 2026-11-20) -------------------------------------------------------------------------------------------
+// Receivers mostly open the gift inside LINE's own browser, where saving files is unreliable. The gift page stays online for at least ten years, so the keepsake that matters is the way back to it: the QR code
+// of the receiver's page (`/g/<token>`) on an Ivory slip, the character under it and 「ICHIREI 一字礼」 in small type. No moment text, no names. The last page of the whole-gift PDF is the same slip
+// with one line above the character: where the film and the music are.
+
+export const QR_SLIP_W = 1080
+export const QR_SLIP_H = 1350
+const IVORY = '#F7F1E3'
+
+export interface QrSlipArtwork {
+  /** The receiver's page address (the QR carries exactly this). */
+  url: string
+  /** The character, drawn under the code. */
+  glyph: string
+  lang: 'en' | 'ja' | 'zh-Hant' | 'zh-Hans'
+  /** No red for a remembrance or a quiet gift. */
+  quiet: boolean
+  /** One line under the code (the PDF's last page: 「この贈りものの映像と音楽は、こちらから」). */
+  line?: string
+}
+
+export async function makeQrSlip(a: QrSlipArtwork): Promise<Buffer> {
+  const f = fontsFor(a.lang)
+  const body = fontObject(f.body)
+  const hero = fontObject(f.character)
+  const W = QR_SLIP_W
+  const H = QR_SLIP_H
+  const qrSize = a.line ? 620 : 700
+  const qr = await QRCode.toBuffer(a.url, { type: 'png', errorCorrectionLevel: 'M', margin: 2, width: qrSize, color: { dark: INK, light: IVORY } })
+  const gs = 190
+  const top = a.line ? 120 : 150
+  let svg = ''
+  svg += `<rect x="60" y="60" width="${W - 120}" height="${H - 120}" fill="none" stroke="#B8924A" stroke-width="2"/>`
+  let y = top + qrSize + 40
+  if (a.line) {
+    for (const l of wrapText(body, a.line, 40, W - 260).slice(0, 2)) {
+      svg += textPaths(body, l, 40, W / 2, y + 40, INK, 'middle').svg
+      y += 60
+    }
+    y += 20
+  } else y += 30
+  svg += textPaths(hero, a.glyph, gs, W / 2, y + gs * 0.82, a.quiet ? INK : CINNABAR, 'middle', f.stroke).svg
+  svg += textPaths(body, 'ICHIREI 一字礼', 30, W / 2, H - 120, MUTED, 'middle').svg
+  return sharp({ create: { width: W, height: H, channels: 3, background: IVORY } })
+    .composite([
+      { input: qr, left: Math.round((W - qrSize) / 2), top },
+      { input: Buffer.from(`<svg xmlns="http://www.w3.org/2000/svg" width="${W}" height="${H}" viewBox="0 0 ${W} ${H}">${svg}</svg>`), left: 0, top: 0 },
+    ])
     .png({ compressionLevel: 9 })
     .toBuffer()
 }

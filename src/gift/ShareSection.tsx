@@ -25,7 +25,7 @@ type Kind = 'film' | 'card'
 const PATH: Record<Kind, string> = { film: 'share-film.mp4', card: 'share-card.png' }
 const FILE: Record<Kind, { name: string; type: string }> = { film: { name: 'ichirei-share.mp4', type: 'video/mp4' }, card: { name: 'ichirei-poem-card.png', type: 'image/png' } }
 
-export default function ShareSection({ lang, base, role }: { lang: PageLang; base: string; role: 'sender' | 'receiver' }) {
+export default function ShareSection({ lang, base, role, bare = false }: { lang: PageLang; base: string; role: 'sender' | 'receiver'; /** In a sheet (Part 12): no section title, the same buttons and the same line. */ bare?: boolean }) {
   const c = COPY[lang]
   const files = useRef<Partial<Record<Kind, File>>>({})
   const pending = useRef<Partial<Record<Kind, Promise<File | null>>>>({})
@@ -101,7 +101,7 @@ export default function ShareSection({ lang, base, role }: { lang: PageLang; bas
 
   return (
     <section className="gf-save sh-share" data-testid="share-section">
-      <h3 className="gf-label" data-testid="share-title">{c.title}</h3>
+      {!bare && <h3 className="gf-label" data-testid="share-title">{c.title}</h3>}
       <p className="an-small" data-testid="share-line">{c.line}</p>
       <div className="gf-save-list">
         <button type="button" className="gf-btn gf-btn-quiet" data-testid="share-film" onClick={() => void tap('film')}>{c.film}</button>

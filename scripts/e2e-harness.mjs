@@ -6510,6 +6510,145 @@ for (const [lang, locale, text] of [['en', 'en-US', 'Your gift is being finished
   }
 }
 
+// ---------- Run 46 (2026-11-20, Part 12): saving and sharing are ONE button each — on the sender's page and on the receiver's keepsakes screen (ja / en / zh-Hant, 390 px); each opens its choices in a small paper sheet; the schedule shows what is saved ----------
+{
+  const T46 = (page, id) => page.locator(`[data-testid="${id}"]`)
+  const ID = 'AN-testtesttesttesttest'
+  const TOKEN = 'RG-testtesttesttesttest'
+  const L = {
+    ja: { saveAll: 'まとめて保存', other: 'ほかの形で保存', share: 'シェアする', forever: 'ギフトページは少なくとも10年間公開します。', film: '映像（MP4）', scroll: '物語絵巻（画像 PNG）', card: 'カード（A4のPDF）', qr: 'QRコードを画像で保存', copied: 'コピーしました', pick: '日時を選ぶ', now: 'すぐに開ける', opts: ['LINEで贈る', 'WhatsAppで贈る', 'WeChatで贈る', 'リンクをコピー', 'QRコードを表示', 'メールで贈る'] },
+    en: { saveAll: 'Save everything', other: 'Other formats', share: 'Share', forever: 'The gift page stays online for at least ten years.', film: 'The film (MP4)', scroll: 'The story scroll (PNG image)', card: 'The card (A4 PDF)', qr: 'Save the QR code as an image', copied: 'Copied', pick: 'Pick a date and time', now: 'Now', opts: ['Copy link', 'Email', 'WhatsApp', 'Messages'] },
+    'zh-Hant': { saveAll: '全部儲存', other: '其他格式', share: '分享', forever: '禮物頁面至少公開 10 年。', film: '影片（MP4）', scroll: '故事長卷（圖片 PNG）', card: '卡片（A4 PDF）', qr: '把QR碼存成圖片', copied: '已複製', pick: '選擇日期與時間', now: '立即開啟', opts: [] },
+  }
+  const view = (lang, gift = {}) => ({ id: ID, language: lang, glyph: '備', reading: lang === 'ja' ? 'そなえる' : '', romanization: 'sonaeru', meaning_en: 'to be ready', who: 'x', memorial: false, purpose: 'thanks', film: { status: 'ready', lines: ['a', 'b', 'c', 'd'], pictures: ['/img/scenes/children.jpg', '/img/scenes/friends.jpg', '/img/scenes/m1.jpg', '/img/scenes/m2.jpg'] }, gift: { url: `https://ichirei.beyondculture.ai/g/${TOKEN}`, size_code: 'ICHIREI-EGIFT', ship_to: 'none', egift_state: null, opens_on: null, opens_at: null, opens_tz: null, certificate_no: 12, reply: null, states: { shared_at: null, opened_at: null, answered_at: null }, ...gift }, order: { collected: true, ordered_at: '2026-11-19T05:30:00Z', change_until: null, wood: null } })
+  const open = async (lang, v, { share = false } = {}) => {
+    const ctx = await browser.newContext({ locale: lang === 'en' ? 'en-US' : lang === 'ja' ? 'ja-JP' : 'zh-TW', viewport: { width: 390, height: 844 }, permissions: ['clipboard-read', 'clipboard-write'], acceptDownloads: true })
+    if (share) await ctx.addInitScript(() => { navigator.share = async (d) => { window.__shared = d } })
+    const page = await ctx.newPage()
+    const errs = []
+    page.on('pageerror', (e) => errs.push(String(e)))
+    await page.route('**/api/me*', (r) => r.fulfill({ json: { basket: { count: 3 }, ready: null, hold: null } }))
+    await page.route(`**/api/animation/${ID}`, (r) => r.fulfill({ json: v }))
+    await page.route(`**/api/gift/${TOKEN}/qr.svg`, (r) => r.fulfill({ status: 200, contentType: 'image/svg+xml', body: '<svg xmlns="http://www.w3.org/2000/svg" width="10" height="10"/>' }))
+    await page.route(`**/api/animation/${ID}/gift.pdf`, (r) => r.fulfill({ status: 200, contentType: 'application/pdf', headers: { 'content-disposition': 'attachment; filename="ichirei-gift.pdf"' }, body: '%PDF-1.4\n' }))
+    await page.route(`**/api/animation/${ID}/shared`, (r) => r.fulfill({ status: 204, body: '' }))
+    await page.goto(`http://localhost:5173/a/${ID}`, { waitUntil: 'networkidle' })
+    await T46(page, 'gift-actions').waitFor()
+    return { page, ctx, errs }
+  }
+  for (const lang of ['ja', 'en', 'zh-Hant']) {
+    const W = L[lang]
+    const { page, ctx, errs } = await open(lang, view(lang))
+    const row = await page.evaluate(() => [...document.querySelectorAll('[data-testid=gift-actions] .ga-btn')].map((e) => { const r = e.getBoundingClientRect(); const cs = getComputedStyle(e); return { text: e.textContent.trim(), top: r.top, bottom: r.bottom, left: r.left, width: r.width, height: r.height, color: cs.color, border: cs.borderTopStyle !== 'none' && parseFloat(cs.borderTopWidth) >= 1 } }))
+    check(`sender page (${lang}): exactly two actions on the page — 「${W.saveAll}」 and 「${W.share}」 — and nothing else listed (no film, scroll, card, LINE… until a sheet is opened)`, JSON.stringify(row.map((b) => b.text)) === JSON.stringify([W.saveAll, W.share]) && (await page.locator('[data-testid=save-film], [data-testid=save-scroll], [data-testid=save-card], [data-testid=give-line], [data-testid=give-copy], [data-testid=share-film], [data-testid=share-card]').count()) === 0, JSON.stringify(row.map((b) => b.text)))
+    check(`sender page (${lang}, 390 px): ghost buttons — hairline, Vintage Gold text, at least 44 px, stacked with a gap, no horizontal scroll`, row.every((b) => b.border && b.height >= 44 && b.color === 'rgb(201, 169, 110)') && row[1].top - row[0].bottom >= 8 && Math.abs(row[0].left - row[1].left) < 2 && (await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 1)), JSON.stringify(row.map((b) => [b.height, b.color, Math.round(b.top)])))
+    check(`sender page (${lang}): under them one small link 「${W.other}」 and the one line 「${W.forever}」; the long explanation lines are not on the page`, ((await T46(page, 'other-formats').textContent()) ?? '').trim() === W.other && ((await T46(page, 'save-forever').textContent()) ?? '').trim() === W.forever && (await T46(page, 'save-card-note').count()) === 0 && (await T46(page, 'share-line').count()) === 0)
+    // 「まとめて保存」: one tap, one file
+    const [dl] = await Promise.all([page.waitForEvent('download', { timeout: 6000 }), T46(page, 'save-all').click()])
+    check(`sender page (${lang}): 「${W.saveAll}」 is one tap and one file — the whole-gift PDF (gift.pdf)`, dl.suggestedFilename() === 'ichirei-gift.pdf' && (await T46(page, 'save-all').getAttribute('href')) === `/api/animation/${ID}/gift.pdf` && (await page.locator('[data-testid=formats-sheet]').count()) === 0)
+    // 「ほかの形で保存」: a small sheet
+    await T46(page, 'other-formats').click()
+    await T46(page, 'formats-sheet').waitFor()
+    const sheet = await page.evaluate(() => { const e = document.querySelector('[data-testid=formats-sheet]'); const cs = getComputedStyle(e); const bd = getComputedStyle(document.querySelector('[data-testid=formats-sheet-backdrop]')); return { bg: cs.backgroundColor, shadow: cs.boxShadow !== 'none', blur: cs.backdropFilter + '|' + bd.backdropFilter + '|' + cs.filter, w: e.getBoundingClientRect().width, vw: window.innerWidth, items: [...e.querySelectorAll('.ga-item')].map((x) => x.textContent.trim()) } })
+    check(`sender page (${lang}): the formats sheet lists the film, the scroll (PNG), the card (A4 PDF) and the QR image — 「${W.film}」 / 「${W.scroll}」 / 「${W.card}」 / 「${W.qr}」 — with the cut-and-fold note inside it`, JSON.stringify(sheet.items.slice(0, 1)) === JSON.stringify([W.film]) && sheet.items.includes(W.scroll) && sheet.items.includes(W.card) && sheet.items.includes(W.qr) && (await T46(page, 'save-card-note').count()) === 1 && (await T46(page, 'save-qr').getAttribute('href')) === `/api/animation/${ID}/keep-qr.png` && (await T46(page, 'save-scroll').getAttribute('href')) === `/api/animation/${ID}/scroll.png` && (await T46(page, 'save-card').getAttribute('href')) === `/api/animation/${ID}/card.pdf`, JSON.stringify(sheet.items))
+    check(`sender page (${lang}): the sheet is a paper slip with a soft shadow — never glass or blur — and fits the phone`, sheet.bg === 'rgb(243, 235, 216)' && sheet.shadow && /none\|none\|none/.test(sheet.blur) && sheet.w <= sheet.vw, JSON.stringify(sheet))
+    if (lang === 'ja') await page.screenshot({ path: `${SHOTS}/p12-sender-formats-ja-390.png` })
+    await page.keyboard.press('Escape')
+    check(`sender page (${lang}): Escape closes the sheet (so do ✕ and a tap outside)`, (await T46(page, 'formats-sheet').count()) === 0)
+    await T46(page, 'other-formats').click(); await T46(page, 'formats-sheet-close').click()
+    await T46(page, 'other-formats').click(); await page.mouse.click(10, 10)
+    check(`sender page (${lang}): ✕ and a tap outside close it too`, (await T46(page, 'formats-sheet').count()) === 0)
+    // 「シェアする」 where there is no share sheet: the sender's own options inside a sheet
+    await T46(page, 'share-button').click()
+    await T46(page, 'share-sheet').waitFor()
+    const labels = await page.evaluate(() => [...document.querySelectorAll('[data-testid=sender-share-options] .an-btn')].map((x) => x.textContent.trim()))
+    check(`sender page (${lang}): with no device share sheet, 「${W.share}」 opens a sheet with the send options (${W.opts.join(' · ') || 'the existing ones'})`, W.opts.every((o) => labels.includes(o)) && (await T46(page, 'give-copy').count()) === 1, JSON.stringify(labels))
+    if (lang === 'ja') await page.screenshot({ path: `${SHOTS}/p12-sender-share-ja-390.png` })
+    await T46(page, 'give-copy').click()
+    await page.waitForFunction((t) => document.querySelector('[data-testid=give-copy]')?.textContent.trim() === t, W.copied, { timeout: 4000 }).catch(() => {})
+    check(`sender page (${lang}): copying the link says 「${W.copied}」`, ((await T46(page, 'give-copy').textContent()) ?? '').trim() === W.copied && (await page.evaluate(() => navigator.clipboard.readText())) === `https://ichirei.beyondculture.ai/g/${TOKEN}`)
+    if (lang === 'ja') { await page.keyboard.press('Escape'); await page.screenshot({ path: `${SHOTS}/p12-sender-buttons-ja-390.png`, fullPage: true }) }
+    check(`no page errors (run 46, ${lang})`, errs.length === 0, errs.join('; '))
+    await ctx.close()
+    // a phone with a share sheet: one tap opens it with the gift link only, and no sheet of ours
+    const s = await open(lang, view(lang), { share: true })
+    await T46(s.page, 'share-button').click()
+    await s.page.waitForFunction(() => window.__shared)
+    const shared = await s.page.evaluate(() => window.__shared)
+    check(`sender page (${lang}): where the device has a share sheet, one tap opens it with the gift link only — no title, no text — and our sheet stays closed`, shared.url === `https://ichirei.beyondculture.ai/g/${TOKEN}` && shared.title === undefined && shared.text === undefined && (await s.page.locator('[data-testid=share-sheet]').count()) === 0)
+    await s.ctx.close()
+    // the schedule: set for a day → 「日時を選ぶ」 with the saved date, time and zone; set to open now → 「すぐに開ける」
+    const now0 = await open(lang, view(lang))
+    await T46(now0.page, 'give-schedule').click()
+    check(`schedule (${lang}, opens now): 「${W.now}」 is the ticked option`, await T46(now0.page, 'choice-now').isChecked() && !(await T46(now0.page, 'choice-pick').isChecked()))
+    await now0.ctx.close()
+    const sched = lang === 'en' ? { opens_on: '2026-11-21', opens_at: '2026-11-21T12:00:00.000Z', opens_tz: 'America/New_York' } : { opens_on: '2026-11-21', opens_at: '2026-11-20T22:00:00.000Z', opens_tz: 'Asia/Tokyo' }
+    const sc = await open(lang, view(lang, sched))
+    await T46(sc.page, 'give-schedule').click()
+    check(`schedule (${lang}, set for Nov 21, 7:00): the panel opens on 「${W.pick}」 with the saved date, time and zone filled in — not 「${W.now}」`, (await T46(sc.page, 'choice-pick').isChecked()) && !(await T46(sc.page, 'choice-now').isChecked()) && (await T46(sc.page, 'schedule-date').inputValue()) === '2026-11-21' && (await T46(sc.page, 'schedule-time').inputValue()) === '07:00' && (await sc.page.locator('#schedule-zone').inputValue()) === sched.opens_tz, JSON.stringify([await T46(sc.page, 'choice-pick').isChecked(), await T46(sc.page, 'schedule-date').inputValue().catch(() => null)]))
+    check(`schedule (${lang}): the set button is still the only way to change it`, (await T46(sc.page, 'schedule-saved').count()) === 1 && (await T46(sc.page, 'schedule-save').count()) === 1)
+    if (lang === 'ja') await sc.page.screenshot({ path: `${SHOTS}/p12-schedule-ja-390.png` })
+    await sc.ctx.close()
+  }
+  {
+    const s = await open('ja', view('ja', { opens_on: '2026-12-25', opens_at: null, opens_tz: null }))
+    await T46(s.page, 'give-schedule').click()
+    check('schedule (an older gift with a date only): 「日時を選ぶ」 with 2026-12-25 and Japan time', (await T46(s.page, 'choice-pick').isChecked()) && (await T46(s.page, 'schedule-date').inputValue()) === '2026-12-25' && (await s.page.locator('#schedule-zone').inputValue()) === 'Asia/Tokyo')
+    await s.ctx.close()
+  }
+  // the receiver's keepsakes screen: the four cards to look at, then the same two buttons
+  {
+    const PICS = ['/img/scenes/children.jpg', '/img/scenes/friends.jpg', '/img/scenes/m1.jpg', '/img/scenes/m2.jpg']
+    const gview = (lang) => ({ id: TOKEN, token: TOKEN, language: lang, glyph: '添', reading: lang === 'ja' ? 'そう' : '', romanization: 'sou', meaning_en: 'to stay beside', who: lang === 'en' ? 'Someone who walked beside me.' : '隣をゆっくり歩いてくれた人。', poem: { type: lang === 'zh-Hant' ? 'tang' : lang === 'ja' ? 'tanka' : 'en', lines: lang === 'en' ? ['one', 'two', 'three'] : lang === 'ja' ? ['道の端', '並んで歩く', 'ゆっくりと', '待ってくれてる', '静かな時間'] : ['道旁並肩行', '慢步不言聲', '一路相陪伴', '靜中有真情'], reading: '' }, memorial: false, purpose: 'thanks', music: 'thanks', film: { status: 'ready', lines: ['a', 'b', 'c', 'd'], pictures: PICS }, certificate_line: 'x', from: lang === 'en' ? 'Brian' : '佐藤', to: lang === 'en' ? 'Kenji' : '田中', message: '', egift: null, certificate_no: 12, order_date: '2026-11-18', opens_on: null, opens_at: null, opens_tz: null, replied: false, package: 'egift', locked: false })
+    for (const lang of ['ja', 'en', 'zh-Hant']) {
+      const W = L[lang]
+      const ctx = await browser.newContext({ locale: lang === 'en' ? 'en-US' : lang === 'ja' ? 'ja-JP' : 'zh-TW', viewport: { width: 390, height: 844 }, reducedMotion: 'reduce', permissions: ['clipboard-read', 'clipboard-write'], acceptDownloads: true })
+      const page = await ctx.newPage()
+      const errs = []
+      page.on('pageerror', (e) => errs.push(String(e)))
+      await page.route('**/api/analytics', (r) => r.fulfill({ status: 204, body: '' }))
+      await page.route('**/api/me*', (r) => r.fulfill({ json: { basket: { count: 0 }, ready: null, hold: null } }))
+      await page.route(`**/api/gift/${TOKEN}/gift.pdf`, (r) => r.fulfill({ status: 200, contentType: 'application/pdf', body: '%PDF-1.4\n' }))
+      await page.route(`**/api/gift/${TOKEN}**`, async (r) => {
+        const u = new URL(r.request().url())
+        if (u.pathname === `/api/gift/${TOKEN}/opened`) return r.fulfill({ json: { ok: true } })
+        if (u.pathname === `/api/gift/${TOKEN}/render`) return r.fulfill({ json: { state: 'ready', view: gview(lang) } })
+        if (u.pathname === `/api/gift/${TOKEN}`) return r.fulfill({ json: gview(lang) })
+        return r.fulfill({ status: 204, body: '' })
+      })
+      await page.goto(`http://localhost:5173/g/${TOKEN}`, { waitUntil: 'networkidle' })
+      await T46(page, 'cr-markbtn').click()
+      await T46(page, 'cr-film').waitFor()
+      await page.waitForFunction(() => document.querySelector('[data-testid=cr-film]')?.getAttribute('data-ready') === 'yes', null, { timeout: 15000 })
+      await T46(page, 'gift-skip').click()
+      await page.waitForSelector('[data-testid=cr-char][data-meaning=yes]', { timeout: 30000 })
+      await T46(page, 'cr-to-poem').click()
+      await T46(page, 'cr-poem').waitFor()
+      await page.waitForTimeout(3600)
+      await T46(page, 'cr-to-cert').click()
+      await T46(page, 'cr-to-keep').click()
+      await T46(page, 'gift-keep').waitFor()
+      const btns = await page.evaluate(() => [...document.querySelectorAll('[data-testid=gift-actions] .ga-btn')].map((e) => e.textContent.trim()))
+      check(`receiver keepsakes (${lang}): the four cards are there to look at, with no 保存 link of their own — and exactly two actions: 「${W.saveAll}」 and 「${W.share}」`, (await page.locator('[data-testid=keep-film], [data-testid=keep-pictures], [data-testid=keep-card], [data-testid=keep-cert]').count()) === 4 && JSON.stringify(btns) === JSON.stringify([W.saveAll, W.share]) && (await page.locator('.cr-slip a, .cr-slip button').count()) === 0 && (await page.locator('[data-testid=save-film], [data-testid=save-scroll], [data-testid=save-card], [data-testid=save-certificate], [data-testid=share-section]').count()) === 0, JSON.stringify(btns))
+      check(`receiver keepsakes (${lang}): 「${W.saveAll}」 is the whole-gift PDF of this gift, one tap; under it 「${W.other}」 and 「${W.forever}」`, (await T46(page, 'save-all').getAttribute('href')) === `/api/gift/${TOKEN}/gift.pdf` && ((await T46(page, 'other-formats').textContent()) ?? '').trim() === W.other && ((await T46(page, 'save-forever').textContent()) ?? '').trim() === W.forever)
+      await T46(page, 'other-formats').click()
+      await T46(page, 'formats-sheet').waitFor()
+      const items = await page.evaluate(() => [...document.querySelectorAll('[data-testid=formats-sheet] .ga-item')].map((x) => x.textContent.trim()))
+      check(`receiver keepsakes (${lang}): the formats sheet: the film, the scroll, the card and the QR image`, items.includes(W.film) && items.includes(W.scroll) && items.includes(W.card) && items.includes(W.qr) && (await T46(page, 'save-qr').getAttribute('href')) === `/api/gift/${TOKEN}/keep-qr.png`, JSON.stringify(items))
+      if (lang === 'ja') await page.screenshot({ path: `${SHOTS}/p12-keepsakes-formats-ja-390.png` })
+      await page.keyboard.press('Escape')
+      await T46(page, 'share-button').click()
+      await T46(page, 'share-sheet').waitFor()
+      check(`receiver keepsakes (${lang}): with no device share sheet the share sheet offers the film, the poem card and copy-link, with the line that no names or story text go with them`, (await T46(page, 'share-film').count()) === 1 && (await T46(page, 'share-card').count()) === 1 && (await T46(page, 'share-copy').count()) === 1 && (await T46(page, 'share-line').count()) === 1)
+      if (lang === 'ja') await page.screenshot({ path: `${SHOTS}/p12-keepsakes-share-ja-390.png` })
+      await page.keyboard.press('Escape')
+      if (lang === 'ja') await page.screenshot({ path: `${SHOTS}/p12-keepsakes-ja-390.png`, fullPage: false })
+      check(`no page errors (run 46, receiver ${lang})`, errs.length === 0, errs.join('; '))
+      await ctx.close()
+    }
+  }
+}
+
 await browser.close()
 console.log(failures === 0 ? '\nALL E2E CHECKS PASSED' : `\n${failures} CHECKS FAILED`)
 process.exit(failures === 0 ? 0 : 1)

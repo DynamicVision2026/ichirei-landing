@@ -7,6 +7,12 @@ import { inflateSync } from 'node:zlib'
 import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import sharp from 'sharp'
+import jsQR from 'jsqr'
+import { execFileSync } from 'node:child_process'
+import { mkdtempSync, writeFileSync, readdirSync } from 'node:fs'
+import { tmpdir } from 'node:os'
+import { giftPdfPages } from '../engine/render/giftpdf.ts'
+import { makeCertificateCard } from '../engine/render/keepsake.ts'
 import { createGiftHandlers } from '../api/gift.ts'
 import { createOpsHandlers, checkOpsAuth, sameSitePost } from '../api/ops.ts'
 import { buildAnimationRecord, newAnimationId } from '../engine/animation.ts'
@@ -96,7 +102,48 @@ check('(2) GET /api/gift/<token>/scroll.png — 200, image/png, a download, priv
 check('(2) …and as a PDF; the sender\'s page gets the same scroll through its own id', pdfRes.status === 200 && pdfRes.headers.get('content-type') === 'application/pdf' && fromSender.status === 200 && fromSender.headers.get('content-type') === 'image/png' && (await H.scrollForSender('AN-notanidnotanidnotanid', 'png')).status === 404)
 const a2 = await addOrder(store, {}, 'IC-20261023-BBBBBBBB', ['ai', 'washi', 'ai', 'ai'])
 const notReady = await createGiftHandlers(() => ({ store, now: () => NOW })).scroll(a2.token, 'png')
+const a2w = a2
 check('(2) with a washi slot there is NO scroll (404 not_ready) — the page never offers it; an unknown token, a wrong extension or a made-up id is a 404', notReady.status === 404 && ((await notReady.json()) as { error: string }).error === 'not_ready' && (await H.scroll('RG-aaaaaaaaaaaaaaaaaaaa', 'png')).status === 404 && (await H.scroll(a1.token, 'gif')).status === 404)
+
+// ---- 2b. 「まとめて保存」: the whole gift as ONE PDF (Part 12, 2026-11-20) ----------------------------------------------------------------------------------------------------
+{
+  const dark = async (png: Buffer) => { const { data, info } = await sharp(png).raw().toBuffer({ resolveWithObject: true }); let x0 = info.width, x1 = 0, y0 = info.height, y1 = 0; for (let y = 0; y < info.height; y++) for (let x = 0; x < info.width; x++) { const i = (y * info.width + x) * info.channels; if (data[i] < 90 && data[i + 1] < 90 && data[i + 2] < 90) { x0 = Math.min(x0, x); x1 = Math.max(x1, x); y0 = Math.min(y0, y); y1 = Math.max(y1, y) } } return { w: x1 - x0, h: y1 - y0 } }
+  const decode = async (png: Buffer) => { const raw = await sharp(png).ensureAlpha().raw().toBuffer({ resolveWithObject: true }); return jsQR(new Uint8ClampedArray(raw.data), raw.info.width, raw.info.height)?.data ?? null }
+  const cert = await makeCertificateCard({ glyph: work.glyph, reading: 'しょう', word: '', to: '山田 一郎', from: '山田 太郎', line: 'この字は、あなたの目に映る、その人です。', number: '一字礼　第 0001 号', place: '2026年10月23日', lang: 'ja', toLine: '山田 一郎さんへ', fromLine: '山田 太郎より' })
+  const { pages } = await giftPdfPages(work, cert)
+  check('(2b) the whole gift is: the character page, the poem, the four pictures with their lines, the certificate, and the QR page — eight pages for a gift with a poem', pages.length === 8, String(pages.length))
+  const meta = await Promise.all(pages.map((p) => sharp(p).metadata()))
+  check('(2b) every page is 1080 px wide; the four picture pages carry a strip for the line under the picture; the others are 1080 × 1350', meta.every((m) => m.width === 1080) && meta.slice(2, 6).every((m) => (m.height ?? 0) > 1350) && [0, 1, 6, 7].every((i) => meta[i].height === 1350))
+  check('(2b) the first page holds the character in cinnabar (red pixels), the poem page holds none', (await redPixels(pages[0])) > 5000 && (await redPixels(pages[1])) === 0)
+  const poemBox = await dark(pages[1])
+  check('(2b) the Japanese poem is set VERTICALLY (縦書き): its ink is taller than it is wide', poemBox.h > poemBox.w, JSON.stringify(poemBox))
+  const zhPoem = (await giftPdfPages({ ...work, language: 'zh-Hant', poem: ['道旁並肩行', '慢步不言聲', '一路相陪伴', '靜中有真情'], poemType: 'tang' }, cert)).pages[1]
+  const zhBox = await dark(zhPoem)
+  const bands = async (png: Buffer) => { const { data, info } = await sharp(png).raw().toBuffer({ resolveWithObject: true }); const col: boolean[] = []; for (let x = 0; x < info.width; x++) { let on = false; for (let y = 0; y < info.height; y++) { const i = (y * info.width + x) * info.channels; if (data[i] < 90 && data[i + 1] < 90 && data[i + 2] < 90) { on = true; break } } col.push(on) } let n = 0; for (let x = 0; x < col.length; x++) if (col[x] && !col[x - 1]) n++; return n }
+  const enPoem = (await giftPdfPages({ ...work, language: 'en', poem: ['She kept the porch light on', 'every night, unasked,', 'and never said a word.'], poemType: 'en' }, cert)).pages[1]
+  const enBox = await dark(enPoem)
+  check('(2b) the Chinese poem is vertical too — one column per line — and the English one runs horizontally (wider than tall)', (await bands(zhPoem)) === 4 && (await bands(pages[1])) === work.poem.length && enBox.w > enBox.h, JSON.stringify([zhBox, enBox, await bands(zhPoem), await bands(pages[1])]))
+  check('(2b) the last page: the QR of the receiver\'s page (it decodes to /g/<token>), on Ivory', (await decode(pages[7])) === work.qrUrl && work.qrUrl === `https://ichirei.beyondculture.ai/g/${a1.token}`, String(await decode(pages[7])))
+  check('(2b) with no poem there is no poem page (seven pages); with a washi slot there are no picture pages', (await giftPdfPages({ ...work, poem: [] }, cert)).pages.length === 7 && (await giftPdfPages({ ...work, pictures: [work.pictures[0], null, work.pictures[2], work.pictures[3]] }, cert)).pages.length === 4)
+  const quietPages = (await giftPdfPages({ ...work, memorial: true, quiet: true }, null)).pages
+  const reds = await Promise.all(quietPages.map(redPixels))
+  check('(2b) a remembrance: no certificate page and not a red pixel anywhere in the document', quietPages.length === 7 && reds.every((n) => n === 0), JSON.stringify(reds))
+  const res = await H.giftPdf(a1.token)
+  const bytes = Buffer.from(await res.arrayBuffer())
+  check('(2b) GET /api/gift/<token>/gift.pdf — 200, one PDF of eight pages, a download, private; the sender\'s page gets the same through its own id', res.status === 200 && res.headers.get('content-type') === 'application/pdf' && /attachment; filename="ichirei-gift\.pdf"/.test(res.headers.get('content-disposition') ?? '') && /no-store/.test(res.headers.get('cache-control') ?? '') && (bytes.toString('latin1').match(/\/Type \/Page\b/g) ?? []).length === 8 && (await H.giftPdfForSender(a1.animId)).status === 200)
+  check('(2b) a gift with a washi slot still saves as one PDF (without the picture pages); an unknown token is 404', (await H.giftPdf(a2w.token)).status === 200 && (await H.giftPdf('RG-aaaaaaaaaaaaaaaaaaaa')).status === 404)
+  // the QR page decodes from the real PDF too (rasterised), where a rasteriser exists
+  let pdftoppm = true
+  try { execFileSync('pdftoppm', ['-v'], { stdio: 'ignore' }) } catch (e) { pdftoppm = (e as { status?: number }).status !== undefined }
+  if (!pdftoppm) console.log('SKIP  (2b) the PDF\'s QR page, rasterised (no pdftoppm here)')
+  else {
+    const dir = mkdtempSync(join(tmpdir(), 'ichirei-gift-'))
+    writeFileSync(join(dir, 'g.pdf'), bytes)
+    execFileSync('pdftoppm', ['-r', '72', '-f', '8', '-l', '8', '-png', join(dir, 'g.pdf'), join(dir, 'p')])
+    const file = readdirSync(dir).find((f) => f.endsWith('.png'))!
+    check('(2b) rasterised, the last page of the downloaded PDF decodes to the receiver\'s page', (await decode(await sharp(join(dir, file)).png().toBuffer())) === work.qrUrl)
+  }
+}
 
 // ---- 3. the card ------------------------------------------------------------------------------------------------------------------------------------
 const cards = await cardsPdf([work, { ...work, from: '', to: '', message: '' }, memWork])

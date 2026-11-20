@@ -3,7 +3,7 @@ import { trackUs } from '../demo/analytics.ts'
 import ZoneSelect from '../demo/ZoneSelect.tsx'
 import { SIZE_COPY } from '../demo/sizes-copy.ts'
 import { availableChoices, christmasTarget, pickTarget, thanksgivingTarget, CHOICE_COPY, type ChoiceId } from '../order/opening-choices.ts'
-import { isValidZone, marketZone, openingLabelAt, openingLabelFromRecord, todayIn } from '../order/opens-at.ts'
+import { clockIn, dateInZone, isValidZone, marketZone, openingLabelAt, openingLabelFromRecord, todayIn } from '../order/opens-at.ts'
 import { CAL_BUTTON, googleCalendarUrl, icsText, type CalendarEvent } from '../order/calendar.ts'
 import { CEREMONY_COPY } from './ceremony-copy.ts'
 import type { PageLang } from './copy.ts'
@@ -27,10 +27,16 @@ export default function Schedule({ animationId, lang, quiet, to, giftUrl, sender
   const cal = CAL_BUTTON[lang]
   const sc = SIZE_COPY[lang]
   const [open, setOpen] = useState(false)
-  const [tz, setTz] = useState(opensTz && isValidZone(opensTz) ? opensTz : marketZone(lang))
-  const [choice, setChoice] = useState<ChoiceId>('now')
-  const [date, setDate] = useState(opensOn ?? '')
-  const [time, setTime] = useState('07:00')
+  // what is saved is what the panel shows (Part 12, 2026-11-20): a gift set for a day opens on 「日時を選ぶ」 with that date, time and zone filled in; only a gift that opens at once shows 「すぐに開ける」
+  const savedZone = opensAt && opensTz && isValidZone(opensTz) ? opensTz : null
+  const savedDate = savedZone && opensAt ? dateInZone(opensAt, savedZone) : null
+  const savedClock = savedZone && opensAt ? clockIn(opensAt, savedZone) : null
+  const olderDateOnly = !savedZone && !!opensOn // a gift made before exact moments: Japan midnight of its date (the instant the server locks until)
+  const scheduled = !!((savedDate && savedClock) || olderDateOnly)
+  const [tz, setTz] = useState(savedZone ?? (olderDateOnly ? 'Asia/Tokyo' : marketZone(lang)))
+  const [choice, setChoice] = useState<ChoiceId>(scheduled ? 'pick' : 'now')
+  const [date, setDate] = useState(savedDate ?? opensOn ?? '')
+  const [time, setTime] = useState(savedClock ? `${String(savedClock.hour).padStart(2, '0')}:${String(savedClock.minute).padStart(2, '0')}` : olderDateOnly ? '00:00' : '07:00')
   const [saved, setSaved] = useState<{ at: string; tz: string } | null>(opensAt && opensTz ? { at: opensAt, tz: opensTz } : null)
   const [phase, setPhase] = useState<'idle' | 'saving' | 'error'>('idle')
   const [calOpen, setCalOpen] = useState(false)

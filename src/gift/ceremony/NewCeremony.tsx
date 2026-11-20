@@ -7,7 +7,7 @@ import { RETURN_CHARS, returnWord } from '../../order/return-chars.ts'
 import { cleanReading } from '../../order/reading.ts'
 import { usePromoOn } from '../../demo/useSizes'
 import { trackReceiverOpened, trackUs } from '../../demo/analytics'
-import ShareSection from '../ShareSection.tsx'
+import GiftActions from '../GiftActions.tsx'
 import { pageLang } from '../../animation/copy.ts'
 import { CER, cerLang } from './copy.ts'
 import { thanksCopy } from '../../loop/copy.ts'
@@ -584,46 +584,15 @@ function FilmScreen({ view, reduced, from, onDone }: { view: GiftView; reduced: 
   )
 }
 
-type SavePhase = 'idle' | 'making' | 'ready' | 'failed'
 
 /** Screen 7: the film (MP4, unchanged), the four pictures (the story scroll), the card (the print-at-home PDF) and the certificate (PNG). */
 function KeepScreen({ view, preview, q, from, onAnswer }: { view: GiftView; preview: boolean; q: string; from: string; onAnswer: () => void }) {
   const C = CER[cerLang(view.language)]
   const base = `/api/gift/${view.token}`
-  const [film, setFilm] = useState<SavePhase>('idle')
-  const alive = useRef(true)
-  useEffect(() => {
-    alive.current = true
-    return () => { alive.current = false }
-  }, [])
   const complete = filmComplete(view)
   const scroll = scrollAvailable(view)
   const pics = view.film?.pictures ?? []
-  const sep = q ? '&' : '?'
-  const saveFilm = async () => {
-    setFilm('making')
-    try {
-      for (let i = 0; i < 40 && alive.current; i++) {
-        const res = await fetch(`${base}/film/make${q}`, { method: 'POST' })
-        const j = (await res.json().catch(() => ({}))) as { state?: string }
-        if (res.ok && j.state === 'ready') {
-          const a = document.createElement('a')
-          a.href = `${base}/film.mp4${q}${sep}download=1`
-          a.download = 'ichirei-film.mp4'
-          document.body.appendChild(a)
-          a.click()
-          a.remove()
-          setFilm('ready')
-          return
-        }
-        if (!res.ok && res.status !== 202) throw new Error('make failed')
-        await wait(3000)
-      }
-      throw new Error('timed out')
-    } catch {
-      if (alive.current) setFilm('failed')
-    }
-  }
+  // Part 12 (2026-11-20): the four things are shown to LOOK at; saving and sharing are two buttons below (「まとめて保存」 and 「シェアする」), each opening its choices in a small sheet
   return (
     <section className="cr-scr cr-flow" data-testid="gift-keep">
       <h2 className="cr-h">{C.keepTitle}</h2>
@@ -633,15 +602,7 @@ function KeepScreen({ view, preview, q, from, onAnswer }: { view: GiftView; prev
           <div>
             <h3>{C.keepFilm}</h3>
             <p>{C.keepFilmLine(from, !!view.music)}</p>
-            {!preview && <button type="button" className="cr-go" data-testid="save-film" disabled={film === 'making'} onClick={() => void saveFilm()}>{film === 'making' ? C.saving : film === 'ready' ? C.saved : C.save}</button>}
-            {film === 'failed' && <p role="alert" className="cr-err" data-testid="save-film-failed">{C.saveFailed}</p>}
           </div>
-        </div>
-      )}
-      {film === 'ready' && (
-        <div>
-          <video className="cr-video" data-testid="save-film-video" src={`${base}/film.mp4${q}`} controls playsInline preload="metadata" />
-          <p className="cr-b" style={{ fontSize: 15 }}>{C.filmHint}</p>
         </div>
       )}
       {scroll && (
@@ -650,7 +611,6 @@ function KeepScreen({ view, preview, q, from, onAnswer }: { view: GiftView; prev
           <div>
             <h3>{C.keepPictures}</h3>
             <p>{C.keepPicturesLine}</p>
-            {!preview && <a className="cr-go" data-testid="save-scroll" href={`${base}/scroll.png${q}`} download>{C.save}</a>}
           </div>
         </div>
       )}
@@ -660,7 +620,6 @@ function KeepScreen({ view, preview, q, from, onAnswer }: { view: GiftView; prev
           <div>
             <h3>{C.keepCard}</h3>
             <p>{C.keepCardLine(!!view.poem)}</p>
-            {!preview && <a className="cr-go" data-testid="save-card" href={`${base}/card.pdf${q}`} download>{C.save}</a>}
           </div>
         </div>
       )}
@@ -669,10 +628,11 @@ function KeepScreen({ view, preview, q, from, onAnswer }: { view: GiftView; prev
         <div>
           <h3>{C.keepCert}</h3>
           <p>{C.keepCertLine(view.certificate_no, !!(view.to && view.from))}</p>
-          {!preview && <a className="cr-go" data-testid="save-certificate" href={`${base}/certificate.png${q}`} download onClick={() => trackUs('receiver_saved_card')}>{C.save}</a>}
         </div>
       </div>
-      {!preview && complete && <div className="cr-share"><ShareSection lang={pageLang(view.language)} base={base} role="receiver" /></div>}
+      <div className="cr-actions">
+        <GiftActions lang={pageLang(view.language)} role="receiver" base={base} q={q} giftUrl={`${window.location.origin}/g/${view.token}`} complete={complete} scroll={scroll} memorial={view.memorial} enCard={view.language === 'en' && !!view.en} track preview={preview} />
+      </div>
       {view.egift && !preview && <div className="cr-egift"><EgiftReceive view={view} lang={pageLang(view.language)} /></div>}
       {!preview && <button type="button" className="cr-go cr-next" style={{ marginTop: 'auto' }} data-testid="gift-to-answer" onClick={onAnswer}>{C.toAnswer(from)}</button>}
       <a className="cr-go cr-quiet" href="/credits" data-testid="animation-credits-link">{C.credits}</a>

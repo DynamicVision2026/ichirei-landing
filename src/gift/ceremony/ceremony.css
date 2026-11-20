@@ -170,3 +170,9 @@
 .cr-wait .cr-b { max-width: none; font-size: 16px; }
 .cr[data-cl='ja'] .cr-wait .cr-h, .cr[data-cl='zh-Hant'] .cr-wait .cr-h, .cr[data-cl='zh-Hans'] .cr-wait .cr-h { font-size: 22px; letter-spacing: .01em; }
 .cr[data-cl='en'] .cr-wait .cr-h { font-size: 30px; }
+
+/* Part 12 (2026-11-20): the keepsakes screen's two buttons: Save everything / Share (ghost, ink on the paper) */
+.cr-actions { margin-top: 4px; color: #2A221B; }
+.cr-actions .ga-btn { color: #2A221B; border-color: #8a7344; }
+.cr-actions .ga-note { color: #6B5F4E; opacity: 1; }
+.cr-actions .ga-link { color: #2A221B; }
