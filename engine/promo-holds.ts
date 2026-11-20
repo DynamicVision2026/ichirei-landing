@@ -54,6 +54,8 @@ export interface HoldRecord {
   discount?: HoldDiscount | null
   used_at?: string | null
   consent: boolean
+  /** Sign-in (2026-11-20): the account that placed the hold — one free gift per account AND one per email. */
+  account?: string | null
 }
 
 export type HoldState = 'active' | 'checkout' | 'used' | 'expired'
@@ -82,6 +84,8 @@ const slotPath = (day: string, n: number, g: number): string => `promo/${day}/sl
 const holdPath = (day: string, hash: string): string => `promo/${day}/holds/${hash}.json`
 /** (2026-11-16) one free gift per person for the WHOLE promotion (ours alone: the private codes are open to any customer): an email that used its free gift on any day is marked here. */
 const usedEverPath = (hash: string): string => `promo/used/${hash}.json`
+/** The marker of an ACCOUNT that has received its free gift (the same place as an email's, under a hash of its own: 'acct|<id>'). */
+export const accountUsedHash = (accountId: string): string => createHash('sha256').update(`acct|${accountId}`).digest('hex').slice(0, 32)
 
 /**
  * Has this email received its free gift at any time in the promotion (any day, either language)? The marker written when a gift is used answers at once; a gift used before the marker
@@ -236,6 +240,8 @@ export type PlaceResult =
 
 export interface PlaceInput {
   email: unknown
+  /** The signed-in account asking (2026-11-20): an account that has had its free gift holds no more, whatever email it types. */
+  account?: string | null
   code?: unknown
   browser?: string | null
   ip?: string
@@ -263,6 +269,7 @@ export async function placeHold(d: PromoDeps, input: PlaceInput): Promise<PlaceR
   const hash = emailHash(email)
   const browser = input.browser && /^V[A-Za-z0-9_-]{22}$/.test(input.browser) ? input.browser : null
   const existing = await readJson<HoldRecord>(store, holdPath(day, hash))
+  if (input.account && (await readJson<{ day: string }>(store, usedEverPath(accountUsedHash(input.account))))) return { ok: false, code: 'already_given' }
   // one free gift per person for the whole promotion (2026-11-16, enforced here — a private code is open to any customer): an email that received one on ANY day, in either language, holds no more
   if (!(existing && (existing.status === 'active' || existing.status === 'checkout')) && (await usedInPromotion(store, env, hash, now))) return { ok: false, code: 'already_given' }
   if (existing) {
@@ -308,7 +315,7 @@ export async function placeHold(d: PromoDeps, input: PlaceInput): Promise<PlaceR
   }
   const rec: HoldRecord = {
     schema: 'hold', id, day, email, email_hash: hash, browsers: browser ? [browser] : [], code: givenCode,
-    created_at: now.toISOString(), expires_at: expires.toISOString(), status: 'active', count: (existing?.count ?? 0) + 1, slot, discount, consent: input.marketing === true,
+    created_at: now.toISOString(), expires_at: expires.toISOString(), status: 'active', count: (existing?.count ?? 0) + 1, slot, discount, consent: input.marketing === true, ...(input.account ? { account: input.account } : {}),
   }
   if (existing) {
     await casJson<HoldRecord>(store, holdPath(day, hash), () => ({ ...rec, browsers: [...new Set([...existing.browsers, ...rec.browsers])] }))
@@ -381,6 +388,7 @@ export async function markHoldUsed(d: PromoDeps, ref: { holdId?: string | null; 
   await casJson<SlotRecord>(store, slotPath(rec.day, rec.slot.n, rec.slot.g), (cur) => (cur && cur.hold === rec.id ? { ...cur, state: 'used', reaped: true } : null))
   await casJson<HoldRecord>(store, holdPath(rec.day, rec.email_hash), (cur) => (cur ? { ...cur, status: 'used', used_at: now.toISOString() } : null))
   await store.putObject(usedEverPath(rec.email_hash), JSON.stringify({ day: rec.day, at: now.toISOString() }), 'application/json').catch(() => false)
+  if (rec.account) await store.putObject(usedEverPath(accountUsedHash(rec.account)), JSON.stringify({ day: rec.day, at: now.toISOString() }), 'application/json').catch(() => false)
   cache.delete(rec.day)
   await dropCode(d, rec) // the code is single-use and already spent; deleting it keeps Shopify tidy
   await recordCustomerEvent(store, { email: rec.email, browser: rec.browsers[0] ?? null }, 'hold_used', {}, now)

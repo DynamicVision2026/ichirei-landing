@@ -242,7 +242,8 @@ export function createLoopHandlers(deps: () => LoopDeps) {
       const body = (await readBody(req)) as Record<string, unknown> | 'big' | null
       if (!body || body === 'big' || typeof body !== 'object') return json(400, { error: 'bad_request', code: 'bad_request' })
       const browser = visitorOf(req, d.env)
-      const r = await placeHold(promoDeps(d), { email: body.email, code: body.code, browser, ip, marketing: body.marketing === true, language: body.language === 'ja' || body.language === 'zh-Hant' || body.language === 'zh-Hans' ? body.language : 'en' }) // one shared pool for /en, / and /zh (the language is only recorded)a (2026-11-16); the language is only recorded
+      const acct = d.store ? await sessionAccount(d.store, req, d.env ?? process.env, now).catch(() => null) : null
+      const r = await placeHold(promoDeps(d), { account: acct?.id ?? null, email: body.email, code: body.code, browser, ip, marketing: body.marketing === true, language: body.language === 'ja' || body.language === 'zh-Hant' || body.language === 'zh-Hans' ? body.language : 'en' }) // one shared pool for /en, / and /zh (the language is only recorded)a (2026-11-16); the language is only recorded
       if (!r.ok) return json(r.code === 'unavailable' ? 503 : 200, { ok: false, code: r.code })
       const left = (await liveCount(d.store, d.env ?? process.env, now, true)).left
       const token = browser ? await ensureBasketToken(d.store, browser, now).catch(() => null) : null
