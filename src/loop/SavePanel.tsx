@@ -3,6 +3,7 @@ import type { RevealLang } from '../reveal/copy.ts'
 import { basketPath } from '../reveal/paths.ts'
 import { LOOP, SAVE } from './copy.ts'
 import { refreshMe } from './me.ts'
+import { useAuth } from '../auth/auth.ts'
 import './loop.css'
 
 /**
@@ -16,6 +17,8 @@ import './loop.css'
 export default function SavePanel({ lang, className = 'btn ghost' }: { lang: RevealLang; className?: string }) {
   const c = LOOP[lang]
   const s = SAVE[lang]
+  // Signed in (2026-11-20): Save is automatic — the panel is one line, 「〈マイギフト〉に保存しました」, plus the link and the QR to share
+  const auth = useAuth()
   const [open, setOpen] = useState(false)
   const [link, setLink] = useState<string | null>(null)
   const [state, setState] = useState<'idle' | 'loading' | 'none'>('idle')
@@ -72,8 +75,8 @@ export default function SavePanel({ lang, className = 'btn ghost' }: { lang: Rev
     }
   }
 
-  const needsEmail = mail.on && !savedAs
-  const showSaved = !!link && (savedAs !== null || !mail.on)
+  const needsEmail = mail.on && !savedAs && !auth.signedIn
+  const showSaved = !!link && (savedAs !== null || !mail.on || auth.signedIn)
   return (
     <div className="savePanelWrap">
       <button type="button" className={className} onClick={toggle} aria-expanded={open} data-testid="save-button">
@@ -126,7 +129,7 @@ export default function SavePanel({ lang, className = 'btn ghost' }: { lang: Rev
 
           {showSaved && (
             <>
-              <p className="saved" role="status" data-testid="save-saved">{savedAs ? s.saved(savedAs.masked) : s.savedPlain}</p>
+              <p className="saved" role="status" data-testid="save-saved">{auth.signedIn ? s.savedSignedIn : savedAs ? s.saved(savedAs.masked) : s.savedPlain}</p>
               {savedAs?.pending && <p className="note" data-testid="save-pending">{c.mailPending}</p>}
               <a className="goldBtn" href={basketPath(lang)} data-testid="save-open-gifts">
                 {s.open}

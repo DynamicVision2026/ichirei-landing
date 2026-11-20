@@ -36,6 +36,8 @@ import { ensureFilmVideo, ensureShareFilm, filmComplete, filmVideoPath, serveByt
 import { makeShareCard, type ShareArtwork } from '../engine/render/share.ts'
 import { relationLine } from '../src/order/relation-line.ts'
 import { bumpSample } from '../engine/sample.ts'
+import { sessionAccount } from '../engine/accounts.ts'
+import { providersOf, signInRequired } from '../engine/oauth.ts'
 import { cardsPdf, homePrintPdf } from '../engine/render/card.ts'
 
 const headers = (extra: Record<string, string> = {}) => ({ 'x-robots-tag': 'noindex, nofollow', ...extra })
@@ -521,8 +523,10 @@ export function createGiftHandlers(deps: () => GiftDeps) {
      * Part 14 (2026-11-20): the receiver presses 「〈from〉さんに一字を贈り返す（無料）」. A reply ticket (server-side, tied to this gift) is made — only for a gift that has been opened and may be answered (not a remembrance, not
      * a quiet purpose, not a reply itself, not switched off). The page then opens the normal writing page with the ticket; the order step uses it up.
      */
-    async back(token: string): Promise<Response> {
+    async back(token: string, req?: Request): Promise<Response> {
       const d = deps()
+      // a gift back is a signed-in act once a way in exists (2026-11-20): the account carries the pair of the two gifts
+      if (req && d.store && signInRequired(await providersOf(d.env ?? process.env).catch(() => ({ google: null, line: null, email: null }))) && !(await sessionAccount(d.store, req, d.env ?? process.env, d.now?.() ?? new Date()).catch(() => null))) return json(401, { error: 'signin_required', code: 'signin_required' }, { 'cache-control': 'no-store' })
       const r = await loadGift(token, d)
       if (r.status !== 200) return json(r.status, { error: r.status === 404 ? 'not_found' : 'unavailable' }, { 'cache-control': 'no-store' })
       if (r.gift.source === 'sample') return json(403, { error: 'not_offered', code: 'reply_off' }, { 'cache-control': 'no-store' }) // an example never gives a gift back

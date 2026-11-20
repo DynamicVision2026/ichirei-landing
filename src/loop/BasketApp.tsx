@@ -10,9 +10,11 @@ import { deadlineText } from '../animation/buyer-copy.ts'
 import { clockText, marketZone, openingDayText, partsOfZone } from '../order/opens-at.ts'
 import { refreshMe, setBasketCount } from './me.ts'
 import SavePanel from './SavePanel.tsx'
+import SignInPanel from '../auth/SignInPanel.tsx'
+import { signInRequired, signOut, useAuth } from '../auth/auth.ts'
 import { contextChips } from './chips.ts'
 import KeepByEmail from './KeepByEmail.tsx'
-import { landingPath, writePath } from '../reveal/paths.ts'
+import { basketPath, landingPath, writePath } from '../reveal/paths.ts'
 import MyGiftsButton from './MyGifts.tsx'
 import './loop.css'
 import '../reveal/reveal.css'
@@ -54,6 +56,9 @@ interface Sent {
 }
 
 interface PageData {
+  /** Sign-in (2026-11-20): the server says this browser is not signed in (and a way in exists): the page asks to sign in instead of showing gifts. */
+  signin_required?: boolean
+  account?: { kind: 'email' | 'line'; text: string }
   items: Item[]
   email?: string | null
   hold?: { expires_at: string; minutes_left: number } | null
@@ -242,6 +247,10 @@ export default function BasketApp() {
   const path = window.location.pathname
   const token = path.startsWith('/b/') ? decodeURIComponent(path.slice(3).replace(/\/$/, '')) : null
   const [data, setData] = useState<PageData | null>(null)
+  const auth = useAuth()
+  const [delAsk, setDelAsk] = useState(false)
+  const [delNote, setDelNote] = useState(false)
+  const authFailed = new URLSearchParams(window.location.search).get('auth') === 'failed'
   const [notFound, setNotFound] = useState(false)
   const [pic, setPic] = useState<string | null>(null)
 
@@ -368,14 +377,31 @@ export default function BasketApp() {
           {c.basketSaved}
         </p>
         {/* On a device with no saved gifts and no address: the e-mail asks for the link (2026-11-20). An address alone opens nothing; the answer is the same "sent" whether or not it has gifts. */}
-        {(() => {
+        {/* Sign-in (2026-11-20): once a way in exists, the new-device email box is 「ログイン」 — the panel below; the old box stays only while no way in exists */}
+        {data?.signin_required && <SignInPanel lang={lang} ret={basketPath(lang)} failed={authFailed} />}
+        {data?.account && (
+          <p className="myAccount" data-testid="my-account">
+            <span className="notranslate" data-testid="my-account-name">{data.account.text}</span>
+            <button type="button" className="linkBtn" data-testid="my-logout" onClick={() => void signOut().then(() => { window.location.assign(basketPath(lang)) })}>{c.signOut}</button>
+            {!delNote && !delAsk && <button type="button" className="linkBtn" data-testid="my-delete" onClick={() => setDelAsk(true)}>{c.deleteAccount}</button>}
+            {delAsk && !delNote && (
+              <span className="mgAsk" role="alert" data-testid="my-delete-ask">
+                {c.deleteAsk}
+                <button type="button" className="linkBtn danger" data-testid="my-delete-yes" onClick={() => void fetch('/api/auth/delete-request', { method: 'POST', credentials: 'same-origin' }).then(() => { setDelNote(true); setDelAsk(false) })}>{c.removeYes}</button>
+                <button type="button" className="linkBtn" data-testid="my-delete-no" onClick={() => setDelAsk(false)}>{c.removeNo}</button>
+              </span>
+            )}
+            {delNote && <span data-testid="my-delete-note">{c.deleteSent}</span>}
+          </p>
+        )}
+        {!signInRequired(auth) && !data?.signin_required && (() => {
           const lookup = !!data && !data.email && items !== null && items.length === 0 && sent.length === 0
           // a new phone, a private window, a browser that forgot: one box. Until the mailer is set up the box says the calm busy line and sends nothing.
           return data?.mail || lookup ? <KeepByEmail lang={lang} hasEmail={!!data?.email} lookup={lookup} off={!data?.mail} /> : null
         })()}
 
         {items === null && !notFound && <p className="sent">{c.loading}</p>}
-        {(notFound || (items !== null && items.length === 0 && sent.length === 0)) && (
+        {!data?.signin_required && (notFound || (items !== null && items.length === 0 && sent.length === 0)) && (
           <div className="myEmpty" data-testid="basket-empty">
             <p>{c.emptyPage}</p>
             <a className="btn primary" href={writePath(lang)} data-testid="my-write">

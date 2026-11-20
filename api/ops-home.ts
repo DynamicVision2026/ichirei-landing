@@ -248,7 +248,21 @@ export function renderSamples(rows: SampleRow[], base: string, notice: string | 
     `<div class="muted">The sample shows 「あなた」 / "You" from 「一字礼」 / "ICHIREI", is read-only, and uses no free gift and no order.</div>${list}</section>`
 }
 
-export function renderHome(payload: StatsPayload, p: Period, now: Date, customers: CustomerRow[] = [], engine: EngineCardData | null = null, freeUse: FreeUseCard | null = null, samples: { rows: SampleRow[]; base: string; notice: string | null } | null = null): string {
+/** Account deletion requests (2026-11-20): who asked (a masked email or a LINE name — never a full address) and when, the last 30 days. The owner deletes by hand; nothing is deleted from here. */
+export async function buildDeleteRequests(store: OrderStore | null, now: Date): Promise<Array<{ ts: string; who: string }>> {
+  if (!store) return []
+  const out: Array<{ ts: string; who: string }> = []
+  for (let i = 0; i < 30; i++) {
+    const day = analyticsDay(new Date(now.getTime() - i * DAY_MS))
+    const lines = await readJsonl<{ ts?: string; who?: string }>(store, `ops/account-deletes-${day}.jsonl`).catch(() => [])
+    for (const l of lines) if (l.ts) out.push({ ts: l.ts, who: String(l.who ?? '').slice(0, 60) })
+  }
+  return out.sort((a, b) => b.ts.localeCompare(a.ts))
+}
+const renderDeletes = (rows: Array<{ ts: string; who: string }>): string =>
+  rows.length === 0 ? '' : `<section class="card" aria-label="Account deletion requests" data-testid="delete-requests"><h2 class="serif" style="font-size:19px">Account deletion requests</h2><div class="muted">Last 30 days — delete by hand, then reply to the person.</div>${rows.map((r) => `<div class="mini"><div>${esc(r.ts.slice(0, 10))}</div><div></div><div style="text-align:right">${esc(r.who)}</div></div>`).join('')}</section>`
+
+export function renderHome(payload: StatsPayload, p: Period, now: Date, customers: CustomerRow[] = [], engine: EngineCardData | null = null, freeUse: FreeUseCard | null = null, samples: { rows: SampleRow[]; base: string; notice: string | null } | null = null, deletes: Array<{ ts: string; who: string }> = []): string {
   const s = payload.stats.periods[p]
   const f = s.funnel
   const orders = payload.orders.filter((o) => inPeriod(o, p, now))
@@ -309,6 +323,7 @@ export function renderHome(payload: StatsPayload, p: Period, now: Date, customer
     (promoRows ? `<section class="card" aria-label="Free gifts by day"><h2 class="serif" style="font-size:19px">Free gifts by day</h2><div class="muted">One shared pool for /en and the Japanese page; the language of each gift is in the table below.</div>${promoRows}<div class="muted">A promotion day runs 4:00 a.m. to 3:59 a.m. Eastern.</div></section>` : '') +
     `<section class="card" aria-label="AI cost"><h2 class="serif" style="font-size:19px">AI cost (estimate)</h2><div class="serif" style="font-size:34px;font-weight:700">$${s.ai_cost_usd.toFixed(2)} <span style="font-size:16px;color:#5C564D">¥${n(s.ai_cost_jpy)}</span></div><div class="muted">${perMoment ? `About $${perMoment.toFixed(2)} per moment written. ` : ''}Real bills: Anthropic Console and Google Cloud Billing.</div></section>` +
     renderFreeUse(freeUse) +
+    renderDeletes(deletes) +
     (samples ? renderSamples(samples.rows, samples.base, samples.notice, s.sources, PERIOD_LABEL[p]) : '') +
     (chars ? `<section class="card" aria-label="Characters chosen"><h2 class="serif" style="font-size:19px">Most chosen characters, 30 days</h2><div class="chars">${chars}</div></section>` : '') +
     `</div></div>` +
@@ -448,7 +463,7 @@ export function createHomeHandlers(deps: () => OpsDeps) {
       if (freeUse) freeUse.exempt = isExempt(req, g.env)
       const notice = new URL(req.url).searchParams.get('notice')
       const samples = { rows: await listSamples(g.store).catch(() => [] as SampleRow[]), base: publicUrl(g.env), notice: notice ? notice.slice(0, 600) : null }
-      return new Response(renderHome(payload, p, g.now, customers, engineCardData(lines, g.now, configuredModels(g.env)), freeUse, samples), { status: 200, headers: headers('text/html; charset=utf-8') })
+      return new Response(renderHome(payload, p, g.now, customers, engineCardData(lines, g.now, configuredModels(g.env)), freeUse, samples, await buildDeleteRequests(g.store, g.now).catch(() => [])), { status: 200, headers: headers('text/html; charset=utf-8') })
     },
     /** "Check now": ONE tiny call to the AI (the review model, about 10 tokens), at most once a minute. The answer is OK or the error class in words; nothing else is returned. */
     async engineCheck(req: Request): Promise<Response> {

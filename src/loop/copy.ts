@@ -47,6 +47,11 @@ export interface LoopCopy {
   poemHeading: string
   picturesHeading: string
   pictureOpen: string
+  /** Sign-in (2026-11-20): the account line of マイギフト. */
+  signOut: string
+  deleteAccount: string
+  deleteAsk: string
+  deleteSent: string
   /** A picture that is still being drawn: the soft tile in its place. */
   pictureMaking: string
   close: string
@@ -128,6 +133,10 @@ export const LOOP: Record<RevealLang, LoopCopy> = {
     poemHeading: '詩',
     picturesHeading: 'その場面の4枚の絵',
     pictureOpen: 'この絵を大きく見る',
+    signOut: 'ログアウト',
+    deleteAccount: 'アカウントを削除',
+    deleteAsk: 'アカウントの削除を依頼しますか？',
+    deleteSent: '削除の依頼を受け付けました。担当者がご連絡します。',
     pictureMaking: '絵を描いています…',
     close: '閉じる',
     removeAsk: 'この贈りものをマイギフトから削除しますか？',
@@ -202,6 +211,10 @@ export const LOOP: Record<RevealLang, LoopCopy> = {
     poemHeading: '詩',
     picturesHeading: '那個片刻的四幅畫',
     pictureOpen: '放大這幅畫',
+    signOut: '登出',
+    deleteAccount: '刪除帳戶',
+    deleteAsk: '要申請刪除帳戶嗎？',
+    deleteSent: '已收到刪除申請，我們會與你聯絡。',
     pictureMaking: '正在繪製這幅畫…',
     close: '關閉',
     removeAsk: '要把這份禮物從「我的禮物」刪除嗎？',
@@ -278,6 +291,10 @@ export const LOOP: Record<RevealLang, LoopCopy> = {
     poemHeading: 'The poem',
     picturesHeading: 'Four pictures of your moment',
     pictureOpen: 'Open this picture',
+    signOut: 'Sign out',
+    deleteAccount: 'Delete my account',
+    deleteAsk: 'Ask us to delete your account?',
+    deleteSent: 'Request received. We will be in touch.',
     pictureMaking: 'Drawing this picture…',
     close: 'Close',
     removeAsk: 'Remove this gift from My gifts?',
@@ -491,6 +508,8 @@ export interface SaveCopy {
   saved: (masked: string) => string
   /** After saving while the mailer is not set up yet: the same line without the e-mail part */
   savedPlain: string
+  /** Signed in (2026-11-20): the one line that replaces the email step. */
+  savedSignedIn: string
   open: string
   /** My gifts on a new device: asks for the e-mail, then says "sent" whether or not it has gifts */
   lookupLead: string
@@ -512,6 +531,7 @@ export const SAVE: Record<RevealLang, SaveCopy> = {
     consent: '新しい季節やお知らせを受け取る',
     saved: (m) => `✓ 保存しました。${m}の贈りものとして、30日間お預かりします。リンクをメールでお送りしました。`,
     savedPlain: '✓ 保存しました。30日間お預かりします。',
+    savedSignedIn: '〈マイギフト〉に保存しました',
     open: 'マイギフトを開く →',
     lookupLead: 'メールアドレスを入れてください。マイギフトを開くリンクをお送りします。登録やパスワードは要りません。',
     lookupSent: '送りました。メールのリンクから開いてください。',
@@ -529,6 +549,7 @@ export const SAVE: Record<RevealLang, SaveCopy> = {
     consent: '也告訴我新的季節與優惠',
     saved: (m) => `✓ 已保存在${m}之下，保留30天。連結已寄到你的信箱。`,
     savedPlain: '✓ 已保存，保留30天。',
+    savedSignedIn: '已保存到〈我的禮物〉',
     open: '打開我的禮物 →',
     lookupLead: '輸入你的電子郵件，我們會寄給你打開〈我的禮物〉的連結。不需要註冊或密碼。',
     lookupSent: '已寄出。請從郵件裡的連結打開。',
@@ -546,6 +567,7 @@ export const SAVE: Record<RevealLang, SaveCopy> = {
     consent: 'Also tell me about new seasons and offers',
     saved: (m) => `✓ Saved under ${m} for 30 days. We've emailed you the link.`,
     savedPlain: "✓ Saved. We'll keep it for 30 days.",
+    savedSignedIn: 'Saved to My gifts',
     open: 'Open My gifts →',
     lookupLead: "Enter your email and we'll send you a link to My gifts. No account or password needed.",
     lookupSent: 'Sent. Open My gifts from the link in your email.',

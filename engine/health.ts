@@ -36,6 +36,10 @@ export const HEALTH_CODES = [
   'hold_expired',
   'basket_saved',
   'basket_link_opened',
+  'signin_new',
+  'signin_back',
+  'signin_failed',
+  'account_delete_requested',
 ] as const
 export type HealthCode = (typeof HEALTH_CODES)[number]
 export const RED_HEALTH_CODES: readonly HealthCode[] = ['en_cart_currency_mismatch', 'needs_attention', 'certificate_no_missing', 'order_record_failed']

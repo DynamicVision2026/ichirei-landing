@@ -32,12 +32,21 @@ const safe = {
  * With none left: the form is gone. After a hold ended: one line, "Your hold ended.", and the form as usual.
  * `compact` (2026-11-17): the same box, placed right under "Write your moment" in the hero (no section of its own, no side margins).
  */
+import SignInPanel from '../auth/SignInPanel.tsx'
+import { refreshAuth, signInRequired, useAuth } from '../auth/auth.ts'
+import { landingPath } from '../reveal/paths.ts'
+
 export default function DaysOfThanks({ lang = 'en', compact = false }: { lang?: ThanksLang; compact?: boolean }) {
   const THANKS = thanksCopy(lang)
   const on = usePromoOn()
   const p = usePromo()
   const price = useTodayPrice(lang)
   const [email, setEmail] = useState('')
+  const auth = useAuth()
+  // signed in (2026-11-20): the email of the account is prefilled; an account with none (LINE gave none) is asked ONCE here and keeps it
+  useEffect(() => {
+    if (auth.email) setEmail((cur) => cur || auth.email || '')
+  }, [auth.email])
   const [marketing, setMarketing] = useState(false)
   const [busy, setBusy] = useState(false)
   const [message, setMessage] = useState<string | null>(null)
@@ -63,6 +72,10 @@ export default function DaysOfThanks({ lang = 'en', compact = false }: { lang?: 
   const place = async (e: string, m: boolean) => {
     setBusy(true)
     setMessage(null)
+    if (auth.signedIn && auth.needsEmail) {
+      const a = await fetch('/api/auth/email-add', { method: 'POST', credentials: 'same-origin', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ email: e }) }).catch(() => null)
+      if (a?.ok) await refreshAuth()
+    }
     const r = await requestHold(e, m, lang)
     if (r.ok) {
       safe.set({ email: e })
@@ -117,7 +130,10 @@ export default function DaysOfThanks({ lang = 'en', compact = false }: { lang?: 
                   {THANKS.ended}
                 </p>
               )}
-              {left > 0 && p.ended !== 'used' && p.ended !== 'three_holds' && (
+              {left > 0 && p.ended !== 'used' && p.ended !== 'three_holds' && signInRequired(auth) && !auth.signedIn && (
+                <SignInPanel lang={lang === 'zh-Hans' ? 'zh-Hant' : lang} ret={landingPath(lang === 'zh-Hans' ? 'zh-Hant' : lang)} />
+              )}
+              {left > 0 && p.ended !== 'used' && p.ended !== 'three_holds' && !(signInRequired(auth) && !auth.signedIn) && (
                 <form
                   className={lang === 'ja' ? 'ja' : lang === 'zh-Hant' || lang === 'zh-Hans' ? 'zh' : undefined}
                   onSubmit={(ev) => {

@@ -13,6 +13,7 @@ import { CER, cerLang } from './copy.ts'
 import { thanksCopy } from '../../loop/copy.ts'
 import './ceremony.css'
 import MyGiftsButton from '../../loop/MyGifts.tsx'
+import SignInPanel from '../../auth/SignInPanel.tsx'
 
 // The receiver's new ceremony (gift ceremony redesign 2026-11-15, phase A: Classic, English). Nine screens, one at a time, each waits for a tap:
 //   1 the mark · 2 the note · 3 the film · 4 the character (it grows from the mark, then the poem is found inside its strokes) · 5 the poem · 6 the certificate
@@ -647,12 +648,14 @@ function KeepScreen({ view, preview, q, from, onAnswer }: { view: GiftView; prev
  * Under it, unchanged: 「まだ、きちんと伝えられていない人はいませんか。」 with 「あなたも一字を贈る」 (and the promotion box only while it runs).
  */
 /** The example gift's words (2026-11-20): the one line at the top, and the one button of the last screen (to the writing side of the site, counted as `src=x_sample`). */
-export const SAMPLE_COPY: Record<'ja' | 'en' | 'zh-Hant', { note: string; button: string; off: string }> = {
+export const SAMPLE_COPY: Record<'ja' | 'en' | 'zh-Hant' | 'zh-Hans', { note: string; button: string; off: string }> = {
   ja: { note: '一字礼の贈りもの（見本）。実際にこのように届きます。', button: 'あなたの大切な人へ', off: 'この見本は公開を終了しました' },
   en: { note: 'An example ICHIREI gift, the way it arrives on a phone.', button: 'Make one for someone of yours', off: 'This example is no longer available' },
   'zh-Hant': { note: '一字禮的禮物（範例）。實際上會這樣送達。', button: '送給你重要的人', off: '這個範例已停止公開' },
+  // (the Simplified words are the Traditional ones converted with OpenCC, never typed by hand)
+  'zh-Hans': { note: '一字礼的礼物（范例）。实际上会这样送达。', button: '送给你重要的人', off: '这个范例已停止公开' },
 }
-const sampleLang = (l: string): 'ja' | 'en' | 'zh-Hant' => (l === 'ja' ? 'ja' : l === 'en' ? 'en' : 'zh-Hant')
+const sampleLang = (l: string): 'ja' | 'en' | 'zh-Hant' | 'zh-Hans' => (l === 'ja' ? 'ja' : l === 'en' ? 'en' : l === 'zh-Hans' ? 'zh-Hans' : 'zh-Hant')
 
 function LastScreen({ view, from, preview, onBackToGift }: { view: GiftView; from: string; preview: boolean; onBackToGift: () => void }) {
   const lang = cerLang(view.language)
@@ -661,11 +664,18 @@ function LastScreen({ view, from, preview, onBackToGift }: { view: GiftView; fro
   const promoOn = usePromoOn()
   const back = view.back ?? null
   const [phase, setPhase] = useState<'idle' | 'busy' | 'error'>('idle')
+  // the gift back is a signed-in act (2026-11-20): signed out, the sign-in panel opens here and the gift page is where the sign-in returns to
+  const [needSignIn, setNeedSignIn] = useState(false)
   const start = async () => {
     if (phase === 'busy' || preview) return
     setPhase('busy')
     try {
-      const res = await fetch(`/api/gift/${view.token}/back`, { method: 'POST' })
+      const res = await fetch(`/api/gift/${view.token}/back`, { method: 'POST', credentials: 'same-origin' })
+      if (res.status === 401) {
+        setNeedSignIn(true)
+        setPhase('idle')
+        return
+      }
       const j = (await res.json().catch(() => ({}))) as { ticket?: string }
       if (!res.ok || !j.ticket) return setPhase('error')
       trackUs('receiver_replied')
@@ -686,6 +696,7 @@ function LastScreen({ view, from, preview, onBackToGift }: { view: GiftView; fro
           {back.state === 'available' ? (
             <>
               <p className="cr-b" data-testid="gift-back-line">{C.backLine(from)}</p>
+              {needSignIn && <SignInPanel lang={lang === 'zh-Hans' ? 'zh-Hant' : lang} ret={window.location.pathname} className="siInline" />}
               {!preview && <button type="button" className="cr-blk cr-backbtn" data-testid="gift-back-button" disabled={phase === 'busy'} onClick={() => void start()}>{phase === 'busy' ? C.backBusy : C.backButton(from)}</button>}
               {phase === 'error' && <p role="alert" className="cr-b cr-ink" data-testid="gift-back-error">{C.backError}</p>}
             </>

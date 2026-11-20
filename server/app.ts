@@ -25,6 +25,7 @@ import { statsHandlers } from '../api/ops-stats.ts'
 import { customerHandlers } from '../api/ops-customers.ts'
 import { homeHandlers } from '../api/ops-home.ts'
 import { examplesHandlers } from '../api/examples.ts'
+import { authHandlers } from '../api/auth.ts'
 import { listSamples } from '../engine/sample.ts'
 import { POST as analyticsPost } from '../api/analytics.ts'
 import { GET as ratesGet } from '../api/rates.ts'
@@ -249,13 +250,25 @@ export function createApp(config: ServerConfig): Hono {
   app.get('/api/gift/:token/card.pdf', limited(scrollLimit), (c) => giftHandlers.cardPdf(c.req.param('token'), c.req.query('preview')))
   app.get('/api/gift/:token/gift.pdf', limited(scrollLimit), (c) => giftHandlers.giftPdf(c.req.param('token'), c.req.query('preview')))
   app.get('/api/animation/:id/gift.pdf', limited(scrollLimit), (c) => giftHandlers.giftPdfForSender(c.req.param('id')))
-  app.post('/api/gift/:token/back', limited(animationLimit), (c) => giftHandlers.back(c.req.param('token')))
+  app.post('/api/gift/:token/back', limited(animationLimit), (c) => giftHandlers.back(c.req.param('token'), c.req.raw))
   app.get('/api/reply/:ticket', limited(animationLimit), (c) => giftHandlers.replyInfo(c.req.param('ticket')))
   app.get('/api/gift/:token/keep-qr.png', limited(scrollLimit), (c) => giftHandlers.keepQr(c.req.param('token'), c.req.query('preview')))
   app.get('/api/animation/:id/keep-qr.png', limited(scrollLimit), (c) => giftHandlers.keepQrForSender(c.req.param('id')))
   app.get('/api/gift/:token/keepsake-card.png', limited(scrollLimit), (c) => giftHandlers.keepsakeCard(c.req.param('token'), c.req.query('preview')))
   app.get('/api/gift/:token/certificate.png', limited(scrollLimit), (c) => giftHandlers.certificate(c.req.param('token'), c.req.query('preview')))
   app.post('/api/gift/:token/opened', limited(replyLimit), (c) => (c.req.query('preview') ? previewRefused() : giftHandlers.opened(c.req.param('token'))))
+  // Sign-in (2026-11-20, api/auth.ts): Google, LINE and the one-time email link
+  app.get('/api/auth/me', limited(animationLimit), (c) => authHandlers.me(c.req.raw))
+  app.post('/api/auth/email', limited(replyLimit), (c) => authHandlers.emailSend(c.req.raw))
+  app.post('/api/auth/logout', limited(replyLimit), (c) => authHandlers.logout(c.req.raw))
+  app.post('/api/auth/email-add', limited(replyLimit), (c) => authHandlers.emailAdd(c.req.raw))
+  app.post('/api/auth/delete-request', limited(replyLimit), (c) => authHandlers.deleteRequest(c.req.raw))
+  app.get('/auth/google/start', limited(replyLimit), (c) => authHandlers.start('google', c.req.raw))
+  app.get('/auth/line/start', limited(replyLimit), (c) => authHandlers.start('line', c.req.raw))
+  app.get('/auth/google/callback', limited(replyLimit), (c) => authHandlers.callback('google', c.req.raw))
+  app.get('/auth/line/callback', limited(replyLimit), (c) => authHandlers.callback('line', c.req.raw))
+  app.get('/auth/email', limited(replyLimit), (c) => authHandlers.emailPage(c.req.raw))
+  app.post('/auth/email', limited(replyLimit), (c) => authHandlers.emailConsume(c.req.raw))
   app.get('/api/examples', limited(animationLimit), (c) => examplesHandlers.list(c.req.raw))
   app.post('/api/examples/count', limited(animationLimit), (c) => examplesHandlers.count(c.req.raw))
   app.post('/api/gift/:token/own', limited(animationLimit), (c) => giftHandlers.own(c.req.param('token')))

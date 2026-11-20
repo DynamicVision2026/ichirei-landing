@@ -35,6 +35,7 @@ import { cleanSession, cleanSource, recordEvent } from '../engine/analytics.ts'
 import { POEM_ID_PATTERN, buildRecord, lineAttributes, newOrderRef, parseOrderRequest, type OrderRecord, type StoredPoem, type ValidOrder } from '../engine/order.ts'
 import { createOrderStore, type OrderStore } from '../engine/order-store.ts'
 import type { Palette } from '../engine/palette.ts'
+import { sessionAccount } from '../engine/accounts.ts'
 import { PromoCartNotFree, ShopifyError, createCart, isPromoLanguage, type CartPromo, loadShopifyConfig, type ShopifyConfig } from '../engine/shopify.ts'
 import { promoShopifyFrom, type PromoShopify } from '../engine/promo-shopify.ts'
 import { checkClaimSession, claimOf, readWaiting, normalizeOrderNumber } from '../engine/waiting.ts'
@@ -362,6 +363,8 @@ export function createOrderHandler(deps: () => OrderDeps) {
         }
         if (heldRec?.code) heldCart = { code: heldRec.code, email: heldRec.rec.email, holdId: heldRec.rec.id }
       }
+      // a signed-in account's email prefills the checkout (2026-11-20); the order joins the account by that email, as in Part 7
+      const buyerEmail = d.store ? (await sessionAccount(d.store, req, d.env ?? process.env, d.now?.() ?? new Date()).catch(() => null))?.email ?? null : null
       let cart: Awaited<ReturnType<typeof createCart>>
       try {
         // the customer's private My gifts link, known now: this browser's own basket token (made if it has none) — carried on the order like the order-page link. A cart made with no browser id (an order from a
@@ -373,7 +376,7 @@ export function createOrderHandler(deps: () => OrderDeps) {
         } catch {
           myGiftsLink = null
         }
-        cart = await createCart(d.shopify!, order.package, lineAttributes(order, orderRef, animationLink, giftLink, myGiftsLink), orderRef, d.fetchImpl, order.page_language, heldCart, d.promoRetryMs)
+        cart = await createCart(d.shopify!, order.package, lineAttributes(order, orderRef, animationLink, giftLink, myGiftsLink), orderRef, d.fetchImpl, order.page_language, heldCart, d.promoRetryMs, buyerEmail)
       } catch (err) {
         if (err instanceof PromoCartNotFree) return promoBreak(record, orderRef, putOrder, d)
         throw err

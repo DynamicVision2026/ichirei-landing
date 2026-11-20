@@ -1744,11 +1744,6 @@ const mockPage = async (browser, { onExplain, result, order, track } = {}) => {
 
 // ---------- Run 8g-5: 「SNSでシェアする」 — the share section (buyer after collecting, receiver after opening): the system share sheet gets the FILE only; a saved file and a line where it cannot; hidden before collecting and for remembrance ----------
 {
-  const COPY = {
-    ja: { title: 'SNSでシェアする', line: '動画と歌を、あなたのSNSに。お名前や物語の文章は入りません。', film: '動画をシェア', card: '歌のカードをシェア', fb: '保存した動画を、各SNSのアプリから投稿してください。' },
-    'zh-Hant': { title: '分享到社群', line: '把影片和詩分享到你的社群。不會包含姓名或故事文字。', film: '分享影片', card: '分享詩卡', fb: '請從各社群App上傳剛儲存的影片。' },
-    en: { title: 'Share it', line: 'Post the film and the poem on your social media. No names or story text are included.', film: 'Share the film', card: 'Share the poem card', fb: 'Post the saved file from your social app.' },
-  }
   const real = ['/film/washi-1.webp', '/film/washi-2.webp', '/film/washi-3.webp', '/film/washi-4.webp'].map((u, i) => `/film-art/real-${i + 1}.webp`)
   const film = { status: 'ready', lines: ['a', 'b', 'c', 'd'], pictures: real }
   const mkView = (lang, memorial, collected) => ({ id: 'AN-testtesttesttesttest', language: lang, glyph: '備', reading: 'そなえる', romanization: 'sonaeru', meaning_en: 'to be ready', who: 'x', memorial, film, gift: { url: 'https://ichirei.soul-id.jp/g/RG-testtesttesttesttest', size_code: 'ICHIREI-EGIFT', ship_to: 'none', egift_state: null, opens_on: null }, order: { collected, ordered_at: '2026-11-06T05:30:00Z', change_until: collected ? null : '2099-01-01T00:00:00Z', wood: null } })
@@ -7232,6 +7227,155 @@ for (const [lang, locale, text] of [['en', 'en-US', 'Your gift is being finished
     await page.goto(`http://localhost:5173/?src=${tag}`, { waitUntil: 'networkidle' })
     await page.waitForTimeout(500)
     check(`counting: arriving with ?src=${tag} sends the page view with that tag as its source (no personal data)`, counts.tracked.some((e) => e.event === 'page_view' && e.ref === tag))
+    await ctx.close()
+  }
+}
+
+// ---------- Run 54 (2026-11-20): sign-in — the panel at 「字を見つける」, the story kept across it, the order of the ways in, each provider hidden until it exists, マイギフト signed out and in ----------
+{
+  const SHOTS54 = process.env.E2E_SHOTS_DIR || '/tmp/e2e-shots'
+  const st = { providers: { google: true, line: true, email: true }, signed: false, display: 'b•••@gmail.com', email: 'brian@gmail.com' }
+  const wireAuth = async (page, extra = {}) => {
+    const auth = { calls: [], logouts: 0, mails: [] }
+    await page.route('**/api/auth/me', (r) => r.fulfill({ json: st.signed ? { providers: st.providers, signed_in: true, display: st.display, kind: 'email', email: st.email, needs_email: false } : { providers: st.providers, signed_in: false } }))
+    await page.route('**/auth/*/start**', (r) => { auth.calls.push(r.request().url()); st.signed = true; return r.fulfill({ status: 302, headers: { location: `${extra.back ?? '/write'}?signed=1` } }) })
+    await page.route('**/api/auth/email', (r) => { auth.mails.push(JSON.parse(r.request().postData() ?? '{}')); return r.fulfill({ json: { ok: true } }) })
+    await page.route('**/api/auth/logout', (r) => { auth.logouts++; st.signed = false; return r.fulfill({ json: { ok: true } }) })
+    return auth
+  }
+  const SIGN = {
+    ja: { title: 'ログインして続ける', line: 'あなたの場面と贈りものは、このアカウントの〈マイギフト〉に残ります。パスワードは要りません。', order: ['LINEでログイン', 'Googleでログイン', 'メールでログイン'], url: '/write?lang=ja' },
+    en: { title: 'Sign in to continue', line: 'Your moments and gifts stay in your My gifts. No password needed.', order: ['Continue with Google', 'Continue with LINE', 'Continue with email'], url: '/en/write?lang=en' },
+    'zh-Hant': { title: '登入以繼續', line: '你的片刻與禮物會留在這個帳戶的〈我的禮物〉裡。不需要密碼。', order: ['LINE登入', 'Google登入', '電子郵件登入'], url: '/zh/write?lang=zh-Hant' },
+  }
+  const STORY54 = 'She kept the porch light on every night until I got home, and she never once mentioned it.'
+  const STORYJA = '母が毎朝、黙って弁当を詰めてくれた。その手の速さを、ずっと覚えている。'
+  for (const lang of ['ja', 'en', 'zh-Hant']) {
+    st.providers = { google: true, line: true, email: true }; st.signed = false
+    const f = await mockPage(browser)
+    await f.page.setViewportSize({ width: 390, height: 844 })
+    await f.page.route('**/api/me*', (r) => r.fulfill({ json: { basket: { count: 0 }, ready: null, hold: null } }))
+    const auth = await wireAuth(f.page, { back: SIGN[lang].url.split('?')[0] })
+    const text = lang === 'en' ? STORY54 : STORYJA
+    await f.page.goto(`http://localhost:5174${SIGN[lang].url}`, { waitUntil: 'networkidle' })
+    await f.page.waitForTimeout(500)
+    await f.page.locator('#write [data-testid=story-input]').fill(text)
+    await pickContext(f.page)
+    await f.page.click(`#write >> text=${GO[lang === 'zh-Hant' ? 'zh-Hant' : lang]}`)
+    await f.page.waitForTimeout(600)
+    const panel = f.page.locator('[data-testid=signin-panel]')
+    const labels = await panel.locator('.siBtn').allInnerTexts()
+    check(`sign-in (${lang}): pressing 「字を見つける」 signed out opens the sign-in panel — a paper slip (not a pop-up window), the title 「${SIGN[lang].title}」 and the one line — and nothing is sent to the engine`, (await panel.locator('[data-testid=signin-title]').innerText()) === SIGN[lang].title && (await panel.locator('[data-testid=signin-lead]').innerText()) === SIGN[lang].line && f.calls.select.length === 0 && (await f.page.locator('[role=dialog]').count()) === 0 && (await panel.evaluate((e) => getComputedStyle(e).position)) !== 'fixed')
+    check(`sign-in (${lang}): the ways in, in this page language's order — ${SIGN[lang].order.join(' · ')} — and the terms and privacy links in small type`, labels.map((x) => x.trim()).join('|').toLowerCase() === SIGN[lang].order.join('|').toLowerCase() && (await panel.locator('[data-testid=signin-small] a').count()) === 2)
+    check(`sign-in (${lang}): the story is kept — it is saved as a draft before the sign-in`, await f.page.evaluate((t) => { try { return (JSON.parse(localStorage.getItem('ichirei.draft.v1') ?? '{}').story ?? '') === t } catch { return false } }, text))
+    await panel.scrollIntoViewIfNeeded()
+    await f.page.evaluate(() => { const el = document.querySelector('[data-testid=signin-panel]'); if (el) window.scrollTo(0, el.getBoundingClientRect().top + window.scrollY - 24) })
+    if (lang !== 'zh-Hant') await f.page.screenshot({ path: `${SHOTS54}/signin-${lang}-find-390.png`, fullPage: false })
+    check(`sign-in (${lang}): no horizontal scroll at 390 px, square buttons (4px at most), no cinnabar on the panel`, (await f.page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 1)) && (await panel.locator('.siBtn').evaluateAll((els) => els.every((e) => parseFloat(getComputedStyle(e).borderTopLeftRadius) <= 4 && !/192, 57, 43|179, 51, 31|200, 64, 45/.test(getComputedStyle(e).color + getComputedStyle(e).backgroundColor + getComputedStyle(e).borderTopColor)))))
+    // the (mocked) provider sends the person back signed in: the same story's round starts by itself
+    await panel.locator(lang === 'en' ? '[data-testid=signin-google]' : '[data-testid=signin-line]').click()
+    await f.page.waitForTimeout(1800)
+    check(`sign-in (${lang}): after signing in the same story's round starts right away (one call, the story unchanged) — the person does not press anything again`, auth.calls.length === 1 && f.calls.select.length === 1 && f.calls.select[0].story === text, JSON.stringify({ calls: auth.calls.length, select: f.calls.select.length }))
+    await f.page.close()
+  }
+  // a provider that does not exist yet is hidden; with none, nothing asks for sign-in
+  {
+    st.providers = { google: false, line: true, email: false }; st.signed = false
+    const f = await mockPage(browser)
+    await f.page.setViewportSize({ width: 390, height: 844 })
+    await f.page.route('**/api/me*', (r) => r.fulfill({ json: { basket: { count: 0 }, ready: null, hold: null } }))
+    await wireAuth(f.page)
+    await f.page.goto('http://localhost:5174/write?lang=ja', { waitUntil: 'networkidle' })
+    await f.page.locator('#write [data-testid=story-input]').fill(STORYJA)
+    await pickContext(f.page)
+    await f.page.click(`#write >> text=${GO.ja}`)
+    await f.page.waitForTimeout(500)
+    check('sign-in: with only LINE set up, only 「LINEでログイン」 shows (Google and the email option are hidden)', (await f.page.locator('[data-testid=signin-line]').count()) === 1 && (await f.page.locator('[data-testid=signin-google]').count()) === 0 && (await f.page.locator('[data-testid=signin-email]').count()) === 0)
+    await f.page.close()
+    st.providers = { google: false, line: false, email: false }
+    const g = await mockPage(browser)
+    await g.page.route('**/api/me*', (r) => r.fulfill({ json: { basket: { count: 0 }, ready: null, hold: null } }))
+    await wireAuth(g.page)
+    await g.page.goto('http://localhost:5174/write?lang=ja', { waitUntil: 'networkidle' })
+    await g.page.locator('#write [data-testid=story-input]').fill(STORYJA)
+    await pickContext(g.page)
+    await g.page.click(`#write >> text=${GO.ja}`)
+    await g.page.waitForTimeout(1200)
+    check('sign-in: with no provider set up nobody is asked to sign in — the round simply starts', (await g.page.locator('[data-testid=signin-panel]').count()) === 0 && g.calls.select.length === 1)
+    await g.page.close()
+  }
+  // the email option
+  {
+    st.providers = { google: true, line: true, email: true }; st.signed = false
+    const f = await mockPage(browser)
+    await f.page.setViewportSize({ width: 390, height: 844 })
+    await f.page.route('**/api/me*', (r) => r.fulfill({ json: { basket: { count: 0 }, ready: null, hold: null } }))
+    const auth = await wireAuth(f.page)
+    await f.page.goto('http://localhost:5174/en/write?lang=en', { waitUntil: 'networkidle' })
+    await f.page.locator('#write [data-testid=story-input]').fill(STORY54)
+    await pickContext(f.page)
+    await f.page.click(`#write >> text=${GO.en}`)
+    await f.page.locator('[data-testid=signin-email]').click()
+    await f.page.locator('[data-testid=signin-email-input]').fill('brian@example.com')
+    await f.page.locator('[data-testid=signin-email-send]').click()
+    await f.page.locator('[data-testid=signin-email-note]').waitFor()
+    check('sign-in (email): "Continue with email" asks for the address, sends it once with the page language and where to come back to, and says it was sent', auth.mails.length === 1 && auth.mails[0].email === 'brian@example.com' && auth.mails[0].language === 'en' && /\/en\/write/.test(auth.mails[0].return) && /Sent\./.test(await f.page.locator('[data-testid=signin-email-note]').innerText()))
+    await f.page.close()
+  }
+  // マイギフト: signed out → the panel; signed in → the account and ログアウト, the Save panel as one line
+  for (const lang of ['ja', 'en']) {
+    st.providers = { google: true, line: true, email: true }; st.signed = false
+    const ctx = await browser.newContext({ viewport: { width: 390, height: 900 }, locale: lang === 'ja' ? 'ja-JP' : 'en-US', deviceScaleFactor: 2 })
+    const page = await ctx.newPage()
+    const errs = []
+    page.on('pageerror', (e) => errs.push(String(e)))
+    const bp = lang === 'ja' ? '/basket' : '/en/basket'
+    await page.route('**/api/me*', (r) => r.fulfill({ json: { basket: { count: st.signed ? 1 : 0 }, ready: null, hold: null } }))
+    const auth = await wireAuth(page, { back: bp })
+    const item = { id: 'BK-aaaaaaaaaaaaaaaaaaaa', created_at: '2026-11-20T10:00:00Z', updated_at: '2026-11-20T10:00:00Z', language: lang, to: lang === 'ja' ? '母' : 'Mom', card: { kanji: '支', reading: 'し', word: lang === 'en' ? 'keeper' : '', line: lang === 'ja' ? 'いつも、みんなの食卓を支えてくれる人。' : 'She keeps everyone at the table.', meaning: 'keeper' }, preview_id: null, context: { relationship: 'parent_mother', relationship_other: '', purpose: 'thanks', purpose_other: '', occasion: 'thanksgiving' }, round: 1, slot: 'main', poem: null, story: 'x', saved_until: '2026-12-20T10:00:00Z', pictures: [] }
+    await page.route('**/api/basket', (r) => r.fulfill({ json: st.signed ? { items: [item], token: 'BT-x', link: 'https://ichirei.beyondculture.ai/b/BT-abcdefghjkmnpqrstuvwxyz2', email: null, hold: null, sent: [], mail: true, saved_days: 30, account: { kind: 'email', text: st.display } } : { items: [], token: null, link: null, email: null, hold: null, sent: [], mail: true, saved_days: 30, signin_required: true } }))
+    await page.route('**/api/basket/qr.svg*', (r) => r.fulfill({ status: 200, contentType: 'image/svg+xml', body: '<svg xmlns="http://www.w3.org/2000/svg" width="10" height="10"/>' }))
+    await page.goto(`http://localhost:5174${bp}`, { waitUntil: 'networkidle' })
+    await page.locator('[data-testid=signin-panel]').waitFor()
+    check(`マイギフト (${lang}), signed out: the sign-in panel opens in place of the lists and the old new-device email box is gone`, (await page.locator('[data-testid=signin-title]').innerText()) === SIGN[lang].title && (await page.locator('[data-testid=keep-mail]').count()) === 0 && (await page.locator('[data-testid=basket-item]').count()) === 0)
+    await page.locator(lang === 'en' ? '[data-testid=signin-google]' : '[data-testid=signin-line]').click()
+    await page.locator('[data-testid=my-account]').waitFor({ timeout: 8000 })
+    check(`マイギフト (${lang}), signed in: the account (masked email) and 「${lang === 'ja' ? 'ログアウト' : 'Sign out'}」 are shown, the gifts are back, and there is no email box`, (await page.locator('[data-testid=my-account-name]').innerText()) === 'b•••@gmail.com' && (await page.locator('[data-testid=my-logout]').innerText()) === (lang === 'ja' ? 'ログアウト' : 'Sign out') && (await page.locator('[data-testid=basket-item]').count()) === 1 && (await page.locator('[data-testid=keep-mail]').count()) === 0 && (await page.locator('[data-testid=signin-panel]').count()) === 0)
+    await page.locator('[data-testid=save-button]').click()
+    await page.locator('[data-testid=save-saved]').waitFor()
+    check(`マイギフト (${lang}), signed in: the Save panel is ONE line — 「${lang === 'ja' ? '〈マイギフト〉に保存しました' : 'Saved to My gifts'}」 — with the link and the QR, no email step`, (await page.locator('[data-testid=save-saved]').innerText()) === (lang === 'ja' ? '〈マイギフト〉に保存しました' : 'Saved to My gifts') && (await page.locator('[data-testid=save-email-step]').count()) === 0 && (await page.locator('[data-testid=save-qr]').count()) === 1)
+    await page.locator('[data-testid=save-button]').click()
+    await page.evaluate(() => window.scrollTo(0, 0))
+    await page.screenshot({ path: `${SHOTS54}/signin-mygifts-${lang}-390.png`, fullPage: false })
+    check(`マイギフト (${lang}): no horizontal scroll at 390 px`, await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 1))
+    await page.locator('[data-testid=my-logout]').click()
+    await page.waitForTimeout(800)
+    check(`マイギフト (${lang}): signing out ends the session (one request) and the page asks to sign in again`, auth.logouts === 1 && (await page.locator('[data-testid=signin-panel]').count()) === 1)
+    await page.locator('[data-testid=my-gifts]').first().waitFor({ timeout: 3000 }).catch(() => {})
+    check(`no page errors (run 54, マイギフト ${lang})`, errs.length === 0, errs.join('; '))
+    await ctx.close()
+  }
+  // the gift back asks to sign in first
+  {
+    st.providers = { google: true, line: true, email: true }; st.signed = false
+    const TOKEN = 'RG-signinsigninsignin22'
+    const view = { id: TOKEN, token: TOKEN, language: 'en', glyph: '労', reading: '', romanization: 'rou', meaning_en: 'tending', en: { word: 'tending', word_source: 'generated', line: 'x', line_you: 'You tend.', echo: null }, who: 'x', poem: { type: 'free', lines: ['a', 'b'], reading: '' }, memorial: false, purpose: 'thanks', music: 'thanks', film: { status: 'ready', lines: ['a', 'b', 'c', 'd'], pictures: ['/img/scenes/children.jpg', '/img/scenes/friends.jpg', '/img/scenes/m1.jpg', '/img/scenes/m2.jpg'] }, certificate_line: 'x', from: 'Brian', to: 'Kenji', message: '', egift: null, locked: false, certificate_no: 12, order_date: '2026-11-20', opens_on: null, replied: false, package: 'egift', back: { state: 'available' } }
+    const ctx = await browser.newContext({ viewport: { width: 390, height: 844 }, locale: 'en-US', reducedMotion: 'reduce' })
+    const page = await ctx.newPage()
+    await wireAuth(page, { back: `/g/${TOKEN}` })
+    await page.route('**/api/me*', (r) => r.fulfill({ json: { basket: { count: 0 }, ready: null, hold: null, has: true } }))
+    await page.route('**/api/analytics', (r) => r.fulfill({ status: 204, body: '' }))
+    await page.route('**/api/promo', (r) => r.fulfill({ json: { on: false, left: 0, daily: 100, hold: null } }))
+    await page.route('**/api/sizes', (r) => r.fulfill({ json: { sizes: ['egift'], promo: { from: '2026-10-01T00:00:00Z', until: '2026-10-31T00:00:00Z' }, usd: { egift: 25 } } }))
+    await page.route(`**/api/gift/${TOKEN}**`, (r) => { const u = new URL(r.request().url()); if (u.pathname.endsWith('/back')) return r.fulfill({ status: 401, json: { error: 'signin_required', code: 'signin_required' } }); if (u.pathname.endsWith('/render')) return r.fulfill({ json: { state: 'ready', view } }); if (u.pathname.endsWith('/opened')) return r.fulfill({ json: { ok: true } }); return r.fulfill({ json: view }) })
+    await page.goto(`http://localhost:5174/g/${TOKEN}`, { waitUntil: 'networkidle' })
+    await page.locator('[data-testid=cr-markbtn]').click()
+    await page.locator('[data-testid=cr-to-film]').click({ timeout: 4000 }).catch(() => {})
+    await page.locator('[data-testid=gift-skip]').click({ timeout: 15000 })
+    await page.locator('[data-testid=cr-to-poem]').click(); await page.locator('[data-testid=cr-to-cert]').click(); await page.locator('[data-testid=cr-to-keep]').click(); await page.locator('[data-testid=gift-to-answer]').click()
+    await page.locator('[data-testid=gift-back-button]').click()
+    await page.locator('[data-testid=signin-panel]').waitFor({ timeout: 5000 })
+    check('the free gift back: signed out, the button opens the sign-in panel on the same screen (the server said signin_required)', (await page.locator('[data-testid=signin-title]').innerText()) === 'Sign in to continue')
     await ctx.close()
   }
 }

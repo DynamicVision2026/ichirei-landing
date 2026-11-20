@@ -1,4 +1,5 @@
-import { useState, type ReactNode } from 'react'
+import { useEffect, useState, type ReactNode } from 'react'
+import { useAuth } from '../auth/auth.ts'
 import { UsdPriceView } from '../order/SalePrice.tsx'
 import { usd, type UsdPrice } from '../order/usd.ts'
 import type { Sale } from '../order/sale.ts'
@@ -23,6 +24,11 @@ export default function OrderLine({ lang = 'en' }: { lang?: ThanksLang }) {
   const p = usePromo()
   const price = useTodayPrice(lang)
   const [email, setEmail] = useState('')
+  const auth = useAuth()
+  // signed in (2026-11-20): the account's email is prefilled at the free-gift hold
+  useEffect(() => {
+    if (auth.email) setEmail((cur) => cur || auth.email || '')
+  }, [auth.email])
   const [busy, setBusy] = useState(false)
   const [message, setMessage] = useState<string | null>(null)
   if (!p || !p.on) return null

@@ -23,6 +23,8 @@ import { recordFreeSource, recordMain } from '../engine/free-source.ts'
 import { createOrderStore } from '../engine/order-store.ts'
 import { newMoment, siteRound } from '../engine/day-limits.ts'
 import { claimMoment, isExempt, whoOf } from '../engine/use-limits.ts'
+import { sessionAccount } from '../engine/accounts.ts'
+import { providersOf, signInRequired } from '../engine/oauth.ts'
 import { recordHealth } from '../engine/health.ts'
 import { classOf, requestIdOf, visitorCode } from '../engine/engine-log.ts'
 import { decideStoryLanguage } from '../engine/story-language.ts'
@@ -141,10 +143,15 @@ export async function POST(req: Request): Promise<Response> {
       const table = code === 'limit_person' ? LIMIT_PERSON : code === 'limit_unpaid10' ? LIMIT_UNPAID10 : LIMIT_SITE
       return jsonResponse(429, { error: table[lang] ?? table.en, code })
     }
+    // Sign-in is the precondition of the free trial (2026-11-20) — once at least one way in exists (until then nobody is turned away). A gift back's own ticket is a signed-in act too.
+    const account = store ? await sessionAccount(store, req).catch(() => null) : null
+    if (store && !account && signInRequired(await providersOf().catch(() => ({ google: null, line: null, email: null })))) {
+      return jsonResponse(401, { error: 'Sign in to continue', code: 'signin_required' })
+    }
     if (ex.retry === 0 && !replyRound) {
       // Part 19 (2026-11-20): the counts live in the store (every server copy sees the same, a deploy resets nothing) and the person is every key we know them by; the owner's browsers are exempt.
       if (store && !isExempt(req)) {
-        const v = await claimMoment(store, await whoOf(store, req))
+        const v = await claimMoment(store, await whoOf(store, req, process.env, account?.id ?? null))
         if (!v.ok) return v.code === 'limit_ip' ? refuse('limit_person', 'limit_ip') : refuse(v.code)
       } else if (!store) {
         const v = newMoment(visitorOf(req), clientIp(req))

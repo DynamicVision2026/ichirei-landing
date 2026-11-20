@@ -33,6 +33,8 @@ export interface LegalCopy {
   /** 2026-11-15: what the email is used for (Email), how long saved gifts stay (Retention) — shown under the privacy sentence — and the cancellation-time sentence (under the return rules). */
   emailUse: string
   retention: string
+  /** 2026-11-20: what signing in stores, why, and how to delete the account. */
+  signIn: string
   cancelTime: string
   faq: { q: string; a: string }[]
   back: string
@@ -71,6 +73,7 @@ export const LEGAL: Record<RevealLang, LegalCopy> = {
     privacy: { heading: 'プライバシー', body: '無料のお試し回数を管理するため、機能上必要なCookieを1つ使用します。' },
     emailUse: '無料の贈りものを確保するためにメールアドレスをご入力いただいた場合、確保と決済時の照合のためだけに使います。ご希望の場合のみ、お知らせをお送りします。',
     retention: 'ご注文のない保存データは、30日後に削除します。',
+    signIn: 'ログイン（Google、LINE、メールのリンク）では、ログイン先の提供元が発行するID、メールアドレス（提供される場合）、LINEの表示名（ヘッダーの表示用）だけを保存します。目的は、お客様の贈りものを保存し、どの端末からでも見つけられるようにすることです。プロフィール写真や友だち情報は取得しません。アカウントの削除は、マイギフトの「アカウントを削除」から、または info@beyondculture.ai までご連絡ください。お知らせのメールは、別の同意ボックスにチェックされた場合のみお送りします。',
     cancelTime: 'キャンセルのご連絡は、メールを送信した時刻で受け付けます。',
     faqTitle: 'よくあるご質問',
     faq: [
@@ -109,6 +112,7 @@ export const LEGAL: Record<RevealLang, LegalCopy> = {
     privacy: { heading: '隱私', body: '為了管理免費試用次數，我們使用一個功能上必要的Cookie。' },
     emailUse: '若你為保留免費禮物輸入電子郵件，我們只用它來保留禮物並在結帳時核對。只有在你同意時，才會寄送消息。',
     retention: '沒有下單的儲存資料，會在30天後刪除。',
+    signIn: '登入（Google、LINE、電子郵件連結）只會儲存登入提供者發出的識別碼、電子郵件（若有提供）與 LINE 顯示名稱（用於頁首顯示）。目的是保存你的禮物，讓你在任何裝置上都能找到。我們不會取得大頭貼或好友資料。要刪除帳戶，請在〈我的禮物〉按「刪除帳戶」，或來信 info@beyondculture.ai。只有在另外勾選同意框時，我們才會寄送消息信件。',
     cancelTime: '取消申請以你寄出郵件的時間為準。',
     faqTitle: '常見問題',
     faq: [
@@ -147,6 +151,7 @@ export const LEGAL: Record<RevealLang, LegalCopy> = {
     privacy: { heading: 'Privacy', body: 'We use one functional cookie to limit free previews.' },
     emailUse: 'If you enter your email to hold a free gift, we use it only to hold it and match it at checkout. We send news only if you ask for it.',
     retention: 'Saved gifts without an order are deleted after 30 days.',
+    signIn: 'Signing in (Google, LINE or an email link) stores only the id the provider gives us, your email (when it gives one) and your LINE display name (to show in the header). We do it to keep your gifts and let you find them on any device. We do not take your profile photo or your friends. To delete your account, use “Delete my account” in My gifts or email info@beyondculture.ai. We send news only if you tick the separate consent box.',
     cancelTime: 'For cancellations, the time you send your email is the time that counts.',
     faqTitle: 'Questions',
     faq: [

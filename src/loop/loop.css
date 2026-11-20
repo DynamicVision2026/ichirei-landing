@@ -245,3 +245,7 @@
 @media (max-width:560px){.rv.basketPage .mgSentItem .btn,.rv.basketPage .mgSentItem .ghostLink{grid-column:1/-1;justify-self:start}}
 .rv.basketPage{padding-top:0}
 .rv.basketPage .basketTop .wrap{max-width:60rem}
+/* The account line of マイギフト (2026-11-20, sign-in): who is signed in (masked), 「ログアウト」, 「アカウントを削除」 */
+.rv.basketPage .myAccount{display:flex;flex-wrap:wrap;gap:.3rem 1rem;align-items:center;margin:.6rem 0 .3rem;font:400 .9rem var(--label);letter-spacing:.03em;color:var(--soft)}
+.rv.basketPage .myAccount .linkBtn{padding:.2rem 0}
+.siInline{margin:1rem 0}

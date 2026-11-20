@@ -199,16 +199,29 @@ export async function recordCustomerEvent(store: OrderStore | null, who: Who, co
  * the basket (its token and its items) all move to the email record. Idempotent.
  */
 export async function linkEmail(store: OrderStore, browser: string, email: string, now: Date = new Date()): Promise<string> {
-  const eid = emailCustomerId(email)
+  return joinCustomer(store, browser, emailCustomerId(email), { email, openBasket: false }, now)
+}
+
+/**
+ * Merge what a browser has under its own record (or under the record it points to) into the customer `targetId`, and point the browser at it. `email` (when known) is added to the target.
+ * `openBasket` (2026-11-20, sign-in): a browser that SIGNED IN to the target becomes one of its basket browsers; a browser that only typed an address does not (linkEmail).
+ */
+export async function joinCustomer(store: OrderStore, browser: string, targetId: string, opts: { email?: string | null; openBasket?: boolean } = {}, now: Date = new Date()): Promise<string> {
+  const eid = targetId
   const current = await customerIdOf(store, browser)
-  if (current === eid) return eid
+  if (current === eid) {
+    if (opts.openBasket) await casJson<CustomerRecord>(store, path(eid), (cur) => (cur && !(cur.basket_browsers ?? []).includes(browser) ? { ...cur, basket_browsers: [...(cur.basket_browsers ?? []), browser], browsers: cur.browsers.includes(browser) ? cur.browsers : [...cur.browsers, browser] } : null))
+    return eid
+  }
   const from = parse(await store.getObject(path(current)))
   let created = false
   await casJson<CustomerRecord>(store, path(eid), (cur) => {
     const rec: CustomerRecord = cur ?? blank(eid, from?.first_seen ? new Date(from.first_seen) : now)
     if (!cur) created = true
-    const e = normalizeEmail(email)
-    if (!rec.emails.includes(e)) rec.emails.push(e)
+    if (opts.email) {
+      const e = normalizeEmail(opts.email)
+      if (!rec.emails.includes(e)) rec.emails.push(e)
+    }
     for (const b of [browser, ...(from?.browsers ?? [])]) if (!rec.browsers.includes(b)) rec.browsers.push(b)
     if (from) {
       for (const m of from.emails) if (!rec.emails.includes(m)) rec.emails.push(m)
@@ -219,20 +232,49 @@ export async function linkEmail(store: OrderStore, browser: string, email: strin
       rec.basket_token = rec.basket_token ?? from.basket_token
       for (const item of from.basket) if (!rec.basket.includes(item)) rec.basket.push(item)
       // An email alone never opens a basket (2026-11-18): when the email's record already existed, the browser that only typed the address does not become one of its basket browsers
-      // (it may be somebody else's address). Only the link in the mail does that (engine/basket.ts openBasketLink).
-      if (!cur) rec.basket_browsers = [...new Set([...(rec.basket_browsers ?? []), ...(from.basket_browsers ?? [])])]
+      // (it may be somebody else's address). Only the link in the mail does that (engine/basket.ts openBasketLink) — or signing in (2026-11-20).
+      if (!cur || opts.openBasket) rec.basket_browsers = [...new Set([...(rec.basket_browsers ?? []), ...(from.basket_browsers ?? [])])]
       rec.has_order = rec.has_order || from.has_order
       rec.events = [...rec.events, ...from.events].sort((a, b) => Date.parse(a.at) - Date.parse(b.at)).slice(-MAX_EVENTS)
     }
+    if (opts.openBasket && !(rec.basket_browsers ?? []).includes(browser)) rec.basket_browsers = [...(rec.basket_browsers ?? []), browser]
     rec.last_seen = now.toISOString()
     return rec
   })
   if (created) await listNew(store, eid, now)
-  // a basket token that pointed at the browser record now points at the email record
+  // a basket token that pointed at the browser record now points at the target record
   if (from?.basket_token) await casJson<{ customer: string }>(store, `basket/tok/${from.basket_token}.json`, () => ({ customer: eid })).catch(() => {})
   await store.putObject(ptrPath(browser), JSON.stringify({ id: eid }), 'application/json')
   if (from && current !== eid && current === browser) await store.deleteObject?.(path(current)).catch(() => {})
   return eid
+}
+
+/** Merge one customer record into another (an account that has just learned its email): the pointer keeps old links working. Idempotent. */
+export async function mergeCustomer(store: OrderStore, fromId: string, toId: string, now: Date = new Date()): Promise<void> {
+  if (fromId === toId) return
+  const from = parse(await store.getObject(path(fromId)))
+  if (from) {
+    await casJson<CustomerRecord>(store, path(toId), (cur) => {
+      const rec: CustomerRecord = cur ?? blank(toId, new Date(from.first_seen))
+      for (const m of from.emails) if (!rec.emails.includes(m)) rec.emails.push(m)
+      for (const b of from.browsers) if (!rec.browsers.includes(b)) rec.browsers.push(b)
+      for (const b of from.basket_browsers ?? []) if (!(rec.basket_browsers ?? []).includes(b)) rec.basket_browsers = [...(rec.basket_browsers ?? []), b]
+      if (Date.parse(from.first_seen) < Date.parse(rec.first_seen)) rec.first_seen = from.first_seen
+      rec.language = rec.language ?? from.language
+      rec.from_code = rec.from_code ?? from.from_code
+      if (from.consent.marketing && !rec.consent.marketing) rec.consent = from.consent
+      rec.basket_token = rec.basket_token ?? from.basket_token
+      for (const item of from.basket) if (!rec.basket.includes(item)) rec.basket.push(item)
+      rec.has_order = rec.has_order || from.has_order
+      rec.events = [...rec.events, ...from.events].sort((a, b) => Date.parse(a.at) - Date.parse(b.at)).slice(-MAX_EVENTS)
+      rec.last_seen = now.toISOString()
+      return rec
+    })
+    if (from.basket_token) await casJson<{ customer: string }>(store, `basket/tok/${from.basket_token}.json`, () => ({ customer: toId })).catch(() => {})
+    for (const b of from.browsers) await store.putObject(ptrPath(b), JSON.stringify({ id: toId }), 'application/json').catch(() => false)
+    await store.deleteObject?.(path(fromId)).catch(() => {})
+  }
+  await store.putObject(ptrPath(fromId), JSON.stringify({ id: toId }), 'application/json').catch(() => false)
 }
 
 /** The marketing consent (a ticked box), with its time. */

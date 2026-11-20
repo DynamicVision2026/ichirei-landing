@@ -22,6 +22,7 @@ import { visitorOf } from '../engine/visitor.ts'
 import { recordCustomerEvent } from '../engine/customer.ts'
 import { recordHealth } from '../engine/health.ts'
 import { claimPictureSet, isExempt, whoOf } from '../engine/use-limits.ts'
+import { sessionAccount } from '../engine/accounts.ts'
 import { previewOutcome, previewView, renderPreview, startPreview, type PreviewDeps } from '../engine/preview.ts'
 import { decideStoryLanguage } from '../engine/story-language.ts'
 
@@ -133,7 +134,8 @@ export function createPreviewHandlers(deps: () => PreviewApiDeps) {
             return true
           }
           if (!d.store || isExempt(req, env)) return true
-          const ok = await claimPictureSet(d.store, await whoOf(d.store, req, env), env, d.now?.() ?? new Date())
+          const acct = await sessionAccount(d.store, req, env, d.now?.() ?? new Date()).catch(() => null)
+          const ok = await claimPictureSet(d.store, await whoOf(d.store, req, env, acct?.id ?? null), env, d.now?.() ?? new Date())
           if (!ok) void recordHealth(d.store, 'limit_pictures', { reason: 'person' }, d.now?.() ?? new Date())
           return ok
         },

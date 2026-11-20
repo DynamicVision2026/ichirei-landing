@@ -1,0 +1,18 @@
+/* The sign-in panel (2026-11-20): a paper slip with the soft directional shadow and the thin gold top rule; ink buttons, square-edged (4px at most); no cinnabar; no pop-up. */
+.siPanel{display:grid;gap:.9rem;max-width:30rem;margin:1.2rem 0;padding:1.5rem 1.4rem 1.2rem;background:#FBF8F1;color:#151311;border:1px solid rgba(21,19,17,.12);border-top:1px solid #B8924A;border-radius:2px;box-shadow:0 12px 26px -16px rgba(40,30,15,.42);text-align:left}
+.siTitle{margin:0;font:700 1.35rem/1.3 'Zen Old Mincho','Noto Serif TC','Cormorant Garamond',Georgia,serif;color:#151311;letter-spacing:.03em}
+.siPanel:lang(en) .siTitle{font-family:'Cormorant Garamond','Zen Old Mincho',Georgia,serif;font-size:1.5rem}
+.siLine{margin:0;font-size:.95rem;line-height:1.75;color:#3B362F}
+.siWays{display:grid;gap:.6rem}
+.siBtn{display:flex;align-items:center;justify-content:center;min-height:48px;padding:0 1.2rem;border:1px solid #151311;border-radius:2px;background:transparent;color:#151311;font:500 .95rem Inter,'Zen Kaku Gothic New',system-ui,sans-serif;letter-spacing:.06em;text-decoration:none;cursor:pointer}
+.siBtn:hover{background:rgba(21,19,17,.06)}
+.siWays .siBtn:first-child{background:#151311;color:#FBF8F1}
+.siWays .siBtn:first-child:hover{background:#2B2824}
+.siGo{background:#151311;color:#FBF8F1}
+.siMail{display:grid;gap:.55rem}
+.siLabel{font:300 .8rem Inter,system-ui,sans-serif;letter-spacing:.12em;color:#5C564D;text-transform:uppercase}
+.siMail input{min-height:46px;padding:0 .8rem;font:1rem Inter,system-ui,sans-serif;border:1px solid rgba(21,19,17,.35);border-radius:2px;background:#FDFCF8;color:#151311}
+.siNote{margin:0;font-size:.9rem;color:#3B362F}
+.siNote.bad{color:#151311;font-weight:600}
+.siSmall{margin:0;font:300 .78rem Inter,system-ui,sans-serif;letter-spacing:.06em;color:#5C564D}
+.siSmall a{color:#5C564D;text-underline-offset:3px}

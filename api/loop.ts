@@ -30,6 +30,8 @@ import { promoShopifyFrom, type PromoShopify } from '../engine/promo-shopify.ts'
 import { recordHealth } from '../engine/health.ts'
 import { isOrderRecord } from '../engine/buyer.ts'
 import { publicUrl } from '../engine/animation.ts'
+import { sessionAccount, displayOf } from '../engine/accounts.ts'
+import { providersOf, signInRequired } from '../engine/oauth.ts'
 
 const MAX_BODY_BYTES = 300_000
 const hdr = (extra: Record<string, string> = {}) => ({ 'x-robots-tag': 'noindex, nofollow', 'cache-control': 'private, no-store', ...extra })
@@ -81,11 +83,19 @@ export function createLoopHandlers(deps: () => LoopDeps) {
   const promoDeps = (d: LoopDeps): PromoDeps => ({ store: d.store, env: d.env ?? process.env, ...(d.now ? { now: d.now } : {}), shopify: d.shopify === undefined ? promoShopifyFrom(d.env ?? process.env) : d.shopify })
   let lastReap = 0
 
+  /** Sign-in (2026-11-20): once a way in exists, saving and finding gifts is for a signed-in person — no browser-only saving any more. null = fine; otherwise the account is missing. */
+  const needsSignIn = async (req: Request, d: LoopDeps): Promise<boolean> => {
+    if (!d.store) return false
+    const env = d.env ?? process.env
+    if (!signInRequired(await providersOf(env).catch(() => ({ google: null, line: null, email: null })))) return false
+    return !(await sessionAccount(d.store, req, env, d.now?.() ?? new Date()).catch(() => null))
+  }
   return {
     async me(req: Request): Promise<Response> {
       const d = deps()
       const browser = visitorOf(req, d.env)
       if (!d.store || !browser) return json(200, { basket: { count: 0 }, ready: null, hold: null })
+      if (await needsSignIn(req, d)) return json(200, { basket: { count: 0 }, has: false, ready: null, hold: null, signin: true })
       const now = d.now?.() ?? new Date()
       // a visit lands on the timeline of a record that already exists (a visit alone never makes a record)
       const lang = new URL(req.url, 'http://localhost').searchParams.get('l')
@@ -101,6 +111,7 @@ export function createLoopHandlers(deps: () => LoopDeps) {
       const d = deps()
       const browser = visitorOf(req, d.env)
       if (!browser) return json(400, { error: 'no_browser', code: 'no_browser' })
+      if (await needsSignIn(req, d)) return json(401, { error: 'signin_required', code: 'signin_required' })
       const body = (await readBody(req)) as Record<string, unknown> | 'big' | null
       if (body === 'big') return json(413, { error: 'too_large', code: 'too_large' })
       if (!body || typeof body !== 'object') return json(400, { error: 'bad_request', code: 'bad_request' })
@@ -140,8 +151,10 @@ export function createLoopHandlers(deps: () => LoopDeps) {
       const browser = visitorOf(req, d.env)
       const mail = (await mailOf(d)) !== null
       if (!browser) return json(200, { items: [], token: null, link: null, email: null, hold: null, sent: [], mail, saved_days: 30 })
+      if (await needsSignIn(req, d)) return json(200, { items: [], token: null, link: null, email: null, hold: null, sent: [], mail, saved_days: 30, signin_required: true })
       const p = await myPage(d.store, browser, d.now?.() ?? new Date())
-      return json(200, { ...p, link: p.token ? `${publicUrl(d.env)}/b/${p.token}` : null, mail })
+      const acct = d.store ? await sessionAccount(d.store, req, d.env ?? process.env, d.now?.() ?? new Date()).catch(() => null) : null
+      return json(200, { ...p, link: p.token ? `${publicUrl(d.env)}/b/${p.token}` : null, mail, ...(acct ? { account: displayOf(acct) } : {}) })
     },
 
     async basketItem(req: Request, id: string): Promise<Response> {

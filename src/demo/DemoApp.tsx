@@ -26,6 +26,9 @@ import { useLanguage } from '../useLanguage'
 import { cleanInscriptionForm } from '../order/inscription'
 import { BasketBar } from '../loop/LoopBars'
 import { refreshMe, setBasketCount } from '../loop/me'
+import SignInPanel from '../auth/SignInPanel.tsx'
+import { markAfterSignIn, refreshAuth, signInRequired, takeAfterSignIn, peekAfterSignIn, useAuth } from '../auth/auth.ts'
+import { writePath } from '../reveal/paths.ts'
 
 // Validation-harness orchestrator: elicitation (§7) → engine call (§4) →
 // adaptive follow-up (§7.4, at most twice) → progressive reveal (§8), with the
@@ -259,6 +262,10 @@ export default function DemoApp({ mode = 'harness', aside }: { mode?: Mode; asid
   const [questionId, setQuestionId] = useState<string | null>(null)
   // A draft saved by an earlier visit (customer page): offered once, never applied silently.
   const [draftOffer, setDraftOffer] = useState<Draft | null>(() => (mode === 'customer' ? loadDraft() : null))
+  // Sign-in (2026-11-20): pressing 「字を見つける」 signed out asks to sign in (the story stays in the saved draft); right after signing in the round starts by itself
+  const auth = useAuth()
+  const [showSignIn, setShowSignIn] = useState(false)
+  const [autoFind, setAutoFind] = useState(false)
   // The language is shared with the landing page: starts from the sender's stored choice and writes it back.
   const [context, setContextState] = useState<GiftContext>(() => ({ ...DEFAULT_GIFT_CONTEXT, language: getLanguage() }))
   const setContext = (next: GiftContext) => {
@@ -520,16 +527,18 @@ export default function DemoApp({ mode = 'harness', aside }: { mode?: Mode; asid
       if (!res.ok) {
         let message: string | null = null
         let busyCode = false
+        let quietSignIn = false
         try {
           const body = (await res.json()) as { error?: string; code?: string }
           setErrorCode(body?.code ?? null)
+          if (body?.code === 'signin_required') { quietSignIn = true; saveDraft(draftOf(story, context, questionId)); markAfterSignIn('find'); setShowSignIn(true); void refreshAuth() }
           busyCode = body?.code === 'engine_busy' // (a refused gift-back round, or a busy service: the calm line)
           // the server's own words are shown only for the limits (it writes those in the page's language); every other answer shows the calm line, never a message or a status
           message = body?.code === 'story_too_long' || body?.code === 'follow_up_too_long' ? copy.storyTooLong : body?.code === 'rate_limited' ? copy.rateLimited : (body?.code === 'limit_person' || body?.code === 'limit_unpaid10' || body?.code === 'limit_site' || body?.code === 'retry_limit') && typeof body?.error === 'string' ? body.error : null
         } catch {
           message = null
         }
-        throw new ShownError(busyCode ? copy.busy : (message ?? copy.serverError(res.status)))
+        throw new ShownError(quietSignIn ? '' : busyCode ? copy.busy : (message ?? copy.serverError(res.status)))
       }
       // Cards appear as they pass their checks (main first, then second, then the free pick): the page opens the reveal with the cards so far. The terminal result
       // still replaces it with the whole set, and a sender who has already moved on (chosen a card, opened the order form) is not pulled back.
@@ -673,6 +682,35 @@ export default function DemoApp({ mode = 'harness', aside }: { mode?: Mode; asid
   }
 
   const revealLang = toRevealLang(context.language)
+  const continueDraft = (d: Draft) => {
+    setStory(d.story)
+    setContextState((c) => ({ ...c, relationship: d.relationship, direction: d.direction, occasion: d.occasion, purpose: (d.purpose ?? '') as GiftContext['purpose'], purposeOther: d.purposeOther ?? '', state: (d.state ?? '') as GiftContext['state'], stateOther: d.stateOther ?? '', relationshipOther: d.relationshipOther ?? '', receiverGender: (d.receiverGender ?? '') as GiftContext['receiverGender'], senderGender: (d.senderGender ?? '') as GiftContext['senderGender'], occasionDetail: d.occasionDetail, reader: d.reader as GiftContext['reader'] }))
+    setQuestionId(d.questionId)
+    trackFlow('draft_restored', { language: context.language })
+    setDraftOffer(null)
+  }
+  // Sign-in (2026-11-20): right after signing in, the saved story comes back and the round starts by itself ("the story they wrote is kept across the sign-in")
+  useEffect(() => {
+    if (!customer || !auth.signedIn || !draftOffer || phase !== 'elicit') return
+    if (!peekAfterSignIn()) return
+    if (takeAfterSignIn() !== 'find') return
+    continueDraft(draftOffer)
+    setAutoFind(true)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [customer, auth.signedIn, draftOffer, phase])
+  useEffect(() => {
+    if (!autoFind || !story.trim() || phase !== 'elicit') return
+    setAutoFind(false)
+    setFollowUps([])
+    trackFlow('story_submitted', { language: context.language, set: questionSetOf(context), qid: questionId })
+    void runEngine(story)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [autoFind, story, phase])
+  // arriving back from a sign-in that did not work (?auth=failed): the panel is open again with its one calm line
+  const authFailed = typeof window !== 'undefined' && new URLSearchParams(window.location.search).get('auth') === 'failed'
+  useEffect(() => {
+    if (authFailed) setShowSignIn(true)
+  }, [authFailed])
   const phrases = useMemo(() => storyPhrases(story), [story])
   const body = (
     <>
@@ -697,13 +735,7 @@ export default function DemoApp({ mode = 'harness', aside }: { mode?: Mode; asid
             type="button"
             className="btn ghost"
             data-testid="draft-continue"
-            onClick={() => {
-              setStory(draftOffer.story)
-              setContextState((c) => ({ ...c, relationship: draftOffer.relationship, direction: draftOffer.direction, occasion: draftOffer.occasion, purpose: (draftOffer.purpose ?? '') as GiftContext['purpose'], purposeOther: draftOffer.purposeOther ?? '', state: (draftOffer.state ?? '') as GiftContext['state'], stateOther: draftOffer.stateOther ?? '', relationshipOther: draftOffer.relationshipOther ?? '', receiverGender: (draftOffer.receiverGender ?? '') as GiftContext['receiverGender'], senderGender: (draftOffer.senderGender ?? '') as GiftContext['senderGender'], occasionDetail: draftOffer.occasionDetail, reader: draftOffer.reader as GiftContext['reader'] }))
-              setQuestionId(draftOffer.questionId)
-              trackFlow('draft_restored', { language: context.language })
-              setDraftOffer(null)
-            }}
+            onClick={() => continueDraft(draftOffer)}
           >
             {OPENER[revealLang].draftContinue}
           </button>
@@ -723,11 +755,19 @@ export default function DemoApp({ mode = 'harness', aside }: { mode?: Mode; asid
 
       {phase === 'elicit' && (
         <>
+          {customer && showSignIn && !auth.signedIn && <SignInPanel lang={revealLang} ret={`${writePath(revealLang)}?after=find`} failed={authFailed} className="siInline" />}
           {customer ? (
             <Composer
               story={story}
               onStoryChange={setStory}
               onSubmit={() => {
+                // signed out (and a way in exists): ask to sign in first — the story is saved as a draft and the round starts right after
+                if (signInRequired(auth) && !auth.signedIn) {
+                  saveDraft(draftOf(story, context, questionId))
+                  markAfterSignIn('find')
+                  setShowSignIn(true)
+                  return
+                }
                 setFollowUps([])
                 trackFlow('story_submitted', { language: context.language, set: questionSetOf(context), qid: questionId })
                 void runEngine(story)
