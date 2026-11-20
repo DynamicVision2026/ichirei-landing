@@ -4,13 +4,13 @@ import { toRevealLang } from '../reveal/lang.ts'
 import type { RevealLang } from '../reveal/copy.ts'
 import RevealPage from '../reveal/RevealPage.tsx'
 import { setLanguage } from '../lang-store.ts'
-import { COPY, type UiLanguage } from '../demo/i18n.ts'
-import { PURPOSE_COPY } from '../demo/purpose-copy.ts'
+import type { UiLanguage } from '../demo/i18n.ts'
 import { LOOP, SAVE } from './copy.ts'
 import { deadlineText } from '../animation/buyer-copy.ts'
 import { clockText, marketZone, openingDayText, partsOfZone } from '../order/opens-at.ts'
 import { refreshMe, setBasketCount } from './me.ts'
 import SavePanel from './SavePanel.tsx'
+import { contextChips } from './chips.ts'
 import KeepByEmail from './KeepByEmail.tsx'
 import { writePath } from '../reveal/paths.ts'
 import './loop.css'
@@ -24,7 +24,7 @@ interface Item {
   to: string
   card: { kanji: string; reading: string; word: string; line: string; meaning?: string }
   preview_id: string | null
-  context?: { relationship: string; relationship_other: string; purpose: string; purpose_other: string; occasion: string }
+  context?: { relationship: string; relationship_other: string; purpose: string; purpose_other: string; occasion: string; occasion_detail?: string }
   round?: number | null
   slot?: string | null
   poem?: { lines: string[]; reading: string; type?: string } | null
@@ -77,23 +77,8 @@ const timeOf = (iso: string, lang: string): string => {
   }
 }
 
-/** "お祝い（誕生日・還暦…）" → "お祝い": a chip says the reason, not its examples. */
-const short = (label: string): string => label.replace(/[（(].*$/, '').trim()
-
-/** The relationship and the reason the sender picked, in the page's language: "Mother · Thanks". */
-function chipsOf(i: Item, lang: RevealLang): string[] {
-  const ui: UiLanguage = lang
-  const x = i.context
-  if (!x) return []
-  const out: string[] = []
-  const rels = COPY[ui].relationships as Record<string, string>
-  const rel = x.relationship === 'other' ? (x.relationship_other || PURPOSE_COPY[ui].other) : rels[x.relationship]
-  if (rel) out.push(short(rel))
-  const purposes = PURPOSE_COPY[ui].purposes as Record<string, string>
-  const why = x.purpose === 'other' ? (x.purpose_other || PURPOSE_COPY[ui].other) : purposes[x.purpose]
-  if (why) out.push(short(why))
-  return out
-}
+/** The relationship and the reason the sender picked, in the page's language: "Mother · Thanks" — never a chip that only says "Other" (src/loop/chips.ts). */
+const chipsOf = (i: Item, lang: RevealLang): string[] => contextChips(i.context, lang as UiLanguage)
 
 /**
  * One of the four pictures. There: the picture, that opens full screen. Still being made: a soft paper tile that says so (the page asks again and the picture fills in).
@@ -180,12 +165,14 @@ function GiftCard({ item, lang, onOpenPic, onPicLost, onRemoved }: { item: Item;
         </div>
       </div>
       {item.card.line && <p className="mgLine" data-testid="mg-line">{item.card.line}</p>}
-      <div className="mgFor">
-        {item.to && <span className="mgForName" data-testid="mg-for">{c.forName(item.to)}</span>}
-        {chips.map((t, k) => (
-          <span className="mgChip" key={k} data-testid="mg-chip">{t}</span>
-        ))}
-      </div>
+      {(item.to || chips.length > 0) && (
+        <div className="mgFor">
+          {item.to && <span className="mgForName" data-testid="mg-for">{c.forName(item.to)}</span>}
+          {chips.map((t, k) => (
+            <span className="mgChip" key={k} data-testid="mg-chip">{t}</span>
+          ))}
+        </div>
+      )}
 
       {story && (
         <section className="mgMoment" data-testid="mg-moment">

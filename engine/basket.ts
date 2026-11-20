@@ -28,7 +28,7 @@ export interface BasketItem {
   /** The card: character, reading, word, the one line. `meaning` is the English core meaning of the character (en cards; "" otherwise). */
   card: { kanji: string; reading: string; word: string; line: string; meaning?: string }
   /** What the sender picked for this gift (2026-11-18): the relationship and the reason for giving (codes, plus the free text of "other"), the round (1–3) and the slot (main / second / free) of the chosen card. */
-  context?: { relationship: string; relationship_other: string; purpose: string; purpose_other: string; occasion: string }
+  context?: { relationship: string; relationship_other: string; purpose: string; purpose_other: string; occasion: string; occasion_detail?: string }
   round?: number
   slot?: string
   /** The poem of the preview, when one had been written. */
@@ -78,6 +78,8 @@ export interface SaveInput {
   purpose?: string
   purpose_other?: string
   occasion?: string
+  /** The sender's own words for the occasion (the optional field of 「お祝い」/"Other"): what a chip says when the reason is "Other". */
+  occasion_detail?: string
   round?: number
   slot?: string
   poem?: { lines: string[]; reading: string; type?: string } | null
@@ -112,7 +114,7 @@ export async function saveBasketItem(store: OrderStore | null, browser: string, 
       from: clip(input.from, 40) || cur?.from || '',
       // what is saved is exactly what was chosen: every field of the card comes from this request, none is kept from an earlier save of the same item
       card: { kanji: clip(input.kanji, 2), reading: clip(input.reading, 60), word: clip(input.word, 60), line: clip(input.line, 200), meaning: clip(input.meaning, 60) },
-      context: { relationship: clip(input.relationship, 24), relationship_other: clip(input.relationship_other, 60), purpose: clip(input.purpose, 24), purpose_other: clip(input.purpose_other, 60), occasion: clip(input.occasion, 24) },
+      context: { relationship: clip(input.relationship, 24), relationship_other: clip(input.relationship_other, 60), purpose: clip(input.purpose, 24), purpose_other: clip(input.purpose_other, 60), occasion_detail: clip(input.occasion_detail, 60), occasion: clip(input.occasion, 24) },
       round: Number.isInteger(input.round) && (input.round as number) >= 1 && (input.round as number) <= 9 ? input.round : cur?.round,
       slot: SLOTS.includes(input.slot ?? '') ? input.slot : cur?.slot,
       poem: cleanPoem(input.poem) ?? cur?.poem ?? null,

@@ -122,6 +122,7 @@ export function createLoopHandlers(deps: () => LoopDeps) {
         purpose: str(body.purpose, 24),
         purpose_other: str(body.purpose_other, 60),
         occasion: str(body.occasion, 24),
+        occasion_detail: str(body.occasion_detail, 60),
         round: typeof body.round === 'number' ? body.round : undefined,
         slot: str(body.slot, 12),
         poem: body.poem && typeof body.poem === 'object' ? (body.poem as SaveInput['poem']) : null,

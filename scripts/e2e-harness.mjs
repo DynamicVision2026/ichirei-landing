@@ -1059,6 +1059,7 @@ const mockPage = async (browser, { onExplain, result, order, track } = {}) => {
   await sp.goto('http://localhost:5173/a/AN-testtesttesttesttest', { waitUntil: 'networkidle' })
   const panel = sp.locator('[data-testid=sender-panel]')
   await panel.waitFor()
+  await panel.locator('[data-testid=share-button]').click() // Part 12 (2026-11-20): the send options live in the share sheet
   check('buyer page: B 「贈りものを送る」 with its line, LINE, copy-the-link, QR and e-mail; the receiver\'s link as selectable text', (await panel.locator('h2').innerText()) === '贈りものを送る' && (await panel.locator('[data-testid=buyer-send-line]').innerText()) === '相手が開くのは、封をした贈りものです。下のどれかで送ってください。' && (await panel.locator('[data-testid=give-link]').inputValue()) === GIFT && (await panel.locator('[data-testid=give-line]').getAttribute('href')).startsWith('https://line.me/R/share?text=') && decodeURIComponent(await panel.locator('[data-testid=give-line]').getAttribute('href')).includes(GIFT) && (await panel.locator('[data-testid=give-mail]').getAttribute('href')).startsWith('mailto:?subject='))
   await panel.locator('[data-testid=give-qr]').click()
   check('buyer page: the QR code of the receiver\'s page shows on screen', (await panel.locator('[data-testid=give-qr-img] img').getAttribute('src')) === '/api/gift/RG-testtesttesttesttest/qr.svg')
@@ -1429,6 +1430,7 @@ const mockPage = async (browser, { onExplain, result, order, track } = {}) => {
     await page.goto('http://localhost:5173/a/AN-testtesttesttesttest', { waitUntil: 'networkidle' })
     const panel = T(page, 'sender-panel')
     await panel.waitFor()
+    await T(page, 'share-button').click() // Part 12 (2026-11-20): the send options live in the share sheet
     if (lang === 'en') {
       // the US launch (2026-11-12, C3): Copy link, Email, WhatsApp, Messages, "Schedule for a date" — no LINE, no WeChat
       const wa = decodeURIComponent((await T(page, 'give-whatsapp').getAttribute('href')) ?? '')
@@ -1676,7 +1678,7 @@ const mockPage = async (browser, { onExplain, result, order, track } = {}) => {
     check(`collect (${lang}): 「${t.no}」 goes back and nothing is recorded`, (await p.locator('[data-testid=collect-button]').count()) === 1 && posts.length === 0)
     await p.locator('[data-testid=collect-button]').click()
     await p.locator('[data-testid=collect-yes]').click()
-    await p.locator('[data-testid=give-copy]').waitFor()
+    await p.locator('[data-testid=share-button]').waitFor() // Part 12: the send options are in the share sheet
     check(`collect (${lang}): after 「${t.yes}」 the server is told once, and the page shows the send buttons, the receiver link and the save section; the collect block and the cancel lines are gone`, posts.filter((u) => u.endsWith('/collect')).length === 1 && (await p.locator('[data-testid=give-link]').inputValue()).includes('/g/RG-') && (await p.locator('[data-testid=buyer-collect-section]').count()) === 0 && (await p.locator('[data-testid=buyer-deadline]').count()) === 0 && (await p.locator('[data-testid=buyer-cancel-by]').count()) === 0)
     if (lang === 'ja') await p.screenshot({ path: 'shots/buyer-after-collect-ja.png', fullPage: true })
     await ctx.close()
@@ -1712,7 +1714,7 @@ const mockPage = async (browser, { onExplain, result, order, track } = {}) => {
     await p.locator('[data-testid=collect-button]').waitFor()
     check('collect: after 24 hours there is no cancel deadline line, the line under the button is the short one, and the tap unlocks at once with NO confirm', (await p.locator('[data-testid=buyer-cancel-by]').count()) === 0 && (await p.locator('[data-testid=collect-line]').innerText()) === '受け取ると、相手に送ったり、保存したりできるようになります。')
     await p.locator('[data-testid=collect-button]').click()
-    await p.locator('[data-testid=give-copy]').waitFor()
+    await p.locator('[data-testid=share-button]').waitFor() // Part 12: the send options are in the share sheet
     check('collect: …and the send buttons appeared without a confirm step', (await p.locator('[data-testid=collect-confirm]').count()) === 0 && posts.filter((u) => u.endsWith('/collect')).length === 1)
     await p.close()
   }
@@ -1760,42 +1762,19 @@ const mockPage = async (browser, { onExplain, result, order, track } = {}) => {
     await p.route('**/api/analytics', (r) => { analytics.push(JSON.parse(r.request().postData() ?? '{}')); return r.fulfill({ status: 204, body: '' }) })
   }
   for (const lang of ['ja', 'zh-Hant', 'en']) {
-    const t = COPY[lang]
-    // the buyer, after collecting: the system share sheet gets the file only
+    // the sender's page, after collecting (Part 12, 2026-11-20): no share section on the page any more — the film and the poem card are the receiver's to share; the sender's 「シェアする」 sheet holds the send options only
     {
       const ctx = await browser.newContext({ locale: 'ja-JP', viewport: { width: 390, height: 844 } })
-      await ctx.addInitScript(() => { window.__shared = []; navigator.canShare = () => true; navigator.share = async (d) => { window.__shared.push({ keys: Object.keys(d), files: (d.files ?? []).map((f) => ({ name: f.name, type: f.type })) }) } })
-      const p = await ctx.newPage()
-      const analytics = []
-      await wire(p, '/api/animation/AN-testtesttesttesttest', analytics)
-      await p.route('**/api/animation/AN-testtesttesttesttest', (r) => r.fulfill({ json: mkView(lang, false, true) }))
-      await p.goto('http://localhost:5173/a/AN-testtesttesttesttest', { waitUntil: 'networkidle' })
-      await p.locator('[data-testid=share-section]').waitFor()
-      check(`share (${lang}, buyer): the section sits under the save buttons: title, line and the two buttons — word for word`, (await p.locator('[data-testid=share-title]').textContent()) === t.title && (await p.locator('[data-testid=share-line]').innerText()) === t.line && (await p.locator('[data-testid=share-film]').innerText()) === t.film && (await p.locator('[data-testid=share-card]').innerText()) === t.card && (await p.locator('[data-testid=buyer-save] [data-testid=keepsakes]').count()) === 1)
-      await p.waitForTimeout(600)
-      await p.locator('[data-testid=share-film]').click()
-      await p.waitForFunction(() => window.__shared.length === 1)
-      await p.locator('[data-testid=share-card]').click()
-      await p.waitForFunction(() => window.__shared.length === 2)
-      const shared = await p.evaluate(() => window.__shared)
-      check(`share (${lang}, buyer): the system share sheet is given the FILE and nothing else (no title, no text, no link): the film as an MP4, the card as a PNG`, shared[0].keys.join() === 'files' && shared[0].files[0].name === 'ichirei-share.mp4' && shared[0].files[0].type === 'video/mp4' && shared[1].keys.join() === 'files' && shared[1].files[0].name === 'ichirei-poem-card.png' && shared[1].files[0].type === 'image/png', JSON.stringify(shared))
-      check(`share (${lang}, buyer): the taps are counted by kind and role only (share_film_tap / share_card_tap, role sender) — no character, no name`, analytics.some((a) => a.event === 'share_film_tap' && a.role === 'sender') && analytics.some((a) => a.event === 'share_card_tap' && a.role === 'sender') && !JSON.stringify(analytics).includes('備'))
-      check(`share (${lang}, buyer): no fallback line when the share sheet worked`, (await p.locator('[data-testid=share-fallback]').count()) === 0)
-      if (lang === 'ja' || lang === 'zh-Hant') await p.screenshot({ path: `shots/share-section-${lang}.png`, fullPage: true })
-      await ctx.close()
-    }
-    // where file sharing is not possible: the file is saved and the page says to post it from the social app
-    {
-      const ctx = await browser.newContext({ locale: 'ja-JP', viewport: { width: 1000, height: 800 }, acceptDownloads: true })
       await ctx.addInitScript(() => { navigator.canShare = undefined; navigator.share = undefined })
       const p = await ctx.newPage()
       await wire(p, '/api/animation/AN-testtesttesttesttest', [])
       await p.route('**/api/animation/AN-testtesttesttesttest', (r) => r.fulfill({ json: mkView(lang, false, true) }))
       await p.goto('http://localhost:5173/a/AN-testtesttesttesttest', { waitUntil: 'networkidle' })
-      await p.locator('[data-testid=share-section]').waitFor()
-      await p.waitForTimeout(600)
-      const [dl] = await Promise.all([p.waitForEvent('download'), p.locator('[data-testid=share-film]').click()])
-      check(`share (${lang}, no file sharing): the film is SAVED as ichirei-share.mp4 and the page says 「${t.fb}」`, dl.suggestedFilename() === 'ichirei-share.mp4' && (await p.locator('[data-testid=share-fallback]').innerText()) === t.fb)
+      await p.locator('[data-testid=share-button]').waitFor()
+      check(`share (${lang}, sender's page): no share-the-film section on the page itself`, (await p.locator('[data-testid=share-section]').count()) === 0)
+      await p.locator('[data-testid=share-button]').click()
+      await p.locator('[data-testid=sender-share-options]').waitFor()
+      check(`share (${lang}, sender's page): the share sheet holds the send options (copy the link…) and no film / poem-card buttons`, (await p.locator('[data-testid=give-copy]').count()) === 1 && (await p.locator('[data-testid=share-film]').count()) === 0 && (await p.locator('[data-testid=share-card]').count()) === 0)
       await ctx.close()
     }
   }
@@ -1812,8 +1791,8 @@ const mockPage = async (browser, { onExplain, result, order, track } = {}) => {
     await wire(m, '/api/animation/AN-testtesttesttesttest', [])
     await m.route('**/api/animation/AN-testtesttesttesttest', (r) => r.fulfill({ json: mkView('ja', true, true) }))
     await m.goto('http://localhost:5173/a/AN-testtesttesttesttest', { waitUntil: 'networkidle' })
-    await m.locator('[data-testid=buyer-save]').waitFor()
-    check('share: a remembrance order has the save buttons but NO share section', (await m.locator('[data-testid=keepsakes]').count()) === 1 && (await m.locator('[data-testid=share-section]').count()) === 0)
+    await m.locator('[data-testid=share-button]').waitFor()
+    check('share: a remembrance order has no share section on its page', (await m.locator('[data-testid=share-section]').count()) === 0)
     await m.close()
   }
   // the receiver, after opening the envelope (the last screen): the same section with role receiver; not in preview mode; not for remembrance
@@ -5094,16 +5073,11 @@ for (const [lang, locale, text] of [['en', 'en-US', 'Your gift is being finished
     await T(page, 'gift-keep').waitFor()
     await page.waitForTimeout(400)
     await note(); await shot('7-keepsakes')
+    // Part 14 (2026-11-20): the twelve characters and their "sent" screen are gone; the last screen is the gift back (one button, offered and never pushed) and the way to give one's own
     await T(page, 'gift-to-answer').click()
-    await T(page, 'gift-answer').waitFor()
-    await T(page, 'gift-char-家').click()
-    await T(page, 'gift-reply-text').fill('You noticed. See you Thursday.')
-    await page.locator('main').evaluate(() => document.querySelector('[data-testid=gift-answer]').scrollTo(0, 0))
-    await note(); await shot('8-send-back')
-    await T(page, 'gift-reply-send').click()
-    await T(page, 'gift-reply-sent').waitFor()
+    await T(page, 'gift-last').waitFor()
     await page.waitForTimeout(300)
-    await note(); await shot('9-sent')
+    await note(); await shot('8-last')
     return out
   }
 
@@ -5114,9 +5088,9 @@ for (const [lang, locale, text] of [['en', 'en-US', 'Your gift is being finished
       const label = `${w}×${h}${reduced ? ', reduced motion' : ''}`
       check(`ceremony (${label}): an English gift opens on the new ceremony — the small mark, "For Kenji", "Brian sent you one small mark." and nothing else (no character, no moment, no note before the mark is touched)`, await (async () => { await T(page, 'cr-mark').waitFor(); const t = await pageText(page); return (await page.locator('main').getAttribute('data-ceremony')) === 'new' && t.includes('FOR KENJI') && t.includes('Brian sent you') && t.includes('one small mark.') && !t.includes('労') && !t.includes('Thursday') && !t.includes('tending') })())
       const r = await walk(page)
-      check(`ceremony (${label}): the nine screens come in order — mark, note, film, character, poem, certificate, keepsakes, send back, sent`, r.screens.join(',') === 'mark,note,film,char,poem,cert,keep,back,sent', r.screens.join(','))
+      check(`ceremony (${label}): the screens come in order — mark, note, film, character, poem, certificate, keepsakes, the last screen (the gift back)`, r.screens.join(',') === 'mark,note,film,char,poem,cert,keep,back', r.screens.join(','))
       check(`ceremony (${label}): touching the mark is the opening (counted once)`, seen.opened === 1)
-      check(`ceremony (${label}): the answer goes once, with 家 and the words`, seen.reply.length === 1 && seen.reply[0].char === '家' && seen.reply[0].text === 'You noticed. See you Thursday.')
+      check(`ceremony (${label}): nothing is sent back by itself (the twelve characters are gone since Part 14)`, seen.reply.length === 0)
       const all = r.texts.join('\n')
       check(`ceremony (${label}): no "AI" anywhere and no he / she / his / him / her in the receiver's words`, !/\bAI\b/.test(all) && !PRONOUN.test(all), (all.match(PRONOUN) ?? [''])[0])
       check(`ceremony (${label}): cinnabar only on the mark and the character`, r.red.length === 0, r.red.join(', '))
@@ -5202,22 +5176,15 @@ for (const [lang, locale, text] of [['en', 'en-US', 'Your gift is being finished
     await ctx.close()
   }
 
-  // ---- send back: the twelve, 80 characters, the sent screen and the real button ----
+  // ---- the last screen (Part 14, 2026-11-20: the gift back replaces the twelve characters and their sent screen) ----
   {
-    const { page, ctx, seen } = await open(view(), { reduced: true })
+    const { page, ctx, seen } = await open(view({ back: { state: 'available' } }), { reduced: true })
     await T(page, 'cr-markbtn').click(); await T(page, 'cr-to-film').click(); await T(page, 'gift-skip').click()
     await T(page, 'cr-to-poem').click(); await T(page, 'cr-to-cert').click(); await T(page, 'cr-to-keep').click()
-    check('keepsakes: the film (MP4), the four pictures, the card (PDF) and the certificate (PNG) — then "Answer Brian"', (await T(page, 'save-scroll').getAttribute('href')) === `/api/gift/${TOKEN}/scroll.png` && (await T(page, 'save-card').getAttribute('href')) === `/api/gift/${TOKEN}/card.pdf` && (await T(page, 'save-certificate').getAttribute('href')) === `/api/gift/${TOKEN}/certificate.png` && (await T(page, 'save-film').innerText()) === 'SAVE' && (await T(page, 'gift-to-answer').innerText()) === 'ANSWER BRIAN')
+    check('keepsakes (Part 12): exactly the two actions — save everything and share — and the way on to the last screen', (await T(page, 'save-all').count()) === 1 && (await T(page, 'share-button').count()) === 1 && (await T(page, 'save-scroll').count()) === 0 && (await T(page, 'gift-to-answer').count()) === 1)
     await T(page, 'gift-to-answer').click()
-    const chars = await page.locator('[data-testid=gift-chars] button').evaluateAll((bs) => bs.map((b) => `${b.querySelector('b').textContent} ${b.querySelector('span').textContent}`))
-    check('send back: "And how do you see Brian?" and the director\'s twelve, in order', (await T(page, 'gift-answer-title').innerText()).replace(/\n/g, ' ') === 'And how do you see Brian?' && chars.join('|') === "謝 thankful|家 family|光 you light the way|笑 made me smile|憶 remembered|温 warmed|守 I'll keep it|同 same here|友 friend|絆 bond|幸 glad|恩 I owe you", chars.join('|'))
-    check('send back: nothing chosen, nothing sent (the button waits); the words are optional and stop at 80 characters', await T(page, 'gift-reply-send').isDisabled() && await (async () => { await T(page, 'gift-reply-text').fill('x'.repeat(120)); return (await T(page, 'gift-reply-text').inputValue()).length === 80 })())
-    await T(page, 'gift-reply-text').fill('')
-    await T(page, 'gift-char-絆').click()
-    check('send back: choosing 絆 names it on the button ("Send 絆 to Brian")', (await T(page, 'gift-reply-send').innerText()) === 'SEND 絆 TO BRIAN')
-    await T(page, 'gift-reply-send').click()
-    await T(page, 'gift-reply-sent').waitFor()
-    check('sent: "Sent to Brian · 絆, bond", "One character from Brian, one from you. Now you have both said it.", the question, and a real button to /en', (await T(page, 'cr-sent-line').innerText()) === 'SENT TO BRIAN · 絆, BOND' && (await T(page, 'gift-reply-sent').innerText()).includes('One character from Brian, one from you. Now you have both said it.') && (await T(page, 'cr-ask').innerText()) === "Is there someone you've never quite said it to?" && (await T(page, 'gift-landing-line').getAttribute('href')) === '/en' && (await T(page, 'gift-landing-line').evaluate((a) => a.tagName)) === 'A' && seen.reply.length === 1 && seen.reply[0].char === '絆' && !('text' in seen.reply[0]))
+    await T(page, 'gift-last').waitFor()
+    check('last screen: the gift back is offered with ONE button and no twelve characters, nothing is sent until it is pressed', (await T(page, 'gift-last').getAttribute('data-back')) === 'available' && (await T(page, 'gift-back-button').count()) === 1 && (await T(page, 'gift-chars').count()) === 0 && seen.reply.length === 0)
     await ctx.close()
   }
 
@@ -5229,6 +5196,7 @@ for (const [lang, locale, text] of [['en', 'en-US', 'Your gift is being finished
     await page.route(`**/api/gift/${TOKEN}/film.mp4**`, (r) => r.fulfill({ status: 200, contentType: 'video/mp4', body: 'x' }))
     await T(page, 'cr-markbtn').click(); await T(page, 'cr-to-film').click(); await T(page, 'gift-skip').click()
     await T(page, 'cr-to-poem').click(); await T(page, 'cr-to-cert').click(); await T(page, 'cr-to-keep').click()
+    await T(page, 'other-formats').click() // Part 12: the film, the scroll, the card and the QR are in the 「ほかの形で保存」 sheet
     const dl = page.waitForEvent('download', { timeout: 15000 }).catch(() => null)
     await T(page, 'save-film').click()
     const d = await dl
@@ -5441,14 +5409,15 @@ for (const [lang, locale, text] of [['en', 'en-US', 'Your gift is being finished
   }
   // 3. coming back to an answered gift
   {
-    const { ctx, page, errs, T } = await openGift(gift({ replied: true, answer: { char: '家', words: true } }), true)
+    const { ctx, page, errs, T } = await openGift(gift({ replied: true, answer: { char: '家', words: true }, back: { state: 'used', char: '家', page: null } }), true)
     await T('cr-to-poem').click({ timeout: 20000 })
     await T('cr-to-cert').click()
     await T('cr-to-keep').click()
     await T('gift-to-answer').click()
-    await T('gift-reply-sent').waitFor()
+    await T('gift-last').waitFor()
     await page.waitForTimeout(300)
-    check('answered gift: the Sent screen shows what was sent — "Sent to Brian · 家, family" and "One character from Brian, one from you."', (await T('cr-sent-line').innerText()) === 'SENT TO BRIAN · 家, FAMILY' && (await T('gift-reply-sent').innerText()).includes('One character from Brian, one from you.') && (await T('gift-answer').count()) === 0)
+    // (Part 14, 2026-11-20: the twelve characters and their "Sent" screen are gone; a gift already sent back shows the character that went back, once, and nothing more to send)
+    check('answered gift: the last screen says the character already went back (家), and offers nothing more to send', (await T('gift-last').getAttribute('data-back')) === 'used' && (await T('gift-back-char').innerText()) === '家' && (await T('gift-back-button').count()) === 0 && (await T('gift-answer').count()) === 0)
     await page.screenshot({ path: `${SHOTS}/polish-sent-answered-390.png` })
     check('no page errors (run 34, answered)', errs.length === 0, errs.join('; '))
     await ctx.close()
@@ -5854,7 +5823,7 @@ for (const [lang, locale, text] of [['en', 'en-US', 'Your gift is being finished
 
   // ---- English, with an email, a hold and a sent gift; the mail box on
   {
-    const { page, ctx, errs, posts } = await open38({ email: 'b•••@gmail.com', hold: { expires_at: '2026-11-18T23:49:00Z', minutes_left: 60 }, mail: true, sent: [{ kanji: '憶', reading: 'oku', word: 'remember', receiver: 'Kenji', at: '2026-11-16T10:00:00Z', status: 'opened', page: '/a/AN-abcdefghjkmnpqrstuvw' }] })
+    const { page, ctx, errs, posts } = await open38({ email: 'b•••@gmail.com', hold: { expires_at: '2026-11-18T23:49:00Z', minutes_left: 60 }, mail: true, sent: [{ kanji: '憶', reading: 'oku', word: 'remember', receiver: 'Kenji', at: '2026-11-16T10:00:00Z', status: 'opened', opened_at: '2026-11-17T09:00:00Z', page: '/a/AN-abcdefghjkmnpqrstuvw' }] })
     check('My ICHIREI (en): the title (2026-11-20: "Saved under b•••@gmail.com (n)" once the address is known), the masked email with "Your gifts and orders", the free-gift hold, and "Saved for 30 days."', /^Saved under b•••@gmail\.com \(\d+\)$/.test(await T(page, 'my-title').innerText()) && (await T(page, 'my-email').innerText()).includes('b•••@gmail.com') && (await T(page, 'my-email').innerText()).includes('Your gifts and orders') && (await T(page, 'my-hold').innerText()).startsWith('Your free gift is held until') && (await T(page, 'basket-saved').innerText()) === 'Saved for 30 days.')
     const card = T(page, 'basket-item').first()
     check('full card (en): the character large, the English word as the headline — and NO romanized reading anywhere on the card', (await card.locator('[data-testid=mg-glyph]').innerText()) === '恒' && (await card.locator('[data-testid=mg-word]').innerText()) === 'constant' && (await card.locator('[data-testid=mg-reading]').count()) === 0 && !(await card.innerText()).includes('kō'))
@@ -5873,7 +5842,7 @@ for (const [lang, locale, text] of [['en', 'en-US', 'Your gift is being finished
     await T(page, 'mg-light-close').click()
     check('…closed', (await T(page, 'mg-light').count()) === 0)
     check('full card (en): the date saved, "Saved until Dec 18", and "Give this gift →" opens the writing room with the item', (await card.locator('[data-testid=mg-dates]').innerText()).includes('Saved Nov 18') && (await card.locator('[data-testid=mg-until]').innerText()) === 'Saved until Dec 18' && (await card.locator('[data-testid=basket-give]').innerText()) === 'Give this gift →' && (await card.locator('[data-testid=basket-give]').getAttribute('href')) === '/en/write?resume=BK-aaaaaaaaaaaaaaaaaaaa')
-    check('Gifts you\'ve sent (en, with an email): the character, "For Kenji", the status "Opened", and a button to the gift page', (await T(page, 'my-sent').locator('h2').innerText()) === "Gifts you've sent" && (await T(page, 'my-sent-item').innerText()).includes('For Kenji') && (await T(page, 'my-sent-status').innerText()) === 'Opened' && (await T(page, 'my-sent-open').getAttribute('href')) === '/a/AN-abcdefghjkmnpqrstuvw')
+    check('Sent group (en, with an email; the dashboard since Part 7): the character, "For Kenji", the status "Opened", and a button to the gift page', (await T(page, 'group-sent').locator('h2').innerText()) === 'Sent' && (await T(page, 'my-sent-item').innerText()).includes('For Kenji') && (await T(page, 'my-sent-status').innerText()).startsWith('Opened') && (await T(page, 'my-sent-open').getAttribute('href')) === '/a/AN-abcdefghjkmnpqrstuvw')
     check('Save to my email (en): the box, its title, the field and "Save to my email", and "Send my link again" because the record has an email', (await T(page, 'keep-mail').count()) === 1 && (await T(page, 'keep-mail').innerText()).includes("Keep your gifts: we'll email you your private link.") && (await T(page, 'keep-mail-save').innerText()) === 'Save to my email' && (await T(page, 'keep-mail-again').innerText()) === 'Send my link again')
     await T(page, 'keep-mail-input').fill('mia@example.com')
     await T(page, 'keep-mail-save').click()
@@ -5901,7 +5870,7 @@ for (const [lang, locale, text] of [['en', 'en-US', 'Your gift is being finished
   // ---- no email: neither the masked email nor the sent gifts; no mail box without a key
   {
     const { page, ctx } = await open38({ email: null, sent: [{ kanji: '憶', reading: '', word: '', receiver: 'Kenji', at: '2026-11-16T10:00:00Z', status: 'paid', page: null }], mail: false })
-    check('without an email on the record: no masked email and no "Gifts you\'ve sent"; with no mail key: no "Save to my email" box — the rest of the page works', (await T(page, 'my-email').count()) === 0 && (await T(page, 'my-sent').count()) === 0 && (await T(page, 'keep-mail').count()) === 0 && (await T(page, 'basket-item').count()) === 1)
+    check('without an email on the record: no masked email and no sent groups; with no mail key: no "Save to my email" box — the rest of the page works', (await T(page, 'my-email').count()) === 0 && (await T(page, 'group-sent').count()) === 0 && (await T(page, 'group-unsent').count()) === 0 && (await T(page, 'keep-mail').count()) === 0 && (await T(page, 'basket-item').count()) === 1)
     await ctx.close()
   }
   // ---- the empty page
@@ -6288,7 +6257,7 @@ for (const [lang, locale, text] of [['en', 'en-US', 'Your gift is being finished
     const seen = { reply: [], opened: 0 }
     page.on('pageerror', (e) => errs.push(String(e)))
     await page.route('**/api/analytics', (r) => r.fulfill({ status: 204, body: '' }))
-    await page.route('**/api/me*', (r) => r.fulfill({ json: { basket: { count: 0 }, ready: null, hold: null } }))
+    await page.route('**/api/me*', (r) => r.fulfill({ json: { basket: { count: 1 }, ready: null, hold: null, has: true } }))
     await page.route('**/api/promo', (r) => r.fulfill({ json: { on: true, left: 37, daily: 100, hold: null } }))
     await page.route('**/api/sizes', (r) => r.fulfill({ json: { sizes: ['egift'], promo: { from: '2026-11-01T00:00:00Z', until: '2099-01-01T00:00:00Z' }, usd: { egift: 25, egift_sale: 17.5 } } }))
     await page.route(`**/api/gift/${TOKEN}**`, async (r) => {
@@ -6337,16 +6306,13 @@ for (const [lang, locale, text] of [['en', 'en-US', 'Your gift is being finished
     await T(page, 'cr-to-keep').click()
     await T(page, 'gift-keep').waitFor()
     check(`ceremony (${lang}): "yours to keep" — the title and the four things, no English`, (await text(page, 'gift-keep')).includes(J ? 'あなたの手もとに。' : '留給你的。') && !/\b(Save|Credits|Film)\b/.test(await text(page, 'gift-keep')))
+    // Part 14 (2026-11-20): the twelve characters and their sent screen are gone — the last screen is the gift back and the way to give one's own
     await T(page, 'gift-to-answer').click()
-    await T(page, 'gift-answer').waitFor()
-    check(`ceremony (${lang}): send back — the twelve characters with their ${J ? 'Japanese' : 'Chinese'} words`, (await T(page, 'gift-chars').locator('li').count()) === 12 && (await text(page, 'gift-char-謝')).includes(J ? 'ありがとう' : '謝謝'))
-    await T(page, 'gift-char-謝').click()
-    await T(page, 'gift-reply-send').click()
-    await T(page, 'gift-reply-sent').waitFor()
+    await T(page, 'gift-last').waitFor()
+    check(`ceremony (${lang}): the last screen has no twelve characters and no send-back form`, (await T(page, 'gift-chars').count()) === 0 && (await T(page, 'gift-reply-send').count()) === 0 && (await T(page, 'gift-landing-line').count()) === 1)
     { const cr = await contrastOf(page, '[data-testid=cr-mygifts-top] [data-testid=my-gifts]'); check(`ceremony (${lang}): the receiver's own マイギフト is at the top right of the last screen and readable (contrast ${cr === null ? 'n/a' : cr.toFixed(1)} ≥ 4.5)`, cr !== null && cr >= 4.5) }
     await page.waitForTimeout(300)
-    check(`ceremony (${lang}): sent — 「${J ? '佐藤さんへ送りました · 謝、ありがとう' : '已送給小華 · 謝，謝謝'}」, the question, the free-gift lines of the landing in this language, and the button to ${J ? '/' : '/zh'}`, (await text(page, 'cr-sent-line')) === (J ? '佐藤さんへ送りました · 謝、ありがとう' : '已送給小華 · 謝，謝謝') && (await text(page, 'cr-ask')) === (J ? 'まだ、きちんと伝えられていない人はいませんか。' : '有沒有一個人，你一直還沒好好說出口？') && (await text(page, 'gift-landing-promo')).includes(J ? '毎日100件の贈りものは無料です。' : '每天前100份禮物免費送出。') && (await T(page, 'gift-landing-line').getAttribute('href')) === (J ? '/' : '/zh') && (await text(page, 'gift-landing-line')) === (J ? 'あなたも一字を贈る' : '你也送一個字') && seen.reply.length === 1 && seen.reply[0].char === '謝')
-    await page.screenshot({ path: `${SHOTS42}/cer-${lang}-4-sent-390.png` })
+    await page.screenshot({ path: `${SHOTS42}/cer-${lang}-4-last-390.png` })
     check(`ceremony (${lang}): no page errors`, errs.length === 0, errs.join('; '))
     await ctx.close()
   }
@@ -6982,6 +6948,42 @@ for (const [lang, locale, text] of [['en', 'en-US', 'Your gift is being finished
     await page.waitForSelector('[data-testid=basket-page]')
     await page.waitForTimeout(800)
     check('Part 16 (c): a picture whose link fails is dropped quietly (no striped box), the server is asked once more, and the other three stay', (await states(page)).join() === 'ok,ok,ok' && calls >= 2 && (await page.locator('[data-state=empty]').count()) === 0)
+    await ctx.close()
+  }
+}
+
+// ---------- Run 51 (2026-11-20, Part 17): no meaningless "Other" chips on My gifts — the customer's own words, or nothing; both gone = no chip row ----------
+{
+  const mk = (id, lang, context, to = 'Mom') => ({
+    id, created_at: '2026-11-20T10:00:00Z', updated_at: '2026-11-20T10:00:00Z', language: lang, to,
+    card: { kanji: '支', reading: 'shi', word: 'keeper', line: 'She keeps everyone at the table.', meaning: 'keeper' }, preview_id: null,
+    context, round: 1, slot: 'main', poem: null, story: 'x', saved_until: '2026-12-20T10:00:00Z', pictures: [],
+  })
+  const OTHER = { relationship: 'other', relationship_other: '', purpose: 'other', purpose_other: '', occasion: 'other', occasion_detail: '' }
+  for (const lang of ['en', 'ja', 'zh-Hant']) {
+    const ctx = await browser.newContext({ viewport: { width: 390, height: 900 }, locale: lang === 'ja' ? 'ja-JP' : lang === 'zh-Hant' ? 'zh-TW' : 'en-US' })
+    const page = await ctx.newPage()
+    const errs = []
+    page.on('pageerror', (e) => errs.push(String(e)))
+    const items = [
+      mk('BK-aaaaaaaaaaaaaaaaaaaa', lang, OTHER),
+      mk('BK-bbbbbbbbbbbbbbbbbbbb', lang, { ...OTHER, relationship_other: 'Old neighbour', occasion_detail: 'Moving away' }),
+      mk('BK-cccccccccccccccccccc', lang, OTHER, ''),
+    ]
+    await page.route('**/api/me*', (r) => r.fulfill({ json: { basket: { count: 3 }, ready: null, hold: null } }))
+    await page.route('**/api/basket', (r) => r.fulfill({ json: { items, token: 'BT-x', link: '', email: null, hold: null, sent: [], mail: false, saved_days: 30 } }))
+    await page.goto('http://localhost:5173/basket', { waitUntil: 'networkidle' })
+    await page.waitForSelector('[data-testid=basket-item]')
+    const cards = page.locator('[data-testid=basket-item]')
+    const chipsOf = (n) => cards.nth(n).locator('[data-testid=mg-chip]').allInnerTexts()
+    // (the list is newest first; the three share one time, so find by id order as served)
+    const texts = await Promise.all([0, 1, 2].map(chipsOf))
+    const withWords = texts.findIndex((t) => t.length === 2)
+    check(`Part 17 (${lang}): "Other" with nothing typed shows no chip, and no text anywhere says Other / その他 / 其他 as a chip`, texts.filter((t) => t.length === 0).length === 2 && (await page.locator('[data-testid=mg-chip]').allInnerTexts()).every((t) => !/^(other|その他|其他)$/i.test(t.trim())))
+    check(`Part 17 (${lang}): with words typed, the chips are those words`, withWords >= 0 && texts[withWords].join('|') === 'Old neighbour|Moving away')
+    check(`Part 17 (${lang}): no name and no chips: no empty row`, (await page.locator('.mgFor').count()) === 2)
+    if (lang === 'en') await page.screenshot({ path: `${SHOTS}/p17-chips-en-390.png`, fullPage: true })
+    check(`no page errors (run 51, ${lang})`, errs.length === 0, errs.join('; '))
     await ctx.close()
   }
 }

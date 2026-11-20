@@ -381,7 +381,7 @@ export default function DemoApp({ mode = 'harness', aside }: { mode?: Mode; asid
       credentials: 'same-origin',
       body: JSON.stringify({
         resume, story, language: context.language, kanji: chosen.kanji, reading: live.reading, word: live.word ?? '', line: live.line, to: live.receiverName, preview_id: live.preview.draftId,
-        meaning: live.meaning, relationship: context.relationship, relationship_other: context.relationshipOther ?? '', purpose, purpose_other: context.purposeOther ?? '', occasion: occasionOf(context),
+        meaning: live.meaning, relationship: context.relationship, relationship_other: context.relationshipOther ?? '', purpose, purpose_other: context.purposeOther ?? '', occasion_detail: context.occasionDetail ?? '', occasion: occasionOf(context),
         round: chosenSet + 1, slot: chosen.slot, poem: live.poem,
       }),
     })
