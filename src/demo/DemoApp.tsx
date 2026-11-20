@@ -420,12 +420,24 @@ export default function DemoApp({ mode = 'harness', aside }: { mode?: Mode; asid
     } catch {
       // a page without history access simply has no address state
     }
+    // the browser's back from the result page lands on the writing page with the story still in the box (2026-11-20), the same as 「← 場面に戻る」
     const onPop = () => {
-      if (window.location.hash !== '#result') setPhase((p) => (p === 'result' ? 'reveal' : p))
+      if (window.location.hash !== '#result') backToStoryRef.current()
     }
     window.addEventListener('popstate', onPop)
     return () => window.removeEventListener('popstate', onPop)
   }, [customer, phase])
+  /** The result page's way back (its header's link, and the browser's back): the writing page with the story kept (tryAgain), the address without #result. */
+  const backToStory = () => {
+    try {
+      if (window.location.hash === '#result') window.history.replaceState(null, '', window.location.pathname + window.location.search)
+    } catch {
+      // nothing to clear
+    }
+    tryAgain()
+  }
+  const backToStoryRef = useRef(backToStory)
+  backToStoryRef.current = backToStory
   const leaveResult = (to: 'order' | 'reveal') => {
     try {
       if (window.location.hash === '#result') window.history.replaceState(null, '', window.location.pathname + window.location.search)
@@ -875,7 +887,7 @@ export default function DemoApp({ mode = 'harness', aside }: { mode?: Mode; asid
         </div>
       )}
 
-      {customer && phase === 'result' && live && chosen && live.kanji === chosen.kanji && live.slot === chosen.slot && <ResultPage live={live} onMake={() => leaveResult('order')} onAnother={() => leaveResult('reveal')} />}
+      {customer && phase === 'result' && live && chosen && live.kanji === chosen.kanji && live.slot === chosen.slot && <ResultPage live={live} onMake={() => leaveResult('order')} onAnother={() => leaveResult('reveal')} onBack={backToStory} />}
 
       {customer && (phase === 'order' || phase === 'result') && result && chosen && (
         <div hidden={phase === 'result'}>

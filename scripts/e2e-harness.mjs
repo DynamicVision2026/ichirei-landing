@@ -2010,7 +2010,7 @@ const mockPage = async (browser, { onExplain, result, order, track } = {}) => {
   check('result page: when all four are there the waiting line is gone; each picture has its line of the story under it', (await ja.page.locator('[data-testid=result-waiting]').count()) === 0 && (await ja.page.locator('[data-testid=result-pictures] .rs-fig figcaption').nth(1).innerText()) === '「もういらない」と私は言った。')
   await ja.page.locator('[data-testid=result-poem]').waitFor({ timeout: 5000 })
   check('result page: the poem of the chosen format is on the page', (await ja.page.locator('[data-testid=result-poem]').innerText()).includes('蓋の花添え'))
-  check('result page: NO download before payment — no link, no download attribute, no scroll or PDF address anywhere; the only buttons are the two choices and 「保存」 (the basket\'s Save panel, 2026-11-15; its link opens only once pressed)', (await ja.page.locator('[data-testid=result-page] a, [data-testid=result-page] [download]').count()) === 0 && !(await ja.page.locator('[data-testid=result-page]').innerHTML()).match(/scroll\.|\.pdf|download/) && (await ja.page.locator('[data-testid=result-page] button').count()) === 3 && (await ja.page.locator('[data-testid=result-page] [data-testid=save-button]').count()) === 1)
+  check('result page: NO download before payment — no link, no download attribute, no scroll or PDF address anywhere; the only buttons are the two choices and 「保存」 (the basket\'s Save panel, 2026-11-15; its link opens only once pressed)', (await ja.page.locator('[data-testid=result-page] [download]').count()) === 0 && (await ja.page.locator('[data-testid=result-page] a:not([data-testid=result-top] a)').count()) === 0 && (await ja.page.locator('[data-testid=result-top] a').count()) === 2 && !(await ja.page.locator('[data-testid=result-page]').innerHTML()).match(/scroll\.|\.pdf|download/) && (await ja.page.locator('[data-testid=result-page] button').count()) === 4 && (await ja.page.locator('[data-testid=result-page] [data-testid=save-button]').count()) === 1)
   check('result page: the closing line, the note and the two buttons are the owner\'s words', (await ja.page.locator('[data-testid=result-closing]').innerText()) === 'この一字は、あなたの目に映る、その人です。' && (await ja.page.locator('[data-testid=result-make]').innerText()) === RC.ja.make && (await ja.page.locator('[data-testid=result-another]').innerText()) === RC.ja.another)
   await ja.page.screenshot({ path: `${SHOTS}/e2e-result-ja-desktop.png`, fullPage: false })
   // 「別の字を選ぶ」 goes back to the cards (no new engine call)
@@ -2056,6 +2056,111 @@ const mockPage = async (browser, { onExplain, result, order, track } = {}) => {
   check('analytics: card_preview_shown, candidates_retry (1), pictures_before_pay (shown), preview_to_order, result_page_view and result_to_order are reported — codes only, never a character or a story', ['card_preview_shown', 'pictures_before_pay', 'preview_to_order', 'result_page_view', 'result_to_order'].every((e) => ja.calls.analytics.some((a) => a.event === e)) && ja.calls.analytics.filter((a) => a.event === 'candidates_retry').map((a) => a.n).join() === '1' && ja.calls.analytics.some((a) => a.event === 'pictures_before_pay' && a.state === 'shown') && !JSON.stringify(ja.calls.analytics.filter((a) => /preview|retry|pictures|result/.test(a.event))).match(/証|備|story/))
   check('no page errors (run 8f, ja)', ja.errors.length === 0, JSON.stringify(ja.errors))
   await ja.page.close()
+  // Part 3 (2026-11-20): the result page's header (brand, My gifts, the way back with the story kept) and the Save panel under the customer's e-mail
+  {
+    const SAVED_LINE = { ja: '✓ 保存しました。b•••@gmail.comの贈りものとして、30日間お預かりします。リンクをメールでお送りしました。', 'zh-Hant': '✓ 已保存在b•••@gmail.com之下，保留30天。連結已寄到你的信箱。', en: "✓ Saved under b•••@gmail.com for 30 days. We've emailed you the link." }
+    const OPEN = { ja: 'マイギフトを開く →', 'zh-Hant': '打開我的禮物 →', en: 'Open My gifts →' }
+    const LEAD = { ja: 'この贈りものを、あなたのメールアドレスに保存します。', 'zh-Hant': '這份禮物會保存在你的電子郵件之下。', en: "We'll save this gift under your email address." }
+    const BACK = { ja: '← 場面に戻る', 'zh-Hant': '← 回到我的片刻', en: '← Back to my moment' }
+    const BTN = { ja: 'メールに保存する', 'zh-Hant': '保存到我的電子郵件', en: 'Save to my email' }
+    const LANDING = { ja: '/', 'zh-Hant': '/zh', en: '/en' }
+    const wire = async (page, { mail = true, masked = null, posts, me }) => {
+      await page.route('**/api/basket', async (route) => {
+        if (route.request().method() === 'POST') return route.fulfill({ json: { id: 'BK-aaaaaaaaaaaaaaaaaaaa', token: 'BT-x', count: 1, created: true } })
+        return route.fulfill({ json: { items: [], token: 'BT-abcdefghjkmnpqrstuvwxyz2', link: 'https://ichirei.beyondculture.ai/b/BT-abcdefghjkmnpqrstuvwxyz2', mail, email: masked, saved_days: 30 } })
+      })
+      await page.route('**/api/basket/email', (route) => { posts.push({ path: 'email', body: JSON.parse(route.request().postData() ?? '{}') }); return route.fulfill({ json: { ok: true, email: 'b•••@gmail.com', pending: false } }) })
+      await page.route('**/api/basket/email/resend', (route) => { posts.push({ path: 'resend', body: JSON.parse(route.request().postData() ?? '{}') }); return route.fulfill({ json: { ok: true, email: 'b•••@gmail.com', pending: false } }) })
+      await page.route('**/api/basket/qr.svg*', (route) => route.fulfill({ status: 200, contentType: 'image/svg+xml', body: '<svg xmlns="http://www.w3.org/2000/svg" width="29" height="29"><rect width="29" height="29" fill="#F5EDD8"/><rect x="2" y="2" width="9" height="9" fill="#1A1410"/></svg>' }))
+      await page.route('**/api/me*', (route) => { me.n++; return route.fulfill({ json: { basket: { count: me.count }, ready: null, hold: null } }) })
+    }
+    for (const lang of ['ja', 'zh-Hant', 'en']) {
+      const posts = []
+      const me = { n: 0, count: 1 }
+      const q = await mk(lang)
+      await wire(q.page, { posts, me })
+      await q.page.setViewportSize({ width: 390, height: 844 })
+      await pickMain(q.page, lang)
+      const top = await q.page.evaluate(() => {
+        const t = document.querySelector('[data-testid=result-top]')
+        const r = t.getBoundingClientRect()
+        const brand = document.querySelector('[data-testid=result-brand]')
+        const rp = document.querySelector('[data-testid=result-page]')
+        return { pos: getComputedStyle(t).position, h: r.height, brand: brand.textContent.replace(/\s+/g, ' ').trim(), href: new URL(brand.href).pathname, gifts: !!t.querySelector('[data-testid=my-gifts]'), back: document.querySelector('[data-testid=result-back]').textContent, overflow: rp.scrollWidth > rp.clientWidth, docOverflow: document.documentElement.scrollWidth > window.innerWidth, oneLine: [...t.querySelectorAll('a,button')].every((e) => e.getBoundingClientRect().height < 56) }
+      })
+      check(`result page header (${lang}, 390px): the brand 字 ICHIREI linking to the landing page in the page's language, My gifts, and 「${BACK[lang]}」; it is not sticky; it fits on one line; no horizontal scroll`, top.brand === '字ICHIREI' && top.href === LANDING[lang] && top.gifts && top.back === BACK[lang] && top.pos !== 'sticky' && top.pos !== 'fixed' && top.oneLine && !top.overflow && !top.docOverflow, JSON.stringify(top))
+      await q.page.click('[data-testid=save-button]')
+      await q.page.locator('[data-testid=save-email-step]').waitFor()
+      const bg = await q.page.evaluate(() => { const el = document.querySelector('[data-testid=save-panel]'); return { bg: getComputedStyle(el).backgroundColor, color: getComputedStyle(el).color, border: getComputedStyle(el).borderTopColor, btn: getComputedStyle(document.querySelector('[data-testid=save-email-button]')).backgroundColor } })
+      check(`Save panel (${lang}): Antique Paper #231C14 with ivory text — no white, no glass; the e-mail step first (${LEAD[lang]}), the button 「${BTN[lang]}」, the news box unticked`, bg.bg === 'rgb(35, 28, 20)' && bg.color === 'rgb(245, 237, 216)' && bg.bg !== 'rgb(255, 255, 255)' && (await q.page.locator('[data-testid=save-lead]').innerText()) === LEAD[lang] && (await q.page.locator('[data-testid=save-email-button]').innerText()) === BTN[lang] && !(await q.page.locator('[data-testid=save-marketing]').isChecked()), JSON.stringify(bg))
+      await q.page.click('[data-testid=save-email-button]')
+      check(`Save requires an e-mail (${lang}): pressing the button with no address sends nothing`, posts.length === 0 && (await q.page.locator('[data-testid=save-saved]').count()) === 0)
+      const meBefore = me.n
+      await q.page.fill('[data-testid=save-email-input]', 'brian@gmail.com')
+      await q.page.click('[data-testid=save-email-button]')
+      await q.page.locator('[data-testid=save-saved]').waitFor()
+      const html = await q.page.content()
+      check(`Save (${lang}): the address is sent once, the news box stays unticked (marketing false); the line 「${SAVED_LINE[lang]}」 and the button 「${OPEN[lang]}」 to My gifts`, posts.length === 1 && posts[0].body.email === 'brian@gmail.com' && posts[0].body.marketing === false && (await q.page.locator('[data-testid=save-saved]').innerText()) === SAVED_LINE[lang] && (await q.page.locator('[data-testid=save-open-gifts]').innerText()) === OPEN[lang] && new URL(await q.page.locator('[data-testid=save-open-gifts]').getAttribute('href'), 'http://x').pathname === (lang === 'ja' ? '/basket' : lang === 'en' ? '/en/basket' : '/zh/basket'))
+      check(`Save (${lang}): the full address is nowhere on the page after saving (only b•••@gmail.com); My gifts (n) is asked again at once; copy link and the QR stay below, smaller, with the privacy note`, !html.includes('brian@gmail.com') && me.n > meBefore && (await q.page.locator('[data-testid=save-copy]').count()) === 1 && (await q.page.locator('[data-testid=save-qr]').count()) === 1 && (await q.page.locator('[data-testid=save-note]').count()) === 1)
+      const qr = await q.page.evaluate(() => { const i = document.querySelector('[data-testid=save-qr]'); const cs = getComputedStyle(i); return { bg: cs.backgroundColor, pad: cs.paddingTop, w: i.getBoundingClientRect().width } })
+      check(`Save (${lang}): the QR sits on an ivory slip (#F5EDD8, not white) with a 12px quiet margin`, qr.bg === 'rgb(245, 237, 216)' && qr.pad === '12px', JSON.stringify(qr))
+      check(`Save panel (${lang}): no horizontal scroll at 390px`, !(await q.page.evaluate(() => document.documentElement.scrollWidth > window.innerWidth || document.querySelector('[data-testid=result-page]').scrollWidth > document.querySelector('[data-testid=result-page]').clientWidth)))
+      // back: the writing page with the same story in the box
+      await q.page.click('[data-testid=result-back]')
+      await q.page.waitForSelector('[data-testid=result-page]', { state: 'detached' })
+      const kept = await q.page.locator('#write [data-testid=story-input]').inputValue()
+      check(`result page (${lang}): 「${BACK[lang]}」 lands on the writing page with the same story in the box`, kept.includes(STORY.slice(0, 30)), kept.slice(0, 60))
+      await pickMain(q.page, lang).catch(() => {})
+      check(`no page errors (Part 3 header and Save, ${lang})`, q.errors.length === 0, JSON.stringify(q.errors))
+      await q.page.close()
+    }
+    // browser back from the result page: the same writing page with the story kept (ja)
+    {
+      const posts = []
+      const q = await mk('ja')
+      await wire(q.page, { posts, me: { n: 0, count: 1 } })
+      await pickMain(q.page, 'ja')
+      await q.page.goBack()
+      await q.page.waitForSelector('[data-testid=result-page]', { state: 'detached', timeout: 6000 })
+      const kept = await q.page.locator('#write [data-testid=story-input]').inputValue().catch(() => '')
+      check('result page (ja): the browser\'s back lands on the writing page with the same story in the box', kept.includes(STORY.slice(0, 30)), kept.slice(0, 60))
+      await q.page.close()
+    }
+    // no mailer yet (no RESEND_API_KEY): Save works as before, in the new look, with the 「✓ 保存しました。」 line and no e-mail part
+    {
+      const posts = []
+      const q = await mk('ja')
+      await wire(q.page, { mail: false, posts, me: { n: 0, count: 1 } })
+      await pickMain(q.page, 'ja')
+      await q.page.click('[data-testid=save-button]')
+      await q.page.locator('[data-testid=save-saved]').waitFor()
+      check('Save without a mailer (no RESEND_API_KEY): no e-mail step, the line 「✓ 保存しました。30日間お預かりします。」 (no address in it), 「マイギフトを開く →」, the link and the QR', (await q.page.locator('[data-testid=save-email-step]').count()) === 0 && (await q.page.locator('[data-testid=save-saved]').innerText()) === '✓ 保存しました。30日間お預かりします。' && (await q.page.locator('[data-testid=save-open-gifts]').innerText()) === 'マイギフトを開く →' && (await q.page.locator('[data-testid=save-qr]').count()) === 1 && posts.length === 0)
+      await q.page.close()
+    }
+    // an address already on this browser (a free-gift hold or an earlier save): prefilled, partly hidden, with 「このメールに保存する」 and 「別のメールにする」
+    {
+      const posts = []
+      const q = await mk('ja')
+      await wire(q.page, { masked: 'b•••@gmail.com', posts, me: { n: 0, count: 1 } })
+      await pickMain(q.page, 'ja')
+      await q.page.click('[data-testid=save-button]')
+      await q.page.locator('[data-testid=save-masked]').waitFor()
+      const pre = { masked: await q.page.locator('[data-testid=save-masked]').innerText(), use: await q.page.locator('[data-testid=save-use-saved]').innerText(), other: await q.page.locator('[data-testid=save-other]').innerText(), field: await q.page.locator('[data-testid=save-email-input]').count() }
+      check('Save with an address already known: it shows partly hidden, the button 「このメールに保存する」 and 「別のメールにする」; no field yet', pre.masked === 'b•••@gmail.com' && pre.use === 'このメールに保存する' && pre.other === '別のメールにする' && pre.field === 0, JSON.stringify(pre))
+      await q.page.click('[data-testid=save-other]')
+      check('「別のメールにする」 shows the e-mail field and the news box (unticked)', (await q.page.locator('[data-testid=save-email-input]').count()) === 1 && !(await q.page.locator('[data-testid=save-marketing]').isChecked()))
+      await q.page.close()
+      const q2 = await mk('ja')
+      const posts2 = []
+      await wire(q2.page, { masked: 'b•••@gmail.com', posts: posts2, me: { n: 0, count: 1 } })
+      await pickMain(q2.page, 'ja')
+      await q2.page.click('[data-testid=save-button]')
+      await q2.page.click('[data-testid=save-use-saved]')
+      await q2.page.locator('[data-testid=save-saved]').waitFor()
+      check('「このメールに保存する」 saves under the address on the record (the link is mailed again) without typing it', posts2.length === 1 && posts2[0].path === 'resend')
+      await q2.page.close()
+    }
+  }
   // the daily picture limit: the page shows the character and the poem without pictures (the block is left out), with the line that they come after the order — and the order step works
   const lim = await mk('ja', { limited: true })
   await pickMain(lim.page, 'ja')
@@ -4639,12 +4744,12 @@ for (const [lang, locale, text] of [['en', 'en-US', 'Your gift is being finished
     check('My gifts page: "Give this gift →" opens the writing room of the gift\'s language (2026-11-16) with the item to put back', ((await page.locator('[data-testid=basket-give]').first().getAttribute('href')) ?? '') === '/en/write?resume=BK-aaaaaaaaaaaaaaaaaaaa')
     await page.locator('[data-testid=save-button]').click()
     await page.locator('[data-testid=save-panel]').waitFor()
-    await page.waitForSelector('[data-testid=save-mail]')
-    const href = (await page.locator('[data-testid=save-mail]').getAttribute('href')) ?? ''
-    check('Save panel: "Copy link", the QR code, "Email it to myself" (a mailto with no recipient, the subject "My ICHIREI gifts" and the link) and the privacy note', (await page.locator('[data-testid=save-copy]').innerText()) === 'Copy link' && (await page.locator('[data-testid=save-qr]').count()) === 1 && (await page.locator('[data-testid=save-mail]').innerText()) === 'Email it to myself' && href.startsWith('mailto:?subject=My%20ICHIREI%20gifts&body=') && href.includes(encodeURIComponent('https://ichirei.soul-id.jp/b/BT-abcdefghjkmnpqrstuvwxyz2')) && (await page.locator('[data-testid=save-note]').innerText()) === 'Anyone with this link can see your saved gifts. Keep it private.', href)
+    await page.waitForSelector('[data-testid=save-saved]')
+    // (2026-11-20) the Save panel is the e-mail panel: with no mailer (this mock has none) it says "✓ Saved. We'll keep it for 30 days." with the gold button to My gifts, the link and the QR below, and the privacy note
+    check('Save panel (no mailer): "Copy link", the QR code, the gold "Open My gifts →" and the privacy note — and no mailto (we send nothing from the page)', (await page.locator('[data-testid=save-copy]').innerText()) === 'Copy link' && (await page.locator('[data-testid=save-qr]').count()) === 1 && (await page.locator('[data-testid=save-open-gifts]').innerText()) === 'Open My gifts →' && (await page.locator('[data-testid=save-mail]').count()) === 0 && (await page.locator('[data-testid=save-note]').innerText()) === 'Anyone with this link can see your saved gifts. Keep it private.')
     // (2026-11-15) the panel says what Save did and where, first
     const saveLines = await page.locator('[data-testid=save-panel] p.note').allInnerTexts()
-    check('Save panel: it first says "Saved to My gifts (top right), on this device for 30 days.", then "To continue on another device (your phone, another computer), scan the code or email the link to yourself.", and keeps "Anyone with this link can see your saved gifts. Keep it private."', saveLines[0] === 'Saved to My gifts (top right), on this device for 30 days.' && saveLines[1] === 'To continue on another device (your phone, another computer), scan the code or email the link to yourself.' && saveLines.at(-1) === 'Anyone with this link can see your saved gifts. Keep it private.' && !saveLines.includes('Scan with your phone to continue there'), JSON.stringify(saveLines))
+    check('Save panel: it says "✓ Saved. We\'ll keep it for 30 days." first, then the scan line, and keeps "Anyone with this link can see your saved gifts. Keep it private."', (await page.locator('[data-testid=save-saved]').innerText()) === "✓ Saved. We'll keep it for 30 days." && saveLines.includes('Scan this to continue on your phone right now') && saveLines.at(-1) === 'Anyone with this link can see your saved gifts. Keep it private.', JSON.stringify(saveLines))
     await page.locator('[data-testid=save-panel]').scrollIntoViewIfNeeded().catch(() => {})
     await page.screenshot({ path: `${SHOTS}/polish-save-panel-390.png` }).catch(() => {})
     await page.locator('[data-testid=basket-remove]').first().click()
@@ -5384,7 +5489,7 @@ for (const [lang, locale, text] of [['en', 'en-US', 'Your gift is being finished
     // Save's first line names My gifts
     await T(page, 'save-button').first().click().catch(() => {})
     await T(page, 'save-saved').waitFor({ timeout: 6000 }).catch(() => {})
-    check('Save on the result page: the first line is "Saved to My gifts (top right), on this device for 30 days."', (await T(page, 'save-saved').innerText().catch(() => '')) === 'Saved to My gifts (top right), on this device for 30 days.')
+    check('Save on the result page: the first line is "✓ Saved. We\'ll keep it for 30 days." (no mailer in this run; with one it asks for the e-mail first)', (await T(page, 'save-saved').innerText().catch(() => '')) === "✓ Saved. We'll keep it for 30 days.")
     // "← Back" returns to the landing page; the hold and the saved gifts are still there
     await page.goto('http://localhost:5173/en/write', { waitUntil: 'networkidle' })
     await T(page, 'write-back').click()
@@ -5594,7 +5699,7 @@ for (const [lang, locale, text] of [['en', 'en-US', 'Your gift is being finished
   // ---- English, with an email, a hold and a sent gift; the mail box on
   {
     const { page, ctx, errs, posts } = await open38({ email: 'b•••@gmail.com', hold: { expires_at: '2026-11-18T23:49:00Z', minutes_left: 60 }, mail: true, sent: [{ kanji: '憶', reading: 'oku', word: 'remember', receiver: 'Kenji', at: '2026-11-16T10:00:00Z', status: 'opened', page: '/a/AN-abcdefghjkmnpqrstuvw' }] })
-    check('My ICHIREI (en): the title, the masked email with "Your gifts and orders", the free-gift hold, and "Saved for 30 days."', (await T(page, 'my-title').innerText()) === 'My ICHIREI' && (await T(page, 'my-email').innerText()).includes('b•••@gmail.com') && (await T(page, 'my-email').innerText()).includes('Your gifts and orders') && (await T(page, 'my-hold').innerText()).startsWith('Your free gift is held until') && (await T(page, 'basket-saved').innerText()) === 'Saved for 30 days.')
+    check('My ICHIREI (en): the title (2026-11-20: "Saved under b•••@gmail.com (n)" once the address is known), the masked email with "Your gifts and orders", the free-gift hold, and "Saved for 30 days."', /^Saved under b•••@gmail\.com \(\d+\)$/.test(await T(page, 'my-title').innerText()) && (await T(page, 'my-email').innerText()).includes('b•••@gmail.com') && (await T(page, 'my-email').innerText()).includes('Your gifts and orders') && (await T(page, 'my-hold').innerText()).startsWith('Your free gift is held until') && (await T(page, 'basket-saved').innerText()) === 'Saved for 30 days.')
     const card = T(page, 'basket-item').first()
     check('full card (en): the character large, the English word as the headline — and NO romanized reading anywhere on the card', (await card.locator('[data-testid=mg-glyph]').innerText()) === '恒' && (await card.locator('[data-testid=mg-word]').innerText()) === 'constant' && (await card.locator('[data-testid=mg-reading]').count()) === 0 && !(await card.innerText()).includes('kō'))
     check('full card (en): the one line, "For Mom", and the chips "Mother" and "Thank you"', (await card.locator('[data-testid=mg-line]').innerText()) === 'She is the one who never changes.' && (await card.locator('[data-testid=mg-for]').innerText()) === 'For Mom' && (await card.locator('[data-testid=mg-chip]').allInnerTexts()).join('|') === 'Mother|Thank you')
@@ -5653,7 +5758,7 @@ for (const [lang, locale, text] of [['en', 'en-US', 'Your gift is being finished
   {
     const { page, ctx, errs } = await open38({ lang: 'ja', items: [item({ language: 'ja', to: '母', card: { kanji: '恒', reading: 'コウ・つね', word: '', line: 'いつも変わらず、そこにいてくれる人。', meaning: '' }, context: { relationship: 'parent_mother', relationship_other: '', purpose: 'thanks', purpose_other: '', occasion: 'thanksgiving' } })], email: 'b•••@gmail.com', mail: true })
     const card = T(page, 'basket-item').first()
-    check('My ICHIREI (ja): 「マイギフト」, the character with its reading small beside it AND the line (the reading is never alone), 「母へ」, chips 「母」「ありがとう」', (await T(page, 'my-title').innerText()) === 'マイギフト' && (await card.locator('[data-testid=mg-reading]').innerText()) === 'コウ・つね' && (await card.locator('[data-testid=mg-line]').innerText()) === 'いつも変わらず、そこにいてくれる人。' && (await card.locator('[data-testid=mg-for]').innerText()) === '母へ' && (await card.locator('[data-testid=mg-chip]').allInnerTexts()).join('|') === '母|ありがとう')
+    check('My ICHIREI (ja): the heading 「…に保存した贈りもの（n）」 (2026-11-20), the character with its reading small beside it AND the line (the reading is never alone), 「母へ」, chips 「母」「ありがとう」', /に保存した贈りもの（\d+）$/.test(await T(page, 'my-title').innerText()) && (await card.locator('[data-testid=mg-reading]').innerText()) === 'コウ・つね' && (await card.locator('[data-testid=mg-line]').innerText()) === 'いつも変わらず、そこにいてくれる人。' && (await card.locator('[data-testid=mg-for]').innerText()) === '母へ' && (await card.locator('[data-testid=mg-chip]').allInnerTexts()).join('|') === '母|ありがとう')
     check('My ICHIREI (ja): 「あなたの場面」, 「この贈りものを贈る →」, 「削除」, 「保存日」と「まで保存」, and the mail box 「メールに保存」', (await card.locator('[data-testid=mg-moment] h2').textContent()) === 'あなたの場面' && (await card.locator('[data-testid=basket-give]').innerText()) === 'この贈りものを贈る →' && (await card.locator('[data-testid=basket-remove]').innerText()) === '削除' && (await card.locator('[data-testid=mg-until]').innerText()) === '12月18日まで保存' && (await T(page, 'keep-mail-save').innerText()) === 'メールに保存')
     check('no horizontal scroll at 390 px (ja)', await noScroll(page))
     await page.screenshot({ path: `${SHOTS}/mygifts-ja-390.png`, fullPage: true })
@@ -5667,7 +5772,7 @@ for (const [lang, locale, text] of [['en', 'en-US', 'Your gift is being finished
   {
     const { page, ctx, errs } = await open38({ lang: 'zh-Hant', items: [item({ language: 'zh-Hant', to: '媽媽', card: { kanji: '恒', reading: 'héng', word: '', line: '那個始終如一、一直都在的人。', meaning: '' }, context: { relationship: 'parent_mother', relationship_other: '', purpose: 'thanks', purpose_other: '', occasion: 'thanksgiving' } })], email: 'b•••@gmail.com', mail: true })
     const card = T(page, 'basket-item').first()
-    check('My ICHIREI (zh-Hant): 「我的禮物」, the reading small beside the character with the line, 「給媽媽」, chips 「母親」「謝謝」, 「存到我的信箱」', (await T(page, 'my-title').innerText()) === '我的禮物' && (await card.locator('[data-testid=mg-reading]').innerText()) === 'héng' && (await card.locator('[data-testid=mg-line]').innerText()) === '那個始終如一、一直都在的人。' && (await card.locator('[data-testid=mg-for]').innerText()) === '給媽媽' && (await card.locator('[data-testid=mg-chip]').allInnerTexts()).join('|') === '母親|謝謝' && (await T(page, 'keep-mail-save').innerText()) === '存到我的信箱')
+    check('My ICHIREI (zh-Hant): the heading 「保存在…的禮物（n）」 (2026-11-20), the reading small beside the character with the line, 「給媽媽」, chips 「母親」「謝謝」, 「存到我的信箱」', /^保存在.+的禮物（\d+）$/.test(await T(page, 'my-title').innerText()) && (await card.locator('[data-testid=mg-reading]').innerText()) === 'héng' && (await card.locator('[data-testid=mg-line]').innerText()) === '那個始終如一、一直都在的人。' && (await card.locator('[data-testid=mg-for]').innerText()) === '給媽媽' && (await card.locator('[data-testid=mg-chip]').allInnerTexts()).join('|') === '母親|謝謝' && (await T(page, 'keep-mail-save').innerText()) === '存到我的信箱')
     check('no horizontal scroll at 390 px (zh-Hant)', await noScroll(page))
     await page.screenshot({ path: `${SHOTS}/mygifts-zh-390.png`, fullPage: true })
     await page.setViewportSize({ width: 1280, height: 1000 })

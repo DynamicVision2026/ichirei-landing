@@ -26,12 +26,6 @@
 @media (max-width:560px){.basketItem{grid-template-columns:auto 1fr}.basketItem .acts{grid-column:1/-1;flex-direction:row;justify-content:space-between;align-items:center}}
 
 .savePanelWrap{position:relative;display:inline-block}
-.savePanel{margin-top:.7rem;padding:1rem 1.1rem;background:var(--card,#fff);border:1px solid var(--line,#E6D8D1);border-top:2px solid var(--gold,#8A6A35);border-radius:6px;max-width:22rem;display:grid;gap:.8rem;font-size:.92rem}
-.savePanel svg,.savePanel img{width:9rem;height:9rem;justify-self:start;background:#fff}
-.savePanel .note{margin:0;color:var(--mute,#5B6178);font-size:.85rem}
-.savePanel .row{display:flex;gap:.6rem;flex-wrap:wrap}
-.savePanel .miniBtn{font:600 .9rem var(--display,system-ui);padding:.5rem .95rem;border-radius:999px;border:1.5px solid var(--line,#E6D8D1);background:transparent;color:var(--ink,#1F2A44);cursor:pointer;text-decoration:none}
-.savePanel .miniBtn:hover{border-color:var(--gold,#8A6A35)}
 
 .thanksCard{margin:0 auto;max-width:42rem;padding:1.4rem 1.5rem;background:var(--card,#fff);border:1px solid var(--line,#E6D8D1);border-top:3px solid var(--gold,#8A6A35);border-radius:4px;text-align:center}
 .thanksCard h2{font:700 1.5rem var(--display,system-ui);margin:0 0 .6rem}
@@ -59,7 +53,6 @@
 .orderFree .err{margin:.5rem 0 0;font-size:.9rem}
 .priceFree s{opacity:.6}
 .priceFree b{font-weight:700}
-.savePanel .note.saved{font-weight:600;opacity:1}
 .priceFree .freeLabel{font-size:.62em;font-weight:600;white-space:nowrap}
 /* 2026-11-16: the header's "My gifts", the writing room's header, and the landing's welcome-back card */
 .myGifts{display:inline-flex;align-items:center;min-height:40px;padding:.35rem .8rem;border:1px solid var(--line,#E6D8D1);border-radius:999px;background:var(--paper,#FBF8F1);color:var(--ink,#1F2A44);font:600 .86rem var(--body,system-ui);text-decoration:none;white-space:nowrap}
@@ -103,7 +96,6 @@
 .keepMail .keepBtn[disabled]{opacity:.6;cursor:default}
 .keepMail .keepNote{margin:0;font-size:.88rem;color:#2A221B}
 .keepMail .keepNote.bad{color:var(--seal-text,#B3331F)}
-.savePanel .keepMail{max-width:none;margin:.2rem 0 0;padding:.8rem .9rem;box-shadow:none}
 .linkBtn{background:none;border:0;padding:.3rem .1rem;font:600 .9rem var(--display,system-ui);color:var(--ink,#1F2A44);text-decoration:underline;text-underline-offset:3px;cursor:pointer;justify-self:start}
 .linkBtn.danger{color:var(--seal-text,#B3331F)}
 .linkBtn[disabled]{opacity:.6}
@@ -147,3 +139,31 @@
 /* the site's own `.rv section` padding is for the landing's big blocks: inside a card and on this page the sections sit tight */
 .basketPage .mgCard section,.basketPage section.mgSent{padding-block:0}
 .basketPage section.mgSent{margin-top:2.4rem}
+
+/* The Save panel in the page's own material (2026-11-20): Antique Paper #231C14, a soft directional shadow, a 1px Vintage Gold hairline at 30%, Ivory #F5EDD8 text — no white, no blur. Noto Serif JP for the
+   body, Inter Light for the small notes; opens in place with a 200 ms fade; never under 12px. */
+@keyframes savePanelIn{from{opacity:0}to{opacity:1}}
+.savePanel{margin-top:.8rem;padding:1.15rem 1.2rem 1.2rem;background:#231C14;color:#F5EDD8;border:1px solid rgba(201,169,110,.3);border-radius:2px;max-width:min(24rem,100%);display:grid;gap:.85rem;text-align:left;font:400 .98rem/1.7 'Noto Serif JP','Noto Serif TC','Zen Old Mincho',Georgia,serif;box-shadow:6px 10px 26px rgba(0,0,0,.45);animation:savePanelIn .2s ease-out}
+.savePanel .lead{margin:0;font-size:1rem;line-height:1.7}
+.savePanel .note{margin:0;color:rgba(245,237,216,.82);font:300 .86rem/1.6 Inter,system-ui,sans-serif}
+.savePanel .note.small{font-size:.8rem}
+.savePanel .note.bad{color:#E8A89B}
+.savePanel .saved{margin:0;font-weight:600;line-height:1.75}
+.savePanel .maskedEmail{margin:0;font:500 1rem Inter,system-ui,sans-serif;letter-spacing:.02em}
+.savePanel .saveStep{display:grid;gap:.7rem}
+.savePanel .fieldLabel{font:300 .86rem Inter,system-ui,sans-serif;color:rgba(245,237,216,.82)}
+.savePanel input[type=email]{min-height:44px;padding:0 .75rem;font:400 1rem Inter,system-ui,sans-serif;color:#F5EDD8;background:#1A1410;border:1px solid rgba(201,169,110,.45);border-radius:2px;width:100%}
+.savePanel input[type=email]:focus-visible{outline:2px solid #C9A96E;outline-offset:2px}
+.savePanel .consent{display:flex;gap:.55rem;align-items:flex-start;font:300 .86rem/1.5 Inter,system-ui,sans-serif;color:rgba(245,237,216,.9)}
+.savePanel .consent input{width:1.05rem;height:1.05rem;margin-top:.18rem;accent-color:#C9A96E;flex:none}
+/* ghost buttons, like 「ほかの字を選ぶ」: gold text, a thin gold border, no fill */
+.savePanel .goldBtn,.savePanel .miniBtn{display:inline-flex;align-items:center;justify-content:center;min-height:44px;padding:0 1.2rem;border:1px solid #C9A96E;border-radius:2px;background:transparent;color:#C9A96E;font:500 .95rem 'Noto Serif JP','Noto Serif TC',Georgia,serif;letter-spacing:.06em;text-decoration:none;cursor:pointer;justify-self:start}
+.savePanel .goldBtn:hover,.savePanel .miniBtn:hover{background:rgba(201,169,110,.12)}
+.savePanel .goldBtn[disabled]{opacity:.6;cursor:default}
+.savePanel .miniBtn{min-height:40px;font-size:.86rem;color:rgba(201,169,110,.95)}
+.savePanel .linkBtn{color:#C9A96E;font:400 .86rem Inter,system-ui,sans-serif;text-underline-offset:3px}
+.savePanel .row{display:flex;gap:.6rem;flex-wrap:wrap}
+/* the QR: dark modules on an ivory slip with a 12px quiet margin (never pure white, never inverted) */
+.savePanel .qrSlip{display:flex;gap:.85rem;align-items:center;flex-wrap:wrap}
+.savePanel .qrSlip img{display:block;width:112px;height:112px;padding:12px;box-sizing:content-box;background:#F5EDD8;border-radius:2px;justify-self:start}
+.savePanel .qrSlip .note{flex:1 1 9rem}

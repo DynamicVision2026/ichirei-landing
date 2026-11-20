@@ -25,3 +25,10 @@ export const writeHref = (lang: RevealLang): string => {
 
 /** The same, for the landing's sections that know only their copy: the language is read from the page's language store. */
 export const writeLink = (): string => writeHref(toRevealLang(getLanguage()))
+
+/** My gifts (2026-11-20): /basket is the Japanese page, /en/basket and /zh/basket the others — the same page in the address's language. */
+export const basketPath = (lang: RevealLang): string => (lang === 'en' ? '/en/basket' : lang === 'zh-Hant' ? '/zh/basket' : '/basket')
+export const basketLangOf = (path: string): RevealLang | null => {
+  const p = path.replace(/\/+$/, '')
+  return p === '/en/basket' ? 'en' : p === '/zh/basket' ? 'zh-Hant' : p === '/basket' ? 'ja' : null
+}

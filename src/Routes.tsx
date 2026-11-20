@@ -57,7 +57,9 @@ export default function Routes() {
     )
   }
   // the basket (2026-11-15): /basket is this browser's saved gifts, /b/<token> the private link that opens them on any device (a token that is not a basket's shows the normal landing page)
-  if (path === '/basket' || path === '/basket/' || path.startsWith('/b/')) {
+  // /en/basket and /zh/basket (2026-11-20): the same page in the address's language (the Save panel's gold button goes there)
+  if (/^\/(en|zh)\/basket\/?$/.test(path)) setLanguage(path.startsWith('/en') ? 'en' : 'zh-Hant')
+  if (path === '/basket' || path === '/basket/' || /^\/(en|zh)\/basket\/?$/.test(path) || path.startsWith('/b/')) {
     return (
       <Suspense fallback={null}>
         <BasketApp />

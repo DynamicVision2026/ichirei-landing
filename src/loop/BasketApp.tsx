@@ -6,7 +6,7 @@ import RevealPage from '../reveal/RevealPage.tsx'
 import { setLanguage } from '../lang-store.ts'
 import { COPY, type UiLanguage } from '../demo/i18n.ts'
 import { PURPOSE_COPY } from '../demo/purpose-copy.ts'
-import { LOOP } from './copy.ts'
+import { LOOP, SAVE } from './copy.ts'
 import { refreshMe, setBasketCount } from './me.ts'
 import SavePanel from './SavePanel.tsx'
 import KeepByEmail from './KeepByEmail.tsx'
@@ -264,7 +264,7 @@ export default function BasketApp() {
           </a>
           <SavePanel lang={lang} />
         </div>
-        <h1 data-testid="my-title">{c.pageTitle}</h1>
+        <h1 data-testid="my-title">{data?.email ? SAVE[lang].heading(data.email, (items ?? []).length) : c.pageTitle}</h1>
         {data?.email && (
           <p className="myEmail" data-testid="my-email">
             <span className="notranslate">{data.email}</span> · {c.giftsAndOrders}
@@ -278,7 +278,8 @@ export default function BasketApp() {
         <p className="basketSaved" data-testid="basket-saved">
           {c.basketSaved}
         </p>
-        {data?.mail && <KeepByEmail lang={lang} hasEmail={!!data.email} />}
+        {/* On a device with no saved gifts and no address: the e-mail asks for the link (2026-11-20). An address alone opens nothing; the answer is the same "sent" whether or not it has gifts. */}
+        {data?.mail && <KeepByEmail lang={lang} hasEmail={!!data.email} lookup={!data.email && items !== null && items.length === 0 && sent.length === 0} />}
 
         {items === null && !notFound && <p className="sent">{c.loading}</p>}
         {(notFound || (items !== null && items.length === 0 && sent.length === 0)) && (

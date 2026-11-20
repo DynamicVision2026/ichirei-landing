@@ -18,6 +18,8 @@ export interface ResultCopy {
   drawing: string
   /** the poem is still being written */
   poemWaiting: string
+  /** the header's way back to the writing page, with the story still in the box (2026-11-20) */
+  back: string
 }
 
 export const RESULT_COPY: Record<UiLanguage, ResultCopy> = {
@@ -33,6 +35,7 @@ export const RESULT_COPY: Record<UiLanguage, ResultCopy> = {
     waiting: 'その場面を描いています。1分ほどお待ちください。',
     drawing: '描いています…',
     poemWaiting: '歌を書いています…',
+    back: '← 場面に戻る',
   },
   'zh-Hant': {
     headingNamed: (n) => `給${n}的禮物`,
@@ -46,6 +49,7 @@ export const RESULT_COPY: Record<UiLanguage, ResultCopy> = {
     waiting: '正在描繪這個片刻，約需一分鐘。',
     drawing: '描繪中……',
     poemWaiting: '正在寫詩……',
+    back: '← 回到我的片刻',
   },
   'zh-Hans': {
     headingNamed: (n) => `给${n}的礼物`,
@@ -59,6 +63,7 @@ export const RESULT_COPY: Record<UiLanguage, ResultCopy> = {
     waiting: '正在描绘这个片刻，约需一分钟。',
     drawing: '描绘中……',
     poemWaiting: '正在写诗……',
+    back: '← 回到我的片刻',
   },
   en: {
     headingNamed: (n) => `Your gift for ${n}`,
@@ -72,5 +77,6 @@ export const RESULT_COPY: Record<UiLanguage, ResultCopy> = {
     waiting: 'Painting your moment. About a minute.',
     drawing: 'Painting…',
     poemWaiting: 'Writing the poem…',
+    back: '← Back to my moment',
   },
 }

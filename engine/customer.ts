@@ -14,7 +14,7 @@ import { analyticsDay } from './analytics.ts'
 import type { OrderStore } from './order-store.ts'
 
 export const EVENT_CODES = [
-  'visited', 'tried', 'previewed', 'saved',
+  'visited', 'tried', 'previewed', 'saved', 'saved_email',
   'held', 'hold_expired', 'hold_used',
   'ordered_free', 'ordered_paid',
   'collected', 'sent', 'opened', 'answered',

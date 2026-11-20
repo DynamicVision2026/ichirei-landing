@@ -328,7 +328,7 @@ export function createApp(config: ServerConfig): Hono {
     c.header('X-Robots-Tag', 'noindex, nofollow')
   })
   // the basket and its private link (2026-11-15) are never indexed either
-  for (const p of ['/basket', '/b/*']) {
+  for (const p of ['/basket', '/en/basket', '/zh/basket', '/b/*']) {
     app.use(p, async (c, next) => {
       await next()
       c.header('X-Robots-Tag', 'noindex, nofollow')

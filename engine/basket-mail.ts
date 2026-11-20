@@ -4,7 +4,8 @@
 // Rules this file keeps:
 //   - An email alone never shows anything. Only the link inside the mail opens the page — opening it proves the address is theirs.
 //   - If the record already has an email, a NEW address replaces it only after the link in the mail to the new address is opened (engine/basket.ts openBasketLink with ?m=).
-//   - An address that already has a record (another device, a free-gift hold) gets the link of THAT record; this browser is not merged into it by typing the address.
+//   - An address that already has a record (another device, a free-gift hold) gets the link of THAT record; this browser is not merged into it by typing the address. The two join (one e-mail = one
+//     collection) when the mailed link is opened in this browser (engine/basket.ts absorbs the browser's own gifts): that is the proof that the inbox is theirs.
 //   - At most 3 mails a day per address (saving and "send my link again" together).
 //   - The marketing consent is not touched: saving never subscribes anyone.
 //   - No address and no message in any log line; nothing here logs.
@@ -105,8 +106,17 @@ async function stamp(store: OrderStore, id: string, now: Date): Promise<void> {
   }).catch(() => null)
 }
 
-/** "Save to my email". Sends exactly one mail with the private link, or says why not. */
-export async function saveToEmail(d: MailDeps, browser: string | null, emailRaw: unknown, language: unknown): Promise<MailResult> {
+/** The step "saved under an e-mail" goes on the timeline of the record that holds the address (no address, no story: a code and a time). */
+async function stampSavedEmail(store: OrderStore, id: string, now: Date): Promise<void> {
+  await casJson<CustomerRecord>(store, `customers/${id}.json`, (cur) => {
+    if (!cur) return null
+    cur.events = [...cur.events, { code: 'saved_email' as const, at: now.toISOString() }].slice(-200)
+    return cur
+  }).catch(() => null)
+}
+
+/** "Save to my email". Sends exactly one mail with the private link, or says why not. `marketing` is the separate, unticked box (news and offers): only a ticked box records a consent. */
+export async function saveToEmail(d: MailDeps, browser: string | null, emailRaw: unknown, language: unknown, opts: { marketing?: boolean } = {}): Promise<MailResult> {
   if (!d.mailer) return { ok: false, code: 'off' }
   if (!d.store) return { ok: false, code: 'no_store' }
   if (!browser) return { ok: false, code: 'no_browser' }
@@ -147,6 +157,15 @@ export async function saveToEmail(d: MailDeps, browser: string | null, emailRaw:
   if (!sent) return { ok: false, code: 'send_failed' }
   await countMail(store, email, now)
   await stamp(store, stampOn, now)
+  await stampSavedEmail(store, stampOn, now)
+  if (opts.marketing === true) {
+    // the ticked box goes on the record that holds this address (the one the mail's link opens); an address still waiting for its confirming link has no record yet and records nothing
+    await casJson<CustomerRecord>(store, `customers/${stampOn}.json`, (cur) => {
+      if (!cur || !cur.emails.includes(email)) return null
+      cur.consent = { marketing: true, at: now.toISOString() }
+      return cur
+    }).catch(() => null)
+  }
   return { ok: true, email: maskEmail(email), pending }
 }
 
@@ -166,5 +185,6 @@ export async function resendLink(d: MailDeps, browser: string | null, language: 
   if (!sent) return { ok: false, code: 'send_failed' }
   await countMail(store, email, now)
   await stamp(store, rec.id, now)
+  await stampSavedEmail(store, rec.id, now)
   return { ok: true, email: maskEmail(email), pending: false }
 }

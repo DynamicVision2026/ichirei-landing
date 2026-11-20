@@ -212,6 +212,8 @@ export function robotsTxt(base: string): string {
       'Disallow: /a/',
       'Disallow: /b/',
       'Disallow: /basket',
+      'Disallow: /en/basket',
+      'Disallow: /zh/basket',
       'Disallow: /claim',
       'Disallow: /track',
       'Disallow: /ops',

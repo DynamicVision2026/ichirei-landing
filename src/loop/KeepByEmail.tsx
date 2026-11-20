@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import type { RevealLang } from '../reveal/copy.ts'
-import { LOOP } from './copy.ts'
+import { LOOP, SAVE } from './copy.ts'
 import './loop.css'
 
 /**
@@ -8,14 +8,16 @@ import './loop.css'
  * in full and an email alone opens nothing — only the link in the mail does. With an email already on the record, "Send my link again" re-sends it (at most 3 mails a day per address). The marketing
  * consent has no part in this: saving never subscribes anyone. Not rendered at all while the server has no mailer (no RESEND_API_KEY).
  */
-export default function KeepByEmail({ lang, hasEmail = false, onSent }: { lang: RevealLang; hasEmail?: boolean; onSent?: () => void }) {
+export default function KeepByEmail({ lang, hasEmail = false, onSent, lookup = false }: { lang: RevealLang; hasEmail?: boolean; onSent?: () => void; lookup?: boolean }) {
   const c = LOOP[lang]
+  const s = SAVE[lang]
   const [email, setEmail] = useState('')
   const [busy, setBusy] = useState(false)
   const [note, setNote] = useState<{ text: string; bad: boolean } | null>(null)
 
   const answer = (code: string | undefined, ok: boolean, pending: boolean): void => {
-    if (ok) setNote({ text: pending ? c.mailPending : c.mailSent, bad: false })
+    // `lookup` (My gifts on a device that has none): the same "sent" line whether or not that address has gifts — nothing says who has saved
+    if (ok) setNote({ text: lookup ? s.lookupSent : pending ? c.mailPending : c.mailSent, bad: false })
     else setNote({ text: code === 'bad_email' ? c.mailBad : code === 'limit' ? c.mailLimit : c.mailFail, bad: true })
   }
   const post = async (path: string, body: Record<string, unknown>): Promise<void> => {
@@ -35,17 +37,17 @@ export default function KeepByEmail({ lang, hasEmail = false, onSent }: { lang: 
   return (
     <form
       className="keepMail"
-      data-testid="keep-mail"
+      data-testid={lookup ? 'lookup-mail' : 'keep-mail'}
       onSubmit={(e) => {
         e.preventDefault()
         if (!busy) void post('/api/basket/email', { email: email.trim() })
       }}
     >
-      <p className="keepTitle">{c.keepTitle}</p>
+      <p className="keepTitle" data-testid="keep-title">{lookup ? s.lookupLead : c.keepTitle}</p>
       <div className="keepRow">
         <input type="email" name="email" autoComplete="email" inputMode="email" required placeholder={c.emailPlaceholder} aria-label={c.emailLabel} value={email} onChange={(e) => setEmail(e.target.value)} data-testid="keep-mail-input" />
         <button type="submit" className="keepBtn" disabled={busy} data-testid="keep-mail-save">
-          {busy ? c.sending : c.saveToEmail}
+          {busy ? c.sending : lookup ? s.lookupButton : c.saveToEmail}
         </button>
       </div>
       {hasEmail && (

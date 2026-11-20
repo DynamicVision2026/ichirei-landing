@@ -158,7 +158,7 @@ export function createLoopHandlers(deps: () => LoopDeps) {
       const browser = visitorOf(req, d.env)
       const l = browser ? await listBasket(d.store, browser) : { items: [], token: null }
       if (!l.token) return json(404, { error: 'not_found', code: 'not_found' })
-      const svg = await QRCode.toString(`${publicUrl(d.env)}/b/${l.token}`, { type: 'svg', errorCorrectionLevel: 'M', margin: 2 })
+      const svg = await QRCode.toString(`${publicUrl(d.env)}/b/${l.token}`, { type: 'svg', errorCorrectionLevel: 'M', margin: 2, color: { dark: '#1A1410', light: '#F5EDD8' } }) // dark on Ivory, never pure white (2026-11-20)
       return new Response(svg, { status: 200, headers: hdr({ 'content-type': 'image/svg+xml; charset=utf-8' }) })
     },
 
@@ -182,7 +182,7 @@ export function createLoopHandlers(deps: () => LoopDeps) {
       if (!mailLimiter.hit(clientIp(req), now.getTime())) return json(429, { ok: false, code: 'rate_limited' }, { 'Retry-After': '600' })
       const body = (await readBody(req)) as Record<string, unknown> | 'big' | null
       if (!body || body === 'big' || typeof body !== 'object') return json(400, { ok: false, code: 'bad_request' })
-      const r = await saveToEmail({ store: d.store, mailer: await mailOf(d), env: d.env, now }, visitorOf(req, d.env), body.email, body.language)
+      const r = await saveToEmail({ store: d.store, mailer: await mailOf(d), env: d.env, now }, visitorOf(req, d.env), body.email, body.language, { marketing: body.marketing === true })
       return mailAnswer(r)
     },
 

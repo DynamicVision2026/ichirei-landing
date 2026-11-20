@@ -247,7 +247,7 @@ export const STEP_COLUMNS: { label: string; codes: EventCode[] }[] = [
   { label: 'Visited', codes: ['visited'] },
   { label: 'Wrote', codes: ['tried'] },
   { label: 'Pictures', codes: ['previewed'] },
-  { label: 'Saved', codes: ['saved'] },
+  { label: 'Saved (e-mail)', codes: ['saved_email'] }, // saves with an e-mail only (2026-11-20): a save without one is not counted
   { label: 'Held free', codes: ['held'] },
   { label: 'Ordered', codes: ['ordered_free', 'ordered_paid'] },
   { label: 'Collected', codes: ['collected'] },
@@ -257,7 +257,7 @@ export const STEP_COLUMNS: { label: string; codes: EventCode[] }[] = [
 ]
 
 const EVENT_WORDS: Record<EventCode, string> = {
-  visited: 'Visited the page', tried: 'Wrote a moment', previewed: 'Saw the pictures', saved: 'Saved a gift', held: 'Held a free gift', hold_expired: 'Free-gift hold ended',
+  visited: 'Visited the page', tried: 'Wrote a moment', previewed: 'Saw the pictures', saved: 'Saved a gift', saved_email: 'Saved a gift under an e-mail', held: 'Held a free gift', hold_expired: 'Free-gift hold ended',
   hold_used: 'Used the free-gift hold', ordered_free: 'Ordered (free)', ordered_paid: 'Ordered (paid)', collected: 'Collected the gift', sent: 'Sent the link', opened: 'Receiver opened it',
   answered: 'Receiver answered', cancelled: 'Cancelled', refunded: 'Refunded',
 }

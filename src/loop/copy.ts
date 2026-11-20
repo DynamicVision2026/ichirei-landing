@@ -406,3 +406,83 @@ export function holdRefusal(code: string, price: string, lang: string = 'en'): s
       return THANKS.unavailable
   }
 }
+
+// ---- Save under the customer's e-mail (2026-11-20, the owner's words) ----
+export interface SaveCopy {
+  /** The panel's lead above the e-mail field */
+  lead: string
+  field: string
+  button: string
+  note: string
+  /** The prefilled address (partly hidden): the button and the way to type another */
+  useSaved: string
+  other: string
+  /** The separate, unticked box (the free-gift text) */
+  consent: string
+  /** After saving: where the gift is now (the masked address in the line) */
+  saved: (masked: string) => string
+  /** After saving while the mailer is not set up yet: the same line without the e-mail part */
+  savedPlain: string
+  open: string
+  /** My gifts on a new device: asks for the e-mail, then says "sent" whether or not it has gifts */
+  lookupLead: string
+  lookupSent: string
+  lookupButton: string
+  /** My gifts' heading once the e-mail is known */
+  heading: (masked: string, n: number) => string
+  /** the smaller copy-link line under the saved block */
+  scanLine: string
+}
+export const SAVE: Record<RevealLang, SaveCopy> = {
+  ja: {
+    lead: 'この贈りものを、あなたのメールアドレスに保存します。',
+    field: 'メールアドレス',
+    button: 'メールに保存する',
+    note: '保存した贈りもののリンクをお送りします。お知らせを送ることはありません。',
+    useSaved: 'このメールに保存する',
+    other: '別のメールにする',
+    consent: '新しい季節やお知らせを受け取る',
+    saved: (m) => `✓ 保存しました。${m}の贈りものとして、30日間お預かりします。リンクをメールでお送りしました。`,
+    savedPlain: '✓ 保存しました。30日間お預かりします。',
+    open: 'マイギフトを開く →',
+    lookupLead: 'メールアドレスを入れると、保存した贈りもののリンクをお送りします',
+    lookupSent: '送りました。メールのリンクから開いてください',
+    lookupButton: 'リンクを送る',
+    heading: (m, n) => `${m}に保存した贈りもの（${n}）`,
+    scanLine: 'スマホで読み取ると、いますぐ続きができます',
+  },
+  'zh-Hant': {
+    lead: '這份禮物會保存在你的電子郵件之下。',
+    field: '電子郵件',
+    button: '保存到我的電子郵件',
+    note: '我們只會寄給你保存禮物的連結，不寄其他東西。',
+    useSaved: '保存到這個電子郵件',
+    other: '換一個電子郵件',
+    consent: '也告訴我新的季節與優惠',
+    saved: (m) => `✓ 已保存在${m}之下，保留30天。連結已寄到你的信箱。`,
+    savedPlain: '✓ 已保存，保留30天。',
+    open: '打開我的禮物 →',
+    lookupLead: '輸入電子郵件，我們會把保存禮物的連結寄給你',
+    lookupSent: '已寄出。請從信中的連結開啟',
+    lookupButton: '寄連結給我',
+    heading: (m, n) => `保存在${m}的禮物（${n}）`,
+    scanLine: '用手機掃描，馬上就能繼續',
+  },
+  en: {
+    lead: "We'll save this gift under your email address.",
+    field: 'Email',
+    button: 'Save to my email',
+    note: "We'll send you the link to your saved gifts. Nothing else.",
+    useSaved: 'Save to this email',
+    other: 'Use a different email',
+    consent: 'Also tell me about new seasons and offers',
+    saved: (m) => `✓ Saved under ${m} for 30 days. We've emailed you the link.`,
+    savedPlain: "✓ Saved. We'll keep it for 30 days.",
+    open: 'Open My gifts →',
+    lookupLead: "Enter your email and we'll send you the link to your saved gifts",
+    lookupSent: 'Sent. Please open the link in the email',
+    lookupButton: 'Send me the link',
+    heading: (m, n) => `Saved under ${m} (${n})`,
+    scanLine: 'Scan this to continue on your phone right now',
+  },
+}

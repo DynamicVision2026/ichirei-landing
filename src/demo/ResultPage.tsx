@@ -1,5 +1,7 @@
 import { useEffect, useMemo, useRef } from 'react'
 import SavePanel from '../loop/SavePanel'
+import MyGiftsButton from '../loop/MyGifts'
+import { landingPath } from '../reveal/paths.ts'
 import { toRevealLang } from '../reveal/lang'
 import type { PreviewState } from './usePreview.ts'
 import type { PreviewCopy } from './preview-copy.ts'
@@ -37,7 +39,7 @@ export interface ResultLive {
   pc: PreviewCopy
 }
 
-export default function ResultPage({ live, onMake, onAnother }: { live: ResultLive; onMake: () => void; onAnother: () => void }) {
+export default function ResultPage({ live, onMake, onAnother, onBack }: { live: ResultLive; onMake: () => void; onAnother: () => void; onBack: () => void }) {
   const c = RESULT_COPY[live.language]
   const ref = useRef<HTMLDivElement | null>(null)
   const { preview } = live
@@ -53,6 +55,7 @@ export default function ResultPage({ live, onMake, onAnother }: { live: ResultLi
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
+  const lang = toRevealLang(live.language)
   const name = live.receiverName.trim()
   const heading = name ? c.headingNamed(name) : c.heading
   // pictures: a slot that failed for good shows the nearest PASSED picture (never the plain tile); nothing passed at all leaves the block out
@@ -78,6 +81,17 @@ export default function ResultPage({ live, onMake, onAnother }: { live: ResultLi
   return (
     <div className="rs" ref={ref} role="dialog" aria-modal="true" aria-label={heading} data-testid="result-page" data-quiet={live.quiet ? 'yes' : 'no'} data-memorial={live.memorial ? 'yes' : undefined} lang={live.language === 'zh-Hans' ? 'zh-Hans' : live.language === 'zh-Hant' ? 'zh-Hant' : live.language}>
       <div className="rs-inner">
+        {/* the writing room's header (2026-11-20): the brand (to the landing page in the page's language), My gifts (n), and the way back to the writing page with the story still in the box. It scrolls away with the page: never sticky. */}
+        <header className="rs-top" data-testid="result-top">
+          <a className="rs-brand" href={landingPath(lang)} data-testid="result-brand">
+            <span className="ji notranslate" aria-hidden="true">字</span>
+            <b>ICHIREI</b>
+          </a>
+          <div className="topR">
+            <MyGiftsButton lang={lang} />
+            <button type="button" className="writeBack" onClick={onBack} data-testid="result-back">{c.back}</button>
+          </div>
+        </header>
         <header className="rs-head">
           <h1 data-testid="result-heading" className="rs-name">{heading}</h1>
           <p className="rs-sub" data-testid="result-sub">{c.sub}</p>
@@ -144,7 +158,7 @@ export default function ResultPage({ live, onMake, onAnother }: { live: ResultLi
           <div className="rs-actions">
             <button type="button" className="rs-btn" data-testid="result-make" onClick={onMake}>{c.make}</button>
             <button type="button" className="rs-link" data-testid="result-another" onClick={onAnother}>{c.another}</button>
-            <SavePanel lang={toRevealLang(live.language)} className="rs-link" />
+            <SavePanel lang={lang} className="rs-link" />
           </div>
         </footer>
       </div>
