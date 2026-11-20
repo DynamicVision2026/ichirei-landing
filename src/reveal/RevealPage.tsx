@@ -1,3 +1,4 @@
+import { ExamplesSection } from './Examples.tsx'
 import { Suspense, lazy, useEffect, type ReactNode } from 'react'
 import { useLanguage } from '../useLanguage'
 import { trackPageView } from '../demo/analytics'
@@ -179,6 +180,7 @@ export default function RevealPage({ write = false }: { write?: boolean }) {
         <StoryShape t={t} />
         <Angles t={t} lang={lang} />
         <Steps t={t} lang={lang} memorial={memorial} woodOnSale={woodOnSale} />
+        <ExamplesSection lang={lang} />
         <Moments t={t} memorial={memorial} />
         <Reviews t={t} />
         <Receive lang={lang} />

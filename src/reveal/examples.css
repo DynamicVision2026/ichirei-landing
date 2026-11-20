@@ -1,0 +1,30 @@
+/* The examples (2026-11-20): paper-slip cards, the character in cinnabar, a ghost button, no pills. Same tokens as the landing (.rv). */
+.exBtn{display:inline-flex;align-items:center;justify-content:center;min-height:44px;padding:0 1.2rem;border:1px solid var(--ink,#1F2A44);border-radius:2px;background:transparent;color:var(--ink,#1F2A44);font:500 .95rem var(--display,system-ui);letter-spacing:.04em;text-decoration:none}
+.exBtn:hover{background:rgba(31,42,68,.06)}
+.exSection{padding-block:clamp(2.5rem,6vw,4.5rem)}
+.exH{font-family:var(--kanji,serif);font-size:clamp(1.5rem,4vw,2rem);margin:0 0 1.2rem;color:var(--ink,#1F2A44)}
+.exRow{display:flex;gap:1rem;overflow-x:auto;scroll-snap-type:x mandatory;padding:.2rem .1rem 1rem;-webkit-overflow-scrolling:touch}
+.exRow .exCard{flex:0 0 min(78vw,19rem);scroll-snap-align:start}
+@media (min-width:900px){.exRow{overflow:visible;flex-wrap:nowrap}.exRow .exCard{flex:1 1 0;min-width:0}}
+.exCard{display:flex;flex-direction:column;text-decoration:none;color:#2A221B;background:#FBF8F1;border:1px solid rgba(21,19,17,.12);border-top:1px solid #B8924A;border-radius:2px;box-shadow:0 12px 26px -16px rgba(40,30,15,.42);overflow:hidden}
+.exPic{display:block;aspect-ratio:1/1;background:#F1EADB;overflow:hidden}
+.exPic img{width:100%;height:100%;object-fit:cover;display:block}
+.exBody{display:grid;gap:.45rem;padding:1rem 1.1rem 1.1rem}
+.exFace{display:flex;align-items:baseline;gap:.7rem}
+.exGlyph{font:900 3.2rem/1 var(--kanji,serif);color:#C0392B}
+.exWord{font:700 1.2rem var(--kanji,serif);color:#2A221B}
+.exLine{font:500 1rem/1.6 var(--kanji,serif)}
+.exMoment{font:300 .82rem/1.6 Inter,var(--body,system-ui);letter-spacing:.02em;color:#5C564D}
+.exLang{justify-self:start;font:300 .72rem Inter,system-ui,sans-serif;letter-spacing:.14em;text-transform:uppercase;color:#5C564D;border:1px solid rgba(21,19,17,.22);border-radius:2px;padding:.1rem .5rem}
+.exAll{margin:.4rem 0 0}
+.exAll a{color:var(--ink,#1F2A44);font:500 .95rem var(--display,system-ui);text-decoration:underline;text-underline-offset:3px}
+.exMain{padding-block:2rem 4rem}
+.exTitle{font-family:var(--kanji,serif);font-size:clamp(1.8rem,6vw,2.6rem);margin:0 0 .4rem;color:var(--ink,#1F2A44)}
+.exLead{margin:0 0 1.4rem;color:var(--mute,#5B6178)}
+.exGrid{display:grid;grid-template-columns:1fr;gap:1.2rem}
+@media (min-width:760px){.exGrid{grid-template-columns:repeat(2,minmax(0,1fr))}}
+.exMake{margin:2rem 0 0}
+.exMake .btn{border-radius:2px}
+.ctaRow .exBtn{margin-left:.2rem}
+.exBtnSmall{min-height:38px;padding:0 .9rem;font-size:.85rem;margin-top:.5rem}
+.exUnder{margin:.3rem 0 .6rem}

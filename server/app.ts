@@ -24,6 +24,8 @@ import { handlers as opsHandlers } from '../api/ops.ts'
 import { statsHandlers } from '../api/ops-stats.ts'
 import { customerHandlers } from '../api/ops-customers.ts'
 import { homeHandlers } from '../api/ops-home.ts'
+import { examplesHandlers } from '../api/examples.ts'
+import { listSamples } from '../engine/sample.ts'
 import { POST as analyticsPost } from '../api/analytics.ts'
 import { GET as ratesGet } from '../api/rates.ts'
 import { GET as sizesGet } from '../api/sizes.ts'
@@ -122,7 +124,7 @@ export function createApp(config: ServerConfig): Hono {
     await next()
     c.header('Referrer-Policy', 'no-referrer')
   }
-  for (const path of ['/a/*', '/g/*', '/api/animation/*', '/api/gift/*', '/api/film/*', '/api/preview/*', '/b/*', '/api/b/*']) app.use(path, noReferrer)
+  for (const path of ['/a/*', '/g/*', '/s/*', '/api/animation/*', '/api/gift/*', '/api/film/*', '/api/preview/*', '/b/*', '/api/b/*']) app.use(path, noReferrer)
 
   // The browser token (2026-11-15, engine/visitor.ts): a first-party cookie, `ic_v`, on the first page visit and on the two routes that count free tries (/api/select, /api/preview). A missing or
   // forged cookie is replaced; nothing is ever refused for the lack of one. No banner: it is one functional cookie, named on /legal.
@@ -254,6 +256,9 @@ export function createApp(config: ServerConfig): Hono {
   app.get('/api/gift/:token/keepsake-card.png', limited(scrollLimit), (c) => giftHandlers.keepsakeCard(c.req.param('token'), c.req.query('preview')))
   app.get('/api/gift/:token/certificate.png', limited(scrollLimit), (c) => giftHandlers.certificate(c.req.param('token'), c.req.query('preview')))
   app.post('/api/gift/:token/opened', limited(replyLimit), (c) => (c.req.query('preview') ? previewRefused() : giftHandlers.opened(c.req.param('token'))))
+  app.get('/api/examples', limited(animationLimit), (c) => examplesHandlers.list(c.req.raw))
+  app.post('/api/examples/count', limited(animationLimit), (c) => examplesHandlers.count(c.req.raw))
+  app.post('/api/gift/:token/own', limited(animationLimit), (c) => giftHandlers.own(c.req.param('token')))
   app.post('/api/animation/:id/shared', limited(replyLimit), (c) => giftHandlers.sharedBySender(c.req.param('id')))
   app.post('/api/animation/:id/schedule', limited(replyLimit), async (c) => giftHandlers.scheduleForSender(c.req.param('id'), await c.req.json().catch(() => null)))
   app.get('/api/animation/:id/keepsake-card.png', limited(scrollLimit), (c) => giftHandlers.keepsakeCardForSender(c.req.param('id')))
@@ -274,6 +279,9 @@ export function createApp(config: ServerConfig): Hono {
   app.get('/ops', limited(opsLimit), (c) => opsHandlers.page(c.req.raw))
   app.get('/ops/home', limited(opsLimit), (c) => homeHandlers.page(c.req.raw))
   app.get('/ops/home/orders.csv', limited(opsLimit), (c) => homeHandlers.csv(c.req.raw))
+  app.post('/ops/home/samples', limited(opsLimit), (c) => homeHandlers.samplesMake(c.req.raw))
+  app.post('/ops/home/samples/update', limited(opsLimit), (c) => homeHandlers.samplesUpdate(c.req.raw))
+  app.get('/ops/home/sample-qr/:file', limited(opsLimit), (c) => homeHandlers.sampleQr(c.req.raw, c.req.param('file').replace(/\.png$/, '')))
   app.post('/ops/home/exempt', limited(opsLimit), (c) => homeHandlers.exempt(c.req.raw))
   app.post('/ops/home/engine-check', limited(opsLimit), (c) => homeHandlers.engineCheck(c.req.raw))
   app.get('/ops/home/customers.csv', limited(opsLimit), (c) => homeHandlers.customersCsv(c.req.raw))
@@ -349,9 +357,31 @@ export function createApp(config: ServerConfig): Hono {
     await next()
     c.header('X-Robots-Tag', 'noindex, nofollow')
   })
+  app.use('/s/*', async (c, next) => {
+    await next()
+    c.header('X-Robots-Tag', 'noindex, nofollow')
+  })
   // The receiver's link, as HTML for the crawlers of LINE, WhatsApp, WeChat and mail (they do not run the page's scripts): this gift's own Open Graph tags
   // (names and the opening date, and the envelope picture — never the character). Everything else about the page is the built index.html.
   let indexHtml: string | null = null
+  // The short printed addresses (2026-11-20): the corporate site's Firebase redirects (beyondculture.ai/ichirei/sample, …/en/sample) point at these, and these send the visitor to the example marked
+  // "featured" for that language (the landing page when there is none).
+  for (const [path, lang, fallback] of [['/sample', 'ja', '/'], ['/en/sample', 'en', '/en'], ['/zh/sample', 'zh-Hant', '/zh']] as const) {
+    app.get(path, limited(animationLimit), async (c) => {
+      const rows = await listSamples(createOrderStore()).catch(() => [])
+      const hit = rows.find((r) => r.on && r.featured && (lang === 'zh-Hant' ? r.language.startsWith('zh') : r.language === lang))
+      return c.redirect(hit ? `/s/${hit.token}` : fallback, 302)
+    })
+  }
+  // the example gift (2026-11-20): /s/<token> is the same page and the same tags (names are 「あなた」 / 「一字礼」; the preview says it is an example)
+  app.get('/s/:token', limited(animationLimit), async (c, next) => {
+    try {
+      indexHtml ??= await readFile('./dist/index.html', 'utf8')
+    } catch {
+      return next()
+    }
+    return (await giftHandlers.page(c.req.param('token'), indexHtml)) ?? next()
+  })
   app.get('/g/:token', limited(animationLimit), async (c, next) => {
     try {
       indexHtml ??= await readFile('./dist/index.html', 'utf8')

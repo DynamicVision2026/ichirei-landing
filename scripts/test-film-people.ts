@@ -7,6 +7,9 @@
 //
 //   node --experimental-strip-types --disable-warning=ExperimentalWarning scripts/test-film-people.ts
 
+// (the fake image model draws one and the same picture for every slot; the duplicate check has its own test, scripts/test-duplicate-pictures.ts)
+process.env.ICHIREI_DUPLICATE_CHECK = 'off'
+
 import { fakePicture } from './_fake-picture.mjs'
 import { readFileSync, readdirSync } from 'node:fs'
 import * as OpenCC from 'opencc-js'

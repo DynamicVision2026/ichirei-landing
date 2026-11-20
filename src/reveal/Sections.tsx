@@ -1,3 +1,4 @@
+import { ExamplesButton } from './Examples.tsx'
 import { useFlowActive } from './flow-store.ts'
 import { SUPPORT_EMAIL } from '../order/support'
 import { PACKAGE_DISPLAY_ORDER, RECOMMENDED_PACKAGE } from '../order/packages.ts'
@@ -230,7 +231,8 @@ export function Steps({ t, lang = 'en', memorial = false, woodOnSale = false }: 
       <div className="wrap center" style={{ marginTop: '2.4rem' }}>
         <a className="btn primary" href={writeLink()}>
           {t.ctaSteps}
-        </a>
+        </a>{' '}
+        <ExamplesButton lang={lang} />
         <PromoNote lang={lang} id="steps" />
       </div>
     </section>

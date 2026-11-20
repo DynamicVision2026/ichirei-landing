@@ -60,8 +60,11 @@ export default function NewCeremony({ view, preview, q }: { view: GiftView; prev
   const firstMark = useRef<HTMLButtonElement>(null)
   const stage = useRef<HTMLDivElement>(null)
   const root = useRef<HTMLElement>(null)
-  const from = view.from ?? ''
-  const to = view.to ?? ''
+  // an example gift (2026-11-20) says 「あなた」 / "You" from 「一字礼」 / "ICHIREI" on its certificate only; the words of the ceremony speak without names (no 「あなたさんへ」)
+  const from = view.sample ? '' : view.from ?? ''
+  const to = view.sample ? '' : view.to ?? ''
+  const certTo = view.to ?? ''
+  const certFrom = view.from ?? ''
 
   // the 398 px stage, scaled up on a large screen by min(w/430, h/660, 1.7) (never down)
   useStageFit(stage, root)
@@ -80,7 +83,7 @@ export default function NewCeremony({ view, preview, q }: { view: GiftView; prev
     const m = firstMark.current?.getBoundingClientRect()
     if (m && m.width) markAt.current = { x: m.left + m.width / 2, y: m.top + m.height / 2 }
     if (!preview) {
-      trackReceiverOpened(view.token)
+      if (!view.sample) trackReceiverOpened(view.token)
       // the sender's page shows "Opened (time)": the first opening is kept (codes only)
       try { void fetch(`/api/gift/${view.token}/opened`, { method: 'POST', keepalive: true }).catch(() => {}) } catch { /* the page works without it */ }
     }
@@ -96,6 +99,7 @@ export default function NewCeremony({ view, preview, q }: { view: GiftView; prev
         <p className="cr-wm">ICHIREI</p>
         <p className="cr-wv" lang="ja">一字礼</p>
         {preview && <p className="cr-preview" data-testid="gift-preview-note">{C.previewNote}</p>}
+        {view.sample && <p className="cr-preview cr-sample" data-testid="sample-note">{SAMPLE_COPY[sampleLang(view.language)].note}</p>}
 
         {/* Part 11: the sender's own preview of a gift that is still locked shows the waiting screen first — what the receiver sees until the time — then lets the sender go on */}
         {screen === 'wait' && view.waiting && (
@@ -174,16 +178,16 @@ export default function NewCeremony({ view, preview, q }: { view: GiftView; prev
                 </p>
               )}
               {wordOf(view) && <p className="cr-m" style={{ margin: 0, fontSize: 25, fontWeight: 900 }} data-testid="gift-cert-word">{wordOf(view)}</p>}
-              {(to || from) && (
+              {(certTo || certFrom) && (
                 C.certLines ? (
                   <div className="cr-pair cr-pair-lines">
-                    {to && <p className="cr-name" data-testid="gift-cert-to">{C.certToLine(to)}</p>}
-                    {from && <p className="cr-name" data-testid="gift-cert-from">{C.certFromLine(from)}</p>}
+                    {certTo && <p className="cr-name" data-testid="gift-cert-to">{C.certToLine(certTo)}</p>}
+                    {certFrom && <p className="cr-name" data-testid="gift-cert-from">{C.certFromLine(certFrom)}</p>}
                   </div>
                 ) : (
                   <div className="cr-pair">
-                    {to && <div><p className="cr-lab">{C.certFor}</p><p className="cr-name" data-testid="gift-cert-to">{to}</p></div>}
-                    {from && <div><p className="cr-lab">{C.certFrom}</p><p className="cr-name" data-testid="gift-cert-from">{from}</p></div>}
+                    {certTo && <div><p className="cr-lab">{C.certFor}</p><p className="cr-name" data-testid="gift-cert-to">{certTo}</p></div>}
+                    {certFrom && <div><p className="cr-lab">{C.certFrom}</p><p className="cr-name" data-testid="gift-cert-from">{certFrom}</p></div>}
                   </div>
                 )
               )}
@@ -642,6 +646,14 @@ function KeepScreen({ view, preview, q, from, onAnswer }: { view: GiftView; prev
  *   · nothing offered (a remembrance, a quiet purpose, a reply itself, switched off): only the question below.
  * Under it, unchanged: 「まだ、きちんと伝えられていない人はいませんか。」 with 「あなたも一字を贈る」 (and the promotion box only while it runs).
  */
+/** The example gift's words (2026-11-20): the one line at the top, and the one button of the last screen (to the writing side of the site, counted as `src=x_sample`). */
+export const SAMPLE_COPY: Record<'ja' | 'en' | 'zh-Hant', { note: string; button: string; off: string }> = {
+  ja: { note: '一字礼の贈りもの（見本）。実際にこのように届きます。', button: 'あなたの大切な人へ', off: 'この見本は公開を終了しました' },
+  en: { note: 'An example ICHIREI gift, the way it arrives on a phone.', button: 'Make one for someone of yours', off: 'This example is no longer available' },
+  'zh-Hant': { note: '一字禮的禮物（範例）。實際上會這樣送達。', button: '送給你重要的人', off: '這個範例已停止公開' },
+}
+const sampleLang = (l: string): 'ja' | 'en' | 'zh-Hant' => (l === 'ja' ? 'ja' : l === 'en' ? 'en' : 'zh-Hant')
+
 function LastScreen({ view, from, preview, onBackToGift }: { view: GiftView; from: string; preview: boolean; onBackToGift: () => void }) {
   const lang = cerLang(view.language)
   const C = CER[lang]
@@ -667,7 +679,7 @@ function LastScreen({ view, from, preview, onBackToGift }: { view: GiftView; fro
   return (
     <section className="cr-scr cr-flow" data-testid="gift-last" data-back={back?.state ?? 'none'}>
       {/* Part 8 (2026-11-20): the receiver's own マイギフト, in the same corner as on every other page */}
-      <div className="cr-mygifts-top" data-testid="cr-mygifts-top"><MyGiftsButton lang={lang === 'zh-Hans' ? 'zh-Hant' : lang} receiver /></div>
+      {!view.sample && <div className="cr-mygifts-top" data-testid="cr-mygifts-top"><MyGiftsButton lang={lang === 'zh-Hans' ? 'zh-Hant' : lang} receiver /></div>}
       {back && (
         <>
           <h2 className="cr-h" data-testid="gift-back-title">{title[0]}{title[1] && <><br />{title[1]}</>}</h2>
@@ -692,8 +704,14 @@ function LastScreen({ view, from, preview, onBackToGift }: { view: GiftView; fro
           <p className="cr-promo-sub">{T.sub}</p>
         </div>
       )}
-      <a className="cr-blk" href={C.landing} data-testid="gift-landing-line">{C.giveOwn}</a>
-      <button type="button" className="cr-go cr-quiet" onClick={onBackToGift}>{C.backToGift}</button>
+      {view.sample ? (
+        <a className="cr-blk" href={`${C.landing === '/' ? '/' : C.landing}?src=x_sample`} data-testid="gift-landing-line" data-sample="yes" onClick={() => { try { void fetch(`/api/gift/${view.token}/own`, { method: 'POST', keepalive: true }).catch(() => {}) } catch { /* a count only */ } }}>{SAMPLE_COPY[sampleLang(view.language)].button}</a>
+      ) : (
+        <>
+          <a className="cr-blk" href={C.landing} data-testid="gift-landing-line">{C.giveOwn}</a>
+          <button type="button" className="cr-go cr-quiet" onClick={onBackToGift}>{C.backToGift}</button>
+        </>
+      )}
     </section>
   )
 }

@@ -183,3 +183,7 @@
 /* Part 14 (2026-11-20): the free gift back — one button, and (once it is used) the character that was sent, in ink */
 .cr-backbtn { align-self: flex-start; }
 .cr-char-ink { margin: 0; font-family: var(--f-m); font-weight: 900; font-size: 96px; line-height: 1.1; color: var(--ink); }
+
+/* The example gift's one line (2026-11-20): small, two lines at most, and the screens start below it. */
+.cr-preview.cr-sample { top: 44px; font-size: 12px; line-height: 1.35; right: 44px; }
+.cr-sample ~ .cr-flow { padding-top: 104px; }

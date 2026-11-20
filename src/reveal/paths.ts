@@ -32,3 +32,10 @@ export const basketLangOf = (path: string): RevealLang | null => {
   const p = path.replace(/\/+$/, '')
   return p === '/en/basket' ? 'en' : p === '/zh/basket' ? 'zh-Hant' : p === '/basket' ? 'ja' : null
 }
+
+/** The examples page (2026-11-20): /examples, /en/examples, /zh/examples. */
+export const examplesPath = (lang: RevealLang): string => (lang === 'en' ? '/en/examples' : lang === 'zh-Hant' ? '/zh/examples' : '/examples')
+export const examplesLangOf = (path: string): RevealLang | null => {
+  const p = path.replace(/\/+$/, '')
+  return p === '/en/examples' ? 'en' : p === '/zh/examples' ? 'zh-Hant' : p === '/examples' ? 'ja' : null
+}

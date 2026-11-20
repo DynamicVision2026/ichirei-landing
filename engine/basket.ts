@@ -140,6 +140,9 @@ export async function saveBasketItem(store: OrderStore | null, browser: string, 
   })
   for (const d of dropped) await store.deleteObject?.(itemPath(d)).catch(() => {})
   await store.putObject(tokPath(token), JSON.stringify({ customer }), 'application/json', { ifAbsent: true }).catch(() => false)
+  // which saved item holds the card of this draft (the owner's dashboard can turn the draft into a sample: engine/sample.ts); the id of the item only, nothing of the story
+  const pv = typeof input.preview_id === 'string' && /^AN-[a-z2-9]{20}$/.test(input.preview_id) ? input.preview_id : null
+  if (pv) await store.putObject(`basket/pv/${pv}.json`, JSON.stringify({ item: id }), 'application/json').catch(() => false)
   return { ok: true, id, token, created, customer }
 }
 

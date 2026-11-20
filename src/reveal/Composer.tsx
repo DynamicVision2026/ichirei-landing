@@ -1,3 +1,5 @@
+import { ExamplesButton } from './Examples.tsx'
+import { toRevealLang } from './lang.ts'
 import { useEffect, useRef, useState } from 'react'
 import { trackFlow, trackUs } from '../demo/analytics'
 import { OCCASION_CHIPS, RELATIONSHIP_CHIPS, occasionChipOf, relationshipChipOf } from '../order/en-chips.ts'
@@ -474,6 +476,7 @@ export default function Composer({ story, onStoryChange, onSubmit, copy, lang, c
           {copy.storyCounter(n, STORY_MAX)}
         </span>
       </div>
+      <p className="exUnder" data-testid="examples-under-hint"><ExamplesButton lang={toRevealLang(context.language)} className="exBtnSmall" /></p>
       {over && (
         <p className="storyOver" role="alert" data-testid="story-over">
           {copy.storyOver}

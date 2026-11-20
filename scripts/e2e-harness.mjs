@@ -7080,6 +7080,162 @@ for (const [lang, locale, text] of [['en', 'en-US', 'Your gift is being finished
   }
 }
 
+// ---------- Run 53 (2026-11-20): the read-only example gift (/s/<token>), the examples page, the landing section and the 「見本を見る」 buttons ----------
+{
+  const SHOTS53 = process.env.E2E_SHOTS_DIR || '/tmp/e2e-shots'
+  const TOKEN = 'RG-samplesamplesample22'
+  const PICS = ['/img/scenes/children.jpg', '/img/scenes/friends.jpg', '/img/scenes/m1.jpg', '/img/scenes/m2.jpg']
+  const mkView = (lang) => ({
+    id: TOKEN, token: TOKEN, language: lang, glyph: '整', reading: lang === 'ja' ? 'ととのえる' : '', romanization: lang === 'en' ? 'sei' : '', meaning_en: lang === 'en' ? 'composed' : null,
+    ...(lang === 'en' ? { en: { word: 'composed', word_source: 'generated', line: 'One who takes a breath at the door.', line_you: 'You take a breath at the door.', echo: null } } : {}),
+    who: lang === 'ja' ? '玄関の前で深く息をついて自分を整え、何でもなかったような声で「ただいま」と言う人。' : lang === 'en' ? 'One who takes a breath at the door.' : '在門前深深呼吸、整理好自己，再若無其事說「我回來了」的人。',
+    poem: { type: lang === 'ja' ? 'tanka' : 'free', lines: lang === 'ja' ? ['玄関の', '深い息つぎ', 'そのあとの', 'ただいまの声', 'やわらかい'] : ['at the door', 'one breath, then home'], reading: '' }, memorial: false, purpose: 'thanks', music: 'thanks',
+    film: { status: 'ready', lines: lang === 'ja' ? ['玄関の前で立ち止まる', '深く息をつく', '「ただいま」と言う', '台所の灯りがともる'] : ['She stops at the door', 'A long breath', '"I\'m home"', 'The kitchen light is on'], pictures: PICS },
+    certificate_line: 'x', from: lang === 'ja' ? '一字礼' : lang === 'en' ? 'ICHIREI' : '一字禮', to: lang === 'ja' ? 'あなた' : lang === 'en' ? 'You' : '你', message: '', egift: null, locked: false, certificate_no: null, order_date: '2026-11-20', opens_on: null,
+    replied: false, package: 'egift', back: null, sample: true,
+  })
+  const locale = (l) => (l === 'ja' ? 'ja-JP' : l === 'en' ? 'en-US' : 'zh-TW')
+  const openSample = async (lang, { w = 390, h = 844, off = false } = {}) => {
+    const ctx = await browser.newContext({ locale: locale(lang), viewport: { width: w, height: h }, reducedMotion: 'reduce' })
+    const page = await ctx.newPage()
+    const errs = []
+    const seen = { opened: 0, own: 0, back: 0, reply: 0, tracked: [] }
+    page.on('pageerror', (e) => errs.push(String(e)))
+    await page.route('**/api/analytics', (r) => { try { seen.tracked.push(JSON.parse(r.request().postData() ?? '{}')) } catch { /* */ } return r.fulfill({ status: 204, body: '' }) })
+    await page.route('**/api/me*', (r) => r.fulfill({ json: { basket: { count: 0 }, ready: null, hold: null } }))
+    await page.route('**/api/promo', (r) => r.fulfill({ json: { on: false, left: 0, daily: 100, hold: null } }))
+    await page.route('**/api/sizes', (r) => r.fulfill({ json: { sizes: ['egift'], promo: { from: '2026-10-01T00:00:00Z', until: '2026-10-31T00:00:00Z' }, usd: { egift: 25, egift_sale: 17.5 } } }))
+    await page.route(`**/api/gift/${TOKEN}**`, async (r) => {
+      const u = new URL(r.request().url())
+      if (u.pathname === `/api/gift/${TOKEN}/opened`) { seen.opened++; return r.fulfill({ json: { ok: true } }) }
+      if (u.pathname === `/api/gift/${TOKEN}/own`) { seen.own++; return r.fulfill({ json: { ok: true } }) }
+      if (u.pathname === `/api/gift/${TOKEN}/back`) { seen.back++; return r.fulfill({ status: 403, json: {} }) }
+      if (u.pathname === `/api/gift/${TOKEN}/reply`) { seen.reply++; return r.fulfill({ status: 403, json: {} }) }
+      if (off) return r.fulfill({ status: 410, json: { error: 'sample_off', code: 'sample_off', language: lang } })
+      if (u.pathname === `/api/gift/${TOKEN}/render`) return r.fulfill({ json: { state: 'ready', view: mkView(lang) } })
+      if (u.pathname === `/api/gift/${TOKEN}`) return r.fulfill({ json: mkView(lang) })
+      return r.fulfill({ status: 204, body: '' })
+    })
+    await page.goto(`http://localhost:5173/s/${TOKEN}`, { waitUntil: 'networkidle' })
+    return { page, ctx, errs, seen }
+  }
+  const NOTE = { ja: '一字礼の贈りもの（見本）。実際にこのように届きます。', en: 'An example ICHIREI gift, the way it arrives on a phone.', 'zh-Hant': '一字禮的禮物（範例）。實際上會這樣送達。' }
+  const BTN = { ja: ['あなたの大切な人へ', '/?src=x_sample'], en: ['Make one for someone of yours', '/en?src=x_sample'], 'zh-Hant': ['送給你重要的人', '/zh?src=x_sample'] }
+  const Tt = (page, id) => page.locator(`[data-testid=${id}]`)
+  for (const lang of ['ja', 'en', 'zh-Hant']) {
+    const { page, ctx, errs, seen } = await openSample(lang)
+    await Tt(page, 'cr-mark').waitFor()
+    check(`sample (${lang}): the ceremony opens with the one small line at the top — 「${NOTE[lang]}」`, (await Tt(page, 'sample-note').innerText()) === NOTE[lang] && (await page.locator('main').getAttribute('data-ceremony')) === 'new')
+    if (lang !== 'zh-Hant') await page.screenshot({ path: `${SHOTS53}/sample-${lang}-1-first-390.png` })
+    await Tt(page, 'cr-markbtn').click()
+    await page.waitForTimeout(300)
+    check(`sample (${lang}): touching the mark counts one open for the sample (nothing is marked), not a receiver's open`, seen.opened === 1 && !seen.tracked.some((e) => e.event === 'receiver_opened'))
+    await Tt(page, 'gift-skip').click({ timeout: 15000 }) // (no sender's note on a sample: the film comes straight after the mark)
+    await Tt(page, 'cr-to-poem').click(); await Tt(page, 'cr-to-cert').click(); await Tt(page, 'cr-to-keep').click()
+    check(`sample (${lang}): the saving and sharing buttons stay (save everything, share) and there is still a way on`, (await Tt(page, 'save-all').count()) === 1 && (await Tt(page, 'share-button').count()) === 1 && (await Tt(page, 'gift-to-answer').count()) === 1)
+    await Tt(page, 'gift-to-answer').click()
+    await Tt(page, 'gift-last').waitFor()
+    const btn = Tt(page, 'gift-landing-line')
+    check(`sample (${lang}): the last screen has ONE button — 「${BTN[lang][0]}」 to ${BTN[lang][1]} — and no gift back, no send-back, no My gifts corner, no back-to-gift button`, (await btn.innerText()).toLowerCase() === BTN[lang][0].toLowerCase() && (await btn.getAttribute('href')) === BTN[lang][1] && (await Tt(page, 'gift-back-button').count()) === 0 && (await Tt(page, 'cr-mygifts-top').count()) === 0 && (await page.locator('main button, main a').filter({ hasText: /./ }).evaluateAll((els) => els.filter((e) => e.getAttribute('data-testid') !== 'gift-landing-line' && e.offsetParent !== null && /cr-blk|cr-go|cr-backbtn/.test(e.className)).length)) === 0)
+    check(`sample (${lang}): the free-gift box shows only while the promotion runs (here it is over: not shown)`, (await Tt(page, 'gift-landing-promo').count()) === 0)
+    if (lang !== 'zh-Hant') await page.screenshot({ path: `${SHOTS53}/sample-${lang}-2-last-390.png` })
+    await page.route('**/write**', (r) => r.fulfill({ status: 200, contentType: 'text/html', body: '<html></html>' }))
+    await page.route('**/?src=x_sample', (r) => r.fulfill({ status: 200, contentType: 'text/html', body: '<html></html>' }))
+    await btn.click().catch(() => {})
+    await page.waitForTimeout(300)
+    check(`sample (${lang}): pressing it counts one "made their own" for the sample`, seen.own === 1)
+    check(`sample (${lang}): nothing was sent back or replied`, seen.back === 0 && seen.reply === 0)
+    check(`no page errors (run 53, sample ${lang})`, errs.length === 0, errs.join('; '))
+    await ctx.close()
+  }
+  // switched off: the calm line and the landing button
+  for (const [lang, off, go] of [['ja', 'この見本は公開を終了しました', '/'], ['en', 'This example is no longer available', '/en'], ['zh-Hant', '這個範例已停止公開', '/zh']]) {
+    const { page, ctx } = await openSample(lang, { off: true })
+    await Tt(page, 'sample-off').waitFor()
+    check(`sample (${lang}, switched off): 「${off}」 with the landing button`, (await Tt(page, 'sample-off').innerText()) === off && (await Tt(page, 'sample-off-landing').getAttribute('href')) === go)
+    await ctx.close()
+  }
+  // the examples page, the landing section and the buttons
+  const CARDS = (l) => [
+    { token: 'RG-exaaaaaaaaaaaaaaaaaa', language: 'ja', glyph: '整', word: 'ととのえる', line: '玄関の前で深く息をついて自分を整える人。', moment: '玄関の前で立ち止まる', picture: '/img/scenes/children.jpg' },
+    { token: 'RG-exbbbbbbbbbbbbbbbbbb', language: 'en', glyph: '庇', word: 'shelter', line: 'One who takes the day\'s weather so the kitchen stays warm.', moment: 'She stops at the door', picture: '/img/scenes/friends.jpg' },
+    { token: 'RG-exccccccccccccccccc2', language: 'ja', glyph: '守', word: 'まもる', line: '結果の貼り紙の前で、何も言わずに待っていた人。', moment: '貼り紙の前で', picture: '/img/scenes/m1.jpg' },
+  ].sort((a, b) => Number(b.language === (l === 'zh-Hant' ? 'zh-Hant' : l)) - Number(a.language === (l === 'zh-Hant' ? 'zh-Hant' : l)))
+  const mockSite = async (page, lang, counts) => {
+    await page.route('**/api/analytics', (r) => { try { counts.tracked.push(JSON.parse(r.request().postData() ?? '{}')) } catch { /* */ } return r.fulfill({ status: 204, body: '' }) })
+    await page.route('**/api/me*', (r) => r.fulfill({ json: { basket: { count: 0 }, ready: null, hold: null } }))
+    await page.route('**/api/promo', (r) => r.fulfill({ json: { on: false, left: 0, daily: 100, hold: null } }))
+    await page.route('**/api/sizes', (r) => r.fulfill({ json: { sizes: ['egift'], promo: { from: '2026-11-01T00:00:00Z', until: '2026-11-30T00:00:00Z' }, usd: { egift: 25, egift_sale: 17.5 } } }))
+    await page.route('**/api/examples?*', (r) => r.fulfill({ json: { examples: CARDS(lang) } }))
+    await page.route('**/api/examples/count', (r) => { try { counts.count.push(JSON.parse(r.request().postData() ?? '{}').kind) } catch { /* */ } return r.fulfill({ json: { ok: true } }) })
+    await page.route('**/api/gift/RG-ex*/picture/*', (r) => r.fulfill({ status: 302, headers: { location: '/img/scenes/children.jpg' } }))
+  }
+  const EXP = { ja: ['/examples', '一字礼の見本', '見本を見る', 'あなたの大切な人へ', '/write?src=examples', 'ほかの見本も見る →', '/'], en: ['/en/examples', 'ICHIREI examples', 'See examples', 'Make one for someone of yours', '/en/write?src=examples', 'See all examples →', '/en'], 'zh-Hant': ['/zh/examples', '一字禮範例', '看範例', '送給你重要的人', '/zh/write?src=examples', '看更多範例 →', '/zh'] }
+  for (const lang of ['ja', 'en', 'zh-Hant']) {
+    const [path, title, btnText, makeText, makeHref, allText, landing] = EXP[lang]
+    const ctx = await browser.newContext({ locale: locale(lang), viewport: { width: 390, height: 844 } })
+    const page = await ctx.newPage()
+    const errs = []
+    const counts = { tracked: [], count: [] }
+    page.on('pageerror', (e) => errs.push(String(e)))
+    await mockSite(page, lang, counts)
+    await page.goto(`http://localhost:5173${path}`, { waitUntil: 'networkidle' })
+    await Tt(page, 'examples-page').waitFor()
+    await page.locator('[data-testid=example-card]').first().waitFor()
+    const cards = await page.locator('[data-testid=example-card]').evaluateAll((els) => els.map((e) => ({ lang: e.getAttribute('data-lang'), href: e.getAttribute('href'), glyph: e.querySelector('[data-testid=example-glyph]')?.textContent, color: getComputedStyle(e.querySelector('[data-testid=example-glyph]')).color, label: e.querySelector('[data-testid=example-lang]')?.textContent ?? null, hasWord: !!e.querySelector('[data-testid=example-word]'), line: !!e.querySelector('[data-testid=example-line]'), moment: !!e.querySelector('[data-testid=example-moment]'), img: e.querySelector('img')?.getAttribute('loading') })))
+    const own = lang === 'zh-Hant' ? 'zh-Hant' : lang
+    check(`examples (${lang}): the title 「${title}」, one card per example (3 here), the page's own language first, the others labelled with their language`, (await Tt(page, 'examples-title').innerText()) === title && cards.length === 3 && (!cards.some((c) => c.lang === own) || cards[0].lang === own) && cards.slice(1).every((c) => c.lang !== own ? !!c.label : true) && cards.filter((c) => c.lang !== own).every((c) => c.label), JSON.stringify(cards))
+    check(`examples (${lang}): each card shows the character in cinnabar, its word, the one line, one line of the moment and a lazy picture`, cards.every((c) => c.color === 'rgb(192, 57, 43)' && c.hasWord && c.line && c.moment && c.img === 'lazy'))
+    check(`examples (${lang}): a card opens that example's ceremony (/s/<token>?src=examples)`, cards.every((c) => /^\/s\/RG-ex[a-z0-9]+\?src=examples$/.test(c.href)))
+    check(`examples (${lang}): the page view is counted (a count only)`, counts.count.filter((k) => k === 'view').length >= 1)
+    check(`examples (${lang}): at the bottom 「${makeText}」 goes to the writing page with src=examples`, (await Tt(page, 'examples-make').innerText()) === makeText && (await Tt(page, 'examples-make').getAttribute('href')) === makeHref)
+    check(`examples (${lang}): no horizontal scroll at 390 px and no corner above 4px on the cards or the button`, (await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 1)) && (await page.evaluate(() => [...document.querySelectorAll('.exCard, .exMake .btn')].every((e) => parseFloat(getComputedStyle(e).borderTopLeftRadius) <= 4))))
+    if (lang === 'ja') await page.screenshot({ path: `${SHOTS53}/examples-ja-390.png`, fullPage: true })
+    await page.route('**/s/**', (r) => r.fulfill({ status: 200, contentType: 'text/html', body: '<html></html>' }))
+    await page.locator('[data-testid=example-card]').first().click().catch(() => {})
+    await page.waitForTimeout(300)
+    check(`examples (${lang}): opening a card is counted`, counts.count.includes('card'))
+    check(`no page errors (run 53, examples ${lang})`, errs.length === 0, errs.join('; '))
+    await ctx.close()
+    // the landing: the buttons, the swipe row and "see all"
+    const c2 = await browser.newContext({ locale: locale(lang), viewport: { width: 390, height: 844 } })
+    const lp = await c2.newPage()
+    const lcounts = { tracked: [], count: [] }
+    await mockSite(lp, lang, lcounts)
+    await lp.goto(`http://localhost:5173${landing}`, { waitUntil: 'networkidle' })
+    await lp.locator('[data-testid=examples-section]').waitFor({ timeout: 8000 })
+    const land = await lp.evaluate(() => {
+      const btns = [...document.querySelectorAll('[data-testid=examples-button]')]
+      const row = document.querySelector('[data-testid=examples-row]')
+      const cs = [...document.querySelectorAll('[data-testid=examples-row] [data-testid=example-card]')]
+      const r0 = cs[0].getBoundingClientRect(); const r1 = cs[1].getBoundingClientRect()
+      return { n: btns.length, text: btns.map((b) => b.textContent), hrefs: btns.map((b) => b.getAttribute('href')), radius: btns.map((b) => parseFloat(getComputedStyle(b).borderTopLeftRadius)), overflowX: getComputedStyle(row).overflowX, firstW: r0.width, nextLeft: r1.left, vw: window.innerWidth, lazy: cs.every((c) => c.querySelector('img')?.getAttribute('loading') === 'lazy'), all: document.querySelector('[data-testid=examples-all]')?.textContent, allHref: document.querySelector('[data-testid=examples-all]')?.getAttribute('href') }
+    })
+    check(`landing (${lang}): the 「${btnText}」 ghost button next to the start button and in "How it works" (never a pill), linking to ${path}`, land.n >= 2 && land.text.every((t) => t === btnText) && land.hrefs.every((h) => h === path) && land.radius.every((x) => x <= 4), JSON.stringify(land))
+    check(`landing (${lang}): the examples section is a swipeable row — one card and a bit of the next visible on a phone — with lazy pictures and 「${allText}」 to ${path}`, land.overflowX === 'auto' && land.nextLeft < land.vw - 20 && land.nextLeft > land.firstW && land.lazy && land.all === allText && land.allHref === path, JSON.stringify(land))
+    await c2.close()
+    // the writing page: the button under the guide line
+    const c3 = await browser.newContext({ locale: locale(lang), viewport: { width: 390, height: 844 } })
+    const wp = await c3.newPage()
+    await mockSite(wp, lang, { tracked: [], count: [] })
+    await wp.goto(`http://localhost:5173${lang === 'ja' ? '/write' : lang === 'en' ? '/en/write' : '/zh/write'}`, { waitUntil: 'networkidle' })
+    await wp.locator('[data-testid=examples-under-hint]').waitFor({ timeout: 8000 })
+    check(`writing page (${lang}): 「${btnText}」 sits under the moment box's guide line and goes to ${path}`, (await wp.locator('[data-testid=examples-under-hint] a').innerText()) === btnText && (await wp.locator('[data-testid=examples-under-hint] a').getAttribute('href')) === path)
+    await c3.close()
+  }
+  // counting: arriving with src=x_sample / src=examples is its own source
+  for (const tag of ['x_sample', 'examples']) {
+    const ctx = await browser.newContext({ locale: 'ja-JP', viewport: { width: 390, height: 844 } })
+    const page = await ctx.newPage()
+    const counts = { tracked: [], count: [] }
+    await mockSite(page, 'ja', counts)
+    await page.goto(`http://localhost:5173/?src=${tag}`, { waitUntil: 'networkidle' })
+    await page.waitForTimeout(500)
+    check(`counting: arriving with ?src=${tag} sends the page view with that tag as its source (no personal data)`, counts.tracked.some((e) => e.event === 'page_view' && e.ref === tag))
+    await ctx.close()
+  }
+}
+
 await browser.close()
 console.log(failures === 0 ? '\nALL E2E CHECKS PASSED' : `\n${failures} CHECKS FAILED`)
 process.exit(failures === 0 ? 0 : 1)

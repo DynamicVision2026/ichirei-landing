@@ -4,6 +4,9 @@
 //
 //   node --experimental-strip-types scripts/test-animation.ts
 
+// (the fake image model draws one and the same picture for every slot; the duplicate check has its own test, scripts/test-duplicate-pictures.ts)
+process.env.ICHIREI_DUPLICATE_CHECK = 'off'
+
 import { fakePicture } from './_fake-picture.mjs'
 import http from 'node:http'
 import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'

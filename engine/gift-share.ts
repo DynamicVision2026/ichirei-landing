@@ -30,6 +30,12 @@ export interface OgMeta {
 export function ogMeta(g: GiftRecord, env: NodeJS.ProcessEnv = process.env, now: Date = new Date()): OgMeta {
   const lang = pageLang(g.language)
   const base = publicUrl(env)
+  // an example gift (2026-11-20): the sealed mark and "An ICHIREI gift (example)" — never the character, as for a real gift
+  if (g.source === 'sample') {
+    const title = lang === 'ja' ? '一字礼の贈りもの（見本）' : lang === 'zh-Hant' ? '一字禮的禮物（範例）' : 'An ICHIREI gift (example)'
+    const description = lang === 'ja' ? '実際にこのように届きます。' : lang === 'zh-Hant' ? '實際上會這樣送達。' : 'The way it arrives on a phone.'
+    return { title, description, image: `${base}${ogPath(g)}`, url: `${base}/s/${g.token}`, lang }
+  }
   const exact = openingLabelFromRecord(lang, g.opens_at, g.opens_tz) // "Opens Dec 25, 7:00 a.m. (Eastern)"
   const date = g.opens_on ? openDateText(lang, g.opens_on, now.getUTCFullYear()) : null
   // A name nobody gave is left out — no placeholder, no relationship word.

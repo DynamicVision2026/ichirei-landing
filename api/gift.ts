@@ -35,6 +35,7 @@ import { injectOg, ogKey, ogMeta } from '../engine/gift-share.ts'
 import { ensureFilmVideo, ensureShareFilm, filmComplete, filmVideoPath, serveBytes, shareFilmPath } from '../engine/film-video-store.ts'
 import { makeShareCard, type ShareArtwork } from '../engine/render/share.ts'
 import { relationLine } from '../src/order/relation-line.ts'
+import { bumpSample } from '../engine/sample.ts'
 import { cardsPdf, homePrintPdf } from '../engine/render/card.ts'
 
 const headers = (extra: Record<string, string> = {}) => ({ 'x-robots-tag': 'noindex, nofollow', ...extra })
@@ -48,12 +49,14 @@ export interface GiftDeps extends AnimationDeps {
   videoRender?: typeof import('../engine/render/film-video.ts').makeFilmVideo
 }
 
-async function loadGift(token: string, d: GiftDeps): Promise<{ status: 200; gift: GiftRecord; anim: AnimationRecord } | { status: 404 | 503 }> {
+/** A sample (2026-11-20, engine/sample.ts) switched off answers 410 with its record (so the page can say, calmly, that it is no longer available). */
+async function loadGift(token: string, d: GiftDeps): Promise<{ status: 200; gift: GiftRecord; anim: AnimationRecord } | { status: 404 | 503 } | { status: 410; gift: GiftRecord }> {
   if (!GIFT_TOKEN_PATTERN.test(token)) return { status: 404 }
   if (!d.store) return { status: 503 }
   try {
     const g = await d.store.get(token)
     if (!isGiftRecord(g)) return { status: 404 }
+    if (g.source === 'sample' && !g.sample?.on) return { status: 410, gift: g }
     const a = await d.store.get(g.animation_id)
     if (!isAnimationRecord(a)) return { status: 404 }
     return { status: 200, gift: g, anim: a }
@@ -305,6 +308,7 @@ export function createGiftHandlers(deps: () => GiftDeps) {
     async view(token: string, preview?: string | null): Promise<Response> {
       const d = deps()
       const r = await loadGift(token, d)
+      if (r.status === 410) return json(410, { error: 'sample_off', code: 'sample_off', language: r.gift.language }, { 'cache-control': 'no-store' })
       if (r.status !== 200) return json(r.status, { error: r.status === 404 ? 'not_found' : 'unavailable' }, { 'cache-control': 'no-store' })
       const gate = await gateOf(r.gift, d)
       if (gate === 'error') return busy()
@@ -314,6 +318,8 @@ export function createGiftHandlers(deps: () => GiftDeps) {
       if (closed(r.gift, d, preview)) return json(200, lockedView(r.gift, d.now?.() ?? new Date()), noStore)
       const art = filmUsable(r.anim.film) && r.anim.film.status === 'ready' ? await safeArt(d.store, r.anim.id) : null
       const v = giftView(r.gift, r.anim, art)
+      // a sample (2026-11-20): read-only — no gift back, no e-gift, no names, no order data; the page knows it is an example
+      if (r.gift.source === 'sample') return json(200, { ...v, back: null, egift: null, replied: false, answer: null, certificate_no: null, sample: true }, noStore)
       // Part 14: the free gift back the receiver is offered on the last screen (the sender's own preview never gets the link to the gift that was sent back)
       { const oo = r.gift.order_ref && d.store ? await d.store.get(r.gift.order_ref).catch(() => null) : null
         const back = backStateOf(r.gift, isOrderRecord(oo) ? oo : null, d.env ?? process.env)
@@ -327,6 +333,7 @@ export function createGiftHandlers(deps: () => GiftDeps) {
     async render(token: string, preview?: string | null): Promise<Response> {
       const d = deps()
       const r = await loadGift(token, d)
+      if (r.status === 410) return json(410, { error: 'sample_off', code: 'sample_off', language: r.gift.language }, { 'cache-control': 'no-store' })
       if (r.status !== 200) return json(r.status, { error: r.status === 404 ? 'not_found' : 'unavailable' }, { 'cache-control': 'no-store' })
       const gate = await gateOf(r.gift, d)
       if (gate === 'error') return busy()
@@ -341,6 +348,7 @@ export function createGiftHandlers(deps: () => GiftDeps) {
       const rec = fresh.status === 200 ? fresh : r
       const art = filmUsable(rec.anim.film) && rec.anim.film.status === 'ready' ? await safeArt(d.store, rec.anim.id) : null
       const v = giftView(rec.gift, rec.anim, art)
+      if (rec.gift.source === 'sample') return json(200, { state: j.state, view: { ...v, back: null, egift: null, replied: false, answer: null, certificate_no: null, sample: true } }, noStore)
       return json(200, { state: j.state, view: senderPreview(rec.gift, preview) ? withPreview(v, rec.gift.animation_id) : v }, noStore)
     },
 
@@ -406,6 +414,15 @@ export function createGiftHandlers(deps: () => GiftDeps) {
       if (r.status !== 200) return null
       const out = injectOg(html, ogMeta(r.gift, d.env, d.now?.() ?? new Date()))
       return new Response(out, { status: 200, headers: headers({ 'content-type': 'text/html; charset=utf-8', 'cache-control': 'no-cache' }) })
+    },
+
+    /** A visitor to an example pressed its last button (2026-11-20): one count for that sample, nothing about the visitor. */
+    async own(token: string): Promise<Response> {
+      const d = deps()
+      const r = await loadGift(token, d)
+      if (r.status !== 200 || r.gift.source !== 'sample') return json(404, { error: 'not_found' }, { 'cache-control': 'no-store' })
+      await bumpSample(d.store, token, 'own')
+      return json(200, { ok: true }, noStore)
     },
 
     /** The same QR code as a PNG picture: WeChat has no share link, so the sender saves this image and sends it. */
@@ -508,6 +525,7 @@ export function createGiftHandlers(deps: () => GiftDeps) {
       const d = deps()
       const r = await loadGift(token, d)
       if (r.status !== 200) return json(r.status, { error: r.status === 404 ? 'not_found' : 'unavailable' }, { 'cache-control': 'no-store' })
+      if (r.gift.source === 'sample') return json(403, { error: 'not_offered', code: 'reply_off' }, { 'cache-control': 'no-store' }) // an example never gives a gift back
       if (!d.store) return busy()
       if (closed(r.gift, d)) return json(403, { error: 'locked' }, { 'cache-control': 'no-store' })
       { const gate = await gateOf(r.gift, d); if (gate === 'cancelled') return gone(r.gift); if (gate === 'pending') return notCollected(); if (gate === 'error') return busy() }
@@ -665,6 +683,7 @@ export function createGiftHandlers(deps: () => GiftDeps) {
       const d = deps()
       const r = await loadGift(token, d)
       if (r.status !== 200) return json(r.status, { error: r.status === 404 ? 'not_found' : 'unavailable' }, { 'cache-control': 'no-store' })
+      if (r.gift.source === 'sample') return json(403, { error: 'not_offered', code: 'reply_off' }, { 'cache-control': 'no-store' })
       { const gate = await gateOf(r.gift, d); if (gate === 'cancelled') return gone(r.gift); if (gate === 'pending') return notCollected(); if (gate === 'error') return busy() }
       if (closed(r.gift, d, null)) return json(403, { error: 'locked' }, { 'cache-control': 'no-store' })
       if (r.gift.reply) return json(409, { error: 'The reply has already been sent', code: 'already_replied' }, noStore)
@@ -686,6 +705,8 @@ export function createGiftHandlers(deps: () => GiftDeps) {
       const d = deps()
       const r = await loadGift(token, d)
       if (r.status !== 200) return json(r.status, { error: r.status === 404 ? 'not_found' : 'unavailable' }, { 'cache-control': 'no-store' })
+      // an example is opened any number of times and nothing is marked: only a count (how often it was opened)
+      if (r.gift.source === 'sample') { await bumpSample(d.store, token, 'views'); return json(200, { ok: true }, noStore) }
       { const gate = await gateOf(r.gift, d); if (gate === 'cancelled') return gone(r.gift); if (gate === 'pending') return notCollected(); if (gate === 'error') return busy() }
       if (closed(r.gift, d, null)) return json(403, { error: 'locked' }, { 'cache-control': 'no-store' })
       if (!r.gift.opened_at) {

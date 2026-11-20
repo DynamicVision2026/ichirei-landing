@@ -107,6 +107,13 @@ export function trackPageView(language: string): void {
     } catch {
       ref = ''
     }
+    // a tagged link (an example gift's last button, the examples page) is its own source, whatever the referrer says
+    try {
+      const tag = new URLSearchParams(window.location.search).get('src')
+      if (tag === 'x_sample' || tag === 'examples') ref = tag
+    } catch {
+      // no tag
+    }
     void fetch('/api/analytics', {
       method: 'POST',
       headers: { 'content-type': 'application/json' },

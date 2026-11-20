@@ -19,6 +19,9 @@ import { ENGINE_CONFIG, DEFAULT_FREE_MODEL } from '../engine/engine.ts'
 import { readJsonl } from '../engine/egift-ops.ts'
 import { healthPath } from '../engine/health.ts'
 import { exemptSetCookie, isExempt, limitsLogPath, summarizeLimits, type LimitsDay } from '../engine/use-limits.ts'
+import QRCode from 'qrcode'
+import { publicUrl } from '../engine/animation.ts'
+import { listSamples, makeSample, updateSample, type SampleRow } from '../engine/sample.ts'
 import Anthropic from '@anthropic-ai/sdk'
 
 const DAY_MS = 86_400_000
@@ -220,7 +223,32 @@ const renderFreeUse = (f: FreeUseCard | null): string => {
     `<form method="post" action="/ops/home/exempt" style="margin-top:10px"><div class="muted">This browser is ${f.exempt ? '<b>exempt</b> from' : 'counted by'} the free limits.</div>${f.exempt ? '' : '<button type="submit" data-testid="exempt-button">Exempt this browser</button>'}</form></section>`
 }
 
-export function renderHome(payload: StatsPayload, p: Period, now: Date, customers: CustomerRow[] = [], engine: EngineCardData | null = null, freeUse: FreeUseCard | null = null): string {
+const LANG_NAME: Record<string, string> = { ja: '日本語', en: 'English', 'zh-Hant': '繁體中文', 'zh-Hans': '简体中文' }
+/** The 見本 / Samples card (2026-11-20): make a read-only sample from a draft or film id, then the list with its link, QR, counts and switches. */
+export function renderSamples(rows: SampleRow[], base: string, notice: string | null = null, sources: { visits: Record<string, number>; paid: Record<string, number>; results?: Record<string, number> } | null = null, period = ''): string {
+  const via = (k: string): string => (sources ? `${sources.visits[k] ?? 0} visits → ${sources.results?.[k] ?? 0} saw a result → ${sources.paid[k] ?? 0} ordered` : '')
+  const list = rows.length === 0 ? '<div class="muted">No samples yet.</div>' : rows.map((r) => {
+    const url = `${base}/s/${r.token}`
+    return `<div class="mini" data-testid="sample-row" data-token="${esc(r.token)}" style="display:block;border-top:1px solid #eee;padding:8px 0">` +
+      `<div><b class="serif" style="font-size:22px">${esc(r.glyph)}</b> <span class="muted">${esc(LANG_NAME[r.language] ?? r.language)} · ${esc(r.created_at.slice(0, 10))}${r.word ? ' · ' + esc(r.word) : ''}</span> ${r.on ? '' : '<span class="pill soft">off</span>'}${r.featured ? ' <span class="pill">featured</span>' : ''}</div>` +
+      `<div class="muted" style="word-break:break-all"><a href="${esc(url)}" data-testid="sample-link">${esc(url)}</a> · <a href="/ops/home/sample-qr/${esc(r.token)}.png" data-testid="sample-qr" download>QR PNG</a></div>` +
+      `<div class="muted">Opened <b>${r.views}</b> · made their own <b>${r.own}</b>${r.changes.length ? ` · ${r.changes.length} name change(s): ${esc(r.changes.join('; '))}` : ''}</div>` +
+      `<form method="post" action="/ops/home/samples/update" style="display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-top:4px"><input type="hidden" name="token" value="${esc(r.token)}">` +
+      `<label><input type="checkbox" name="on" value="1"${r.on ? ' checked' : ''}> on</label><label><input type="checkbox" name="featured" value="1"${r.featured ? ' checked' : ''}> featured for ${esc(LANG_NAME[r.language] ?? r.language)}</label>` +
+      `<label><input type="checkbox" name="examples" value="1"${r.examples ? ' checked' : ''}> show on the examples page</label><label>order <input type="number" name="order" min="0" max="99" value="${r.order}" style="width:56px"></label><button type="submit">Save</button></form></div>`
+  }).join('')
+  return `<section class="card" id="samples" aria-label="Samples" data-testid="samples"><h2 class="serif" style="font-size:19px">見本 / Samples</h2>` +
+    (notice ? `<div class="alert" data-testid="samples-notice">${esc(notice)}</div>` : '') +
+    `<form method="post" action="/ops/home/samples" style="display:grid;gap:6px;margin-bottom:10px"><label>Draft or film id <input name="id" placeholder="AN-…" required style="width:100%" data-testid="sample-id"></label>` +
+    `<label><input type="checkbox" name="permission" value="1" data-testid="sample-permission"> 本人の了承を得ています / I have the giver's permission</label>` +
+    `<label>Names to take out (comma separated, optional) <input name="names" style="width:100%"></label>` +
+    `<details><summary class="muted">Only if the store has no record of the chosen character</summary><label>Character <input name="kanji" size="3"></label> <label>Reading <input name="reading"></label> <label>Word (en) <input name="word"></label><label>One line <input name="line" style="width:100%"></label><label>Language <select name="language"><option value="">as the draft</option><option value="ja">ja</option><option value="en">en</option><option value="zh-Hant">zh-Hant</option></select></label></details>` +
+    `<label><input type="checkbox" name="featured" value="1"> featured for its language</label><button type="submit" data-testid="sample-make">見本にする</button></form>` +
+    (sources ? `<div class="muted" data-testid="sample-sources">${esc(period)} · From an example gift (src=x_sample): <b>${via('x_sample')}</b> · From the examples page (src=examples): <b>${via('examples')}</b></div>` : '') +
+    `<div class="muted">The sample shows 「あなた」 / "You" from 「一字礼」 / "ICHIREI", is read-only, and uses no free gift and no order.</div>${list}</section>`
+}
+
+export function renderHome(payload: StatsPayload, p: Period, now: Date, customers: CustomerRow[] = [], engine: EngineCardData | null = null, freeUse: FreeUseCard | null = null, samples: { rows: SampleRow[]; base: string; notice: string | null } | null = null): string {
   const s = payload.stats.periods[p]
   const f = s.funnel
   const orders = payload.orders.filter((o) => inPeriod(o, p, now))
@@ -281,6 +309,7 @@ export function renderHome(payload: StatsPayload, p: Period, now: Date, customer
     (promoRows ? `<section class="card" aria-label="Free gifts by day"><h2 class="serif" style="font-size:19px">Free gifts by day</h2><div class="muted">One shared pool for /en and the Japanese page; the language of each gift is in the table below.</div>${promoRows}<div class="muted">A promotion day runs 4:00 a.m. to 3:59 a.m. Eastern.</div></section>` : '') +
     `<section class="card" aria-label="AI cost"><h2 class="serif" style="font-size:19px">AI cost (estimate)</h2><div class="serif" style="font-size:34px;font-weight:700">$${s.ai_cost_usd.toFixed(2)} <span style="font-size:16px;color:#5C564D">¥${n(s.ai_cost_jpy)}</span></div><div class="muted">${perMoment ? `About $${perMoment.toFixed(2)} per moment written. ` : ''}Real bills: Anthropic Console and Google Cloud Billing.</div></section>` +
     renderFreeUse(freeUse) +
+    (samples ? renderSamples(samples.rows, samples.base, samples.notice, s.sources, PERIOD_LABEL[p]) : '') +
     (chars ? `<section class="card" aria-label="Characters chosen"><h2 class="serif" style="font-size:19px">Most chosen characters, 30 days</h2><div class="chars">${chars}</div></section>` : '') +
     `</div></div>` +
     `<footer><a href="/ops/customers">Customers (search by email)</a><a href="/ops">All orders</a><a href="/ops/stats">Engine details</a><span>Numbers include our own tests.</span></footer>` +
@@ -417,7 +446,9 @@ export function createHomeHandlers(deps: () => OpsDeps) {
       const todayGifts = payload.orders.filter((o) => inPeriod(o, 'today', g.now) && o.state === 'paid').length
       const freeUse = await buildFreeUse(g.store, g.now, todayGifts).catch(() => null)
       if (freeUse) freeUse.exempt = isExempt(req, g.env)
-      return new Response(renderHome(payload, p, g.now, customers, engineCardData(lines, g.now, configuredModels(g.env)), freeUse), { status: 200, headers: headers('text/html; charset=utf-8') })
+      const notice = new URL(req.url).searchParams.get('notice')
+      const samples = { rows: await listSamples(g.store).catch(() => [] as SampleRow[]), base: publicUrl(g.env), notice: notice ? notice.slice(0, 600) : null }
+      return new Response(renderHome(payload, p, g.now, customers, engineCardData(lines, g.now, configuredModels(g.env)), freeUse, samples), { status: 200, headers: headers('text/html; charset=utf-8') })
     },
     /** "Check now": ONE tiny call to the AI (the review model, about 10 tokens), at most once a minute. The answer is OK or the error class in words; nothing else is returned. */
     async engineCheck(req: Request): Promise<Response> {
@@ -435,6 +466,39 @@ export function createHomeHandlers(deps: () => OpsDeps) {
       if (g instanceof Response) return g
       if (!sameSitePost(req)) return new Response(JSON.stringify({ error: 'forbidden' }), { status: 403, headers: headers('application/json; charset=utf-8') })
       return new Response(null, { status: 303, headers: { location: '/ops/home', 'set-cookie': exemptSetCookie(g.env), 'cache-control': 'no-store' } })
+    },
+    /** 「見本にする」: build a read-only sample from a draft or film id (engine/sample.ts). Only the owner, behind /ops. */
+    async samplesMake(req: Request): Promise<Response> {
+      const g = await guard(req)
+      if (g instanceof Response) return g
+      if (!sameSitePost(req)) return new Response(JSON.stringify({ error: 'forbidden' }), { status: 403, headers: headers('application/json; charset=utf-8') })
+      const f = await req.formData().catch(() => null)
+      const v = (k: string): string => String(f?.get(k) ?? '').trim()
+      const lang = v('language')
+      const kanji = v('kanji')
+      const r = await makeSample(g.store, {
+        id: v('id'), permission: v('permission') === '1', featured: v('featured') === '1',
+        names: v('names').split(/[,、，\n]/).map((x) => x.trim()).filter(Boolean),
+        card: kanji && v('line') ? { kanji, reading: v('reading'), word: v('word'), line: v('line'), ...(lang === 'ja' || lang === 'en' || lang === 'zh-Hant' ? { language: lang } : {}) } : null,
+      }, g.now)
+      const notice = r.ok ? `Made ${publicUrl(g.env)}/s/${r.token}${r.changes.length ? ' — names replaced: ' + r.changes.join('; ') : ' — no names were found to replace (check the text yourself)'}` : r.error
+      return new Response(null, { status: 303, headers: { location: `/ops/home?notice=${encodeURIComponent(notice)}#samples`, 'cache-control': 'no-store' } })
+    },
+    async samplesUpdate(req: Request): Promise<Response> {
+      const g = await guard(req)
+      if (g instanceof Response) return g
+      if (!sameSitePost(req)) return new Response(JSON.stringify({ error: 'forbidden' }), { status: 403, headers: headers('application/json; charset=utf-8') })
+      const f = await req.formData().catch(() => null)
+      const b = (k: string): boolean => String(f?.get(k) ?? '') === '1'
+      const r = await updateSample(g.store, String(f?.get('token') ?? ''), { on: b('on'), featured: b('featured'), examples: b('examples'), order: Number(f?.get('order')) })
+      return new Response(null, { status: 303, headers: { location: `/ops/home${r.ok ? '' : `?notice=${encodeURIComponent(r.error)}`}#samples`, 'cache-control': 'no-store' } })
+    },
+    async sampleQr(req: Request, token: string): Promise<Response> {
+      const g = await guard(req)
+      if (g instanceof Response) return g
+      if (!/^RG-[a-z2-9]{20}$/.test(token)) return new Response(JSON.stringify({ error: 'not_found' }), { status: 404, headers: headers('application/json; charset=utf-8') })
+      const png = await QRCode.toBuffer(`${publicUrl(g.env)}/s/${token}`, { type: 'png', errorCorrectionLevel: 'M', margin: 4, width: 720 })
+      return new Response(new Uint8Array(png), { status: 200, headers: headers('image/png', { 'content-disposition': `attachment; filename="ichirei-sample-${token.slice(3, 9)}.png"` }) })
     },
     async csv(req: Request): Promise<Response> {
       const g = await guard(req)

@@ -89,3 +89,25 @@ export async function checkEmpty(image: Buffer): Promise<{ empty: boolean; stats
   const stats = await pixelStats(image)
   return { empty: isNearEmpty(stats), stats }
 }
+
+
+/** A small fingerprint of a picture (2026-11-20, "four different pictures, always"): a difference hash of 8 × 8 comparisons on a 9 × 8 grey copy, as 16 hex digits. */
+export async function pictureHash(img: Buffer): Promise<string> {
+  const raw = await sharp(img).resize(9, 8, { fit: 'fill' }).greyscale().raw().toBuffer()
+  let bits = ''
+  for (let y = 0; y < 8; y++) for (let x = 0; x < 8; x++) bits += raw[y * 9 + x] > raw[y * 9 + x + 1] ? '1' : '0'
+  let hex = ''
+  for (let i = 0; i < 64; i += 4) hex += parseInt(bits.slice(i, i + 4), 2).toString(16)
+  return hex
+}
+/** How many of the 64 bits differ between two fingerprints (0 = the same picture). */
+export function hashDistance(a: string, b: string): number {
+  let d = 0
+  for (let i = 0; i < Math.min(a.length, b.length); i++) {
+    let x = parseInt(a[i], 16) ^ parseInt(b[i], 16)
+    while (x) { d += x & 1; x >>= 1 }
+  }
+  return d
+}
+/** Two pictures of one film are the same picture (a copy of the neighbour, or two scenes drawn alike) when they differ in at most this many bits. */
+export const DUPLICATE_BITS = 2

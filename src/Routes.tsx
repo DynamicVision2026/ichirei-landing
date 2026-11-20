@@ -2,7 +2,7 @@ import { Suspense, lazy } from 'react'
 import RevealPage from './reveal/RevealPage.tsx'
 import { setLanguage } from './lang-store.ts'
 import { captureUtm } from './demo/utm-store.ts'
-import { writeLangOf } from './reveal/paths.ts'
+import { examplesLangOf, writeLangOf } from './reveal/paths.ts'
 
 // Minimal path-based routing (thin, per the harness's "choose thinner" rule):
 // /demo renders the validation harness; /track the order-status page; /a/<id> the private story animation of one order (the sender's page), /g/<token> the receiver's gift page; /credits its attributions; /legal the legal notice (特定商取引法), the return rules and three short questions; /claim the page for an order paid without our site; everything else the landing page
@@ -16,6 +16,7 @@ const CreditsApp = lazy(() => import('./animation/CreditsApp.tsx'))
 const LegalApp = lazy(() => import('./legal/LegalApp.tsx'))
 const ClaimApp = lazy(() => import('./claim/ClaimApp.tsx'))
 const BasketApp = lazy(() => import('./loop/BasketApp.tsx'))
+const ExamplesPage = lazy(() => import('./reveal/Examples.tsx'))
 
 export default function Routes() {
   const path = window.location.pathname
@@ -27,7 +28,16 @@ export default function Routes() {
       </Suspense>
     )
   }
-  if (path.startsWith('/g/')) {
+  const exLang = examplesLangOf(path)
+  if (exLang) {
+    setLanguage(exLang)
+    return (
+      <Suspense fallback={null}>
+        <ExamplesPage lang={exLang} />
+      </Suspense>
+    )
+  }
+  if (path.startsWith('/g/') || path.startsWith('/s/')) {
     return (
       <Suspense fallback={null}>
         <GiftApp />

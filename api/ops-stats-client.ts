@@ -89,7 +89,7 @@ export const STATS_CLIENT_JS = String.raw`
   }
 
   function renderSources(s) {
-    var SRC = ['direct', 'instagram', 'facebook', 'x', 'line', 'xhs', 'other'], LG = [['ja', 'lang_ja'], ['zh-Hant', 'lang_zh'], ['en', 'lang_en']];
+    var SRC = ['direct', 'instagram', 'facebook', 'x', 'line', 'xhs', 'x_sample', 'examples', 'other'], LG = [['ja', 'lang_ja'], ['zh-Hant', 'lang_zh'], ['en', 'lang_en']];
     var h = '<h2>' + esc(t('source')) + '</h2><div class="two"><div class="wide"><table><thead><tr><th></th><th class="n">' + esc(t('sources_visits')) + '</th><th class="n">' + esc(t('sources_orders')) + '</th></tr></thead><tbody>';
     SRC.forEach(function (k) { h += '<tr><td>' + esc(t('src_' + k)) + '</td><td class="n">' + num(s.sources.visits[k] || 0) + '</td><td class="n">' + num(s.sources.paid[k] || 0) + '</td></tr>'; });
     h += '</tbody></table></div><div class="wide"><table><thead><tr><th></th><th class="n">' + esc(t('sources_visits')) + '</th><th class="n">' + esc(t('sources_orders')) + '</th></tr></thead><tbody>';

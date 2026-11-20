@@ -58,6 +58,8 @@ export interface GiftView extends AnimationView {
   waiting?: { opens_on: string | null; opens_at: string | null; opens_tz: string | null } | null
   /** Part 14 (2026-11-20): what the receiver is offered on the last screen. `available`: one button, send a gift back, free. `used`: this gift was answered (its character, and the sender page of that gift). Absent: nothing. */
   back?: { state: 'available' } | { state: 'used'; char: string; page: string | null } | null
+  /** 2026-11-20: true on an example gift (/s/<token>): read-only, no gift back, no order data. */
+  sample?: boolean
 }
 
 /** The closed envelope before the opening date: the two names and the date, nothing else. */

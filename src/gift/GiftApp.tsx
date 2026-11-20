@@ -13,7 +13,7 @@ import { COPY as FILM_COPY, pageLang, type PageLang } from '../animation/copy.ts
 import { Film } from '../animation/AnimationApp.tsx'
 import { EgiftReceive } from '../animation/GiftPanels.tsx'
 import Keepsakes from './Keepsakes.tsx'
-import NewCeremony from './ceremony/NewCeremony.tsx'
+import NewCeremony, { SAMPLE_COPY } from './ceremony/NewCeremony.tsx'
 import { newCeremony, newWaiting } from './ceremony/switch.ts'
 import WaitingCeremony from './ceremony/Waiting.tsx'
 import ShareSection from './ShareSection.tsx'
@@ -38,14 +38,14 @@ import MyGiftsButton from '../loop/MyGifts.tsx'
 
 
 type Step = 'envelope' | 'opening' | 'letter' | 'music' | 'film' | 'reveal' | 'poem' | 'cert' | 'keep' | 'answer'
-type Load = { state: 'loading' } | { state: 'error'; kind: 'notFound' | 'unavailable' | 'gone' } | { state: 'locked'; view: GiftLockedView } | { state: 'ready'; view: GiftView }
+type Load = { state: 'loading' } | { state: 'error'; kind: 'notFound' | 'unavailable' | 'gone' | 'sampleOff' } | { state: 'locked'; view: GiftLockedView } | { state: 'ready'; view: GiftView }
 
 export const OPENING_MS = 1500
 /** How long the knot is held before it comes undone. */
 export const HOLD_MS = 1200
 export const FADE_MS = 450
 
-const routeToken = (): string | null => window.location.pathname.match(/^\/g\/(RG-[a-z2-9]{20})\/?$/)?.[1] ?? window.location.pathname.match(/^\/g\/([A-Za-z0-9-]{3,64})\/?$/)?.[1] ?? null
+const routeToken = (): string | null => window.location.pathname.match(/^\/[gs]\/(RG-[a-z2-9]{20})\/?$/)?.[1] ?? window.location.pathname.match(/^\/g\/([A-Za-z0-9-]{3,64})\/?$/)?.[1] ?? null
 const previewKey = (): string | null => new URLSearchParams(window.location.search).get('preview')
 
 const prefersReducedMotion = (): boolean => window.matchMedia?.('(prefers-reduced-motion: reduce)').matches ?? false
@@ -89,9 +89,9 @@ export default function GiftApp() {
         if (res.status === 404) return setLoad({ state: 'error', kind: 'notFound' })
         if (res.status === 410) {
           // a cancelled order: the link says only that the gift is no longer available
-          const j = (await res.json().catch(() => ({}))) as { language?: GiftView['language'] }
+          const j = (await res.json().catch(() => ({}))) as { language?: GiftView['language']; code?: string }
           if (j.language) setLang(pageLang(j.language))
-          return setLoad({ state: 'error', kind: 'gone' })
+          return setLoad({ state: 'error', kind: j.code === 'sample_off' ? 'sampleOff' : 'gone' })
         }
         if (!res.ok) return setLoad({ state: 'error', kind: 'unavailable' })
         const view = (await res.json()) as GiftView | GiftLockedView
@@ -156,6 +156,16 @@ export default function GiftApp() {
   const quiet = memorial || ((load.state === 'ready' || load.state === 'locked') && isQuietPurpose(load.view.purpose))
   const shell = `gf-page gf-step-${step}${quiet ? ' gf-memorial' : ''}`
 
+  // an example that was switched off (2026-11-20): one calm line and the way to the landing page
+  if (load.state === 'error' && load.kind === 'sampleOff') {
+    const sc = SAMPLE_COPY[lang === 'ja' ? 'ja' : lang === 'en' ? 'en' : 'zh-Hant']
+    return (
+      <main className={shell} lang={lang} data-testid="gift-page" data-step="loading">
+        <p className="gf-note" role="alert" data-testid="sample-off">{sc.off}</p>
+        <p><a className="gf-btn" data-testid="sample-off-landing" href={lang === 'ja' ? '/' : lang === 'en' ? '/en' : '/zh'}>{lang === 'ja' ? '一字礼へ' : lang === 'en' ? 'Go to ICHIREI' : '前往一字禮'}</a></p>
+      </main>
+    )
+  }
   if (load.state === 'loading' || load.state === 'error')
     return (
       <main className={shell} lang={lang} data-testid="gift-page" data-step="loading">

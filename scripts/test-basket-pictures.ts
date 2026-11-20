@@ -5,6 +5,9 @@
 //
 //   node --experimental-strip-types --disable-warning=ExperimentalWarning scripts/test-basket-pictures.ts
 
+// (the fake image model draws one and the same picture for every slot; the duplicate check has its own test, scripts/test-duplicate-pictures.ts)
+process.env.ICHIREI_DUPLICATE_CHECK = 'off'
+
 import { fakePicture } from './_fake-picture.mjs'
 import { readFileSync } from 'node:fs'
 import { join } from 'node:path'

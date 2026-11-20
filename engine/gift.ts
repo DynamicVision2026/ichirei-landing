@@ -18,6 +18,7 @@ import { EGIFT_JAPAN_ONLY, PACKAGE_SKU, type PackageId } from '../src/order/pack
 import type { OrderRecord } from './order.ts'
 import type { ArtRecord } from './film-art.ts'
 import type { Language } from './contract.ts'
+import type { SampleMeta } from './sample.ts'
 import { purposeFromOccasion } from '../src/order/purpose.ts'
 import { isReturnChar } from '../src/order/return-chars.ts'
 import { convertLineScript, fullWidthPunctuation } from './script.ts'
@@ -99,7 +100,9 @@ export interface GiftRecord {
   /** The receiver's one answer (2026-11-14): a written reply, one of the twelve characters given back, or both — sent once, shown on the sender's page. `text` is '' when only a character came. */
   reply?: { text: string; at: string; char?: string; /** Part 14: the reply gift's token when the answer is a gift sent back (not one of the old twelve characters). */ gift?: string } | null
   /** Part 14 (2026-11-20): `reply` = this gift was sent back, free, by a receiver (it never gets a reply of its own); the original gift it answers. */
-  source?: 'reply' | null
+  source?: 'reply' | 'sample' | null
+  /** 2026-11-20: a read-only example gift made from a draft in the owner's dashboard (engine/sample.ts) — no order, no reply, never marked opened. */
+  sample?: SampleMeta | null
   reply_of?: string | null
   /** The original gift: the gift sent back for it (the character and the sender page of the reply gift, for the receiver's own last screen), and the one open reply ticket. */
   back?: { char: string; at: string; gift: string; page?: string | null } | null
@@ -179,6 +182,8 @@ export interface GiftView extends AnimationView {
   waiting?: { opens_on: string | null; opens_at: string | null; opens_tz: string | null } | null
   /** Part 14: what the receiver is offered on the last screen — `available` (send a gift back, free), `used` (this gift was answered: its character and the sender page of the gift sent back), or absent (nothing). */
   back?: { state: 'available' } | { state: 'used'; char: string; page: string | null } | null
+  /** 2026-11-20: true on an example gift (/s/<token>): read-only, no gift back, no order data. */
+  sample?: boolean
 }
 
 /** The closed envelope: names and the date only. Nothing of the film, the character, the poem or the message leaves the server before the day. */

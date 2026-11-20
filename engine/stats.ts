@@ -60,7 +60,7 @@ export interface PeriodStats {
   funnel: { chips: number; story: number; cards: number; give: number; paid: number; collected: number; opened: number; shared: number; visits: number }
   choice: { main: number; free: number; second: number; round2: number; round3: number }
   daily: { day: string; visits: number; paid: number }[]
-  sources: { visits: Record<SourceBucket, number>; paid: Record<SourceBucket, number> }
+  sources: { visits: Record<SourceBucket, number>; paid: Record<SourceBucket, number>; /** sessions that saw a result (cards), by where they came from */ results: Record<SourceBucket, number> }
   languages: { visits: Record<'ja' | 'zh-Hant' | 'en', number>; paid: Record<'ja' | 'zh-Hant' | 'en', number> }
 }
 
@@ -131,6 +131,8 @@ export function computeStats(inp: StatsInput): StatsResult {
       visitLang[langBucket(e.language)]++
     }
     const paidBy = zero(SOURCE_BUCKETS)
+    const resultsBy = zero(SOURCE_BUCKETS)
+    for (const sess of cardsS) resultsBy[srcOfSession.get(sess) ?? 'direct']++
     const paidLang = { ja: 0, 'zh-Hant': 0, en: 0 }
     for (const o of paidOrders) {
       paidBy[(o.session && srcOfSession.get(o.session)) || 'direct']++
@@ -181,7 +183,7 @@ export function computeStats(inp: StatsInput): StatsResult {
         round3: paidOrders.filter((o) => o.rounds >= 3).length,
       },
       daily: days.map((day) => ({ day, visits: visitsPerDay.get(day)?.size ?? 0, paid: paidPerDay.get(day) ?? 0 })),
-      sources: { visits: visitsBy, paid: paidBy },
+      sources: { visits: visitsBy, paid: paidBy, results: resultsBy },
       languages: { visits: visitLang, paid: paidLang },
     }
   }

@@ -34,7 +34,7 @@ export type ShareEvent = (typeof SHARE_EVENTS)[number]
 export const SHARE_ROLES = ['sender', 'receiver'] as const
 export type ShareRole = (typeof SHARE_ROLES)[number]
 /** The owner dashboard (/ops/stats, 2026-11-07): a page view (once per tab session; the referrer's HOST is turned into a bucket on arrival and never stored) and the receiver opening the envelope (a short hash of the gift link, never the link itself). */
-export const SOURCE_BUCKETS = ['direct', 'instagram', 'facebook', 'x', 'line', 'xhs', 'other'] as const
+export const SOURCE_BUCKETS = ['direct', 'instagram', 'facebook', 'x', 'line', 'xhs', 'x_sample', 'examples', 'other'] as const
 export type SourceBucket = (typeof SOURCE_BUCKETS)[number]
 /**
  * The US e-gift launch (2026-11-12, English pages only): codes only. `us_banner_seen` = the delivery banner scrolled into view on /en; `occasion_chip` = which occasion chip was chosen (a code from US_CHIPS);
@@ -49,6 +49,8 @@ export const CLIENT_EVENTS = ['chosen', 'explain_opened', 'page_view', 'receiver
 /** The referrer's host → a bucket (the dashboard's 「どこから」). Search engines and no referrer are `direct`; a shared post carries no tag, so it shows under the platform it came from. */
 export function sourceBucket(host: unknown, ownHost?: string): SourceBucket {
   const h = typeof host === 'string' ? host.toLowerCase().trim().replace(/^www\./, '').slice(0, 100) : ''
+  // a tag on the link (2026-11-20): `?src=x_sample` (the last button of an example gift) and `?src=examples` (the examples page) — the page sends the tag in place of a referrer host
+  if (h === 'x_sample' || h === 'examples') return h
   if (!h || (ownHost && h === ownHost.toLowerCase())) return 'direct'
   if (/(^|\.)instagram\.com$/.test(h)) return 'instagram'
   if (/(^|\.)(facebook\.com|fb\.com|fb\.me)$/.test(h)) return 'facebook'

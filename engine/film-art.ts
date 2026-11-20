@@ -36,7 +36,7 @@ import { callSignal, timedOut } from './limits.ts'
 import type { OrderStore } from './order-store.ts'
 import { OLD_CHECK_SETTING, OLD_REWRITE_SETTING, swapOnce, world, worldLang } from './film-world.ts'
 import { plainDescription } from './film-plain.ts'
-import { checkEmpty } from './picture-pixels.ts'
+import { checkEmpty, DUPLICATE_BITS, hashDistance, pictureHash } from './picture-pixels.ts'
 import { recordHealth } from './health.ts'
 import { recordOutcome, tracked } from './engine-log.ts'
 
@@ -52,6 +52,8 @@ const RETRY_HINT: Record<string, string> = {
   face: 'Absolutely no faces, not even in profile: show only hands, or a person seen from behind or far away as a small silhouette.',
   // the second try after a `text` failure (2026-11-14): the object that carries the lettering is shown smaller and from further away, as well as the no-writing line
   text: 'Absolutely no writing, letters or marks that look like writing anywhere in the picture. Show the object smaller and seen from further away, so that no label, lettering or number could be seen on it.',
+  brand_logo: 'No brand names, logos or readable trademarks anywhere: a car, phone, bag, bottle or shop is shown plain, with no badge, emblem or sign on it.',
+  duplicate: 'A clearly different view from the other scenes of the film: a different place or object, a different distance — never the same composition.',
   empty: 'The picture must show a clear subject — the place, an object or a small figure — with soft ink shapes and some detail; never plain paper with a single stroke.',
   illness: 'Show only a calm everyday moment: no medical or sickroom scene, no injury.',
   celebration: 'No celebration of any kind: quiet and still.',
@@ -275,7 +277,7 @@ export interface Verdict {
   ok: boolean
   reason: string
 }
-const REASONS = new Set(['ok', 'face', 'text', 'illness', 'celebration', 'unsafe', 'clothing', 'setting', 'religious', 'empty', 'people', 'added_place', 'missed_moment', 'off_story'])
+const REASONS = new Set(['ok', 'face', 'text', 'illness', 'celebration', 'unsafe', 'clothing', 'setting', 'religious', 'empty', 'people', 'added_place', 'missed_moment', 'off_story', 'brand_logo', 'duplicate'])
 type Messages = Pick<Anthropic, 'messages'>
 
 function readPrompt(): string {
@@ -432,6 +434,8 @@ export const ANGLE_TEXT: Record<RewriteAngle, string> = {
 /** Extra instructions for the reason the picture failed (the text-bearing object must go; an English setting must be stated in Western terms, with the figure's hair colour). */
 function reasonFeedback(reason: string, language: Language): string {
   if (reason === 'text') return 'The object that carried writing (anything with a label, a brand, a number, a sign or lettering on it) must NOT be in the new scene at all — leave it out entirely.'
+  if (reason === 'brand_logo') return 'The object that carried a brand name, a logo or a readable trademark (a car\'s badge or steering-wheel emblem, a phone, a bag, a shoe, a bottle, a shop sign) must NOT be in the new scene as it was: show it plain and unmarked, or leave it out.'
+  if (reason === 'duplicate') return 'This picture came out the same as another picture of the film. Show a clearly different view: a different place or object, a different distance, a different moment of the same day — never the same composition.'
   if (reason === 'people') return 'Say plainly how many people there are and who each is (a man, a woman, a child, an older person — exactly as the description already says, never a new guess; a person it leaves neutral stays neutral). Each person is seen from behind, as hands or as a small silhouette.'
   if (reason === 'added_place') return 'The picture drew a place the description does not name. Name the place and the object of the moment first, and put nothing else in the scene: no genkan, shoes, vending machine, bus stop, convenience store, park or station.'
   if (reason === 'missed_moment') return 'The picture missed the key object or action. Say it first and plainly (the thing held, the place walked to, the act itself) and keep the view close enough that it is clearly the subject. Keep the place, change only the angle or the distance.'
@@ -630,6 +634,8 @@ async function renderLocked(deps: ArtDeps, input: RenderInput): Promise<ArtRecor
   const desc = (i: number) => plainDescription(rewritten[i] ?? descriptions[i]) // brands, products and written objects become plain words (B8); the caption keeps the sender's own words
   /** Slots whose description was just rewritten and have not been drawn since. */
   const afterRewrite = new Set<number>()
+  /** The fingerprint of each kept picture (filled as they are kept, read from the store for ones kept before): the duplicate check. */
+  const picHash = new Map<number, string | null>()
   /** Slots whose rewrite could not be had in THIS render (an outage, or two answers that broke the rules): not asked again in this render — the next open asks. */
   const noRewriteNow = new Set<number>()
   let calls = retry ? (cur!.calls ?? 0) : 0
@@ -734,7 +740,22 @@ async function renderLocked(deps: ArtDeps, input: RenderInput): Promise<ArtRecor
       const res: CheckResult = { ...modelRes, verdicts: left.map((g, i) => (empties[i] ? { ok: false, reason: 'empty' } : (modelRes.verdicts[forModel.indexOf(g)] ?? null))) }
       const still: typeof left = []
       for (const [i, g] of left.entries()) {
-        const v = res.verdicts[i]
+        let v = res.verdicts[i]
+        // Four different pictures, always (2026-11-20): a picture that came out the same as one already kept is a failure like any other ("duplicate": the usual rewrite, then washi)
+        if (v?.ok && process.env.ICHIREI_DUPLICATE_CHECK !== 'off') {
+          const h = await pictureHash(g.webp).catch(() => null)
+          if (h) {
+            let same = false
+            for (let j = 0; j < slots.length && !same; j++) {
+              if (j === g.slot || slots[j] !== 'ai') continue
+              if (!picHash.has(j)) picHash.set(j, await store.getObject(picturePath(id, j + 1)).then((b) => (b ? pictureHash(b) : null)).catch(() => null))
+              const o = picHash.get(j)
+              if (o && hashDistance(o, h) <= DUPLICATE_BITS) same = true
+            }
+            if (same) v = { ok: false, reason: 'duplicate' }
+            else picHash.set(g.slot, h)
+          }
+        }
         if (!v) {
           still.push(g)
         } else if (v.ok) {
@@ -843,7 +864,7 @@ async function renderLocked(deps: ArtDeps, input: RenderInput): Promise<ArtRecor
   // The order of protection (2026-11-14): a clean description (above) → the first draw → the targeted second try (a `text` failure redraws the object smaller / further away) → a rewrite to the safest
   // angle (the place) → a second rewrite (the hands or the object) → only then washi, which shows another passed picture of the story. Each pass draws what failed its check or hit a transient error
   // other than quota; a description rewritten in the last pass is drawn from its new view in the next one. Whatever the window has no room for stays pending for the next open.
-  const failureReasons = ['face', 'text', 'illness', 'celebration', 'unsafe', 'clothing', 'setting', 'religious', 'empty', 'people', 'added_place', 'missed_moment', 'off_story']
+  const failureReasons = ['face', 'text', 'illness', 'celebration', 'unsafe', 'clothing', 'setting', 'religious', 'empty', 'people', 'added_place', 'missed_moment', 'off_story', 'brand_logo', 'duplicate']
   const transient = ['', 'http', 'timeout', 'network', 'no_image', 'blocked', 'image']
   for (let pass = 2; pass <= 5; pass++) {
     if (Date.now() >= deadline - 15_000) break

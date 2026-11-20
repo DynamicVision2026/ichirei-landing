@@ -1,3 +1,4 @@
+import { ExamplesButton } from './Examples.tsx'
 import { useCallback, useEffect, useRef, useState, type KeyboardEvent } from 'react'
 import { CATS, EXAMPLES, SCENE, TEXT, type RevealLang } from './copy.ts'
 import { rich } from './rich.tsx'
@@ -112,6 +113,7 @@ export default function Hero({ lang, currency, rates, woodOnSale = false }: { la
             <a className="btn primary" href={writeLink()}>
               {t.ctaHero}
             </a>
+            <ExamplesButton lang={lang} />
             <span className="free">{rich(t.freeLine)}</span>
             {!promoLayout && approx && <span className="approxHero">{approx}</span>}
             {!promoLayout && lang === 'en' && (
