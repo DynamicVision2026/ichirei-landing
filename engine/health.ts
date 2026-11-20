@@ -24,6 +24,8 @@ export const HEALTH_CODES = [
   'film_drawn',
   'order_record_failed',
   'limit_person',
+  'limit_unpaid10',
+  'limit_ip',
   'limit_site',
   'limit_pictures',
   'promo_unavailable',

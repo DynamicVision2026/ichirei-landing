@@ -85,7 +85,7 @@ export type StartOutcome =
  * The draft of this story: the one the browser already has (same story → the same set, nothing drawn again) or a new one. `allowNew` is the
  * per-person daily limit — asked only when a NEW set would be drawn.
  */
-export async function startPreview(deps: PreviewDeps, input: PreviewStart, allowNew: () => boolean = () => true): Promise<StartOutcome> {
+export async function startPreview(deps: PreviewDeps, input: PreviewStart, allowNew: () => boolean | Promise<boolean> = () => true): Promise<StartOutcome> {
   const pickedAt = (deps.now?.() ?? new Date()).toISOString()
   const hash = storyHash(input.story, input.language, input.memorial, input)
   if (input.draft_id) {
@@ -94,7 +94,7 @@ export async function startPreview(deps: PreviewDeps, input: PreviewStart, allow
       return { state: 'ok', id: old.id, reused: true, script: old.film?.status === 'ready' ? 'ready' : 'fallback' }
     }
   }
-  if (!allowNew()) {
+  if (!(await allowNew())) {
     ;(deps.log ?? console.log)(`[ichirei-preview] ${JSON.stringify({ event: 'preview_start', outcome: 'limit', limit: 'person_daily' })}`)
     return { state: 'limited' }
   }

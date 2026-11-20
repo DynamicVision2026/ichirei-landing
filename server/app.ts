@@ -274,6 +274,7 @@ export function createApp(config: ServerConfig): Hono {
   app.get('/ops', limited(opsLimit), (c) => opsHandlers.page(c.req.raw))
   app.get('/ops/home', limited(opsLimit), (c) => homeHandlers.page(c.req.raw))
   app.get('/ops/home/orders.csv', limited(opsLimit), (c) => homeHandlers.csv(c.req.raw))
+  app.post('/ops/home/exempt', limited(opsLimit), (c) => homeHandlers.exempt(c.req.raw))
   app.post('/ops/home/engine-check', limited(opsLimit), (c) => homeHandlers.engineCheck(c.req.raw))
   app.get('/ops/home/customers.csv', limited(opsLimit), (c) => homeHandlers.customersCsv(c.req.raw))
   app.get('/ops/stats', limited(opsLimit), (c) => statsHandlers.page(c.req.raw))

@@ -21,6 +21,7 @@ import { SlidingWindowLimiter, clientIp } from '../engine/rate-limit.ts'
 import { visitorOf } from '../engine/visitor.ts'
 import { recordCustomerEvent } from '../engine/customer.ts'
 import { recordHealth } from '../engine/health.ts'
+import { claimPictureSet, isExempt, whoOf } from '../engine/use-limits.ts'
 import { previewOutcome, previewView, renderPreview, startPreview, type PreviewDeps } from '../engine/preview.ts'
 import { decideStoryLanguage } from '../engine/story-language.ts'
 
@@ -119,15 +120,22 @@ export function createPreviewHandlers(deps: () => PreviewApiDeps) {
           ...(picked.length ? { picked } : {}),
           draft_id: draftId,
         },
-        () => {
-          // both counters are asked before either is recorded
-          if (daily.blocked(person) || dailyIp.blocked(ip)) {
-            void recordHealth(d.store, 'limit_pictures', { reason: 'person' }, d.now?.() ?? new Date())
-            return false
+        async () => {
+          // Part 19 (2026-11-20): a NEW picture set is counted in the store (the person's keys and the connection; shared by every copy and kept across deploys); the owner's browsers are exempt.
+          // (Tests may still hand in their own in-memory limiters.)
+          if (d.daily) {
+            if (daily.blocked(person) || dailyIp.blocked(ip)) {
+              void recordHealth(d.store, 'limit_pictures', { reason: 'person' }, d.now?.() ?? new Date())
+              return false
+            }
+            daily.hit(person)
+            dailyIp.hit(ip)
+            return true
           }
-          daily.hit(person)
-          dailyIp.hit(ip)
-          return true
+          if (!d.store || isExempt(req, env)) return true
+          const ok = await claimPictureSet(d.store, await whoOf(d.store, req, env), env, d.now?.() ?? new Date())
+          if (!ok) void recordHealth(d.store, 'limit_pictures', { reason: 'person' }, d.now?.() ?? new Date())
+          return ok
         },
       )
       void cleanSession(body.session)

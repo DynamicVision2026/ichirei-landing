@@ -117,7 +117,7 @@ export const STATS_CLIENT_JS = String.raw`
     return h + '</tbody></table></div>';
   }
 
-  var HEALTH_CODES = ['en_cart_currency_mismatch', 'needs_attention', 'certificate_no_missing', 'gift_incomplete', 'picture_substituted', 'pictures_none', 'picture_empty', 'poem_failed', 'film_fallback', 'order_record_failed', 'limit_person', 'limit_site', 'limit_pictures', 'promo_unavailable', 'consent_saved', 'consent_not_saved', 'held', 'hold_used', 'hold_expired', 'basket_saved', 'basket_link_opened'];
+  var HEALTH_CODES = ['en_cart_currency_mismatch', 'needs_attention', 'certificate_no_missing', 'gift_incomplete', 'picture_substituted', 'pictures_none', 'picture_empty', 'poem_failed', 'film_fallback', 'order_record_failed', 'limit_person', 'limit_unpaid10', 'limit_ip', 'limit_site', 'limit_pictures', 'promo_unavailable', 'consent_saved', 'consent_not_saved', 'held', 'hold_used', 'hold_expired', 'basket_saved', 'basket_link_opened'];
   var RED = { en_cart_currency_mismatch: 1, needs_attention: 1, certificate_no_missing: 1, order_record_failed: 1 };
   function renderHealth() {
     var H = D.health; if (!H) return '';

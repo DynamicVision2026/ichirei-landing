@@ -4766,6 +4766,21 @@ for (const [lang, locale, text] of [['en', 'en-US', 'Your gift is being finished
     check(`limit (${lang}, ${code}): the page shows 「${text}」`, (await f.page.locator('body').innerText()).includes(text))
     await f.page.close()
   }
+  // Part 19 (2026-11-20): ten moments written and none given — the owner's sentence, in each language, shown with the way to My gifts
+  for (const [lang, text] of [['ja', 'これまでに十の場面を書いてくださいました。そのうちの一字を贈ると、また新しく書けます。'], ['en', "You've written ten moments. Give one of them, and you can write more."], ['zh-Hant', '你已經寫下十個片刻。送出其中一個字，就能繼續寫。']]) {
+    const f = await mockPage(browser)
+    await f.page.route('**/api/select', (r) => r.fulfill({ status: 429, json: { error: text, code: 'limit_unpaid10' } }))
+    await f.page.route('**/api/me*', (r) => r.fulfill({ json: { basket: { count: 2 }, ready: null, hold: null } }))
+    await f.page.goto(`http://localhost:5173/${lang === 'en' ? 'en/' : ''}write?lang=${lang}`, { waitUntil: 'networkidle' })
+    await f.page.waitForTimeout(400)
+    await f.page.locator('#write [data-testid=story-input]').fill(lang === 'en' ? 'She left the porch light on every night until I got home, and she never once mentioned it.' : STORY)
+    await pickContext(f.page)
+    await f.page.click(`#write >> text=${GO[lang]}`)
+    await f.page.waitForTimeout(1500)
+    const body = await f.page.locator('body').innerText()
+    check(`limit (${lang}, limit_unpaid10): the page shows 「${text}」 and the My gifts link under it`, body.includes(text) && (await f.page.locator('.loopBar--under').count()) >= 1)
+    await f.page.close()
+  }
 }
 
 // ---------- Run 31 (2026-11-15, the customer loop): the basket bar, the gift-ready bar, the basket page and its Save panel, the private link, the "Days of Thanks" card and its hold, the new /legal sentences ----------

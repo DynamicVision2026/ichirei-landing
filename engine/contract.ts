@@ -744,6 +744,13 @@ export const LIMIT_PERSON: Record<string, string> = {
   'zh-Hans': '今天你已经写下许多片刻了。明天可以继续写。已经找到的字，今天就能送出。',
   en: "You've written many moments today. You can write more tomorrow, and any character you've already found can still be given today.",
 }
+/** Ten moments written and none given (Part 19, 2026-11-20): giving one of them lets the person write more. Shown with the My gifts link. */
+export const LIMIT_UNPAID10: Record<string, string> = {
+  ja: 'これまでに十の場面を書いてくださいました。そのうちの一字を贈ると、また新しく書けます。',
+  'zh-Hant': '你已經寫下十個片刻。送出其中一個字，就能繼續寫。',
+  'zh-Hans': '你已经写下十个片刻。送出其中一个字，就能继续写。',
+  en: "You've written ten moments. Give one of them, and you can write more.",
+}
 export const LIMIT_SITE: Record<string, string> = {
   ja: 'ただいま多くの方にご利用いただいています。少し時間をおいて、もう一度お試しください。',
   'zh-Hant': '目前有很多人正在使用，請稍等片刻再試一次。',

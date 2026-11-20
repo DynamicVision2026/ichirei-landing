@@ -22,6 +22,7 @@ import { costCollector } from '../engine/ai-cost.ts'
 import { recordFreeSource, recordMain } from '../engine/free-source.ts'
 import { createOrderStore } from '../engine/order-store.ts'
 import { newMoment, siteRound } from '../engine/day-limits.ts'
+import { claimMoment, isExempt, whoOf } from '../engine/use-limits.ts'
 import { recordHealth } from '../engine/health.ts'
 import { classOf, requestIdOf, visitorCode } from '../engine/engine-log.ts'
 import { decideStoryLanguage } from '../engine/story-language.ts'
@@ -30,7 +31,7 @@ import { visitorOf } from '../engine/visitor.ts'
 import { recordCustomerEvent } from '../engine/customer.ts'
 import { parsePromptQuestion } from '../engine/story-questions.ts'
 import { REPLY_BUSY, claimReplyRound, claimsReply } from '../engine/reply.ts'
-import { FOLLOW_UP_MAX, LIMIT_PERSON, LIMIT_SITE, NO_MORE_ROUNDS, STORY_MAX, parseExclude, countChars, mergeStory, parseContext, parseFollowUps, type Condition } from '../engine/contract.ts'
+import { FOLLOW_UP_MAX, LIMIT_PERSON, LIMIT_SITE, LIMIT_UNPAID10, NO_MORE_ROUNDS, STORY_MAX, parseExclude, countChars, mergeStory, parseContext, parseFollowUps, type Condition } from '../engine/contract.ts'
 
 // Full Hobby-plan ceiling (also mirrored in vercel.json).
 export const maxDuration = 60
@@ -134,14 +135,21 @@ export async function POST(req: Request): Promise<Response> {
   {
     const store = createOrderStore()
     const lang = pageLanguage
-    const refuse = (code: 'limit_person' | 'limit_site') => {
-      console.log(`[ichirei-limit] ${JSON.stringify({ route: '/api/select', code })}`)
-      void recordHealth(store, code)
-      return jsonResponse(429, { error: (code === 'limit_person' ? LIMIT_PERSON : LIMIT_SITE)[lang] ?? (code === 'limit_person' ? LIMIT_PERSON : LIMIT_SITE).en, code })
+    const refuse = (code: 'limit_person' | 'limit_site' | 'limit_unpaid10', health: 'limit_person' | 'limit_site' | 'limit_unpaid10' | 'limit_ip' = code) => {
+      console.log(`[ichirei-limit] ${JSON.stringify({ route: '/api/select', code: health })}`)
+      void recordHealth(store, health)
+      const table = code === 'limit_person' ? LIMIT_PERSON : code === 'limit_unpaid10' ? LIMIT_UNPAID10 : LIMIT_SITE
+      return jsonResponse(429, { error: table[lang] ?? table.en, code })
     }
     if (ex.retry === 0 && !replyRound) {
-      const v = newMoment(visitorOf(req), clientIp(req))
-      if (!v.ok) return refuse(v.code)
+      // Part 19 (2026-11-20): the counts live in the store (every server copy sees the same, a deploy resets nothing) and the person is every key we know them by; the owner's browsers are exempt.
+      if (store && !isExempt(req)) {
+        const v = await claimMoment(store, await whoOf(store, req))
+        if (!v.ok) return v.code === 'limit_ip' ? refuse('limit_person', 'limit_ip') : refuse(v.code)
+      } else if (!store) {
+        const v = newMoment(visitorOf(req), clientIp(req))
+        if (!v.ok) return refuse(v.code)
+      }
       void recordCustomerEvent(store, { browser: visitorOf(req) }, 'tried', { language: lang }).catch(() => {})
     }
     if (!(await siteRound(store))) return refuse('limit_site')

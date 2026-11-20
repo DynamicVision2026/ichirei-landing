@@ -525,7 +525,7 @@ export default function DemoApp({ mode = 'harness', aside }: { mode?: Mode; asid
           setErrorCode(body?.code ?? null)
           busyCode = body?.code === 'engine_busy' // (a refused gift-back round, or a busy service: the calm line)
           // the server's own words are shown only for the limits (it writes those in the page's language); every other answer shows the calm line, never a message or a status
-          message = body?.code === 'story_too_long' || body?.code === 'follow_up_too_long' ? copy.storyTooLong : body?.code === 'rate_limited' ? copy.rateLimited : (body?.code === 'limit_person' || body?.code === 'limit_site' || body?.code === 'retry_limit') && typeof body?.error === 'string' ? body.error : null
+          message = body?.code === 'story_too_long' || body?.code === 'follow_up_too_long' ? copy.storyTooLong : body?.code === 'rate_limited' ? copy.rateLimited : (body?.code === 'limit_person' || body?.code === 'limit_unpaid10' || body?.code === 'limit_site' || body?.code === 'retry_limit') && typeof body?.error === 'string' ? body.error : null
         } catch {
           message = null
         }
@@ -681,7 +681,7 @@ export default function DemoApp({ mode = 'harness', aside }: { mode?: Mode; asid
       {error && (
         <div role="alert" className="font-label mb-6 rounded-sm border border-seal/60 bg-seal/10 p-4 text-sm text-fg">
           <p>{error}</p>
-          {customer && errorCode === 'limit_person' && <BasketBar lang={revealLang} className="loopBar--under" />}
+          {customer && (errorCode === 'limit_person' || errorCode === 'limit_unpaid10') && <BasketBar lang={revealLang} className="loopBar--under" />}
           {customer && lastRun.current && (
             <button type="button" className="btn ghost mt-4" data-testid="retry-request" onClick={() => lastRun.current?.()}>
               {pc.retry}

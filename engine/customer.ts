@@ -176,6 +176,18 @@ export async function recordCustomerEvent(store: OrderStore | null, who: Who, co
     return rec
   })
   if (created) await listNew(store, id, now)
+  // A gift GIVEN (paid, the promotion's free gift, or a gift back) earns the person 3 more moments today and sets the count of moments not yet given back to 0 (Part 19, 2026-11-20).
+  if (code === 'ordered_free' || code === 'ordered_paid') {
+    try {
+      const rec = await readCustomer(store, id)
+      const { creditGift } = await import('./use-limits.ts')
+      await creditGift(store, { emails: rec?.emails ?? (email ? [email] : []), browser: browser ?? rec?.browsers?.[0] ?? null }, now)
+      // (every other browser of the same record is the same person)
+      for (const b of rec?.browsers ?? []) if (b !== browser) await creditGiftBrowser(store, b, now)
+    } catch {
+      // a counter is never a reason to lose an order
+    }
+  }
   if (extra.order && (code === 'ordered_free' || code === 'ordered_paid')) {
     await store.putObject(orderPath(extra.order), JSON.stringify({ id }), 'application/json').catch(() => {})
   }
@@ -303,4 +315,9 @@ export async function recordOrderEvent(store: OrderStore | null, orderRef: strin
   } catch {
     // the timeline is never a reason to fail a customer's action
   }
+}
+
+async function creditGiftBrowser(store: OrderStore, browser: string, now: Date): Promise<void> {
+  const { creditGift } = await import('./use-limits.ts')
+  await creditGift(store, { browser }, now)
 }

@@ -16,6 +16,9 @@ import type { BasketItem } from '../engine/basket.ts'
 import type { OrderStore } from '../engine/order-store.ts'
 import { checkNow, countsOf, lastErrorOf, lightOf, modelsOf, plainWords, readEngineLines, replyCountsOf, type ReplyCounts, type Counts, type EngineLine, type LastError, type LightState } from '../engine/engine-log.ts'
 import { ENGINE_CONFIG, DEFAULT_FREE_MODEL } from '../engine/engine.ts'
+import { readJsonl } from '../engine/egift-ops.ts'
+import { healthPath } from '../engine/health.ts'
+import { exemptSetCookie, isExempt, limitsLogPath, summarizeLimits, type LimitsDay } from '../engine/use-limits.ts'
 import Anthropic from '@anthropic-ai/sdk'
 
 const DAY_MS = 86_400_000
@@ -187,7 +190,37 @@ export function renderEngineCard(d: EngineCardData, now: Date): string {
     `</section>`
 }
 
-export function renderHome(payload: StatsPayload, p: Period, now: Date, customers: CustomerRow[] = [], engine: EngineCardData | null = null): string {
+
+/** Today's free use (Part 19, 2026-11-20): moments per person, the limits hit, picture sets drawn and the share that became gifts, the top 5 by picture sets (masked). Counts only. */
+export interface FreeUseCard extends LimitsDay {
+  hits: { limit_person: number; limit_unpaid10: number; limit_ip: number }
+  gifts: number
+  /** This browser carries the owner's exempt cookie. */
+  exempt?: boolean
+}
+export async function buildFreeUse(store: OrderStore | null, now: Date, gifts = 0): Promise<FreeUseCard | null> {
+  if (!store) return null
+  const day = analyticsDay(now)
+  const [lines, health] = await Promise.all([
+    readJsonl<{ p?: string; label?: string; kind?: string }>(store, limitsLogPath(day)).catch(() => []),
+    readJsonl<{ code?: string }>(store, healthPath(now)).catch(() => []),
+  ])
+  const hit = (c: string): number => health.filter((h) => h.code === c).length
+  return { ...summarizeLimits(lines), hits: { limit_person: hit('limit_person'), limit_unpaid10: hit('limit_unpaid10'), limit_ip: hit('limit_ip') }, gifts }
+}
+const renderFreeUse = (f: FreeUseCard | null): string => {
+  if (!f) return ''
+  const share = f.pictureSets > 0 ? `${Math.round((100 * Math.min(f.gifts, f.pictureSets)) / f.pictureSets)}%` : '—'
+  const top = f.top.length ? f.top.map((t) => `<div class="mini"><div>${esc(t.label)}</div><div></div><div style="text-align:right"><b>${t.sets}</b></div></div>`).join('') : '<div class="muted">No picture sets yet today.</div>'
+  return `<section class="card" aria-label="Free use today" data-testid="free-use"><h2 class="serif" style="font-size:19px">Free use today</h2>` +
+    `<div class="muted">Moments per person: average <b>${f.avg}</b> · highest <b>${f.highest}</b> · ${n(f.moments)} moments from ${n(f.people)} people</div>` +
+    `<div class="muted">Limits hit: per person <b>${f.hits.limit_person}</b> · ten not given <b>${f.hits.limit_unpaid10}</b> · same connection <b>${f.hits.limit_ip}</b></div>` +
+    `<div class="muted">Picture sets drawn <b>${n(f.pictureSets)}</b> · gifts made today ${n(f.gifts)} (${share} of the sets)</div>` +
+    `<h3 style="font-size:14px;margin:10px 0 4px">Top 5 by picture sets</h3>${top}` +
+    `<form method="post" action="/ops/home/exempt" style="margin-top:10px"><div class="muted">This browser is ${f.exempt ? '<b>exempt</b> from' : 'counted by'} the free limits.</div>${f.exempt ? '' : '<button type="submit" data-testid="exempt-button">Exempt this browser</button>'}</form></section>`
+}
+
+export function renderHome(payload: StatsPayload, p: Period, now: Date, customers: CustomerRow[] = [], engine: EngineCardData | null = null, freeUse: FreeUseCard | null = null): string {
   const s = payload.stats.periods[p]
   const f = s.funnel
   const orders = payload.orders.filter((o) => inPeriod(o, p, now))
@@ -247,6 +280,7 @@ export function renderHome(payload: StatsPayload, p: Period, now: Date, customer
     `</section></div><div class="side">` +
     (promoRows ? `<section class="card" aria-label="Free gifts by day"><h2 class="serif" style="font-size:19px">Free gifts by day</h2><div class="muted">One shared pool for /en and the Japanese page; the language of each gift is in the table below.</div>${promoRows}<div class="muted">A promotion day runs 4:00 a.m. to 3:59 a.m. Eastern.</div></section>` : '') +
     `<section class="card" aria-label="AI cost"><h2 class="serif" style="font-size:19px">AI cost (estimate)</h2><div class="serif" style="font-size:34px;font-weight:700">$${s.ai_cost_usd.toFixed(2)} <span style="font-size:16px;color:#5C564D">¥${n(s.ai_cost_jpy)}</span></div><div class="muted">${perMoment ? `About $${perMoment.toFixed(2)} per moment written. ` : ''}Real bills: Anthropic Console and Google Cloud Billing.</div></section>` +
+    renderFreeUse(freeUse) +
     (chars ? `<section class="card" aria-label="Characters chosen"><h2 class="serif" style="font-size:19px">Most chosen characters, 30 days</h2><div class="chars">${chars}</div></section>` : '') +
     `</div></div>` +
     `<footer><a href="/ops/customers">Customers (search by email)</a><a href="/ops">All orders</a><a href="/ops/stats">Engine details</a><span>Numbers include our own tests.</span></footer>` +
@@ -380,7 +414,10 @@ export function createHomeHandlers(deps: () => OpsDeps) {
       const asked = new URL(req.url).searchParams.get('p') ?? 'today'
       const p: Period = (PERIODS as readonly string[]).includes(asked) ? (asked as Period) : 'today'
       const [payload, customers, lines] = await Promise.all([buildStats(g.d, g.store, g.env, g.now), buildCustomers(g.store, g.now).catch(() => [] as CustomerRow[]), readEngineLines(g.store, g.now, 24).catch(() => [] as EngineLine[])])
-      return new Response(renderHome(payload, p, g.now, customers, engineCardData(lines, g.now, configuredModels(g.env))), { status: 200, headers: headers('text/html; charset=utf-8') })
+      const todayGifts = payload.orders.filter((o) => inPeriod(o, 'today', g.now) && o.state === 'paid').length
+      const freeUse = await buildFreeUse(g.store, g.now, todayGifts).catch(() => null)
+      if (freeUse) freeUse.exempt = isExempt(req, g.env)
+      return new Response(renderHome(payload, p, g.now, customers, engineCardData(lines, g.now, configuredModels(g.env)), freeUse), { status: 200, headers: headers('text/html; charset=utf-8') })
     },
     /** "Check now": ONE tiny call to the AI (the review model, about 10 tokens), at most once a minute. The answer is OK or the error class in words; nothing else is returned. */
     async engineCheck(req: Request): Promise<Response> {
@@ -391,6 +428,13 @@ export function createHomeHandlers(deps: () => OpsDeps) {
       const client = dd.engineClient ?? (new Anthropic({ maxRetries: 0, ...(g.env.ANTHROPIC_API_KEY ? { apiKey: g.env.ANTHROPIC_API_KEY } : {}) }) as unknown as Parameters<typeof checkNow>[0]['client'])
       const result = await checkNow({ client, model: g.env.ICHIREI_REVIEW_MODEL ?? ENGINE_CONFIG.REVIEW_MODEL, store: g.store, now: g.now })
       return new Response(JSON.stringify(result), { status: 200, headers: headers('application/json; charset=utf-8') })
+    },
+    /** "Exempt this browser" (Part 19): the owner's own browsers are not counted by the free limits — a private signed cookie, set only from here (behind the same password). */
+    async exempt(req: Request): Promise<Response> {
+      const g = await guard(req)
+      if (g instanceof Response) return g
+      if (!sameSitePost(req)) return new Response(JSON.stringify({ error: 'forbidden' }), { status: 403, headers: headers('application/json; charset=utf-8') })
+      return new Response(null, { status: 303, headers: { location: '/ops/home', 'set-cookie': exemptSetCookie(g.env), 'cache-control': 'no-store' } })
     },
     async csv(req: Request): Promise<Response> {
       const g = await guard(req)
