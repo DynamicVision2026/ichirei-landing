@@ -12,7 +12,8 @@ import { refreshMe, setBasketCount } from './me.ts'
 import SavePanel from './SavePanel.tsx'
 import { contextChips } from './chips.ts'
 import KeepByEmail from './KeepByEmail.tsx'
-import { writePath } from '../reveal/paths.ts'
+import { landingPath, writePath } from '../reveal/paths.ts'
+import MyGiftsButton from './MyGifts.tsx'
 import './loop.css'
 import '../reveal/reveal.css'
 
@@ -130,7 +131,7 @@ function SentCard({ g, lang }: { g: Sent; lang: RevealLang }) {
         {(stage === 'to_collect') && g.change_until && <p className="mgDates" data-testid="my-sent-cancel">{c.cancelBy(deadlineText(lang, g.change_until))}</p>}
         {line && <p className={`mgStatus ${stage}`} data-testid="my-sent-status">{line}{stage === 'answered' && g.answer?.word ? <span className="mgAnswerWord notranslate"> · {g.answer.word}</span> : null}</p>}
       </div>
-      {g.page && <a className="btn primary" data-testid="my-sent-open" href={g.page}>{label}</a>}
+      {g.page && <a className={stage === 'to_collect' || stage === 'to_send' ? 'btn primary' : 'ghostLink'} data-testid="my-sent-open" href={g.page}>{label}</a>}
     </li>
   )
 }
@@ -230,7 +231,7 @@ function GiftCard({ item, lang, onOpenPic, onPicLost, onRemoved }: { item: Item;
 }
 
 /**
- * "My ICHIREI" (2026-11-18; "My gifts" before): the customer's own page at /basket and the private link /b/<token>. Each saved gift is a full paper card — the character, its word, the line, who it is for, the
+ * My gifts (2026-11-18; one name since 2026-11-20): the customer's own page at /basket and the private link /b/<token>. Each saved gift is a full paper card — the character, its word, the line, who it is for, the
  * moment, the poem, the four pictures, the dates and the actions. Once the record has an email (a free-gift hold, an order or "Save to my email") the top shows it masked, and the gifts already sent follow.
  * The page opens only in the browser it was made in or by the private link; an email alone opens nothing. A token that is not a page's shows the normal landing page.
  */
@@ -336,14 +337,23 @@ export default function BasketApp() {
 
   return (
     <div className="rv basketPage" data-testid="basket-page" lang={lang}>
-      <div className="wrap">
-        <div className="basketTop">
-          <a className="back" href={writePath(lang)}>
-            {c.backToWrite}
-          </a>
-          <SavePanel lang={lang} />
-        </div>
+        <header className="top writeTop basketTop" data-testid="basket-top">
+          <div className="wrap">
+            <a className="brand" href={landingPath(lang)} data-testid="basket-brand">
+              <span className="ji notranslate" aria-hidden="true">字</span>
+              <b>ICHIREI</b>
+            </a>
+            <div className="topR">
+              <MyGiftsButton lang={lang} />
+              <a className="writeBack" href={writePath(lang)} data-testid="basket-back">
+                {c.backToWrite}
+              </a>
+            </div>
+          </div>
+        </header>
+      <div className="wrap basketBody">
         <h1 data-testid="my-title">{data?.email ? SAVE[lang].heading(data.email, (items ?? []).length) : c.pageTitle}</h1>
+        <div className="basketTools"><SavePanel lang={lang} className="btn ghost saveGhost" /></div>
         {data?.email && (
           <p className="myEmail" data-testid="my-email">
             <span className="notranslate">{data.email}</span> · {c.giftsAndOrders}

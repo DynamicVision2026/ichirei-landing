@@ -1,5 +1,5 @@
 // "Save to my email" (2026-11-18): any customer can keep their page by email and open it again from any device. One mail, in the page language, with the private link /b/<token> and nothing else of
-// theirs in it (no story, no names): one line, the button "Open my gifts", "Saved until {date}", and the company footer.
+// theirs in it (no story, no names): one line, the button "Open My gifts", "Saved until {date}", and the company footer.
 //
 // Rules this file keeps:
 //   - An email alone never shows anything. Only the link inside the mail opens the page — opening it proves the address is theirs.
@@ -28,9 +28,9 @@ const MONTH_EN = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep',
 export const dayText = (d: Date, lang: MailLang): string => (lang === 'en' ? `${MONTH_EN[d.getUTCMonth()]} ${d.getUTCDate()}` : `${d.getUTCMonth() + 1}月${d.getUTCDate()}日`)
 
 const TEXT: Record<MailLang, { subject: string; line: string; button: string; until: (d: string) => string; ignore: string; company: string }> = {
-  en: { subject: 'Your ICHIREI gifts', line: 'Here is your private link to your ICHIREI gifts.', button: 'Open my gifts', until: (d) => `Saved until ${d}.`, ignore: 'If you did not ask for this, you can ignore it: nothing opens without this link.', company: 'Beyond Culture 獨歩文化株式会社' },
-  ja: { subject: '一字礼 マイギフト', line: '一字礼のマイギフトを開く、あなただけのリンクです。', button: 'マイギフトを開く', until: (d) => `${d}まで保存されます。`, ignore: '心当たりがない場合は、このメールは無視してください。このリンクがなければ、何も開きません。', company: 'Beyond Culture 獨歩文化株式会社' },
-  'zh-Hant': { subject: '一字禮 我的禮物', line: '這是開啟你的一字禮「我的禮物」的專屬連結。', button: '開啟我的禮物', until: (d) => `保存至${d}。`, ignore: '如果不是你本人操作，請忽略這封信：沒有這個連結，什麼都不會打開。', company: 'Beyond Culture 獨歩文化株式会社' },
+  en: { subject: 'My gifts · ICHIREI', line: 'Here is your private link to My gifts.', button: 'Open My gifts', until: (d) => `Saved until ${d}.`, ignore: 'If you did not ask for this, you can ignore it: nothing opens without this link.', company: 'Beyond Culture 獨歩文化株式会社' },
+  ja: { subject: 'マイギフト · ICHIREI', line: 'マイギフトを開く、あなただけのリンクです。', button: 'マイギフトを開く', until: (d) => `${d}まで保存されます。`, ignore: '心当たりがない場合は、このメールは無視してください。このリンクがなければ、何も開きません。', company: 'Beyond Culture 獨歩文化株式会社' },
+  'zh-Hant': { subject: '我的禮物 · ICHIREI', line: '這是開啟「我的禮物」的專屬連結。', button: '開啟我的禮物', until: (d) => `保存至${d}。`, ignore: '如果不是你本人操作，請忽略這封信：沒有這個連結，什麼都不會打開。', company: 'Beyond Culture 獨歩文化株式会社' },
 }
 
 const esc = (s: string): string => s.replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;').replace(/>/g, '&gt;')

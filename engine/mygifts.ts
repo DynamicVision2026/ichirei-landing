@@ -1,4 +1,4 @@
-// "My ICHIREI" (2026-11-18): the customer's own page. What /basket and /b/<token> hold beyond the saved gifts: the customer's email (masked — never in full), the free-gift hold, and the gifts
+// My gifts (2026-11-18): the customer's own page. What /basket and /b/<token> hold beyond the saved gifts: the customer's email (masked — never in full), the free-gift hold, and the gifts
 // already sent (the orders on this customer's record). Everything here is behind the same door as the basket: only a browser that saved into it or opened its private link sees any of it —
 // an email alone never does. Nothing here calls a model, and nothing here is ever put in a log line.
 

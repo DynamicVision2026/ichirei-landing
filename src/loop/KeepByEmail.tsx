@@ -5,7 +5,7 @@ import { COPY } from '../demo/i18n.ts'
 import './loop.css'
 
 /**
- * "Save to my email" (2026-11-18): an email field and one button on My ICHIREI and in the result page's Save panel. The server sends ONE mail with the private link; the address is never shown back
+ * "Save to my email" (2026-11-18): an email field and one button on My gifts and in the result page's Save panel. The server sends ONE mail with the private link; the address is never shown back
  * in full and an email alone opens nothing — only the link in the mail does. With an email already on the record, "Send my link again" re-sends it (at most 3 mails a day per address). The marketing
  * consent has no part in this: saving never subscribes anyone. Not rendered at all while the server has no mailer (no RESEND_API_KEY).
  */

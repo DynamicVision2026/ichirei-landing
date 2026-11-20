@@ -1,4 +1,4 @@
-// "My ICHIREI" (2026-11-18): the customer's own page and "Save to my email". No network, no model, no Shopify; a fake mailer.
+// My gifts (2026-11-18): the customer's own page and "Save to my email". No network, no model, no Shopify; a fake mailer.
 //   node --experimental-strip-types --disable-warning=ExperimentalWarning scripts/test-mygifts.ts
 
 import { readFileSync } from 'node:fs'
@@ -123,7 +123,7 @@ void realWrite
   const mail = mailer.sent[0]
   const link = /https:\/\/ichirei\.beyondculture\.ai\/b\/BT-[a-z2-9]{24}/.exec(mail.text)?.[0] ?? ''
   const tok = link.split('/b/')[1]
-  check('C: the mail has the private link /b/<token>, "Open my gifts", "Saved until Dec 18", the company footer with info@beyondculture.ai, and the subject "Your ICHIREI gifts"', /^https:\/\/ichirei\.beyondculture\.ai\/b\/BT-/.test(link) && mail.html.includes('Open my gifts') && mail.html.includes('Saved until Dec 18') && mail.html.includes('info@beyondculture.ai') && mail.subject === 'Your ICHIREI gifts' && mail.text.includes(link))
+  check('C: the mail has the private link /b/<token>, "Open My gifts", "Saved until Dec 18", the company footer with info@beyondculture.ai, and the subject "My gifts · ICHIREI"', /^https:\/\/ichirei\.beyondculture\.ai\/b\/BT-/.test(link) && mail.html.includes('Open My gifts') && mail.html.includes('Saved until Dec 18') && mail.html.includes('info@beyondculture.ai') && mail.subject === 'My gifts · ICHIREI' && mail.text.includes(link))
   check('C: the mail has no story text, no names, no character', ![STORY, '答え', 'Mom', '乂', 'word-乂', 'line of'].some((t) => mail.html.includes(t) || mail.text.includes(t)))
   check('C: the answer carries only the masked address (never the address)', r.ok && r.email === 'm•••@example.com' && !JSON.stringify(r).includes('mia@example.com'))
   const rec = await readCustomer(store, emailCustomerId('mia@example.com'))
@@ -152,7 +152,7 @@ void realWrite
   const change = await saveToEmail(d3, B3, 'new@example.com', 'ja')
   const before = await readCustomer(store, emailCustomerId('mia@example.com'))
   const l3 = /https:\/\/[^\s]+/.exec(m3.sent[0]?.text ?? '')?.[0] ?? ''
-  check('C: a record that already has an email keeps it when another address is typed: one mail goes to the NEW address with a confirm token, and the record is unchanged until it is opened', change.ok && change.pending && m3.sent.length === 1 && m3.sent[0].to === 'new@example.com' && /\/b\/BT-[a-z2-9]{24}\?m=BM-[a-z2-9]{24}/.test(l3) && before?.emails.join() === 'mia@example.com' && m3.sent[0].subject === '一字礼 マイギフト', l3)
+  check('C: a record that already has an email keeps it when another address is typed: one mail goes to the NEW address with a confirm token, and the record is unchanged until it is opened', change.ok && change.pending && m3.sent.length === 1 && m3.sent[0].to === 'new@example.com' && /\/b\/BT-[a-z2-9]{24}\?m=BM-[a-z2-9]{24}/.test(l3) && before?.emails.join() === 'mia@example.com' && m3.sent[0].subject === 'マイギフト · ICHIREI', l3)
   const u = new URL(l3)
   await openBasketLink(store, B3, u.pathname.slice(3), u.searchParams.get('m'), NOW)
   const after = await myPage(store, B3, NOW)
@@ -162,7 +162,7 @@ void realWrite
   await saveToEmail({ store, mailer: m4, env: ENV, now: NOW }, B3, 'third@example.com', 'zh-Hant')
   const l4 = new URL(/https:\/\/[^\s]+/.exec(m4.sent[0].text)![0])
   const tokenOnly = await openBasketLink(store, B2, l4.pathname.slice(3), null, NOW) // the page's link without the confirm token: opens the page, changes no address
-  check('C: the link without its confirm token opens the page but does not change the address', !!tokenOnly && (await myPage(store, B2, NOW)).email === 'n•••@example.com' && m4.sent[0].subject === '一字禮 我的禮物')
+  check('C: the link without its confirm token opens the page but does not change the address', !!tokenOnly && (await myPage(store, B2, NOW)).email === 'n•••@example.com' && m4.sent[0].subject === '我的禮物 · ICHIREI')
 
   // the 3-a-day limit, per address, saving and resending together
   const sL = new MemoryOrderStore()
@@ -192,7 +192,7 @@ void realWrite
   const en = basketMail('a@b.co', 'https://x/b/BT-1', t, 'en')
   const ja = basketMail('a@b.co', 'https://x/b/BT-1', t, 'ja')
   const zh = basketMail('a@b.co', 'https://x/b/BT-1', t, 'zh-Hant')
-  check('C: the mail in English, Japanese and Chinese: the subject, "Open my gifts" button, "Saved until" and the footer', en.subject === 'Your ICHIREI gifts' && ja.subject === '一字礼 マイギフト' && zh.subject === '一字禮 我的禮物' && en.html.includes('Open my gifts') && ja.html.includes('マイギフトを開く') && zh.html.includes('開啟我的禮物') && en.html.includes('Saved until Dec 18') && ja.html.includes('12月18日まで保存') && zh.html.includes('保存至12月18日') && [en, ja, zh].every((m) => m.html.includes('info@beyondculture.ai') && m.text.includes('info@beyondculture.ai')))
+  check('C: the mail in English, Japanese and Chinese: the subject, "Open My gifts" button, "Saved until" and the footer', en.subject === 'My gifts · ICHIREI' && ja.subject === 'マイギフト · ICHIREI' && zh.subject === '我的禮物 · ICHIREI' && en.html.includes('Open My gifts') && ja.html.includes('マイギフトを開く') && zh.html.includes('開啟我的禮物') && en.html.includes('Saved until Dec 18') && ja.html.includes('12月18日まで保存') && zh.html.includes('保存至12月18日') && [en, ja, zh].every((m) => m.html.includes('info@beyondculture.ai') && m.text.includes('info@beyondculture.ai')))
 }
 
 // ---- D. the routes: the mail box is hidden without a key; no address in any answer or log -------------------------------------------------------------------
@@ -264,7 +264,7 @@ void realWrite
 {
   const keys = ['pageTitle', 'giftsAndOrders', 'yourMoment', 'readAll', 'readLess', 'poemHeading', 'picturesHeading', 'removeAsk', 'removeYes', 'removeNo', 'sentHeading', 'statusPaid', 'statusCollected', 'statusOpened', 'openGift', 'emptyPage', 'writeMoment', 'keepTitle', 'saveToEmail', 'mailSent', 'mailPending', 'mailBad', 'mailLimit', 'mailFail', 'sendAgain'] as const
   check('E: every label of the page and the mail box exists in en, ja and zh-Hant (and the ones with a name or a date in them take it)', (['en', 'ja', 'zh-Hant'] as const).every((l) => keys.every((k) => typeof LOOP[l][k] === 'string' && (LOOP[l][k] as string).length > 0) && LOOP[l].forName('Ann').includes('Ann') && LOOP[l].savedUntil('Dec 18').includes('Dec 18') && LOOP[l].holdUntil('11:49 PM').includes('11:49 PM')))
-  check('E: the titles: "My ICHIREI" / 「マイギフト」 / 「我的禮物」, and the mail button 「メールに保存」 / 「存到我的信箱」', LOOP.en.pageTitle === 'My ICHIREI' && LOOP.ja.pageTitle === 'マイギフト' && LOOP['zh-Hant'].pageTitle === '我的禮物' && LOOP.ja.saveToEmail === 'メールに保存' && LOOP['zh-Hant'].saveToEmail === '存到我的信箱' && LOOP.en.saveToEmail === 'Save to my email')
+  check('E: the titles: "My gifts" / 「マイギフト」 / 「我的禮物」, and the mail button 「メールに保存」 / 「存到我的信箱」', LOOP.en.pageTitle === 'My gifts' && LOOP.ja.pageTitle === 'マイギフト' && LOOP['zh-Hant'].pageTitle === '我的禮物' && LOOP.ja.saveToEmail === 'メールに保存' && LOOP['zh-Hant'].saveToEmail === '存到我的信箱' && LOOP.en.saveToEmail === 'Save to my email')
 }
 
 console.log(failures === 0 ? '\nALL PASS' : `\n${failures} FAILED`)

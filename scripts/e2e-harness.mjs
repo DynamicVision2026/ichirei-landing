@@ -4874,7 +4874,7 @@ for (const [lang, locale, text] of [['en', 'en-US', 'Your gift is being finished
     await page.route('**/api/basket', (r) => r.fulfill({ json: { items, token: 'BT-x', link: 'https://ichirei.soul-id.jp/b/BT-abcdefghjkmnpqrstuvwxyz2' } }))
     await page.goto('http://localhost:5173/basket', { waitUntil: 'networkidle' })
     await page.waitForSelector('[data-testid=basket-item]')
-    check('My ICHIREI page (2026-11-18; "My gifts" before): the heading "My ICHIREI", "Saved for 30 days.", two full cards each with the character, "Give this gift →" and "Remove"', (await page.locator('.basketPage h1').innerText()) === 'My ICHIREI' && (await page.locator('[data-testid=basket-saved]').innerText()) === 'Saved for 30 days.' && (await page.locator('[data-testid=basket-item]').count()) === 2 && (await page.locator('[data-testid=basket-give]').first().innerText()) === 'Give this gift →' && (await page.locator('[data-testid=basket-remove]').first().innerText()) === 'Remove')
+    check('My gifts page (2026-11-18; "My gifts" before): the heading "My gifts", "Saved for 30 days.", two full cards each with the character, "Give this gift →" and "Remove"', (await page.locator('.basketPage h1').innerText()) === 'My gifts' && (await page.locator('[data-testid=basket-saved]').innerText()) === 'Saved for 30 days.' && (await page.locator('[data-testid=basket-item]').count()) === 2 && (await page.locator('[data-testid=basket-give]').first().innerText()) === 'Give this gift →' && (await page.locator('[data-testid=basket-remove]').first().innerText()) === 'Remove')
     check('My gifts page: "Give this gift →" opens the writing room of the gift\'s language (2026-11-16) with the item to put back', ((await page.locator('[data-testid=basket-give]').first().getAttribute('href')) ?? '') === '/en/write?resume=BK-aaaaaaaaaaaaaaaaaaaa')
     await page.locator('[data-testid=save-button]').click()
     await page.locator('[data-testid=save-panel]').waitFor()
@@ -4888,10 +4888,10 @@ for (const [lang, locale, text] of [['en', 'en-US', 'Your gift is being finished
     await page.screenshot({ path: `${SHOTS}/polish-save-panel-390.png` }).catch(() => {})
     await page.locator('[data-testid=basket-remove]').first().click()
     await page.waitForTimeout(300)
-    check('My ICHIREI: "Remove" asks once on the page (no browser dialog) — nothing is deleted yet', deleted === null && (await page.locator('[data-testid=basket-remove-ask]').count()) === 1 && (await page.locator('[data-testid=basket-item]').count()) === 2)
+    check('My gifts: "Remove" asks once on the page (no browser dialog) — nothing is deleted yet', deleted === null && (await page.locator('[data-testid=basket-remove-ask]').count()) === 1 && (await page.locator('[data-testid=basket-item]').count()) === 2)
     await page.locator('[data-testid=basket-remove-yes]').click()
     await page.waitForTimeout(400)
-    check('My ICHIREI: after "Remove" is confirmed the item is deleted and gone', deleted === 'BK-aaaaaaaaaaaaaaaaaaaa' && (await page.locator('[data-testid=basket-item]').count()) === 1)
+    check('My gifts: after "Remove" is confirmed the item is deleted and gone', deleted === 'BK-aaaaaaaaaaaaaaaaaaaa' && (await page.locator('[data-testid=basket-item]').count()) === 1)
     check('no page errors (run 31, basket page)', errs.length === 0, errs.join('; '))
     await ctx.close()
   }
@@ -5655,7 +5655,7 @@ for (const [lang, locale, text] of [['en', 'en-US', 'Your gift is being finished
     await four.page.close()
     const g = await open35('http://localhost:5173/basket', { on: false }, { me: { basket: { count: 2 }, ready: null, hold: null }, items: ITEMS(2) })
     await T(g.page, 'basket-item').first().waitFor({ timeout: 8000 })
-    check('My ICHIREI page: the heading "My ICHIREI" (2026-11-18); the word "basket" is nowhere on it', (await g.page.locator('.basketPage h1').innerText()) === 'My ICHIREI' && !/basket/i.test(await g.page.locator('body').innerText()))
+    check('My gifts page: the heading "My gifts" (2026-11-18); the word "basket" is nowhere on it', (await g.page.locator('.basketPage h1').innerText()) === 'My gifts' && !/basket/i.test(await g.page.locator('body').innerText()))
     await g.page.screenshot({ path: `${SHOTS}/sg-my-gifts-390.png` })
     check('no page errors (run 35, My gifts page)', g.errors.length === 0, g.errors.join('; '))
     await g.page.close()
@@ -5789,7 +5789,7 @@ for (const [lang, locale, text] of [['en', 'en-US', 'Your gift is being finished
 }
 
 
-// ---------- Run 38 (2026-11-18): "My ICHIREI" — the customer's own page: full paper cards (the character, its word — never the reading alone —, the line, who it is for, the moment collapsed and expanded, the poem, four pictures
+// ---------- Run 38 (2026-11-18): "My gifts" — the customer's own page: full paper cards (the character, its word — never the reading alone —, the line, who it is for, the moment collapsed and expanded, the poem, four pictures
 // with a placeholder for a missing one, the dates, Give / Remove), the masked email and the gifts sent, the empty state, "Save to my email"; en, ja and zh-Hant; screenshots at 390 and 1280 ----------
 {
   const SVG = '<svg xmlns="http://www.w3.org/2000/svg" width="40" height="40"><rect width="40" height="40" fill="#9a8f7a"/></svg>'
@@ -5824,7 +5824,7 @@ for (const [lang, locale, text] of [['en', 'en-US', 'Your gift is being finished
   // ---- English, with an email, a hold and a sent gift; the mail box on
   {
     const { page, ctx, errs, posts } = await open38({ email: 'b•••@gmail.com', hold: { expires_at: '2026-11-18T23:49:00Z', minutes_left: 60 }, mail: true, sent: [{ kanji: '憶', reading: 'oku', word: 'remember', receiver: 'Kenji', at: '2026-11-16T10:00:00Z', status: 'opened', opened_at: '2026-11-17T09:00:00Z', page: '/a/AN-abcdefghjkmnpqrstuvw' }] })
-    check('My ICHIREI (en): the title (2026-11-20: "Saved under b•••@gmail.com (n)" once the address is known), the masked email with "Your gifts and orders", the free-gift hold, and "Saved for 30 days."', /^Saved under b•••@gmail\.com \(\d+\)$/.test(await T(page, 'my-title').innerText()) && (await T(page, 'my-email').innerText()).includes('b•••@gmail.com') && (await T(page, 'my-email').innerText()).includes('Your gifts and orders') && (await T(page, 'my-hold').innerText()).startsWith('Your free gift is held until') && (await T(page, 'basket-saved').innerText()) === 'Saved for 30 days.')
+    check('My gifts (en): the title (2026-11-20: "Saved under b•••@gmail.com (n)" once the address is known), the masked email with "Your gifts and orders", the free-gift hold, and "Saved for 30 days."', /^Saved under b•••@gmail\.com \(\d+\)$/.test(await T(page, 'my-title').innerText()) && (await T(page, 'my-email').innerText()).includes('b•••@gmail.com') && (await T(page, 'my-email').innerText()).includes('Your gifts and orders') && (await T(page, 'my-hold').innerText()).startsWith('Your free gift is held until') && (await T(page, 'basket-saved').innerText()) === 'Saved for 30 days.')
     const card = T(page, 'basket-item').first()
     check('full card (en): the character large, the English word as the headline — and NO romanized reading anywhere on the card', (await card.locator('[data-testid=mg-glyph]').innerText()) === '恒' && (await card.locator('[data-testid=mg-word]').innerText()) === 'constant' && (await card.locator('[data-testid=mg-reading]').count()) === 0 && !(await card.innerText()).includes('kō'))
     check('full card (en): the one line, "For Mom", and the chips "Mother" and "Thank you"', (await card.locator('[data-testid=mg-line]').innerText()) === 'She is the one who never changes.' && (await card.locator('[data-testid=mg-for]').innerText()) === 'For Mom' && (await card.locator('[data-testid=mg-chip]').allInnerTexts()).join('|') === 'Mother|Thank you')
@@ -5883,8 +5883,8 @@ for (const [lang, locale, text] of [['en', 'en-US', 'Your gift is being finished
   {
     const { page, ctx, errs } = await open38({ lang: 'ja', items: [item({ language: 'ja', to: '母', card: { kanji: '恒', reading: 'コウ・つね', word: '', line: 'いつも変わらず、そこにいてくれる人。', meaning: '' }, context: { relationship: 'parent_mother', relationship_other: '', purpose: 'thanks', purpose_other: '', occasion: 'thanksgiving' } })], email: 'b•••@gmail.com', mail: true })
     const card = T(page, 'basket-item').first()
-    check('My ICHIREI (ja): the heading 「…に保存した贈りもの（n）」 (2026-11-20), the character with its reading small beside it AND the line (the reading is never alone), 「母へ」, chips 「母」「ありがとう」', /に保存した贈りもの（\d+）$/.test(await T(page, 'my-title').innerText()) && (await card.locator('[data-testid=mg-reading]').innerText()) === 'コウ・つね' && (await card.locator('[data-testid=mg-line]').innerText()) === 'いつも変わらず、そこにいてくれる人。' && (await card.locator('[data-testid=mg-for]').innerText()) === '母へ' && (await card.locator('[data-testid=mg-chip]').allInnerTexts()).join('|') === '母|ありがとう')
-    check('My ICHIREI (ja): 「あなたの場面」, 「この贈りものを贈る →」, 「削除」, 「保存日」と「まで保存」, and the mail box 「メールに保存」', (await card.locator('[data-testid=mg-moment] h2').textContent()) === 'あなたの場面' && (await card.locator('[data-testid=basket-give]').innerText()) === 'この贈りものを贈る →' && (await card.locator('[data-testid=basket-remove]').innerText()) === '削除' && (await card.locator('[data-testid=mg-until]').innerText()) === '12月18日まで保存' && (await T(page, 'keep-mail-save').innerText()) === 'メールに保存')
+    check('My gifts (ja): the heading 「…に保存した贈りもの（n）」 (2026-11-20), the character with its reading small beside it AND the line (the reading is never alone), 「母へ」, chips 「母」「ありがとう」', /に保存した贈りもの（\d+）$/.test(await T(page, 'my-title').innerText()) && (await card.locator('[data-testid=mg-reading]').innerText()) === 'コウ・つね' && (await card.locator('[data-testid=mg-line]').innerText()) === 'いつも変わらず、そこにいてくれる人。' && (await card.locator('[data-testid=mg-for]').innerText()) === '母へ' && (await card.locator('[data-testid=mg-chip]').allInnerTexts()).join('|') === '母|ありがとう')
+    check('My gifts (ja): 「あなたの場面」, 「この贈りものを贈る →」, 「削除」, 「保存日」と「まで保存」, and the mail box 「メールに保存」', (await card.locator('[data-testid=mg-moment] h2').textContent()) === 'あなたの場面' && (await card.locator('[data-testid=basket-give]').innerText()) === 'この贈りものを贈る →' && (await card.locator('[data-testid=basket-remove]').innerText()) === '削除' && (await card.locator('[data-testid=mg-until]').innerText()) === '12月18日まで保存' && (await T(page, 'keep-mail-save').innerText()) === 'メールに保存')
     check('no horizontal scroll at 390 px (ja)', await noScroll(page))
     await page.screenshot({ path: `${SHOTS}/mygifts-ja-390.png`, fullPage: true })
     await page.setViewportSize({ width: 1280, height: 1000 })
@@ -5897,7 +5897,7 @@ for (const [lang, locale, text] of [['en', 'en-US', 'Your gift is being finished
   {
     const { page, ctx, errs } = await open38({ lang: 'zh-Hant', items: [item({ language: 'zh-Hant', to: '媽媽', card: { kanji: '恒', reading: 'héng', word: '', line: '那個始終如一、一直都在的人。', meaning: '' }, context: { relationship: 'parent_mother', relationship_other: '', purpose: 'thanks', purpose_other: '', occasion: 'thanksgiving' } })], email: 'b•••@gmail.com', mail: true })
     const card = T(page, 'basket-item').first()
-    check('My ICHIREI (zh-Hant): the heading 「保存在…的禮物（n）」 (2026-11-20), the reading small beside the character with the line, 「給媽媽」, chips 「母親」「謝謝」, 「存到我的信箱」', /^保存在.+的禮物（\d+）$/.test(await T(page, 'my-title').innerText()) && (await card.locator('[data-testid=mg-reading]').innerText()) === 'héng' && (await card.locator('[data-testid=mg-line]').innerText()) === '那個始終如一、一直都在的人。' && (await card.locator('[data-testid=mg-for]').innerText()) === '給媽媽' && (await card.locator('[data-testid=mg-chip]').allInnerTexts()).join('|') === '母親|謝謝' && (await T(page, 'keep-mail-save').innerText()) === '存到我的信箱')
+    check('My gifts (zh-Hant): the heading 「保存在…的禮物（n）」 (2026-11-20), the reading small beside the character with the line, 「給媽媽」, chips 「母親」「謝謝」, 「存到我的信箱」', /^保存在.+的禮物（\d+）$/.test(await T(page, 'my-title').innerText()) && (await card.locator('[data-testid=mg-reading]').innerText()) === 'héng' && (await card.locator('[data-testid=mg-line]').innerText()) === '那個始終如一、一直都在的人。' && (await card.locator('[data-testid=mg-for]').innerText()) === '給媽媽' && (await card.locator('[data-testid=mg-chip]').allInnerTexts()).join('|') === '母親|謝謝' && (await T(page, 'keep-mail-save').innerText()) === '存到我的信箱')
     check('no horizontal scroll at 390 px (zh-Hant)', await noScroll(page))
     await page.screenshot({ path: `${SHOTS}/mygifts-zh-390.png`, fullPage: true })
     await page.setViewportSize({ width: 1280, height: 1000 })
@@ -6984,6 +6984,83 @@ for (const [lang, locale, text] of [['en', 'en-US', 'Your gift is being finished
     check(`Part 17 (${lang}): no name and no chips: no empty row`, (await page.locator('.mgFor').count()) === 2)
     if (lang === 'en') await page.screenshot({ path: `${SHOTS}/p17-chips-en-390.png`, fullPage: true })
     check(`no page errors (run 51, ${lang})`, errs.length === 0, errs.join('; '))
+    await ctx.close()
+  }
+}
+
+// ---------- Run 52 (2026-11-20, Part 18): My gifts in the site's own look and one name — マイギフト / My gifts / 我的禮物; the site serif in ink; square buttons; cinnabar only on the character; the header of the writing pages ----------
+{
+  const NAME52 = { ja: 'マイギフト', en: 'My gifts', 'zh-Hant': '我的禮物' }
+  const BACK52 = { ja: '← 場面を書く', en: '← Write a moment', 'zh-Hant': '← 寫下片刻' }
+  const pic52 = (n) => `<svg xmlns="http://www.w3.org/2000/svg" width="200" height="200"><rect width="200" height="200" fill="#d8d0bc"/><ellipse cx="100" cy="150" rx="${70 + n * 6}" ry="26" fill="#3a352c" opacity=".7"/><polygon points="40,110 90,60 140,110" fill="#2a2620" opacity=".85"/><circle cx="${40 + n * 35}" cy="46" r="14" fill="#6b6354" opacity=".8"/></svg>`
+  const ok52 = (n) => ({ state: 'ok', url: `/api/film/AN-previewpreviewprev22/picture/${n}.webp` })
+  const gift52 = (lang, over = {}) => ({
+    id: 'BK-aaaaaaaaaaaaaaaaaaaa', created_at: '2026-11-20T10:00:00Z', updated_at: '2026-11-20T10:00:00Z', language: lang, to: lang === 'ja' ? '母' : 'Mom',
+    card: { kanji: '支', reading: lang === 'en' ? '' : 'し', word: lang === 'en' ? 'keeper' : '', line: lang === 'ja' ? 'いつも、みんなの食卓を支えてくれる人。' : lang === 'zh-Hant' ? '總是撐起全家餐桌的人。' : 'She keeps everyone at the table.', meaning: 'keeper' }, preview_id: 'AN-previewpreviewprev22',
+    context: { relationship: 'parent_mother', relationship_other: '', purpose: 'thanks', purpose_other: '', occasion: 'thanksgiving' }, round: 1, slot: 'main',
+    poem: { lines: lang === 'ja' ? ['朝の光', '弁当の蓋'] : ['morning light', 'a lunch box, closed'], reading: '' }, story: lang === 'ja' ? '感謝祭の日、母はいつも最後に座った。' : 'Every Thanksgiving she sat down last.', saved_until: '2026-12-20T10:00:00Z',
+    pictures: [1, 2, 3, 4].map(ok52), ...over,
+  })
+  const sentItems = (lang) => [
+    { kanji: '憶', reading: '', word: '', receiver: lang === 'ja' ? '健二' : 'Kenji', at: '2026-11-16T10:00:00Z', status: 'collected', group: 'unsent', stage: 'to_send', change_until: null, page: '/a/AN-abcdefghjkmnpqrstuvw' },
+    { kanji: '謝', reading: '', word: '', receiver: lang === 'ja' ? '美咲' : 'Misaki', at: '2026-11-15T10:00:00Z', status: 'opened', group: 'sent', stage: 'answered', answer: { char: '家', word: '' }, page: '/a/AN-bcdefghjkmnpqrstuvwx' },
+  ]
+  for (const lang of ['en', 'ja', 'zh-Hant']) {
+    const ctx = await browser.newContext({ viewport: { width: 390, height: 900 }, locale: lang === 'ja' ? 'ja-JP' : lang === 'zh-Hant' ? 'zh-TW' : 'en-US', deviceScaleFactor: 2 })
+    const page = await ctx.newPage()
+    const errs = []
+    page.on('pageerror', (e) => errs.push(String(e)))
+    await page.route('**/api/me*', (r) => r.fulfill({ json: { basket: { count: 1 }, ready: null, hold: null } }))
+    await page.route('**/api/film/*/picture/*', (r) => r.fulfill({ status: 200, contentType: 'image/svg+xml', body: pic52(Number((r.request().url().match(/picture\/(\d)/) ?? [])[1] ?? 1)) }))
+    await page.route('**/api/basket', (r) => r.fulfill({ json: { items: [gift52(lang)], token: 'BT-x', link: '', email: 'b•••@gmail.com', hold: null, sent: sentItems(lang), mail: true, saved_days: 30 } }))
+    await page.goto('http://localhost:5173/basket', { waitUntil: 'networkidle' })
+    await page.waitForSelector('[data-testid=basket-item]')
+    await page.waitForTimeout(400)
+    const body = await page.locator('body').innerText()
+    check(`Part 18 (${lang}): one name — the title, the tab and the header button say 「${NAME52[lang]}」; no "My ICHIREI", 「マイ一字礼」 or 「一字禮」 leftovers on the page`, (await page.title()).startsWith(`${NAME52[lang]} · ICHIREI`) && (await page.locator('[data-testid=my-gifts]').innerText()).startsWith(NAME52[lang]) && !/My ICHIREI|マイ一字礼|マイ一字|我的一字|ICHIREI マイ/.test(body))
+    // the header: the same as the writing pages
+    const hdr = await page.evaluate(() => {
+      const q = (s) => document.querySelector(s)?.getBoundingClientRect()
+      const b = q('[data-testid=basket-brand]'), g = q('[data-testid=my-gifts]'), k = q('[data-testid=basket-back]')
+      return { b, g, k, text: document.querySelector('[data-testid=basket-brand]')?.textContent, ji: document.querySelector('[data-testid=basket-brand] .ji')?.textContent, back: document.querySelector('[data-testid=basket-back]')?.textContent.trim(), scroll: document.documentElement.scrollWidth, w: window.innerWidth }
+    })
+    const cy = (r) => r.top + r.height / 2
+    check(`Part 18 (${lang}): the header is the writing pages' — 字 ICHIREI on the left, 「${NAME52[lang]}」 and the back link 「${BACK52[lang]}」 on the right, all on ONE line at 390 px, no horizontal scroll`, hdr.ji === '字' && /ICHIREI/.test(hdr.text) && hdr.back === BACK52[lang] && Math.abs(cy(hdr.b) - cy(hdr.g)) < 6 && Math.abs(cy(hdr.g) - cy(hdr.k)) < 6 && hdr.b.left < hdr.g.left && hdr.g.left < hdr.k.left && hdr.k.right <= hdr.w && hdr.scroll <= hdr.w + 1, JSON.stringify(hdr))
+    // the look: serif in ink (not navy), the label style, square buttons, cinnabar only on the character
+    const look = await page.evaluate(() => {
+      const css = (el, p) => getComputedStyle(el)[p]
+      const h1 = document.querySelector('[data-testid=my-title]')
+      const counts = document.querySelector('[data-testid=my-counts]')
+      const label = document.querySelector('[data-testid=mg-moment] h2') ?? document.querySelector('.mgCard h2')
+      const reds = new Set(['rgb(192, 57, 43)', 'rgb(179, 51, 31)', 'rgb(200, 64, 45)'])
+      const badRed = []
+      for (const el of document.querySelectorAll('.basketPage *')) {
+        if (el.closest('.mgGlyph') || el.classList.contains('mgGlyph') || el.closest('.brand .ji') || el.matches('.brand .ji')) continue
+        const st = getComputedStyle(el)
+        for (const p of ['color', 'backgroundColor', 'borderTopColor', 'borderBottomColor', 'borderLeftColor', 'borderRightColor', 'outlineColor']) {
+          if (reds.has(st[p]) && (p === 'color' ? !!el.textContent.trim() && el.children.length === 0 : (p === 'backgroundColor' || st[p.replace('Color', 'Style')] !== 'none') && !(p.startsWith('border') && parseFloat(st[p.replace('Color', 'Width')]) === 0))) badRed.push(`${el.tagName}.${el.className}:${p}`)
+        }
+      }
+      const buttons = [...document.querySelectorAll('.basketPage button, .basketPage a.btn, .basketPage .ghostLink, .basketPage .myGifts, .basketPage .linkBtn')]
+      const radii = buttons.map((b) => Math.max(parseFloat(css(b, 'borderTopLeftRadius')) || 0, parseFloat(css(b, 'borderTopRightRadius')) || 0, parseFloat(css(b, 'borderBottomLeftRadius')) || 0, parseFloat(css(b, 'borderBottomRightRadius')) || 0))
+      const give = document.querySelector('[data-testid=basket-give]')
+      const glyph = document.querySelector('[data-testid=mg-glyph]')
+      const sendIt = document.querySelector('[data-testid=group-unsent] [data-testid=my-sent-open]')
+      const seeAnswer = document.querySelector('[data-testid=group-sent] [data-testid=my-sent-open]')
+      return { h1font: css(h1, 'fontFamily'), h1color: css(h1, 'color'), countsFont: css(counts, 'fontFamily'), countsWeight: css(counts, 'fontWeight'), countsSpacing: css(counts, 'letterSpacing'), countsColor: css(counts, 'color'), labelColor: css(label, 'color'), labelSpacing: css(label, 'letterSpacing'),
+        badRed, maxRadius: Math.max(0, ...radii), nButtons: buttons.length, giveBg: css(give, 'backgroundColor'), giveRadius: css(give, 'borderTopLeftRadius'), glyphColor: css(glyph, 'color'),
+        sendBg: sendIt ? css(sendIt, 'backgroundColor') : null, answerBg: seeAnswer ? css(seeAnswer, 'backgroundColor') : null, answerClass: seeAnswer?.className, cardRadius: css(document.querySelector('.mgCard'), 'borderTopLeftRadius'), cardTop: css(document.querySelector('.mgCard'), 'borderTopColor') }
+    })
+    const serifOk = lang === 'ja' ? /Zen Old Mincho/.test(look.h1font) : lang === 'zh-Hant' ? /Noto Serif TC/.test(look.h1font) : /Cormorant Garamond/.test(look.h1font)
+    check(`Part 18 (${lang}): the title is in the site serif, in ink (#151311) and not navy`, serifOk && look.h1color === 'rgb(21, 19, 17)', JSON.stringify({ f: look.h1font, c: look.h1color }))
+    check(`Part 18 (${lang}): the counts and the card labels are in the small label style — Inter Light, letter-spaced, muted ink`, /Inter/.test(look.countsFont) && look.countsWeight === '300' && parseFloat(look.countsSpacing) > 0.5 && look.countsColor === 'rgb(92, 86, 77)' && /^rgb\(92, 86, 77\)$/.test(look.labelColor) && parseFloat(look.labelSpacing) > 0.5, JSON.stringify(look))
+    check(`Part 18 (${lang}): cinnabar #C0392B is the character and nothing else — no button, label, count, border or underline uses it (nor the other site reds)`, look.glyphColor === 'rgb(192, 57, 43)' && look.badRed.length === 0, JSON.stringify(look.badRed))
+    check(`Part 18 (${lang}): no button is a pill — every button, button-link and the header button has a corner radius of 4px at most (${look.nButtons} checked)`, look.nButtons >= 6 && look.maxRadius <= 4, JSON.stringify({ n: look.nButtons, max: look.maxRadius }))
+    check(`Part 18 (${lang}): the primary buttons (give this gift, send it) are the site's solid ink button; 「返事を見る」 is a ghost link, not a solid button`, look.giveBg === 'rgb(21, 19, 17)' && look.sendBg === 'rgb(21, 19, 17)' && look.answerBg === 'rgba(0, 0, 0, 0)' && /ghostLink/.test(look.answerClass ?? ''), JSON.stringify({ g: look.giveBg, s: look.sendBg, a: look.answerBg, c: look.answerClass }))
+    check(`Part 18 (${lang}): the cards keep the paper slip with a thin gold top rule and a corner of 4px at most`, parseFloat(look.cardRadius) <= 4 && look.cardTop === 'rgb(184, 146, 74)', JSON.stringify({ r: look.cardRadius, t: look.cardTop }))
+    check(`Part 18 (${lang}): the 支 gift shows all four pictures, no "Other" chip, and no horizontal scroll`, (await page.locator('[data-testid=mg-pic][data-state=ok]').count()) === 4 && (await page.locator('[data-testid=mg-chip]').allInnerTexts()).every((t) => !/^(other|その他|其他)$/i.test(t.trim())) && (await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 1)))
+    if (lang !== 'zh-Hant') await page.screenshot({ path: `${SHOTS}/p18-mygifts-${lang}-390.png`, fullPage: true })
+    check(`no page errors (run 52, ${lang})`, errs.length === 0, errs.join('; '))
     await ctx.close()
   }
 }

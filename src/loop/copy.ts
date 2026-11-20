@@ -33,7 +33,7 @@ export interface LoopCopy {
   /** the landing's welcome-back card (a returning visitor with saved gifts) */
   welcome: string
   seeAll: string
-  // ---- "My ICHIREI", the customer's own page (2026-11-18) ----
+  // ---- My gifts, the customer's own page (2026-11-18; one name — マイギフト / My gifts / 我的禮物 — since 2026-11-20) ----
   pageTitle: string
   /** under the masked email: what the page holds once an email is known */
   giftsAndOrders: string
@@ -108,7 +108,7 @@ export const LOOP: Record<RevealLang, LoopCopy> = {
     copied: 'コピーしました',
     qrNote: 'スマホで読み取ると、続きができます',
     emailIt: '自分にメールで送る',
-    emailSubject: 'ICHIREI マイギフト',
+    emailSubject: 'マイギフト',
     emailBody: (link) => link,
     linkNote: 'このリンクを知っている人は、保存した内容を見られます。大切に保管してください。',
     loading: '…',
@@ -182,7 +182,7 @@ export const LOOP: Record<RevealLang, LoopCopy> = {
     copied: '已複製',
     qrNote: '用手機掃描就能繼續',
     emailIt: '寄給自己',
-    emailSubject: 'ICHIREI 我的禮物',
+    emailSubject: '我的禮物',
     emailBody: (link) => link,
     linkNote: '知道這個連結的人都能看到儲存的內容，請妥善保管。',
     loading: '…',
@@ -256,7 +256,7 @@ export const LOOP: Record<RevealLang, LoopCopy> = {
     copied: 'Copied',
     qrNote: 'Scan with your phone to continue there',
     emailIt: 'Email it to myself',
-    emailSubject: 'My ICHIREI gifts',
+    emailSubject: 'My gifts',
     emailBody: (link) => link,
     linkNote: 'Anyone with this link can see your saved gifts. Keep it private.',
     loading: '…',
@@ -266,7 +266,7 @@ export const LOOP: Record<RevealLang, LoopCopy> = {
     back: '← Back',
     welcome: 'Welcome back. Your saved gifts:',
     seeAll: 'See all →',
-    pageTitle: 'My ICHIREI',
+    pageTitle: 'My gifts',
     giftsAndOrders: 'Your gifts and orders',
     holdUntil: (t) => `Your free gift is held until ${t}`,
     savedOn: (d) => `Saved ${d}`,
@@ -280,7 +280,7 @@ export const LOOP: Record<RevealLang, LoopCopy> = {
     pictureOpen: 'Open this picture',
     pictureMaking: 'Drawing this picture…',
     close: 'Close',
-    removeAsk: 'Remove this gift from My ICHIREI?',
+    removeAsk: 'Remove this gift from My gifts?',
     removeYes: 'Remove',
     removeNo: 'Keep it',
     sentHeading: "Gifts you've sent",
