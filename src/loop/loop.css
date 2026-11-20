@@ -121,7 +121,10 @@
 @media (min-width:760px){.mgGrid{grid-template-columns:repeat(4,minmax(0,1fr))}}
 .mgPic{display:block;position:relative;aspect-ratio:1/1;width:100%;padding:0;border:1px solid #C9B88F;background:#F6EEE0;overflow:hidden;cursor:zoom-in;border-radius:2px}
 .mgPic img{width:100%;height:100%;object-fit:cover;display:block}
-.mgPicEmpty{cursor:default;background:repeating-linear-gradient(135deg,#F1E8D4 0 10px,#EDE2CA 10px 20px);box-shadow:inset 0 0 0 1px rgba(255,255,255,.5)}
+.mgPicMaking{cursor:default;display:flex;align-items:center;justify-content:center;text-align:center;background:#F6EEE0;color:#6B6458;font-size:.72rem;letter-spacing:.06em;padding:.4rem;animation:mgSoft 2.4s ease-in-out infinite}
+.mgPicMaking span{max-width:90%}
+@keyframes mgSoft{0%,100%{opacity:1}50%{opacity:.62}}
+@media (prefers-reduced-motion:reduce){.mgPicMaking{animation:none}}
 .mgDates{display:flex;flex-wrap:wrap;gap:.3rem 1rem;margin:0;font-size:.85rem;color:#7A6F60}
 .mgActs{display:flex;flex-wrap:wrap;gap:.7rem 1.2rem;align-items:center}
 .mgAsk{display:inline-flex;flex-wrap:wrap;gap:.4rem .9rem;align-items:center;font-size:.92rem}

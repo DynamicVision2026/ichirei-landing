@@ -8,6 +8,9 @@
 import { createHash, randomBytes } from 'node:crypto'
 import { casJson, customerIdOf, linkEmail, normalizeEmail, readCustomer, validEmail, type CustomerRecord } from './customer.ts'
 import type { OrderStore } from './order-store.ts'
+import { isAnimationRecord } from './animation.ts'
+import { readArt } from './film-art.ts'
+import { viewOf } from './preview.ts'
 
 const ALPHABET = 'abcdefghjkmnpqrstuvwxyz23456789'
 export const MAX_ITEMS = 20
@@ -154,6 +157,33 @@ export interface BasketSummary {
   story: string
   /** The day the saved gift is removed if nothing more happens (30 days after the last visit; a record with an order is kept). */
   saved_until: string
+  /**
+   * The four pictures, read from the film store when the page is asked for (2026-11-20, Part 16) — a saved gift never carries picture links of its own, so a link can never be stale or wrong:
+   * `ok` = the picture is there (its address), `making` = still being drawn (the page shows the soft "preparing" tile and asks again), `none` = it will not come (the page leaves it out).
+   */
+  pictures: BasketPicture[]
+}
+
+export type BasketPicture = { state: 'ok'; url: string } | { state: 'making' } | { state: 'none' }
+const NO_PICTURES: BasketPicture[] = [{ state: 'none' }, { state: 'none' }, { state: 'none' }, { state: 'none' }]
+
+/** The pictures of one draft/film as they stand now. A draft that is not there any more (or a saved item that never had one) has no pictures: the page leaves the section out. */
+export async function picturesOf(store: OrderStore, previewId: string | null): Promise<BasketPicture[]> {
+  if (!previewId) return NO_PICTURES
+  try {
+    const rec = await store.get(previewId)
+    if (!isAnimationRecord(rec)) return NO_PICTURES
+    const art = await readArt(store, previewId).catch(() => null)
+    const v = viewOf(rec, art)
+    return [0, 1, 2, 3].map((i): BasketPicture => {
+      const url = v.pictures[i]
+      if (v.slots[i] === 'ai' && url) return { state: 'ok', url }
+      if (v.slots[i] === 'pending' && v.state === 'drawing') return { state: 'making' }
+      return { state: 'none' }
+    })
+  } catch {
+    return NO_PICTURES
+  }
 }
 
 const DAY_MS = 86_400_000
@@ -164,7 +194,7 @@ const summaryOf = (it: BasketItem, rec: CustomerRecord): BasketSummary => {
   return {
     id: it.id, created_at: it.created_at, updated_at: it.updated_at ?? it.created_at, language: it.language, to: it.to, card: it.card, preview_id: it.preview_id,
     context: it.context ?? { relationship: '', relationship_other: '', purpose: '', purpose_other: '', occasion: '' },
-    round: it.round ?? null, slot: it.slot ?? null, poem: it.poem ?? null, story,
+    round: it.round ?? null, slot: it.slot ?? null, poem: it.poem ?? null, story, pictures: NO_PICTURES,
     saved_until: new Date(Date.parse(rec.last_seen) + 30 * DAY_MS).toISOString(),
   }
 }
@@ -179,7 +209,9 @@ export async function listBasket(store: OrderStore | null, browser: string): Pro
     const raw = await store.getObject(itemPath(id)).catch(() => null)
     if (!raw) continue
     try {
-      items.push(summaryOf(JSON.parse(raw.toString('utf8')) as BasketItem, rec))
+      const sum = summaryOf(JSON.parse(raw.toString('utf8')) as BasketItem, rec)
+      sum.pictures = await picturesOf(store, sum.preview_id)
+      items.push(sum)
     } catch {
       // a broken item is skipped
     }

@@ -47,6 +47,8 @@ export interface LoopCopy {
   poemHeading: string
   picturesHeading: string
   pictureOpen: string
+  /** A picture that is still being drawn: the soft tile in its place. */
+  pictureMaking: string
   close: string
   removeAsk: string
   removeYes: string
@@ -126,6 +128,7 @@ export const LOOP: Record<RevealLang, LoopCopy> = {
     poemHeading: '詩',
     picturesHeading: 'その場面の4枚の絵',
     pictureOpen: 'この絵を大きく見る',
+    pictureMaking: '絵を描いています…',
     close: '閉じる',
     removeAsk: 'この贈りものをマイギフトから削除しますか？',
     removeYes: '削除する',
@@ -199,6 +202,7 @@ export const LOOP: Record<RevealLang, LoopCopy> = {
     poemHeading: '詩',
     picturesHeading: '那個片刻的四幅畫',
     pictureOpen: '放大這幅畫',
+    pictureMaking: '正在繪製這幅畫…',
     close: '關閉',
     removeAsk: '要把這份禮物從「我的禮物」刪除嗎？',
     removeYes: '刪除',
@@ -274,6 +278,7 @@ export const LOOP: Record<RevealLang, LoopCopy> = {
     poemHeading: 'The poem',
     picturesHeading: 'Four pictures of your moment',
     pictureOpen: 'Open this picture',
+    pictureMaking: 'Drawing this picture…',
     close: 'Close',
     removeAsk: 'Remove this gift from My ICHIREI?',
     removeYes: 'Remove',

@@ -5829,7 +5829,8 @@ for (const [lang, locale, text] of [['en', 'en-US', 'Your gift is being finished
     id: 'BK-aaaaaaaaaaaaaaaaaaaa', created_at: '2026-11-17T10:00:00Z', updated_at: '2026-11-18T10:00:00Z', language: 'en', to: 'Mom',
     card: { kanji: '恒', reading: 'kō', word: 'constant', line: 'She is the one who never changes.', meaning: 'constant' }, preview_id: 'AN-previewpreviewprev22',
     context: { relationship: 'parent_mother', relationship_other: '', purpose: 'thanks', purpose_other: '', occasion: 'thanksgiving' }, round: 1, slot: 'main',
-    poem: { lines: ['morning light', 'a lunch box, closed'], reading: '' }, story: STORY38, saved_until: '2026-12-18T10:00:00Z', ...over,
+    poem: { lines: ['morning light', 'a lunch box, closed'], reading: '' }, story: STORY38, saved_until: '2026-12-18T10:00:00Z',
+    pictures: [1, 2, 3, 4].map((n) => ({ state: 'ok', url: `/api/film/AN-previewpreviewprev22/picture/${n}.webp` })), ...over,
   })
   const open38 = async ({ lang = 'en', items = [item()], email = null, hold = null, sent = [], mail = false, width = 390, height = 900, path = '/basket', clock = '2026-11-18T15:00:00Z' } = {}) => {
     const ctx = await browser.newContext({ viewport: { width, height }, locale: lang === 'ja' ? 'ja-JP' : lang === 'zh-Hant' ? 'zh-TW' : 'en-US', deviceScaleFactor: 1 })
@@ -5839,7 +5840,7 @@ for (const [lang, locale, text] of [['en', 'en-US', 'Your gift is being finished
     await page.clock.setFixedTime(new Date(clock))
     const posts = []
     await page.route('**/api/me*', (r) => r.fulfill({ json: { basket: { count: items.length }, ready: null, hold: null } }))
-    await page.route('**/api/film/*/picture/*', (r) => (r.request().url().endsWith('/picture/1.webp') ? r.fulfill({ status: 404, body: '' }) : r.fulfill({ status: 200, contentType: 'image/svg+xml', body: SVG })))
+    await page.route('**/api/film/*/picture/*', (r) => r.fulfill({ status: 200, contentType: 'image/svg+xml', body: SVG }))
     await page.route('**/api/basket/qr.svg*', (r) => r.fulfill({ status: 200, contentType: 'image/svg+xml', body: '<svg xmlns="http://www.w3.org/2000/svg" width="10" height="10"/>' }))
     await page.route('**/api/basket/email**', (r) => { posts.push({ url: r.request().url(), body: JSON.parse(r.request().postData() ?? '{}') }); return r.fulfill({ json: { ok: true, email: 'm•••@example.com', pending: false } }) })
     await page.route('**/api/basket', (r) => r.fulfill({ json: { items, token: 'BT-x', link: 'https://ichirei.beyondculture.ai/b/BT-abcdefghjkmnpqrstuvwxyz2', email, hold, sent, mail, saved_days: 30 } }))
@@ -5866,7 +5867,7 @@ for (const [lang, locale, text] of [['en', 'en-US', 'Your gift is being finished
     check('full card (en): "Read all" opens the whole text (the third line is there, the box grew), and "Show less" closes it', !(await story.getAttribute('class')).includes('clamped') && hOpen > hCollapsed + 10 && (await story.innerText()).includes('The third line only shows after Read all.') && (await card.locator('[data-testid=mg-readall]').innerText()) === 'Show less')
     check('full card (en): the poem', (await card.locator('[data-testid=mg-poem]').innerText()).includes('morning light') && (await card.locator('[data-testid=mg-poem]').innerText()).includes('a lunch box, closed'))
     const pics = card.locator('[data-testid=mg-pic]')
-    check('full card (en): four picture slots — the missing one (slot 2) is a soft paper placeholder, never a hole — and every slot is square', (await pics.count()) === 4 && (await pics.nth(1).getAttribute('data-state')) === 'empty' && (await pics.nth(0).getAttribute('data-state')) === 'ok' && (await Promise.all([0, 1, 2, 3].map(async (n) => { const b = await pics.nth(n).boundingBox(); return Math.abs(b.width - b.height) < 2 && b.width > 100 }))).every(Boolean))
+    check('full card (en): all four pictures are there — picture 1 included — each a real picture (never the striped box), and every one is square', (await pics.count()) === 4 && (await Promise.all([0, 1, 2, 3].map((n) => pics.nth(n).getAttribute('data-state')))).every((x) => x === 'ok') && (await page.locator('.mgPicEmpty').count()) === 0 && (await Promise.all([0, 1, 2, 3].map(async (n) => { const b = await pics.nth(n).boundingBox(); return Math.abs(b.width - b.height) < 2 }))).every(Boolean))
     await pics.nth(0).click()
     check('a picture opens full screen, and closes again', (await T(page, 'mg-light').count()) === 1 && (await T(page, 'mg-light').locator('img').count()) === 1)
     await T(page, 'mg-light-close').click()
@@ -6917,6 +6918,70 @@ for (const [lang, locale, text] of [['en', 'en-US', 'Your gift is being finished
     const page = await ctx.newPage()
     await page.goto('http://localhost:5173/credits', { waitUntil: 'networkidle' })
     check('/credits (an older link): Japanese for a Japanese reader', (await page.locator('h1').innerText()) === 'クレジット・ライセンス')
+    await ctx.close()
+  }
+}
+
+// ---------- Run 50 (2026-11-20, Part 16): a saved gift shows all four pictures — a still-making picture shows the soft tile and fills in by itself; one that will not come is left out (no empty box) ----------
+{
+  const SVG50 = '<svg xmlns="http://www.w3.org/2000/svg" width="40" height="40"><rect width="40" height="40" fill="#8a7f6a"/></svg>'
+  const mkItem = (pictures, over = {}) => ({
+    id: 'BK-aaaaaaaaaaaaaaaaaaaa', created_at: '2026-11-20T10:00:00Z', updated_at: '2026-11-20T10:00:00Z', language: 'en', to: 'Mom',
+    card: { kanji: '支', reading: 'shi', word: 'keeper', line: 'She keeps everyone at the table.', meaning: 'keeper' }, preview_id: 'AN-previewpreviewprev22',
+    context: { relationship: 'parent_mother', relationship_other: '', purpose: 'thanks', purpose_other: '', occasion: 'thanksgiving' }, round: 1, slot: 'main',
+    poem: { lines: ['one', 'two'], reading: '' }, story: 'She cooked every Thanksgiving.', saved_until: '2026-12-20T10:00:00Z', pictures, ...over,
+  })
+  const ok = (n) => ({ state: 'ok', url: `/api/film/AN-previewpreviewprev22/picture/${n}.webp` })
+  const open50 = async (answers, { lang = 'en' } = {}) => {
+    const ctx = await browser.newContext({ viewport: { width: 390, height: 900 }, locale: lang === 'ja' ? 'ja-JP' : 'en-US', deviceScaleFactor: 1 })
+    const page = await ctx.newPage()
+    const errs = []
+    page.on('pageerror', (e) => errs.push(String(e)))
+    let calls = 0
+    let phase = 0
+    await page.route('**/api/me*', (r) => r.fulfill({ json: { basket: { count: 1 }, ready: null, hold: null } }))
+    await page.route('**/api/film/*/picture/*', (r) => r.fulfill({ status: 200, contentType: 'image/svg+xml', body: SVG50 }))
+    await page.route('**/api/basket', (r) => { calls++; const items = answers[Math.min(phase, answers.length - 1)]; return r.fulfill({ json: { items, token: 'BT-x', link: 'https://ichirei.beyondculture.ai/b/BT-abcdefghjkmnpqrstuvwxyz2', email: null, hold: null, sent: [], mail: false, saved_days: 30 } }) })
+    await page.goto('http://localhost:5173/basket', { waitUntil: 'networkidle' })
+    await page.waitForSelector('[data-testid=basket-page]')
+    return { page, ctx, errs, calls: () => calls, next: () => { phase++ } }
+  }
+  const states = (page) => page.locator('[data-testid=mg-pic]').evaluateAll((els) => els.map((e) => e.getAttribute('data-state')))
+  // (a) picture 1 still being made, then ready: the soft tile with its words, then the picture — the same page, no reload
+  {
+    const { page, ctx, errs, calls, next } = await open50([[mkItem([{ state: 'making' }, ok(2), ok(3), ok(4)])], [mkItem([ok(1), ok(2), ok(3), ok(4)])]])
+    check('Part 16 (a): picture 1 still being made shows the soft "preparing" tile in its place (with its words) and the other three pictures', (await states(page)).join() === 'making,ok,ok,ok' && /Drawing this picture/.test(await page.locator('[data-state=making]').innerText()) && (await page.locator('.mgPicEmpty').count()) === 0)
+    const callsBefore = calls()
+    next()
+    await page.waitForFunction(() => document.querySelectorAll('[data-testid=mg-pic][data-state=ok]').length === 4, null, { timeout: 12000 })
+    check('Part 16 (a): the page asks again by itself and picture 1 fills in — four pictures, nothing empty', (await states(page)).join() === 'ok,ok,ok,ok' && calls() > callsBefore && (await page.locator('[data-testid=mg-pic] img').count()) === 4)
+    const imgsLoaded = await page.locator('[data-testid=mg-pic] img').evaluateAll((els) => els.every((i) => i.complete && i.naturalWidth > 0))
+    check('Part 16 (a): all four images really loaded (picture 1 included)', imgsLoaded)
+    check('Part 16 (a): the first picture is the one at picture/1 (the numbering the store uses)', ((await page.locator('[data-testid=mg-pic] img').first().getAttribute('src')) ?? '').endsWith('/picture/1.webp'))
+    check('no page errors (run 50 a)', errs.length === 0, errs.join('; '))
+    await ctx.close()
+  }
+  // (b) picture 1 will never come: the other three only, no empty box; nothing at all: no pictures section
+  {
+    const { page, ctx } = await open50([[mkItem([{ state: 'none' }, ok(2), ok(3), ok(4)]), mkItem([{ state: 'none' }, { state: 'none' }, { state: 'none' }, { state: 'none' }], { id: 'BK-bbbbbbbbbbbbbbbbbbbb', card: { kanji: '恒', reading: 'kō', word: 'constant', line: 'x' } })]])
+    const first = page.locator('[data-testid=basket-item]').first()
+    const second = page.locator('[data-testid=basket-item]').nth(1)
+    check('Part 16 (b): a picture that failed for good is left out — three pictures, no empty box', (await first.locator('[data-testid=mg-pic]').count()) === 3 && (await first.locator('[data-testid=mg-pic][data-state=ok]').count()) === 3 && (await page.locator('.mgPicEmpty, [data-state=empty]').count()) === 0)
+    check('Part 16 (b): a gift with no pictures at all has no pictures section', (await second.locator('[data-testid=mg-pics]').count()) === 0)
+    await ctx.close()
+  }
+  // (c) a link that cannot be loaded is dropped quietly (no striped box) and the page asks the server again once
+  {
+    const ctx = await browser.newContext({ viewport: { width: 390, height: 900 }, locale: 'en-US' })
+    const page = await ctx.newPage()
+    let calls = 0
+    await page.route('**/api/me*', (r) => r.fulfill({ json: { basket: { count: 1 }, ready: null, hold: null } }))
+    await page.route('**/api/film/*/picture/*', (r) => (r.request().url().includes('/picture/3.webp') ? r.fulfill({ status: 500, body: '' }) : r.fulfill({ status: 200, contentType: 'image/svg+xml', body: SVG50 })))
+    await page.route('**/api/basket', (r) => { calls++; return r.fulfill({ json: { items: [mkItem([ok(1), ok(2), ok(3), ok(4)])], token: 'BT-x', link: '', email: null, hold: null, sent: [], mail: false, saved_days: 30 } }) })
+    await page.goto('http://localhost:5173/basket', { waitUntil: 'networkidle' })
+    await page.waitForSelector('[data-testid=basket-page]')
+    await page.waitForTimeout(800)
+    check('Part 16 (c): a picture whose link fails is dropped quietly (no striped box), the server is asked once more, and the other three stay', (await states(page)).join() === 'ok,ok,ok' && calls >= 2 && (await page.locator('[data-state=empty]').count()) === 0)
     await ctx.close()
   }
 }

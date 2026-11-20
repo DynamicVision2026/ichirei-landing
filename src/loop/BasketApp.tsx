@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { useLanguage } from '../useLanguage.ts'
 import { toRevealLang } from '../reveal/lang.ts'
 import type { RevealLang } from '../reveal/copy.ts'
@@ -30,6 +30,8 @@ interface Item {
   poem?: { lines: string[]; reading: string; type?: string } | null
   story?: string
   saved_until?: string
+  /** The four pictures as the server read them from the film store (Part 16): there (with the address), still being made, or never coming. */
+  pictures?: ({ state: 'ok'; url: string } | { state: 'making' } | { state: 'none' })[]
 }
 
 interface Sent {
@@ -93,13 +95,17 @@ function chipsOf(i: Item, lang: RevealLang): string[] {
   return out
 }
 
-/** One of the four pictures: a soft paper tile (never a hole) while it is missing, the picture — that opens full screen — when it is there. */
-function Pic({ src, n, label, onOpen }: { src: string | null; n: number; label: string; onOpen: (src: string) => void }) {
+/**
+ * One of the four pictures. There: the picture, that opens full screen. Still being made: a soft paper tile that says so (the page asks again and the picture fills in).
+ * Never coming (or one that cannot be loaded): nothing — no empty box; the other pictures simply sit in the grid (2026-11-20).
+ */
+function Pic({ p, n, label, making, onOpen, onLost }: { p: NonNullable<Item['pictures']>[number] | undefined; n: number; label: string; making: string; onOpen: (src: string) => void; onLost: () => void }) {
   const [failed, setFailed] = useState(false)
-  if (!src || failed) return <span className="mgPic mgPicEmpty" data-testid="mg-pic" data-state="empty" data-slot={n + 1} aria-hidden="true" />
+  if (!p || p.state === 'none' || failed) return null
+  if (p.state === 'making') return <span className="mgPic mgPicMaking" data-testid="mg-pic" data-state="making" data-slot={n + 1}><span>{making}</span></span>
   return (
-    <button type="button" className="mgPic" data-testid="mg-pic" data-state="ok" data-slot={n + 1} aria-label={label} onClick={() => onOpen(src)}>
-      <img src={src} alt="" loading="lazy" decoding="async" onError={() => setFailed(true)} />
+    <button type="button" className="mgPic" data-testid="mg-pic" data-state="ok" data-slot={n + 1} aria-label={label} onClick={() => onOpen(p.url)}>
+      <img src={p.url} alt="" loading="lazy" decoding="async" onError={() => { setFailed(true); onLost() }} />
     </button>
   )
 }
@@ -144,7 +150,7 @@ function SentCard({ g, lang }: { g: Sent; lang: RevealLang }) {
   )
 }
 
-function GiftCard({ item, lang, onOpenPic, onRemoved }: { item: Item; lang: RevealLang; onOpenPic: (src: string) => void; onRemoved: (id: string) => void }) {
+function GiftCard({ item, lang, onOpenPic, onPicLost, onRemoved }: { item: Item; lang: RevealLang; onOpenPic: (src: string) => void; onPicLost: () => void; onRemoved: (id: string) => void }) {
   const c = LOOP[lang]
   const [open, setOpen] = useState(false)
   const [asking, setAsking] = useState(false)
@@ -154,7 +160,8 @@ function GiftCard({ item, lang, onOpenPic, onRemoved }: { item: Item; lang: Reve
   const chips = chipsOf(item, lang)
   const story = (item.story ?? '').trim()
   const long = story.length > 90 || story.split(/\n+/).length > 2
-  const pics = [0, 1, 2, 3].map((n) => (item.preview_id ? `/api/film/${item.preview_id}/picture/${n}.webp` : null))
+  const pics = item.pictures ?? []
+  const anyPic = pics.some((p) => p.state !== 'none')
   const remove = async () => {
     onRemoved(item.id)
     try {
@@ -199,14 +206,16 @@ function GiftCard({ item, lang, onOpenPic, onRemoved }: { item: Item; lang: Reve
         </section>
       )}
 
-      <section className="mgPics" aria-label={c.picturesHeading}>
-        <h2>{c.picturesHeading}</h2>
-        <div className="mgGrid" data-testid="mg-pics">
-          {pics.map((src, n) => (
-            <Pic key={n} src={src} n={n} label={c.pictureOpen} onOpen={onOpenPic} />
-          ))}
-        </div>
-      </section>
+      {anyPic && (
+        <section className="mgPics" aria-label={c.picturesHeading}>
+          <h2>{c.picturesHeading}</h2>
+          <div className="mgGrid" data-testid="mg-pics" data-count={pics.filter((p) => p.state !== 'none').length}>
+            {[0, 1, 2, 3].map((n) => (
+              <Pic key={`${n}-${pics[n]?.state}`} p={pics[n]} n={n} label={c.pictureOpen} making={c.pictureMaking} onOpen={onOpenPic} onLost={onPicLost} />
+            ))}
+          </div>
+        </section>
+      )}
 
       <p className="mgDates" data-testid="mg-dates">
         <span>{c.savedOn(dateOf(item.updated_at ?? item.created_at, lang))}</span>
@@ -263,6 +272,36 @@ export default function BasketApp() {
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
   }, [pic])
+
+  // The pictures are read from the film store each time the page is asked for. A picture still being made shows the soft "preparing" tile; the page asks again (every 4 s for the first two minutes,
+  // then every 15 s, only while the page is in view) and the picture takes the tile's place — the same rhythm as the result page. Only the pictures are taken from the answer.
+  const refreshPictures = useCallback(async () => {
+    try {
+      const r = await fetch('/api/basket', { credentials: 'same-origin' })
+      if (!r.ok) return
+      const j = (await r.json()) as PageData
+      setData((cur) => (cur ? { ...cur, items: cur.items.map((i) => ({ ...i, pictures: j.items.find((x) => x.id === i.id)?.pictures ?? i.pictures })) } : cur))
+    } catch {
+      // the next round tries again
+    }
+  }, [])
+  const making = !!data?.items.some((i) => i.pictures?.some((p) => p.state === 'making'))
+  useEffect(() => {
+    if (!making) return
+    let stopped = false
+    let timer = 0
+    const started = Date.now()
+    const tick = () => {
+      if (stopped) return
+      if (document.visibilityState !== 'hidden') void refreshPictures()
+      timer = window.setTimeout(tick, Date.now() - started < 120_000 ? 4000 : 15_000)
+    }
+    timer = window.setTimeout(tick, 4000)
+    return () => {
+      stopped = true
+      window.clearTimeout(timer)
+    }
+  }, [making, refreshPictures])
 
   useEffect(() => {
     let alive = true
@@ -369,7 +408,7 @@ export default function BasketApp() {
             <h2>{c.groupSaved}</h2>
             <ul className="mgList">
               {(items ?? []).map((i) => (
-                <GiftCard key={i.id} item={i} lang={lang} onOpenPic={setPic} onRemoved={dropItem} />
+                <GiftCard key={i.id} item={i} lang={lang} onOpenPic={setPic} onPicLost={refreshPictures} onRemoved={dropItem} />
               ))}
             </ul>
           </section>
