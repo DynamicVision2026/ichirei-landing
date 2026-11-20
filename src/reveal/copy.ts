@@ -166,6 +166,7 @@ const EN = {
   ctaClose: "Write your moment →",
   foot: "Order status: /track · Questions: reply to your order email",
   legal: "Legal notice and returns",
+  credits: "Credits & licences",
   dock: "Write your moment · free to try",
 } as const
 
@@ -322,6 +323,7 @@ const JA: Partial<Record<CopyKey, string>> = {
   ship2S: "",
   foot: "注文状況：/track ・ お問い合わせ：ご注文確認メールへご返信",
   legal: "特定商取引法に基づく表記・返品について",
+  credits: "クレジット・ライセンス",
 }
 
 const ZH: Partial<Record<CopyKey, string>> = {
@@ -475,6 +477,7 @@ const ZH: Partial<Record<CopyKey, string>> = {
   ship2S: "",
   foot: "訂單查詢：/track · 諮詢：請回覆訂單確認郵件",
   legal: "特定商取引法標示・退換貨說明",
+  credits: "致謝與授權",
 }
 
 export const TEXT: Record<RevealLang, Record<CopyKey, string>> = {

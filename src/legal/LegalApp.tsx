@@ -7,6 +7,9 @@ import { useLanguage } from '../useLanguage.ts'
 import type { UiLanguage } from '../demo/i18n.ts'
 import '../reveal/reveal.css'
 
+/** 「クレジット・ライセンス」: the credits page is linked from the footer and from here only (Part 15, 2026-11-20). */
+const CREDITS_LINK = { ja: 'クレジット・ライセンス', en: 'Credits & licences', 'zh-Hant': '致謝與授權' } as const
+
 // /legal — 特定商取引法に基づく表記, the return rules and three short questions, in ja / zh-Hant / en. Linked from the footer and from beside the order button.
 // The seller's details are the owner's own (src/legal/legal-copy.ts); the e-mail address is plain, selectable text.
 
@@ -72,6 +75,9 @@ export default function LegalApp() {
             </details>
           ))}
         </div>
+        <p>
+          <a href={lang === 'en' ? '/en/credits' : lang === 'zh-Hant' ? '/zh/credits' : '/credits'} className="legalLink" data-testid="legal-credits">{CREDITS_LINK[lang]}</a>
+        </p>
         <p>
           <a href="/" className="legalLink">{t.back}</a>
         </p>

@@ -15,7 +15,6 @@ export interface PageCopy {
   replay: string
   share: string
   copied: string
-  credits: string
   reducedNote: string
   playAnyway: string
   sealText: string[]
@@ -41,7 +40,6 @@ export const COPY: Record<PageLang, PageCopy> = {
     replay: 'もう一度見る',
     share: '共有する',
     copied: 'リンクをコピーしました',
-    credits: 'クレジット',
     reducedNote: '動きを減らす設定のため、静止画で表示しています。',
     playAnyway: 'アニメーションを再生する',
     sealText: ['一', '字', '礼'],
@@ -62,7 +60,6 @@ export const COPY: Record<PageLang, PageCopy> = {
     replay: '再看一次',
     share: '分享',
     copied: '已複製連結',
-    credits: '版權與致謝',
     reducedNote: '因為你設定了減少動態效果，這裡顯示為靜態畫面。',
     playAnyway: '播放動畫',
     sealText: ['一', '字', '禮'],
@@ -83,7 +80,6 @@ export const COPY: Record<PageLang, PageCopy> = {
     replay: 'Watch again',
     share: 'Share',
     copied: 'Link copied',
-    credits: 'Credits',
     reducedNote: 'Shown as a still because your device asks for reduced motion.',
     playAnyway: 'Play the animation',
     sealText: ['一', '字', '礼'],

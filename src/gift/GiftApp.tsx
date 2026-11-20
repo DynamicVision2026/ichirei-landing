@@ -292,7 +292,6 @@ export default function GiftApp() {
       {!preview && <button type="button" className="gf-btn gf-btn-hot" data-testid="gift-to-answer" onClick={() => setStep('answer')}>{copy.answerTitle}</button>}
       <p className="gf-row">
         <button type="button" className="gf-btn gf-btn-quiet" data-testid="gift-replay" onClick={() => setStep('film')}>{FILM_COPY[lang].replay}</button>
-        <a className="gf-btn gf-btn-quiet" href="/credits" data-testid="animation-credits-link">{FILM_COPY[lang].credits}</a>
       </p>
     </section>,
   )

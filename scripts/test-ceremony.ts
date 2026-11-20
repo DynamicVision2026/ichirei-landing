@@ -199,8 +199,8 @@ const gift = async (t: string) => (await mem.get(t)) as GiftRecord
   check('(5) no character is both: the fallback list holds exactly the ones the file lacks', [...fallback].every((c) => !file.chars[c]) && Object.keys(file.chars).every((c) => need.has(c)))
   check('(5) the stroke file is KanjiVG\'s, under its licence (CC BY-SA 3.0), says so inside, and every character has at least one path starting with a move', /KanjiVG/.test(file._license) && /Share[- ]Alike 3\.0/.test(file._license) && Object.values(file.chars).every((p) => p.length > 0 && p.every((d) => /^[Mm]/.test(d))) && /Share[- ]Alike 3\.0/i.test(readFileSync('public/strokes/LICENSE.txt', 'utf8')))
   check('(5) the twelve return characters all have stroke data (the answer is written in gold, stroke by stroke)', RETURN_CHARS.every((r) => !!file.chars[r.char]))
-  const credits = readFileSync('src/animation/CreditsApp.tsx', 'utf8')
-  check('(5) /credits names KanjiVG, its authors and licence, and says the stroke file is shared under the same licence', /KanjiVG/.test(credits) && /Ulrich Apel/.test(credits) && /Attribution-Share Alike 3\.0/.test(credits) && /same licence/.test(credits))
+  const credits = readFileSync('src/animation/CreditsApp.tsx', 'utf8') + readFileSync('src/animation/credits-copy.ts', 'utf8')
+  check('(5) /credits names KanjiVG, its authors and licence, and says the stroke file is shared under the same licence', /KanjiVG/.test(credits) && /Ulrich Apel/.test(credits) && /Attribution-Share Alike 3\.0/.test(credits) && /same licence/.test(credits) && /同じライセンス/.test(credits) && /相同授權/.test(credits))
 }
 
 // ======================================================================================================================================================================

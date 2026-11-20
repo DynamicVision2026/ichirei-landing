@@ -66,7 +66,9 @@ export default function Routes() {
       </Suspense>
     )
   }
-  if (path === '/credits' || path === '/credits/') {
+  // /credits (2026-11-20, Part 15): one language — the page's own; /en/credits and /zh/credits say so in the address
+  if (/^\/(en|zh)\/credits\/?$/.test(path)) setLanguage(path.startsWith('/en') ? 'en' : 'zh-Hant')
+  if (path === '/credits' || path === '/credits/' || /^\/(en|zh)\/credits\/?$/.test(path)) {
     return (
       <Suspense fallback={null}>
         <CreditsApp />

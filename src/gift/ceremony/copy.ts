@@ -91,7 +91,6 @@ const CER_EN = {
   saveFailed: 'It could not be prepared. Please try again.',
   filmHint: 'On iPhone, press and hold the film, or use the share button and choose “Save Video”.',
   toAnswer: (from: string) => (s(from) ? `Answer ${s(from)}` : 'Send something back'),
-  credits: 'Credits',
   // 8 · send back
   backTitle: (from: string) => (s(from) ? ['And how do you', `see ${s(from)}?`] : ['And how do you', 'see the one who sent it?']),
   // 8 · the free gift back (Part 14, 2026-11-20) replaces the twelve characters and their sent screen: one button, then the way to give one's own
@@ -189,7 +188,6 @@ const CER_JA: CerCopy = {
   saveFailed: '準備できませんでした。もう一度お試しください。',
   filmHint: 'iPhoneでは、映像を長押しするか、共有ボタンから「ビデオを保存」を選んでください。',
   toAnswer: (from: string) => (s(from) ? `${s(from)}さんに返す` : '返事を返す'),
-  credits: 'クレジット',
   backTitle: (from: string) => (s(from) ? ['あなたの目に、', `${s(from)}さんはどう映っていますか。`] : ['あなたの目に、', '送ってくれた人はどう映っていますか。']),
   // 8 · the free gift back (Part 14, 2026-11-20) replaces the twelve characters and their sent screen: one button, then the way to give one's own
   toLast: '次へ',
@@ -282,7 +280,6 @@ const CER_ZH_HANT: CerCopy = {
   saveFailed: '無法準備，請再試一次。',
   filmHint: '在 iPhone 上，請長按影片，或用分享按鈕選擇「儲存影片」。',
   toAnswer: (from: string) => (s(from) ? `回覆${s(from)}` : '回覆'),
-  credits: '致謝',
   backTitle: (from: string) => (s(from) ? ['在你眼中，', `${s(from)}是什麼樣子？`] : ['在你眼中，', '送禮的人是什麼樣子？']),
   // 8 · the free gift back (Part 14, 2026-11-20) replaces the twelve characters and their sent screen: one button, then the way to give one's own
   toLast: '下一步',
@@ -375,7 +372,6 @@ const CER_ZH_HANS: CerCopy = {
   saveFailed: '无法准备，请再试一次。',
   filmHint: '在 iPhone 上，请长按影片，或用分享按钮选择「储存影片」。',
   toAnswer: (from: string) => (s(from) ? `回复${s(from)}` : '回复'),
-  credits: '致谢',
   backTitle: (from: string) => (s(from) ? ['在你眼中，', `${s(from)}是什么样子？`] : ['在你眼中，', '送礼的人是什么样子？']),
   // 8 · the free gift back (Part 14, 2026-11-20) replaces the twelve characters and their sent screen: one button, then the way to give one's own
   toLast: '下一步',

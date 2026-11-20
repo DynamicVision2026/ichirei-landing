@@ -631,7 +631,6 @@ function KeepScreen({ view, preview, q, from, onAnswer }: { view: GiftView; prev
       </div>
       {view.egift && !preview && <div className="cr-egift"><EgiftReceive view={view} lang={pageLang(view.language)} /></div>}
       {!preview && <button type="button" className="cr-go cr-next" style={{ marginTop: 'auto' }} data-testid="gift-to-answer" onClick={onAnswer}>{view.back?.state === 'available' ? C.toAnswer(from) : C.toLast}</button>}
-      <a className="cr-go cr-quiet" href="/credits" data-testid="animation-credits-link">{C.credits}</a>
     </section>
   )
 }

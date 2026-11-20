@@ -505,6 +505,7 @@ export function Footer({ t, lang }: { t: T; lang?: RevealLang }) {
         <span data-testid="footer-slogan">{lang === 'en' ? EN_FOOTER_LINE : t.slogan}</span>
         <span>{withTrackLink(t.foot)}</span>
         <a href="/legal" data-testid="footer-legal">{t.legal}</a>
+        <a href={lang === 'en' ? '/en/credits' : lang === 'zh-Hant' ? '/zh/credits' : '/credits'} data-testid="footer-credits">{t.credits}</a>
         <span data-testid="footer-contact">{SUPPORT_EMAIL}</span>
       </div>
     </footer>

@@ -1510,8 +1510,15 @@ const mockPage = async (browser, { onExplain, result, order, track } = {}) => {
     await p.route('**/film-art/**', (r) => r.fulfill({ status: 200, contentType: 'image/svg+xml', body: '<svg xmlns="http://www.w3.org/2000/svg" width="10" height="10"/>' }))
     await p.goto('http://localhost:5173/a/AN-testtesttesttesttest', { waitUntil: 'networkidle' })
     await p.locator('[data-testid=sender-panel]').waitFor()
-    const n = await p.locator('[data-testid=save-scroll] a').count()
-    check(`scroll buttons (${name}): ${shown ? 'PNG and PDF links to this film' : 'none'}`, shown ? n === 2 && (await p.locator('[data-testid=save-scroll] a').first().getAttribute('href')) === '/api/animation/AN-testtesttesttesttest/scroll.png' : n === 0)
+    // Part 12 (2026-11-20): the story scroll is one item in the 「ほかの形で保存」 sheet (the PNG); the whole gift is one PDF behind 「まとめて保存」
+    let n = 0
+    let href = null
+    if ((await p.locator('[data-testid=other-formats]').count()) > 0) {
+      await p.locator('[data-testid=other-formats]').click()
+      n = await p.locator('[data-testid=save-scroll]').count()
+      href = n ? await p.locator('[data-testid=save-scroll]').first().getAttribute('href') : null
+    }
+    check(`scroll buttons (${name}): ${shown ? 'the PNG link to this film, in the formats sheet' : 'none'}`, shown ? n === 1 && href === '/api/animation/AN-testtesttesttesttest/scroll.png' : n === 0)
     await p.close()
   }
 }
@@ -2499,7 +2506,7 @@ const SECTION_ORDER = ['.hero', '.strip', '.philo', '#shape', '#angles', '#how',
   // textContent, not innerText: sections below the fold are not rendered until they are near the screen (content-visibility)
   const t = await page.evaluate(() => document.body.textContent)
   check('landing ja: <html lang>, title, hero (「あなたとわたし、一字の距離。」) and the primary call to action', (await page.getAttribute('html', 'lang')) === 'ja' && (await page.title()) === 'ICHIREI 一字礼 — 一字の贈りもの' && (await page.locator('h1').innerText()) === 'あなたとわたし、一字の距離。' && (await page.locator('.hero a.btn.primary').innerText()) === 'ひと場面を書く →')
-  check('landing ja: honesty — no native-speaker claim, no AI, no payment methods, no review counts or ratings', !/ネイティブ|\bAI\b|人工知能|VISA|Visa|PayPal|クレジット|★|⭐/.test(t) && t.includes('本物のレビューが、ここに並びます'))
+  check('landing ja: honesty — no native-speaker claim, no AI, no payment methods, no review counts or ratings', !/ネイティブ|\bAI\b|人工知能|VISA|Visa|PayPal|クレジット(?!・ライセンス)|★|⭐/.test(t) && t.includes('本物のレビューが、ここに並びます'))
   check('landing ja: the trust strip has three items (no "checked by native speakers")', (await page.locator('.strip li').count()) === 3)
   check('landing ja: no test controls (no A/B/C, no log export, no golden fixture, no harness label)', !/condition|ログ書き出し|golden fixture|VALIDATION HARNESS|raw contract/.test(t))
   await page.goto('http://localhost:5173/write?lang=ja', { waitUntil: 'networkidle' })
@@ -4027,7 +4034,9 @@ const SECTION_ORDER = ['.hero', '.strip', '.philo', '#shape', '#angles', '#how',
     await sp.goto(`http://localhost:5173/a/${ID}`, { waitUntil: 'networkidle' })
     const panel = sp.locator('[data-testid=sender-panel]')
     await panel.waitFor()
+    await panel.locator('[data-testid=share-button]').click() // Part 12: the send options live in the share sheet
     check('sender (en): after "Collect your gift" the share sheet offers Copy link, Email, WhatsApp, Messages and "Schedule for a date" — no LINE, no WeChat, no QR', (await panel.locator('[data-testid=en-share-sheet] > *').allInnerTexts()).join() === 'Copy link,Email,WhatsApp,Messages' && (await panel.locator('[data-testid=give-schedule]').innerText()) === 'Schedule for a date' && (await panel.locator('[data-testid=give-line], [data-testid=give-wechat], [data-testid=give-qr]').count()) === 0)
+    await sp.keyboard.press('Escape') // close the share sheet
     await panel.locator('[data-testid=give-schedule]').click()
     check('sender (en, Nov 14): the choices are "Now", "Thanksgiving dinner (Nov 26, 6:00 p.m.)" and "Pick a date and time" — no Christmas morning before Dec 1', (await panel.locator('.by-choice label').allInnerTexts()).map((t) => t.trim()).join('|') === 'Now|Thanksgiving dinner (Nov 26, 6:00 p.m.)|Pick a date and time')
     await panel.locator('[data-testid=choice-pick]').check()
@@ -4413,6 +4422,7 @@ const SECTION_ORDER = ['.hero', '.strip', '.philo', '#shape', '#angles', '#how',
     page.on('pageerror', (e) => errs.push(String(e)))
     page.on('request', (r) => seen.urls.push(r.url()))
     await page.route('**/api/analytics', (r) => r.fulfill({ status: 204, body: '' }))
+    await page.route('**/api/me*', (r) => r.fulfill({ json: { basket: { count: 3 }, ready: null, hold: null } })) // (the receiver's マイギフト shows once the browser holds something: Part 14)
     await page.route(`**/api/gift/${TOKEN}**`, async (r) => {
       const u = new URL(r.request().url())
       if (u.pathname === `/api/gift/${TOKEN}/reply`) { seen.reply.push(JSON.parse(r.request().postData() ?? '{}')); return r.fulfill({ json: { ok: true } }) }
@@ -4706,6 +4716,7 @@ const SECTION_ORDER = ['.hero', '.strip', '.philo', '#shape', '#angles', '#how',
     await sp.screenshot({ path: `${SHOTS}/ceremony-${lang}-sender-christmas.png`, fullPage: true })
     // using copy marks the gift as "sent"
     await sp.context().grantPermissions(['clipboard-read', 'clipboard-write']).catch(() => {})
+    await panel.locator('[data-testid=share-button]').click().catch(() => {}) // Part 12: the send options live in the share sheet
     await panel.locator('[data-testid=give-copy]').click().catch(() => {})
     await sp.waitForTimeout(400)
     check(`sender (${lang}): using "copy link" tells the server the gift was sent (shared)`, seen.shared === 1, String(seen.shared))
@@ -6711,6 +6722,7 @@ for (const [lang, locale, text] of [['en', 'en-US', 'Your gift is being finished
     for (const ua of ['safari', 'chrome']) {
       if (lang !== 'ja' && ua !== 'safari') continue
       const k = await toKeep(lang, ua)
+      check(`keepsakes (${lang}, ${ua}): no 「クレジット」 / Credits link anywhere on the screen (Part 15)`, (await k.page.locator('[data-testid=animation-credits-link], a[href*="credits"]').count()) === 0)
       check(`keepsakes (${lang}, ${ua}): no in-app line`, (await T47(k.page, 'keep-inapp').count()) === 0 && (await T47(k.page, 'gift-actions').count()) === 1)
       if (ua === 'safari') {
         await T47(k.page, 'other-formats').click()
@@ -6860,6 +6872,51 @@ for (const [lang, locale, text] of [['en', 'en-US', 'Your gift is being finished
     check('マイギフト: the answered gift says 「返事が届きました：證」 and its button 「返事を見る →」 opens the gift that was sent back (/g/…); the other one is as before', (await st(0)).startsWith('返事が届きました：證') && norm(await rows[0].locator('[data-testid=my-sent-open]').innerText()) === '返事を見る →' && (await rows[0].locator('[data-testid=my-sent-open]').getAttribute('href')) === '/g/RG-replyreplyreplyrepl' && (await rows[1].locator('[data-testid=my-sent-open]').getAttribute('href')) === '/a/AN-aaaaaaaaaaaaaaaaaaaa', JSON.stringify([await st(0), await st(1)]))
     await page.screenshot({ path: `${SHOTS}/p14-mygifts-reply-ja-390.png`, fullPage: true })
     check('no page errors (run 48, マイギフト)', errs.length === 0, errs.join('; '))
+    await ctx.close()
+  }
+}
+
+
+// ---------- Run 49 (2026-11-20, Part 15): credits out of the customer's way — linked only from the landing footers and /legal as 「クレジット・ライセンス」 / "Credits & licences" / 「致謝與授權」; one language per page ----------
+{
+  const T49 = (page, id) => page.locator(`[data-testid="${id}"]`)
+  const NAME = { ja: 'クレジット・ライセンス', en: 'Credits & licences', 'zh-Hant': '致謝與授權' }
+  const HREF = { ja: '/credits', en: '/en/credits', 'zh-Hant': '/zh/credits' }
+  const LANDING = { ja: '/', en: '/en', 'zh-Hant': '/zh' }
+  const ILLUS = { ja: '挿絵は、画像生成ツールで描き、一枚ずつ確認しています。', en: 'The illustrations are drawn with an image-generation tool and checked one by one.', 'zh-Hant': '插圖以圖像生成工具繪製，並逐張確認。' }
+  const HEAD = { ja: 'クレジット・ライセンス', en: 'Credits & licences', 'zh-Hant': '致謝與授權' }
+  const locale = (l) => (l === 'en' ? 'en-US' : l === 'ja' ? 'ja-JP' : 'zh-TW')
+  for (const lang of ['ja', 'en', 'zh-Hant']) {
+    const ctx = await browser.newContext({ locale: locale(lang), viewport: { width: 390, height: 844 } })
+    const page = await ctx.newPage()
+    const errs = []
+    page.on('pageerror', (e) => errs.push(String(e)))
+    await page.route('**/api/**', (r) => (/api\/(me|rates|promo|sizes)/.test(r.request().url()) ? r.fallback() : r.fulfill({ status: 204, body: '' })))
+    await page.goto(`http://localhost:5173${LANDING[lang]}`, { waitUntil: 'networkidle' })
+    const link = page.locator('[data-testid=footer-credits]').first()
+    await link.waitFor({ state: 'attached' })
+    check(`landing footer (${lang}): the small link 「${NAME[lang]}」 to ${HREF[lang]}`, ((await link.textContent()) ?? '').trim() === NAME[lang] && (await link.getAttribute('href')) === HREF[lang])
+    await page.goto(`http://localhost:5173/legal`, { waitUntil: 'networkidle' })
+    await page.locator(`[data-lang=${lang}]`).first().click().catch(() => {})
+    await page.waitForTimeout(300)
+    const lc = T49(page, 'legal-credits')
+    check(`/legal (${lang}): links to it as 「${NAME[lang]}」`, ((await lc.textContent()) ?? '').trim() === NAME[lang] && (await lc.getAttribute('href')) === HREF[lang])
+    await page.goto(`http://localhost:5173${HREF[lang]}`, { waitUntil: 'networkidle' })
+    await T49(page, 'credits-page').waitFor()
+    const text = await page.locator('[data-testid=credits-page]').innerText()
+    const noLatin = text.replace(/Zen Old Mincho|Noto Serif (JP|TC)|Cormorant Garamond|Cormorant|Inter|Source Han Serif|Google LLC|Google Fonts|Adobe|Christian Thalmann|Catharsis Fonts|Rasmus Andersson|The Inter Project Authors|The Zen Old Mincho Project Authors|SIL Open Font License 1\.1|KanjiVG|Ulrich Apel|Musopen|Beethoven|Schumann|Satie|Grieg|Chopin|ICHIREI|https?:\/\/\S+|\/strokes\/kanjivg-subset\.json|Google|Source|Han|Serif|Project|Authors|Fonts|SIL|Open|Font|License|©/g, ' ')
+    check(`credits (${lang}): the page's own language only — the heading 「${HEAD[lang]}」, the illustrations line, and no second language`, (await page.locator('h1').innerText()) === HEAD[lang] && (await T49(page, 'credit-illustrations').innerText()) === ILLUS[lang] && (await page.locator('[data-testid=credits-page]').getAttribute('lang')) === (lang === 'zh-Hant' ? 'zh-Hant' : lang) && (lang === 'en' ? !/[\u3040-\u30ff\u3400-\u9fff]/.test(text) : !/[A-Za-z]{3,}/.test(noLatin)) && !/／/.test(text), noLatin.match(/[A-Za-z]{3,}/g)?.join(',') ?? '')
+    check(`credits (${lang}): the five typefaces, KanjiVG with its licence and the music are all there`, (await T49(page, 'credit-item').count()) === 5 && /KanjiVG/.test(await T49(page, 'credit-kanjivg').innerText()) && /Musopen/.test(await T49(page, 'credit-music').innerText()))
+    if (lang === 'ja') await page.screenshot({ path: `${SHOTS}/p15-credits-ja-390.png`, fullPage: true })
+    check(`no page errors (run 49, ${lang})`, errs.length === 0, errs.join('; '))
+    await ctx.close()
+  }
+  // /credits without a prefix stays Japanese for a Japanese reader (older links)
+  {
+    const ctx = await browser.newContext({ locale: 'ja-JP', viewport: { width: 390, height: 844 } })
+    const page = await ctx.newPage()
+    await page.goto('http://localhost:5173/credits', { waitUntil: 'networkidle' })
+    check('/credits (an older link): Japanese for a Japanese reader', (await page.locator('h1').innerText()) === 'クレジット・ライセンス')
     await ctx.close()
   }
 }

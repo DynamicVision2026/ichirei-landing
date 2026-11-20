@@ -67,7 +67,7 @@ const allText = (l: (typeof REVEAL_LANGS)[number]) => Object.values(TEXT[l]).joi
 const banned: [string, RegExp][] = [
   ['native-speaker claim', /native[- ]speaker|ネイティブ|母語者|母语|母語/i],
   ['"no AI" / AI as hero', /\bA\.?I\b|人工知能|人工智慧|artificial intelligence/i],
-  ['payment methods', /visa|master ?card|amex|paypal|apple pay|google pay|credit card|クレジット|信用卡|銀聯|银联/i],
+  ['payment methods', /visa|master ?card|amex|paypal|apple pay|google pay|credit card|クレジット(?!・ライセンス)|信用卡|銀聯|银联/i],
   ['review counts / ratings / testimonials', /\d+(?:\.\d+)?\s*(?:\/\s*5|stars?|★)|[★⭐]|\d[\d,]*\s*(?:reviews|customers|happy|満足|件のレビュー|則評價|位客戶)|testimonial/i],
 ]
 for (const [what, re] of banned) check(`honesty: no ${what} in any language`, REVEAL_LANGS.every((l) => !re.test(allText(l))), REVEAL_LANGS.map((l) => allText(l).match(re)?.[0]).filter(Boolean))

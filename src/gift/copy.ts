@@ -77,7 +77,6 @@ export interface GiftCopy {
   /** Skip to the next screen when motion is reduced and the film is shown as stills. */
   next: string
   replay: string
-  credits: string
   creditLine: string
 }
 
@@ -157,7 +156,6 @@ export const GIFT_COPY: Record<PageLang, GiftCopy> = {
     replyLeft: (n) => `あと${n}字`,
     next: '次へ',
     replay: 'もう一度見る',
-    credits: 'クレジット',
     creditLine: '',
   },
   'zh-Hant': {
@@ -216,7 +214,6 @@ export const GIFT_COPY: Record<PageLang, GiftCopy> = {
     replyLeft: (n) => `還可輸入 ${n} 字`,
     next: '下一步',
     replay: '再看一次',
-    credits: '版權與致謝',
     creditLine: '',
   },
   en: {
@@ -279,7 +276,6 @@ export const GIFT_COPY: Record<PageLang, GiftCopy> = {
     replyLeft: (n) => `${n} left`,
     next: 'Next',
     replay: 'Watch again',
-    credits: 'Credits',
     creditLine: '',
   },
 }

@@ -498,9 +498,6 @@ export function Film({ view, film, copy, giftMode = false, onEnd }: { view: Anim
               {copy.share}
             </button>
           )}
-          <a className="an-btn" href="/credits" data-testid="animation-credits-link">
-            {copy.credits}
-          </a>
         </div>
         <p className="an-toast" role="status">
           {toast}
