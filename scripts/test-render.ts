@@ -170,6 +170,23 @@ check('(3) cinnabar (#C0392B) is the main character\'s and nothing else; for rem
 check('(3) the pictures are embedded at full size (1080 × 1350 JPEGs), one per slot', (one.match(/\/I\d+ Do/g) ?? []).length >= 4 && (txt.match(/\/Width 1080/g) ?? []).length >= 4 && (txt.match(/\/Height 1350/g) ?? []).length >= 4)
 check('(3) the 「さんへ / より」 lines: blank (＿＿) when the sender hands it over; filled with the names and the message when it ships directly or as an e-gift — the artwork says so', loadArtwork !== undefined && (await loadArtwork(store, { ...a1.gift, ship_to: 'me' }, a1.anim, art)).from === '' && (await loadArtwork(store, { ...a1.gift, ship_to: 'me' }, a1.anim, art)).message === '' && (await loadArtwork(store, { ...a1.gift, ship_to: 'direct', message: 'いつも、ありがとう。' }, a1.anim, art)).from === '山田 太郎' && (await loadArtwork(store, { ...a1.gift, ship_to: 'direct', message: 'いつも、ありがとう。' }, a1.anim, art)).message === 'いつも、ありがとう。')
 check('(3) the QR code points to the RECEIVER\'s page, never the sender\'s', work.qrUrl === `https://ichirei.beyondculture.ai/g/${a1.token}` && !work.qrUrl.includes(a1.animId))
+// Part 13 (2026-11-20): the printable card carries the QR of the receiver's page on its back, small — a printed card opens the page too. Rasterised (pdftoppm) and decoded; skipped where there is no rasteriser.
+{
+  let pdftoppm = true
+  try { execFileSync('pdftoppm', ['-v'], { stdio: 'ignore' }) } catch (e) { pdftoppm = (e as { status?: number }).status !== undefined }
+  if (!pdftoppm) console.log('SKIP  (3) the card PDF\'s QR (no pdftoppm here)')
+  else {
+    for (const [label, pdf] of [['the card for the wooden sizes', await cardsPdf([work])], ['the card an e-gift receiver prints at home', await homePrintPdf(work)]] as const) {
+      const dir = mkdtempSync(join(tmpdir(), 'ichirei-card-'))
+      writeFileSync(join(dir, 'c.pdf'), pdf)
+      execFileSync('pdftoppm', ['-r', '300', '-f', '1', '-l', '1', '-png', join(dir, 'c.pdf'), join(dir, 'p')])
+      const file = readdirSync(dir).find((f) => f.endsWith('.png'))!
+      const raw = await sharp(join(dir, file)).ensureAlpha().raw().toBuffer({ resolveWithObject: true })
+      const found = jsQR(new Uint8ClampedArray(raw.data), raw.info.width, raw.info.height)
+      check(`(3) ${label}: the QR on the back decodes to the receiver's page`, found?.data === work.qrUrl, String(found?.data))
+    }
+  }
+}
 
 // ---- 4. /ops ----------------------------------------------------------------------------------------------------------------------------------------
 const opsStore = new MemoryOrderStore()

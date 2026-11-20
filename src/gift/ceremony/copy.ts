@@ -75,6 +75,8 @@ const CER_EN = {
   toKeep: 'Next: everything you keep',
   // 7 · keepsakes
   keepTitle: 'Yours to keep.',
+  // 7b · the in-app browser hint (Part 13, 2026-11-20): saving files is unreliable inside LINE's own browser
+  inAppLine: "If saving doesn't work, open this page in your browser from the ︙ menu.",
   keepFilm: 'The film',
   keepFilmLine: (from: string, music: boolean) => `${s(from) ? `The moment ${s(from)} chose to keep` : 'The moment chosen to keep'}${music ? ', with music.' : '.'}`,
   keepPictures: 'The four pictures',
@@ -172,6 +174,8 @@ const CER_JA: CerCopy = {
   certAria: (reading: string) => (reading ? `「${reading}」の字` : '一字'),
   toKeep: '次へ：あなたの手もとに残るもの',
   keepTitle: 'あなたの手もとに。',
+  // 7b · the in-app browser hint (Part 13, 2026-11-20): saving files is unreliable inside LINE's own browser
+  inAppLine: '保存がうまくいかないときは、右上の︙から「ブラウザで開く」を選んでください。',
   keepFilm: '映像',
   keepFilmLine: (from: string, music: boolean) => `${s(from) ? `${s(from)}さんが選んだ場面` : '選ばれた場面'}${music ? '、音楽つき。' : '。'}`,
   keepPictures: '4枚の絵',
@@ -264,6 +268,8 @@ const CER_ZH_HANT: CerCopy = {
   certAria: (reading: string) => (reading ? `「${reading}」這個字` : '這個字'),
   toKeep: '下一步：你可以留下的',
   keepTitle: '留給你的。',
+  // 7b · the in-app browser hint (Part 13, 2026-11-20): saving files is unreliable inside LINE's own browser
+  inAppLine: '如果無法儲存，請從右上角的︙選擇「用瀏覽器開啟」。',
   keepFilm: '影片',
   keepFilmLine: (from: string, music: boolean) => `${s(from) ? `${s(from)}珍藏的那一刻` : '被珍藏的那一刻'}${music ? '，配樂。' : '。'}`,
   keepPictures: '四幅畫',
@@ -356,6 +362,8 @@ const CER_ZH_HANS: CerCopy = {
   certAria: (reading: string) => (reading ? `「${reading}」这个字` : '这个字'),
   toKeep: '下一步：你可以留下的',
   keepTitle: '留给你的。',
+  // 7b · the in-app browser hint (Part 13, 2026-11-20): saving files is unreliable inside LINE's own browser
+  inAppLine: '如果无法储存，请从右上角的︙选择「用浏览器开启」。',
   keepFilm: '影片',
   keepFilmLine: (from: string, music: boolean) => `${s(from) ? `${s(from)}珍藏的那一刻` : '被珍藏的那一刻'}${music ? '，配乐。' : '。'}`,
   keepPictures: '四幅画',

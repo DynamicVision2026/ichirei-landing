@@ -6649,6 +6649,80 @@ for (const [lang, locale, text] of [['en', 'en-US', 'Your gift is being finished
   }
 }
 
+// ---------- Run 47 (2026-11-20, Part 13): the receiver keeps the way back — the in-app browser line above the two buttons (LINE, Instagram, Facebook, WeChat; not Safari or Chrome), the QR image in the formats sheet with its line, the four cards to look at ----------
+{
+  const T47 = (page, id) => page.locator(`[data-testid="${id}"]`)
+  const TOKEN = 'RG-keepkeepkeepkeepkeep'
+  const PICS = ['/img/scenes/children.jpg', '/img/scenes/friends.jpg', '/img/scenes/m1.jpg', '/img/scenes/m2.jpg']
+  const WORDS = {
+    ja: { inApp: '保存がうまくいかないときは、右上の︙から「ブラウザで開く」を選んでください。', qr: 'QRコードを画像で保存', qrNote: '写真に残せば、いつでも読み取ってこのページを開けます。' },
+    en: { inApp: "If saving doesn't work, open this page in your browser from the ︙ menu.", qr: 'Save the QR code as an image', qrNote: 'Keep it in your photos and scan it anytime to open this page.' },
+    'zh-Hant': { inApp: '如果無法儲存，請從右上角的︙選擇「用瀏覽器開啟」。', qr: '把QR碼存成圖片', qrNote: '存在相簿裡，隨時掃描就能打開這個頁面。' },
+  }
+  const UA = {
+    line: 'Mozilla/5.0 (iPhone; CPU iPhone OS 17_5 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Mobile/15E148 Safari Line/14.8.0',
+    instagram: 'Mozilla/5.0 (iPhone; CPU iPhone OS 17_5 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Mobile/15E148 Instagram 330.0.0.12.114',
+    facebook: 'Mozilla/5.0 (Linux; Android 14) AppleWebKit/537.36 (KHTML, like Gecko) Version/4.0 Chrome/125.0 Mobile Safari/537.36 [FB_IAB/FB4A;FBAV/460.0.0.0.0;]',
+    wechat: 'Mozilla/5.0 (Linux; Android 14) AppleWebKit/537.36 (KHTML, like Gecko) Version/4.0 Chrome/116.0 Mobile Safari/537.36 MicroMessenger/8.0.47.2560',
+    safari: 'Mozilla/5.0 (iPhone; CPU iPhone OS 17_5 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.5 Mobile/15E148 Safari/604.1',
+    chrome: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36',
+  }
+  const view = (lang) => ({ id: TOKEN, token: TOKEN, language: lang, glyph: '添', reading: lang === 'ja' ? 'そう' : '', romanization: 'sou', meaning_en: 'to stay beside', who: lang === 'en' ? 'Someone who walked beside me.' : '隣をゆっくり歩いてくれた人。', poem: { type: lang === 'zh-Hant' ? 'tang' : lang === 'ja' ? 'tanka' : 'en', lines: lang === 'en' ? ['one', 'two', 'three'] : lang === 'ja' ? ['道の端', '並んで歩く', 'ゆっくりと', '待ってくれてる', '静かな時間'] : ['道旁並肩行', '慢步不言聲', '一路相陪伴', '靜中有真情'], reading: '' }, memorial: false, purpose: 'thanks', music: 'thanks', film: { status: 'ready', lines: ['a', 'b', 'c', 'd'], pictures: PICS }, certificate_line: 'x', from: lang === 'en' ? 'Brian' : '佐藤', to: lang === 'en' ? 'Kenji' : '田中', message: '', egift: null, certificate_no: 12, order_date: '2026-11-18', opens_on: null, opens_at: null, opens_tz: null, replied: false, package: 'egift', locked: false })
+  const toKeep = async (lang, ua) => {
+    const ctx = await browser.newContext({ locale: lang === 'en' ? 'en-US' : lang === 'ja' ? 'ja-JP' : 'zh-TW', viewport: { width: 390, height: 844 }, reducedMotion: 'reduce', userAgent: UA[ua] })
+    const page = await ctx.newPage()
+    const errs = []
+    page.on('pageerror', (e) => errs.push(String(e)))
+    await page.route('**/api/analytics', (r) => r.fulfill({ status: 204, body: '' }))
+    await page.route('**/api/me*', (r) => r.fulfill({ json: { basket: { count: 0 }, ready: null, hold: null } }))
+    await page.route(`**/api/gift/${TOKEN}**`, async (r) => {
+      const u = new URL(r.request().url())
+      if (u.pathname === `/api/gift/${TOKEN}/opened`) return r.fulfill({ json: { ok: true } })
+      if (u.pathname === `/api/gift/${TOKEN}/render`) return r.fulfill({ json: { state: 'ready', view: view(lang) } })
+      if (u.pathname === `/api/gift/${TOKEN}`) return r.fulfill({ json: view(lang) })
+      return r.fulfill({ status: 204, body: '' })
+    })
+    await page.goto(`http://localhost:5173/g/${TOKEN}`, { waitUntil: 'networkidle' })
+    await T47(page, 'cr-markbtn').click()
+    await T47(page, 'cr-film').waitFor()
+    await page.waitForFunction(() => document.querySelector('[data-testid=cr-film]')?.getAttribute('data-ready') === 'yes', null, { timeout: 15000 })
+    await T47(page, 'gift-skip').click()
+    await page.waitForSelector('[data-testid=cr-char][data-meaning=yes]', { timeout: 30000 })
+    await T47(page, 'cr-to-poem').click()
+    await T47(page, 'cr-poem').waitFor()
+    await page.waitForTimeout(3600)
+    await T47(page, 'cr-to-cert').click()
+    await T47(page, 'cr-to-keep').click()
+    await T47(page, 'gift-keep').waitFor()
+    return { page, ctx, errs }
+  }
+  const norm = (t) => t.replace(/\s+/g, ' ').trim()
+  for (const lang of ['ja', 'en', 'zh-Hant']) {
+    const W = WORDS[lang]
+    for (const ua of ['line', 'instagram', 'facebook', 'wechat']) {
+      if (lang !== 'ja' && ua !== 'line') continue
+      const k = await toKeep(lang, ua)
+      const pos = await k.page.evaluate(() => { const h = document.querySelector('[data-testid=keep-inapp]'); const b = document.querySelector('[data-testid=gift-actions] .ga-btn'); return h && b ? { hint: h.getBoundingClientRect().top, btn: b.getBoundingClientRect().top } : null })
+      check(`keepsakes (${lang}, ${ua}'s browser): one small line above the two buttons — 「${W.inApp}」`, !!pos && pos.hint < pos.btn && norm(await T47(k.page, 'keep-inapp').innerText()) === W.inApp && (await k.page.locator('[data-testid=keep-inapp]').count()) === 1, JSON.stringify(pos))
+      if (lang === 'ja' && ua === 'line') await k.page.screenshot({ path: `${SHOTS}/p13-keepsakes-inapp-ja-390.png` })
+      check(`no page errors (run 47, ${lang}, ${ua})`, k.errs.length === 0, k.errs.join('; '))
+      await k.ctx.close()
+    }
+    for (const ua of ['safari', 'chrome']) {
+      if (lang !== 'ja' && ua !== 'safari') continue
+      const k = await toKeep(lang, ua)
+      check(`keepsakes (${lang}, ${ua}): no in-app line`, (await T47(k.page, 'keep-inapp').count()) === 0 && (await T47(k.page, 'gift-actions').count()) === 1)
+      if (ua === 'safari') {
+        await T47(k.page, 'other-formats').click()
+        await T47(k.page, 'formats-sheet').waitFor()
+        check(`keepsakes (${lang}): the QR image is in the formats sheet — 「${W.qr}」 — with its line 「${W.qrNote}」, saved from this gift's own address`, norm(await T47(k.page, 'save-qr').innerText()) === W.qr && norm(await T47(k.page, 'save-qr-note').innerText()) === W.qrNote && (await T47(k.page, 'save-qr').getAttribute('href')) === `/api/gift/${TOKEN}/keep-qr.png` && (await T47(k.page, 'save-qr').getAttribute('download')) !== null)
+        if (lang === 'ja') await k.page.screenshot({ path: `${SHOTS}/p13-keepsakes-qr-ja-390.png` })
+      }
+      await k.ctx.close()
+    }
+  }
+}
+
 await browser.close()
 console.log(failures === 0 ? '\nALL E2E CHECKS PASSED' : `\n${failures} CHECKS FAILED`)
 process.exit(failures === 0 ? 0 : 1)

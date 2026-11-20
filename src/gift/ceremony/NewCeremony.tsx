@@ -8,6 +8,7 @@ import { cleanReading } from '../../order/reading.ts'
 import { usePromoOn } from '../../demo/useSizes'
 import { trackReceiverOpened, trackUs } from '../../demo/analytics'
 import GiftActions from '../GiftActions.tsx'
+import { isInAppBrowser } from './in-app.ts'
 import { pageLang } from '../../animation/copy.ts'
 import { CER, cerLang } from './copy.ts'
 import { thanksCopy } from '../../loop/copy.ts'
@@ -592,6 +593,8 @@ function KeepScreen({ view, preview, q, from, onAnswer }: { view: GiftView; prev
   const complete = filmComplete(view)
   const scroll = scrollAvailable(view)
   const pics = view.film?.pictures ?? []
+  // Part 13 (2026-11-20): in an in-app browser (LINE, Instagram, Facebook, WeChat) saving files is unreliable: one small line above the two buttons says how to open the page in the browser
+  const inApp = useMemo(() => isInAppBrowser(typeof navigator === 'undefined' ? '' : navigator.userAgent), [])
   // Part 12 (2026-11-20): the four things are shown to LOOK at; saving and sharing are two buttons below (「まとめて保存」 and 「シェアする」), each opening its choices in a small sheet
   return (
     <section className="cr-scr cr-flow" data-testid="gift-keep">
@@ -631,7 +634,7 @@ function KeepScreen({ view, preview, q, from, onAnswer }: { view: GiftView; prev
         </div>
       </div>
       <div className="cr-actions">
-        <GiftActions lang={pageLang(view.language)} role="receiver" base={base} q={q} giftUrl={`${window.location.origin}/g/${view.token}`} complete={complete} scroll={scroll} memorial={view.memorial} enCard={view.language === 'en' && !!view.en} track preview={preview} />
+        <GiftActions lang={pageLang(view.language)} role="receiver" base={base} q={q} giftUrl={`${window.location.origin}/g/${view.token}`} complete={complete} scroll={scroll} memorial={view.memorial} enCard={view.language === 'en' && !!view.en} track preview={preview} hint={inApp ? <p className="cr-inapp" data-testid="keep-inapp" role="note">{C.inAppLine}</p> : undefined} />
       </div>
       {view.egift && !preview && <div className="cr-egift"><EgiftReceive view={view} lang={pageLang(view.language)} /></div>}
       {!preview && <button type="button" className="cr-go cr-next" style={{ marginTop: 'auto' }} data-testid="gift-to-answer" onClick={onAnswer}>{C.toAnswer(from)}</button>}

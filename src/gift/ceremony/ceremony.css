@@ -176,3 +176,6 @@
 .cr-actions .ga-btn { color: #2A221B; border-color: #8a7344; }
 .cr-actions .ga-note { color: #6B5F4E; opacity: 1; }
 .cr-actions .ga-link { color: #2A221B; }
+
+/* Part 13 (2026-11-20): the in-app browser line above the two buttons */
+.cr-inapp { margin: 0; font-size: 14px; line-height: 1.5; color: #6B5F4E; border-left: 2px solid #B8924A; padding-left: 10px; align-self: stretch; }
