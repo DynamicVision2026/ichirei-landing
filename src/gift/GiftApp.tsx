@@ -24,6 +24,7 @@ import '../fonts.css'
 import './gift.css'
 import './ceremony.css'
 import { trackReceiverOpened, trackUs } from '../demo/analytics'
+import MyGiftsButton from '../loop/MyGifts.tsx'
 
 // The receiver's gift page /g/<token> (Part 3 of the 2026-10-31 ticket; the ceremony of 2026-11-14). One screen at a time, and nothing moves on by itself — every step waits for a tap:
 //   the sealed envelope with its mizuhiki cord (press and hold the knot, or tap 「ほどく」/Untie)  ·  the letter (the sender's own words)  ·  「This gift has music」  ·  the film  ·  the character written stroke by stroke  ·  the poem
@@ -452,6 +453,8 @@ function AnswerBox({ token, lang, copy, from, replied, memorial }: { token: stri
   if (phase === 'sent')
     return (
       <>
+        {/* Part 8 (2026-11-20): the receiver's own マイギフト in the same corner */}
+        <div className="gf-mygifts-top" data-testid="gf-mygifts-top"><MyGiftsButton lang={lang} /></div>
         <p className="gf-sent-line" role="status" data-testid="gift-reply-sent">{copy.replySent(from)}</p>
         {!memorial && <p className="gf-landing-line" data-testid="gift-landing-line"><a className="gf-landing-btn" href={landing}>{copy.answerLanding}</a></p>}
         {!memorial && promoOn && lang === 'en' && copy.answerPromo && <p className="gf-landing-promo" data-testid="gift-landing-promo">{copy.answerPromo}</p>}

@@ -191,3 +191,7 @@
 .gf-en-cert .en-reading, .gf-en-cert .en-line, .gf-en-cert .en-where { color: inherit; }
 .gf-en-cert .en-word { color: inherit; }
 .gf-poem-from { margin: 8px 0 0; font-size: 14px; opacity: 0.85; font-style: italic; }
+
+/* The receiver's own マイギフト on the old ceremony's last screen (Part 8, 2026-11-20) */
+.gf-mygifts-top { display: flex; justify-content: flex-end; width: 100%; margin: 0 0 12px; }
+.gf-mygifts-top .myGifts { background: transparent; color: #C9A96E; border: 1px solid rgba(201, 169, 110, .55); font-weight: 500; }

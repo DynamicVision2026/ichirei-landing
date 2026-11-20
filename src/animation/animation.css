@@ -190,3 +190,6 @@
 .by-cancel-by { color: var(--gold); font-size: .95rem; margin: 1.2rem 0 .6rem; }
 .by-confirm { border: 1px solid var(--gold); border-radius: 4px; padding: .6rem 1rem; margin: 1rem auto; max-width: 24rem; }
 .an-memorial .by-cancel-by { color: var(--gold); }
+/* "You can send it later" (Part 8, 2026-11-20): one quiet line under the send buttons, with the way to My gifts in Vintage Gold */
+.by-later { margin: .8rem 0 0; font-size: .95rem; line-height: 1.7; opacity: .92; }
+.by-later-link { color: var(--gold); font-weight: 600; text-underline-offset: 3px; white-space: nowrap; }

@@ -28,6 +28,27 @@ const INSUFFICIENT = {
 // (A legacy `occasion` name is still accepted and clicks the purpose it stands for.)
 const OCC_TO_PURPOSE = { birthday_milestone: 'celebrate', wedding: 'celebrate', new_baby: 'celebrate', school_career: 'celebrate', retirement_farewell: 'farewell', parent_day: 'thanks', seasonal_thanks: 'thanks', memorial: 'memorial' }
 // the refund terms must be ticked before the order button works (2026-11-06): the flows that place an order tick it first
+/** The contrast ratio of an element's text against the background it really sits on (ancestors composited over white); null when the background is an image or gradient we cannot read. */
+const contrastOf = (page, selector) => page.evaluate((sel) => {
+  const el = document.querySelector(sel)
+  if (!el) return null
+  const parse = (c) => { const m = c.match(/rgba?\(([^)]+)\)/); if (!m) return null; const [r, g, b, a = 1] = m[1].split(/[ ,/]+/).filter(Boolean).map(Number); return { r, g, b, a } }
+  const chain = []
+  for (let n = el; n; n = n.parentElement) chain.push(n)
+  let bg = { r: 255, g: 255, b: 255 }
+  for (const n of chain.reverse()) {
+    const cs = getComputedStyle(n)
+    if (cs.backgroundImage && cs.backgroundImage !== 'none' && n !== el) { /* an image or gradient: not readable here */ }
+    const c = parse(cs.backgroundColor)
+    if (c && c.a > 0) bg = { r: c.r * c.a + bg.r * (1 - c.a), g: c.g * c.a + bg.g * (1 - c.a), b: c.b * c.a + bg.b * (1 - c.a) }
+  }
+  const fg = parse(getComputedStyle(el).color)
+  if (!fg) return null
+  const f = { r: fg.r * fg.a + bg.r * (1 - fg.a), g: fg.g * fg.a + bg.g * (1 - fg.a), b: fg.b * fg.a + bg.b * (1 - fg.a) }
+  const lum = ({ r, g, b }) => { const k = (v) => { v /= 255; return v <= 0.03928 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4 }; return 0.2126 * k(r) + 0.7152 * k(g) + 0.0722 * k(b) }
+  const [a, b] = [lum(f), lum(bg)].sort((x, y) => y - x)
+  return (a + 0.05) / (b + 0.05)
+}, selector)
 const tickRefund = async (page) => { const c = page.locator('[data-testid=order-refund-check]'); if ((await c.count()) && !(await c.isChecked())) await c.check() }
 const pickContext = async (page, ctx = {}) => {
   const c = { relationship: 'parent_father', direction: 'up', ...ctx }
@@ -2423,6 +2444,45 @@ check('included poem: the Japanese site starts with the tanka (the default forma
   }
 }
 
+// ---------- Run 44 (2026-11-20): マイギフト in one fixed, obvious place — present and readable (contrast ≥ 4.5:1) on every page type, in all three languages; the sender page's "send it later" line ----------
+{
+  const NAMES = { ja: 'マイギフト', 'zh-Hant': '我的禮物', en: 'My gifts' }
+  const LATER = { ja: 'あとで送ることもできます。この贈りものは〈マイギフト〉に残っています。', 'zh-Hant': '也可以稍後再送。這份禮物會留在〈我的禮物〉裡。', en: 'You can send it later. This gift stays in My gifts.' }
+  const OPEN = { ja: 'マイギフトを開く →', 'zh-Hant': '打開我的禮物 →', en: 'Open My gifts →' }
+  const PATH = { landing: { ja: '/', 'zh-Hant': '/zh', en: '/en' }, write: { ja: '/write', 'zh-Hant': '/zh/write', en: '/en/write' } }
+  const seenBy = async (page, where, lang) => {
+    await page.route('**/api/me*', (r) => r.fulfill({ json: { basket: { count: 3 }, ready: null, hold: null } }))
+    const sel = '[data-testid=my-gifts]'
+    await page.locator(sel).first().waitFor({ timeout: 8000 })
+    const box = await page.evaluate((q) => { const e = document.querySelector(q); const r = e.getBoundingClientRect(); const t = e.textContent.trim(); return { right: r.right, top: r.top + window.scrollY, width: window.innerWidth, text: t, h: r.height } }, sel)
+    const cr = await contrastOf(page, sel)
+    check(`My gifts (${where}, ${lang}): the button is there, at the top right, reads 「${NAMES[lang]}（n）」 and is readable (contrast ${cr === null ? 'n/a' : cr.toFixed(1)} ≥ 4.5)`, box.text.startsWith(NAMES[lang]) && box.right > box.width * 0.6 && box.top < 160 && cr !== null && cr >= 4.5, JSON.stringify({ box, cr }))
+  }
+  for (const lang of ['ja', 'zh-Hant', 'en']) {
+    for (const where of ['landing', 'write']) {
+      const page = await browser.newPage({ locale: 'ja-JP', viewport: { width: 390, height: 844 } })
+      await page.route('**/api/**', (r) => (/api\/(me|rates|promo)/.test(r.request().url()) ? r.fallback() : r.fulfill({ status: 204, body: '' })))
+      await page.goto(`http://localhost:5173${PATH[where][lang]}`, { waitUntil: 'networkidle' })
+      await seenBy(page, where, lang)
+      const oneLine = await page.evaluate(() => { const b = document.querySelector('[data-testid=my-gifts]'); const br = document.querySelector('.brand'); return !!b && !!br && Math.abs(b.getBoundingClientRect().top - br.getBoundingClientRect().top) < 40 && document.documentElement.scrollWidth <= window.innerWidth })
+      check(`My gifts (${where}, ${lang}, 390px): on one line with the brand, no horizontal scroll`, oneLine)
+      await page.close()
+    }
+    // the sender page after payment
+    const ctx = await browser.newContext({ locale: 'ja-JP', viewport: { width: 390, height: 844 } })
+    const p = await ctx.newPage()
+    await p.route('**/api/me*', (r) => r.fulfill({ json: { basket: { count: 3 }, ready: null, hold: null } }))
+    await p.route('**/api/animation/AN-testtesttesttesttest', (r) => r.fulfill({ json: { id: 'AN-testtesttesttesttest', language: lang, glyph: '備', reading: 'そなえる', romanization: 'sonaeru', meaning_en: 'to be ready', who: 'x', memorial: false, film: { status: 'fallback', lines: ['a', 'b'], pictures: ['/film/washi-1.webp', '/film/washi-2.webp'] }, gift: { url: 'https://ichirei.beyondculture.ai/g/RG-testtesttesttesttest', size_code: 'ICHIREI-SIMPLE', ship_to: 'me', egift_state: null }, order: { collected: true, ordered_at: '2026-11-06T05:30:00Z', change_until: null, wood: null } } }))
+    await p.route('**/api/gift/RG-testtesttesttesttest/qr.svg', (r) => r.fulfill({ status: 200, contentType: 'image/svg+xml', body: '<svg xmlns="http://www.w3.org/2000/svg" width="10" height="10"/>' }))
+    await p.goto('http://localhost:5173/a/AN-testtesttesttesttest', { waitUntil: 'networkidle' })
+    await seenBy(p, 'sender page', lang)
+    await p.locator('[data-testid=send-later]').waitFor()
+    check(`sender page (${lang}): under the send buttons the line 「${LATER[lang]}」 and the link 「${OPEN[lang]}」 to My gifts`, (await p.locator('[data-testid=send-later-line]').innerText()) === LATER[lang] && (await p.locator('[data-testid=send-later-open]').innerText()) === OPEN[lang] && (await p.locator('[data-testid=send-later-open]').getAttribute('href')) === '/basket')
+    if (lang === 'ja') await p.screenshot({ path: `${SHOTS}/p8-sender-ja-390.png`, fullPage: true })
+    await ctx.close()
+  }
+}
+
 // ---------- Run 9: the Reveal landing page — sections, copy per language, honesty, no test controls ----------
 // (2026-11-16) the flow is no longer on the landing page: it has a page of its own, the writing room (/write, /en/write, /zh/write)
 const SECTION_ORDER = ['.hero', '.strip', '.philo', '#shape', '#angles', '#how', '#moments', '.reviewsEmpty', '#gifts', '.faq', '.closing']
@@ -4463,6 +4523,7 @@ const SECTION_ORDER = ['.hero', '.strip', '.philo', '#shape', '#angles', '#how',
       await T(page, 'gift-reply-text').fill(L ? 'Thank you, Emily.\nSee you soon.' : 'ありがとう。\nまたね。')
       await T(page, 'gift-reply-send').click()
       await T(page, 'gift-reply-sent').waitFor()
+      { const cr = await contrastOf(page, '[data-testid=gf-mygifts-top] [data-testid=my-gifts]'); check(`ceremony (${lang}, the older one for locked / remembrance gifts): the receiver's own マイギフト is at the top right of the last screen and readable (contrast ${cr === null ? 'n/a' : cr.toFixed(1)} ≥ 4.5)`, cr !== null && cr >= 4.5) }
       check(`ceremony (${lang}): a character and a note sent together, once — "${S.sent}", then no box and no second send`, seen.reply.length === 1 && seen.reply[0].char === '謝' && seen.reply[0].text.includes('\n') && (await T(page, 'gift-reply-sent').innerText()) === S.sent && (await T(page, 'gift-reply-send').count()) === 0 && (await T(page, 'gift-chars').count()) === 0, JSON.stringify(seen.reply))
       check(`ceremony (${lang}): then one quiet line to the landing in the receiver's language — "${S.landing}"`, (await T(page, 'gift-landing-line').innerText()) === S.landing && ((await T(page, 'gift-landing-line').locator('a').getAttribute('href')) ?? '').startsWith(L ? '/en' : '/'))
       await pause(page, `${shots}-7-sent.png`)
@@ -6270,6 +6331,7 @@ for (const [lang, locale, text] of [['en', 'en-US', 'Your gift is being finished
     await T(page, 'gift-char-謝').click()
     await T(page, 'gift-reply-send').click()
     await T(page, 'gift-reply-sent').waitFor()
+    { const cr = await contrastOf(page, '[data-testid=cr-mygifts-top] [data-testid=my-gifts]'); check(`ceremony (${lang}): the receiver's own マイギフト is at the top right of the last screen and readable (contrast ${cr === null ? 'n/a' : cr.toFixed(1)} ≥ 4.5)`, cr !== null && cr >= 4.5) }
     await page.waitForTimeout(300)
     check(`ceremony (${lang}): sent — 「${J ? '佐藤さんへ送りました · 謝、ありがとう' : '已送給小華 · 謝，謝謝'}」, the question, the free-gift lines of the landing in this language, and the button to ${J ? '/' : '/zh'}`, (await text(page, 'cr-sent-line')) === (J ? '佐藤さんへ送りました · 謝、ありがとう' : '已送給小華 · 謝，謝謝') && (await text(page, 'cr-ask')) === (J ? 'まだ、きちんと伝えられていない人はいませんか。' : '有沒有一個人，你還沒好好對他說過？') && (await text(page, 'gift-landing-promo')).includes(J ? '毎日100件の贈りものは無料です。' : '每天前100份禮物免費送出。') && (await T(page, 'gift-landing-line').getAttribute('href')) === (J ? '/' : '/zh') && (await text(page, 'gift-landing-line')) === (J ? 'あなたも一字を贈る' : '你也送一個字') && seen.reply.length === 1 && seen.reply[0].char === '謝')
     await page.screenshot({ path: `${SHOTS42}/cer-${lang}-4-sent-390.png` })

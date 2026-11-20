@@ -10,6 +10,7 @@ import { pageLang } from '../../animation/copy.ts'
 import { CER, cerLang } from './copy.ts'
 import { thanksCopy } from '../../loop/copy.ts'
 import './ceremony.css'
+import MyGiftsButton from '../../loop/MyGifts.tsx'
 
 // The receiver's new ceremony (gift ceremony redesign 2026-11-15, phase A: Classic, English). Nine screens, one at a time, each waits for a tap:
 //   1 the mark · 2 the note · 3 the film · 4 the character (it grows from the mark, then the poem is found inside its strokes) · 5 the poem · 6 the certificate
@@ -737,6 +738,8 @@ function SentScreen({ lang, from, sent, onBack }: { lang: ReturnType<typeof cerL
   const char = sent?.char ?? null
   return (
     <section className="cr-scr cr-flow" data-testid="gift-reply-sent">
+      {/* Part 8 (2026-11-20): the receiver's own マイギフト, in the same corner as on every other page */}
+      <div className="cr-mygifts-top" data-testid="cr-mygifts-top"><MyGiftsButton lang={lang === 'zh-Hans' ? 'zh-Hant' : lang} /></div>
       <div className="cr-sent"><span className="cr-dot" aria-hidden="true" /><p className="cr-lab" role="status" data-testid="cr-sent-line">{C.sentLine(from, char, char ? returnWord(char, lang) : '')}</p></div>
       {char ? <p className="cr-b cr-ink">{C.bothSaid(from)}</p> : sent?.text ? <p className="cr-b cr-ink">{C.wordsSent(from)}</p> : null}
       <h2 className="cr-h" style={{ fontSize: 'clamp(28px, 8.6vw, 35px)' }} data-testid="cr-ask">{C.ask}</h2>

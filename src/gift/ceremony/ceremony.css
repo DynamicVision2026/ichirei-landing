@@ -155,3 +155,8 @@
 .cr-poem.cr-vert p { font-size: clamp(22px, 6.2vw, 25px); line-height: 1.9; letter-spacing: .16em; margin: 0 0 0 14px; white-space: nowrap; }
 .cr-poem.cr-vert p.cr-gap { margin-top: 0; margin-left: 30px; }
 .cr-pair-lines { display: flex; flex-direction: column; gap: 6px; align-items: center; }
+
+/* The receiver's own マイギフト on the last screen (Part 8, 2026-11-20): the same corner; this ceremony is light paper, so the button is ink on paper with a hairline (always readable) */
+.cr-mygifts-top { display: flex; justify-content: flex-end; width: 100%; margin: 0 0 8px; }
+.cr-mygifts-top .myGifts { background: transparent; color: var(--ink); border: 1px solid color-mix(in srgb, var(--ink) 45%, transparent); font-weight: 500; min-height: 40px; }
+.cr-mygifts-top .myGifts[data-count]:not([data-count='0']) { border-color: var(--ink); }
