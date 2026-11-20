@@ -63,11 +63,11 @@ export const BUYER_COPY: Record<PageLang, BuyerCopy> = {
     woodSteps: ['ご注文を承りました', '制作しています', '発送しました', 'お届け済み'],
     woodShip: { me: 'お届け先：ご自身', direct: 'お届け先：相手の方へ直接' },
     saveTitle: '保存する',
-    changeUntil: (w) => `お支払い完了から24時間以内（${w}まで）なら、確認メールにご返信いただくとキャンセル（全額返金）ができます。`,
+    changeUntil: (w) => `お支払い完了から24時間以内、${w}までなら、確認メールにご返信いただくとキャンセル（全額返金）ができます。`,
     collect: '贈りものを受け取る',
     collectMemorial: '一字を受け取る',
-    collectLine: '受け取ると、送る・保存するができるようになります。受け取った後はキャンセルできません。',
-    collectLineLate: '受け取ると、送る・保存するができるようになります。',
+    collectLine: '受け取ると、相手に送ったり、保存したりできるようになります。受け取った後はキャンセルできません。',
+    collectLineLate: '受け取ると、相手に送ったり、保存したりできるようになります。',
     collectFinishing: '贈りものを仕上げています…',
     collectConfirm: '受け取りますか？この後はキャンセルできません。',
     collectYes: '受け取る',
@@ -94,7 +94,7 @@ export const BUYER_COPY: Record<PageLang, BuyerCopy> = {
     woodSteps: ['已收到訂單', '製作中', '已出貨', '已送達'],
     woodShip: { me: '寄送對象：寄給自己', direct: '寄送對象：直接寄給對方' },
     saveTitle: '儲存',
-    changeUntil: (w) => `付款完成後24小時內（${w}前），回覆確認郵件即可取消並全額退款。`,
+    changeUntil: (w) => `付款完成後24小時內，${w}前，回覆確認郵件即可取消並全額退款。`,
     collect: '領取禮物',
     collectMemorial: '領取這個字',
     collectLine: '領取後即可傳送與儲存。領取後將無法取消訂單。',
@@ -153,19 +153,33 @@ export function dayText(lang: PageLang, ymd: string): string {
   return lang === 'en' ? `${day} ${EN_MONTHS[month - 1]}` : `${month}月${day}日`
 }
 
-/** The ordering day in the reader's own time zone (the browser's). */
-export function orderedText(lang: PageLang, iso: string): string {
-  const t = new Date(iso)
-  if (Number.isNaN(t.getTime())) return ''
-  return lang === 'en' ? `${t.getDate()} ${EN_MONTHS[t.getMonth()]}` : `${t.getMonth() + 1}月${t.getDate()}日`
+/**
+ * The page's market zone for the times on the buyer's page (2026-11-20): ja → Japan time, zh → Japan time (the Chinese page is the Japanese store's), en → US Eastern. Never the device's zone: nothing
+ * about the visitor's device decides what time a page shows.
+ */
+const ZONE_OF: Record<PageLang, string> = { ja: 'Asia/Tokyo', 'zh-Hant': 'Asia/Tokyo', en: 'America/New_York' }
+const clockOf = (lang: PageLang, iso: string): { month: number; day: number; hour: number; minute: number } | null => {
+  const t = Date.parse(iso)
+  if (!Number.isFinite(t)) return null
+  const f = new Intl.DateTimeFormat('en-US', { timeZone: ZONE_OF[lang], hourCycle: 'h23', month: 'numeric', day: 'numeric', hour: 'numeric', minute: 'numeric' })
+  const p = Object.fromEntries(f.formatToParts(new Date(t)).map((x) => [x.type, x.value]))
+  return { month: Number(p.month), day: Number(p.day), hour: Number(p.hour), minute: Number(p.minute) }
 }
 
-/** 11月7日 14時 · 14時37分 · 7 Nov, 14:37 — the deadline in the reader's own time zone; the minutes are shown unless they are 00 (the deadline is exact, so it is never rounded). */
+/** The ordering day, in the page's market zone. */
+export function orderedText(lang: PageLang, iso: string): string {
+  const c = clockOf(lang, iso)
+  if (!c) return ''
+  return lang === 'en' ? `${c.day} ${EN_MONTHS[c.month - 1]}` : `${c.month}月${c.day}日`
+}
+
+/** The cancel deadline with its zone, in the page's market: 「11月20日 20時4分（日本時間）」 · en "Nov 20, 6:04 AM ET". The minutes are shown unless they are 00 (the deadline is exact, so it is never rounded). */
 export function deadlineText(lang: PageLang, iso: string): string {
-  const t = new Date(iso)
-  if (Number.isNaN(t.getTime())) return ''
-  const h = t.getHours()
-  const min = t.getMinutes()
-  if (lang === 'en') return `${t.getDate()} ${EN_MONTHS[t.getMonth()]}, ${String(h).padStart(2, '0')}:${String(min).padStart(2, '0')}`
-  return `${t.getMonth() + 1}月${t.getDate()}日 ${h}時${min ? `${min}分` : ''}`
+  const c = clockOf(lang, iso)
+  if (!c) return ''
+  if (lang === 'en') {
+    const h12 = c.hour % 12 === 0 ? 12 : c.hour % 12
+    return `${EN_MONTHS[c.month - 1]} ${c.day}, ${h12}:${String(c.minute).padStart(2, '0')} ${c.hour >= 12 ? 'PM' : 'AM'} ET`
+  }
+  return `${c.month}月${c.day}日 ${c.hour}時${c.minute ? `${c.minute}分` : ''}（日本時間）`
 }

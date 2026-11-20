@@ -250,10 +250,10 @@ export default function BuyerPage({ view, lang, preparing, onCollected }: { view
         </section>
       )}
 
-      {((!collected && until) || view.support_email) && (
+      {/* the cancel rule is said ONCE on this page (2026-11-20): the gold line under the preview button; the bottom paragraph that said it again is gone */}
+      {view.support_email && (
         <section className="an-panel by-help" data-testid="buyer-help">
-          {!collected && until && <p data-testid="buyer-deadline" data-until={until}>{c.changeUntil(deadlineText(lang, until))}</p>}
-          {view.support_email && <p className="by-support" data-testid="buyer-support">{view.support_email}</p>}
+          <p className="by-support" data-testid="buyer-support">{view.support_email}</p>
         </section>
       )}
     </div>

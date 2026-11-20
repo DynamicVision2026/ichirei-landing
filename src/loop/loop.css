@@ -167,3 +167,8 @@
 .savePanel .qrSlip{display:flex;gap:.85rem;align-items:center;flex-wrap:wrap}
 .savePanel .qrSlip img{display:block;width:112px;height:112px;padding:12px;box-sizing:content-box;background:#F5EDD8;border-radius:2px;justify-self:start}
 .savePanel .qrSlip .note{flex:1 1 9rem}
+
+/* The order page's My gifts button (2026-11-20): it was dark text on the dark page. The ghost style: Vintage Gold text with a hairline, no fill. */
+.by-top .myGifts{background:transparent;color:#C9A96E;border:1px solid rgba(201,169,110,.55);font-weight:500}
+.by-top .myGifts[data-count]:not([data-count="0"]){border-color:#C9A96E}
+.by-top .myGifts:hover{background:rgba(201,169,110,.12)}

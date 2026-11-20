@@ -1498,26 +1498,26 @@ const mockPage = async (browser, { onExplain, result, order, track } = {}) => {
 // ---------- Run 8g: E — the 24-hour change line on the buyer's page: the real deadline in the buyer's own time zone, three languages; gone after it ----------
 {
   const UNTIL = '2026-11-07T05:30:00Z' // 14:30 in Tokyo
-  const WHEN = { ja: '11月7日 14時30分', 'zh-Hant': '11月7日 14時30分', en: '7 Nov, 14:30' }
+  const WHEN = { ja: '11月7日 14時30分（日本時間）', 'zh-Hant': '11月7日 14時30分（日本時間）', en: 'Nov 7, 12:30 AM ET' } // the page's market zone, with its label (2026-11-20) — the test device is in Asia/Shanghai on purpose
   const LINE = {
-    ja: `お支払い完了から24時間以内（${WHEN.ja}まで）なら、確認メールにご返信いただくとキャンセル（全額返金）ができます。`,
-    'zh-Hant': `付款完成後24小時內（${WHEN['zh-Hant']}前），回覆確認郵件即可取消並全額退款。`,
-    en: `Until ${WHEN.en} (24 hours after payment), reply to the confirmation email to cancel for a full refund.`,
+    ja: `キャンセル期限：${WHEN.ja}まで（受け取る前に限ります）。期限を過ぎると、お客様都合による返金はできません。`,
+    'zh-Hant': `取消期限：${WHEN['zh-Hant']}前（限領取前）。超過期限後，恕不接受個人因素退款。`,
+    en: `Cancel by: ${WHEN.en} (before you collect). After that, no refunds for change of mind.`,
   }
   const mkView = (lang, order, extra = {}) => ({ id: 'AN-testtesttesttesttest', language: lang, glyph: '備', reading: 'そなえる', romanization: 'sonaeru', meaning_en: 'to be ready', who: 'x', memorial: false, film: { status: 'fallback', lines: ['a', 'b'], pictures: ['/film/washi-1.webp', '/film/washi-2.webp'] }, gift: { url: 'https://ichirei.soul-id.jp/g/RG-testtesttesttesttest', size_code: 'ICHIREI-SIMPLE', ship_to: 'me', egift_state: null }, order, ...extra })
   for (const lang of ['ja', 'zh-Hant', 'en']) {
-    const ctx = await browser.newContext({ locale: 'ja-JP', timezoneId: 'Asia/Tokyo', viewport: { width: 390, height: 800 } })
+    const ctx = await browser.newContext({ locale: 'ja-JP', timezoneId: 'Asia/Shanghai', viewport: { width: 390, height: 800 } })
     const p = await ctx.newPage()
     await p.clock.install({ time: new Date('2026-11-06T06:00:00Z') })
     await p.route('**/api/animation/AN-testtesttesttesttest', (r) => r.fulfill({ json: mkView(lang, { collected: false, ordered_at: '2026-11-06T05:30:00Z', change_until: UNTIL, wood: null }, { support_email: 'help@example.com' }) }))
     await p.route('**/api/gift/RG-testtesttesttesttest/qr.svg', (r) => r.fulfill({ status: 200, contentType: 'image/svg+xml', body: '<svg xmlns="http://www.w3.org/2000/svg" width="10" height="10"/>' }))
     await p.goto('http://localhost:5173/a/AN-testtesttesttesttest', { waitUntil: 'networkidle' })
     await p.locator('[data-testid=buyer-help]').waitFor()
-    check(`E (${lang}): the 24-hour line states the real deadline in the buyer's time zone — word for word`, (await p.locator('[data-testid=buyer-deadline]').innerText()) === LINE[lang], await p.locator('[data-testid=buyer-deadline]').innerText())
+    check(`E (${lang}): the cancel deadline is shown in the page's market zone with its label (never the device's: it is Asia/Shanghai here), word for word, and the rule is said once — no second paragraph`, (await p.locator('[data-testid=buyer-cancel-by]').innerText()) === LINE[lang] && (await p.locator('[data-testid=buyer-deadline]').count()) === 0, await p.locator('[data-testid=buyer-cancel-by]').innerText())
     check(`E (${lang}): the support address is plain, selectable text`, (await p.locator('[data-testid=buyer-support]').innerText()) === 'help@example.com' && (await p.locator('[data-testid=buyer-support] a').count()) === 0)
     await p.clock.fastForward('24:00:00')
     await p.waitForTimeout(300)
-    check(`E (${lang}): the line disappears by itself when the deadline passes while the page is open`, (await p.locator('[data-testid=buyer-deadline]').count()) === 0)
+    check(`E (${lang}): the line disappears by itself when the deadline passes while the page is open`, (await p.locator('[data-testid=buyer-cancel-by]').count()) === 0)
     await ctx.close()
   }
   {
@@ -1526,7 +1526,7 @@ const mockPage = async (browser, { onExplain, result, order, track } = {}) => {
     await p.route('**/api/gift/RG-testtesttesttesttest/qr.svg', (r) => r.fulfill({ status: 200, contentType: 'image/svg+xml', body: '<svg xmlns="http://www.w3.org/2000/svg" width="10" height="10"/>' }))
     await p.goto('http://localhost:5173/a/AN-testtesttesttesttest', { waitUntil: 'networkidle' })
     await p.locator('[data-testid=buyer-collect-section]').waitFor()
-    check('E: a page opened after the deadline has no 24-hour line at all (and no empty help block)', (await p.locator('[data-testid=buyer-deadline]').count()) === 0 && (await p.locator('[data-testid=buyer-help]').count()) === 0)
+    check('E: a page opened after the deadline has no 24-hour line at all (and no empty help block)', (await p.locator('[data-testid=buyer-cancel-by]').count()) === 0 && (await p.locator('[data-testid=buyer-deadline]').count()) === 0 && (await p.locator('[data-testid=buyer-help]').count()) === 0)
     await p.close()
   }
 }
@@ -1622,9 +1622,9 @@ const mockPage = async (browser, { onExplain, result, order, track } = {}) => {
 // ---------- Run 8g-4: 「贈りものを受け取る」 — before the tap nothing can be sent or saved; the confirm within 24 hours; no confirm after them; the button waits for the final film; then everything appears ----------
 {
   const T = {
-    ja: { btn: '贈りものを受け取る', line: '受け取ると、送る・保存するができるようになります。受け取った後はキャンセルできません。', late: '受け取ると、送る・保存するができるようになります。', confirm: '受け取りますか？この後はキャンセルできません。', yes: '受け取る', no: 'まだ', by: 'キャンセル期限：11月7日 14時30分まで（受け取る前に限ります）。期限を過ぎると、お客様都合による返金はできません。', wait: '贈りものを仕上げています…', first: '受け取る前に、相手に届く内容をご確認ください。', preview: '相手が見る画面を確かめる' },
-    'zh-Hant': { btn: '領取禮物', line: '領取後即可傳送與儲存。領取後將無法取消訂單。', late: '領取後即可傳送與儲存。', confirm: '確定領取嗎？領取後將無法取消。', yes: '領取', no: '先不要', by: '取消期限：11月7日 14時30分前（限領取前）。超過期限後，恕不接受個人因素退款。', wait: '禮物製作中…', first: '領取前，請先確認對方將收到的內容。', preview: '預覽對方會看到的畫面' },
-    en: { btn: 'Collect your gift', line: "Once collected, you can send and save it. After that, the order can't be cancelled.", late: 'Once collected, you can send and save it.', confirm: "Collect it now? You won't be able to cancel after this.", yes: 'Collect', no: 'Not yet', by: 'Cancel by: 7 Nov, 14:30 (before you collect). After that, no refunds for change of mind.', wait: 'Finishing your gift…', first: "Before collecting, check what they'll receive.", preview: "Preview what they'll see" },
+    ja: { btn: '贈りものを受け取る', line: '受け取ると、相手に送ったり、保存したりできるようになります。受け取った後はキャンセルできません。', late: '受け取ると、相手に送ったり、保存したりできるようになります。', confirm: '受け取りますか？この後はキャンセルできません。', yes: '受け取る', no: 'まだ', by: 'キャンセル期限：11月7日 14時30分（日本時間）まで（受け取る前に限ります）。期限を過ぎると、お客様都合による返金はできません。', wait: '贈りものを仕上げています…', first: '受け取る前に、相手に届く内容をご確認ください。', preview: '相手が見る画面を確かめる' },
+    'zh-Hant': { btn: '領取禮物', line: '領取後即可傳送與儲存。領取後將無法取消訂單。', late: '領取後即可傳送與儲存。', confirm: '確定領取嗎？領取後將無法取消。', yes: '領取', no: '先不要', by: '取消期限：11月7日 14時30分（日本時間）前（限領取前）。超過期限後，恕不接受個人因素退款。', wait: '禮物製作中…', first: '領取前，請先確認對方將收到的內容。', preview: '預覽對方會看到的畫面' },
+    en: { btn: 'Collect your gift', line: "Once collected, you can send and save it. After that, the order can't be cancelled.", late: 'Once collected, you can send and save it.', confirm: "Collect it now? You won't be able to cancel after this.", yes: 'Collect', no: 'Not yet', by: 'Cancel by: Nov 7, 12:30 AM ET (before you collect). After that, no refunds for change of mind.', wait: 'Finishing your gift…', first: "Before collecting, check what they'll receive.", preview: "Preview what they'll see" },
   }
   const mkView = (lang, order, film, memorial = false) => ({ id: 'AN-testtesttesttesttest', language: lang, glyph: '備', reading: 'そなえる', romanization: 'sonaeru', meaning_en: 'to be ready', who: 'x', memorial, film: film ?? { status: 'fallback', lines: ['a', 'b'], pictures: ['/film/washi-1.webp', '/film/washi-2.webp'] }, gift: { url: 'https://ichirei.soul-id.jp/g/RG-testtesttesttesttest', size_code: 'ICHIREI-EGIFT', ship_to: 'none', egift_state: null, opens_on: null }, order })
   for (const lang of ['ja', 'zh-Hant', 'en']) {
@@ -1640,7 +1640,7 @@ const mockPage = async (browser, { onExplain, result, order, track } = {}) => {
     await p.goto('http://localhost:5173/a/AN-testtesttesttesttest', { waitUntil: 'networkidle' })
     await p.locator('[data-testid=buyer-collect-section]').waitFor()
     check(`before collecting (${lang}): the welcome and the preview are there; NO send button, no receiver link, no QR, no save/download`, (await p.locator('[data-testid=buyer-welcome]').count()) === 1 && (await p.locator('[data-testid=give-preview] a').innerText()) === t.preview && (await p.locator('[data-testid=buyer-check-first]').innerText()) === t.first && (await p.locator('[data-testid=give-line], [data-testid=give-whatsapp], [data-testid=give-wechat], [data-testid=give-copy], [data-testid=give-qr], [data-testid=give-mail], [data-testid=give-link], [data-testid=buyer-save], [data-testid=keepsakes]').count()) === 0 && !(await p.locator('input[readonly]').count()))
-    check(`before collecting (${lang}): the cancel deadline (real, in the buyer's time zone), the big button, and the line under it — word for word; the e-mail-style cancel line also shows`, (await p.locator('[data-testid=buyer-cancel-by]').innerText()) === t.by && (await p.locator('[data-testid=collect-button]').innerText()) === t.btn && (await p.locator('[data-testid=collect-line]').innerText()) === t.line && (await p.locator('[data-testid=buyer-deadline]').count()) === 1, await p.locator('[data-testid=buyer-cancel-by]').innerText())
+    check(`before collecting (${lang}): the cancel deadline (real, in the page's market zone with its label, never the device's), the big button, and the line under it — word for word; the cancel rule is said ONCE (the bottom paragraph is gone)`, (await p.locator('[data-testid=buyer-cancel-by]').innerText()) === t.by && (await p.locator('[data-testid=collect-button]').innerText()) === t.btn && (await p.locator('[data-testid=collect-line]').innerText()) === t.line && (await p.locator('[data-testid=buyer-deadline]').count()) === 0, await p.locator('[data-testid=buyer-cancel-by]').innerText())
     if (lang === 'ja') await p.screenshot({ path: 'shots/buyer-before-collect-ja.png', fullPage: true })
     await p.locator('[data-testid=collect-button]').click()
     check(`collect (${lang}): within 24 hours a confirm appears IN the page (not a browser dialog), with 「${t.yes}」 and 「${t.no}」 — and nothing was sent yet`, (await p.locator('[data-testid=collect-confirm] p').first().innerText()) === t.confirm && (await p.locator('[data-testid=collect-yes]').innerText()) === t.yes && (await p.locator('[data-testid=collect-no]').innerText()) === t.no && posts.length === 0)
@@ -1682,7 +1682,7 @@ const mockPage = async (browser, { onExplain, result, order, track } = {}) => {
     await p.route('**/api/gift/RG-testtesttesttesttest/qr.svg', (r) => r.fulfill({ status: 200, contentType: 'image/svg+xml', body: '<svg xmlns="http://www.w3.org/2000/svg" width="10" height="10"/>' }))
     await p.goto('http://localhost:5173/a/AN-testtesttesttesttest', { waitUntil: 'networkidle' })
     await p.locator('[data-testid=collect-button]').waitFor()
-    check('collect: after 24 hours there is no cancel deadline line, the line under the button is the short one, and the tap unlocks at once with NO confirm', (await p.locator('[data-testid=buyer-cancel-by]').count()) === 0 && (await p.locator('[data-testid=collect-line]').innerText()) === '受け取ると、送る・保存するができるようになります。')
+    check('collect: after 24 hours there is no cancel deadline line, the line under the button is the short one, and the tap unlocks at once with NO confirm', (await p.locator('[data-testid=buyer-cancel-by]').count()) === 0 && (await p.locator('[data-testid=collect-line]').innerText()) === '受け取ると、相手に送ったり、保存したりできるようになります。')
     await p.locator('[data-testid=collect-button]').click()
     await p.locator('[data-testid=give-copy]').waitFor()
     check('collect: …and the send buttons appeared without a confirm step', (await p.locator('[data-testid=collect-confirm]').count()) === 0 && posts.filter((u) => u.endsWith('/collect')).length === 1)
