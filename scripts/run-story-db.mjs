@@ -271,7 +271,7 @@ export async function callSelect(base, body, signal) {
     const t = line.trim()
     if (!t) return
     const msg = JSON.parse(t)
-    if (msg.type === 'error') throw new Error(`server: ${msg.error}`)
+    if (msg.type === 'error') throw new Error(`server: ${msg.error ?? msg.code ?? 'engine_error'}`)
     if (msg.type === 'result') final = msg.result
   }
   for await (const chunk of res.body) {

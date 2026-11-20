@@ -21,6 +21,7 @@ import { fileURLToPath } from 'node:url'
 import { familyOf, type ReviewVerdict, type Candidate, type EngineContext, type EngineResult, type ReviewReport, type Slot } from './contract.ts'
 import { refereeFamilies, type Palette } from './palette.ts'
 import { callSignal, reviewTimeoutMs } from './limits.ts'
+import { tracked } from './engine-log.ts'
 
 export const REVIEW_SLOTS = {
   language: '{{ LANGUAGE }}',
@@ -183,7 +184,7 @@ export async function runReview(result: EngineResult, palette: Palette, story: s
     const client = opts.client ?? new Anthropic(opts.apiKey ? { apiKey: opts.apiKey } : {})
     const effort = (process.env.ICHIREI_REVIEW_EFFORT ?? 'low') as 'low' | 'medium' | 'high'
     const signal = callSignal(opts.signal, reviewTimeoutMs())
-    const stream = client.messages.stream(
+    const stream = tracked('review', client).messages.stream(
       { model: opts.model, max_tokens: Number(process.env.ICHIREI_REVIEW_MAX_TOKENS ?? 4000), output_config: { effort }, messages: [{ role: 'user', content: prompt }] },
       { signal },
     )

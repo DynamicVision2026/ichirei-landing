@@ -5,7 +5,7 @@
 //   GET /ops/home?p=today|d7|d30|all   the page
 //   GET /ops/home/orders.csv           the latest gifts as a spreadsheet file
 
-import { checkOpsAuth, type OpsDeps } from './ops.ts'
+import { checkOpsAuth, sameSitePost, type OpsDeps } from './ops.ts'
 import { buildStats, shortRef, type StatsPayload } from './ops-stats.ts'
 import { createOrderStore } from '../engine/order-store.ts'
 import { analyticsDay } from '../engine/analytics.ts'
@@ -14,6 +14,9 @@ import { PERIODS, type OrderStat, type Period } from '../engine/stats.ts'
 import { readCustomer, type CustomerRecord, type EventCode } from '../engine/customer.ts'
 import type { BasketItem } from '../engine/basket.ts'
 import type { OrderStore } from '../engine/order-store.ts'
+import { checkNow, countsOf, lastErrorOf, lightOf, modelsOf, plainWords, readEngineLines, type Counts, type EngineLine, type LastError, type LightState } from '../engine/engine-log.ts'
+import { ENGINE_CONFIG, DEFAULT_FREE_MODEL } from '../engine/engine.ts'
+import Anthropic from '@anthropic-ai/sdk'
 
 const DAY_MS = 86_400_000
 const headers = (type: string, extra: Record<string, string> = {}) => ({ 'content-type': type, 'x-robots-tag': 'noindex, nofollow', 'cache-control': 'no-store', ...extra })
@@ -80,6 +83,9 @@ h1{margin:4px 0;font-size:34px;font-weight:700;line-height:1.15}h2{margin:0;font
 .kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:16px}
 .kpi{gap:6px}.kpi .label{font-size:13px;color:#5C564D}.kpi .big{font-size:44px;font-weight:700;line-height:1}.kpi .big small{font-size:22px;color:#5C564D}.kpi .note{font-size:14px;color:#3B362F}
 .meter{height:6px;background:#E6E0D3}.meter i{display:block;height:6px;background:#151311}
+.eng-light{display:flex;gap:12px;align-items:center}.eng-dot{display:inline-block;width:22px;height:22px;border-radius:50%;box-shadow:0 0 0 4px rgba(21,19,17,.08)}
+.eng th,.eng td{text-align:left;padding:6px 12px 6px 0;font-weight:400}.eng thead th{font-size:13px;color:#5C564D}.eng tbody th{font-weight:500;white-space:nowrap}.eng-last{margin:4px 0 0}.eng-models{display:flex;flex-wrap:wrap;gap:6px 18px;font-size:14px}
+.eng-check{display:flex;flex-wrap:wrap;gap:12px;align-items:center}.eng-btn{min-height:44px;padding:0 20px;border:1px solid #151311;background:#FBF8F1;color:#151311;font:inherit;font-weight:600;border-radius:22px;cursor:pointer}.eng-btn:disabled{opacity:.5;cursor:default}
 .alert{background:#FDECEB;color:#8E1F14;border:2px solid #C0392B;padding:12px 16px;font-weight:600}
 .row2{display:flex;flex-wrap:wrap;gap:16px}.main{flex:999 1 560px;min-width:0;display:flex;flex-direction:column;gap:16px}.side{flex:1 1 320px;min-width:0;display:flex;flex-direction:column;gap:16px}
 .step{display:grid;grid-template-columns:200px minmax(0,1fr) 96px;align-items:center;gap:14px;font-size:15px}.step .bar{height:22px;background:#EFE9DC}.step .bar i{display:block;height:22px;background:#151311}
@@ -115,7 +121,60 @@ function dailyChart(daily: { day: string; visits: number; paid: number }[]): str
   return `<svg class="chart" viewBox="0 0 ${W} ${H}" role="img" aria-label="Visits and gifts per day"><text x="0" y="12" font-size="11" fill="#5C564D">${max}</text><line x1="${pad}" x2="${W}" y1="${H - 20}" y2="${H - 20}" stroke="#E2DBCC"/>${bars}</svg>`
 }
 
-export function renderHome(payload: StatsPayload, p: Period, now: Date, customers: CustomerRow[] = []): string {
+
+// ---------- the engine status card (2026-11-20): is the AI working? ----------
+
+export interface EngineCardData {
+  light: LightState
+  hour: Counts
+  day: Counts
+  last: LastError | null
+  /** What each kind of call last used (seen in the last 24 hours; the configured models fill the rest). */
+  models: Record<string, string>
+}
+
+/** The models the site is set to use (the environment, as the engine reads it). */
+export const configuredModels = (env: NodeJS.ProcessEnv = process.env): Record<string, string> => ({
+  main: ENGINE_CONFIG.MODEL,
+  free: env.ICHIREI_FREE_MODEL ?? env.ICHIREI_REFILL_FREE_MODEL ?? DEFAULT_FREE_MODEL,
+  review: ENGINE_CONFIG.REVIEW_MODEL,
+})
+
+export function engineCardData(lines: EngineLine[], now: Date, configured: Record<string, string> = {}): EngineCardData {
+  return { light: lightOf(lines, now), hour: countsOf(lines, now, 3_600_000), day: countsOf(lines, now, 24 * 3_600_000), last: lastErrorOf(lines), models: modelsOf(lines, configured) }
+}
+
+const LIGHT_LOOK: Record<LightState['light'], { color: string; en: string; zh: string }> = {
+  green: { color: '#2F7D4F', en: 'Working', zh: '正常' },
+  amber: { color: '#B7791F', en: 'Some calls are failing', zh: '部分失敗' },
+  red: { color: '#C0392B', en: 'Not working', zh: '異常' },
+  grey: { color: '#8C867B', en: 'No traffic', zh: '沒有流量' },
+}
+const KIND_LABEL: Record<string, string> = { main: 'Main card 主推', second: 'Second card 第二張', free: 'Free card 趣字', review: 'Review 審查', replace: 'Refill 補位', film_script: 'Film script 影片腳本', pictures: 'Pictures 圖片', pictures_check: 'Picture check 圖片檢查', poem: 'Poem 詩', gaze: 'Who line 一句話', explain: 'Explain 解說', check: 'Check now 立即檢查' }
+
+export function renderEngineCard(d: EngineCardData, now: Date): string {
+  const look = LIGHT_LOOK[d.light.light]
+  const row = (label: string, c: Counts) =>
+    `<tr><th scope="row">${label}</th><td><b>${n(c.cardsOk)}</b> OK 成功 · <b style="color:${c.cardsFailed ? '#C0392B' : 'inherit'}">${n(c.cardsFailed)}</b> failed 失敗</td><td><b>${n(c.picturesOk)}</b> OK 成功 · <b style="color:${c.picturesFailed ? '#C0392B' : 'inherit'}">${n(c.picturesFailed)}</b> failed 失敗</td></tr>`
+  const last = d.last
+    ? (() => {
+        const w = plainWords(d.last.cls)
+        return `<p class="eng-last"><b>${esc(w.en)}</b><br><span>${esc(w.zh)}</span><br><span class="muted">${esc(whenOf(d.last.at))} ET · ${n(d.last.count)}× in 24 h · ${esc(KIND_LABEL[d.last.kind] ?? d.last.kind)} · <code>${esc(d.last.cls)}</code></span></p>`
+      })()
+    : `<p class="muted">No errors in the last 24 hours. 過去 24 小時沒有錯誤。</p>`
+  const models = Object.entries(d.models).filter(([k]) => k !== 'check').map(([k, v]) => `<span class="eng-model">${esc(KIND_LABEL[k] ?? k)}: <b>${esc(v)}</b></span>`).join('')
+  return `<section class="card" id="engine-status" data-light="${d.light.light}" aria-label="Engine status">` +
+    `<div style="display:flex;flex-wrap:wrap;justify-content:space-between;gap:8px;align-items:center"><h2 class="serif">Engine status <span class="muted" style="font-weight:500">引擎狀態</span></h2>` +
+    `<div class="eng-light"><i class="eng-dot" data-testid="engine-light" data-light="${d.light.light}" style="background:${look.color}"></i><span><b data-testid="engine-light-word">${look.en} ${look.zh}</b><br><span class="muted">${esc(d.light.why)} · ${n(d.light.total)} card calls in 30 min</span></span></div></div>` +
+    `<div class="scroll"><table class="eng"><thead><tr><th></th><th>Card rounds 卡片</th><th>Pictures 圖片</th></tr></thead><tbody>${row('Last hour 最近 1 小時', d.hour)}${row('Last 24 h 最近 24 小時', d.day)}</tbody></table></div>` +
+    `<div><div class="eyebrow">Last error 最近一次錯誤</div>${last}</div>` +
+    (models ? `<div><div class="eyebrow">Models in use 使用中的模型</div><div class="eng-models">${models}</div></div>` : '') +
+    `<div class="eng-check"><button type="button" id="engine-check" class="eng-btn">Check now 立即檢查</button><span id="engine-check-result" role="status" aria-live="polite" class="muted">One tiny call to the AI, at most once a minute. 只呼叫一次，每分鐘最多一次。</span></div>` +
+    `<script>(function(){var b=document.getElementById('engine-check'),o=document.getElementById('engine-check-result');if(!b)return;b.addEventListener('click',function(){b.disabled=true;o.textContent='Checking… 檢查中…';fetch('/ops/home/engine-check',{method:'POST',credentials:'same-origin'}).then(function(r){return r.json()}).then(function(j){if(j.limited){o.textContent='Please wait '+j.wait+' s. 請等 '+j.wait+' 秒。'}else if(j.ok){o.textContent='OK 正常 · '+j.model+' · '+(j.ms/1000).toFixed(1)+' s'}else{o.textContent='Failed 失敗: '+j.words.en+' / '+j.words.zh+' ('+j.cls+')'}}).catch(function(){o.textContent='Could not check. 無法檢查。'}).then(function(){b.disabled=false})})})()</script>` +
+    `</section>`
+}
+
+export function renderHome(payload: StatsPayload, p: Period, now: Date, customers: CustomerRow[] = [], engine: EngineCardData | null = null): string {
   const s = payload.stats.periods[p]
   const f = s.funnel
   const orders = payload.orders.filter((o) => inPeriod(o, p, now))
@@ -156,6 +215,7 @@ export function renderHome(payload: StatsPayload, p: Period, now: Date, customer
   return `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="robots" content="noindex,nofollow"><title>ICHIREI · Owner</title>` +
     `<link rel="preconnect" href="https://fonts.googleapis.com"><link href="https://fonts.googleapis.com/css2?family=Zen+Old+Mincho:wght@700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet"><style>${CSS}</style></head><body><div class="wrap">` +
     `<header><div><div class="eyebrow">ICHIREI · Owner</div><h1 class="serif">${PERIOD_LABEL[p]}</h1><div class="sub">Updated ${esc(whenOf(now.toISOString()))} Eastern${payload.promo?.on ? ' · Days of Thanks is on' : ''}${payload.verified ? '' : ' · Shopify could not be checked, payments are unconfirmed'}</div></div><nav class="tabs" aria-label="Period">${tabs}</nav></header>` +
+    (engine ? renderEngineCard(engine, now) : '') +
     (payload.attention.count > 0 ? `<div class="alert">${payload.attention.count} paid gift(s) are not complete. Open <a href="/ops">All orders</a>.</div>` : '') +
     `<section class="kpis" aria-label="Key numbers">` +
     kpi('Visitors', n(s.visits), `${n(s.stories)} wrote a moment · ${n(s.cards)} saw a character`) +
@@ -306,8 +366,18 @@ export function createHomeHandlers(deps: () => OpsDeps) {
       if (g instanceof Response) return g
       const asked = new URL(req.url).searchParams.get('p') ?? 'today'
       const p: Period = (PERIODS as readonly string[]).includes(asked) ? (asked as Period) : 'today'
-      const [payload, customers] = await Promise.all([buildStats(g.d, g.store, g.env, g.now), buildCustomers(g.store, g.now).catch(() => [] as CustomerRow[])])
-      return new Response(renderHome(payload, p, g.now, customers), { status: 200, headers: headers('text/html; charset=utf-8') })
+      const [payload, customers, lines] = await Promise.all([buildStats(g.d, g.store, g.env, g.now), buildCustomers(g.store, g.now).catch(() => [] as CustomerRow[]), readEngineLines(g.store, g.now, 24).catch(() => [] as EngineLine[])])
+      return new Response(renderHome(payload, p, g.now, customers, engineCardData(lines, g.now, configuredModels(g.env))), { status: 200, headers: headers('text/html; charset=utf-8') })
+    },
+    /** "Check now": ONE tiny call to the AI (the review model, about 10 tokens), at most once a minute. The answer is OK or the error class in words; nothing else is returned. */
+    async engineCheck(req: Request): Promise<Response> {
+      const g = await guard(req)
+      if (g instanceof Response) return g
+      if (!sameSitePost(req)) return new Response(JSON.stringify({ error: 'forbidden' }), { status: 403, headers: headers('application/json; charset=utf-8') })
+      const dd = g.d as OpsDeps & { engineClient?: Parameters<typeof checkNow>[0]['client'] }
+      const client = dd.engineClient ?? (new Anthropic({ maxRetries: 0, ...(g.env.ANTHROPIC_API_KEY ? { apiKey: g.env.ANTHROPIC_API_KEY } : {}) }) as unknown as Parameters<typeof checkNow>[0]['client'])
+      const result = await checkNow({ client, model: g.env.ICHIREI_REVIEW_MODEL ?? ENGINE_CONFIG.REVIEW_MODEL, store: g.store, now: g.now })
+      return new Response(JSON.stringify(result), { status: 200, headers: headers('application/json; charset=utf-8') })
     },
     async csv(req: Request): Promise<Response> {
       const g = await guard(req)

@@ -189,10 +189,11 @@ try {
   upstream.state.mode = { kind: 'badjson' }
   const bad = await readNdjson(await post(base, '/api/select', { story: STORY }))
   const badErr = bad.find((l) => l.msg.type === 'error')
-  check('error: non-JSON model output → ndjson error line', Boolean(badErr) && badErr.msg.error.startsWith('Engine failed:'), JSON.stringify(bad.map((l) => l.msg)))
+  check('error: non-JSON model output → ndjson error line', Boolean(badErr) && badErr.msg.code === 'engine_error' && badErr.msg.error === undefined, JSON.stringify(bad.map((l) => l.msg)))
   upstream.state.mode = { kind: 'upstream-400' }
   const up = await readNdjson(await post(base, '/api/select', { story: STORY }))
-  check('error: upstream rejection → ndjson error line with reason', up.some((l) => l.msg.type === 'error' && /simulated upstream rejection/.test(l.msg.error)), JSON.stringify(up.map((l) => l.msg)))
+  check('error: upstream rejection → ndjson error line with a CODE only (never the reason, the status or JSON)', up.some((l) => l.msg.type === 'error' && l.msg.code === 'engine_error') && !JSON.stringify(up.map((l) => l.msg)).match(/simulated upstream rejection|invalid_request_error|Engine failed/), JSON.stringify(up.map((l) => l.msg)))
+  check('error: the full error stays in the server log with the class and the provider\'s request id', server.logs().includes('[ichirei-select] engine_failed') && server.logs().includes('"class":"400 invalid_request_error"') && server.logs().includes('req_test_400_abc') && server.logs().includes('simulated upstream rejection'))
   const noStory = await post(base, '/api/select', { story: '   ' })
   check('error: empty story → 400 JSON (handler validation reused)', noStory.status === 400 && /story/.test((await noStory.json()).error))
   const badJsonBody = await post(base, '/api/select', '{not json')

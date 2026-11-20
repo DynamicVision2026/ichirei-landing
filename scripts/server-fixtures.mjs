@@ -81,7 +81,7 @@ export async function startFakeAnthropic() {
     })
 
     if (m.kind === 'upstream-400') {
-      res.writeHead(400, { 'content-type': 'application/json' })
+      res.writeHead(400, { 'content-type': 'application/json', 'request-id': 'req_test_400_abc' })
       return res.end(
         JSON.stringify({
           type: 'error',

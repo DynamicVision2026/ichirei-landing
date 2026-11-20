@@ -120,7 +120,7 @@ async function viaUrl() {
             const msg = JSON.parse(line)
             if (msg.type === 'stage' && !(msg.stage in at)) at[msg.stage] = Date.now() - t0
             if (msg.type === 'result') result = msg.result
-            if (msg.type === 'error') throw new Error(msg.error)
+            if (msg.type === 'error') throw new Error(msg.error ?? msg.code ?? 'engine_error')
           }
         }
       } catch (e) {

@@ -241,11 +241,11 @@ export default function Reveal({ result, story, followUps = [], condition, copy,
         }),
       })
       const data = await res.json()
-      if (!res.ok) throw new Error(data?.error ?? `HTTP ${res.status}`)
+      if (!res.ok) throw new Error('explain_failed') // (never shown: the page says the calm line)
       setExplanations((m) => ({ ...m, [c.kanji]: data.explanation }))
       track('explain_opened', diagnostics ? 'harness' : 'customer', choiceOf(c, result.primary_kanji))
     } catch (e) {
-      setExplainError(e instanceof Error ? e.message : String(e))
+      setExplainError(copy.busy)
     } finally {
       setExplainLoading(null)
     }

@@ -11,6 +11,7 @@ import { fileURLToPath } from 'node:url'
 import { callSignal } from './limits.ts'
 import type { Candidate, EngineResult, Language } from './contract.ts'
 import { convertLineScript, lineLanguageProblem } from './script.ts'
+import { tracked } from './engine-log.ts'
 
 export const GAZE_TIMEOUT_MS = 12_000
 export const gazeFixEnabled = (env: NodeJS.ProcessEnv = process.env): boolean => !/^(off|0|false|no)$/i.test((env.ICHIREI_GAZE_FIX ?? '').trim())
@@ -292,7 +293,7 @@ export async function fixGazes(cands: Candidate[], story: string, language: Lang
     const items = bad.map((b, i) => `${i + 1}. ${b.kanji}\n   line: ${b.gaze}\n   failed because: ${b.why}`).join('\n')
     const prompt = `${opts.tone ? opts.tone + '\n\n' : ''}${readPrompt().replace(/\{\{ (LANGUAGE|STORY|ITEMS) \}\}/g, (_m, k: string) => ({ LANGUAGE: language, STORY: story, ITEMS: items })[k] ?? '')}`
     const model = process.env.ICHIREI_GAZE_MODEL ?? process.env.ICHIREI_REVIEW_MODEL ?? 'claude-haiku-5-5'
-    const stream = client.messages.stream({ model, max_tokens: 1500, output_config: { effort: 'low' }, messages: [{ role: 'user', content: prompt }] }, { signal })
+    const stream = tracked('gaze', client).messages.stream({ model, max_tokens: 1500, output_config: { effort: 'low' }, messages: [{ role: 'user', content: prompt }] }, { signal })
     const message = await stream.finalMessage()
     opts.onUsage?.(usageOf(model, message.usage))
     const raw = parseJson(message.content.filter((b): b is Anthropic.TextBlock => b.type === 'text').map((b) => b.text).join(''))
@@ -341,7 +342,7 @@ export async function rewriteLines(items: { kanji: string; gaze: string; why: st
     const listed = items.map((b, i) => `${i + 1}. ${b.kanji}\n   line: ${b.gaze}\n   failed because: ${b.why}`).join('\n')
     const prompt = `${opts.tone ? opts.tone + '\n\n' : ''}${readPrompt().replace(/\{\{ (LANGUAGE|STORY|ITEMS) \}\}/g, (_m, k: string) => ({ LANGUAGE: language, STORY: story, ITEMS: listed })[k] ?? '')}`
     const model = opts.model ?? process.env.ICHIREI_GAZE_MODEL ?? process.env.ICHIREI_REVIEW_MODEL ?? 'claude-haiku-5-5'
-    const stream = client.messages.stream({ model, max_tokens: 1500, output_config: { effort: 'low' }, messages: [{ role: 'user', content: prompt }] }, { signal })
+    const stream = tracked('gaze', client).messages.stream({ model, max_tokens: 1500, output_config: { effort: 'low' }, messages: [{ role: 'user', content: prompt }] }, { signal })
     const message = await stream.finalMessage()
     opts.onUsage?.(usageOf(model, message.usage))
     const raw = parseJson(message.content.filter((b): b is Anthropic.TextBlock => b.type === 'text').map((b) => b.text).join(''))

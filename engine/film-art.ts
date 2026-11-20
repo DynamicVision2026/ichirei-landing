@@ -38,6 +38,7 @@ import { OLD_CHECK_SETTING, OLD_REWRITE_SETTING, swapOnce, world, worldLang } fr
 import { plainDescription } from './film-plain.ts'
 import { checkEmpty } from './picture-pixels.ts'
 import { recordHealth } from './health.ts'
+import { recordOutcome, tracked } from './engine-log.ts'
 
 // ---- the style (fixed, the same for every order) ----------------------------------------------------------------------------------------------------
 
@@ -203,7 +204,7 @@ export function vertexImageClient(env: NodeJS.ProcessEnv = process.env, fetchImp
   const getProject = async (signal: AbortSignal) => project ?? (project = (await (await meta('project/project-id', signal)).text()).trim())
   const base = env.ICHIREI_FILM_IMAGE_BASE?.trim() || (location === 'global' ? 'https://aiplatform.googleapis.com' : `https://${location}-aiplatform.googleapis.com`)
 
-  return {
+  const inner: ImageClient = {
     async generate(prompt, signal) {
       let lastNotFound = false
       let sawQuota = false
@@ -244,6 +245,22 @@ export function vertexImageClient(env: NodeJS.ProcessEnv = process.env, fetchImp
         return { bytes: Buffer.from(data, 'base64'), model }
       }
       throw new ImageError(sawQuota ? 'quota' : lastNotFound ? 'model_not_found' : 'network')
+    },
+  }
+  // every picture call's outcome goes to the owner's engine status (a line of codes: never the prompt, which holds the visitor's moment)
+  return {
+    async generate(prompt, signal) {
+      const t0 = Date.now()
+      try {
+        const out = await inner.generate(prompt, signal)
+        recordOutcome({ kind: 'pictures', model: out.model, ok: true, ms: Date.now() - t0 })
+        return out
+      } catch (err) {
+        const kind = err instanceof ImageError ? err.code : ''
+        const cls = kind === 'timeout' ? 'timeout' : kind === 'permission' ? '403 permission' : kind === 'quota' ? '429 quota' : kind === 'network' ? 'connection' : kind === 'http' ? `${/HTTP (\d{3})/.exec(String((err as Error).message))?.[1] ?? '500'} http` : kind || 'other'
+        if (!signal.aborted || kind === 'timeout') recordOutcome({ kind: 'pictures', model: models[working % models.length] ?? '', ok: false, cls, ms: Date.now() - t0 })
+        throw err
+      }
     },
   }
 }
@@ -351,7 +368,7 @@ async function checkCall(client: Messages, jpegs: Buffer[], descriptions: string
   const signal = callSignal(outer, num(env.ICHIREI_FILM_CHECK_TIMEOUT_MS, 60_000))
   let message: Anthropic.Message
   try {
-    message = await client.messages.stream({ model, max_tokens: num(env.ICHIREI_FILM_CHECK_MAX_TOKENS, 4000), output_config: { effort: 'low' }, messages: [{ role: 'user', content }] }, { signal }).finalMessage()
+    message = await tracked('pictures_check', client).messages.stream({ model, max_tokens: num(env.ICHIREI_FILM_CHECK_MAX_TOKENS, 4000), output_config: { effort: 'low' }, messages: [{ role: 'user', content }] }, { signal }).finalMessage()
   } catch (err) {
     throw new CheckFailure(causeOf(err, signal))
   }
@@ -447,7 +464,7 @@ export async function rewritePicture(client: Messages, description: string, reas
   for (let attempt = 1; attempt <= 2; attempt++) {
     const signal = callSignal(outer, num(env.ICHIREI_FILM_CHECK_TIMEOUT_MS, 60_000))
     try {
-      const message = await client.messages.stream({ model, max_tokens: 2000, output_config: { effort: 'low' }, messages: [{ role: 'user', content: buildRewritePrompt(description, reason, memorial, language, feedback, angle) }] }, { signal }).finalMessage()
+      const message = await tracked('pictures_check', client).messages.stream({ model, max_tokens: 2000, output_config: { effort: 'low' }, messages: [{ role: 'user', content: buildRewritePrompt(description, reason, memorial, language, feedback, angle) }] }, { signal }).finalMessage()
       usage.input_tokens += message.usage?.input_tokens ?? 0
       usage.output_tokens += message.usage?.output_tokens ?? 0
       const raw = message.content.filter((b): b is Anthropic.TextBlock => b.type === 'text').map((b) => b.text).join('')

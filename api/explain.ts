@@ -5,6 +5,7 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node'
 import { FOLLOW_UP_MAX, STORY_MAX, countChars, mergeStory, parseContext, parseFollowUps } from '../engine/contract.ts'
 import { runExplain, type ExplainCandidate } from '../engine/explain.ts'
+import { classOf, requestIdOf, visitorCode } from '../engine/engine-log.ts'
 
 // Full Hobby-plan ceiling (also mirrored in vercel.json).
 export const maxDuration = 60
@@ -64,14 +65,16 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   const parsed = parseContext({ language, relationship, direction, occasion, occasion_detail, inscription_script, purpose, purpose_other, state, state_other, relationship_other })
   if (!parsed.ok) return res.status(400).json({ error: parsed.error })
   if (!process.env.ANTHROPIC_API_KEY) {
-    return res.status(500).json({ error: 'ANTHROPIC_API_KEY is not set on the server.' })
+    console.error('[ichirei-explain] ANTHROPIC_API_KEY is not set on the server')
+    return res.status(500).json({ code: 'engine_error' })
   }
 
   try {
     const explanation = await runExplain(mergeStory(story, fu.followUps), candidate as ExplainCandidate, { context: parsed.context })
     return res.status(200).json({ explanation })
   } catch (err) {
-    const message = err instanceof Error ? err.message : String(err)
-    return res.status(502).json({ error: `Explain failed: ${message}` })
+    // the full error stays in the log (with the class and the request id); the page gets a code only and shows its own calm words
+    console.error(`[ichirei-explain] failed ${JSON.stringify({ class: classOf(err), request_id: requestIdOf(err) ?? null })} ${err instanceof Error ? err.message : String(err)}`)
+    return res.status(502).json({ code: visitorCode(err) })
   }
 }

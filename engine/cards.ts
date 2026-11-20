@@ -31,6 +31,7 @@ import { thinkingTokensOf, watchThinkingTokens } from './usage.ts'
 import { cleanReading } from '../src/order/reading.ts'
 import { purposeFrame, toneLine } from './purpose.ts'
 import { cleanInscriptionForm } from '../src/order/inscription.ts'
+import { tracked } from './engine-log.ts'
 
 export type CardSlot = 'main' | 'second' | 'freestyle'
 
@@ -507,7 +508,7 @@ export async function runCards(a: CardsArgs): Promise<CardsOut> {
         let message: Anthropic.Message
         let seen: () => number | null
         try {
-          const stream = client.messages.stream({ model, max_tokens: tokens, output_config: { effort: effort as 'low' }, messages: [{ role: 'user', content }], ...(extra.noThinking ? { thinking: thinkingOff(model) } : extra.adaptive ? { thinking: { type: 'adaptive' as const } } : {}) }, { signal: callSig })
+          const stream = tracked(slot === 'freestyle' ? 'free' : slot, client).messages.stream({ model, max_tokens: tokens, output_config: { effort: effort as 'low' }, messages: [{ role: 'user', content }], ...(extra.noThinking ? { thinking: thinkingOff(model) } : extra.adaptive ? { thinking: { type: 'adaptive' as const } } : {}) }, { signal: callSig })
           seen = watchThinkingTokens(stream)
           if (slot === 'main') {
             let first = true

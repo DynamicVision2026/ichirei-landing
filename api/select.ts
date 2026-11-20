@@ -11,7 +11,7 @@
 //   {"type":"delta","chars":<cumulative model output chars>}   ...repeated
 //   {"type":"card","result":<engine JSON contract, the cards so far>}  ...as each card passes its checks (main; then main+second; then all three), parallel cards only
 //   {"type":"result","result":<engine JSON contract>[,"debug":{…}]}  ...terminal (`debug`: only with ?debug=1 — this request's timings, codes and numbers, no story text)
-//   {"type":"error","error":"<message>","code"?:"model_timeout","seconds"?:<n>}  ...terminal
+//   {"type":"error","code":"engine_busy|model_timeout|engine_error","seconds"?:<n>}  ...terminal (a code only: the page shows its own calm words; the full error is in the log)
 
 import { maxRoundsOf } from '../engine/limits.ts'
 import { claimRound } from '../engine/rounds.ts'
@@ -23,6 +23,7 @@ import { recordFreeSource, recordMain } from '../engine/free-source.ts'
 import { createOrderStore } from '../engine/order-store.ts'
 import { newMoment, siteRound } from '../engine/day-limits.ts'
 import { recordHealth } from '../engine/health.ts'
+import { classOf, requestIdOf, visitorCode } from '../engine/engine-log.ts'
 import { clientIp } from '../engine/rate-limit.ts'
 import { visitorOf } from '../engine/visitor.ts'
 import { recordCustomerEvent } from '../engine/customer.ts'
@@ -103,10 +104,8 @@ export async function POST(req: Request): Promise<Response> {
   if (!ex.ok) return jsonResponse(400, { error: ex.code === 'retry_limit' ? (NO_MORE_ROUNDS[parsed.context.language] ?? NO_MORE_ROUNDS.en) : ex.error, code: ex.code })
 
   if (!process.env.ANTHROPIC_API_KEY) {
-    return jsonResponse(500, {
-      error:
-        'ANTHROPIC_API_KEY is not set on the server. Add it as a Vercel environment variable.',
-    })
+    console.error('[ichirei-select] ANTHROPIC_API_KEY is not set on the server')
+    return jsonResponse(500, { code: 'engine_error' })
   }
 
   // The free tries (2026-11-15): a NEW moment (round 1) is counted per browser (the signed ic_v cookie) with the connection as the backstop; every card round counts for the whole site.
@@ -184,8 +183,10 @@ export async function POST(req: Request): Promise<Response> {
         send({ type: 'result', result, round_ticket: claim.ticket, ...(wantsDebug && debug ? { debug } : {}) })
       } catch (err) {
         void claim.release() // the engine broke: this round is given back
-        const message = err instanceof Error ? err.message : String(err)
-        send({ type: 'error', error: `Engine failed: ${message}`, ...(err instanceof ModelTimeoutError ? { code: 'model_timeout', seconds: Math.round(callTimeoutMs() / 1000) } : {}) })
+        // The full error stays in the server log, with the class and the provider's request id. The page gets only a code (2026-11-20): it shows its own calm text, never a message, a status or JSON.
+        const code = visitorCode(err)
+        console.error(`[ichirei-select] engine_failed ${JSON.stringify({ code, class: classOf(err), request_id: requestIdOf(err) ?? null })} ${err instanceof Error ? err.message : String(err)}`)
+        send({ type: 'error', code, ...(err instanceof ModelTimeoutError ? { seconds: Math.round(callTimeoutMs() / 1000) } : {}) })
       } finally {
         void cost.flush(createOrderStore(), new Date(), cleanSession(session) ?? undefined)
         controller.close()

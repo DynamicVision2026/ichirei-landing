@@ -47,6 +47,7 @@ import {
   type PromptFamily,
   type Language,
 } from './contract.ts'
+import { tracked } from './engine-log.ts'
 
 // --- Configurable in ONE place (build spec §3) ---
 const MODEL = process.env.ICHIREI_MODEL ?? 'claude-sonnet-5-5'
@@ -551,7 +552,7 @@ async function selectWithRetry(a: PipelineArgs, signal: AbortSignal | undefined,
   const content = selectionContent(prompt, view)
   const callSelection = async (limitMs: number, maxTokens: number): Promise<Anthropic.Message> => {
     const callSig = callSignal(signal, limitMs)
-    const stream = client.messages.stream(
+    const stream = tracked('main', client).messages.stream(
       {
         model: MODEL,
         max_tokens: maxTokens,

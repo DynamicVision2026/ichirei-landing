@@ -67,6 +67,18 @@ class ModelTimeoutStreamError extends Error {
 /** The engine stream ended without a terminal line (shown with the sender's UI language). */
 class StreamCutError extends Error {}
 
+/** The server's terminal error line: a CODE only (engine_busy / engine_error). The page shows its own calm words, never anything the server wrote. */
+class EngineStreamError extends Error {
+  code: string
+  constructor(code: string) {
+    super(code)
+    this.code = code
+  }
+}
+
+/** A message that is the page's own copy (a limit, "too long"): the only kind of message that is shown as written. Anything else shows the calm line. */
+class ShownError extends Error {}
+
 /** Consume the /api/select NDJSON stream; resolves on the terminal line. */
 async function consumeEngineStream(
   body: ReadableStream<Uint8Array>,
@@ -86,7 +98,7 @@ async function consumeEngineStream(
       | { type: 'card'; result: EngineResult } // a card has passed its checks: the result as it stands (main; main + second; all three)
       | { type: 'ping' } // server heartbeat during silent reasoning — ignore
       | { type: 'result'; result: EngineResult; round_ticket?: string }
-      | { type: 'error'; error: string; code?: string; seconds?: number }
+      | { type: 'error'; code?: string; seconds?: number }
     if (msg.type === 'ping') return null
     if (msg.type === 'delta') return null
     if (msg.type === 'stage') {
@@ -98,7 +110,7 @@ async function consumeEngineStream(
       return null
     }
     if (msg.type === 'result' && msg.round_ticket) onTicket?.(msg.round_ticket) // the server's signed ticket for the rounds of this moment
-    if (msg.type === 'error') throw msg.code === 'model_timeout' ? new ModelTimeoutStreamError(msg.error, msg.seconds ?? 150) : new Error(msg.error)
+    if (msg.type === 'error') throw msg.code === 'model_timeout' ? new ModelTimeoutStreamError('model_timeout', msg.seconds ?? 150) : new EngineStreamError(msg.code ?? 'engine_error')
     return msg.result
   }
   // Remember the terminal result but keep reading until the server closes the
@@ -472,11 +484,12 @@ export default function DemoApp({ mode = 'harness', aside }: { mode?: Mode; asid
         try {
           const body = (await res.json()) as { error?: string; code?: string }
           setErrorCode(body?.code ?? null)
-          message = body?.code === 'story_too_long' || body?.code === 'follow_up_too_long' ? copy.storyTooLong : body?.code === 'rate_limited' ? copy.rateLimited : (body?.error ?? null)
+          // the server's own words are shown only for the limits (it writes those in the page's language); every other answer shows the calm line, never a message or a status
+          message = body?.code === 'story_too_long' || body?.code === 'follow_up_too_long' ? copy.storyTooLong : body?.code === 'rate_limited' ? copy.rateLimited : (body?.code === 'limit_person' || body?.code === 'limit_site' || body?.code === 'retry_limit') && typeof body?.error === 'string' ? body.error : null
         } catch {
           message = null
         }
-        throw new Error(message ?? copy.serverError(res.status))
+        throw new ShownError(message ?? copy.serverError(res.status))
       }
       // Cards appear as they pass their checks (main first, then second, then the free pick): the page opens the reveal with the cards so far. The terminal result
       // still replaces it with the whole set, and a sender who has already moved on (chosen a card, opened the order form) is not pulled back.
@@ -554,9 +567,9 @@ export default function DemoApp({ mode = 'harness', aside }: { mode?: Mode; asid
         ? copy.timeout(Math.round(ENGINE_TIMEOUT_MS / 1000))
         : e instanceof StreamCutError
           ? copy.streamCut
-          : e instanceof Error
+          : e instanceof ShownError
             ? e.message
-            : String(e)
+            : copy.busy // a network failure, a server code, anything else: the calm line
       setError(message)
       setPhase(again ? 'reveal' : 'elicit')
     } finally {

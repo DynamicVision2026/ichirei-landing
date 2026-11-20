@@ -20,6 +20,7 @@ import { reviewEnabled } from './review.ts'
 import { kanjiNote, wrongKanji } from './homophone.ts'
 import { blockedCharacters, checkCharacterOnce, checkContainsCharacter, checkCraft, checkForcedLabel, checkForm, checkPalette, meaningWords, type PoemDraft } from './poem-check.ts'
 import { poemLinesForLanguage } from './script.ts'
+import { tracked } from './engine-log.ts'
 
 export const POEM_TIMEOUT_MS = 45_000
 export const poemTimeoutMs = (env: NodeJS.ProcessEnv = process.env): number => {
@@ -224,7 +225,7 @@ export async function generatePoem(input: PoemInput, palette: Palette, opts: Gen
   }
   const template = loadPoemPrompt(input.type)
   const callText = async (stage: 'poem' | 'review', mdl: string, prompt: string, maxTokens: number, eff: 'low' | 'medium' | 'high'): Promise<string> => {
-    const stream = client.messages.stream({ model: mdl, max_tokens: maxTokens, output_config: { effort: eff }, messages: [{ role: 'user', content: prompt }] }, { signal })
+    const stream = tracked('poem', client).messages.stream({ model: mdl, max_tokens: maxTokens, output_config: { effort: eff }, messages: [{ role: 'user', content: prompt }] }, { signal })
     const message = await stream.finalMessage()
     opts.onUsage?.(stage, usageOf(mdl, message.usage))
     if (message.stop_reason === 'refusal') throw new Error('Model refused the request')

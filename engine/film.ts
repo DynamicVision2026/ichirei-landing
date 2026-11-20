@@ -22,6 +22,7 @@ import { kanaFixWords, loadTokenizer } from './kana.ts'
 import { EN_FORBIDDEN } from './poem-check.ts'
 import { captionLanguageProblem, convertCaptionScript, fullWidthPunctuation } from './script.ts'
 import { inventedInPicture, isShortStory, lineBorrowsFromStory } from './film-truth.ts'
+import { tracked } from './engine-log.ts'
 
 export const FILM_TIMEOUT_MS = 30_000
 
@@ -387,7 +388,7 @@ export async function reviewArc(a: { client: Pick<Anthropic, 'messages'>; signal
   try {
     const scenes = a.lines.map((l, i) => `Scene ${i + 1}: ${l.replace(/\n/g, ' ')}\n  picture: ${a.pictures[i]}`).join('\n')
     const prompt = fill(loadArcPrompt(), { STORY: a.story, TURNING_POINT: a.turning_point, SCENES: scenes })
-    const stream = a.client.messages.stream({ model: process.env.ICHIREI_FILM_ARC_MODEL ?? DEFAULT_REVIEW_MODEL, max_tokens: 1000, output_config: { effort: 'low' }, messages: [{ role: 'user', content: prompt }] }, { signal })
+    const stream = tracked('film_script', a.client).messages.stream({ model: process.env.ICHIREI_FILM_ARC_MODEL ?? DEFAULT_REVIEW_MODEL, max_tokens: 1000, output_config: { effort: 'low' }, messages: [{ role: 'user', content: prompt }] }, { signal })
     const message = await stream.finalMessage()
     const text = message.content.filter((b): b is Anthropic.TextBlock => b.type === 'text').map((b) => b.text).join('')
     return parseArcVerdict(parseJson(text))
@@ -499,7 +500,7 @@ export async function makeFilm(input: FilmInput, opts: FilmOptions = {}): Promis
       })
       const wl = worldLang(input.language)
       const prompt = wl ? `${built}\n\n${world(wl, 'script scenes')}` : built
-      const stream = client.messages.stream({ model, max_tokens: 1200, output_config: { effort: 'low' }, messages: [{ role: 'user', content: prompt }] }, { signal })
+      const stream = tracked('film_script', client).messages.stream({ model, max_tokens: 1200, output_config: { effort: 'low' }, messages: [{ role: 'user', content: prompt }] }, { signal })
       const message = await stream.finalMessage()
       const raw = parseJson(message.content.filter((b): b is Anthropic.TextBlock => b.type === 'text').map((b) => b.text).join(''))
       if (!raw || typeof raw.line !== 'string' || typeof raw.picture !== 'string') return null
@@ -598,7 +599,7 @@ export async function makeFilm(input: FilmInput, opts: FilmOptions = {}): Promis
   for (let attempt = 1; attempt <= maxAttempts; attempt++) {
     const signal = callSignal(opts.signal, timeoutMs)
     try {
-      const stream = client.messages.stream({ model, max_tokens: Number(process.env.ICHIREI_FILM_MAX_TOKENS ?? 4000), output_config: { effort: 'low' }, messages: [{ role: 'user', content: buildFilmPrompt(input, feedback) }] }, { signal })
+      const stream = tracked('film_script', client).messages.stream({ model, max_tokens: Number(process.env.ICHIREI_FILM_MAX_TOKENS ?? 4000), output_config: { effort: 'low' }, messages: [{ role: 'user', content: buildFilmPrompt(input, feedback) }] }, { signal })
       const message = await stream.finalMessage()
       if (message.stop_reason === 'refusal') throw new Error('refusal')
       const text = message.content.filter((b): b is Anthropic.TextBlock => b.type === 'text').map((b) => b.text).join('')

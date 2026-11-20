@@ -17,6 +17,7 @@ import {
   type EngineContext,
   type Language,
 } from './contract.ts'
+import { tracked } from './engine-log.ts'
 
 const MODEL = process.env.ICHIREI_MODEL ?? 'claude-sonnet-5-5'
 const MAX_TOKENS = Number(process.env.ICHIREI_EXPLAIN_MAX_TOKENS ?? 6000)
@@ -145,7 +146,7 @@ export async function runExplain(
   const prompt = fillExplainPrompt(loadExplainPrompt(context.language), story, candidate, context)
 
   const client = new Anthropic()
-  const stream = client.messages.stream({
+  const stream = tracked('explain', client).messages.stream({
     model: MODEL,
     max_tokens: MAX_TOKENS,
     output_config: { effort: 'medium' },

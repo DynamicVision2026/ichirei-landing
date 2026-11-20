@@ -336,8 +336,9 @@ const browser = await chromium.launch({
   await pickContext(page)
   await page.click('text=その一字を、探しにいく')
   check('timeout: spinner shows first', await page.locator('text=言葉を読んでいます').isVisible())
-  await page.waitForSelector('text=時間切れになりました', { timeout: 8000 })
-  check('timeout: visible error after deadline', true)
+  // (2026-11-20) a timeout shows the same calm line as every other trouble: no seconds, no "server-side"
+  await page.waitForSelector('text=ただいま混み合っています。少し待ってから、もう一度お試しください。書いたひと場面はそのまま残っています。', { timeout: 8000 })
+  check('timeout: visible error after deadline (the calm line)', true)
   check('timeout: spinner gone', (await page.locator('text=言葉を読んでいます').count()) === 0)
   check('timeout: back on elicitation (retry possible)', await page.locator('text=小さなことを、ひとつだけ').isVisible())
   check('no page errors (run 4)', errors.length === 0)
@@ -356,15 +357,17 @@ const browser = await chromium.launch({
       status: 200,
       contentType: 'application/x-ndjson; charset=utf-8',
       body: JSON.stringify({ type: 'delta', chars: 210 }) + '\n' +
-        JSON.stringify({ type: 'error', error: 'Engine failed: model output was not valid JSON' }) + '\n',
+        JSON.stringify({ type: 'error', code: 'engine_error' }) + '\n',
     }),
   )
   await page.goto('http://localhost:5173/demo', { waitUntil: 'networkidle' })
   await page.locator('textarea').first().fill(STORY)
   await pickContext(page)
   await page.click('text=その一字を、探しにいく')
-  await page.waitForSelector('text=model output was not valid JSON', { timeout: 6000 })
-  check('ndjson error line: surfaced to UI', true)
+  const CALM_JA = 'ただいま混み合っています。少し待ってから、もう一度お試しください。書いたひと場面はそのまま残っています。'
+  await page.waitForSelector(`text=${CALM_JA}`, { timeout: 6000 })
+  const errText = await page.locator('body').innerText()
+  check('ndjson error line (a code only): the page shows the calm line, never a technical message, a status or JSON', errText.includes(CALM_JA) && !/Engine failed|invalid_request_error|HTTP \d{3}|engine_error|[{}]/.test(errText), errText.slice(0, 400))
   check('ndjson error line: spinner gone', (await page.locator('text=言葉を読んでいます').count()) === 0)
   check('no page errors (run 5)', errors.length === 0)
   if (errors.length) console.log('page errors:', errors)

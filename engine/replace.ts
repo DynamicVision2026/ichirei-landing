@@ -22,6 +22,7 @@ import { ensureLineLanguage } from './script.ts'
 import { callSignal, replaceTimeoutMs } from './limits.ts'
 import type { Candidate, EngineContext, EngineResult, RefereeAction } from './contract.ts'
 import { cleanInscriptionForm } from '../src/order/inscription.ts'
+import { tracked } from './engine-log.ts'
 
 export const REPLACE_SLOTS = { surviving: '{{ SURVIVING }}', avoid: '{{ AVOID }}', slots: '{{ SLOTS }}' } as const
 export type RefillSlot = 'main' | 'second' | 'freestyle'
@@ -321,7 +322,7 @@ export async function completeMains(
     const hedgeMs = freeOnly ? 0 : Number(process.env.ICHIREI_REPLACE_HEDGE_MS ?? Math.round(limitMs / 2))
     const ctl1 = new AbortController()
     const ctl2 = new AbortController()
-    const stream = client.messages.stream(params, { signal: AbortSignal.any([callSignal(opts.signal, limitMs), ctl1.signal]) })
+    const stream = tracked('replace', client).messages.stream(params, { signal: AbortSignal.any([callSignal(opts.signal, limitMs), ctl1.signal]) })
     const thinking = watchThinkingTokens(stream)
     const first = stream.finalMessage()
     let message: Awaited<typeof first>
@@ -330,7 +331,7 @@ export async function completeMains(
         const timer = setTimeout(() => {
           if (opts.signal?.aborted) return reject(new Error('aborted'))
           callInfo.hedged = true
-          client.messages.stream({ ...params, thinking: thinkingOff(params.model) }, { signal: AbortSignal.any([callSignal(opts.signal, limitMs - hedgeMs), ctl2.signal]) }).finalMessage().then(resolve, reject)
+          tracked('replace', client).messages.stream({ ...params, thinking: thinkingOff(params.model) }, { signal: AbortSignal.any([callSignal(opts.signal, limitMs - hedgeMs), ctl2.signal]) }).finalMessage().then(resolve, reject)
         }, hedgeMs)
         first.then(() => clearTimeout(timer), () => undefined)
         ctl1.signal.addEventListener('abort', () => clearTimeout(timer))

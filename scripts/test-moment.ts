@@ -64,7 +64,8 @@ else {
   const GUARD = ['engine/slots.ts', 'engine/review.ts']
   // The one change since (gift ceremony 2026-11-15, A4): the English prompt also asks for `line_you_en`, the receiver's line, in the same answer. Every other guarded line is as it was.
   const guardDiff = execFileSync('git', ['diff', '-U0', 'b2af257', '--', ...GUARD]).toString().split('\n').filter((l) => /^[-+]/.test(l) && !/^(\+\+\+|---)/.test(l))
-  const allowed = (l: string) => /line_you_en/.test(l) || l === '-* The freestyle candidate has neither field.' || l === '+* The freestyle candidate has none of these fields.'
+  // (2026-11-20, the engine status ticket: every model call writes one outcome line — the stream is wrapped by tracked(), nothing about the choice changes.)
+  const allowed = (l: string) => /line_you_en/.test(l) || /\btracked\b|engine-log\.ts|client\.messages\.stream\(/.test(l) || l === '-* The freestyle candidate has neither field.' || l === '+* The freestyle candidate has none of these fields.'
   const sinceMoment = guardDiff.filter((l) => !allowed(l)).join('\n')
   check('the engine\'s choice of characters (selection, cards, slots, prompts, palette, lexicon, review) is untouched since the moment release — so the request an existing story fixture produces is the same (the English prompt only adds the receiver\'s line, line_you_en)', sinceMoment === '', sinceMoment)
   // (2026-11-15, the customer-loop ticket, item 4: the owner's English word for 修 is "mend", and the first-listed meaning of three more characters whose gift sense is not their first one is reordered — nothing else in the palette or the lexicon moves)

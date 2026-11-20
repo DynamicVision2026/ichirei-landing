@@ -180,6 +180,8 @@ export interface Copy {
   exportLog: string
   rawContract: string
   // errors
+  /** The calm line for every engine or server trouble (2026-11-20): never a status, a message or JSON. */
+  busy: string
   serverError: (status: number) => string
   streamCut: string
   /** HTTP 429 from /api/select: too many runs from this connection. */
@@ -364,11 +366,11 @@ const ja: Copy = {
   tryAgain: 'もう一度試す',
   exportLog: 'ログ書き出し',
   rawContract: 'raw contract（診断用）',
-  serverError: (s) => `サーバーエラー（HTTP ${s}）`,
-  streamCut: 'エンジンの応答が途中で切れました（サーバー側タイムアウトの可能性）',
+  busy: 'ただいま混み合っています。少し待ってから、もう一度お試しください。書いたひと場面はそのまま残っています。',
+  serverError: () => 'ただいま混み合っています。少し待ってから、もう一度お試しください。書いたひと場面はそのまま残っています。',
+  streamCut: 'ただいま混み合っています。少し待ってから、もう一度お試しください。書いたひと場面はそのまま残っています。',
   rateLimited: 'この接続からのご利用が短い間に重なりました。しばらくおいて、もう一度お試しください。',
-  timeout: (s) =>
-    `結果が届く前に時間切れになりました（${s}秒）。もう一度お試しください。続く場合はサーバー側の制限の可能性があります。`,
+  timeout: () => 'ただいま混み合っています。少し待ってから、もう一度お試しください。書いたひと場面はそのまま残っています。',
   revealIntro: 'あなたの言葉から、一字ずつ浮かびあがります。気になった字に触れてください。',
   revealIntroCustomer: 'あなたの思い出のひと場面から浮かんだ字です。贈りたい一字を選んでください。',
   revealIntroMemorial: 'あなたの思い出のひと場面から浮かんだ字です。その人を偲ぶ一字を選んでください。',
@@ -520,10 +522,11 @@ const zhHans: Copy = {
   tryAgain: '再试一次',
   exportLog: '导出日志',
   rawContract: 'raw contract（诊断用）',
-  serverError: (s) => `服务器错误（HTTP ${s}）`,
-  streamCut: '引擎的回应中途中断（可能是服务器端超时）',
+  busy: '目前有点忙碌，请稍候再试一次。你写下的片刻都还在。',
+  serverError: () => '目前有点忙碌，请稍候再试一次。你写下的片刻都还在。',
+  streamCut: '目前有点忙碌，请稍候再试一次。你写下的片刻都还在。',
   rateLimited: '此连接在短时间内的请求过多。请稍候片刻再试。',
-  timeout: (s) => `结果送达前已超时（${s} 秒）。请再试一次；若持续出现，可能是服务器端的限制。`,
+  timeout: () => '目前有点忙碌，请稍候再试一次。你写下的片刻都还在。',
   revealIntro: '从你的文字里，一个字一个字浮现出来。请触碰让你在意的字。',
   revealIntroCustomer: '这些字来自你写下的片刻。选出你想送的那一个。',
   revealIntroMemorial: '这些字来自你写下的片刻。选出你想用来追思的那一个。',
@@ -681,10 +684,11 @@ const zhHant: Copy = {
   tryAgain: '再試一次',
   exportLog: '匯出日誌',
   rawContract: 'raw contract（診斷用）',
-  serverError: (s) => `伺服器錯誤（HTTP ${s}）`,
-  streamCut: '引擎的回應中途中斷（可能是伺服器端逾時）',
+  busy: '目前有點忙碌，請稍候再試一次。你寫下的片刻都還在。',
+  serverError: () => '目前有點忙碌，請稍候再試一次。你寫下的片刻都還在。',
+  streamCut: '目前有點忙碌，請稍候再試一次。你寫下的片刻都還在。',
   rateLimited: '此連線在短時間內的請求過多。請稍候片刻再試。',
-  timeout: (s) => `結果送達前已逾時（${s} 秒）。請再試一次；若持續出現，可能是伺服器端的限制。`,
+  timeout: () => '目前有點忙碌，請稍候再試一次。你寫下的片刻都還在。',
   revealIntro: '從你的文字裡，一個字一個字浮現出來。請觸碰讓你在意的字。',
   revealIntroCustomer: '這些字來自你寫下的片刻。選出你想送的那一個。',
   revealIntroMemorial: '這些字來自你寫下的片刻。選出你想用來追思的那一個。',
@@ -844,11 +848,11 @@ const en: Copy = {
   tryAgain: 'Try again',
   exportLog: 'Export log',
   rawContract: 'raw contract (diagnostics)',
-  serverError: (s) => `Server error (HTTP ${s})`,
-  streamCut: 'The engine’s reply was cut off (possibly a server-side timeout).',
+  busy: "We're a little busy right now. Please try again in a moment. Your moment is still here.",
+  serverError: () => "We're a little busy right now. Please try again in a moment. Your moment is still here.",
+  streamCut: "We're a little busy right now. Please try again in a moment. Your moment is still here.",
   rateLimited: 'Too many requests from this connection in a short time. Please wait a little and try again.',
-  timeout: (s) =>
-    `The result did not arrive in time (${s} seconds). Please try again; if it keeps happening it may be a server-side limit.`,
+  timeout: () => "We're a little busy right now. Please try again in a moment. Your moment is still here.",
   revealIntro: 'One character at a time, they rise out of your words. Touch the one that draws you.',
   revealIntroCustomer: 'These characters came from your moment. Choose the one you want to give.',
   revealIntroMemorial: 'These characters came from your moment. Choose the one to remember them by.',

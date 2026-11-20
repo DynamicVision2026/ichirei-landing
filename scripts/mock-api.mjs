@@ -35,7 +35,7 @@ const server = createServer(async (req, res) => {
       'cache-control': 'no-store',
     })
     if (mode === 'error') {
-      res.write(JSON.stringify({ type: 'error', error: 'Engine failed: simulated model parse failure' }) + '\n')
+      res.write(JSON.stringify({ type: 'error', code: 'engine_error' }) + '\n')
       return res.end()
     }
     let reqBody = {}
