@@ -140,4 +140,47 @@ export async function takeHeld(store: OrderStore, receiverEmail: string): Promis
   return h.replies
 }
 
+// ---- the ticket's one card round, enforced on the server (Part 14 follow-up, 2026-11-20) ------------------------------------------------------------------------------------------------------
+
+/** The calm busy line a refused card call gets, in the page's language — the same words the page shows whenever the service is busy (never a reason, never a status). */
+export const REPLY_BUSY: Record<string, string> = {
+  ja: 'ただいま混み合っています。少し待ってから、もう一度お試しください。書いたひと場面はそのまま残っています。',
+  en: "We're a little busy right now. Please try again in a moment. Your moment is still here.",
+  'zh-Hant': '目前有點忙碌，請稍候再試一次。你寫下的片刻都還在。',
+  'zh-Hans': '目前有点忙碌，请稍候再试一次。你写下的片刻都还在。',
+}
+
+/** A card call that names a reply ticket (any `reply_ticket` or `reply` field, whatever its value) is a call that CLAIMS to be a reply. */
+export const claimsReply = (body: unknown): boolean => {
+  const b = body as { reply_ticket?: unknown; reply?: unknown } | null
+  return !!b && typeof b === 'object' && (b.reply_ticket !== undefined || b.reply !== undefined)
+}
+
+const roundPath = (ticketId: string): string => `reply/round/${ticketId}.json`
+export type ReplyRound = { ok: true; release: () => Promise<void> } | { ok: false }
+
+/**
+ * One reply ticket allows exactly ONE card round. The call is good only with a ticket that exists, is still open (not used by an order), belongs to a gift that may still be answered (opened, not a remembrance
+ * or a quiet purpose, not answered yet, the switch on) — and the round is taken by a lock (`ifAbsent`) so a second round, a refill, a retry or a second tab for the same ticket is refused. `release` gives the
+ * round back when the call produced no cards (the engine failed, or it only asked a follow-up question): the visitor is never left with a dead ticket for a call that gave them nothing.
+ */
+export async function claimReplyRound(store: OrderStore | null, raw: unknown, env: NodeJS.ProcessEnv = process.env, now: Date = new Date()): Promise<ReplyRound> {
+  if (!store || typeof raw !== 'string' || !REPLY_TICKET_PATTERN.test(raw)) return { ok: false }
+  if (!replyEnabled(env)) return { ok: false }
+  try {
+    const ticket = await readTicket(store, raw)
+    if (!ticket || ticket.status !== 'open') return { ok: false }
+    const gift = await store.get(ticket.gift_token)
+    if (!isGiftRecord(gift)) return { ok: false }
+    const order = gift.order_ref ? await store.get(gift.order_ref).catch(() => null) : null
+    const state = backStateOf(gift, order && typeof order === 'object' ? (order as OrderRecord) : null, env)
+    if (!state || state.state !== 'available') return { ok: false }
+    const took = await store.putObject(roundPath(ticket.id), JSON.stringify({ at: now.toISOString() }), 'application/json', { ifAbsent: true })
+    if (!took) return { ok: false }
+    return { ok: true, release: async () => { await store.deleteObject?.(roundPath(ticket.id)).catch(() => {}) } }
+  } catch {
+    return { ok: false }
+  }
+}
+
 export { isGiftRecord }

@@ -514,20 +514,22 @@ export default function DemoApp({ mode = 'harness', aside }: { mode?: Mode; asid
       const res = await fetch('/api/select', {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ story: fullStory, ...(answers.length ? { follow_ups: answers } : {}), ...(customer && questionId ? { prompt_question: { id: questionId, text: questionTextOf(questionId, toRevealLang(ctx.language)) ?? '' } } : {}), session: sessionId, source: customer ? 'customer' : 'harness', condition, ...contextToPayload(ctx), ...(again ? { exclude: again.exclude, retry: again.retry, ...(roundTicket.current ? { round_ticket: roundTicket.current } : {}) } : {}) }),
+        body: JSON.stringify({ story: fullStory, ...(answers.length ? { follow_ups: answers } : {}), ...(customer && questionId ? { prompt_question: { id: questionId, text: questionTextOf(questionId, toRevealLang(ctx.language)) ?? '' } } : {}), session: sessionId, source: customer ? 'customer' : 'harness', condition, ...contextToPayload(ctx), ...(reply ? { reply_ticket: reply.ticket } : {}), ...(again ? { exclude: again.exclude, retry: again.retry, ...(roundTicket.current ? { round_ticket: roundTicket.current } : {}) } : {}) }),
         signal: controller.signal,
       })
       if (!res.ok) {
         let message: string | null = null
+        let busyCode = false
         try {
           const body = (await res.json()) as { error?: string; code?: string }
           setErrorCode(body?.code ?? null)
+          busyCode = body?.code === 'engine_busy' // (a refused gift-back round, or a busy service: the calm line)
           // the server's own words are shown only for the limits (it writes those in the page's language); every other answer shows the calm line, never a message or a status
           message = body?.code === 'story_too_long' || body?.code === 'follow_up_too_long' ? copy.storyTooLong : body?.code === 'rate_limited' ? copy.rateLimited : (body?.code === 'limit_person' || body?.code === 'limit_site' || body?.code === 'retry_limit') && typeof body?.error === 'string' ? body.error : null
         } catch {
           message = null
         }
-        throw new ShownError(message ?? copy.serverError(res.status))
+        throw new ShownError(busyCode ? copy.busy : (message ?? copy.serverError(res.status)))
       }
       // Cards appear as they pass their checks (main first, then second, then the free pick): the page opens the reveal with the cards so far. The terminal result
       // still replaces it with the whole set, and a sender who has already moved on (chosen a card, opened the order form) is not pulled back.

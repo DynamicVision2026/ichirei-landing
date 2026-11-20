@@ -29,6 +29,7 @@ import { clientIp } from '../engine/rate-limit.ts'
 import { visitorOf } from '../engine/visitor.ts'
 import { recordCustomerEvent } from '../engine/customer.ts'
 import { parsePromptQuestion } from '../engine/story-questions.ts'
+import { REPLY_BUSY, claimReplyRound, claimsReply } from '../engine/reply.ts'
 import { FOLLOW_UP_MAX, LIMIT_PERSON, LIMIT_SITE, NO_MORE_ROUNDS, STORY_MAX, parseExclude, countChars, mergeStory, parseContext, parseFollowUps, type Condition } from '../engine/contract.ts'
 
 // Full Hobby-plan ceiling (also mirrored in vercel.json).
@@ -115,6 +116,19 @@ export async function POST(req: Request): Promise<Response> {
     return jsonResponse(500, { code: 'engine_error' })
   }
 
+  // A card call that CLAIMS to be a gift back (Part 14 follow-up, 2026-11-20) must hold a valid, unused reply ticket, and a ticket allows exactly ONE card round: a second round, a refill, a retry, a second
+  // tab, a made-up, used or switched-off ticket — all refused here with the calm busy line, before any model call, whatever the page says. (A call that does not claim to be a reply is an ordinary moment.)
+  let replyRound: Awaited<ReturnType<typeof claimReplyRound>> | null = null
+  if (claimsReply(body)) {
+    const store = createOrderStore()
+    const rr = ex.retry === 0 && ex.exclude.length === 0 ? await claimReplyRound(store, (body as { reply_ticket?: unknown }).reply_ticket) : ({ ok: false } as const)
+    if (!rr.ok) {
+      console.log(`[ichirei-reply] ${JSON.stringify({ route: '/api/select', code: 'round_refused' })}`)
+      return jsonResponse(429, { error: REPLY_BUSY[pageLanguage] ?? REPLY_BUSY.en, code: 'engine_busy' })
+    }
+    replyRound = rr
+  }
+
   // The free tries (2026-11-15): a NEW moment (round 1) is counted per browser (the signed ic_v cookie) with the connection as the backstop; every card round counts for the whole site.
   // A missing or forged cookie is never a reason to refuse — it is just a new browser. Nothing here touches checkout or payment.
   {
@@ -125,7 +139,7 @@ export async function POST(req: Request): Promise<Response> {
       void recordHealth(store, code)
       return jsonResponse(429, { error: (code === 'limit_person' ? LIMIT_PERSON : LIMIT_SITE)[lang] ?? (code === 'limit_person' ? LIMIT_PERSON : LIMIT_SITE).en, code })
     }
-    if (ex.retry === 0) {
+    if (ex.retry === 0 && !replyRound) {
       const v = newMoment(visitorOf(req), clientIp(req))
       if (!v.ok) return refuse(v.code)
       void recordCustomerEvent(store, { browser: visitorOf(req) }, 'tried', { language: lang }).catch(() => {})
@@ -187,9 +201,12 @@ export async function POST(req: Request): Promise<Response> {
         // Learning loop: codes and booleans only, tied to a random browser session id (engine/analytics.ts). Never awaited.
         const sessionId = cleanSession(session)
         if (sessionId) void recordEvent(shownEvent(result, sessionId, cleanSource(source), new Date(), Date.now() - t0))
+        // a reply's one round is kept only when it gave cards: no cards (a follow-up question, a remembrance offer) gives it back
+        if (replyRound && (result.status !== 'sufficient' || result.primary_kanji === null)) void replyRound.release()
         send({ type: 'result', result: { ...result, story_language: storyLanguage, page_language: pageLanguage }, round_ticket: claim.ticket, ...(wantsDebug && debug ? { debug } : {}) })
       } catch (err) {
         void claim.release() // the engine broke: this round is given back
+        if (replyRound) void replyRound.release()
         // The full error stays in the server log, with the class and the provider's request id. The page gets only a code (2026-11-20): it shows its own calm text, never a message, a status or JSON.
         const code = visitorCode(err)
         console.error(`[ichirei-select] engine_failed ${JSON.stringify({ code, class: classOf(err), request_id: requestIdOf(err) ?? null })} ${err instanceof Error ? err.message : String(err)}`)
