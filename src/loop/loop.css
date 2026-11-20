@@ -172,3 +172,9 @@
 .by-top .myGifts{background:transparent;color:#C9A96E;border:1px solid rgba(201,169,110,.55);font-weight:500}
 .by-top .myGifts[data-count]:not([data-count="0"]){border-color:#C9A96E}
 .by-top .myGifts:hover{background:rgba(201,169,110,.12)}
+/* The dashboard (Part 7, 2026-11-20): the counts, the groups (the one that needs action first), the quiet line at the bottom */
+.mgCounts{margin:.2rem 0 1.2rem;font:600 .95rem var(--body,system-ui);color:var(--ink,#1F2A44)}
+.mgGroup{margin:0 0 1.8rem}
+.mgGroup>h2{margin:0 0 .8rem;font-size:1.15rem}
+.mgAnswerWord{opacity:.8;font-weight:400}
+.mgSafe{margin:1.6rem 0 .4rem;font:300 .88rem/1.7 var(--body,system-ui);color:var(--mute,#5B6178)}

@@ -7,6 +7,8 @@ import { setLanguage } from '../lang-store.ts'
 import { COPY, type UiLanguage } from '../demo/i18n.ts'
 import { PURPOSE_COPY } from '../demo/purpose-copy.ts'
 import { LOOP, SAVE } from './copy.ts'
+import { deadlineText } from '../animation/buyer-copy.ts'
+import { clockText, marketZone, openingDayText, partsOfZone } from '../order/opens-at.ts'
 import { refreshMe, setBasketCount } from './me.ts'
 import SavePanel from './SavePanel.tsx'
 import KeepByEmail from './KeepByEmail.tsx'
@@ -37,6 +39,14 @@ interface Sent {
   receiver: string
   at: string
   status: 'paid' | 'collected' | 'opened'
+  /** Part 7: the group, the stage, the cancel deadline, when it opens / opened, the character that came back */
+  group?: 'unsent' | 'sent'
+  stage?: 'to_collect' | 'to_send' | 'scheduled' | 'unopened' | 'opened' | 'answered'
+  change_until?: string | null
+  opens_at?: string | null
+  opens_tz?: string | null
+  opened_at?: string | null
+  answer?: { char: string; word: string } | null
   page: string | null
 }
 
@@ -91,6 +101,46 @@ function Pic({ src, n, label, onOpen }: { src: string | null; n: number; label: 
     <button type="button" className="mgPic" data-testid="mg-pic" data-state="ok" data-slot={n + 1} aria-label={label} onClick={() => onOpen(src)}>
       <img src={src} alt="" loading="lazy" decoding="async" onError={() => setFailed(true)} />
     </button>
+  )
+}
+
+/** "11月21日 7:00" · "Nov 21, 7:00 a.m." — a moment on the wall clock of a zone (the gift's own, else the page's market), in the page's language. */
+function whenText(lang: RevealLang, iso: string, tz: string | null): string {
+  const t = Date.parse(iso)
+  if (!Number.isFinite(t)) return ''
+  const zone = tz || marketZone(lang)
+  try {
+    const p = partsOfZone(zone, t)
+    const day = openingDayText(lang, p.date)
+    return lang === 'ja' ? `${day} ${p.hour}:${String(p.minute).padStart(2, '0')}` : lang === 'en' ? `${day}, ${clockText('en', p.hour, p.minute)}` : `${day} ${clockText('zh-Hant', p.hour, p.minute)}`
+  } catch {
+    return iso.slice(0, 10)
+  }
+}
+
+/** A paid gift on the dashboard (Part 7): the character, 〈name〉へ, the paid date, and — by where it stands — the cancel deadline, when it opens, that it was opened, or the character that came back; one button. */
+function SentCard({ g, lang }: { g: Sent; lang: RevealLang }) {
+  const c = LOOP[lang]
+  const stage = g.stage ?? (g.status === 'opened' ? 'opened' : g.status === 'collected' ? 'to_send' : 'to_collect')
+  const label =
+    stage === 'to_collect' ? c.collectAndSend : stage === 'to_send' ? c.sendIt : stage === 'answered' ? c.seeAnswer : c.giftPage
+  const line =
+    stage === 'scheduled' && g.opens_at ? c.opensAt(whenText(lang, g.opens_at, g.opens_tz ?? null))
+    : stage === 'unopened' ? c.notOpenedYet
+    : stage === 'opened' && g.opened_at ? c.openedAt(whenText(lang, g.opened_at, g.opens_tz ?? null))
+    : stage === 'answered' && g.answer ? c.answerCame(g.answer.char)
+    : null
+  return (
+    <li className="mgSentItem" data-testid="my-sent-item" data-status={g.status} data-stage={stage} data-group={g.group ?? 'sent'}>
+      <span className="mgGlyph small notranslate" translate="no">{g.kanji}</span>
+      <div className="mgSentMeta">
+        {g.receiver && <p className="mgForName" data-testid="my-sent-for">{c.forName(g.receiver)}</p>}
+        <p className="mgDates"><span data-testid="my-sent-paid">{c.paidOn(dateOf(g.at, lang))}</span></p>
+        {(stage === 'to_collect') && g.change_until && <p className="mgDates" data-testid="my-sent-cancel">{c.cancelBy(deadlineText(lang, g.change_until))}</p>}
+        {line && <p className={`mgStatus ${stage}`} data-testid="my-sent-status">{line}{stage === 'answered' && g.answer?.word ? <span className="mgAnswerWord notranslate"> · {g.answer.word}</span> : null}</p>}
+      </div>
+      {g.page && <a className="btn primary" data-testid="my-sent-open" href={g.page}>{label}</a>}
+    </li>
   )
 }
 
@@ -253,6 +303,9 @@ export default function BasketApp() {
 
   const items = data?.items ?? null
   const sent = data?.email ? (data.sent ?? []) : []
+  const groupOf = (g: Sent): 'unsent' | 'sent' => g.group ?? (g.status === 'opened' ? 'sent' : 'unsent')
+  const unsent = sent.filter((g) => groupOf(g) === 'unsent')
+  const sentGroup = sent.filter((g) => groupOf(g) === 'sent')
   const dropItem = (id: string) => setData((d) => (d ? { ...d, items: d.items.filter((i) => i.id !== id) } : d))
 
   return (
@@ -279,7 +332,11 @@ export default function BasketApp() {
           {c.basketSaved}
         </p>
         {/* On a device with no saved gifts and no address: the e-mail asks for the link (2026-11-20). An address alone opens nothing; the answer is the same "sent" whether or not it has gifts. */}
-        {data?.mail && <KeepByEmail lang={lang} hasEmail={!!data.email} lookup={!data.email && items !== null && items.length === 0 && sent.length === 0} />}
+        {(() => {
+          const lookup = !!data && !data.email && items !== null && items.length === 0 && sent.length === 0
+          // a new phone, a private window, a browser that forgot: one box. Until the mailer is set up the box says the calm busy line and sends nothing.
+          return data?.mail || lookup ? <KeepByEmail lang={lang} hasEmail={!!data?.email} lookup={lookup} off={!data?.mail} /> : null
+        })()}
 
         {items === null && !notFound && <p className="sent">{c.loading}</p>}
         {(notFound || (items !== null && items.length === 0 && sent.length === 0)) && (
@@ -291,38 +348,33 @@ export default function BasketApp() {
           </div>
         )}
 
-        <ul className="mgList">
-          {(items ?? []).map((i) => (
-            <GiftCard key={i.id} item={i} lang={lang} onOpenPic={setPic} onRemoved={dropItem} />
-          ))}
-        </ul>
-
-        {sent.length > 0 && (
-          <section className="mgSent" data-testid="my-sent">
-            <h2>{c.sentHeading}</h2>
-            <ul className="mgSentList">
-              {sent.map((g, k) => (
-                <li className="mgSentItem" key={k} data-testid="my-sent-item" data-status={g.status}>
-                  <span className="mgGlyph small notranslate" translate="no">{g.kanji}</span>
-                  <div className="mgSentMeta">
-                    {g.receiver && <p className="mgForName">{c.forName(g.receiver)}</p>}
-                    <p className="mgDates">
-                      <span>{dateOf(g.at, lang)}</span>
-                      <span className={`mgStatus ${g.status}`} data-testid="my-sent-status">
-                        {g.status === 'opened' ? c.statusOpened : g.status === 'collected' ? c.statusCollected : c.statusPaid}
-                      </span>
-                    </p>
-                  </div>
-                  {g.page && (
-                    <a className="btn primary" data-testid="my-sent-open" href={g.page}>
-                      {c.openGift}
-                    </a>
-                  )}
-                </li>
+        {/* Part 7 (2026-11-20): the customer's dashboard — three groups, the one that needs action first; an empty group is not shown; newest first inside each */}
+        {sent.length + (items ?? []).length > 0 && (
+          <p className="mgCounts" data-testid="my-counts">{c.counts(unsent.length, sentGroup.length, (items ?? []).length)}</p>
+        )}
+        {unsent.length > 0 && (
+          <section className="mgSent mgGroup" data-testid="group-unsent">
+            <h2>{c.groupUnsent}</h2>
+            <ul className="mgSentList">{unsent.map((g, k) => <SentCard key={k} g={g} lang={lang} />)}</ul>
+          </section>
+        )}
+        {sentGroup.length > 0 && (
+          <section className="mgSent mgGroup" data-testid="group-sent">
+            <h2>{c.groupSent}</h2>
+            <ul className="mgSentList">{sentGroup.map((g, k) => <SentCard key={k} g={g} lang={lang} />)}</ul>
+          </section>
+        )}
+        {(items ?? []).length > 0 && (
+          <section className="mgGroup" data-testid="group-saved">
+            <h2>{c.groupSaved}</h2>
+            <ul className="mgList">
+              {(items ?? []).map((i) => (
+                <GiftCard key={i.id} item={i} lang={lang} onOpenPic={setPic} onRemoved={dropItem} />
               ))}
             </ul>
           </section>
         )}
+        {sent.length + (items ?? []).length > 0 && <p className="mgSafe" data-testid="my-stays-safe">{c.staysSafe}</p>}
       </div>
 
       {pic && (

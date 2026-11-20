@@ -28,6 +28,8 @@ import { SIZE_COPY } from '../src/demo/sizes-copy.ts'
 import { GIFT_COPY } from '../src/gift/copy.ts'
 import { CEREMONY_COPY, stateTime } from '../src/animation/ceremony-copy.ts'
 import { toSimplified } from '../engine/script.ts'
+import { sentGifts } from '../engine/mygifts.ts'
+import { recordCustomerEvent, readCustomer, emailCustomerId, recordOrderEvent } from '../engine/customer.ts'
 import { parseCsv } from '../engine/palette.ts'
 import sharp from 'sharp'
 
@@ -253,6 +255,52 @@ const gift = async (t: string) => (await mem.get(t)) as GiftRecord
   const memorial = await makeOgImage({ to: g.to, from: g.from, memorial: true, language: g.language })
   check('(8) the cord is drawn on the picture (the picture changes when the cord is left out is not testable pixel by pixel here — the SVG of the cord is present and the memorial one is silver-grey)', cordSvg(100, 100, 3.2, false).includes('#C9A96E') && cordSvg(100, 100, 3.2, true).includes('#A9A8A2') && !cordSvg(100, 100, 3.2, true).includes('#C9A96E') && CORD_PATHS.lines.length === 2 && plain.length > 5000 && !plain.equals(memorial))
   check('(8) the picture\'s object name changed with the cord (cord1), so pictures made before it are made again', ogKey(g).startsWith(`og/${g.token}.`) && ogKey(g) !== ogKey({ ...g, to: g.to + 'x' }))
+}
+
+// ---- Part 7 (2026-11-20): the customer's dashboard — groups, stages, order, statuses ------------------------------------------------------------------------------------------
+{
+  const EMAIL = 'taro@example.com'
+  const mk = async (paidAt: string, over: Record<string, unknown> = {}, collected = true) => {
+    const r = await place(over)
+    const rec = (await mem.get(r.ref)) as Record<string, unknown>
+    await mem.put(r.ref, { ...rec, collected_at: collected ? NOW.toISOString() : null, paid_at_seen: paidAt, buyer_email: EMAIL })
+    await recordCustomerEvent(mem, { email: EMAIL }, 'ordered_paid', { ref: r.ref, order: `#${r.ref.slice(-4)}` }, new Date(paidAt))
+    return r
+  }
+  const g1 = await mk('2026-11-18T01:00:00Z', {}, false) // paid, not collected
+  const g2 = await mk('2026-11-18T02:00:00Z') // collected, not sent
+  const g3 = await mk('2026-11-18T03:00:00Z') // sent, scheduled for later
+  const g4 = await mk('2026-11-18T04:00:00Z') // sent and opened
+  const g5 = await mk('2026-11-18T05:00:00Z') // answered
+  await G(new Date('2026-11-18T06:00:00Z')).scheduleForSender(g3.animId, { open_date: '2026-12-25', open_tz: 'America/New_York' })
+  for (const g of [g3, g4, g5]) await G(new Date('2026-11-18T06:30:00Z')).sharedBySender(g.animId)
+  await G(new Date('2026-11-18T07:00:00Z')).sharedBySender(g3.animId) // the second use does not move it
+  await G(new Date('2026-11-18T07:10:00Z')).opened(g4.token)
+  await G(new Date('2026-11-18T07:20:00Z')).opened(g5.token)
+  await G(new Date('2026-11-18T08:00:00Z')).reply(g5.token, { char: '家' })
+  const rec = (await readCustomer(mem, emailCustomerId(EMAIL)))!
+  const list = await sentGifts(mem, rec, new Date('2026-11-19T00:00:00Z'))
+  const by = (ref: string) => list.find((x) => x.page?.endsWith((mem.records.get(ref) as { animation_id: string }).animation_id))
+  check('(P7) five paid gifts are listed, newest first (by the paid date)', list.length === 5 && list.map((x) => x.at).join() === ['2026-11-18T05:00:00Z', '2026-11-18T04:00:00Z', '2026-11-18T03:00:00Z', '2026-11-18T02:00:00Z', '2026-11-18T01:00:00Z'].join(), list.map((x) => x.at).join())
+  check('(P7) "Not sent yet": the gift not collected (stage to_collect, with its cancel deadline) and the one collected but not sent (to_send, no deadline)', by(g1.ref)?.group === 'unsent' && by(g1.ref)?.stage === 'to_collect' && !!by(g1.ref)?.change_until && by(g2.ref)?.group === 'unsent' && by(g2.ref)?.stage === 'to_send' && by(g2.ref)?.change_until === null, JSON.stringify([by(g1.ref), by(g2.ref)]))
+  check('(P7) "Sent": a scheduled one (opens at the picked moment), an opened one, an answered one', by(g3.ref)?.group === 'sent' && by(g3.ref)?.stage === 'scheduled' && by(g3.ref)?.opens_at === '2026-12-25T12:00:00.000Z' && by(g4.ref)?.stage === 'opened' && !!by(g4.ref)?.opened_at && by(g5.ref)?.stage === 'answered', JSON.stringify([by(g3.ref)?.stage, by(g4.ref)?.stage, by(g5.ref)?.stage]))
+  check('(P7) the answered one shows the character that came back and its word', by(g5.ref)?.answer?.char === '家' && (by(g5.ref)?.answer?.word ?? '') !== '', JSON.stringify(by(g5.ref)?.answer))
+  const sentEvents = rec.events.filter((e) => e.code === 'sent')
+  const fresh = (await readCustomer(mem, emailCustomerId(EMAIL)))!
+  check('(P7) copying the link sets "sent" ONCE per gift (the second use changes nothing): three gifts, three events', fresh.events.filter((e) => e.code === 'sent').length === 3 && sentEvents.length >= 3 && (await gift(g3.token)).shared_at === '2026-11-18T06:30:00.000Z')
+  check('(P7) a send-back records "answered" on the timeline (and the character is on the gift)', fresh.events.some((e) => e.code === 'answered' && e.ref === g5.ref) && (await gift(g5.token)).reply?.char === '家')
+  // one collection per email: a save with email X and a paid order with email x (other case, spaces) are one record
+  const { saveBasketItem } = await import('../engine/basket.ts')
+  const { saveToEmail } = await import('../engine/basket-mail.ts')
+  const { newVisitorId } = await import('../engine/visitor.ts')
+  const br = newVisitorId()
+  await saveBasketItem(mem, br, { resume: { v: 1, story: 'x', result: { candidates: [] } }, story: 'x', language: 'ja', kanji: '添', reading: 'そえる', word: '', line: 'l', to: '先生', preview_id: null, poem: null } as never, NOW)
+  await saveToEmail({ store: mem, mailer: { async send() { return true } }, env: { ICHIREI_PUBLIC_URL: 'https://x.example' } as NodeJS.ProcessEnv, now: NOW }, br, 'Mia@Example.com', 'ja')
+  await recordCustomerEvent(mem, { email: '  mia@EXAMPLE.com ' }, 'ordered_paid', { ref: g1.ref, order: '#9999' }, NOW)
+  const mia = await readCustomer(mem, emailCustomerId('mia@example.com'))
+  check('(P7) a save under "Mia@Example.com" and a paid order of " mia@EXAMPLE.com " (trimmed, any case) are ONE collection: the saved gift and the order are on the same record', !!mia && mia.basket.length === 1 && mia.events.some((e) => e.code === 'ordered_paid' && e.ref === g1.ref) && mia.emails.length === 1)
+  const src = readFileSync('src/loop/BasketApp.tsx', 'utf8')
+  check('(P7) the page shows only the groups that are not empty; the counts and the quiet line are there; the order of the groups is unsent, sent, saved', /unsent\.length > 0 && \(/.test(src) && /sentGroup\.length > 0 && \(/.test(src) && /\(items \?\? \[\]\)\.length > 0 && \(/.test(src) && src.indexOf('group-unsent') < src.indexOf('group-sent') && src.indexOf('group-sent') < src.indexOf('group-saved') && src.includes('my-stays-safe') && src.includes('my-counts'))
 }
 
 console.log(failures === 0 ? '\nAll ceremony checks passed.' : `\n${failures} ceremony check(s) FAILED`)

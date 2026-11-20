@@ -70,6 +70,24 @@ export interface LoopCopy {
   mailLimit: string
   mailFail: string
   sendAgain: string
+  // ---- the dashboard (Part 7, 2026-11-20) ----
+  groupUnsent: string
+  groupSent: string
+  groupSaved: string
+  /** the counts line at the top: only the groups that are not empty */
+  counts: (unsent: number, sent: number, saved: number) => string
+  paidOn: (date: string) => string
+  cancelBy: (when: string) => string
+  collectAndSend: string
+  sendIt: string
+  seeAnswer: string
+  giftPage: string
+  opensAt: (when: string) => string
+  notOpenedYet: string
+  openedAt: (when: string) => string
+  answerCame: (char: string) => string
+  /** the quiet line at the bottom of the dashboard */
+  staysSafe: string
 }
 
 export const LOOP: Record<RevealLang, LoopCopy> = {
@@ -130,6 +148,21 @@ export const LOOP: Record<RevealLang, LoopCopy> = {
     mailLimit: '今日はこのアドレスにすでに3通お送りしました。明日またお試しください。',
     mailFail: 'いま送れませんでした。しばらくしてからもう一度お試しください。',
     sendAgain: 'リンクをもう一度送る',
+    groupUnsent: 'まだ送っていない贈りもの',
+    groupSent: '贈った贈りもの',
+    groupSaved: '保存中の贈りもの',
+    counts: (a, b, c) => [a ? `まだ送っていない：${a}` : '', b ? `贈った：${b}` : '', c ? `保存中：${c}` : ''].filter(Boolean).join('　'),
+    paidOn: (d) => `お支払い：${d}`,
+    cancelBy: (w) => `キャンセル期限：${w}まで`,
+    collectAndSend: '受け取って送る →',
+    sendIt: '相手に送る →',
+    seeAnswer: '返事を見る →',
+    giftPage: '贈りもののページ →',
+    opensAt: (w) => `${w}に開きます`,
+    notOpenedYet: 'まだ開かれていません',
+    openedAt: (w) => `開封されました（${w}）`,
+    answerCame: (ch) => `返事が届きました：${ch}`,
+    staysSafe: 'このブラウザを閉じても、贈りものは消えません。メールのリンクから、いつでも戻れます。',
   },
   'zh-Hant': {
     basketBar: (n) => `我的禮物（${n}）→`,
@@ -188,6 +221,21 @@ export const LOOP: Record<RevealLang, LoopCopy> = {
     mailLimit: '今天已寄給這個信箱 3 封信，請明天再試。',
     mailFail: '目前寄不出去，請稍後再試。',
     sendAgain: '再寄一次連結',
+    groupUnsent: '還沒送出的禮物',
+    groupSent: '已送出的禮物',
+    groupSaved: '保存中的禮物',
+    counts: (a, b, c) => [a ? `還沒送出：${a}` : '', b ? `已送出：${b}` : '', c ? `保存中：${c}` : ''].filter(Boolean).join('　'),
+    paidOn: (d) => `付款：${d}`,
+    cancelBy: (w) => `取消期限：${w}前`,
+    collectAndSend: '領取並送出 →',
+    sendIt: '送給對方 →',
+    seeAnswer: '看回覆 →',
+    giftPage: '禮物頁面 →',
+    opensAt: (w) => `${w}開啟`,
+    notOpenedYet: '還沒被打開',
+    openedAt: (w) => `已打開（${w}）`,
+    answerCame: (ch) => `回覆來了：${ch}`,
+    staysSafe: '關掉瀏覽器，禮物也不會消失。隨時都能從郵件裡的連結回來。',
   },
   en: {
     basketBar: (n) => `My gifts (${n}) →`,
@@ -248,6 +296,21 @@ export const LOOP: Record<RevealLang, LoopCopy> = {
     mailLimit: "We've already sent 3 emails to this address today. Please try again tomorrow.",
     mailFail: "We couldn't send it just now. Please try again in a moment.",
     sendAgain: 'Send my link again',
+    groupUnsent: 'Not sent yet',
+    groupSent: 'Sent',
+    groupSaved: 'Saved',
+    counts: (a, b, c) => [a ? `Not sent yet: ${a}` : '', b ? `Sent: ${b}` : '', c ? `Saved: ${c}` : ''].filter(Boolean).join(' · '),
+    paidOn: (d) => `Paid ${d}`,
+    cancelBy: (w) => `Cancel by ${w}`,
+    collectAndSend: 'Collect and send →',
+    sendIt: 'Send it →',
+    seeAnswer: 'See the answer →',
+    giftPage: 'Gift page →',
+    opensAt: (w) => `Opens ${w}`,
+    notOpenedYet: 'Not opened yet',
+    openedAt: (w) => `Opened (${w})`,
+    answerCame: (ch) => `An answer came: ${ch}`,
+    staysSafe: 'Your gifts stay safe even if you close this browser. Come back anytime from the link in your email.',
   },
 }
 
@@ -445,8 +508,8 @@ export const SAVE: Record<RevealLang, SaveCopy> = {
     saved: (m) => `✓ 保存しました。${m}の贈りものとして、30日間お預かりします。リンクをメールでお送りしました。`,
     savedPlain: '✓ 保存しました。30日間お預かりします。',
     open: 'マイギフトを開く →',
-    lookupLead: 'メールアドレスを入れると、保存した贈りもののリンクをお送りします',
-    lookupSent: '送りました。メールのリンクから開いてください',
+    lookupLead: 'メールアドレスを入れてください。マイギフトを開くリンクをお送りします。登録やパスワードは要りません。',
+    lookupSent: '送りました。メールのリンクから開いてください。',
     lookupButton: 'リンクを送る',
     heading: (m, n) => `${m}に保存した贈りもの（${n}）`,
     scanLine: 'スマホで読み取ると、いますぐ続きができます',
@@ -462,8 +525,8 @@ export const SAVE: Record<RevealLang, SaveCopy> = {
     saved: (m) => `✓ 已保存在${m}之下，保留30天。連結已寄到你的信箱。`,
     savedPlain: '✓ 已保存，保留30天。',
     open: '打開我的禮物 →',
-    lookupLead: '輸入電子郵件，我們會把保存禮物的連結寄給你',
-    lookupSent: '已寄出。請從信中的連結開啟',
+    lookupLead: '輸入你的電子郵件，我們會寄給你打開〈我的禮物〉的連結。不需要註冊或密碼。',
+    lookupSent: '已寄出。請從郵件裡的連結打開。',
     lookupButton: '寄連結給我',
     heading: (m, n) => `保存在${m}的禮物（${n}）`,
     scanLine: '用手機掃描，馬上就能繼續',
@@ -479,8 +542,8 @@ export const SAVE: Record<RevealLang, SaveCopy> = {
     saved: (m) => `✓ Saved under ${m} for 30 days. We've emailed you the link.`,
     savedPlain: "✓ Saved. We'll keep it for 30 days.",
     open: 'Open My gifts →',
-    lookupLead: "Enter your email and we'll send you the link to your saved gifts",
-    lookupSent: 'Sent. Please open the link in the email',
+    lookupLead: "Enter your email and we'll send you a link to My gifts. No account or password needed.",
+    lookupSent: 'Sent. Open My gifts from the link in your email.',
     lookupButton: 'Send me the link',
     heading: (m, n) => `Saved under ${m} (${n})`,
     scanLine: 'Scan this to continue on your phone right now',

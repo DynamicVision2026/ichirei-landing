@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import type { RevealLang } from '../reveal/copy.ts'
 import { LOOP, SAVE } from './copy.ts'
+import { COPY } from '../demo/i18n.ts'
 import './loop.css'
 
 /**
@@ -8,7 +9,7 @@ import './loop.css'
  * in full and an email alone opens nothing — only the link in the mail does. With an email already on the record, "Send my link again" re-sends it (at most 3 mails a day per address). The marketing
  * consent has no part in this: saving never subscribes anyone. Not rendered at all while the server has no mailer (no RESEND_API_KEY).
  */
-export default function KeepByEmail({ lang, hasEmail = false, onSent, lookup = false }: { lang: RevealLang; hasEmail?: boolean; onSent?: () => void; lookup?: boolean }) {
+export default function KeepByEmail({ lang, hasEmail = false, onSent, lookup = false, off = false }: { lang: RevealLang; hasEmail?: boolean; onSent?: () => void; lookup?: boolean; off?: boolean }) {
   const c = LOOP[lang]
   const s = SAVE[lang]
   const [email, setEmail] = useState('')
@@ -40,7 +41,10 @@ export default function KeepByEmail({ lang, hasEmail = false, onSent, lookup = f
       data-testid={lookup ? 'lookup-mail' : 'keep-mail'}
       onSubmit={(e) => {
         e.preventDefault()
-        if (!busy) void post('/api/basket/email', { email: email.trim() })
+        if (busy) return
+        // no mailer yet (RESEND_API_KEY not set): the calm busy line, and nothing is sent
+        if (off) { setNote({ text: COPY[lang === 'zh-Hant' ? 'zh-Hant' : lang].busy, bad: true }); return }
+        void post('/api/basket/email', { email: email.trim() })
       }}
     >
       <p className="keepTitle" data-testid="keep-title">{lookup ? s.lookupLead : c.keepTitle}</p>
