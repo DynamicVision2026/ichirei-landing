@@ -14,7 +14,8 @@ import { Film } from '../animation/AnimationApp.tsx'
 import { EgiftReceive } from '../animation/GiftPanels.tsx'
 import Keepsakes from './Keepsakes.tsx'
 import NewCeremony from './ceremony/NewCeremony.tsx'
-import { newCeremony } from './ceremony/switch.ts'
+import { newCeremony, newWaiting } from './ceremony/switch.ts'
+import WaitingCeremony from './ceremony/Waiting.tsx'
 import ShareSection from './ShareSection.tsx'
 import type { GiftLockedView, GiftView } from '../animation/types.ts'
 import { GIFT_COPY, fullDateText, openDateText, type GiftCopy } from './copy.ts'
@@ -64,6 +65,7 @@ export default function GiftApp() {
   const [lang, setLang] = useState<PageLang>(() => { const n = (navigator.language ?? 'ja').toLowerCase(); return n.startsWith('zh') ? 'zh-Hant' : n.startsWith('en') ? 'en' : 'ja' })
   const [step, setStep] = useState<Step>('envelope')
   const [filmEnded, setFilmEnded] = useState(false)
+  const [again, setAgain] = useState(0) // the waiting screen asks the server again when its time has come
   const reduced = useMemo(prefersReducedMotion, [])
   const copy = GIFT_COPY[lang]
 
@@ -109,7 +111,7 @@ export default function GiftApp() {
       if (timer) clearTimeout(timer)
       document.removeEventListener('visibilitychange', onVis)
     }
-  }, [token, q]) // eslint-disable-line react-hooks/exhaustive-deps
+  }, [token, q, again]) // eslint-disable-line react-hooks/exhaustive-deps
 
   // the pictures: drawn once (the server holds the request until they are done), started as soon as the envelope is here so they are ready by the film
   const film0 = load.state === 'ready' ? load.view.film : null
@@ -165,6 +167,9 @@ export default function GiftApp() {
 
   if (load.state === 'locked') {
     const v = load.view
+    // Part 11 (2026-11-20): a scheduled gift waits in the new ceremony's look — the sealed mark, the time, a countdown; when the time comes it opens in place (remembrance and quiet purposes keep the envelope below)
+    if (newWaiting(v) && new URLSearchParams(window.location.search).get('ceremony') !== 'old')
+      return <WaitingCeremony language={v.language} from={v.from} to={v.to} waiting={{ opens_on: v.opens_on, opens_at: v.opens_at ?? null, opens_tz: v.opens_tz ?? null }} onTime={() => setAgain((n) => n + 1)} />
     return (
       <main className={shell} lang={lang} data-testid="gift-page" data-step="envelope" data-locked="yes">
         <Envelope copy={copy} lang={lang} to={v.to} from={v.from} memorial={v.memorial} purpose={v.purpose ?? null} date={v.opens_on} reduced={reduced} state="closed" locked={{ opens_on: v.opens_on, opens_at: v.opens_at ?? null, opens_tz: v.opens_tz ?? null, days_left: v.days_left, arriving: v.arriving === true }} />

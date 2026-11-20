@@ -160,3 +160,13 @@
 .cr-mygifts-top { display: flex; justify-content: flex-end; width: 100%; margin: 0 0 8px; }
 .cr-mygifts-top .myGifts { background: transparent; color: var(--ink); border: 1px solid color-mix(in srgb, var(--ink) 45%, transparent); font-weight: 500; min-height: 40px; }
 .cr-mygifts-top .myGifts[data-count]:not([data-count='0']) { border-color: var(--ink); }
+
+/* Part 11 (2026-11-20): the waiting screen of a locked gift — screen 1, sealed: the mark has no ring, is not a button and does not answer a touch */
+.cr-markbtn.cr-sealed { cursor: default; pointer-events: none; }
+.cr-wait .cr-txt { bottom: 56px; gap: 12px; }
+.cr-wait .cr-sm { font-size: 14px; color: var(--mute); }
+.cr-wait-continue { margin-top: 10px; }
+.cr-wait .cr-markbtn { top: 27%; }
+.cr-wait .cr-b { max-width: none; font-size: 16px; }
+.cr[data-cl='ja'] .cr-wait .cr-h, .cr[data-cl='zh-Hant'] .cr-wait .cr-h, .cr[data-cl='zh-Hans'] .cr-wait .cr-h { font-size: 22px; letter-spacing: .01em; }
+.cr[data-cl='en'] .cr-wait .cr-h { font-size: 30px; }

@@ -10,3 +10,14 @@ export function newCeremony(view: GiftView | GiftLockedView): boolean {
   if (isQuietPurpose(view.purpose ?? null)) return false
   return true
 }
+
+/**
+ * Part 11 (2026-11-20): a gift that is still locked (a scheduled one) opens the new ceremony's waiting screen — unless it is a remembrance or a quiet purpose (those keep today's sealed envelope), or the buyer
+ * has not collected it yet (that one keeps saying it is arriving).
+ */
+export function newWaiting(view: GiftLockedView): boolean {
+  if (view.arriving) return false
+  if (view.memorial) return false
+  if (isQuietPurpose(view.purpose ?? null)) return false
+  return true
+}

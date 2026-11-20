@@ -54,6 +54,8 @@ export interface GiftView extends AnimationView {
   /** The receiver's own answer, shown back on their Sent screen: the character given back (if any) and whether words were sent. */
   answer?: { char: string | null; words: boolean } | null
   package: 'egift' | 'simple' | 'standard'
+  /** Only on the sender's own preview of a gift that is still locked: when it opens (so the preview shows the waiting screen first). */
+  waiting?: { opens_on: string | null; opens_at: string | null; opens_tz: string | null } | null
 }
 
 /** The closed envelope before the opening date: the two names and the date, nothing else. */

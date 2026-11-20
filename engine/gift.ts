@@ -168,6 +168,8 @@ export interface GiftView extends AnimationView {
   replied: boolean
   /** Which size it is: the keepsake lines of the last screen depend on it. */
   package: PackageId
+  /** Only on the sender's own preview of a gift that is still locked: when it opens (so the preview shows the waiting screen first). */
+  waiting?: { opens_on: string | null; opens_at: string | null; opens_tz: string | null } | null
 }
 
 /** The closed envelope: names and the date only. Nothing of the film, the character, the poem or the message leaves the server before the day. */

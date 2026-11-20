@@ -1,4 +1,6 @@
-import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useStageFit } from './stage-fit.ts'
+import { WaitBody, useNow } from './Waiting.tsx'
 import type { GiftView } from '../../animation/types.ts'
 import { EgiftReceive } from '../../animation/GiftPanels.tsx'
 import { RETURN_CHARS, returnWord } from '../../order/return-chars.ts'
@@ -18,7 +20,7 @@ import MyGiftsButton from '../../loop/MyGifts.tsx'
 // The motion and the numbers are the director's preview (v5). Reduced motion: cross-fades only (no push-in, no grow, no dive into the stroke).
 // The data is today's gift view; nothing new is asked of the sender. Before the mark is touched the page shows the two names and nothing else.
 
-export type CeremonyScreen = 'mark' | 'note' | 'film' | 'char' | 'poem' | 'cert' | 'keep' | 'back' | 'sent'
+export type CeremonyScreen = 'wait' | 'mark' | 'note' | 'film' | 'char' | 'poem' | 'cert' | 'keep' | 'back' | 'sent'
 
 /** The director's film: 6.6 s a picture, a 0.9 s cross-fade, a slow push-in 1 → 1.07; then it fades to paper over 1.1 s while the music fades over 2.4 s. */
 export const FILM_HOLD_MS = 6600
@@ -49,7 +51,8 @@ const scrollAvailable = (v: GiftView): boolean => filmComplete(v) && v.film!.pic
 export default function NewCeremony({ view, preview, q }: { view: GiftView; preview: boolean; q: string }) {
   const C = CER[cerLang(view.language)]
   const reduced = useMemo(reducedMotion, [])
-  const [screen, setScreen] = useState<CeremonyScreen>('mark')
+  const [screen, setScreen] = useState<CeremonyScreen>(preview && view.waiting ? 'wait' : 'mark')
+  const now = useNow()
   // an answered gift shows what was sent when the receiver comes back (the view carries their own answer)
   const [sent, setSent] = useState<{ char: string | null; text: boolean } | null>(view.replied ? { char: view.answer?.char ?? null, text: view.answer?.words ?? false } : null)
   const [meaningDone, setMeaningDone] = useState(false)
@@ -63,23 +66,7 @@ export default function NewCeremony({ view, preview, q }: { view: GiftView; prev
   const to = view.to ?? ''
 
   // the 398 px stage, scaled up on a large screen by min(w/430, h/660, 1.7) (never down)
-  useLayoutEffect(() => {
-    const fit = () => {
-      const st = stage.current
-      const el = root.current
-      if (!st || !el) return
-      const vw = window.innerWidth
-      const vh = window.innerHeight
-      const z = Math.max(1, Math.min(vw / 430, vh / 660, 1.7))
-      st.style.transform = z > 1.01 ? `scale(${z})` : 'none'
-      st.style.height = `${vh / z}px`
-      el.style.setProperty('--sh', `${vh / z}px`)
-      el.dataset.zoom = z.toFixed(3)
-    }
-    fit()
-    window.addEventListener('resize', fit)
-    return () => window.removeEventListener('resize', fit)
-  }, [])
+  useStageFit(stage, root)
 
   const go = useCallback((s: CeremonyScreen) => {
     if (!markAt.current && firstMark.current) {
@@ -111,6 +98,14 @@ export default function NewCeremony({ view, preview, q }: { view: GiftView; prev
         <p className="cr-wm">ICHIREI</p>
         <p className="cr-wv" lang="ja">一字礼</p>
         {preview && <p className="cr-preview" data-testid="gift-preview-note">{C.previewNote}</p>}
+
+        {/* Part 11: the sender's own preview of a gift that is still locked shows the waiting screen first — what the receiver sees until the time — then lets the sender go on */}
+        {screen === 'wait' && view.waiting && (
+          <>
+            <WaitBody language={view.language} from={from} to={to} waiting={view.waiting} now={now} />
+            <button type="button" className="cr-go cr-fix cr-next" data-testid="cr-wait-continue" onClick={() => go('mark')}>{C.waitContinue}</button>
+          </>
+        )}
 
         {screen === 'mark' && (
           <section className="cr-scr" data-testid="cr-mark">

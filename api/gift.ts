@@ -277,6 +277,8 @@ export function createGiftHandlers(deps: () => GiftDeps) {
       if (closed(r.gift, d, preview)) return json(200, lockedView(r.gift, d.now?.() ?? new Date()), noStore)
       const art = filmUsable(r.anim.film) && r.anim.film.status === 'ready' ? await safeArt(d.store, r.anim.id) : null
       const v = giftView(r.gift, r.anim, art)
+      // the sender's own preview of a gift that is still locked: the page shows the waiting screen first (Part 11)
+      if (senderPreview(r.gift, preview) && isLocked(r.gift, d.now?.() ?? new Date())) v.waiting = { opens_on: r.gift.opens_on ?? null, opens_at: r.gift.opens_at ?? null, opens_tz: r.gift.opens_tz ?? null }
       return json(200, senderPreview(r.gift, preview) ? withPreview(v, r.gift.animation_id) : v, noStore)
     },
 

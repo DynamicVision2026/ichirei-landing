@@ -5235,9 +5235,9 @@ for (const [lang, locale, text] of [['en', 'en-US', 'Your gift is being finished
   {
     const locked = { locked: true, token: TOKEN, language: 'en', memorial: false, purpose: 'thanks', from: 'Brian', to: 'Kenji', opens_on: '2026-12-25', opens_at: null, opens_tz: null, days_left: 40 }
     const { page, ctx } = await open(locked, { reduced: true })
-    await T(page, 'gift-envelope').waitFor({ timeout: 8000 }).catch(() => {})
+    await T(page, 'cr-wait').waitFor({ timeout: 8000 }).catch(() => {})
     const t = await page.locator('body').innerText()
-    check('today\'s sealed envelope stays for a locked English gift (names and the date only)', (await page.locator('main').getAttribute('data-locked')) === 'yes' && (await page.locator('[data-ceremony=new]').count()) === 0 && !t.includes('労'))
+    check('a locked English gift waits in the new ceremony\'s look (Part 11, 2026-11-20): the sealed mark, names and the time only', (await page.locator('main').getAttribute('data-locked')) === 'yes' && (await page.locator('[data-ceremony=new]').count()) === 1 && (await T(page, 'cr-wait').count()) === 1 && !t.includes('労'))
     await ctx.close()
   }
 }
@@ -6397,6 +6397,115 @@ for (const [lang, locale, text] of [['en', 'en-US', 'Your gift is being finished
     await page.waitForTimeout(1200)
     check('film: a blocked sound — the pictures play on (playing, a picture shown, its line) and the small button says 「音を出す」', (await T(page, 'cr-film').getAttribute('data-playing')) === 'yes' && (await T(page, 'cr-film').getAttribute('data-sound')) === 'blocked' && (await text(page, 'film-sound')) === '音を出す' && (await page.locator('.cr-ticks i.cr-on').count()) >= 1 && (await text(page, 'film-line')).length > 0)
     check('film: no page errors (blocked sound)', errs.length === 0, errs.join('; '))
+    await ctx.close()
+  }
+}
+
+// ---------- Run 45 (2026-11-20, Part 11): the waiting screen of a locked gift in the new ceremony's look — ja / en / zh-Hant: the words, the zone label, the countdown, nothing of the gift in the page, opening in place, the old screen kept for remembrance and quiet gifts, the sender's preview ----------
+{
+  const TOKEN = 'RG-waitwaitwaitwaitwait'
+  const SENDER = 'AN-testtesttesttesttest'
+  const OPENS = { ja: { at: '2026-11-20T22:00:00.000Z', tz: 'Asia/Tokyo', on: '2026-11-21' }, 'zh-Hant': { at: '2026-11-20T22:00:00.000Z', tz: 'Asia/Tokyo', on: '2026-11-21' }, en: { at: '2026-11-21T12:00:00.000Z', tz: 'America/New_York', on: '2026-11-21' } }
+  const NAMES = { ja: { from: '山田 太郎', to: '山田 一郎' }, 'zh-Hant': { from: '陳大明', to: '陳小美' }, en: { from: 'Brian', to: 'Kenji' } }
+  const WORDS = {
+    ja: { label: '山田 一郎さんへ', title: '山田 太郎さんから、 小さな印がひとつ届いています。', opens: 'この印は、11月21日 午前7時（日本時間）に開きます。', days3: 'あと3日。その日まで、封は閉じたままです。', hours5: 'あと5時間。それまで、封は閉じたままです。', soon: 'まもなく開きます。', small: 'このページを残しておいてください。その時刻になると、ここから開けます。', open: '近くで見る' },
+    'zh-Hant': { label: '給陳小美', title: '陳大明送給你 一枚小小的印。', opens: '這枚印將在11月21日 上午7點（日本時間）打開。', days3: '還有3天。在那之前，它會一直封著。', hours5: '還有5小時。在那之前，它會一直封著。', soon: '即將打開。', small: '請保留這個頁面。時間一到，就能在這裡打開。', open: '靠近看看' },
+    en: { label: 'For Kenji', title: 'Brian sent you one small mark.', opens: 'It opens on November 21 at 7:00 AM (US Eastern).', days3: '3 days to go. Until then, it stays sealed.', hours5: '5 hours to go. Until then, it stays sealed.', soon: 'Opening soon.', small: 'Keep this page. When the time comes, you can open it right here.', open: 'Look closer' },
+  }
+  const GLYPH = '添'
+  const fullView = (lang, over = {}) => ({ id: TOKEN, token: TOKEN, language: lang, glyph: GLYPH, reading: lang === 'ja' ? 'そう' : '', romanization: 'sou', meaning_en: 'to stay beside', who: lang === 'en' ? 'Someone who walked beside me.' : '隣をゆっくり歩いてくれた人。', poem: null, memorial: false, purpose: 'thanks', film: { status: 'fallback', lines: ['a', 'b', 'c', 'd'], pictures: ['/film/washi-1.webp', '/film/washi-2.webp'] }, certificate_line: 'x', from: NAMES[lang].from, to: NAMES[lang].to, message: '', egift: null, certificate_no: 12, order_date: '2026-11-18', opens_on: OPENS[lang].on, opens_at: OPENS[lang].at, opens_tz: OPENS[lang].tz, replied: false, package: 'egift', locked: false, ...over })
+  const lockedView = (lang, over = {}) => ({ locked: true, token: TOKEN, language: lang, memorial: false, purpose: 'thanks', from: NAMES[lang].from, to: NAMES[lang].to, opens_on: OPENS[lang].on, opens_at: OPENS[lang].at, opens_tz: OPENS[lang].tz, days_left: 3, ...over })
+  const open = async (lang, { leftMs, viewNow = null, search = '', unlockedView = null, locale } = {}) => {
+    const ctx = await browser.newContext({ locale: locale ?? (lang === 'en' ? 'en-US' : lang === 'ja' ? 'ja-JP' : 'zh-TW'), viewport: { width: 390, height: 844 }, reducedMotion: 'reduce', timezoneId: 'America/Los_Angeles' })
+    const page = await ctx.newPage()
+    const errs = []
+    const urls = []
+    const st = { open: false }
+    page.on('pageerror', (e) => errs.push(String(e)))
+    page.on('request', (r) => urls.push(r.url()))
+    await page.route('**/api/analytics', (r) => r.fulfill({ status: 204, body: '' }))
+    await page.route('**/api/me*', (r) => r.fulfill({ json: { basket: { count: 0 }, ready: null, hold: null } }))
+    await page.route(`**/api/gift/${TOKEN}**`, async (r) => {
+      const u = new URL(r.request().url())
+      if (u.pathname === `/api/gift/${TOKEN}/opened`) return r.fulfill({ json: { ok: true } })
+      if (u.pathname === `/api/gift/${TOKEN}/render`) return r.fulfill({ json: { state: 'ready', view: unlockedView ?? fullView(lang) } })
+      if (u.pathname === `/api/gift/${TOKEN}`) return r.fulfill({ json: st.open ? (unlockedView ?? fullView(lang)) : (viewNow ?? lockedView(lang)) })
+      return r.fulfill({ status: 204, body: '' })
+    })
+    await page.clock.install({ time: new Date(Date.parse(OPENS[lang].at) - leftMs) })
+    await page.goto(`http://localhost:5173/g/${TOKEN}${search}`, { waitUntil: 'networkidle' })
+    return { page, ctx, errs, urls, st }
+  }
+  const T = (page, id) => page.locator(`[data-testid="${id}"]`)
+  const norm = (t) => t.replace(/\s+/g, ' ').trim()
+  const H = 3_600_000
+  for (const lang of ['ja', 'en', 'zh-Hant']) {
+    const W = WORDS[lang]
+    // more than a day to go
+    {
+      const { page, ctx, errs, urls } = await open(lang, { leftMs: 3 * 24 * H - 30 * 60_000 })
+      await T(page, 'cr-wait').waitFor()
+      check(`waiting (${lang}): it is the new ceremony's look (the ICHIREI mark and the stage), sealed — the label, the title, the opening line, the countdown and the small line, word for word`, (await page.locator('[data-ceremony=new]').count()) === 1 && (await T(page, 'cr-for').textContent()).trim() === W.label && norm(await T(page, 'cr-wait-title').innerText()) === W.title && norm(await T(page, 'cr-wait-opens').innerText()) === W.opens && norm(await T(page, 'cr-wait-count-line').innerText()) === W.days3 && norm(await T(page, 'cr-wait-small').innerText()) === W.small, JSON.stringify([await T(page, 'cr-for').textContent(), norm(await T(page, 'cr-wait-title').innerText()), norm(await T(page, 'cr-wait-opens').innerText()), norm(await T(page, 'cr-wait-count-line').innerText())]))
+      check(`waiting (${lang}): the time is the gift's saved zone, never the device's (the device is in Los Angeles)`, /日本時間|US Eastern/.test(await T(page, 'cr-wait-opens').innerText()))
+      check(`waiting (${lang}): nothing to press — no button, no link, no tap-to-open, the mark is not interactive`, (await page.locator('[data-testid=gift-page] button, [data-testid=gift-page] a').count()) === 0 && (await T(page, 'cr-markbtn').count()) === 0 && (await T(page, 'cr-open').count()) === 0)
+      const html = await page.evaluate(() => document.body.innerHTML)
+      const leaks = [html.includes(GLYPH) ? 'glyph' : null, /to stay beside|隣をゆっくり|washi-1|\/picture\//.test(html) ? 'text' : null, ...urls.filter((u) => u.includes('/api/gift/') && new URL(u).pathname !== `/api/gift/${TOKEN}`)].filter(Boolean)
+    check(`waiting (${lang}): the page carries the names and the time only — no character, no meaning, no poem, no picture, and only the view was asked for (no render, no opened)`, leaks.length === 0, leaks.join(' '))
+      check(`no page errors (run 45, ${lang}, waiting)`, errs.length === 0, errs.join('; '))
+      if (lang === 'ja') await page.screenshot({ path: `${SHOTS}/p11-wait-days-ja-390.png` })
+      await ctx.close()
+    }
+    // the last day: hours; the last hour: soon
+    {
+      const a = await open(lang, { leftMs: 5 * H })
+      await T(a.page, 'cr-wait').waitFor()
+      check(`waiting (${lang}): the last day counts hours — 「${W.hours5}」`, norm(await T(a.page, 'cr-wait-count-line').innerText()) === W.hours5 && (await T(a.page, 'cr-wait-count').count()) === 1)
+      if (lang === 'ja') await a.page.screenshot({ path: `${SHOTS}/p11-wait-hours-ja-390.png` })
+      await a.ctx.close()
+      const b = await open(lang, { leftMs: 30 * 60_000 })
+      await T(b.page, 'cr-wait').waitFor()
+      check(`waiting (${lang}): the last hour says 「${W.soon}」`, norm(await T(b.page, 'cr-wait-count-line').innerText()) === W.soon)
+      await b.ctx.close()
+    }
+    // the time comes while the page is open: it turns into screen 1 in place (no reload)
+    {
+      const c = await open(lang, { leftMs: 10 * 60_000 })
+      await T(c.page, 'cr-wait').waitFor()
+      await c.page.evaluate(() => { window.__same = 'yes' })
+      c.st.open = true
+      await c.page.clock.runFor(11 * 60_000)
+      await T(c.page, 'cr-markbtn').waitFor({ timeout: 8000 })
+      check(`waiting (${lang}): when its time comes the page turns into screen 1 in place — no reload — with 「${W.open}」`, (await c.page.evaluate(() => window.__same)) === 'yes' && (await T(c.page, 'cr-wait').count()) === 0 && ((await T(c.page, 'cr-open').textContent()) ?? '').trim() === W.open && (await c.page.locator('main').getAttribute('data-screen')) === 'mark')
+      if (lang === 'ja') await c.page.screenshot({ path: `${SHOTS}/p11-after-ja-390.png` })
+      check(`no page errors (run 45, ${lang}, unlock)`, c.errs.length === 0, c.errs.join('; '))
+      await c.ctx.close()
+    }
+  }
+  // no name: the wording without it
+  {
+    const { page, ctx } = await open('ja', { leftMs: 2 * 24 * H, viewNow: lockedView('ja', { from: '', to: '' }) })
+    await T(page, 'cr-wait').waitFor()
+    check('waiting (ja, no names): 「小さな印がひとつ、/ 届いています。」 and no label', norm(await T(page, 'cr-wait-title').innerText()) === '小さな印がひとつ、 届いています。' && (await T(page, 'cr-for').count()) === 0)
+    await ctx.close()
+  }
+  // a remembrance and a quiet purpose keep today's sealed envelope
+  for (const [label, over] of [['remembrance', { memorial: true, purpose: 'memorial' }], ['apology', { purpose: 'apology' }]]) {
+    const { page, ctx } = await open('ja', { leftMs: 3 * 24 * H, viewNow: lockedView('ja', over) })
+    await T(page, 'gift-envelope').waitFor({ timeout: 8000 }).catch(() => {})
+    check(`waiting: a locked ${label} gift keeps today's sealed envelope (not the new waiting screen)`, (await T(page, 'gift-envelope').count()) === 1 && (await page.locator('[data-ceremony=new]').count()) === 0)
+    await ctx.close()
+  }
+  // the sender's preview of a locked gift: the waiting screen first, then on into the ceremony as today
+  {
+    const v = fullView('ja', { waiting: { opens_on: OPENS.ja.on, opens_at: OPENS.ja.at, opens_tz: OPENS.ja.tz } })
+    const { page, ctx, errs } = await open('ja', { leftMs: 2 * 24 * H, unlockedView: v, viewNow: v, search: `?preview=${SENDER}` })
+    await T(page, 'cr-wait').waitFor({ timeout: 8000 })
+    check('the sender\'s preview of a locked gift shows the same waiting screen first (with the preview note), and a button to go on', norm(await T(page, 'cr-wait-opens').innerText()) === WORDS.ja.opens && (await T(page, 'gift-preview-note').count()) === 1 && (await T(page, 'cr-wait-continue').count()) === 1)
+    await page.screenshot({ path: `${SHOTS}/p11-wait-preview-ja-390.png` })
+    await T(page, 'cr-wait-continue').click()
+    await T(page, 'cr-markbtn').waitFor({ timeout: 5000 })
+    check('…and going on shows the ceremony as today (screen 1, the mark you can touch)', (await T(page, 'cr-wait').count()) === 0 && (await page.locator('main').getAttribute('data-screen')) === 'mark')
+    check('no page errors (run 45, preview)', errs.length === 0, errs.join('; '))
     await ctx.close()
   }
 }

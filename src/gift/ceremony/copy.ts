@@ -22,6 +22,15 @@ const CER_EN = {
   markBody: 'It is all there is on the page. Touch it, and look closer.',
   markButton: 'Look closer',
   markAria: 'Look closer at the small mark',
+  // 1b · the waiting screen of a gift that is still locked (Part 11, 2026-11-20): the same look as screen 1, sealed
+  waitTitle: (from: string) => (s(from) ? [`${s(from)} sent you`, 'one small mark.'] : ['Someone sent you', 'one small mark.']),
+  waitOpens: (day: string, clock: string, zone: string) => (s(day) ? `It opens on ${s(day)}${s(clock) ? ` at ${s(clock)}` : ''}${s(zone) ? ` (${s(zone)})` : ''}.` : ''),
+  waitLine: (kind: 'days' | 'hours' | 'soon', n: number): [string, string] => {
+    const k = Number.isFinite(n) ? Math.trunc(n) : 0
+    return kind === 'days' ? [k === 1 ? 'One day to go' : `${k} days to go`, '. Until then, it stays sealed.'] : kind === 'hours' ? [k === 1 ? 'One hour to go' : `${k} hours to go`, '. Until then, it stays sealed.'] : ['Opening soon', '.']
+  },
+  waitSmall: 'Keep this page. When the time comes, you can open it right here.',
+  waitContinue: 'Continue to what they will see',
   // 2 · the note
   noteLabel: (from: string) => (s(from) ? `A note from ${s(from)}` : 'A note'),
   noteTitle: 'A few words first.',
@@ -118,6 +127,15 @@ const CER_JA: CerCopy = {
   markBody: 'ページにあるのは、これだけです。触れて、近くで見てください。',
   markButton: '近くで見る',
   markAria: '小さな印を近くで見る',
+  // 1b · the waiting screen of a gift that is still locked (Part 11, 2026-11-20): the same look as screen 1, sealed
+  waitTitle: (from: string) => (s(from) ? [`${s(from)}さんから、`, '小さな印がひとつ届いています。'] : ['小さな印がひとつ、', '届いています。']),
+  waitOpens: (day: string, clock: string, zone: string) => (s(day) ? `この印は、${s(day)}${s(clock) ? ` ${s(clock)}` : ''}${s(zone) ? `（${s(zone)}）` : ''}に開きます。` : ''),
+  waitLine: (kind: 'days' | 'hours' | 'soon', n: number): [string, string] => {
+    const k = Number.isFinite(n) ? Math.trunc(n) : 0
+    return kind === 'days' ? [`あと${k}日`, '。その日まで、封は閉じたままです。'] : kind === 'hours' ? [`あと${k}時間`, '。それまで、封は閉じたままです。'] : ['まもなく開きます', '。']
+  },
+  waitSmall: 'このページを残しておいてください。その時刻になると、ここから開けます。',
+  waitContinue: '相手が見る画面へ進む',
   noteLabel: (from: string) => (s(from) ? `${s(from)}さんからのひとこと` : 'ひとこと'),
   noteTitle: 'まずは、短いことばから。',
   noteBody: '続きは、となりの印の中にあります。',
@@ -201,6 +219,15 @@ const CER_ZH_HANT: CerCopy = {
   markBody: '頁面上只有它。輕觸它，靠近看看。',
   markButton: '靠近看看',
   markAria: '靠近看那枚小小的印',
+  // 1b · the waiting screen of a gift that is still locked (Part 11, 2026-11-20): the same look as screen 1, sealed
+  waitTitle: (from: string) => (s(from) ? [`${s(from)}送給你`, '一枚小小的印。'] : ['有人送給你', '一枚小小的印。']),
+  waitOpens: (day: string, clock: string, zone: string) => (s(day) ? `這枚印將在${s(day)}${s(clock) ? ` ${s(clock)}` : ''}${s(zone) ? `（${s(zone)}）` : ''}打開。` : ''),
+  waitLine: (kind: 'days' | 'hours' | 'soon', n: number): [string, string] => {
+    const k = Number.isFinite(n) ? Math.trunc(n) : 0
+    return kind === 'days' ? [`還有${k}天`, '。在那之前，它會一直封著。'] : kind === 'hours' ? [`還有${k}小時`, '。在那之前，它會一直封著。'] : ['即將打開', '。']
+  },
+  waitSmall: '請保留這個頁面。時間一到，就能在這裡打開。',
+  waitContinue: '繼續看對方會看到的畫面',
   noteLabel: (from: string) => (s(from) ? `${s(from)}的幾句話` : '幾句話'),
   noteTitle: '先讀幾句話。',
   noteBody: '其餘的，都在旁邊那枚印裡。',
@@ -284,6 +311,15 @@ const CER_ZH_HANS: CerCopy = {
   markBody: '页面上只有它。轻触它，靠近看看。',
   markButton: '靠近看看',
   markAria: '靠近看那枚小小的印',
+  // 1b · the waiting screen of a gift that is still locked (Part 11, 2026-11-20): the same look as screen 1, sealed
+  waitTitle: (from: string) => (s(from) ? [`${s(from)}送给你`, '一枚小小的印。'] : ['有人送给你', '一枚小小的印。']),
+  waitOpens: (day: string, clock: string, zone: string) => (s(day) ? `这枚印将在${s(day)}${s(clock) ? ` ${s(clock)}` : ''}${s(zone) ? `（${s(zone)}）` : ''}打开。` : ''),
+  waitLine: (kind: 'days' | 'hours' | 'soon', n: number): [string, string] => {
+    const k = Number.isFinite(n) ? Math.trunc(n) : 0
+    return kind === 'days' ? [`还有${k}天`, '。在那之前，它会一直封着。'] : kind === 'hours' ? [`还有${k}小时`, '。在那之前，它会一直封着。'] : ['即将打开', '。']
+  },
+  waitSmall: '请保留这个页面。时间一到，就能在这里打开。',
+  waitContinue: '继续看对方会看到的画面',
   noteLabel: (from: string) => (s(from) ? `${s(from)}的几句话` : '几句话'),
   noteTitle: '先读几句话。',
   noteBody: '其余的，都在旁边那枚印里。',
