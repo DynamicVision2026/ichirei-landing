@@ -23,6 +23,7 @@ function check(name: string, cond: boolean, detail?: string) {
 const GOLDEN = JSON.parse(readFileSync(join(process.cwd(), 'scripts', 'golden-fixture.json'), 'utf8'))
 const GOLDEN_STORY =
   '父は口下手で厳しくて、ほめられた記憶なんてほとんどない。進路のことでも何度もぶつかった。ただ、私が東京に出るとき駅まで送ってくれて、改札で「金は要るか」って、それだけ言って封筒を押し付けてきた。あれから二十年、盆に帰るたびに車で駅まで迎えに来て、帰りも必ず送ってくれる。相変わらず、ほとんど何も話さないけど。'
+const ZH_STORY_HANS = '他总是把玄关的灯留着，不管我多晚回家。二十年了，从来没有一次是暗的。' // Part 6: the story's own script decides zh-Hans vs zh-Hant
 const ZH_STORY = '他總是把玄關的燈留著，不管我多晚回家。二十年了，從來沒有一次是暗的。'
 
 // ---- fake Anthropic upstream ---------------------------------------------
@@ -288,7 +289,7 @@ try {
   check('api: bare "zh" is rejected — use zh-Hans or zh-Hant', (await post({ story: GOLDEN_STORY, language: 'zh' })).status === 400)
   check('api: unknown inscription_script → 400', (await post({ story: GOLDEN_STORY, language: 'zh-Hans', inscription_script: 'hant' })).status === 400)
   const nZh = selectCount()
-  const zhApi = await ndjson(await post({ story: ZH_STORY, language: 'zh-Hans', inscription_script: 'simplified' }))
+  const zhApi = await ndjson(await post({ story: ZH_STORY_HANS, language: 'zh-Hans', inscription_script: 'simplified' }))
   check('api: zh-Hans + inscription_script reach the engine and come back echoed', zhApi.at(-1)?.type === 'result' && zhApi.at(-1).result.language === 'zh-Hans' && zhApi.at(-1).result.inscription_script === 'simplified' && selectCount() === nZh + 1 && lastPrompt().includes('display_script: simplified'))
   check('api: unknown occasion → 400', (await post({ story: GOLDEN_STORY, occasion: 'kanreki' })).status === 400)
   check('api: unknown direction → 400', (await post({ story: GOLDEN_STORY, direction: 'sideways' })).status === 400)

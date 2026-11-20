@@ -22,6 +22,7 @@ import { visitorOf } from '../engine/visitor.ts'
 import { recordCustomerEvent } from '../engine/customer.ts'
 import { recordHealth } from '../engine/health.ts'
 import { previewOutcome, previewView, renderPreview, startPreview, type PreviewDeps } from '../engine/preview.ts'
+import { decideStoryLanguage } from '../engine/story-language.ts'
 
 const MAX_BODY_BYTES = 60_000
 const DAY_MS = 86_400_000
@@ -104,7 +105,7 @@ export function createPreviewHandlers(deps: () => PreviewApiDeps) {
         { ...d, store: d.store },
         {
           story: mergeStory(story.trim(), fu.followUps),
-          language: ctx.context.language,
+          language: decideStoryLanguage(mergeStory(story.trim(), fu.followUps), ctx.context.language), // the film's world follows the story's language (Part 6)
           relationship: ctx.context.relationship,
           direction: ctx.context.direction,
           occasion: ctx.context.occasion,

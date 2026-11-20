@@ -24,6 +24,7 @@ import { createOrderStore } from '../engine/order-store.ts'
 import { newMoment, siteRound } from '../engine/day-limits.ts'
 import { recordHealth } from '../engine/health.ts'
 import { classOf, requestIdOf, visitorCode } from '../engine/engine-log.ts'
+import { decideStoryLanguage } from '../engine/story-language.ts'
 import { clientIp } from '../engine/rate-limit.ts'
 import { visitorOf } from '../engine/visitor.ts'
 import { recordCustomerEvent } from '../engine/customer.ts'
@@ -95,13 +96,19 @@ export async function POST(req: Request): Promise<Response> {
   // length-capped).
   const parsed = parseContext({ language, relationship, direction, occasion, occasion_detail, inscription_script, reader, purpose, purpose_other, state, state_other, relationship_other, receiver_gender, sender_gender })
   if (!parsed.ok) return jsonResponse(400, { error: parsed.error })
+  // The story's language is the one key (Part 6, 2026-11-20): decided ONCE here, when the round starts, from the text (typed or spoken) — Traditional or Simplified follows its own characters, a mixed
+  // story follows its larger part, a story too short to tell keeps the page's language. Every engine step below (the prompt file, the lexicon, the review, the gaze, the explain step, the poem forms, the film
+  // world) runs in it; the page language only fills in when the text says nothing and keeps deciding the menus, prices, currency and checkout.
+  const pageLanguage = parsed.context.language
+  const storyLanguage = decideStoryLanguage(mergeStory(story, fu.followUps), pageLanguage)
+  const engineContext = { ...parsed.context, language: storyLanguage }
   // The story-opener question: `prompt_question` is { id, text }. Only a KNOWN id counts and the wording is the server's own (text from the
   // request is never put in a prompt); it does not count toward the story limit and an unknown one is simply ignored.
-  const promptQuestion = parsePromptQuestion(prompt_question, parsed.context.language)
+  const promptQuestion = parsePromptQuestion(prompt_question, pageLanguage)
 
   // 「別の候補を見る」: the characters already shown for this story (never chosen again) and which retry this is (at most 2).
   const ex = parseExclude(exclude, retry, maxRoundsOf(process.env) - 1)
-  if (!ex.ok) return jsonResponse(400, { error: ex.code === 'retry_limit' ? (NO_MORE_ROUNDS[parsed.context.language] ?? NO_MORE_ROUNDS.en) : ex.error, code: ex.code })
+  if (!ex.ok) return jsonResponse(400, { error: ex.code === 'retry_limit' ? (NO_MORE_ROUNDS[pageLanguage] ?? NO_MORE_ROUNDS.en) : ex.error, code: ex.code })
 
   if (!process.env.ANTHROPIC_API_KEY) {
     console.error('[ichirei-select] ANTHROPIC_API_KEY is not set on the server')
@@ -112,7 +119,7 @@ export async function POST(req: Request): Promise<Response> {
   // A missing or forged cookie is never a reason to refuse — it is just a new browser. Nothing here touches checkout or payment.
   {
     const store = createOrderStore()
-    const lang = parsed.context.language
+    const lang = pageLanguage
     const refuse = (code: 'limit_person' | 'limit_site') => {
       console.log(`[ichirei-limit] ${JSON.stringify({ route: '/api/select', code })}`)
       void recordHealth(store, code)
@@ -129,7 +136,7 @@ export async function POST(req: Request): Promise<Response> {
   // The rounds are counted by the server (gift ceremony ticket, part 0): round 1 hands out a signed ticket, a later round must present it, and round MAX + 1 is refused whatever the page says.
   const round_ticket_in = (body as { round_ticket?: unknown }).round_ticket
   const claim = await claimRound(createOrderStore(), round_ticket_in, ex.retry, maxRoundsOf(process.env))
-  if (!claim.ok) return jsonResponse(400, { error: claim.code === 'retry_limit' ? (NO_MORE_ROUNDS[parsed.context.language] ?? NO_MORE_ROUNDS.en) : 'The round ticket is not valid', code: claim.code })
+  if (!claim.ok) return jsonResponse(400, { error: claim.code === 'retry_limit' ? (NO_MORE_ROUNDS[pageLanguage] ?? NO_MORE_ROUNDS.en) : 'The round ticket is not valid', code: claim.code })
   const serverRetry = claim.round - 1
 
   let wantsDebug = false
@@ -151,14 +158,14 @@ export async function POST(req: Request): Promise<Response> {
       let debug: Record<string, unknown> | null = null
       try {
         const result = await runEngine(mergeStory(story, fu.followUps), cond, {
-          context: parsed.context,
+          context: engineContext,
           promptQuestion: promptQuestion?.text ?? null,
           exclude: ex.exclude,
           round: serverRetry + 1,
           followUpsUsed: fu.followUps.length,
           onStage: (stage) => send({ type: 'stage', stage }),
           onUsage: (stage, usage) => cost.add(stage, usage),
-          onCard: (partial) => send({ type: 'card', result: partial }),
+          onCard: (partial) => send({ type: 'card', result: { ...partial, story_language: storyLanguage, page_language: pageLanguage } }),
           // The /ops count of where the third card (趣字) came from (codes only; best effort)
           onFreeSource: (info) => void recordFreeSource(createOrderStore(), info),
           onMain: (info) => void recordMain(createOrderStore(), info),
@@ -180,7 +187,7 @@ export async function POST(req: Request): Promise<Response> {
         // Learning loop: codes and booleans only, tied to a random browser session id (engine/analytics.ts). Never awaited.
         const sessionId = cleanSession(session)
         if (sessionId) void recordEvent(shownEvent(result, sessionId, cleanSource(source), new Date(), Date.now() - t0))
-        send({ type: 'result', result, round_ticket: claim.ticket, ...(wantsDebug && debug ? { debug } : {}) })
+        send({ type: 'result', result: { ...result, story_language: storyLanguage, page_language: pageLanguage }, round_ticket: claim.ticket, ...(wantsDebug && debug ? { debug } : {}) })
       } catch (err) {
         void claim.release() // the engine broke: this round is given back
         // The full error stays in the server log, with the class and the provider's request id. The page gets only a code (2026-11-20): it shows its own calm text, never a message, a status or JSON.

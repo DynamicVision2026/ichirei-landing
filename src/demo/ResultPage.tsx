@@ -34,13 +34,17 @@ export interface ResultLive {
   preview: PreviewState
   memorial: boolean
   quiet: boolean
+  /** the language of the story (the gift): the character, its word or reading, the line, the poem */
   language: UiLanguage
+  /** the language of the page: the heading, the labels, the buttons */
+  pageLanguage?: UiLanguage
   receiverName: string
   pc: PreviewCopy
 }
 
 export default function ResultPage({ live, onMake, onAnother, onBack }: { live: ResultLive; onMake: () => void; onAnother: () => void; onBack: () => void }) {
-  const c = RESULT_COPY[live.language]
+  const pageLang: UiLanguage = live.pageLanguage ?? live.language
+  const c = RESULT_COPY[pageLang]
   const ref = useRef<HTMLDivElement | null>(null)
   const { preview } = live
   // the page opens at the top, and the landing behind it does not scroll
@@ -55,7 +59,7 @@ export default function ResultPage({ live, onMake, onAnother, onBack }: { live: 
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
-  const lang = toRevealLang(live.language)
+  const lang = toRevealLang(pageLang)
   const name = live.receiverName.trim()
   const heading = name ? c.headingNamed(name) : c.heading
   // pictures: a slot that failed for good shows the nearest PASSED picture (never the plain tile); nothing passed at all leaves the block out
@@ -79,7 +83,7 @@ export default function ResultPage({ live, onMake, onAnother, onBack }: { live: 
   const waiting = (drawing && !noPictures) || poemWaiting
   const who = live.line
   return (
-    <div className="rs" ref={ref} role="dialog" aria-modal="true" aria-label={heading} data-testid="result-page" data-quiet={live.quiet ? 'yes' : 'no'} data-memorial={live.memorial ? 'yes' : undefined} lang={live.language === 'zh-Hans' ? 'zh-Hans' : live.language === 'zh-Hant' ? 'zh-Hant' : live.language}>
+    <div className="rs" ref={ref} role="dialog" aria-modal="true" aria-label={heading} data-testid="result-page" data-quiet={live.quiet ? 'yes' : 'no'} data-memorial={live.memorial ? 'yes' : undefined} lang={pageLang === 'zh-Hans' ? 'zh-Hans' : pageLang === 'zh-Hant' ? 'zh-Hant' : pageLang}>
       <div className="rs-inner">
         {/* the writing room's header (2026-11-20): the brand (to the landing page in the page's language), My gifts (n), and the way back to the writing page with the story still in the box. It scrolls away with the page: never sticky. */}
         <header className="rs-top" data-testid="result-top">

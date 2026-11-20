@@ -78,6 +78,7 @@ export function orderStatOf(entry: OrderIndexEntry, rec: OrderRecord | null, pay
     slot: chosen ? (SLOT[chosen.slot] ?? null) : null,
     memorial: entry.memorial === true,
     language: p.language,
+    ...(rec.page_language ? { page_language: rec.page_language } : {}),
     purpose: p.certificate?.purpose ?? null,
     price_jpy: paidAmount ?? (typeof p.price_jpy === 'number' ? p.price_jpy : 0),
     ...(buyerAmount ? { price_buyer: buyerAmount } : {}),

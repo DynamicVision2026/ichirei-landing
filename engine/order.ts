@@ -139,7 +139,10 @@ export interface ValidOrder {
   /** The story-opener question the sender was shown (a known id; codes only) — for the report of which questions lead to which characters. */
   prompt_question_id?: string | null
   engine_result: EngineResult
+  /** The language of the gift: the language the STORY is written in (Part 6, 2026-11-20) — the character, its reading and meaning, the line, the poem, the film and the receiver's ceremony. */
   language: Language
+  /** The language of the PAGE the customer ordered on: the menus, the prices and currency, the checkout and the e-mails (defaults to the story's language for an older page). */
+  page_language: Language
   candidate: Candidate
   /** The character to carve, from the candidate and the chosen style. */
   glyph: string
@@ -220,6 +223,8 @@ export function parseOrderRequest(body: unknown, now: Date = new Date(), palette
     return fail('language', `Invalid "language": expected one of ${LANGUAGES.join(' | ')}`)
   }
   const lang = language as Language
+  const pageRaw = body.page_language
+  const pageLanguage: Language = typeof pageRaw === 'string' && (LANGUAGES as readonly string[]).includes(pageRaw) ? (pageRaw as Language) : lang
 
   if (!isText(body.story)) return fail('story', 'Missing "story"')
   const story = body.story.trim()
@@ -336,6 +341,7 @@ export function parseOrderRequest(body: unknown, now: Date = new Date(), palette
       prompt_question_id: findQuestion(body.prompt_question_id)?.question.id ?? null,
       engine_result: result as unknown as EngineResult,
       language: lang,
+      page_language: pageLanguage,
       candidate,
       glyph,
       certificate: (() => {
@@ -409,7 +415,7 @@ export const VISIBLE_PROPERTY: Record<Language, { character: string; opens: stri
  */
 export function lineAttributes(order: ValidOrder, orderRef: string, animationLink?: string | null, giftLink?: string | null): Attribute[] {
   const opensOn = order.open_date ?? order.delivery_date
-  const v = VISIBLE_PROPERTY[order.language]
+  const v = VISIBLE_PROPERTY[order.page_language ?? order.language] // what the customer reads on the cart: the page's language
   return [
     { key: v.character, value: order.glyph },
     { key: v.opens, value: opensOn },
@@ -421,7 +427,8 @@ export function lineAttributes(order: ValidOrder, orderRef: string, animationLin
     { key: '_receiver_name', value: order.receiver_name },
     { key: '_delivery_date', value: order.delivery_date },
     { key: '_opens_on', value: opensOn },
-    { key: '_language', value: order.language },
+    { key: '_language', value: order.page_language ?? order.language }, // the buyer's language: the e-mails and pages that talk to the buyer
+    { key: '_story_language', value: order.language }, // the gift's language (the story's)
     { key: '_order_ref', value: orderRef },
     // Part C: the size code (the SKU) and where it goes. Direct: gift packaging and NO price slip, the receiver's address is the one at checkout.
     { key: '_ichirei_size', value: PACKAGE_SKU[order.package] },
@@ -525,6 +532,9 @@ export interface OrderRecord {
   status: OrderStatus
   created_at: string
   updated_at: string
+  /** Part 6 (2026-11-20): the language the story is written in (the gift's) and the language of the page it was ordered on (the menus, prices, checkout). Older records have neither: both are `production.language`. */
+  story_language?: Language
+  page_language?: Language
   /** The private story animation of this order (AN-…): the page is /a/<id>. */
   animation_id?: string | null
   /** The receiver's gift page (RG-…): /g/<token>. */
@@ -615,6 +625,8 @@ export function buildRecord(order: ValidOrder, orderRef: string, now: Date = new
     status: 'pending',
     created_at: iso,
     updated_at: iso,
+    story_language: order.language,
+    page_language: order.page_language ?? order.language,
     production: {
       language: order.language,
       kanji: order.candidate.kanji,

@@ -59,6 +59,9 @@ export interface Fingerprint {
 
 export interface EngineResult {
   language?: 'ja' | 'zh-Hans' | 'zh-Hant' | 'en'
+  /** Part 6: the story's language (the engine ran in it; = language) and the page's, as the server decided them. */
+  story_language?: 'ja' | 'zh-Hans' | 'zh-Hant' | 'en'
+  page_language?: 'ja' | 'zh-Hans' | 'zh-Hant' | 'en'
   inscription_script?: 'traditional' | 'simplified' | null
   relationship?: string | null
   direction?: 'up' | 'down' | 'across' | null

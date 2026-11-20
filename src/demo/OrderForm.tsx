@@ -62,6 +62,8 @@ type Props = {
   /** The receiver's name as typed here (the result page's heading uses it when it is known), and the name to start with when the sender comes back. */
   receiverName?: string
   onReceiver?: (name: string) => void
+  /** The language of the page the customer is on (Part 6): the menus, prices and checkout. Defaults to the story's language. */
+  pageLanguage?: UiLanguage
 }
 
 const pad = (n: number) => String(n).padStart(2, '0')
@@ -78,16 +80,18 @@ const daysUntil = (iso: string) => {
 
 const FIELD_KEYS: readonly OrderField[] = ['sender_name', 'receiver_name', 'delivery_date', 'inscription_style', 'package']
 
-export default function OrderForm({ result, story, followUps = [], promptQuestionId = null, candidate, copy, onBack, draftRef, shown, onLive, receiverName = '', onReceiver }: Props) {
+export default function OrderForm({ result, story, followUps = [], promptQuestionId = null, candidate, copy, onBack, draftRef, shown, onLive, receiverName = '', onReceiver, pageLanguage }: Props) {
   const reduceMotion = useReducedMotion()
-  // The gift's language is the language the engine ran in (the certificate follows it).
-  const language: UiLanguage = result.language ?? 'ja'
+  // Two languages (Part 6, 2026-11-20). The GIFT's language is the language of the story (the engine ran in it): the character, its reading and meaning, the line, the poem, the certificate and the receiver's
+  // ceremony follow it. The PAGE's language decides the menus, the prices and currency, the zone, the checkout. `language` below is the page's; `giftLanguage` is the story's.
+  const giftLanguage: UiLanguage = result.language ?? 'ja'
+  const language: UiLanguage = pageLanguage ?? giftLanguage
   const o = copy.order
   // Remembrance: ink instead of cinnabar on the slip, and the receiver field is the person being remembered.
   const memorial = isMemorial(result.occasion)
   // Launch freeze: apology, encouragement and remembrance are ink — no red on the slip or the card preview (the wording of a remembrance stays its own).
   const quiet = memorial || isQuietPurpose(result.purpose)
-  const distinct = hasFormChoice(language, candidate) // (ja and en carve the modern form only: no choice to show)
+  const distinct = hasFormChoice(giftLanguage, candidate) // (ja and en carve the modern form only: no choice to show)
 
   const [sender, setSender] = useState('')
   const [receiver, setReceiverState] = useState(receiverName)
@@ -96,7 +100,7 @@ export default function OrderForm({ result, story, followUps = [], promptQuestio
     onReceiver?.(v)
   }
   const [date, setDate] = useState('')
-  const [style, setStyle] = useState<InscriptionStyle>(DEFAULT_STYLE[language])
+  const [style, setStyle] = useState<InscriptionStyle>(DEFAULT_STYLE[giftLanguage])
   // An order that was paid without our site (2026-11-13, /claim): the character is attached to that order — the e-gift, nothing to pay, no checkout.
   const claim = useMemo(() => getClaim(), [])
   const claimCopy = CLAIM_COPY[language]
@@ -129,7 +133,7 @@ export default function OrderForm({ result, story, followUps = [], promptQuestio
   const preview = usePreview({ result, story, followUps, shown: shownForms, picked: pickedForms, draftRef })
 
   // what the result page shows, from what this form holds (the pictures are drawn once per story; the poem is written by PoemAddOn below)
-  const enBridge = language === 'en'
+  const enBridge = giftLanguage === 'en'
   useEffect(() => {
     onLive?.({
       kanji: candidate.kanji,
@@ -144,18 +148,19 @@ export default function OrderForm({ result, story, followUps = [], promptQuestio
       preview,
       memorial,
       quiet,
-      language,
+      language: giftLanguage,
+      pageLanguage: language,
       receiverName: receiver,
       pc,
     })
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [glyph, candidate, poemShown, poemStep, preview, memorial, quiet, language, receiver])
+  }, [glyph, candidate, poemShown, poemStep, preview, memorial, quiet, giftLanguage, language, receiver])
   // The carving check (spec v9.1 step 9): the Simple set only takes up to N strokes; a character above it is offered with the Standard set only.
   // The server re-checks with its own count; with no count at all (an old result) the form does not block and the server decides.
   const maxStrokes = result.simple_max_strokes ?? DEFAULT_SIMPLE_MAX_STROKES
   const strokes = carvedStrokes(candidate, glyph)
   const simpleOk = candidate.strokes ? simpleAvailable(strokes, maxStrokes) : true
-  const cert = certificateText(language)
+  const cert = certificateText(giftLanguage)
   // Names are optional (a nickname is enough): blank is fine, only the length is checked.
   const senderOk = [...sender.trim()].length <= NAME_MAX
   const receiverOk = [...receiver.trim()].length <= NAME_MAX
@@ -205,7 +210,8 @@ export default function OrderForm({ result, story, followUps = [], promptQuestio
           selected_kanji: candidate.kanji,
           shown_characters: shown.map((x) => ({ set: x.set, candidate: x.candidate })),
           ...(preview.draftId ? { draft_id: preview.draftId } : {}),
-          language,
+          language: giftLanguage, // the story's language: the gift record, the certificate, the receiver's ceremony
+          page_language: language, // the page's: the checkout, the currency, the e-mails
           sender_name: sender,
           receiver_name: receiver,
           ...(pkg !== 'egift' ? { delivery_date: date } : {}),
@@ -286,7 +292,7 @@ export default function OrderForm({ result, story, followUps = [], promptQuestio
         <span data-order-glyph className="k slipGlyph notranslate">
           {glyph}
         </span>
-        {language === 'en' && candidate.slot !== 'freestyle' && candidate.en_word ? (
+        {giftLanguage === 'en' && candidate.slot !== 'freestyle' && candidate.en_word ? (
           <EnBridgeStack className="slipStack" word={candidate.en_word} line={candidate.en_line} echo={candidate.en_echo} classical={candidate.classical_echo ?? null} />
         ) : (
           <span className="slipReading">{copy.glyphReading(candidate, glyph)}</span>
@@ -299,14 +305,14 @@ export default function OrderForm({ result, story, followUps = [], promptQuestio
 
       <div className="composer">
         {/* The included poem: one format, shown in full before checkout */}
-        <PoemAddOn egift={egiftCopy} result={result} story={story} followUps={followUps} candidate={candidate} copy={copy} language={language} onChange={(ids, step, poem) => { setPoemIds(ids); setPoemStep(step); setPoemShown(poem ?? null) }} disabled={busy} />
+        <PoemAddOn egift={egiftCopy} result={result} story={story} followUps={followUps} candidate={candidate} copy={copy} language={giftLanguage} onChange={(ids, step, poem) => { setPoemIds(ids); setPoemStep(step); setPoemShown(poem ?? null) }} disabled={busy} />
 
         {/* Inscription form: only a real choice when the character has a distinct old/traditional form */}
         <fieldset className="cgroup">
           <legend className="clab">{o.inscriptionLabel}</legend>
           {distinct ? (
             <div className="optRow">
-              {STYLES_BY_LANGUAGE[language].map((st) => (
+              {STYLES_BY_LANGUAGE[giftLanguage].map((st) => (
                 <label key={st} className={`opt${style === st ? ' on' : ''}`}>
                   <input type="radio" name="inscription_style" value={st} checked={style === st} onChange={() => setStyle(st)} />
                   <span className="k optGlyph notranslate">{glyphFor(candidate, st)}</span>

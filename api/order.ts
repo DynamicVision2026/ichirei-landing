@@ -219,7 +219,7 @@ export function createOrderHandler(deps: () => OrderDeps) {
       console.error('[ichirei-order]', JSON.stringify({ event: 'order_record_failed', order_ref: orderRef }))
       void recordHealth(d.store, 'order_record_failed', { ref: orderRef, reason: 'store' }, d.now?.() ?? new Date())
       await releaseClaim()
-      return json(503, { error: ORDER_RECORD_FAILED[order.language] ?? ORDER_RECORD_FAILED.en, code: 'order_record_failed' })
+      return json(503, { error: ORDER_RECORD_FAILED[order.page_language] ?? ORDER_RECORD_FAILED.en, code: 'order_record_failed' })
     }
 
     // 2. Keep the story and the result before anything is sold.
@@ -268,7 +268,7 @@ export function createOrderHandler(deps: () => OrderDeps) {
       let heldCart: CartPromo | undefined
       let heldRec: Awaited<ReturnType<typeof holdForCart>> = null
       // the free gift is an e-gift: a wooden size never carries the code (its price stays as shown)
-      if (isPromoLanguage(order.language) && order.package === 'egift') {
+      if (isPromoLanguage(order.page_language) && order.package === 'egift') {
         try {
           const env = d.env ?? process.env
           heldRec = await holdForCart({ store: d.store, env, now: d.now, shopify: d.promoShopify !== undefined ? d.promoShopify : promoShopifyFrom(env), log: (l) => console.log(l) }, { browser: record.visitor ?? null })
@@ -283,7 +283,7 @@ export function createOrderHandler(deps: () => OrderDeps) {
       }
       let cart: Awaited<ReturnType<typeof createCart>>
       try {
-        cart = await createCart(d.shopify!, order.package, lineAttributes(order, orderRef, animationLink, giftLink), orderRef, d.fetchImpl, order.language, heldCart, d.promoRetryMs)
+        cart = await createCart(d.shopify!, order.package, lineAttributes(order, orderRef, animationLink, giftLink), orderRef, d.fetchImpl, order.page_language, heldCart, d.promoRetryMs)
       } catch (err) {
         if (err instanceof PromoCartNotFree) return promoBreak(record, orderRef, putOrder, d)
         throw err

@@ -6,6 +6,7 @@ import type { VercelRequest, VercelResponse } from '@vercel/node'
 import { FOLLOW_UP_MAX, STORY_MAX, countChars, mergeStory, parseContext, parseFollowUps } from '../engine/contract.ts'
 import { runExplain, type ExplainCandidate } from '../engine/explain.ts'
 import { classOf, requestIdOf, visitorCode } from '../engine/engine-log.ts'
+import { decideStoryLanguage } from '../engine/story-language.ts'
 
 // Full Hobby-plan ceiling (also mirrored in vercel.json).
 export const maxDuration = 60
@@ -70,7 +71,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   }
 
   try {
-    const explanation = await runExplain(mergeStory(story, fu.followUps), candidate as ExplainCandidate, { context: parsed.context })
+    const explanation = await runExplain(mergeStory(story, fu.followUps), candidate as ExplainCandidate, { context: { ...parsed.context, language: decideStoryLanguage(mergeStory(story, fu.followUps), parsed.context.language) } })
     return res.status(200).json({ explanation })
   } catch (err) {
     // the full error stays in the log (with the class and the request id); the page gets a code only and shows its own calm words

@@ -891,7 +891,7 @@ export default function DemoApp({ mode = 'harness', aside }: { mode?: Mode; asid
 
       {customer && (phase === 'order' || phase === 'result') && result && chosen && (
         <div hidden={phase === 'result'}>
-        <OrderForm onLive={setLive} receiverName={receiverName} onReceiver={setReceiverName} result={customer && sets[chosenSet] ? sets[chosenSet] : result} draftRef={draftRef} shown={sets.flatMap((r, i) => r.candidates.filter((c) => !c.eliminated).map((c) => ({ set: (i + 1) as 1 | 2 | 3, candidate: c })))} story={story} followUps={followUps} promptQuestionId={customer ? questionId : null} candidate={chosen} copy={copy} onBack={() => setPhase('reveal')} />
+        <OrderForm pageLanguage={context.language} onLive={setLive} receiverName={receiverName} onReceiver={setReceiverName} result={customer && sets[chosenSet] ? sets[chosenSet] : result} draftRef={draftRef} shown={sets.flatMap((r, i) => r.candidates.filter((c) => !c.eliminated).map((c) => ({ set: (i + 1) as 1 | 2 | 3, candidate: c })))} story={story} followUps={followUps} promptQuestionId={customer ? questionId : null} candidate={chosen} copy={copy} onBack={() => setPhase('reveal')} />
         </div>
       )}
 

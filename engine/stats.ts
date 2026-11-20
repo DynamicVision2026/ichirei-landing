@@ -23,7 +23,9 @@ export interface OrderStat {
   kanji: string
   slot: ChosenSlot | null
   memorial: boolean
+  /** the story's language (the gift's); `page_language` is the page the order was made on (Part 6) — absent on an older order */
   language: string
+  page_language?: string
   purpose: string | null
   /** What was actually paid for the order (from the Shopify order; the package price only when Shopify could not say). */
   price_jpy: number

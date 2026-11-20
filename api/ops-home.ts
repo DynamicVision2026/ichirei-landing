@@ -54,6 +54,14 @@ export function statusOf(o: Omit<OrderStat, 'session'>): { label: string; tone: 
   return { label: 'Paid', tone: 'ink' }
 }
 
+const LANG_WORD = (l: string): string => (l === 'zh-Hant' || l === 'zh-Hans' ? 'zh' : l === 'ja' ? 'ja' : 'en')
+/** The language cell: the story's language, and the page's when it differs ("page ja · story zh", Part 6). */
+export const langCell = (o: { language: string; page_language?: string }): string => {
+  const story = LANG_WORD(o.language)
+  const page = o.page_language ? LANG_WORD(o.page_language) : story
+  return page === story ? (story === 'zh' ? 'Chinese' : story === 'ja' ? 'Japanese' : 'English') : `page ${page} · story ${story}`
+}
+
 const priceOf = (o: Omit<OrderStat, 'session'>): string => {
   if (o.free) return 'Free'
   if (o.price_buyer && o.price_buyer.currency === 'USD') return `$${Number(o.price_buyer.amount).toFixed(2)}`
@@ -204,7 +212,7 @@ export function renderHome(payload: StatsPayload, p: Period, now: Date, customer
     const st = statusOf(o)
     const word = o.word_en || englishWord(o.kanji, words)
     return `<tr><td>${esc(whenOf(o.paid_at ?? o.created_at))}</td><td class="k serif">${esc(o.kanji || '—')}</td><td>${esc(word || '')}</td><td>${esc(o.slot === 'free' ? 'Playful' : o.slot ? 'Main' : '')}</td>` +
-      `<td>${esc(o.language === 'zh-Hant' ? 'Chinese' : o.language === 'ja' ? 'Japanese' : 'English')}</td><td>${esc(o.purpose ?? '')}</td><td>${esc(priceOf(o))}</td><td><span class="pill ${st.tone === 'ink' ? '' : st.tone}">${st.label}</span></td><td class="muted">${esc(shortRef(o.order_ref))}</td></tr>`
+      `<td>${esc(langCell(o))}</td><td>${esc(o.purpose ?? '')}</td><td>${esc(priceOf(o))}</td><td><span class="pill ${st.tone === 'ink' ? '' : st.tone}">${st.label}</span></td><td class="muted">${esc(shortRef(o.order_ref))}</td></tr>`
   }).join('')
   const promoRows = (payload.promo?.days ?? []).slice(0, 16).map((d) => {
     const total = Math.max(1, d.given + d.held + d.left)
@@ -347,7 +355,7 @@ export function customersCsv(rows: CustomerRow[]): string {
 export function ordersCsv(payload: StatsPayload): string {
   const q = (v: unknown) => `"${String(v ?? '').replace(/"/g, '""')}"`
   const head = ['paid_at', 'order', 'character', 'english', 'card', 'language', 'occasion', 'price', 'free', 'collected', 'opened', 'status']
-  const lines = payload.orders.map((o) => [o.paid_at ?? o.created_at, shortRef(o.order_ref), o.kanji, o.word_en || englishWord(o.kanji), o.slot ?? '', o.language, o.purpose ?? '', priceOf(o), o.free ? 'yes' : 'no', o.collected ? 'yes' : 'no', o.opened ? 'yes' : 'no', statusOf(o).label].map(q).join(','))
+  const lines = payload.orders.map((o) => [o.paid_at ?? o.created_at, shortRef(o.order_ref), o.kanji, o.word_en || englishWord(o.kanji), o.slot ?? '', langCell(o), o.purpose ?? '', priceOf(o), o.free ? 'yes' : 'no', o.collected ? 'yes' : 'no', o.opened ? 'yes' : 'no', statusOf(o).label].map(q).join(','))
   return [head.join(','), ...lines].join('\n') + '\n'
 }
 

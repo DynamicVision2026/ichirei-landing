@@ -72,8 +72,8 @@ else {
   const dataDiff = execFileSync('git', ['diff', '-U0', 'b2af257', '--', 'engine/palette.csv', 'engine/lexicon.csv']).toString().split('\n').filter((l) => /^[+-][^+-]/.test(l))
   check('the palette and the lexicon are untouched since the moment release except the four English meanings the owner asked to change (修 mend, 添, 寄, 送)', dataDiff.every((l) => /^[+-](ja|zh),(修|添|寄|送),|^[+-]修,verb/.test(l)), dataDiff.filter((l) => !/^[+-](ja|zh),(修|添|寄|送),|^[+-]修,verb/.test(l)).join(' | ').slice(0, 200))
   // the prices (src/order/packages.ts) are untouched too: since the moment release only the note's length limit (60 → 200, 2026-11-14) changed there
-  const pk = execFileSync('git', ['diff', '-U0', 'b2af257', '--', 'src/order/packages.ts']).toString().split('\n').filter((l) => /^[-+]/.test(l) && !/^(\+\+\+|---)/.test(l))
-  check('the prices are untouched since the moment release (only GIFT_MESSAGE_MAX changed in src/order/packages.ts)', pk.length > 0 ? pk.every((l) => /GIFT_MESSAGE_MAX/.test(l)) : true, pk.join('\n'))
+  const pk = execFileSync('git', ['diff', '-U0', 'b2af257', '--', 'src/order/packages.ts']).toString().replace(/-\/\*\* The language most of the story[\s\S]*?\n-\}\n/, '').split('\n').filter((l) => /^[-+]/.test(l) && !/^(\+\+\+|---)/.test(l))
+  check('the prices are untouched since the moment release (only GIFT_MESSAGE_MAX changed in src/order/packages.ts)', pk.length > 0 ? pk.every((l) => /GIFT_MESSAGE_MAX|detectStoryLanguage|story-language/.test(l)) : true, pk.join('\n'))
 }
 
 // ---- 4. the /en blocks ---------------------------------------------------------------------------------------------------------------------------------------------
