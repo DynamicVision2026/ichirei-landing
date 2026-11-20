@@ -223,7 +223,7 @@ export default function OrderForm({ result, story, followUps = [], promptQuestio
           ...(poemIds.length ? { poems: poemIds.map((poem_id) => ({ poem_id })) } : {}),
           ...(refundAckAt ? { refund_ack_at: refundAckAt } : {}),
           ...(claim ? { claim: { order: claim.order, token: claim.token } } : {}),
-          ...(language === 'en' && Object.keys(getUtm()).length > 0 ? { utm: getUtm() } : {}),
+          ...(Object.keys(getUtm()).length > 0 ? { utm: getUtm() } : {}), // (every language since 2026-11-20)
           session: sessionId,
           source: 'customer',
         }),
@@ -235,7 +235,7 @@ export default function OrderForm({ result, story, followUps = [], promptQuestio
         data = null
       }
       const landing = claim ? data?.animation_url : data?.checkout_url // a claimed order goes to its own page, a normal one to Shopify checkout
-      if (res.ok && landing && language === 'en' && openDate) trackUs('egift_scheduled') // (English launch: the buyer scheduled the opening day)
+      if (res.ok && landing && openDate) trackUs('egift_scheduled') // (the buyer scheduled the opening day — counted for ja, zh and en since 2026-11-20)
       if (!res.ok || !landing) {
         const field = FIELD_KEYS.find((f) => f === data?.field)
         const message = field

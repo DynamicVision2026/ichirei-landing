@@ -166,7 +166,7 @@ export interface ValidOrder {
   open_tz: string | null
   /** When the buyer ticked the refund terms on the order step (ISO); null when the request carried none (e.g. a direct API call). */
   refund_ack_at: string | null
-  /** English orders only (2026-11-12): the utm_* parameters of the landing link, cleaned; passed to the cart line as hidden `_utm_…` attributes. */
+  /** The utm_* parameters of the landing link, cleaned; passed to the cart line as hidden `_utm_…` attributes. English since 2026-11-12; ja and zh too since 2026-11-20 (Part 10), so the dashboard counts all three. */
   utm?: Utm
   /** Every character shown for this story, with its slot (see ShownCharacter); always contains the chosen one. */
   shown: ShownCharacter[]
@@ -371,7 +371,7 @@ export function parseOrderRequest(body: unknown, now: Date = new Date(), palette
       refund_ack_at: (() => { const t = typeof body.refund_ack_at === 'string' ? Date.parse(body.refund_ack_at) : NaN; return Number.isFinite(t) && t <= now.getTime() + 5 * 60_000 && t >= now.getTime() - 24 * 3_600_000 ? new Date(t).toISOString() : null })(),
       sender_email,
       shown: withChosen(parseShown(body.shown_characters), candidate),
-      ...(lang === 'en' && Object.keys(cleanUtm(body.utm)).length > 0 ? { utm: cleanUtm(body.utm) } : {}),
+      ...(Object.keys(cleanUtm(body.utm)).length > 0 ? { utm: cleanUtm(body.utm) } : {}),
     },
   }
 }
@@ -441,8 +441,8 @@ export function lineAttributes(order: ValidOrder, orderRef: string, animationLin
     ...(order.certificate.poems[0] ? poemAttributes(order.certificate.poems[0]) : []),
     // The private address of the story animation (/a/<id>): for the confirmation e-mail and the QR code on the printed card.
     // The receiver's page (/g/<token>): the QR code on the printed card points here; and the sender's own private page.
-    // English orders: where the buyer came from (utm_source=chatgpt.com when ChatGPT sent them) — hidden, for the order report
-    ...(order.language === 'en' && order.utm ? Object.entries(order.utm).map(([k, v]) => ({ key: `_${k}`, value: v as string })) : []),
+    // where the buyer came from (utm_source=chatgpt.com when ChatGPT sent them) — hidden, for the order report; every language (Part 10, 2026-11-20)
+    ...(order.utm ? Object.entries(order.utm).map(([k, v]) => ({ key: `_${k}`, value: v as string })) : []),
     // Part 9 (2026-11-20): the customer's private My gifts link (/b/<token>), for the confirmation e-mail's "All your gifts are in My gifts" — it opens the dashboard in one tap on any device
     ...(myGiftsLink ? [{ key: '_ichirei_mygifts_url', value: myGiftsLink }] : []),
     ...(giftLink ? [{ key: '_ichirei_gift_url', value: giftLink }] : []),

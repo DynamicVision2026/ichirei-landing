@@ -134,7 +134,7 @@ const lexicon = loadLexicon()
   const parsed = parseOrderRequest(body, NOW)
   check('(B) an English order carries the bridge on its certificate — the word, the line, the reviewed echo — built by the server (the browser\'s en_word is checked, not trusted)', parsed.ok && parsed.order.certificate.en?.word === 'hearth' && parsed.order.certificate.en?.line === 'The one who kept the porch light on.' && parsed.order.certificate.en?.echo === null)
   const jaOrder = parseOrderRequest({ ...body, language: 'ja', engine_result: clone(GOLDEN), selected_kanji: '証', utm: body.utm }, NOW)
-  check('(B) a ja order has no English bridge and no utm', jaOrder.ok && jaOrder.order.certificate.en === undefined && jaOrder.order.utm === undefined)
+  check('(B) a ja order has no English bridge (Part 10: it keeps its utm, like every language)', jaOrder.ok && jaOrder.order.certificate.en === undefined && jaOrder.order.utm?.utm_source === 'chatgpt.com')
   check('(B) bridgeForOrder trusts the lexicon, not the browser: a posted classical line the server would not show is dropped', (() => { const c = { ...mk('灯', 'main', { classical_echo: { text: '偽の一行', source: '偽' } }) } as never; return bridgeForOrder(c, story, reviewedLexicon, palette)?.classical === null })())
   // views
   if (parsed.ok) {
@@ -144,7 +144,7 @@ const lexicon = loadLexicon()
     check('(B) the film / gift / sender views carry the bridge for English and nothing for the others', view.en?.word === 'hearth' && view.en?.line.startsWith('The one who') && JSON.stringify(animationView({ ...anim, language: 'ja' })).includes('"en":') === false)
     const enAttrs = lineAttributes(parsed.order, 'IC-20261201-ABCDEFGH')
     const jaAttrs = jaOrder.ok ? lineAttributes(jaOrder.order, 'IC-20261201-ABCDEFGH') : []
-    check('(C) the order\'s hidden line properties carry the UTM source for an English order (utm_source, utm_medium; the bad key and the script are dropped), never for a ja order', enAttrs.some((x) => x.key === '_utm_source' && x.value === 'chatgpt.com') && enAttrs.some((x) => x.key === '_utm_medium') && !enAttrs.some((x) => x.key === '_utm_campaign' || x.key === '_evil') && jaAttrs.length > 0 && !jaAttrs.some((x) => x.key.startsWith('_utm')))
+    check('(C) the order\'s hidden line properties carry the UTM source for an English order (utm_source, utm_medium; the bad key and the script are dropped), for a ja order too (Part 10)', enAttrs.some((x) => x.key === '_utm_source' && x.value === 'chatgpt.com') && enAttrs.some((x) => x.key === '_utm_medium') && !enAttrs.some((x) => x.key === '_utm_campaign' || x.key === '_evil') && jaAttrs.some((x) => x.key === '_utm_source' && x.value === 'chatgpt.com') && !jaAttrs.some((x) => x.key === '_utm_campaign' || x.key === '_evil'))
     // handlers
     const store = new MemoryOrderStore()
     const token = newGiftToken()
