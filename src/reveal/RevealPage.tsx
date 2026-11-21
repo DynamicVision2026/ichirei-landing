@@ -1,9 +1,10 @@
 import { ExamplesSection } from './Examples.tsx'
+import { OneMoment } from './WriteGuide.tsx'
 import { Suspense, lazy, useEffect, type ReactNode } from 'react'
 import { useLanguage } from '../useLanguage'
 import { trackPageView } from '../demo/analytics'
 import { DOCUMENT, REVEAL_LANGS, TEXT, type RevealLang } from './copy'
-import { Angles, Closing, Dock, Faq, Footer, Gifts, Moments, Opening, Philosophy, Reviews, Steps, StoryShape, Strip } from './Sections'
+import { Angles, Closing, Dock, Faq, Footer, Gifts, Opening, Philosophy, Reviews, Steps, StoryShape, Strip } from './Sections'
 import Hero from './Hero'
 import ClaimBanner from '../claim/ClaimBanner'
 import { Receive, UsBanner, UsKanji, UsWho } from './UsSections'
@@ -181,7 +182,7 @@ export default function RevealPage({ write = false }: { write?: boolean }) {
         <Angles t={t} lang={lang} />
         <Steps t={t} lang={lang} memorial={memorial} woodOnSale={woodOnSale} />
         <ExamplesSection lang={lang} />
-        <Moments t={t} memorial={memorial} />
+        <OneMoment lang={lang} />
         <Reviews t={t} />
         <Receive lang={lang} />
         {lang === 'en' && <UsWho />}

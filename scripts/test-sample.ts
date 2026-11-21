@@ -116,6 +116,21 @@ check('(6) examplesFor never returns more than four', examplesFor(await listSamp
 await updateSample(store, more[0], { featured: true })
 const feat = (await listSamples(store)).filter((r) => r.featured && r.language === 'en')
 check('(6) one featured sample per language: featuring another English sample takes the mark off the first', feat.length === 1 && feat[0].token === more[0])
+// Part 24 (2026-11-21): the language's featured sample, for the writing page's example and the landing's "one moment, four pictures and a poem"
+{
+  const fEn = ((await (await EX.featured(new Request('http://x/api/examples/featured?lang=en'))).json()) as { featured: any }).featured
+  const fJa0 = ((await (await EX.featured(new Request('http://x/api/examples/featured?lang=ja'))).json()) as { featured: any }).featured
+  check('(6b) the featured sample of a language: its moment, four pictures with their captions, its character and word — and no real name', !!fEn && fEn.token === more[0] && fEn.language === 'en' && fEn.pictures.length === 4 && fEn.pictures.every((p: any, i: number) => p.src === `/api/gift/${fEn.token}/picture/${i + 1}.webp` && p.caption.length > 0) && !!fEn.moment && !/Kenji/.test(JSON.stringify(fEn)), JSON.stringify(fEn)?.slice(0, 300))
+  check('(6b) a language with no featured sample gets null (the writing page then shows the line and the guides only, the landing hides the section)', fJa0 === null)
+  const jaTok = (await listSamples(store)).find((r) => r.language === 'ja')!.token
+  await updateSample(store, jaTok, { featured: true })
+  const fJa = ((await (await EX.featured(new Request('http://x/api/examples/featured?lang=ja'))).json()) as { featured: any }).featured
+  const fZh = ((await (await EX.featured(new Request('http://x/api/examples/featured?lang=zh-Hant'))).json()) as { featured: any }).featured
+  check('(6b) once a Japanese sample is featured it shows on the Japanese side only', fJa?.token === jaTok && fZh === null)
+  await updateSample(store, jaTok, { on: false })
+  check('(6b) switched off, it is no longer offered', ((await (await EX.featured(new Request('http://x/api/examples/featured?lang=ja'))).json()) as { featured: any }).featured === null)
+  await updateSample(store, jaTok, { on: true, featured: false })
+}
 await EX.count(new Request('http://x/api/examples/count', { method: 'POST', body: JSON.stringify({ kind: 'view' }) }))
 await EX.count(new Request('http://x/api/examples/count', { method: 'POST', body: JSON.stringify({ kind: 'card' }) }))
 const es = JSON.parse((await store.getObject('samples/stats/examples.json'))!.toString('utf8')) as { views: number; cards: number }

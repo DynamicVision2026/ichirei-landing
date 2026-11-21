@@ -748,16 +748,12 @@ const mockPage = async (browser, { onExplain, result, order, track } = {}) => {
   check('opener: before a relationship and an occasion are picked there is no hint, but the headline is already there', (await qEl.count()) === 0 && (await page.locator('#write [data-testid=story-headline]').count()) === 1)
   check('opener: a browser without speech recognition hides the voice button and shows only the help line (「スマホのキーボードのマイクでも入力できます。」)', (await page.locator('#write button.voice').count()) === 0 && (await page.locator('#write [data-testid=voice-lang]').count()) === 0 && (await page.locator('#write [data-testid=voice-help]').innerText()) === 'スマホのキーボードのマイクでも入力できます。')
   await pickContext(page) // parent_father · up · birthday_milestone
-  await qEl.waitFor()
-  const first = await qEl.getAttribute('data-question-id')
+  await page.locator('#write [data-testid=write-guide]').waitFor() // Part 24 (2026-11-21): the rotating hint is gone; the line and the four guides stand under the headline
   const headline = page.locator('#write [data-testid=story-headline]')
   const fs = (loc) => loc.evaluate((el) => parseFloat(getComputedStyle(el).fontSize))
   check('story box (2026-11-01): a LARGE headline names what the box is for — 「忘れられない、ひと場面」 — and it labels the textarea', (await headline.innerText()) === '忘れられない、ひと場面' && (await fs(headline)) >= 20 && (await headline.getAttribute('for')) === 'moment')
-  check('story box: the random question is a small HINT under the headline — 「ヒント：」 + a question of the "up" set — much smaller than the headline, and the box placeholder is 「どこで、その人は何をして、何と言いましたか。数行で十分です。」', first in QJA && (await qEl.innerText()) === QJA[first] && (await page.locator('#write .qHintLabel').innerText()) === 'ヒント：' && (await fs(qEl)) <= 16 && (await fs(qEl)) < (await fs(headline)) && (await box.getAttribute('placeholder')) === 'どこで、その人は何をして、何と言いましたか。数行で十分です。')
-  check('story box: the line 「ヒントに答えなくても大丈夫。…」 sits under the hint (and its 「別のヒントにする」 link), before the box', (await page.locator('#write [data-testid=question-optional]').innerText()) === 'ヒントに答えなくても大丈夫。思い浮かぶ場面を、そのまま書いてください。' && (await page.evaluate(() => { const order = ['story-headline', 'story-hint-line', 'question-switch', 'question-optional', 'story-input'].map((id) => document.querySelector(`#write [data-testid=${id}]`)); return order.every((el, i) => el && (i === 0 || (order[i - 1].compareDocumentPosition(el) & Node.DOCUMENT_POSITION_FOLLOWING) !== 0)) })) && (await page.locator('#write [data-testid=question-switch]').innerText()) === '別のヒントにする')
-  const seenIds = [first]
-  for (let i = 0; i < 4; i++) { await page.click('#write [data-testid=question-switch]'); seenIds.push(await qEl.getAttribute('data-question-id')) }
-  check('opener: 「別のヒントにする」 cycles the four angles of the same set and returns to the first', new Set(seenIds.slice(0, 4)).size === 4 && seenIds[4] === first && seenIds.every((id) => id in QJA))
+  check('story box (Part 24): under the headline there is the one line 「あなたのひと場面は、4枚の墨の絵と一首の歌になります。絵になるように、目に見えることを書いてください。」, and the box placeholder is 「どこで、その人は何をして、何と言いましたか。数行で十分です。」', (await page.locator('#write [data-testid=write-guide-line]').innerText()) === 'あなたのひと場面は、4枚の墨の絵と一首の歌になります。絵になるように、目に見えることを書いてください。' && (await box.getAttribute('placeholder')) === 'どこで、その人は何をして、何と言いましたか。数行で十分です。')
+  check('story box (Part 24): four light guides as a numbered list — 「どこで、いつ」「その人がしたこと」「その人のひと言」「そのあと」 — between the headline and the box; and the rotating ヒント (label, question, switch link, optional note) is gone', JSON.stringify(await page.locator('#write [data-testid=write-guide-item]').allInnerTexts()) === JSON.stringify(['どこで、いつ', 'その人がしたこと', 'その人のひと言', 'そのあと']) && (await page.evaluate(() => { const order = ['story-headline', 'write-guide-line', 'write-guide-list', 'story-input'].map((id) => document.querySelector(`#write [data-testid=${id}]`)); return order.every((el, i) => el && (i === 0 || (order[i - 1].compareDocumentPosition(el) & Node.DOCUMENT_POSITION_FOLLOWING) !== 0)) })) && (await page.locator('#write .qHintLabel, #write [data-testid=story-question], #write [data-testid=question-switch], #write [data-testid=question-optional], #write [data-testid=story-hint-line]').count()) === 0 && (await page.locator('#write ol[data-testid=write-guide-list] input, #write ol[data-testid=write-guide-list] textarea').count()) === 0)
   // a scene quote that already carries 「」 is not wrapped in a second set: 「「そっちは寒いか」とだけ聞く」 → 「『そっちは寒いか』とだけ聞く」
   {
     const NESTED = '「そっちは寒いか」とだけ聞く'
@@ -777,25 +773,19 @@ const mockPage = async (browser, { onExplain, result, order, track } = {}) => {
     const ign = await mockPage(browser)
     await ign.page.goto('http://localhost:5173/write', { waitUntil: 'networkidle' })
     await pickContext(ign.page)
-    await ign.page.locator('#write [data-testid=story-question]').waitFor()
-    const hintId = await ign.page.locator('#write [data-testid=story-question]').getAttribute('data-question-id')
     const STORY1500 = 'あの冬、父は何も言わずに私の自転車のチェーンに油をさしてくれた。'.repeat(60).slice(0, 1500)
     await ign.page.locator('#write [data-testid=story-input]').fill(STORY1500)
     check('story box: a 1,500-character story that does not answer the hint — the counter reads 「1500 / 5000字」 and the button is enabled', (await ign.page.locator('#write [data-testid=story-counter]').innerText()) === '1500 / 5000字' && !(await ign.page.locator('#write button[type=submit]').isDisabled()))
     await ign.page.click(`#write >> text=${GO.ja}`)
     await ign.page.waitForSelector('article[data-slot=freestyle]', { timeout: 15000 })
     const slots = await ign.page.locator('article[data-slot]').evaluateAll((els) => els.map((e) => e.getAttribute('data-slot')))
-    check('story box: …it still gets its two cards; the whole story is sent, and the hint travels only as context (prompt_question id), never inside the story', slots.join() === 'main,freestyle' && ign.calls.select.length === 1 && [...ign.calls.select[0].story].length === 1500 && ign.calls.select[0].story === STORY1500 && ign.calls.select[0].prompt_question?.id === hintId, JSON.stringify([slots, ign.calls.select[0]?.prompt_question]))
+    check('story box: …it still gets its two cards; the whole story is sent, and no question travels with it (Part 24: no rotating hint)', slots.join() === 'main,freestyle' && ign.calls.select.length === 1 && [...ign.calls.select[0].story].length === 1500 && ign.calls.select[0].story === STORY1500 && ign.calls.select[0].prompt_question === undefined, JSON.stringify([slots, ign.calls.select[0]?.prompt_question]))
     check('no page errors (run 8c-2, hint)', ign.errors.length === 0, JSON.stringify(ign.errors))
     await ign.page.close()
   }
-  // a memorial gift gets the remembering-voice set
   await page.click('[data-chip="purpose:memorial"]')
-  await page.waitForFunction(() => document.querySelector('#write [data-testid=story-question]')?.getAttribute('data-question-id')?.startsWith('memorial-'))
-  check('opener: the occasion "memorial" switches to the memorial set (no mention of death or loss)', !/死|亡|逝|失|悲/.test(await qEl.innerText()))
+  check('opener (Part 24): the line and the four guides stay for a remembrance too, and no hint appears', (await page.locator('#write [data-testid=write-guide-item]').count()) === 4 && (await page.locator('#write [data-testid=story-question]').count()) === 0)
   await page.click('[data-chip="purpose:celebrate"]')
-  await page.waitForFunction(() => document.querySelector('#write [data-testid=story-question]')?.getAttribute('data-question-id')?.startsWith('up-'))
-  const shownId = await qEl.getAttribute('data-question-id')
   // the 10-character minimum
   const goBtn = page.locator(`#write button:has-text("${GO.ja}")`)
   await box.fill('あ'.repeat(9))
@@ -806,13 +796,13 @@ const mockPage = async (browser, { onExplain, result, order, track } = {}) => {
   await box.fill('父は、駅の改札でいつも黙って手を振った。')
   await page.waitForTimeout(700)
   const stored = await page.evaluate(() => window.localStorage.getItem('ichirei.draft.v1'))
-  check('opener: the draft is saved in this browser as the visitor types (story, chips, question — and only those)', !!stored && JSON.parse(stored).story.startsWith('父は、駅の改札') && JSON.parse(stored).questionId === shownId && JSON.parse(stored).relationship === 'parent_father')
+  check('opener: the draft is saved in this browser as the visitor types (story, chips, question — and only those)', !!stored && JSON.parse(stored).story.startsWith('父は、駅の改札') && JSON.parse(stored).questionId == null && JSON.parse(stored).relationship === 'parent_father')
   await page.reload({ waitUntil: 'networkidle' })
   const banner = page.locator('#write [data-testid=draft-banner]')
   await banner.waitFor()
   check('opener: coming back shows the quiet banner 「書きかけの場面があります — 続ける / 新しく書く」 and nothing is applied silently', (await banner.innerText()).includes('書きかけの場面があります') && (await page.locator('#write [data-testid=story-input]').inputValue()) === '')
   await page.click('#write [data-testid=draft-continue]')
-  check('opener: 続ける restores the story, the chips and the same question', (await page.locator('#write [data-testid=story-input]').inputValue()).startsWith('父は、駅の改札') && (await page.locator('[data-chip="relationship:parent_father"]').getAttribute('aria-pressed')) === 'true' && (await page.locator('#write [data-testid=story-question]').getAttribute('data-question-id')) === shownId && (await banner.count()) === 0)
+  check('opener: 続ける restores the story and the chips', (await page.locator('#write [data-testid=story-input]').inputValue()).startsWith('父は、駅の改札') && (await page.locator('[data-chip="relationship:parent_father"]').getAttribute('aria-pressed')) === 'true' && (await banner.count()) === 0)
   await page.reload({ waitUntil: 'networkidle' })
   await banner.waitFor()
   await page.click('#write [data-testid=draft-new]')
@@ -822,27 +812,21 @@ const mockPage = async (browser, { onExplain, result, order, track } = {}) => {
   check('opener: a draft older than 30 days is not offered and is deleted', (await page.locator('#write [data-testid=draft-banner]').count()) === 0 && (await page.evaluate(() => window.localStorage.getItem('ichirei.draft.v1'))) === null)
   // submit: the question travels with the story, as { id, text }
   await pickContext(page)
-  await page.locator('#write [data-testid=story-question]').waitFor()
-  const sendId = await page.locator('#write [data-testid=story-question]').getAttribute('data-question-id')
   await page.locator('#write [data-testid=story-input]').fill('父は、駅の改札でいつも黙って手を振った。')
   await page.click(`#write >> text=${GO.ja}`)
   await page.waitForSelector('[data-all-revealed=yes]', { timeout: 15000 })
-  check('opener: /api/select receives prompt_question { id, text } and the story is just the story (the question is not inside it)', calls.select[0].prompt_question?.id === sendId && calls.select[0].prompt_question?.text === QJA[sendId] && calls.select[0].story === '父は、駅の改札でいつも黙って手を振った。')
+  check('opener (Part 24): /api/select receives the story alone — no question is sent', calls.select[0].prompt_question === undefined && calls.select[0].story === '父は、駅の改札でいつも黙って手を振った。')
   const evs = calls.analytics.map((e) => e.event)
-  check('opener: events — story_opened (once per page load), question_shown (id) at the start and after each switch, question_switched, story_submitted, reveal_shown; codes only', evs.filter((e) => e === 'story_opened').length === 4 && evs.includes('question_shown') && evs.filter((e) => e === 'question_switched').length === 4 && evs.includes('story_submitted') && evs.includes('reveal_shown') && calls.analytics.filter((e) => e.event === 'question_shown').every((e) => !('story' in e) && (e.qid in QJA || String(e.qid).startsWith('memorial-'))) && !JSON.stringify(calls.analytics).includes('父は'))
+  check('opener: events — story_opened (once per page load), story_submitted, reveal_shown, and no question events (Part 24); codes only', evs.filter((e) => e === 'story_opened').length === 4 && !evs.includes('question_shown') && !evs.includes('question_switched') && evs.includes('story_submitted') && evs.includes('reveal_shown') && !JSON.stringify(calls.analytics).includes('父は'))
   check('no page errors (run 8c-2, the opener)', errors.length === 0, errors.join('; '))
   await page.close()
-  // English and Traditional Chinese: the same question set in the page language
-  for (const [lang, q0] of [['en', 'What do they always do without being asked?'], ['zh-Hant', '那個人總是在你開口之前，就先做了什麼？']]) {
+  // English and Traditional Chinese: the headline, the line and the four guides in the page language
+  for (const [lang, HLs, line, guides] of [['en', ["One moment you've never forgotten"], 'Your moment becomes four ink pictures and one poem. Write what could be seen.', ['Where and when', 'What they did', 'What they said, even one word', 'What happened next']], ['zh-Hant', ['一個忘不了的片刻'], '你寫下的片刻，會成為四幅水墨畫和一首詩。請寫下看得見的細節。', ['在哪裡、什麼時候', '他做了什麼', '他說的一句話', '之後呢']]]) {
     const e = await mockPage(browser)
     await e.page.goto(`http://localhost:5173/write?lang=${lang}`, { waitUntil: 'networkidle' })
     await pickContext(e.page)
-    await e.page.locator('#write [data-testid=story-question]').waitFor()
-    let found = false
-    for (let i = 0; i < 4 && !found; i++) { found = (await e.page.locator('#write [data-testid=story-question]').innerText()) === q0; if (!found) await e.page.click('#write [data-testid=question-switch]') }
-    check(`opener (${lang}): the "up" set is shown in the page language (the habit question found within four angles)`, found)
-    const HL = { en: ["One moment you've never forgotten", 'Hint:', 'Another hint', "You don't have to answer the hint. Write the scene that comes to mind, just as it is.", 'Where were you? What did they do or say? A few lines are enough.', 'Not a whole story, a few lines are enough. The more true detail, the truer the character.'], 'zh-Hant': ['一個忘不了的片刻', '提示：', '換一個提示', '不必回答提示。想到的場景，直接寫下來就好。', '在哪裡？他做了什麼、說了什麼？幾行就夠了。', '不必是完整的故事，幾行就夠了。寫得越真實、越具體，選出的字就越貼近。'] }[lang]
-    check(`story box (${lang}): headline, 「${HL[1]}」 label, switch link, the "you don't have to answer" line, placeholder and length line, exactly as specified`, (await e.page.locator('#write [data-testid=story-headline]').innerText()) === HL[0] && (await e.page.locator('#write .qHintLabel').innerText()) === HL[1] && (await e.page.locator('#write [data-testid=question-switch]').innerText()) === HL[2] && (await e.page.locator('#write [data-testid=question-optional]').innerText()) === HL[3] && (await e.page.locator('#write [data-testid=story-input]').getAttribute('placeholder')) === HL[4] && (await e.page.locator('#write [data-testid=story-hint]').innerText()) === HL[5], `${await e.page.locator('#write [data-testid=story-headline]').innerText()} | ${await e.page.locator('#write .qHintLabel').innerText()}`)
+    await e.page.locator('#write [data-testid=write-guide]').waitFor()
+    check(`story box (${lang}, Part 24): the headline, the one line and the four guides, in the page language; no rotating hint`, (await e.page.locator('#write [data-testid=story-headline]').innerText()) === HLs[0] && (await e.page.locator('#write [data-testid=write-guide-line]').innerText()) === line && JSON.stringify(await e.page.locator('#write [data-testid=write-guide-item]').allInnerTexts()) === JSON.stringify(guides) && (await e.page.locator('#write .qHintLabel, #write [data-testid=story-question], #write [data-testid=question-switch]').count()) === 0)
     await e.page.close()
   }
 }
@@ -910,18 +894,18 @@ const mockPage = async (browser, { onExplain, result, order, track } = {}) => {
     // (textContent: the sections below the fold are not rendered until scrolled to, and the page no longer scrolls to the writing step by itself)
     const h3 = async () => ((await c.page.locator('#how ol.steps li:nth-child(2) h3').textContent()) ?? '').trim()
     const p2 = async () => ((await c.page.locator('#how ol.steps li:nth-child(2) p').count()) ? (((await c.page.locator('#how ol.steps li:nth-child(2) p').textContent()) ?? '').trim()) : '')
-    const mm = async () => ((await c.page.locator('p.from').first().textContent()) ?? '').trim()
-    check(`copy (${lang}): before an occasion is picked the steps and the examples are unchanged — 「${st2Other}」 and the main-and-playful note`, (await h3()) === st2Other && (await mm()) === noteOther, `${await h3()} | ${await mm()}`)
+    const mm = async () => '' // the moments mosaic and its note left the page with Part 24
+    check(`copy (${lang}): before an occasion is picked the steps and the examples are unchanged — 「${st2Other}」 `, (await h3()) === st2Other, `${await h3()}`)
     await room()
     await pickContext(c.page, { occasion: 'memorial' })
     await c.page.click('[data-testid=write-back]')
     await c.page.waitForSelector('#how')
-    check(`copy (${lang}): with 偲ぶ picked the second step reads 「${st2}」 and says two main characters only, and the examples note says two (no free pick)`, (await h3()) === st2 && (await p2()) === st2p && (await mm()) === note, `${await h3()} | ${await p2()} | ${await mm()}`)
+    check(`copy (${lang}): with 偲ぶ picked the second step reads 「${st2}」 and says two main characters only (no free pick)`, (await h3()) === st2 && (await p2()) === st2p, `${await h3()} | ${await p2()}`)
     await room()
     await pickContext(c.page, { occasion: 'birthday_milestone' })
     await c.page.click('[data-testid=write-back]')
     await c.page.waitForSelector('#how')
-    check(`copy (${lang}): picking another occasion again restores the main-and-playful wording`, (await h3()) === st2Other && (await mm()) === noteOther)
+    check(`copy (${lang}): picking another occasion again restores the main-and-playful wording`, (await h3()) === st2Other)
     check(`no page errors (run 8c-3, remembrance copy ${lang})`, c.errors.length === 0, JSON.stringify(c.errors))
     await c.page.close()
   }
@@ -2468,7 +2452,7 @@ check('included poem: the Japanese site starts with the tanka (the default forma
 
 // ---------- Run 9: the Reveal landing page — sections, copy per language, honesty, no test controls ----------
 // (2026-11-16) the flow is no longer on the landing page: it has a page of its own, the writing room (/write, /en/write, /zh/write)
-const SECTION_ORDER = ['.hero', '.strip', '.philo', '#shape', '#angles', '#how', '#moments', '.reviewsEmpty', '#gifts', '.faq', '.closing']
+const SECTION_ORDER = ['.hero', '.strip', '.philo', '#shape', '#angles', '#how', '.reviewsEmpty', '#gifts', '.faq', '.closing']
 {
   const page = await browser.newPage({ locale: 'ja-JP', viewport: { width: 1280, height: 900 } })
   const errors = []
@@ -2478,7 +2462,7 @@ const SECTION_ORDER = ['.hero', '.strip', '.philo', '#shape', '#angles', '#how',
   await page.route('**/api/select', async (route) => { calls.select.push(JSON.parse(route.request().postData() ?? '{}')); await route.fulfill({ json: FIXTURE }) })
   await page.route('**/api/**', (route) => (route.request().url().includes('/api/select') || route.request().url().includes('/api/rates') ? route.fallback() : route.fulfill({ status: 204, body: '' })))
   await page.goto('http://localhost:5173/?lang=ja', { waitUntil: 'networkidle' })
-  check('landing: the sections are all there, in the reference order (hero, strip, philosophy, story shape, angles, steps, moments, reviews, gifts, FAQ, closing) — and the flow is not on the landing page (it is the writing room)', await page.evaluate((sel) => { const tops = sel.map((q) => document.querySelector(q)?.getBoundingClientRect().top + window.scrollY); return tops.every((t) => Number.isFinite(t)) && tops.every((t, i) => i === 0 || t > tops[i - 1]) }, SECTION_ORDER) && (await page.locator('#write').count()) === 0)
+  check('landing: the sections are all there, in the reference order (hero, strip, philosophy, story shape, angles, steps, reviews, gifts, FAQ, closing — the old moments mosaic was replaced by the "one moment" section of Part 24, which appears only with a featured sample) — and the flow is not on the landing page (it is the writing room)', await page.evaluate((sel) => { const tops = sel.map((q) => document.querySelector(q)?.getBoundingClientRect().top + window.scrollY); return tops.every((t) => Number.isFinite(t)) && tops.every((t, i) => i === 0 || t > tops[i - 1]) }, SECTION_ORDER) && (await page.locator('#write').count()) === 0)
   // textContent, not innerText: sections below the fold are not rendered until they are near the screen (content-visibility)
   const t = await page.evaluate(() => document.body.textContent)
   check('landing ja: <html lang>, title, hero (「あなたとわたし、一字の距離。」) and the primary call to action', (await page.getAttribute('html', 'lang')) === 'ja' && (await page.title()) === 'ICHIREI 一字礼 — 一字の贈りもの' && (await page.locator('h1').innerText()) === 'あなたとわたし、一字の距離。' && (await page.locator('.hero a.btn.primary').innerText()) === 'ひと場面を書く →')
@@ -2499,18 +2483,7 @@ const SECTION_ORDER = ['.hero', '.strip', '.philo', '#shape', '#angles', '#how',
   await page.selectOption('#gifts select', 'JPY')
   // the photos: WebP with JPG fallback, lazy below the hero, sizes given
   const imgs = await page.evaluate(() => [...document.querySelectorAll('picture img')].map((i) => ({ src: i.getAttribute('src'), lazy: i.loading, w: i.getAttribute('width'), h: i.getAttribute('height'), webp: !!i.parentElement.querySelector('source[type="image/webp"]') })))
-  check('photos: every photo is a <picture> with WebP + JPG fallback and width/height; only the hero image is eager', imgs.length === 11 && imgs.every((i) => i.webp && i.w && i.h && i.src.endsWith('.jpg')) && imgs.filter((i) => i.lazy === 'eager').length === 1 && imgs[0].lazy === 'eager')
-  check('photos: m4 has no crop override (object-position is the default 50% 50%)', (await page.locator('img[src$="m4.jpg"]').evaluate((e) => getComputedStyle(e).objectPosition)) === '50% 50%')
-  await page.locator('#moments').scrollIntoViewIfNeeded()
-  await page.waitForTimeout(400)
-  const mosaicCols = await page.evaluate(() => { const g = document.querySelector('.mosaic'); const kids = [...g.children].map((c) => getComputedStyle(c).gridColumnEnd); const cols = getComputedStyle(g).gridTemplateColumns.split(' ').length; const m6 = g.querySelector('.m6').getBoundingClientRect(); const m5 = g.querySelector('.m5').getBoundingClientRect(); return { cols, kids, m6w: Math.round(m6.width), m5w: Math.round(m5.width), rowEnd: Math.round(g.querySelector('.m4').getBoundingClientRect().right), m6right: Math.round(m6.right), sameRow: Math.abs(m5.top - m6.top) < 2 } })
-  check('mosaic (desktop, 4 columns): m6 spans 3 columns next to m5, so the last row has no empty cell', mosaicCols.cols === 4 && mosaicCols.m6w > 3 * mosaicCols.m5w && mosaicCols.sameRow && Math.abs(mosaicCols.m6right - mosaicCols.rowEnd) <= 1, JSON.stringify(mosaicCols))
-  // a missing photo leaves the coloured frame, never a broken image
-  await page.route('**/img/scenes/m3*', (route) => route.fulfill({ status: 404, body: '' }))
-  await page.reload({ waitUntil: 'networkidle' })
-  await page.locator('#moments').scrollIntoViewIfNeeded()
-  await page.waitForTimeout(600)
-  check('photos: a missing photo (m3) removes the <img>; its coloured frame and caption stay', (await page.locator('figure.m3 img').count()) === 0 && (await page.locator('figure.m3 .cap').isVisible()))
+  check('photos: every photo is a <picture> with WebP + JPG fallback and width/height; only the hero image is eager (the six moment photos left the page with the old mosaic, Part 24)', imgs.length === 5 && imgs.every((i) => i.webp && i.w && i.h && i.src.endsWith('.jpg')) && imgs.filter((i) => i.lazy === 'eager').length === 1 && imgs[0].lazy === 'eager')
   // the angles: five doors, keyboard
   await page.locator('#angles').scrollIntoViewIfNeeded()
   const tab0 = page.locator('[role=tab]').first()
@@ -3829,7 +3802,7 @@ const SECTION_ORDER = ['.hero', '.strip', '.philo', '#shape', '#angles', '#how',
     check(`/en (${tag}): the delivery banner is the one fixed line, readable (light text on the dark band), with no date and no word about wood`, (await page.locator('[data-testid=us-banner]').textContent()) === 'The e-gift arrives the same day you order — even on Christmas morning.' && (await page.locator('[data-testid=us-banner]').evaluate((el) => getComputedStyle(el).color)) !== (await page.locator('.usBanner').evaluate((el) => getComputedStyle(el).backgroundColor)))
     check(`/en (${tag}): "What they receive" comes above the gift options and lists the five live items (character with word and line, poem, four pictures, film with music, certificate)`, await page.evaluate(() => { const r = document.querySelector('#receive'); const g = document.querySelector('#gifts'); return !!r && !!g && (r.compareDocumentPosition(g) & Node.DOCUMENT_POSITION_FOLLOWING) !== 0 && [...r.querySelectorAll('li')].map((li) => li.dataset.receive).join() === 'character,poem,pictures,film,certificate' }))
     const scenes = await page.evaluate(() => [...document.querySelectorAll('.hero img, #moments img, .usReceive img')].map((i) => i.currentSrc || i.src))
-    check(`/en (${tag}): the pictures are the real images of / (public/img/scenes/ and the owner's public/img/package/ only — nothing from scenes/en/)`, scenes.length >= 5 && scenes.every((u) => /\/img\/(scenes|package)\/[a-z0-9]+(-\d+)?\.(webp|jpg)/.test(u) && !/scenes\/en\//.test(u)), scenes.join(' '))
+    check(`/en (${tag}): the pictures are the real images of / (public/img/scenes/ and the owner's public/img/package/ only — nothing from scenes/en/)`, scenes.length >= 2 && scenes.every((u) => /\/img\/(scenes|package)\/[a-z0-9]+(-\d+)?\.(webp|jpg)/.test(u) && !/scenes\/en\//.test(u)), scenes.join(' '))
     const usd = async (sel) => ((await page.locator(sel).first().textContent()) ?? '').replace(/\s+/g, ' ').trim()
     check(`/en (${tag}): every price on the landing is $25 — hero, "What they receive" and the gift card — with no yen and no "about $"`, (await usd('[data-testid=usd-hero]')) === '$25' && (await usd('[data-testid=us-receive-price]')) === '$25' && (await usd('#gifts article[data-size=egift] [data-price=egift]')) === '$25' && (await page.locator('#gifts article[data-size=egift] .approx, [data-approx]').count()) === 0)
     await page.evaluate(() => document.querySelectorAll('details').forEach((d) => (d.open = true)))
@@ -7560,6 +7533,71 @@ for (const [lang, locale, text] of [['en', 'en-US', 'Your gift is being finished
     check(`no examples (${lang}): /examples ends up on the landing page of that language (the server answers 302; the page does the same when opened some other way) — never an empty "coming soon" page`, new URL(page.url()).pathname === (base || '/') && (await page.locator('[data-testid=examples-page]').count()) === 0, page.url())
     check(`no page errors (run 56, ${lang})`, errs.length === 0, errs.join('; '))
     await ctx.close()
+  }
+}
+
+// ---------- Run 57 (2026-11-21, Part 24): teach people to write a moment that can be painted — the line and four guides on the writing page, the small example and the landing section only with a featured sample ----------
+{
+  const SHOTS57 = process.env.E2E_SHOTS_DIR || '/tmp/e2e-shots'
+  const G57 = {
+    ja: { base: '', locale: 'ja-JP', write: '/write', line: 'あなたのひと場面は、4枚の墨の絵と一首の歌になります。絵になるように、目に見えることを書いてください。', guides: ['どこで、いつ', 'その人がしたこと', 'その人のひと言', 'そのあと'], section: 'ひと場面が、4枚の絵と一首の歌に', link: 'どう絵になるかを見る →' },
+    en: { base: '/en', locale: 'en-US', write: '/en/write?lang=en', line: 'Your moment becomes four ink pictures and one poem. Write what could be seen.', guides: ['Where and when', 'What they did', 'What they said, even one word', 'What happened next'], section: 'One moment, four pictures and a poem', link: 'See how a moment becomes pictures →' },
+    'zh-Hant': { base: '/zh', locale: 'zh-TW', write: '/zh/write?lang=zh-Hant', line: '你寫下的片刻，會成為四幅水墨畫和一首詩。請寫下看得見的細節。', guides: ['在哪裡、什麼時候', '他做了什麼', '他說的一句話', '之後呢'], section: '一個片刻，四幅畫與一首詩', link: '看片刻如何成畫 →' },
+  }
+  const FEAT = (lang) => ({ token: 'RG-featfeatfeatfeat1234', language: lang, glyph: '整', word: lang === 'en' ? 'composed' : 'ととのえる', moment: lang === 'en' ? 'She stood at the door, took one slow breath, and called out, "I\'m home," as if nothing had happened.' : '玄関の前で深く息をついて、何でもなかったような声で「ただいま」と言う。', pictures: ['/img/scenes/m1.jpg', '/img/scenes/m2.jpg', '/img/scenes/m3.jpg', '/img/scenes/m4.jpg'].map((src, i) => ({ src, caption: lang === 'en' ? `Picture ${i + 1}: a quiet doorway` : `${i + 1}枚め：玄関のひととき` })), poem: lang === 'en' ? ['one slow breath', 'at the door, then home'] : ['深く息をつき', 'ただいまと言う'] })
+  const open57 = async (lang, featured, { width = 390, path = null } = {}) => {
+    const W = G57[lang]
+    const ctx = await browser.newContext({ locale: W.locale, viewport: { width, height: 900 } })
+    const page = await ctx.newPage()
+    const errs = []
+    page.on('pageerror', (e) => errs.push(String(e)))
+    await page.route('**/api/examples/featured?*', (r) => r.fulfill({ json: { featured: featured ? FEAT(lang) : null } }))
+    await page.route('**/api/examples?*', (r) => r.fulfill({ json: { examples: [] } }))
+    await page.route('**/img/scenes/m*.jpg', (r) => r.continue())
+    await page.goto(`http://localhost:5173${path ?? W.write}`, { waitUntil: 'networkidle' })
+    await page.waitForTimeout(500)
+    return { page, ctx, errs }
+  }
+  const noScroll = (page) => page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 1)
+  for (const lang of ['ja', 'en', 'zh-Hant']) {
+    const W = G57[lang]
+    // the writing page, no featured sample: the line and the four guides only, no empty box
+    const a = await open57(lang, false)
+    check(`writing page (${lang}, Part 24): the one line and the four guides show under the headline; nothing is drawn for an example when there is no featured sample`, (await a.page.locator('[data-testid=write-guide-line]').innerText()) === W.line && JSON.stringify(await a.page.locator('[data-testid=write-guide-item]').allInnerTexts()) === JSON.stringify(W.guides) && (await a.page.locator('[data-testid=write-example]').count()) === 0 && (await a.page.locator('.wgEx').count()) === 0)
+    check(`writing page (${lang}, Part 24): the guides are a numbered list, not form fields; the one moment box stays; the rotating hint is gone`, (await a.page.locator('ol[data-testid=write-guide-list]').count()) === 1 && (await a.page.locator('[data-testid=write-guide] input, [data-testid=write-guide] textarea, [data-testid=write-guide] select').count()) === 0 && (await a.page.locator('textarea[data-testid=story-input]').count()) === 1 && (await a.page.locator('[data-testid=story-question], [data-testid=question-switch], .qHintLabel').count()) === 0)
+    check(`writing page (${lang}, 390 px, Part 24): no horizontal scroll`, await noScroll(a.page))
+    if (lang !== 'zh-Hant') { await a.page.locator('[data-testid=story-headline]').scrollIntoViewIfNeeded(); await a.page.evaluate(() => window.scrollBy(0, -12)); await a.page.screenshot({ path: `${SHOTS57}/p24-write-${lang}-390.png`, fullPage: false }) }
+    check(`no page errors (run 57, writing page ${lang})`, a.errs.length === 0, a.errs.join('; '))
+    // the landing, no featured sample: no section, no step-1 link
+    const l0 = await open57(lang, false, { path: W.base || '/' })
+    check(`landing (${lang}, Part 24): with no featured sample the "${W.section}" section and the step-1 link are not there`, (await l0.page.locator('[data-testid=one-moment], #one-moment, [data-testid=step1-link]').count()) === 0)
+    await l0.ctx.close()
+    await a.ctx.close()
+    // with a featured sample: the example on the writing page, the section and the link on the landing
+    const b = await open57(lang, true)
+    await b.page.locator('[data-testid=write-example]').waitFor({ timeout: 8000 })
+    const pics = await b.page.locator('[data-testid=write-example-pictures] img').count()
+    const caps = await b.page.locator('[data-testid=write-example-pictures] [data-testid=guide-example-caption]').allInnerTexts()
+    check(`writing page (${lang}, Part 24): with a featured sample, a small example shows one short moment and its four pictures with their captions, after the guides`, pics === 4 && caps.length === 4 && caps.every((c) => c.length > 0) && ((await b.page.locator('[data-testid=write-example-moment]').innerText()).length > 10) && (await b.page.evaluate(() => { const g = document.querySelector('[data-testid=write-guide-list]'); const e = document.querySelector('[data-testid=write-example]'); return !!(g.compareDocumentPosition(e) & Node.DOCUMENT_POSITION_FOLLOWING) })))
+    check(`writing page (${lang}, 390 px, Part 24): with the example there is still no horizontal scroll`, await noScroll(b.page))
+    if (lang === 'ja') { await b.page.locator('[data-testid=story-headline]').scrollIntoViewIfNeeded(); await b.page.evaluate(() => window.scrollBy(0, 40)); await b.page.screenshot({ path: `${SHOTS57}/p24-write-example-ja-390.png`, fullPage: false }) }
+    await b.ctx.close()
+    const c = await open57(lang, true, { path: W.base || '/' })
+    await c.page.locator('[data-testid=one-moment]').waitFor({ timeout: 8000 })
+    await c.page.locator('[data-testid=one-moment]').scrollIntoViewIfNeeded()
+    await c.page.waitForTimeout(400)
+    const sec = await c.page.evaluate(() => { const r = (el) => el.getBoundingClientRect(); const left = document.querySelector('.wgLeft'); const right = document.querySelector('.wgRight'); return { h: document.querySelector('#one-moment h2').textContent.trim(), moment: document.querySelector('[data-testid=one-moment-text]').textContent.trim(), pics: document.querySelectorAll('[data-testid=one-moment-pictures] img').length, poem: [...document.querySelectorAll('.wgPoemLine')].map((e) => e.textContent.trim()), stacked: r(right).top >= r(left).bottom - 1, sideBySide: Math.abs(r(left).top - r(right).top) < 40 && r(left).right <= r(right).left + 1, fits: document.documentElement.scrollWidth <= window.innerWidth + 1 } })
+    check(`landing (${lang}, 390 px, Part 24): the section 「${W.section}」 shows the moment, its four pictures and the poem, the two sides stacked, no horizontal scroll`, sec.h === W.section && sec.moment.length > 10 && sec.pics === 4 && sec.poem.length === 2 && sec.stacked && !sec.sideBySide && sec.fits, JSON.stringify(sec))
+    check(`landing (${lang}): the old "moments" mosaic is gone, and the section sits where it was (after "How it works")`, (await c.page.locator('#moments, .mosaic').count()) === 0 && (await c.page.evaluate(() => { const h = document.querySelector('#how'); const m = document.querySelector('#one-moment'); return !!(h.compareDocumentPosition(m) & Node.DOCUMENT_POSITION_FOLLOWING) })))
+    const link = c.page.locator('[data-testid=step1-link]')
+    check(`landing (${lang}): "How it works" step 1 links to the section 「${W.link}」`, (await link.innerText()) === W.link && (await link.getAttribute('href')) === '#one-moment' && (await c.page.locator('#how li').first().locator('[data-testid=step1-link]').count()) === 1)
+    if (lang === 'ja') await c.page.screenshot({ path: `${SHOTS57}/p24-landing-section-ja-390.png`, fullPage: false })
+    check(`no page errors (run 57, landing ${lang})`, c.errs.length === 0, c.errs.join('; '))
+    await c.ctx.close()
+    const d = await open57(lang, true, { width: 1100, path: W.base || '/' })
+    await d.page.locator('[data-testid=one-moment]').waitFor({ timeout: 8000 })
+    check(`landing (${lang}, desktop, Part 24): the moment on the left, the four pictures and the poem on the right`, await d.page.evaluate(() => { const r = (el) => el.getBoundingClientRect(); const l = r(document.querySelector('.wgLeft')); const rr = r(document.querySelector('.wgRight')); return Math.abs(l.top - rr.top) < 60 && l.right <= rr.left + 1 }))
+    await d.ctx.close()
   }
 }
 

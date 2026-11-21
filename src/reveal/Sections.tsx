@@ -1,4 +1,5 @@
 import { ExamplesButton } from './Examples.tsx'
+import { ToOneMoment } from './WriteGuide.tsx'
 import { useFlowActive } from './flow-store.ts'
 import { SUPPORT_EMAIL } from '../order/support'
 import { PACKAGE_DISPLAY_ORDER, RECOMMENDED_PACKAGE } from '../order/packages.ts'
@@ -223,6 +224,7 @@ export function Steps({ t, lang = 'en', memorial = false, woodOnSale = false }: 
               </span>
               <h3>{h}</h3>
               {p && <p>{p}</p>}
+              {i === 0 && <ToOneMoment lang={lang} />}
               {time && <span className="time">{time}</span>}
             </li>
           ))}

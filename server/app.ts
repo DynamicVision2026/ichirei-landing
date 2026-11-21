@@ -270,6 +270,7 @@ export function createApp(config: ServerConfig): Hono {
   app.get('/auth/email', limited(replyLimit), (c) => authHandlers.emailPage(c.req.raw))
   app.post('/auth/email', limited(replyLimit), (c) => authHandlers.emailConsume(c.req.raw))
   app.get('/api/examples', limited(animationLimit), (c) => examplesHandlers.list(c.req.raw))
+  app.get('/api/examples/featured', limited(animationLimit), (c) => examplesHandlers.featured(c.req.raw))
   app.post('/api/examples/count', limited(animationLimit), (c) => examplesHandlers.count(c.req.raw))
   app.post('/api/gift/:token/own', limited(animationLimit), (c) => giftHandlers.own(c.req.param('token')))
   app.post('/api/animation/:id/shared', limited(replyLimit), (c) => giftHandlers.sharedBySender(c.req.param('id')))

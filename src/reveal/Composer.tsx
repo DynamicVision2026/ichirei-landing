@@ -1,9 +1,10 @@
 import { ExamplesButton } from './Examples.tsx'
+import { WriteGuide } from './WriteGuide.tsx'
 import { toRevealLang } from './lang.ts'
 import { useEffect, useRef, useState } from 'react'
 import { trackFlow, trackUs } from '../demo/analytics'
 import { OCCASION_CHIPS, RELATIONSHIP_CHIPS, occasionChipOf, relationshipChipOf } from '../order/en-chips.ts'
-import { nextQuestionId, questionSetOf, questionsOf, randomFirst, setOfQuestionId } from '../demo/questions'
+import { questionSetOf } from '../demo/questions'
 import { OPENER, STORY_MIN } from './opener-copy'
 import {
   DIRECTION_CODES,
@@ -187,8 +188,6 @@ export default function Composer({ story, onStoryChange, onSubmit, copy, lang, c
     }
   }, [context])
   const set = questionSetOf(context)
-  const questions = set ? questionsOf(set, lang) : []
-  const question = questions.find((q) => q.id === questionId) ?? null
   // Remembrance: the wording stops speaking of gifts (the person has died; the character is kept, not given).
   const memorial = occasionOf(context) === 'memorial'
   const pc = PURPOSE_COPY[context.language]
@@ -209,26 +208,11 @@ export default function Composer({ story, onStoryChange, onSubmit, copy, lang, c
   storyRef.current = story
   useEffect(() => () => recognitionRef.current?.stop(), [])
 
-  // The question: once a relationship and an occasion are picked, show ONE specific question (a random angle first, so the question never
-  // steers every story to the same few characters). A saved draft brings its own question back; changing the set picks a new one.
+  // Part 24 (2026-11-21): the rotating 「ヒント」 question is gone — the line and the four guides under the headline replace it — so no question is chosen, shown or sent with the order.
   useEffect(() => {
-    if (!set) {
-      if (questionId !== null) onQuestionChange(null)
-      return
-    }
-    if (setOfQuestionId(questionId) === set) return
-    const id = randomFirst(set)
-    onQuestionChange(id)
-    trackFlow('question_shown', { language: context.language, set, qid: id })
+    if (questionId !== null) onQuestionChange(null)
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [set])
-  const switchQuestion = () => {
-    if (!set) return
-    const id = nextQuestionId(set, questionId)
-    onQuestionChange(id)
-    trackFlow('question_switched', { language: context.language, set, qid: id })
-    trackFlow('question_shown', { language: context.language, set, qid: id })
-  }
+  }, [questionId])
 
   // story_opened: the story section comes into view (once per page load).
   const formRef = useRef<HTMLFormElement | null>(null)
@@ -437,22 +421,7 @@ export default function Composer({ story, onStoryChange, onSubmit, copy, lang, c
       <label className="qHeadline" htmlFor="moment" data-testid="story-headline">
         {o.headline}
       </label>
-      {question && (
-        <>
-          <p className="qHint" data-testid="story-hint-line">
-            <span className="qHintLabel">{o.hintLabel}</span>
-            <span data-testid="story-question" data-question-id={question.id}>
-              {question.text}
-            </span>
-          </p>
-          <button type="button" className="qSwitch" data-testid="question-switch" onClick={switchQuestion}>
-            {o.switchQuestion}
-          </button>
-          <p className="qNote" data-testid="question-optional">
-            {o.optionalNote}
-          </p>
-        </>
-      )}
+      <WriteGuide lang={toRevealLang(context.language)} />
       <textarea
         id="moment"
         ref={taRef}

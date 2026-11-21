@@ -152,7 +152,7 @@ export async function makeSample(store: OrderStore | null, input: { id: string; 
   gift = { ...gift, schema: 'gift', token, animation_id: newId, order_ref: '', collected_at: now.toISOString(), created_at: now.toISOString(), from: sn.from, to: sn.to, message: '', egift: null, ship_to: 'none', package: 'egift', opens_on: null, opens_at: null, opens_tz: null, reply: null,
     reply_ticket: null, back: null, source: 'sample', sample: { on: true, featured: !!input.featured, examples: false, order: 0, from_id: id, changes, created_at: now.toISOString() } }
   const anim: AnimationRecord = { schema: 'animation', id: newId, order_ref: '', created_at: now.toISOString(), language: lang, glyph: gift.glyph, reading: gift.reading, romanization: gift.romanization, meaning_en: gift.meaning_en, ...(gift.en ? { en: gift.en } : {}),
-    moment: '', who: gift.who, memorial: false, purpose: gift.purpose ?? null, film, gift_token: token, draft: null }
+    moment: clean(src.moment ?? '', 'the moment'), who: gift.who, memorial: false, purpose: gift.purpose ?? null, film, gift_token: token, draft: null }
   // the pictures and their state, copied under the sample's own id (the draft may be cleaned up later)
   for (let i = 1; i <= 4; i++) {
     const b = await store.getObject(`films/${id}/${i}.webp`).catch(() => null)
@@ -228,6 +228,12 @@ export async function updateSample(store: OrderStore | null, token: string, patc
 }
 
 /** The samples the Examples page shows: switched on, "show on the examples page", at most 4, the page's own language first (then the others, each labelled), then by order number. */
+/** The sample marked "featured" for this language and switched on (Part 24: the writing page's example and the landing's "one moment, four pictures and a poem"); null when there is none. */
+export function featuredFor(rows: SampleRow[], lang: 'ja' | 'en' | 'zh-Hant'): SampleRow | null {
+  const mine = (r: SampleRow): boolean => (lang === 'zh-Hant' ? r.language.startsWith('zh') : r.language === lang)
+  return rows.filter((r) => r.on && r.featured && mine(r)).sort((a, b) => Date.parse(b.created_at) - Date.parse(a.created_at))[0] ?? null
+}
+
 export function examplesFor(rows: SampleRow[], lang: 'ja' | 'en' | 'zh-Hant'): SampleRow[] {
   const mine = (r: SampleRow): boolean => (lang === 'zh-Hant' ? r.language.startsWith('zh') : r.language === lang)
   return rows.filter((r) => r.on && r.examples).sort((a, b) => Number(mine(b)) - Number(mine(a)) || a.order - b.order).slice(0, MAX_EXAMPLES)

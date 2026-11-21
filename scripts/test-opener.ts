@@ -157,7 +157,7 @@ const gift = { relationship: 'parent_mother', direction: 'up', occasion: 'parent
   const bad = parseClientEvent({ session, event: 'question_shown', language: 'xx', set: 'nonsense', qid: 'free text' }, now) as Record<string, unknown> | null
   check('(5) a wrong language, set or question id becomes null (never stored as typed)', !!bad && bad.language === null && bad.set === null && bad.qid === null)
   check('(5) an event without a valid session id is dropped', parseClientEvent({ event: 'story_opened' }, now) === null && parseClientEvent({ session: 'short', event: 'story_opened' }, now) === null)
-  check('(5) the browser sends them: story_opened (section seen), question_shown / question_switched, voice_used, draft_restored, story_submitted, followup_shown, reveal_shown', ['story_opened', 'question_shown', 'question_switched', 'voice_used'].every((n) => read('src/reveal/Composer.tsx').includes(`'${n}'`)) && ['draft_restored', 'story_submitted', 'followup_shown', 'reveal_shown'].every((n) => read('src/demo/DemoApp.tsx').includes(`'${n}'`)))
+  check('(5) the browser sends them: story_opened (section seen), voice_used (question_shown / question_switched went with the rotating hint, Part 24), draft_restored, story_submitted, followup_shown, reveal_shown', ['story_opened', 'voice_used'].every((n) => read('src/reveal/Composer.tsx').includes(`'${n}'`)) && ['draft_restored', 'story_submitted', 'followup_shown', 'reveal_shown'].every((n) => read('src/demo/DemoApp.tsx').includes(`'${n}'`)))
 }
 
 // ---- 6. the report ------------------------------------------------------------------------------------------------------------------------------
