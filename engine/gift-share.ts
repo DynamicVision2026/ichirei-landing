@@ -2,7 +2,8 @@
 // single-page app, which these crawlers do not run, so the server puts the tags into the HTML of /g/<token>. Names and the opening date only: never the
 // character, the poem, the message or the story. Everything here is escaped, because a sender's name is text typed by a person.
 
-import { openingLabelFromRecord } from '../src/order/opens-at.ts'
+import { openingWhenFromRecord } from '../src/order/opens-at.ts'
+import { shareDescription, shareLang, shareTitle } from '../src/order/share-text.ts'
 import { createHash } from 'node:crypto'
 import { publicUrl } from './animation.ts'
 import type { GiftRecord } from './gift.ts'
@@ -36,15 +37,15 @@ export function ogMeta(g: GiftRecord, env: NodeJS.ProcessEnv = process.env, now:
     const description = lang === 'ja' ? '実際にこのように届きます。' : lang === 'zh-Hant' ? '實際上會這樣送達。' : 'The way it arrives on a phone.'
     return { title, description, image: `${base}${ogPath(g)}`, url: `${base}/s/${g.token}`, lang }
   }
-  const exact = openingLabelFromRecord(lang, g.opens_at, g.opens_tz) // "Opens Dec 25, 7:00 a.m. (Eastern)"
-  const date = g.opens_on ? openDateText(lang, g.opens_on, now.getUTCFullYear()) : null
-  // A name nobody gave is left out — no placeholder, no relationship word.
-  const thing = lang === 'ja' ? (g.memorial ? '一字の便り' : '一字の贈りもの') : lang === 'zh-Hant' ? (g.memorial ? '一個字的來信' : '一個字的禮物') : g.memorial ? 'a letter of one character' : 'a gift of one character'
-  const title =
-    lang === 'ja' ? (g.to ? `${g.to}へ　${thing}` : thing) : lang === 'zh-Hant' ? (g.to ? `致 ${g.to}　${thing}` : thing) : g.to ? `To ${g.to} — ${thing}` : thing[0].toUpperCase() + thing.slice(1)
-  const sentence = lang === 'ja' ? (g.from ? `${g.from}さんから` : '') : lang === 'zh-Hant' ? (g.from ? `來自 ${g.from}` : '') : g.from ? `From ${g.from}` : ''
-  const when = exact ?? (date ? (lang === 'ja' ? `${date}に開封` : lang === 'zh-Hant' ? `${date}開啟` : `opens ${date}`) : '')
-  const description = [sentence, when].filter(Boolean).join(' · ') || (lang === 'en' ? 'ICHIREI' : '一字礼')
+  // Part 20 (2026-11-21): the title and the description are the sender's greeting with the two names (src/order/share-text.ts): the same words the share sheet, the e-mail and the other channels carry.
+  // Never the character, the poem, the message or the story. A name nobody gave is left out.
+  const lockedNow = g.opens_at && Date.parse(g.opens_at) > now.getTime()
+  const gl = shareLang(g.language)
+  const when = lockedNow ? openingWhenFromRecord(gl, g.opens_at, g.opens_tz) : null
+  const date = !when && g.opens_on && (!g.opens_at || lockedNow) ? openDateText(lang, g.opens_on, now.getUTCFullYear()) : null
+  const input = { lang: gl, from: g.from, to: g.to, memorial: g.memorial, opens: when ?? date }
+  const title = shareTitle(input)
+  const description = shareDescription(input) || (lang === 'en' ? 'ICHIREI' : '一字礼')
   return { title, description, image: `${base}${ogPath(g)}`, url: `${base}/g/${g.token}`, lang }
 }
 

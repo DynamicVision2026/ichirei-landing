@@ -65,8 +65,8 @@ check('gift page: the letter lead without a name does not start with a possessiv
 
 // ---- the share title / description and the picture -----------------------------------------------------------------------------------------------
 const meta = ogMeta(gb)
-check('share (LINE / WhatsApp / WeChat): with no names the title and the description carry no 「へ」 / "To" / 「さんから」 / "From" and no "undefined"', meta.title === '一字の贈りもの' && !/undefined|さんから|^To |From/.test(meta.title + meta.description) && meta.description.length > 0)
-check('share: typed names still show as typed', ogMeta(g2).title === '媽媽へ　一字の贈りもの' && ogMeta(g2).description.startsWith('まゆさんから'))
+check('share (LINE / WhatsApp / WeChat): with no names the title and the description carry no 「へ」 / "To" / 「さんから」 / "From" and no "undefined"', meta.title === '一字の贈りもの' && !/undefined|さんから|^To |From|sent you/.test(meta.title + meta.description) && meta.description.length > 0)
+check('share: typed names still show as typed', ogMeta(g2).title === 'まゆさんから、一字の贈りもの' && ogMeta(g2).description.startsWith('媽媽さんへ。まゆさんから、'))
 let ogOk = false
 try { const png = await makeOgImage({ to: '', from: '', memorial: false, language: 'ja' }); ogOk = png.length > 1000 && png[1] === 0x50 } catch (e) { logs.push(String(e)) }
 check('the share picture is drawn without any name (no error, a real PNG)', ogOk)

@@ -110,9 +110,9 @@ for (const r of [eg.ref, wd.ref, bl.ref]) pay[r] = { state: 'paid', paid_at: T0.
   check('(2) with no explicit step: printed → 2 (being made), shipped → 3', woodStepOf({}) === 'received' && woodStepOf({ printed_at: 'x' }) === 'making' && woodStepOf({ printed_at: 'x', shipped_at: 'y' }) === 'shipped' && woodStepOf({ wood_step: 'delivered' }) === 'delivered')
   check('(2) buyerOrderView: a cancelled order and an unpaid one have no wooden section', buyerOrderView(rec, windowOf(rec, { state: 'cancelled', paid_at: null }, NOW)).wood === null && buyerOrderView(rec, windowOf(rec, null, NOW)).wood === null)
   {
-  const v = JSON.parse(JSON.stringify(await view(wd.animId))) as { gift?: { to?: string } }
-  if (v.gift) delete v.gift.to
-  check('(2) the view has no price, no address, no order number beyond what the page needs, and the only name is the receiver\'s, typed by the sender, for the calendar event (2026-11-14)', !JSON.stringify(v).match(/山田|IC-2026|¥|taro@/))
+  const v = JSON.parse(JSON.stringify(await view(wd.animId))) as { gift?: { to?: string; from?: string } }
+  if (v.gift) { delete v.gift.to; delete v.gift.from } // the sender's own page carries the two names the sender typed (Part 20: the share greeting)
+  check('(2) the view has no price, no address, no order number beyond what the page needs, and the only names are the two the sender typed (the calendar event, the share greeting)', !JSON.stringify(v).match(/山田|IC-2026|¥|taro@/))
 }
 }
 

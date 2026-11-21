@@ -7,7 +7,7 @@ import './actions.css'
 // Saving and sharing are ONE button each (Part 12, 2026-11-20 — the owner: too many choices make the page heavy). Tapping either opens its choices in a small paper sheet; nothing is listed on the page itself.
 //   「まとめて保存」  one tap downloads one file: the whole gift as a PDF (the character, the poem, the four pictures, the certificate, and on the last page the QR of the gift page).
 //   「ほかの形で保存」 a small link under it: the film (MP4), the story scroll (PNG), the card (A4 PDF, with the cut-and-fold note), the QR as an image.
-//   「シェアする」    one tap opens the device's share sheet with the gift link; where there is none, a sheet with the send options (the sender's page: LINE, WhatsApp, WeChat, copy, QR, e-mail; the receiver's: the film, the
+//   「シェアする」    one tap opens the device's share sheet with the greeting and the gift link (the sender's page, Part 20) or the link alone (the receiver's); where there is none, a sheet with the send options (the sender's page: LINE, WhatsApp, WeChat, copy, QR, e-mail; the receiver's: the film, the
 //                    poem card, copy).
 // The same on the sender's page (after payment) and on the receiver's keepsakes screen, in all three languages. The sheet is a paper slip with a soft shadow, never glass or blur.
 
@@ -152,6 +152,10 @@ export interface GiftActionsProps {
   memorial?: boolean
   /** English: the square card image is offered too. */
   enCard?: boolean
+  /** Part 20 (2026-11-21): the sender's greeting. With a text, 「シェアする」 opens the device's share sheet with this title (the e-mail's subject) and this text, which already holds the link: no `url` is passed
+   *  (some apps drop the text when a url is given, others print the link twice). Without one (the receiver's page) the sheet carries the link only. */
+  shareTitle?: string
+  shareText?: string
   /** The sender's own options (LINE, WhatsApp, WeChat, copy, QR, e-mail), shown in the share sheet where the device has no share sheet. */
   senderOptions?: (ctx: { copied: boolean; copyLink: () => void }) => ReactNode
   /** The sender's first copy or share is kept ("Sent"). */
@@ -219,7 +223,7 @@ export default function GiftActions(p: GiftActionsProps) {
     if (typeof nav.share === 'function') {
       try {
         p.onShared?.()
-        await nav.share({ url: p.giftUrl }) // the gift link only: no title, no text
+        await nav.share(p.shareText ? { title: p.shareTitle, text: p.shareText } : { url: p.giftUrl }) // the greeting with the link inside its text (never also `url`); the receiver's page: the link only
         return
       } catch (err) {
         if ((err as { name?: string })?.name === 'AbortError') return // the person closed the share sheet

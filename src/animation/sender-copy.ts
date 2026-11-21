@@ -8,6 +8,8 @@ export interface PanelCopy {
   giveLead: string
   line: string
   copyLink: string
+  /** Part 20: copies the whole greeting with the link (for WeChat and any other app). */
+  copyMessage: string
   copied: string
   email: string
   qr: string
@@ -73,7 +75,7 @@ export interface PanelCopy {
 export const SENDER_COPY: Record<PageLang, PanelCopy> = {
   ja: {
     giveTitle: '贈る', giveLead: '相手のためのページです。リンクを送ると、映像からはじまります。',
-    line: 'LINEで贈る', copyLink: 'リンクをコピー', copied: 'コピーしました', email: 'メールで贈る', qr: 'QRコードを表示', qrNote: '相手のスマートフォンで読み取れます。',
+    line: 'LINEで贈る', copyLink: 'リンクをコピー', copyMessage: 'メッセージごとコピー', copied: 'コピーしました', email: 'メールで贈る', qr: 'QRコードを表示', qrNote: '相手のスマートフォンで読み取れます。',
     sendLater: 'あとで送ることもできます。この贈りものは〈マイギフト〉に残っています。', openMyGifts: 'マイギフトを開く →',
     linkLabel: '相手のページのリンク', shareText: 'あなたのための一字の物語です。', mailSubject: 'あなたのための一字',
     statusTitle: 'ご注文の状況', sizeLabel: 'サイズ', shipLabel: 'お届け', shipMe: 'ご自身に届けます', shipDirect: '相手に直接届けます', shipEgift: 'eギフト（住所は相手が入力）', shipNone: '郵送はありません（デジタル）',
@@ -89,7 +91,7 @@ export const SENDER_COPY: Record<PageLang, PanelCopy> = {
   },
   'zh-Hant': {
     giveTitle: '送出', giveLead: '這是為對方準備的頁面。把連結傳給對方，會先從影片開始。',
-    line: '用 LINE 傳送', copyLink: '複製連結', copied: '已複製', email: '用電子郵件傳送', qr: '顯示 QR code', qrNote: '對方可以用手機掃描。',
+    line: '用 LINE 傳送', copyLink: '複製連結', copyMessage: '複製訊息', copied: '已複製', email: '用電子郵件傳送', qr: '顯示 QR code', qrNote: '對方可以用手機掃描。',
     sendLater: '也可以稍後再送。這份禮物會留在〈我的禮物〉裡。', openMyGifts: '打開我的禮物 →',
     linkLabel: '對方頁面的連結', shareText: '這是為你準備的一個字的故事。', mailSubject: '為你準備的一個字',
     statusTitle: '訂單狀況', sizeLabel: '尺寸', shipLabel: '寄送', shipMe: '寄給你自己', shipDirect: '直接寄給對方', shipEgift: '電子禮物（地址由對方填寫）', shipNone: '不郵寄（數位版）',
@@ -105,7 +107,7 @@ export const SENDER_COPY: Record<PageLang, PanelCopy> = {
   },
   en: {
     giveTitle: 'Give it', giveLead: 'This page is for the person you are giving it to. Send them the link and it starts with the film.',
-    line: 'Send on LINE', copyLink: 'Copy the link', copied: 'Copied', email: 'Send by e-mail', qr: 'Show a QR code', qrNote: 'They can scan it with their phone.',
+    line: 'Send on LINE', copyLink: 'Copy the link', copyMessage: 'Copy message', copied: 'Copied', email: 'Send by e-mail', qr: 'Show a QR code', qrNote: 'They can scan it with their phone.',
     sendLater: 'You can send it later. This gift stays in My gifts.', openMyGifts: 'Open My gifts →',
     linkLabel: 'Their page’s link', shareText: 'A one-character story, made for you.', mailSubject: 'One character, for you',
     statusTitle: 'Your order', sizeLabel: 'Size', shipLabel: 'Delivery', shipMe: 'Comes to you', shipDirect: 'Goes directly to them', shipEgift: 'E-gift (they enter the address)', shipNone: 'Not shipped (digital)',

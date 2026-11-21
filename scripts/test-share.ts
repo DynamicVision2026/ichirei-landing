@@ -6,7 +6,9 @@
 import sharp from 'sharp'
 import { createGiftHandlers } from '../api/gift.ts'
 import { buildGiftRecord, newGiftToken, type GiftRecord } from '../engine/gift.ts'
+import * as OpenCC from 'opencc-js'
 import { injectOg, ogKey, ogMeta } from '../engine/gift-share.ts'
+import { shareText, shareTitle } from '../src/order/share-text.ts'
 import { makeOgImage } from '../engine/render/og.ts'
 import { MemoryOrderStore } from '../engine/order-store.ts'
 import { buildAnimationRecord, newAnimationId } from '../engine/animation.ts'
@@ -61,20 +63,20 @@ check('(1) a very long name still fits the picture (it shrinks, nothing overflow
 
 // ---- 2. the title and the description -----------------------------------------------------------------------------------------------------------------
 const m = ogMeta(a.g, ENV, NOW)
-check('(2) ja: the title 「○○へ　一字の贈りもの」, the description 「○○さんから · 11月10日に開封」, the picture under our own address', m.title === '山田 一郎へ　一字の贈りもの' && m.description === '山田 太郎さんから · 11月10日に開封' && m.image.startsWith('https://ichirei.soul-id.jp/api/gift/RG-') && m.image.includes('/og.png?v='), JSON.stringify(m))
+check('(2) ja (Part 20): the title 「○○さんから、一字の贈りもの」, the description the greeting with both names and the opening day, the picture under our own address', m.title === '山田 太郎さんから、一字の贈りもの' && m.description === '山田 一郎さんへ。山田 太郎さんから、一字の贈りものが届いています。11月10日に開きます。' && m.image.startsWith('https://ichirei.soul-id.jp/api/gift/RG-') && m.image.includes('/og.png?v='), JSON.stringify(m))
 const plain = ogMeta((await gift({})).g, ENV, NOW)
-check('(2) an undated gift has no date in the description', plain.description === '山田 太郎さんから')
+check('(2) an undated gift has no date in the description', plain.description === '山田 一郎さんへ。山田 太郎さんから、一字の贈りものが届いています。')
 const memorialG = ogMeta({ ...(await gift({})).g, memorial: true }, ENV, NOW)
-check('(2) a remembrance title has no gift word: 「○○へ　一字の便り」', memorialG.title === '山田 一郎へ　一字の便り' && !memorialG.title.includes('贈りもの'), memorialG.title)
+check('(2) a remembrance title has no gift word: 「○○さんから、一字の便り」', memorialG.title === '山田 太郎さんから、一字の便り' && !memorialG.title.includes('贈りもの'), memorialG.title)
 const en = ogMeta({ ...a.g, language: 'en' }, ENV, NOW)
 const zh = ogMeta({ ...a.g, language: 'zh-Hant' }, ENV, NOW)
-check('(2) en and zh-Hant read in their language', en.title === 'To 山田 一郎 — a gift of one character' && en.description === 'From 山田 太郎 · opens 10 November' && zh.title === '致 山田 一郎　一個字的禮物' && zh.description === '來自 山田 太郎 · 11月10日開啟', JSON.stringify([en, zh]))
+check('(2) en and zh-Hant read in their language', en.title === 'A gift of one character from 山田 太郎' && en.description === '山田 一郎, 山田 太郎 sent you a gift of one character. It opens on 10 November.' && zh.title === '山田 太郎送來的一字禮物' && zh.description === '給山田 一郎：山田 太郎送給你一份一字的禮物。將於11月10日打開。', JSON.stringify([en, zh]))
 check('(2) the title and the description carry no character, no poem, no message, no price', !/証|備|¥/.test(m.title + m.description))
 
 // ---- 3. the HTML ---------------------------------------------------------------------------------------------------------------------------------------
 const html = '<!doctype html><html><head><title>ICHIREI</title><meta name="description" content="generic"><meta property="og:title" content="generic"><meta property="og:image" content="/x.jpg"></head><body><div id="root"></div></body></html>'
 const out = injectOg(html, m)
-check('(3) the HTML carries og:title, og:description, og:image (1200 × 630) and a summary_large_image card; the generic tags are gone', out.includes(`property="og:title" content="${m.title}"`) && out.includes(`property="og:image" content="${m.image}"`) && out.includes('og:image:width" content="1200"') && out.includes('summary_large_image') && !out.includes('generic') && !out.includes('/x.jpg') && out.includes('<title>山田 一郎へ　一字の贈りもの</title>') && out.includes('noindex'))
+check('(3) the HTML carries og:title, og:description, og:image (1200 × 630) and a summary_large_image card; the generic tags are gone', out.includes(`property="og:title" content="${m.title}"`) && out.includes(`property="og:image" content="${m.image}"`) && out.includes('og:image:width" content="1200"') && out.includes('summary_large_image') && !out.includes('generic') && !out.includes('/x.jpg') && out.includes('<title>山田 太郎さんから、一字の贈りもの</title>') && out.includes(`<meta name="description" content="${m.description}">`) && out.includes('noindex'))
 const evil = injectOg(html, { ...m, title: '"><script>alert(1)</script>', description: '<b>' })
 check('(3) a name typed by a person is escaped in the tags', !evil.includes('<script>') && evil.includes('&lt;script&gt;'))
 const H = (st: MemoryOrderStore) => createGiftHandlers(() => ({ store: st, now: () => NOW, env: ENV }))
@@ -90,6 +92,28 @@ a.store.objects.set(ogKey(a.g), { body: Buffer.from('cached'), contentType: 'ima
 check('(4) the second request is served from the bucket (nothing is drawn again)', Buffer.from(await (await H(a.store).og(a.g.token)).arrayBuffer()).toString() === 'cached')
 check('(4) corrected names get a new picture (the key changes)', ogKey({ ...a.g, to: '山田 二郎' }) !== ogKey(a.g))
 check('(4) an unknown token is a 404', (await H(a.store).og('RG-aaaaaaaaaaaaaaaaaaaa')).status === 404 && (await H(a.store).og('nope')).status === 404)
+
+// ---- 5. the greeting the share carries (Part 20, 2026-11-21) -----------------------------------------------------------------------------------------
+{
+  const LINK = 'https://ichirei.beyondculture.ai/g/RG-aaaaaaaaaaaaaaaaaaaa'
+  const named = (lang: 'ja' | 'en' | 'zh-Hant' | 'zh-Hans', opens?: string) => ({ lang, from: '傅', to: '蓼沼', opens: opens ?? '' })
+  check('(5) ja title and text with both names', shareTitle(named('ja')) === '傅さんから、一字の贈りもの' && shareText(named('ja'), LINK) === `蓼沼さんへ。傅さんから、一字の贈りものが届いています。こちらから開いてください。${LINK}`, shareText(named('ja'), LINK))
+  const en = { lang: 'en' as const, from: 'Sam', to: 'Mom' }
+  check('(5) en title and text with both names', shareTitle(en) === 'A gift of one character from Sam' && shareText(en, LINK) === `Mom, Sam sent you a gift of one character. Open it here: ${LINK}`, shareText(en, LINK))
+  check('(5) zh-Hant title and text with both names', shareTitle(named('zh-Hant')) === '傅送來的一字禮物' && shareText(named('zh-Hant'), LINK) === `給蓼沼：傅送給你一份一字的禮物。請從這裡打開：${LINK}`, shareText(named('zh-Hant'), LINK))
+  const conv = OpenCC.Converter({ from: 'tw', to: 'cn' })
+  const hant = shareText({ lang: 'zh-Hant', from: '傅', to: '蓼沼', opens: '12月25日上午7點（台北時間）' }, LINK)
+  const hans = shareText({ lang: 'zh-Hans', from: '傅', to: '蓼沼', opens: '12月25日上午7点（台北时间）' }, LINK)
+  check('(5) zh-Hans is the zh-Hant wording converted by OpenCC, names and the link untouched', hans === conv(hant).replace('台北时间', '台北时间') && shareTitle(named('zh-Hans')) === conv(shareTitle(named('zh-Hant'))), hans)
+  check('(5) without names (old gifts) the no-name wording is used, in each language', shareText({ lang: 'en' }, LINK) === `A gift of one character has arrived for you. Open it here: ${LINK}` && shareText({ lang: 'ja' }, LINK) === `一字の贈りものが届いています。こちらから開いてください。${LINK}` && shareText({ lang: 'zh-Hant' }, LINK) === `有一份一字的禮物送給你。請從這裡打開：${LINK}` && shareTitle({ lang: 'en' }) === 'A gift of one character' && shareTitle({ lang: 'ja' }) === '一字の贈りもの')
+  check('(5) a locked gift: the opening line comes before the link, in each language', shareText({ ...en, opens: 'Dec 25, 7:00 a.m. (Eastern)' }, LINK) === `Mom, Sam sent you a gift of one character. It opens on Dec 25, 7:00 a.m. (Eastern). Open it here: ${LINK}` && shareText(named('ja', '12月25日 午前7時（日本時間）'), LINK).includes(`12月25日 午前7時（日本時間）に開きます。こちらから開いてください。${LINK}`) && shareText(named('zh-Hant', '12月25日上午7點（台北時間）'), LINK).includes(`將於12月25日上午7點（台北時間）打開。請從這裡打開：${LINK}`))
+  check('(5) the link is inside the text once (the share sheet is given no separate url, so no app prints it twice)', shareText(en, LINK).split(LINK).length === 2)
+  check('(5) a name that already carries an honorific is not given a second one (お母さん → お母さんへ)', shareText({ lang: 'ja', from: 'Ken', to: 'お母さん' }, LINK).startsWith('お母さんへ。Kenさんから'))
+  const locked = ogMeta({ ...a.g, language: 'en', opens_at: '2026-12-25T12:00:00.000Z', opens_tz: 'America/New_York', opens_on: '2026-12-25' }, ENV, NOW)
+  check('(5) the preview of a locked gift names the day and zone, and never the character', locked.description === '山田 一郎, 山田 太郎 sent you a gift of one character. It opens on Dec 25, 7:00 a.m. (US Eastern).' && !locked.title.includes(a.g.glyph) && !locked.description.includes(a.g.glyph), locked.description)
+  const pg = await (await H(a.store).page(a.g.token, html))!.text()
+  check('(5) /g/<token>: <title>, <meta name="description">, og:title, og:description and og:image carry the names and never the character', pg.includes(`<title>${m.title}</title>`) && pg.includes(`name="description" content="${m.description}"`) && pg.includes(`og:title" content="${m.title}"`) && pg.includes(`og:description" content="${m.description}"`) && /og:image" content="[^"]*\/og\.png\?v=/.test(pg) && !pg.includes(a.g.glyph))
+}
 
 console.log(failures ? `\n${failures} check(s) FAILED` : '\nAll sharing checks passed.')
 process.exit(failures ? 1 : 0)

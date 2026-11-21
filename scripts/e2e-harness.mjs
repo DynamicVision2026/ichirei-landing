@@ -1421,7 +1421,7 @@ const mockPage = async (browser, { onExplain, result, order, track } = {}) => {
   }
 
   // Part 4: the sender's share buttons — LINE, WhatsApp, WeChat (a QR image and a line), copy, e-mail, and the link as selectable text
-  for (const [lang, locale, memorial, sent] of [['ja', 'ja-JP', false, '贈りものを送りました。'], ['ja', 'ja-JP', true, '一字の便りを送りました。'], ['zh-Hant', 'zh-TW', false, '我送了你一份禮物。'], ['en', 'en-US', false, 'I have sent you a gift.']]) {
+  for (const [lang, locale, memorial, sent] of [['ja', 'ja-JP', false, '一字の贈りものが届いています。こちらから開いてください。'], ['ja', 'ja-JP', true, '一字の便りが届いています。こちらから開いてください。'], ['zh-Hant', 'zh-TW', false, '有一份一字的禮物送給你。請從這裡打開：'], ['en', 'en-US', false, 'A gift of one character has arrived for you. Open it here: ']]) {
     const ctx = await browser.newContext({ locale, viewport: { width: 375, height: 844 } })
     const page = await ctx.newPage()
     const GIFT = `https://ichirei.soul-id.jp/g/${TOKEN}`
@@ -4009,7 +4009,7 @@ const SECTION_ORDER = ['.hero', '.strip', '.philo', '#shape', '#angles', '#how',
     const panel = sp.locator('[data-testid=sender-panel]')
     await panel.waitFor()
     await panel.locator('[data-testid=share-button]').click() // Part 12: the send options live in the share sheet
-    check('sender (en): after "Collect your gift" the share sheet offers Copy link, Email, WhatsApp, Messages and "Schedule for a date" — no LINE, no WeChat, no QR', (await panel.locator('[data-testid=en-share-sheet] > *').allInnerTexts()).join() === 'Copy link,Email,WhatsApp,Messages' && (await panel.locator('[data-testid=give-schedule]').innerText()) === 'Schedule for a date' && (await panel.locator('[data-testid=give-line], [data-testid=give-wechat], [data-testid=give-qr]').count()) === 0)
+    check('sender (en): after "Collect your gift" the share sheet offers Copy link, Email, WhatsApp, Messages and "Schedule for a date" — no LINE, no WeChat, no QR', (await panel.locator('[data-testid=en-share-sheet] > *').allInnerTexts()).join() === 'Copy link,Copy message,Email,WhatsApp,Messages' && (await panel.locator('[data-testid=give-schedule]').innerText()) === 'Schedule for a date' && (await panel.locator('[data-testid=give-line], [data-testid=give-wechat], [data-testid=give-qr]').count()) === 0)
     await sp.keyboard.press('Escape') // close the share sheet
     await panel.locator('[data-testid=give-schedule]').click()
     check('sender (en, Nov 14): the choices are "Now", "Thanksgiving dinner (Nov 26, 6:00 p.m.)" and "Pick a date and time" — no Christmas morning before Dec 1', (await panel.locator('.by-choice label').allInnerTexts()).map((t) => t.trim()).join('|') === 'Now|Thanksgiving dinner (Nov 26, 6:00 p.m.)|Pick a date and time')
@@ -6508,7 +6508,8 @@ for (const [lang, locale, text] of [['en', 'en-US', 'Your gift is being finished
     en: { saveAll: 'Save everything', other: 'Other formats', share: 'Share', forever: 'The gift page stays online for at least ten years.', film: 'The film (MP4)', scroll: 'The story scroll (PNG image)', card: 'The card (A4 PDF)', qr: 'Save the QR code as an image', copied: 'Copied', pick: 'Pick a date and time', now: 'Now', opts: ['Copy link', 'Email', 'WhatsApp', 'Messages'] },
     'zh-Hant': { saveAll: '全部儲存', other: '其他格式', share: '分享', forever: '禮物頁面至少公開 10 年。', film: '影片（MP4）', scroll: '故事長卷（圖片 PNG）', card: '卡片（A4 PDF）', qr: '把QR碼存成圖片', copied: '已複製', pick: '選擇日期與時間', now: '立即開啟', opts: [] },
   }
-  const view = (lang, gift = {}) => ({ id: ID, language: lang, glyph: '備', reading: lang === 'ja' ? 'そなえる' : '', romanization: 'sonaeru', meaning_en: 'to be ready', who: 'x', memorial: false, purpose: 'thanks', film: { status: 'ready', lines: ['a', 'b', 'c', 'd'], pictures: ['/img/scenes/children.jpg', '/img/scenes/friends.jpg', '/img/scenes/m1.jpg', '/img/scenes/m2.jpg'] }, gift: { url: `https://ichirei.beyondculture.ai/g/${TOKEN}`, size_code: 'ICHIREI-EGIFT', ship_to: 'none', egift_state: null, opens_on: null, opens_at: null, opens_tz: null, certificate_no: 12, reply: null, states: { shared_at: null, opened_at: null, answered_at: null }, ...gift }, order: { collected: true, ordered_at: '2026-11-19T05:30:00Z', change_until: null, wood: null } })
+  const NAMES = { ja: { to: '蓼沼', from: '傅' }, en: { to: 'Mom', from: 'Sam' }, 'zh-Hant': { to: '小美', from: '阿傅' } }
+  const view = (lang, gift = {}) => ({ id: ID, language: lang, glyph: '備', reading: lang === 'ja' ? 'そなえる' : '', romanization: 'sonaeru', meaning_en: 'to be ready', who: 'x', memorial: false, purpose: 'thanks', film: { status: 'ready', lines: ['a', 'b', 'c', 'd'], pictures: ['/img/scenes/children.jpg', '/img/scenes/friends.jpg', '/img/scenes/m1.jpg', '/img/scenes/m2.jpg'] }, gift: { url: `https://ichirei.beyondculture.ai/g/${TOKEN}`, size_code: 'ICHIREI-EGIFT', ship_to: 'none', egift_state: null, opens_on: null, opens_at: null, opens_tz: null, certificate_no: 12, reply: null, to: NAMES[lang].to, from: NAMES[lang].from, lang, states: { shared_at: null, opened_at: null, answered_at: null }, ...gift }, order: { collected: true, ordered_at: '2026-11-19T05:30:00Z', change_until: null, wood: null } })
   const open = async (lang, v, { share = false } = {}) => {
     const ctx = await browser.newContext({ locale: lang === 'en' ? 'en-US' : lang === 'ja' ? 'ja-JP' : 'zh-TW', viewport: { width: 390, height: 844 }, permissions: ['clipboard-read', 'clipboard-write'], acceptDownloads: true })
     if (share) await ctx.addInitScript(() => { navigator.share = async (d) => { window.__shared = d } })
@@ -6563,8 +6564,43 @@ for (const [lang, locale, text] of [['en', 'en-US', 'Your gift is being finished
     await T46(s.page, 'share-button').click()
     await s.page.waitForFunction(() => window.__shared)
     const shared = await s.page.evaluate(() => window.__shared)
-    check(`sender page (${lang}): where the device has a share sheet, one tap opens it with the gift link only — no title, no text — and our sheet stays closed`, shared.url === `https://ichirei.beyondculture.ai/g/${TOKEN}` && shared.title === undefined && shared.text === undefined && (await s.page.locator('[data-testid=share-sheet]').count()) === 0)
+    const LINK46 = `https://ichirei.beyondculture.ai/g/${TOKEN}`
+    const GREET = {
+      ja: { title: '傅さんから、一字の贈りもの', text: `蓼沼さんへ。傅さんから、一字の贈りものが届いています。こちらから開いてください。${LINK46}`, bare: `一字の贈りものが届いています。こちらから開いてください。${LINK46}`, lock: '12月25日 午前7時（日本時間）に開きます。' },
+      en: { title: 'A gift of one character from Sam', text: `Mom, Sam sent you a gift of one character. Open it here: ${LINK46}`, bare: `A gift of one character has arrived for you. Open it here: ${LINK46}`, lock: 'It opens on Dec 25, 7:00 a.m. (US Eastern).' },
+      'zh-Hant': { title: '阿傅送來的一字禮物', text: `給小美：阿傅送給你一份一字的禮物。請從這裡打開：${LINK46}`, bare: `有一份一字的禮物送給你。請從這裡打開：${LINK46}`, lock: '將於12月25日上午7點（台北時間）打開。' },
+    }[lang]
+    check(`sender page (${lang}, Part 20): where the device has a share sheet, one tap opens it with a TITLE and a TEXT that holds the gift link and both names — no separate url — and our sheet stays closed`, shared.title === GREET.title && shared.text === GREET.text && shared.url === undefined && shared.text.split(LINK46).length === 2 && (await s.page.locator('[data-testid=share-sheet]').count()) === 0, JSON.stringify(shared))
     await s.ctx.close()
+    const nn = await open(lang, view(lang, { to: '', from: '' }), { share: true })
+    await T46(nn.page, 'share-button').click()
+    await nn.page.waitForFunction(() => window.__shared)
+    const nnShared = await nn.page.evaluate(() => window.__shared)
+    check(`sender page (${lang}, Part 20): an old gift with no names gets the no-name wording`, nnShared.text === GREET.bare && !nnShared.title.includes('Sam') && nnShared.title === ({ ja: '一字の贈りもの', en: 'A gift of one character', 'zh-Hant': '一字禮物' })[lang], JSON.stringify(nnShared))
+    await nn.ctx.close()
+    const lk = await open(lang, view(lang, lang === 'en' ? { opens_on: '2099-12-25', opens_at: '2099-12-25T12:00:00.000Z', opens_tz: 'America/New_York' } : lang === 'ja' ? { opens_on: '2099-12-25', opens_at: '2099-12-24T22:00:00.000Z', opens_tz: 'Asia/Tokyo' } : { opens_on: '2099-12-25', opens_at: '2099-12-24T23:00:00.000Z', opens_tz: 'Asia/Taipei' }), { share: true })
+    await T46(lk.page, 'share-button').click()
+    await lk.page.waitForFunction(() => window.__shared)
+    const lkShared = await lk.page.evaluate(() => window.__shared)
+    check(`sender page (${lang}, Part 20): a locked gift says when it opens, before the link`, lkShared.text.includes(GREET.lock) && lkShared.text.indexOf(GREET.lock) < lkShared.text.indexOf(LINK46) && lkShared.text.endsWith(LINK46), lkShared.text)
+    await lk.ctx.close()
+    // the fallback sheet: the same text in the e-mail and the message apps; 「メッセージごとコピー」 copies all of it; 「リンクをコピー」 only the link
+    const fb = await open(lang, view(lang))
+    await T46(fb.page, 'share-button').click()
+    await T46(fb.page, 'share-sheet').waitFor()
+    const mail = await fb.page.locator('[data-testid=give-mail]').getAttribute('href')
+    const mailParams = new URLSearchParams(mail.replace('mailto:?', ''))
+    check(`sender page (${lang}, Part 20): the e-mail's subject is the title and its body the whole text`, mailParams.get('subject') === GREET.title && mailParams.get('body') === GREET.text, mail)
+    const chat = decodeURIComponent((await fb.page.locator(lang === 'en' ? '[data-testid=give-whatsapp]' : '[data-testid=give-line]').getAttribute('href')) ?? '')
+    check(`sender page (${lang}, Part 20): the chat apps open with the same text prefilled`, chat.includes(GREET.text), chat)
+    await T46(fb.page, 'give-copy-message').click()
+    await fb.page.waitForFunction((t) => document.querySelector('[data-testid=give-copy-message]')?.textContent.trim() === t, W.copied, { timeout: 4000 }).catch(() => {})
+    const copiedMsg = await fb.page.evaluate(() => navigator.clipboard.readText())
+    await T46(fb.page, 'give-copy').click()
+    const copiedLink = await fb.page.evaluate(() => navigator.clipboard.readText())
+    check(`sender page (${lang}, Part 20): the copy-message button copies the whole text; the copy-link button copies the link only`, copiedMsg === GREET.text && copiedLink === LINK46, JSON.stringify([copiedMsg, copiedLink]))
+    if (lang === 'ja' || lang === 'en') await fb.page.screenshot({ path: `${SHOTS}/p20-share-sheet-${lang}-390.png` })
+    await fb.ctx.close()
     // the schedule: set for a day → 「日時を選ぶ」 with the saved date, time and zone; set to open now → 「すぐに開ける」
     const now0 = await open(lang, view(lang))
     await T46(now0.page, 'give-schedule').click()

@@ -139,6 +139,18 @@ export function openingLabelAt(lang: OpensLang, date: string, hour: number, minu
   return lang === 'en' ? `Opens ${day}, ${clock} (${zone})` : lang === 'ja' ? `${day} ${clock}（${zone}）に開きます` : lang === 'zh-Hans' ? `${day}${clock}（${zone}）开启` : `${day}${clock}（${zone}）開啟`
 }
 
+/** The moment alone, for a sentence of ours (Part 20 share text): en "Dec 25, 7:00 a.m. (Eastern)" · ja 「12月25日 午前7時（日本時間）」 · zh-Hant 「12月25日上午7點（台北時間）」; null for an old record (a date only). */
+export function openingWhenFromRecord(lang: OpensLang, opensAt: string | null | undefined, opensTz: string | null | undefined): string | null {
+  if (!opensAt || !opensTz) return null
+  const d = dateInZone(opensAt, opensTz)
+  const c = clockIn(opensAt, opensTz)
+  if (!d || !c) return null
+  const day = openingDayText(lang, d)
+  const zone = zoneName(lang, opensTz)
+  const clock = clockText(lang, c.hour, c.minute)
+  return lang === 'en' ? `${day}, ${clock} (${zone})` : lang === 'ja' ? `${day} ${clock}（${zone}）` : `${day}${clock}（${zone}）`
+}
+
 /** The sealed envelope's own line (no zone): en "Opens Dec 25, 7:00 a.m." · ja 「12月25日 午前7時に開きます」 · zh-Hant 「12月25日上午7點開啟」. Memorial gifts use the same words (a date, never a countdown joke). */
 export function openingLabelShortFromRecord(lang: OpensLang, opensAt: string | null | undefined, opensTz: string | null | undefined): string | null {
   if (!opensAt || !opensTz) return null

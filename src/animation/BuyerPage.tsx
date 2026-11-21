@@ -14,7 +14,8 @@ import { isQuietPurpose } from '../order/purpose.ts'
 import { marketZone } from '../order/opens-at.ts'
 import '../gift/ceremony.css'
 import { SENDER_COPY } from './sender-copy.ts'
-import { openingLabelFromRecord } from '../order/opens-at.ts'
+import { openingLabelFromRecord, openingWhenFromRecord } from '../order/opens-at.ts'
+import { shareLang, shareText, shareTitle } from '../order/share-text.ts'
 import MyGiftsButton from '../loop/MyGifts.tsx'
 
 // The buyer's own page /a/<id> (2026-11-06): opened from the one link in the confirmation e-mail. The person who pays is the only person we deal with. Top to bottom:
@@ -40,6 +41,7 @@ export default function BuyerPage({ view, lang, onCollected }: { view: Animation
   const g = view.gift
   const [qr, setQr] = useState(false)
   const [wechat, setWechat] = useState(false)
+  const [msgCopied, setMsgCopied] = useState(false)
   const [confirming, setConfirming] = useState(false)
   const [collecting, setCollecting] = useState(false)
   // the 24-hour line disappears by itself when the deadline passes while the page is open
@@ -79,7 +81,12 @@ export default function BuyerPage({ view, lang, onCollected }: { view: Animation
   const quiet = inkOnly(view)
   const token = g.url.split('/g/')[1] ?? ''
   const size = SKU_SIZE[g.size_code] ?? 'egift'
-  const message = `${view.memorial ? s.sentLineMemorial : s.sentLine}\n${g.url}`
+  // Part 20 (2026-11-21): every channel carries the same greeting, in the GIFT's language (the receiver's ceremony), with the names; the scheduled line goes before the link while the gift is locked
+  const gl = shareLang(g.lang ?? view.language)
+  const lockedWhen = g.opens_at && Date.parse(g.opens_at) > now ? openingWhenFromRecord(gl, g.opens_at, g.opens_tz) : null
+  const greet = { lang: gl, from: g.from ?? '', to: g.to ?? '', memorial: view.memorial, opens: lockedWhen }
+  const title = shareTitle(greet)
+  const message = shareText(greet, g.url)
   // the first copy or share is kept as `shared_at` (the states line shows "Sent"); a failed call changes nothing
   const markShared = () => { try { void fetch(`/api/animation/${view.id}/shared`, { method: 'POST', keepalive: true }).catch(() => {}) } catch { /* the page works without it */ } }
   const until = o?.change_until && Date.parse(o.change_until) > now ? o.change_until : null
@@ -106,13 +113,24 @@ export default function BuyerPage({ view, lang, onCollected }: { view: Animation
   // the film is still being written / drawn (the first open draws it): the save section says so; a still-washi or deferred film has nothing to save
   const waiting = !view.film || (!view.film.pictures && !view.film.deferred)
   // The send options (LINE, WhatsApp, WeChat, copy, QR, e-mail) live in the share sheet now (Part 12, 2026-11-20): one 「シェアする」 button on the page; the device's own share sheet when it has one.
+  const copyMessage = async () => {
+    markShared()
+    try {
+      await navigator.clipboard.writeText(message)
+      setMsgCopied(true)
+      window.setTimeout(() => setMsgCopied(false), 2400)
+    } catch {
+      // the message is on the page's links too; nothing is lost
+    }
+  }
   const senderOptions = (done: boolean, copy: () => void) => (
     <>
         {lang === 'en' && !view.memorial ? (
           <>
             <p className="an-buttons" data-testid="en-share-sheet">
               <button type="button" className="an-btn an-btn-hot" data-testid="give-copy" onClick={copy}>{done ? s.copied : 'Copy link'}</button>
-              <a className="an-btn" data-testid="give-mail" onClick={markShared} href={`mailto:?subject=${encodeURIComponent(s.mailSubject)}&body=${encodeURIComponent(message)}`}>Email</a>
+              <button type="button" className="an-btn" data-testid="give-copy-message" onClick={() => void copyMessage()}>{msgCopied ? s.copied : s.copyMessage}</button>
+              <a className="an-btn" data-testid="give-mail" onClick={markShared} href={`mailto:?subject=${encodeURIComponent(title)}&body=${encodeURIComponent(message)}`}>Email</a>
               <a className="an-btn" data-testid="give-whatsapp" onClick={markShared} href={`https://wa.me/?text=${encodeURIComponent(message)}`} target="_blank" rel="noopener noreferrer">WhatsApp</a>
               <a className="an-btn" data-testid="give-messages" onClick={markShared} href={`sms:?&body=${encodeURIComponent(message)}`}>Messages</a>
             </p>
@@ -123,8 +141,9 @@ export default function BuyerPage({ view, lang, onCollected }: { view: Animation
           <a className="an-btn" data-testid="give-whatsapp" onClick={markShared} href={`https://wa.me/?text=${encodeURIComponent(message)}`} target="_blank" rel="noopener noreferrer">{s.whatsapp}</a>
           <button type="button" className="an-btn" data-testid="give-wechat" onClick={() => { markShared(); setWechat((v) => !v) }} aria-expanded={wechat}>{s.wechat}</button>
           <button type="button" className="an-btn" data-testid="give-copy" onClick={copy}>{done ? s.copied : s.copyLink}</button>
+          <button type="button" className="an-btn" data-testid="give-copy-message" onClick={() => void copyMessage()}>{msgCopied ? s.copied : s.copyMessage}</button>
           <button type="button" className="an-btn" data-testid="give-qr" onClick={() => { markShared(); setQr((v) => !v) }} aria-expanded={qr}>{s.qr}</button>
-          <a className="an-btn" data-testid="give-mail" onClick={markShared} href={`mailto:?subject=${encodeURIComponent(s.mailSubject)}&body=${encodeURIComponent(message)}`}>{s.email}</a>
+          <a className="an-btn" data-testid="give-mail" onClick={markShared} href={`mailto:?subject=${encodeURIComponent(title)}&body=${encodeURIComponent(message)}`}>{s.email}</a>
         </p>
         )}
         {(qr || wechat) && token && (
@@ -199,6 +218,8 @@ export default function BuyerPage({ view, lang, onCollected }: { view: Animation
           memorial={view.memorial}
           enCard={lang === 'en' && !!view.en}
           onShared={markShared}
+          shareTitle={title}
+          shareText={message}
           senderOptions={({ copied: done, copyLink: copy }) => senderOptions(done, copy)}
         />
         {/* Part 8 (2026-11-20): where people stop — sending can wait, and the gift stays in My gifts */}
