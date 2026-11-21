@@ -227,7 +227,7 @@ const renderFreeUse = (f: FreeUseCard | null): string => {
 }
 
 const LANG_NAME: Record<string, string> = { ja: '日本語', en: 'English', 'zh-Hant': '繁體中文', 'zh-Hans': '简体中文' }
-/** The 見本 / Samples card (2026-11-20): make a read-only sample from a draft or film id, then the list with its link, QR, counts and switches. */
+/** The 見本 / Samples card (2026-11-20): make a read-only sample from a draft, film or gift id (AN-… / RG-…), then the list with its link, QR, counts and switches. */
 export function renderSamples(rows: SampleRow[], base: string, notice: string | null = null, sources: { visits: Record<string, number>; paid: Record<string, number>; results?: Record<string, number> } | null = null, period = ''): string {
   const via = (k: string): string => (sources ? `${sources.visits[k] ?? 0} visits → ${sources.results?.[k] ?? 0} saw a result → ${sources.paid[k] ?? 0} ordered` : '')
   const list = rows.length === 0 ? '<div class="muted">No samples yet.</div>' : rows.map((r) => {
@@ -242,10 +242,10 @@ export function renderSamples(rows: SampleRow[], base: string, notice: string | 
   }).join('')
   return `<section class="card" id="samples" aria-label="Samples" data-testid="samples"><h2 class="serif" style="font-size:19px">見本 / Samples</h2>` +
     (notice ? `<div class="alert" data-testid="samples-notice">${esc(notice)}</div>` : '') +
-    `<form method="post" action="/ops/home/samples" style="display:grid;gap:6px;margin-bottom:10px"><label>Draft or film id <input name="id" placeholder="AN-…" required style="width:100%" data-testid="sample-id"></label>` +
+    `<form method="post" action="/ops/home/samples" style="display:grid;gap:6px;margin-bottom:10px"><label>Draft, film or gift id <input name="id" placeholder="AN-… or RG-…" required style="width:100%" data-testid="sample-id"></label>` +
     `<label><input type="checkbox" name="permission" value="1" data-testid="sample-permission"> 本人の了承を得ています / I have the giver's permission</label>` +
-    `<label>Names to take out (comma separated, optional) <input name="names" style="width:100%"></label>` +
-    `<details><summary class="muted">Only if the store has no record of the chosen character</summary><label>Character <input name="kanji" size="3"></label> <label>Reading <input name="reading"></label> <label>Word (en) <input name="word"></label><label>One line <input name="line" style="width:100%"></label><label>Language <select name="language"><option value="">as the draft</option><option value="ja">ja</option><option value="en">en</option><option value="zh-Hant">zh-Hant</option></select></label></details>` +
+    `<label>Names to take out (comma separated, optional — also taken out of the captions, the line and the poem; a gift's own two names are always taken out) <input name="names" style="width:100%"></label>` +
+    `<details><summary class="muted">Only for a draft (AN-…) whose chosen character the store has no record of — a gift (RG-…) needs none</summary><label>Character <input name="kanji" size="3"></label> <label>Reading <input name="reading"></label> <label>Word (en) <input name="word"></label><label>One line <input name="line" style="width:100%"></label><label>Language <select name="language"><option value="">as the draft</option><option value="ja">ja</option><option value="en">en</option><option value="zh-Hant">zh-Hant</option></select></label></details>` +
     `<label><input type="checkbox" name="featured" value="1"> featured for its language</label><button type="submit" data-testid="sample-make">見本にする</button></form>` +
     (sources ? `<div class="muted" data-testid="sample-sources">${esc(period)} · From an example gift (src=x_sample): <b>${via('x_sample')}</b> · From the examples page (src=examples): <b>${via('examples')}</b></div>` : '') +
     `<div class="muted">The sample shows 「あなた」 / "You" from 「一字礼」 / "ICHIREI", is read-only, and uses no free gift and no order.</div>${list}</section>`

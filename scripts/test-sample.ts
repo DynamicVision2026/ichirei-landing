@@ -136,6 +136,25 @@ await EX.count(new Request('http://x/api/examples/count', { method: 'POST', body
 const es = JSON.parse((await store.getObject('samples/stats/examples.json'))!.toString('utf8')) as { views: number; cards: number }
 check('(6) examples-page views and cards opened are counted (counts only)', es.views === 1 && es.cards === 1)
 
+// ---- 1b. a gift id (RG-…) works too (Part 26, 2026-11-21) -------------------------------------------------------------------------------------------------------------
+{
+  const gtok = 'RG-' + 'realgiftrealgiftreal'.slice(0, 20).replace(/[^a-z2-9]/g, 'k')
+  const realGift = { schema: 'gift', token: gtok, animation_id: draftEn, order_ref: 'IC-NOT-THERE', created_at: NOW.toISOString(), language: 'en', glyph: '添', reading: 'tian', romanization: 'tian', meaning_en: 'add', en: { word: 'beside', word_source: 'generated', line: 'The one who stays by Kenji at the smoking area.', line_you: 'You stay beside Kenji at the smoking area.', echo: null }, who: 'The one who stays beside Kenji.', memorial: false, certificate_line: 'x', poem: { type: 'free', lines: ['Kenji waits', 'by the door'], reading: '' }, from: 'Kenji', to: 'Mia', message: 'private note', size_code: 'ICHIREI-EGIFT', package: 'egift', ship_to: 'none', egift: null, opens_on: null, certificate_no: 7, reply: null, shared_at: NOW.toISOString(), opened_at: null }
+  await store.put(gtok, realGift as never)
+  const before = JSON.stringify(await store.get(gtok))
+  const r = await makeSample(store, { id: gtok, permission: true, names: ['Mia'] }, NOW)
+  check('(1b) an RG-… id makes a sample (no character to type): the gift\'s own character, its four captions and its poem', r.ok, JSON.stringify(r))
+  if (r.ok) {
+    const sg = (await store.get(r.token)) as { glyph: string; poem: { lines: string[] } | null; who: string; from: string; to: string; message: string; sample: { from_id: string }; source: string; reply: unknown; opened_at?: unknown; shared_at?: unknown; certificate_no: unknown }
+    const sa = (await store.get((await store.get(r.token) as { animation_id: string }).animation_id)) as { film: { lines: string[] } }
+    check('(1b) the sample has the gift\'s character and four captions, and says 「You」 from 「ICHIREI」 with no note, no opening state, no certificate number', sg.glyph === '添' && sa.film.lines.length === 4 && sg.from === 'ICHIREI' && sg.to === 'You' && sg.message === '' && !sg.opened_at && !sg.shared_at && sg.certificate_no === null && sg.source === 'sample' && sg.sample.from_id === gtok)
+    check('(1b) the gift\'s own two names and a listed name are taken out of the captions, the line and the poem too — and each replacement is reported', !/Kenji|Mia/.test(JSON.stringify([sa.film.lines, sg.who, sg.poem])) && r.changes.some((c) => /film line/.test(c)) && r.changes.some((c) => /poem line/.test(c)) && r.changes.some((c) => /line/.test(c)) && r.changes.every((c) => !/Kenji|Mia/.test(c)), r.changes.join(' | '))
+  }
+  check('(1b) the original gift is untouched: not marked opened, no ticket, no change at all', JSON.stringify(await store.get(gtok)) === before)
+  check('(1b) an unknown or already-sample RG id is refused', !(await makeSample(store, { id: 'RG-aaaaaaaaaaaaaaaaaaaa', permission: true }, NOW)).ok && !(await makeSample(store, { id: token, permission: true }, NOW)).ok)
+  await store.deleteObject?.(gtok).catch(() => {})
+}
+
 // ---- 7. the neutral words ---------------------------------------------------------------------------------------------------------------------------------------------
 {
   const r = neutralize('健二さんは毎朝、健二の弁当を作った。', ['健二'], 'あの人')

@@ -94,8 +94,17 @@ export type MakeResult = { ok: true; token: string; changes: string[] } | { ok: 
 export async function makeSample(store: OrderStore | null, input: { id: string; permission: boolean; card?: CardInput | null; names?: string[]; featured?: boolean }, now: Date = new Date(), random: (n: number) => Uint8Array = randomBytes): Promise<MakeResult> {
   if (!store) return { ok: false, code: 'no_store', error: 'Order storage is not configured' }
   if (!input.permission) return { ok: false, code: 'no_permission', error: 'Tick the box: the giver has said yes' }
-  const id = String(input.id ?? '').trim()
-  if (!ANIMATION_ID_PATTERN.test(id)) return { ok: false, code: 'bad_id', error: 'That is not a draft or film id (AN-…)' }
+  const given = String(input.id ?? '').trim()
+  // Part 26 (2026-11-21): a gift id (RG-…) works too — its film is the gift's own, and its character, line, captions and poem come from the gift itself. The gift is only read: never marked opened, no ticket, no change to its order.
+  let realGift: GiftRecord | null = null
+  let id = given
+  if (GIFT_TOKEN_PATTERN.test(given)) {
+    const g0 = await store.get(given).catch(() => null)
+    if (!isGiftRecord(g0) || g0.source === 'sample') return { ok: false, code: 'not_found', error: 'No gift with that id' }
+    realGift = g0
+    id = g0.animation_id
+  }
+  if (!ANIMATION_ID_PATTERN.test(id)) return { ok: false, code: 'bad_id', error: 'That is not a draft, film or gift id (AN-… or RG-…)' }
   const src = await store.get(id).catch(() => null)
   if (!isAnimationRecord(src)) return { ok: false, code: 'not_found', error: 'No draft or film with that id' }
   if (!src.film || src.film.status !== 'ready' || src.film.lines.length !== 4) return { ok: false, code: 'not_ready', error: 'Its film script is not ready' }
@@ -106,6 +115,7 @@ export async function makeSample(store: OrderStore | null, input: { id: string; 
   const newId = newAnimationId(random)
   let names: string[] = (input.names ?? []).filter((x) => typeof x === 'string')
   let gift: GiftRecord | null = null
+  if (realGift) names = [...names, realGift.from, realGift.to].filter(Boolean)
   // 1 · a finished gift: the order says everything
   if (src.order_ref && src.order_ref !== 'DRAFT') {
     const order = await store.get(src.order_ref).catch(() => null)
@@ -113,6 +123,15 @@ export async function makeSample(store: OrderStore | null, input: { id: string; 
       gift = buildGiftRecord(order, newId, token, null, now)
       names = [...names, order.production.sender_name, order.production.receiver_name].filter(Boolean)
     }
+  }
+  // 1b · a gift whose order record is gone: its own record is the card (only the fields a sample needs; never its address, replies or opening state)
+  if (!gift && realGift) {
+    gift = {
+      schema: 'gift', token, animation_id: newId, order_ref: '', created_at: now.toISOString(), language: realGift.language, glyph: realGift.glyph, reading: realGift.reading, romanization: realGift.romanization,
+      meaning_en: realGift.meaning_en, ...(realGift.en ? { en: JSON.parse(JSON.stringify(realGift.en)) } : {}), who: realGift.who, memorial: false, ...(realGift.purpose ? { purpose: realGift.purpose } : {}),
+      certificate_line: realGift.certificate_line, poem: realGift.poem ? JSON.parse(JSON.stringify(realGift.poem)) : null, from: '', to: '', message: '', size_code: PACKAGE_SKU.egift, package: 'egift', ship_to: 'none', egift: null,
+      shipped_at: null, opens_on: null, certificate_no: null, reply: null,
+    } as GiftRecord
   }
   // 2 · a draft the browser saved into My gifts: its saved card (the index is written when the result page saves)
   let card: CardInput | null = null
@@ -150,7 +169,7 @@ export async function makeSample(store: OrderStore | null, input: { id: string; 
   const film = { ...src.film, lines: src.film.lines.map((l, i) => clean(l, `film line ${i + 1}`)), pictures: src.film.pictures.map((d, i) => clean(d, `picture ${i + 1} description`)) }
   const sn = SAMPLE_NAMES[lang]
   gift = { ...gift, schema: 'gift', token, animation_id: newId, order_ref: '', collected_at: now.toISOString(), created_at: now.toISOString(), from: sn.from, to: sn.to, message: '', egift: null, ship_to: 'none', package: 'egift', opens_on: null, opens_at: null, opens_tz: null, reply: null,
-    reply_ticket: null, back: null, source: 'sample', sample: { on: true, featured: !!input.featured, examples: false, order: 0, from_id: id, changes, created_at: now.toISOString() } }
+    reply_ticket: null, back: null, source: 'sample', sample: { on: true, featured: !!input.featured, examples: false, order: 0, from_id: given, changes, created_at: now.toISOString() } }
   const anim: AnimationRecord = { schema: 'animation', id: newId, order_ref: '', created_at: now.toISOString(), language: lang, glyph: gift.glyph, reading: gift.reading, romanization: gift.romanization, meaning_en: gift.meaning_en, ...(gift.en ? { en: gift.en } : {}),
     moment: clean(src.moment ?? '', 'the moment'), who: gift.who, memorial: false, purpose: gift.purpose ?? null, film, gift_token: token, draft: null }
   // the pictures and their state, copied under the sample's own id (the draft may be cleaned up later)
