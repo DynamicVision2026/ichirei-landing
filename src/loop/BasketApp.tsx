@@ -13,7 +13,6 @@ import SavePanel from './SavePanel.tsx'
 import SignInPanel from '../auth/SignInPanel.tsx'
 import { signInRequired, signOut, useAuth } from '../auth/auth.ts'
 import { contextChips } from './chips.ts'
-import KeepByEmail from './KeepByEmail.tsx'
 import { basketPath, landingPath, writePath } from '../reveal/paths.ts'
 import MyGiftsButton from './MyGifts.tsx'
 import './loop.css'
@@ -342,6 +341,9 @@ export default function BasketApp() {
   const groupOf = (g: Sent): 'unsent' | 'sent' => g.group ?? (g.status === 'opened' ? 'sent' : 'unsent')
   const unsent = sent.filter((g) => groupOf(g) === 'unsent')
   const sentGroup = sent.filter((g) => groupOf(g) === 'sent')
+  // signed out: the server says so (a way in exists and this browser has no session); an empty page: signed in, nothing saved or ordered yet
+  const signedOut = !!data?.signin_required || (auth.loaded && signInRequired(auth) && !auth.signedIn && !token)
+  const isEmpty = !signedOut && items !== null && items.length === 0 && sent.length === 0
   const dropItem = (id: string) => setData((d) => (d ? { ...d, items: d.items.filter((i) => i.id !== id) } : d))
 
   return (
@@ -361,8 +363,13 @@ export default function BasketApp() {
           </div>
         </header>
       <div className="wrap basketBody">
+        {/* Part 27 (2026-11-21): signed out, My gifts is the sign-in panel and nothing else (no old "enter your email" box, no Save). Signed in with nothing yet: the empty line and the way to write — no Save, no "Saved for 30 days". */}
+        {signedOut ? (
+          <SignInPanel lang={lang} ret={basketPath(lang)} failed={authFailed} />
+        ) : (
+        <>
         <h1 data-testid="my-title">{data?.email ? SAVE[lang].heading(data.email, (items ?? []).length) : c.pageTitle}</h1>
-        <div className="basketTools"><SavePanel lang={lang} className="btn ghost saveGhost" /></div>
+        {!isEmpty && <div className="basketTools"><SavePanel lang={lang} className="btn ghost saveGhost" /></div>}
         {data?.email && (
           <p className="myEmail" data-testid="my-email">
             <span className="notranslate">{data.email}</span> · {c.giftsAndOrders}
@@ -373,12 +380,13 @@ export default function BasketApp() {
             {c.holdUntil(timeOf(data.hold.expires_at, lang))}
           </p>
         )}
-        <p className="basketSaved" data-testid="basket-saved">
-          {c.basketSaved}
-        </p>
+        {!isEmpty && (
+          <p className="basketSaved" data-testid="basket-saved">
+            {c.basketSaved}
+          </p>
+        )}
         {/* On a device with no saved gifts and no address: the e-mail asks for the link (2026-11-20). An address alone opens nothing; the answer is the same "sent" whether or not it has gifts. */}
         {/* Sign-in (2026-11-20): once a way in exists, the new-device email box is 「ログイン」 — the panel below; the old box stays only while no way in exists */}
-        {data?.signin_required && <SignInPanel lang={lang} ret={basketPath(lang)} failed={authFailed} />}
         {data?.account && (
           <p className="myAccount" data-testid="my-account">
             <span className="notranslate" data-testid="my-account-name">{data.account.text}</span>
@@ -394,14 +402,8 @@ export default function BasketApp() {
             {delNote && <span data-testid="my-delete-note">{c.deleteSent}</span>}
           </p>
         )}
-        {!signInRequired(auth) && !data?.signin_required && (() => {
-          const lookup = !!data && !data.email && items !== null && items.length === 0 && sent.length === 0
-          // a new phone, a private window, a browser that forgot: one box. Until the mailer is set up the box says the calm busy line and sends nothing.
-          return data?.mail || lookup ? <KeepByEmail lang={lang} hasEmail={!!data?.email} lookup={lookup} off={!data?.mail} /> : null
-        })()}
-
         {items === null && !notFound && <p className="sent">{c.loading}</p>}
-        {!data?.signin_required && (notFound || (items !== null && items.length === 0 && sent.length === 0)) && (
+        {(notFound || isEmpty) && (
           <div className="myEmpty" data-testid="basket-empty">
             <p>{c.emptyPage}</p>
             <a className="btn primary" href={writePath(lang)} data-testid="my-write">
@@ -437,6 +439,8 @@ export default function BasketApp() {
           </section>
         )}
         {sent.length + (items ?? []).length > 0 && <p className="mgSafe" data-testid="my-stays-safe">{c.staysSafe}</p>}
+        </>
+        )}
       </div>
 
       {pic && (

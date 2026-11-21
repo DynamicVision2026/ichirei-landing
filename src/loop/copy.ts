@@ -512,9 +512,6 @@ export interface SaveCopy {
   savedSignedIn: string
   open: string
   /** My gifts on a new device: asks for the e-mail, then says "sent" whether or not it has gifts */
-  lookupLead: string
-  lookupSent: string
-  lookupButton: string
   /** My gifts' heading once the e-mail is known */
   heading: (masked: string, n: number) => string
   /** the smaller copy-link line under the saved block */
@@ -533,9 +530,6 @@ export const SAVE: Record<RevealLang, SaveCopy> = {
     savedPlain: '✓ 保存しました。30日間お預かりします。',
     savedSignedIn: '〈マイギフト〉に保存しました',
     open: 'マイギフトを開く →',
-    lookupLead: 'メールアドレスを入れてください。マイギフトを開くリンクをお送りします。登録やパスワードは要りません。',
-    lookupSent: '送りました。メールのリンクから開いてください。',
-    lookupButton: 'リンクを送る',
     heading: (m, n) => `${m}に保存した贈りもの（${n}）`,
     scanLine: 'スマホで読み取ると、いますぐ続きができます',
   },
@@ -551,9 +545,6 @@ export const SAVE: Record<RevealLang, SaveCopy> = {
     savedPlain: '✓ 已保存，保留30天。',
     savedSignedIn: '已保存到〈我的禮物〉',
     open: '打開我的禮物 →',
-    lookupLead: '輸入你的電子郵件，我們會寄給你打開〈我的禮物〉的連結。不需要註冊或密碼。',
-    lookupSent: '已寄出。請從郵件裡的連結打開。',
-    lookupButton: '寄連結給我',
     heading: (m, n) => `保存在${m}的禮物（${n}）`,
     scanLine: '用手機掃描，馬上就能繼續',
   },
@@ -569,9 +560,6 @@ export const SAVE: Record<RevealLang, SaveCopy> = {
     savedPlain: "✓ Saved. We'll keep it for 30 days.",
     savedSignedIn: 'Saved to My gifts',
     open: 'Open My gifts →',
-    lookupLead: "Enter your email and we'll send you a link to My gifts. No account or password needed.",
-    lookupSent: 'Sent. Open My gifts from the link in your email.',
-    lookupButton: 'Send me the link',
     heading: (m, n) => `Saved under ${m} (${n})`,
     scanLine: 'Scan this to continue on your phone right now',
   },

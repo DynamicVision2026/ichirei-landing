@@ -282,5 +282,39 @@ const sel = (cookie: string) => selectPost(new Request('http://x/api/select', { 
   check('(11) signed out, the answer carries no name', (await meOf('')).name === undefined)
 }
 
+// ---- 12. Part 27 (2026-11-21): the saved gifts of before sign-in existed (the owner's 整 "composed" and 支) are on My gifts after the first sign-in, and the page says it is signed in ---------------------------------------
+{
+  const L = createLoopHandlers(() => ({ store, env: ENV, now: () => NOW }))
+  const BO = newVisitorId()
+  const item = (kanji: string, language: string, word: string) => ({ resume: { v: 1 }, story: 'story', language, kanji, reading: word, word, line: 'l', to: 'x', relationship: 'parent_mother', purpose: 'thanks', occasion: 'thanksgiving', round: 1, slot: 'main', preview_id: null })
+  await saveBasketItem(store, BO, item('整', 'en', 'composed') as never, NOW)
+  await saveBasketItem(store, BO, item('支', 'en', 'keeper') as never, NOW)
+  const listOut = (await (await L.basketList(new Request('http://x/api/basket', { headers: { cookie: ck(BO) } }))).json()) as { items: unknown[]; signin_required?: boolean }
+  check('(12) before signing in, the old saves are not shown on My gifts (it is the sign-in panel: signin_required, no items)', listOut.signin_required === true && listOut.items.length === 0)
+  const r = await googleSignIn(ck(BO), { sub: 'g-owner12', email: 'owner12@example.com', email_verified: true })
+  const cookie = `${ck(BO)}; ${cookieOf(r)}`
+  const after = (await (await L.basketList(new Request('http://x/api/basket', { headers: { cookie } }))).json()) as { items: Array<{ card?: { kanji?: string }; kanji?: string }>; signin_required?: boolean; account?: { text: string } }
+  const kanji = after.items.map((i) => i.card?.kanji ?? i.kanji).sort().join('')
+  check('(12) after the first sign-in both saved gifts (整 and 支) are on My gifts, signed in with the account shown', after.items.length === 2 && kanji === '支整' && !after.signin_required && !!after.account, JSON.stringify([kanji, after.signin_required, after.account]))
+  const BP = newVisitorId()
+  await saveBasketItem(store, BP, item('友', 'ja', 'とも') as never, NOW)
+  const r2 = await googleSignIn(ck(BP), { sub: 'g-owner12', email: 'owner12@example.com', email_verified: true })
+  const again = (await (await L.basketList(new Request('http://x/api/basket', { headers: { cookie: `${ck(BP)}; ${cookieOf(r2)}` } }))).json()) as { items: unknown[] }
+  check('(12) signing in again on another browser of an existing account also joins what that browser had saved (3 gifts now)', again.items.length === 3)
+}
+
+// ---- 13. Part 27: a failed sign-in mail says so plainly and is logged as a mail error, never the engine's busy line ---------------------------------------------------------------------
+{
+  const { readEngineLines } = await import('../engine/engine-log.ts')
+  const failing = createAuthHandlers(() => ({ store, env: ENV, now: () => NOW, providers: { google: GOOGLE, line: LINE, email: { async send() { return false } } }, fetch: fakeFetch }))
+  const res = await failing.emailSend(new Request('http://x/api/auth/email', { method: 'POST', headers: { 'content-type': 'application/json', 'x-forwarded-for': '198.51.100.9' }, body: JSON.stringify({ email: 'mailfail@example.com', language: 'ja', return: '/basket' }) }))
+  const j = (await res.json()) as { code?: string; error?: string }
+  await new Promise((r) => setTimeout(r, 50))
+  const lines = await readEngineLines(store, NOW, 1)
+  check('(13) a mail that cannot be sent answers 503 send_failed with no engine wording, and the cause is on the dashboard\'s engine card as a mail error', res.status === 503 && j.code === 'send_failed' && !/busy/i.test(JSON.stringify(j)) && lines.some((l) => l.kind === 'mail' && !l.ok && l.cls === 'mail_error'), JSON.stringify([res.status, j, lines.length]))
+  const { SIGNIN } = await import('../src/auth/SignInPanel.tsx').catch(() => ({ SIGNIN: null as never }))
+  void SIGNIN
+}
+
 console.log(failures === 0 ? '\nALL PASS' : `\n${failures} FAILED`)
 process.exit(failures === 0 ? 0 : 1)

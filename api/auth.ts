@@ -20,6 +20,7 @@ import { authorizeUrl, exchangeCode, providersOf, type Providers } from '../engi
 import { createOrderStore, type OrderStore } from '../engine/order-store.ts'
 import { clientIp, SlidingWindowLimiter } from '../engine/rate-limit.ts'
 import { recordHealth } from '../engine/health.ts'
+import { recordOutcome } from '../engine/engine-log.ts'
 import { visitorOf } from '../engine/visitor.ts'
 import type { Mail } from '../engine/mailer.ts'
 
@@ -138,6 +139,8 @@ export function createAuthHandlers(deps: () => AuthDeps) {
       const t = await newMailLink(store, { email, lang, ret: safeReturn(body.return, '/basket'), browser: visitorOf(req, env) }, now)
       const link = `${publicUrl(env)}/auth/email?t=${encodeURIComponent(t)}`
       const ok = await providers.email.send(loginMail(email, link, lang)).catch(() => false)
+      // a failed send is said plainly to the visitor (the page's own line) and shows on the owner's engine card as a mail error — the cause never reaches the visitor
+      if (!ok) { recordOutcome({ kind: 'mail', model: 'resend', ok: false, cls: 'mail_error', ms: 0 }, store, now); console.log('[ichirei-mail] sign-in link not sent') }
       return json(ok ? 200 : 503, ok ? { ok: true } : { error: 'send_failed', code: 'send_failed' })
     },
 

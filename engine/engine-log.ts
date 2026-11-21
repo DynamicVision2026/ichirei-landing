@@ -14,7 +14,7 @@ import { createOrderStore, type OrderStore } from './order-store.ts'
 import { thinkingOff } from './thinking-off.ts'
 
 /** What a call was for. `main` `second` `free` are the card calls; `review` checks them; `replace` refills; `film_script` writes the film; `pictures` draws the four pictures; `pictures_check` looks at them; `poem`; `gaze` (the who-line); `explain`. */
-export const ENGINE_KINDS = ['main', 'second', 'free', 'review', 'replace', 'film_script', 'pictures', 'pictures_check', 'poem', 'gaze', 'explain', 'check', 'reply'] as const
+export const ENGINE_KINDS = ['main', 'second', 'free', 'review', 'replace', 'film_script', 'pictures', 'pictures_check', 'poem', 'gaze', 'explain', 'check', 'reply', 'mail'] as const
 export type EngineKind = (typeof ENGINE_KINDS)[number]
 /** The calls that make a visitor's cards: the light is about these. */
 export const CARD_KINDS: readonly EngineKind[] = ['main', 'second', 'free']
@@ -74,6 +74,7 @@ export function classOf(err: unknown, signal?: AbortSignal | null): string {
 /** The class in plain words for the owner (English, then Chinese). */
 export function plainWords(cls: string): { en: string; zh: string } {
   const c = String(cls)
+  if (c === 'mail_error') return { en: 'A sign-in email could not be sent (check the mail key and sender)', zh: '登入信寄不出去（請檢查寄信金鑰與寄件人）' }
   if (c === 'credit') return { en: 'AI account credit or billing problem', zh: 'AI 帳戶餘額或帳務問題' }
   if (c === 'timeout') return { en: 'AI took too long', zh: 'AI 回應太久' }
   if (c === 'connection') return { en: 'Could not reach the AI service', zh: '連不上 AI 服務' }
@@ -128,7 +129,7 @@ export function recordOutcome(line: Omit<EngineLine, 'ts'> & { ts?: string }, st
     } catch (err) {
       console.error('[ichirei-engine-log] append failed', err instanceof Error ? err.message : err)
     }
-    if (!clean.ok && clean.kind !== 'check') void maybeAlert(store, now).catch(() => {})
+    if (!clean.ok && clean.kind !== 'check' && clean.kind !== 'mail') void maybeAlert(store, now).catch(() => {})
   })()
 }
 

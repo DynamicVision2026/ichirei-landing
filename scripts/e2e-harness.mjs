@@ -5830,14 +5830,6 @@ for (const [lang, locale, text] of [['en', 'en-US', 'Your gift is being finished
     check('…closed', (await T(page, 'mg-light').count()) === 0)
     check('full card (en): the date saved, "Saved until Dec 18", and "Give this gift →" opens the writing room with the item', (await card.locator('[data-testid=mg-dates]').innerText()).includes('Saved Nov 18') && (await card.locator('[data-testid=mg-until]').innerText()) === 'Saved until Dec 18' && (await card.locator('[data-testid=basket-give]').innerText()) === 'Give this gift →' && (await card.locator('[data-testid=basket-give]').getAttribute('href')) === '/en/write?resume=BK-aaaaaaaaaaaaaaaaaaaa')
     check('Sent group (en, with an email; the dashboard since Part 7): the character, "For Kenji", the status "Opened", and a button to the gift page', (await T(page, 'group-sent').locator('h2').innerText()) === 'Sent' && (await T(page, 'my-sent-item').innerText()).includes('For Kenji') && (await T(page, 'my-sent-status').innerText()).startsWith('Opened') && (await T(page, 'my-sent-open').getAttribute('href')) === '/a/AN-abcdefghjkmnpqrstuvw')
-    check('Save to my email (en): the box, its title, the field and "Save to my email", and "Send my link again" because the record has an email', (await T(page, 'keep-mail').count()) === 1 && (await T(page, 'keep-mail').innerText()).includes("Keep your gifts: we'll email you your private link.") && (await T(page, 'keep-mail-save').innerText()) === 'Save to my email' && (await T(page, 'keep-mail-again').innerText()) === 'Send my link again')
-    await T(page, 'keep-mail-input').fill('mia@example.com')
-    await T(page, 'keep-mail-save').click()
-    await page.waitForSelector('[data-testid=keep-mail-note]')
-    check('Save to my email: one POST with the address and the page language, and the note says it was sent', posts.length === 1 && posts[0].url.endsWith('/api/basket/email') && posts[0].body.email === 'mia@example.com' && posts[0].body.language === 'en' && (await T(page, 'keep-mail-note').innerText()).startsWith('Sent.'))
-    await T(page, 'keep-mail-again').click()
-    await page.waitForTimeout(200)
-    check('Send my link again: one POST to /resend', posts.length === 2 && posts[1].url.endsWith('/api/basket/email/resend'))
     check('no horizontal scroll at 390 px (en)', await noScroll(page))
     await page.evaluate(() => window.scrollTo(0, 0))
     await page.screenshot({ path: `${SHOTS}/mygifts-en-390.png`, fullPage: true })
@@ -5871,7 +5863,7 @@ for (const [lang, locale, text] of [['en', 'en-US', 'Your gift is being finished
     const { page, ctx, errs } = await open38({ lang: 'ja', items: [item({ language: 'ja', to: '母', card: { kanji: '恒', reading: 'コウ・つね', word: '', line: 'いつも変わらず、そこにいてくれる人。', meaning: '' }, context: { relationship: 'parent_mother', relationship_other: '', purpose: 'thanks', purpose_other: '', occasion: 'thanksgiving' } })], email: 'b•••@gmail.com', mail: true })
     const card = T(page, 'basket-item').first()
     check('My gifts (ja): the heading 「…に保存した贈りもの（n）」 (2026-11-20), the character with its reading small beside it AND the line (the reading is never alone), 「母へ」, chips 「母」「ありがとう」', /に保存した贈りもの（\d+）$/.test(await T(page, 'my-title').innerText()) && (await card.locator('[data-testid=mg-reading]').innerText()) === 'コウ・つね' && (await card.locator('[data-testid=mg-line]').innerText()) === 'いつも変わらず、そこにいてくれる人。' && (await card.locator('[data-testid=mg-for]').innerText()) === '母へ' && (await card.locator('[data-testid=mg-chip]').allInnerTexts()).join('|') === '母|ありがとう')
-    check('My gifts (ja): 「あなたの場面」, 「この贈りものを贈る →」, 「削除」, 「保存日」と「まで保存」, and the mail box 「メールに保存」', (await card.locator('[data-testid=mg-moment] h2').textContent()) === 'あなたの場面' && (await card.locator('[data-testid=basket-give]').innerText()) === 'この贈りものを贈る →' && (await card.locator('[data-testid=basket-remove]').innerText()) === '削除' && (await card.locator('[data-testid=mg-until]').innerText()) === '12月18日まで保存' && (await T(page, 'keep-mail-save').innerText()) === 'メールに保存')
+    check('My gifts (ja): 「あなたの場面」, 「この贈りものを贈る →」, 「削除」, 「保存日」と「まで保存」', (await card.locator('[data-testid=mg-moment] h2').textContent()) === 'あなたの場面' && (await card.locator('[data-testid=basket-give]').innerText()) === 'この贈りものを贈る →' && (await card.locator('[data-testid=basket-remove]').innerText()) === '削除' && (await card.locator('[data-testid=mg-until]').innerText()) === '12月18日まで保存')
     check('no horizontal scroll at 390 px (ja)', await noScroll(page))
     await page.screenshot({ path: `${SHOTS}/mygifts-ja-390.png`, fullPage: true })
     await page.setViewportSize({ width: 1280, height: 1000 })
@@ -5884,7 +5876,7 @@ for (const [lang, locale, text] of [['en', 'en-US', 'Your gift is being finished
   {
     const { page, ctx, errs } = await open38({ lang: 'zh-Hant', items: [item({ language: 'zh-Hant', to: '媽媽', card: { kanji: '恒', reading: 'héng', word: '', line: '那個始終如一、一直都在的人。', meaning: '' }, context: { relationship: 'parent_mother', relationship_other: '', purpose: 'thanks', purpose_other: '', occasion: 'thanksgiving' } })], email: 'b•••@gmail.com', mail: true })
     const card = T(page, 'basket-item').first()
-    check('My gifts (zh-Hant): the heading 「保存在…的禮物（n）」 (2026-11-20), the reading small beside the character with the line, 「給媽媽」, chips 「母親」「謝謝」, 「存到我的信箱」', /^保存在.+的禮物（\d+）$/.test(await T(page, 'my-title').innerText()) && (await card.locator('[data-testid=mg-reading]').innerText()) === 'héng' && (await card.locator('[data-testid=mg-line]').innerText()) === '那個始終如一、一直都在的人。' && (await card.locator('[data-testid=mg-for]').innerText()) === '給媽媽' && (await card.locator('[data-testid=mg-chip]').allInnerTexts()).join('|') === '母親|謝謝' && (await T(page, 'keep-mail-save').innerText()) === '存到我的信箱')
+    check('My gifts (zh-Hant): the heading 「保存在…的禮物（n）」 (2026-11-20), the reading small beside the character with the line, 「給媽媽」, chips 「母親」「謝謝」, 「存到我的信箱」', /^保存在.+的禮物（\d+）$/.test(await T(page, 'my-title').innerText()) && (await card.locator('[data-testid=mg-reading]').innerText()) === 'héng' && (await card.locator('[data-testid=mg-line]').innerText()) === '那個始終如一、一直都在的人。' && (await card.locator('[data-testid=mg-for]').innerText()) === '給媽媽' && (await card.locator('[data-testid=mg-chip]').allInnerTexts()).join('|') === '母親|謝謝')
     check('no horizontal scroll at 390 px (zh-Hant)', await noScroll(page))
     await page.screenshot({ path: `${SHOTS}/mygifts-zh-390.png`, fullPage: true })
     await page.setViewportSize({ width: 1280, height: 1000 })
@@ -7598,6 +7590,51 @@ for (const [lang, locale, text] of [['en', 'en-US', 'Your gift is being finished
     await d.page.locator('[data-testid=one-moment]').waitFor({ timeout: 8000 })
     check(`landing (${lang}, desktop, Part 24): the moment on the left, the four pictures and the poem on the right`, await d.page.evaluate(() => { const r = (el) => el.getBoundingClientRect(); const l = r(document.querySelector('.wgLeft')); const rr = r(document.querySelector('.wgRight')); return Math.abs(l.top - rr.top) < 60 && l.right <= rr.left + 1 }))
     await d.ctx.close()
+  }
+}
+
+// ---------- Run 58 (2026-11-21, Part 27): My gifts — signed out it is the sign-in panel and nothing else; a failed sign-in mail says so plainly; an empty account shows no Save ----------
+{
+  const SHOTS58 = process.env.E2E_SHOTS_DIR || '/tmp/e2e-shots'
+  const L58 = {
+    ja: { path: '/basket', locale: 'ja-JP', title: 'ログインして続ける', fail: 'メールを送れませんでした。少し時間をおいて、もう一度お試しください。', empty: 'まだ何もありません。最初に書いた場面は、ここに残ります。', write: '場面を書く →' },
+    en: { path: '/en/basket', locale: 'en-US', title: 'Sign in to continue', fail: "We couldn't send the email. Please try again in a moment.", empty: 'Nothing here yet. The first moment you write will be kept here for you.', write: 'Write your moment →' },
+    'zh-Hant': { path: '/zh/basket', locale: 'zh-TW', title: '登入以繼續', fail: '郵件無法寄出，請稍後再試。', empty: '這裡還空著。你寫下的第一個片刻，會留在這裡。', write: '寫下你的片刻 →' },
+  }
+  for (const lang of ['ja', 'en', 'zh-Hant']) {
+    const W = L58[lang]
+    const mk = async (signed) => {
+      const ctx = await browser.newContext({ viewport: { width: 390, height: 900 }, locale: W.locale, deviceScaleFactor: 2 })
+      const page = await ctx.newPage()
+      const errs = []
+      page.on('pageerror', (e) => errs.push(String(e)))
+      await page.route('**/api/me*', (r) => r.fulfill({ json: { basket: { count: 0 }, ready: null, hold: null } }))
+      await page.route('**/api/auth/me', (r) => r.fulfill({ json: signed ? { providers: { google: true, line: true, email: true }, signed_in: true, display: 'b•••@gmail.com', kind: 'email', email: 'brian@gmail.com', needs_email: false } : { providers: { google: true, line: true, email: true }, signed_in: false } }))
+      await page.route('**/api/basket', (r) => r.fulfill({ json: signed ? { items: [], token: null, link: null, email: null, hold: null, sent: [], mail: true, saved_days: 30, account: { kind: 'email', text: 'b•••@gmail.com' } } : { items: [], token: null, link: null, email: null, hold: null, sent: [], mail: true, saved_days: 30, signin_required: true } }))
+      await page.route('**/api/auth/email', (r) => r.fulfill({ status: 503, json: { error: 'send_failed', code: 'send_failed' } }))
+      await page.goto(`http://localhost:5173${W.path}`, { waitUntil: 'networkidle' })
+      await page.waitForTimeout(500)
+      return { page, ctx, errs }
+    }
+    const out = await mk(false)
+    await out.page.locator('[data-testid=signin-panel]').waitFor()
+    check(`My gifts (${lang}, signed out, Part 27): only the sign-in panel — LINE, Google and email — and no title, no Save, no "Saved for 30 days", no old "enter your email" box`, (await out.page.locator('[data-testid=signin-title]').innerText()) === W.title && (await out.page.locator('[data-testid=signin-line], [data-testid=signin-google], [data-testid=signin-email]').count()) === 3 && (await out.page.locator('[data-testid=keep-mail], [data-testid=lookup-mail], [data-testid=save-button], [data-testid=basket-saved], [data-testid=my-title], [data-testid=basket-empty]').count()) === 0)
+    check(`My gifts (${lang}, signed out, 390 px): no horizontal scroll`, await out.page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 1))
+    if (lang !== 'zh-Hant') await out.page.screenshot({ path: `${SHOTS58}/p27-mygifts-signedout-${lang}-390.png`, fullPage: false })
+    await out.page.locator('[data-testid=signin-email]').click()
+    await out.page.fill('#signin-email-input', 'mia@example.com')
+    await out.page.locator('[data-testid=signin-email-send]').click()
+    await out.page.locator('[data-testid=signin-email-note]').waitFor()
+    const note = await out.page.locator('[data-testid=signin-email-note]').innerText()
+    check(`My gifts (${lang}, Part 27): a mail that cannot be sent says 「${W.fail}」 — never the engine's busy line`, note === W.fail && !/busy|混み合|忙碌/.test(note), note)
+    check(`no page errors (run 58, signed out ${lang})`, out.errs.length === 0, out.errs.join('; '))
+    await out.ctx.close()
+    const emp = await mk(true)
+    await emp.page.locator('[data-testid=basket-empty]').waitFor()
+    check(`My gifts (${lang}, signed in, nothing yet, Part 27): only the empty line and 「${W.write}」 — no Save button, no "Saved for 30 days", no email box`, (await emp.page.locator('[data-testid=basket-empty] p').innerText()) === W.empty && (await emp.page.locator('[data-testid=my-write]').innerText()) === W.write && (await emp.page.locator('[data-testid=save-button], [data-testid=save-panel], [data-testid=basket-saved], [data-testid=keep-mail], [data-testid=lookup-mail]').count()) === 0)
+    if (lang !== 'zh-Hant') await emp.page.screenshot({ path: `${SHOTS58}/p27-mygifts-empty-${lang}-390.png`, fullPage: false })
+    check(`no page errors (run 58, empty ${lang})`, emp.errs.length === 0, emp.errs.join('; '))
+    await emp.ctx.close()
   }
 }
 
