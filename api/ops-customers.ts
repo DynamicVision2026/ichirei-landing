@@ -43,7 +43,7 @@ export function createCustomerHandlers(deps: () => OpsDeps) {
     async page(req: Request): Promise<Response> {
       const d = deps()
       const env = d.env ?? process.env
-      const denied = await checkOpsAuth(req, env, d.readSecret)
+      const denied = await checkOpsAuth(req, env, d.readSecret, d.store ?? null, d.now?.() ?? new Date())
       if (denied) return denied
       const store = d.store
       const now = d.now?.() ?? new Date()

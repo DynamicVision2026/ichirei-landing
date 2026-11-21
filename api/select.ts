@@ -23,6 +23,7 @@ import { recordFreeSource, recordMain } from '../engine/free-source.ts'
 import { createOrderStore } from '../engine/order-store.ts'
 import { newMoment, siteRound } from '../engine/day-limits.ts'
 import { claimMoment, isExempt, whoOf } from '../engine/use-limits.ts'
+import { ownerAccount } from '../engine/owner.ts'
 import { sessionAccount } from '../engine/accounts.ts'
 import { providersOf, signInRequired } from '../engine/oauth.ts'
 import { recordHealth } from '../engine/health.ts'
@@ -150,7 +151,7 @@ export async function POST(req: Request): Promise<Response> {
     }
     if (ex.retry === 0 && !replyRound) {
       // Part 19 (2026-11-20): the counts live in the store (every server copy sees the same, a deploy resets nothing) and the person is every key we know them by; the owner's browsers are exempt.
-      if (store && !isExempt(req)) {
+      if (store && !isExempt(req) && !(await ownerAccount(store, req).catch(() => null))) { // the owner's own browsers, and a signed-in owner (Part 25), are not counted
         const v = await claimMoment(store, await whoOf(store, req, process.env, account?.id ?? null))
         if (!v.ok) return v.code === 'limit_ip' ? refuse('limit_person', 'limit_ip') : refuse(v.code)
       } else if (!store) {

@@ -5,7 +5,8 @@
 //   GET /ops/home?p=today|d7|d30|all   the page
 //   GET /ops/home/orders.csv           the latest gifts as a spreadsheet file
 
-import { checkOpsAuth, sameSitePost, type OpsDeps } from './ops.ts'
+import { opsAccess, sameSitePost, type OpsDeps } from './ops.ts'
+import { displayOf } from '../engine/accounts.ts'
 import { buildStats, shortRef, type StatsPayload } from './ops-stats.ts'
 import { createOrderStore } from '../engine/order-store.ts'
 import { analyticsDay } from '../engine/analytics.ts'
@@ -200,6 +201,8 @@ export interface FreeUseCard extends LimitsDay {
   gifts: number
   /** This browser carries the owner's exempt cookie. */
   exempt?: boolean
+  /** Signed in as an owner (Part 25): exempt from the free limits too, with no cookie. */
+  owner?: boolean
 }
 export async function buildFreeUse(store: OrderStore | null, now: Date, gifts = 0): Promise<FreeUseCard | null> {
   if (!store) return null
@@ -220,7 +223,7 @@ const renderFreeUse = (f: FreeUseCard | null): string => {
     `<div class="muted">Limits hit: per person <b>${f.hits.limit_person}</b> · ten not given <b>${f.hits.limit_unpaid10}</b> · same connection <b>${f.hits.limit_ip}</b></div>` +
     `<div class="muted">Picture sets drawn <b>${n(f.pictureSets)}</b> · gifts made today ${n(f.gifts)} (${share} of the sets)</div>` +
     `<h3 style="font-size:14px;margin:10px 0 4px">Top 5 by picture sets</h3>${top}` +
-    `<form method="post" action="/ops/home/exempt" style="margin-top:10px"><div class="muted">This browser is ${f.exempt ? '<b>exempt</b> from' : 'counted by'} the free limits.</div>${f.exempt ? '' : '<button type="submit" data-testid="exempt-button">Exempt this browser</button>'}</form></section>`
+    `<form method="post" action="/ops/home/exempt" style="margin-top:10px"><div class="muted">This browser is ${f.exempt ? '<b>exempt</b> from' : 'counted by'} the free limits.${f.owner ? ' <span data-testid="owner-exempt">Signed in as an owner: <b>exempt</b> too, on any device.</span>' : ''}</div>${f.exempt ? '' : '<button type="submit" data-testid="exempt-button">Exempt this browser</button>'}</form></section>`
 }
 
 const LANG_NAME: Record<string, string> = { ja: '日本語', en: 'English', 'zh-Hant': '繁體中文', 'zh-Hans': '简体中文' }
@@ -262,7 +265,7 @@ export async function buildDeleteRequests(store: OrderStore | null, now: Date): 
 const renderDeletes = (rows: Array<{ ts: string; who: string }>): string =>
   rows.length === 0 ? '' : `<section class="card" aria-label="Account deletion requests" data-testid="delete-requests"><h2 class="serif" style="font-size:19px">Account deletion requests</h2><div class="muted">Last 30 days — delete by hand, then reply to the person.</div>${rows.map((r) => `<div class="mini"><div>${esc(r.ts.slice(0, 10))}</div><div></div><div style="text-align:right">${esc(r.who)}</div></div>`).join('')}</section>`
 
-export function renderHome(payload: StatsPayload, p: Period, now: Date, customers: CustomerRow[] = [], engine: EngineCardData | null = null, freeUse: FreeUseCard | null = null, samples: { rows: SampleRow[]; base: string; notice: string | null } | null = null, deletes: Array<{ ts: string; who: string }> = []): string {
+export function renderHome(payload: StatsPayload, p: Period, now: Date, customers: CustomerRow[] = [], engine: EngineCardData | null = null, freeUse: FreeUseCard | null = null, samples: { rows: SampleRow[]; base: string; notice: string | null } | null = null, deletes: Array<{ ts: string; who: string }> = [], owner: string | null = null): string {
   const s = payload.stats.periods[p]
   const f = s.funnel
   const orders = payload.orders.filter((o) => inPeriod(o, p, now))
@@ -302,7 +305,7 @@ export function renderHome(payload: StatsPayload, p: Period, now: Date, customer
   const perMoment = s.stories > 0 ? s.ai_cost_usd / s.stories : 0
   return `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="robots" content="noindex,nofollow"><title>ICHIREI · Owner</title>` +
     `<link rel="preconnect" href="https://fonts.googleapis.com"><link href="https://fonts.googleapis.com/css2?family=Zen+Old+Mincho:wght@700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet"><style>${CSS}</style></head><body><div class="wrap">` +
-    `<header><div><div class="eyebrow">ICHIREI · Owner</div><h1 class="serif">${PERIOD_LABEL[p]}</h1><div class="sub">Updated ${esc(whenOf(now.toISOString()))} Eastern${payload.promo?.on ? ' · Days of Thanks is on' : ''}${payload.verified ? '' : ' · Shopify could not be checked, payments are unconfirmed'}</div></div><nav class="tabs" aria-label="Period">${tabs}</nav></header>` +
+    `<header><div><div class="eyebrow">ICHIREI · Owner</div><h1 class="serif">${PERIOD_LABEL[p]}</h1><div class="sub">Updated ${esc(whenOf(now.toISOString()))} Eastern${payload.promo?.on ? ' · Days of Thanks is on' : ''}${payload.verified ? '' : ' · Shopify could not be checked, payments are unconfirmed'}</div>${owner ? `<div class="sub" data-testid="owner-who">${esc(owner)} · <button type="button" id="owner-logout" data-testid="owner-logout" style="background:none;border:0;padding:0;color:inherit;text-decoration:underline;cursor:pointer;font:inherit">ログアウト</button></div><script>document.getElementById('owner-logout').addEventListener('click',function(){fetch('/api/auth/logout',{method:'POST'}).then(function(){location.reload()})})</script>` : ''}</div><nav class="tabs" aria-label="Period">${tabs}</nav></header>` +
     (engine ? renderEngineCard(engine, now) : '') +
     (payload.attention.count > 0 ? `<div class="alert">${payload.attention.count} paid gift(s) are not complete. Open <a href="/ops">All orders</a>.</div>` : '') +
     `<section class="kpis" aria-label="Key numbers">` +
@@ -446,10 +449,11 @@ export function createHomeHandlers(deps: () => OpsDeps) {
   const guard = async (req: Request) => {
     const d = deps()
     const env = d.env ?? process.env
-    const denied = await checkOpsAuth(req, env, d.readSecret)
+    const now = d.now?.() ?? new Date()
+    const { denied, owner } = await opsAccess(req, env, d.readSecret, d.store ?? null, now)
     if (denied) return denied
     if (!d.store) return new Response(JSON.stringify({ error: 'Order storage is not configured', code: 'store_not_configured' }), { status: 503, headers: headers('application/json; charset=utf-8') })
-    return { d, env, now: d.now?.() ?? new Date(), store: d.store }
+    return { d, env, now, store: d.store, owner }
   }
   return {
     async page(req: Request): Promise<Response> {
@@ -460,10 +464,10 @@ export function createHomeHandlers(deps: () => OpsDeps) {
       const [payload, customers, lines] = await Promise.all([buildStats(g.d, g.store, g.env, g.now), buildCustomers(g.store, g.now).catch(() => [] as CustomerRow[]), readEngineLines(g.store, g.now, 24).catch(() => [] as EngineLine[])])
       const todayGifts = payload.orders.filter((o) => inPeriod(o, 'today', g.now) && o.state === 'paid').length
       const freeUse = await buildFreeUse(g.store, g.now, todayGifts).catch(() => null)
-      if (freeUse) freeUse.exempt = isExempt(req, g.env)
+      if (freeUse) { freeUse.exempt = isExempt(req, g.env); freeUse.owner = !!g.owner }
       const notice = new URL(req.url).searchParams.get('notice')
       const samples = { rows: await listSamples(g.store).catch(() => [] as SampleRow[]), base: publicUrl(g.env), notice: notice ? notice.slice(0, 600) : null }
-      return new Response(renderHome(payload, p, g.now, customers, engineCardData(lines, g.now, configuredModels(g.env)), freeUse, samples, await buildDeleteRequests(g.store, g.now).catch(() => [])), { status: 200, headers: headers('text/html; charset=utf-8') })
+      return new Response(renderHome(payload, p, g.now, customers, engineCardData(lines, g.now, configuredModels(g.env)), freeUse, samples, await buildDeleteRequests(g.store, g.now).catch(() => []), g.owner ? displayOf(g.owner).text : null), { status: 200, headers: headers('text/html; charset=utf-8') })
     },
     /** "Check now": ONE tiny call to the AI (the review model, about 10 tokens), at most once a minute. The answer is OK or the error class in words; nothing else is returned. */
     async engineCheck(req: Request): Promise<Response> {

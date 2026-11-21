@@ -202,7 +202,7 @@ export function createStatsHandlers(deps: () => OpsDeps) {
   const guard = async (req: Request) => {
     const d = deps()
     const env = d.env ?? process.env
-    const denied = await checkOpsAuth(req, env, d.readSecret)
+    const denied = await checkOpsAuth(req, env, d.readSecret, d.store ?? null, d.now?.() ?? new Date())
     if (denied) return denied
     if (!d.store) return respond(503, JSON.stringify({ error: 'Order storage is not configured', code: 'store_not_configured' }), 'application/json; charset=utf-8')
     return { d, env, now: d.now?.() ?? new Date(), store: d.store }

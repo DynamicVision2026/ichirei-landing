@@ -27,6 +27,9 @@ import { TRACKING_PATTERN, WOOD_STEPS, woodStepOf, type WoodStep } from '../engi
 import { cancelOrder, windowOf, type ChangeDeps, type WindowInfo } from '../engine/change-window.ts'
 import { PRINTED_CARD } from '../src/order/packages.ts'
 import { readSecret } from '../engine/track.ts'
+import { ownerAccount, ownerEmails } from '../engine/owner.ts'
+import { providersOf } from '../engine/oauth.ts'
+import type { Account } from '../engine/accounts.ts'
 import { adminTokens, shopifyPayments, trackDepsOf } from '../engine/payments-lookup.ts'
 import { listWaiting, waitingState } from '../engine/waiting.ts'
 import { sweepWaiting } from '../engine/waiting-shopify.ts'
@@ -73,27 +76,69 @@ async function opsPassword(env: NodeJS.ProcessEnv, read: (name: string, env: Nod
   }
 }
 
-/** null = allowed; otherwise the refusal. The password is compared in constant time; any user name is accepted. */
-export async function checkOpsAuth(
+/**
+ * The owner page's gate. Allowed when (1) the person is signed in (Google, LINE or the email link) with an email on the owner list (Part 25, 2026-11-21: ICHIREI_OWNER_EMAILS), or (2) the Basic Auth password
+ * is right (the fallback, so the owner is never locked out). Until the owner list exists nothing changes: no list = Basic Auth only, exactly as before. A page request with neither gets the owner's sign-in
+ * panel (not the browser's password prompt) when the list exists; `?password=1` asks for the password. `owner` is the signed-in owner account (for the dashboard's header), else null.
+ */
+export async function opsAccess(
   req: Request,
   env: NodeJS.ProcessEnv = process.env,
   read: (name: string, env: NodeJS.ProcessEnv) => Promise<string> = readSecret,
-): Promise<Response | null> {
+  store: OrderStore | null = null,
+  now: Date = new Date(),
+): Promise<{ denied: Response | null; owner: Account | null }> {
+  const owner = await ownerAccount(store, req, env, now, read)
+  if (owner) return { denied: null, owner }
   const password = await opsPassword(env, read)
-  if (!password) return jsonRes(503, { error: 'The owner page is not configured (ICHIREI_OPS_PASSWORD).', code: 'ops_not_configured' })
   const header = req.headers.get('authorization') ?? ''
   const m = /^Basic\s+(.+)$/i.exec(header)
-  let given = ''
-  if (m) {
+  if (password && m) {
+    let given = ''
     try {
       const decoded = Buffer.from(m[1], 'base64').toString('utf8')
       given = decoded.slice(decoded.indexOf(':') + 1)
     } catch {
       given = ''
     }
+    if (timingSafeEqual(sha(given), sha(password))) return { denied: null, owner: null }
   }
-  if (m && timingSafeEqual(sha(given), sha(password))) return null
-  return text(401, 'Authentication required', 'text/plain; charset=utf-8', { 'www-authenticate': 'Basic realm="ICHIREI ops", charset="UTF-8"' })
+  const challenge = () => (!password ? jsonRes(503, { error: 'The owner page is not configured (ICHIREI_OPS_PASSWORD).', code: 'ops_not_configured' }) : text(401, 'Authentication required', 'text/plain; charset=utf-8', { 'www-authenticate': 'Basic realm="ICHIREI ops", charset="UTF-8"' }))
+  // the owner list exists: a person opening a page sees the sign-in panel (the password stays one link away)
+  const wantsPage = req.method === 'GET' && /text\/html/.test(req.headers.get('accept') ?? '') && new URL(req.url, 'http://x').searchParams.get('password') !== '1'
+  if (wantsPage && (await ownerEmails(env, read, now.getTime())).length > 0 && store) {
+    const prov = await providersOf(env, now.getTime()).catch(() => ({ google: null, line: null, email: null }))
+    const u = new URL(req.url, 'http://x')
+    return { denied: ownerPanel(u.pathname, !!prov.google, !!prov.line, !!prov.email), owner: null }
+  }
+  return { denied: challenge(), owner: null }
+}
+
+/** null = allowed; otherwise the refusal (the same gate as opsAccess). */
+export async function checkOpsAuth(
+  req: Request,
+  env: NodeJS.ProcessEnv = process.env,
+  read: (name: string, env: NodeJS.ProcessEnv) => Promise<string> = readSecret,
+  store: OrderStore | null = null,
+  now: Date = new Date(),
+): Promise<Response | null> {
+  return (await opsAccess(req, env, read, store, now)).denied
+}
+
+/** The owner's sign-in panel: a paper slip with the ways in that exist right now and a link to the password. Japanese (the owner page is), no script but the small email form. */
+function ownerPanel(path: string, google: boolean, line: boolean, email: boolean): Response {
+  const safe = /^\/ops[A-Za-z0-9\/_\-.]{0,80}$/.test(path) && !path.includes('..') ? path : '/ops/home'
+  const back = encodeURIComponent(safe)
+  const btn = (href: string, label: string, id: string) => `<a class="b" data-testid="${id}" href="${href}">${label}</a>`
+  const buttons = [
+    line ? btn(`/auth/line/start?return=${back}&lang=ja`, 'LINEでログイン', 'ops-signin-line') : '',
+    google ? btn(`/auth/google/start?return=${back}&lang=ja`, 'Googleでログイン', 'ops-signin-google') : '',
+  ].join('')
+  const mail = email
+    ? `<form id="m" data-testid="ops-signin-email-form"><input type="email" name="email" autocomplete="email" required placeholder="メールアドレス" aria-label="メールアドレス"><button class="b" type="submit" data-testid="ops-signin-email">メールでログイン</button></form><p id="ok" hidden data-testid="ops-signin-sent">ログイン用のリンクを送りました。メールをご確認ください。</p><p id="ng" hidden>メールを送れませんでした。少し時間をおいて、もう一度お試しください。</p><script>document.getElementById('m').addEventListener('submit',function(e){e.preventDefault();var f=e.target;fetch('/api/auth/email',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({email:f.email.value,language:'ja',return:decodeURIComponent('${back}')})}).then(function(r){document.getElementById(r.ok?'ok':'ng').hidden=false})})</script>`
+    : ''
+  const html = `<!doctype html><html lang="ja"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="robots" content="noindex,nofollow"><title>ICHIREI</title><style>body{margin:0;min-height:100vh;display:grid;place-items:center;background:#F3EFE5;color:#151311;font:16px/1.7 'Zen Kaku Gothic New',system-ui,sans-serif}main{width:min(26rem,92vw);padding:2rem 1.4rem;background:#FBF8F1;border:1px solid #D9D2C0;border-top:1px solid #B8924A;box-shadow:0 12px 26px -16px rgba(40,30,15,.42)}h1{font-size:1.2rem;margin:0 0 .4rem}p{margin:.5rem 0}.b{display:block;box-sizing:border-box;width:100%;min-height:48px;margin:.6rem 0;padding:.7rem 1rem;border:1px solid #151311;border-radius:2px;background:transparent;color:#151311;text-align:center;text-decoration:none;font:500 1rem inherit;letter-spacing:.06em;cursor:pointer}input{box-sizing:border-box;width:100%;min-height:48px;padding:0 .8rem;border:1px solid #D9D2C0;border-radius:2px;font:inherit}small a{color:#5C564D}</style></head><body><main data-testid="ops-signin"><h1>オーナーとしてログイン</h1><p>管理ページを開くには、オーナーのアカウントでログインしてください。</p>${buttons}${mail}<p><small><a href="${safe}?password=1" data-testid="ops-use-password">パスワードで開く</a></small></p></main></body></html>`
+  return new Response(html, { status: 401, headers: { 'content-type': 'text/html; charset=utf-8', 'cache-control': 'no-store', 'x-robots-tag': 'noindex, nofollow' } })
 }
 
 /** A browser that has cached the password sends it with any request: a POST must come from this very site (Sec-Fetch-Site / Origin). */
@@ -215,7 +260,7 @@ export function createOpsHandlers(deps: () => OpsDeps) {
   const guard = async (req: Request): Promise<{ d: OpsDeps; env: NodeJS.ProcessEnv; now: Date; store: OrderStore } | Response> => {
     const d = deps()
     const env = d.env ?? process.env
-    const denied = await checkOpsAuth(req, env, d.readSecret)
+    const denied = await checkOpsAuth(req, env, d.readSecret, d.store ?? null, d.now?.() ?? new Date())
     if (denied) return denied
     if (!d.store) return jsonRes(503, { error: 'Order storage is not configured', code: 'store_not_configured' })
     return { d, env, now: d.now?.() ?? new Date(), store: d.store }
