@@ -233,7 +233,7 @@ export interface Copy {
     senderPlaceholder: string
     receiverLabel: string
     receiverPlaceholder: string
-    /** The one line under both name fields (2026-11-05): names are optional, a nickname is enough. */
+    /** The one line under both name fields (Part 21, 2026-11-21): both names are required; any name you call them is fine. */
     nameHelp: string
     dateLabel: string
     dateNotice: (days: number) => string
@@ -274,7 +274,7 @@ export interface Copy {
     submitting: string
     redirecting: string
     back: string
-    hints: { gift: string; /** the same line for a remembrance (no gift wording) */ giftMemorial: string; tick: string }
+    hints: { gift: string; /** the same line for a remembrance (no gift wording) */ giftMemorial: string; tick: string; /** Part 21: both names are required */ names: string; /** a remembrance: the sender's name only */ namesMemorial: string }
     errors: { generic: string; network: string; notConfigured: string; recordFailed: string; field: (field: OrderField) => string }
   }
 }
@@ -331,7 +331,7 @@ const ja: Copy = {
       across: '対等な相手（配偶者・友人・きょうだいなど）',
     },
     finalizeButton: 'この字にする',
-    senderLabel: 'あなたの呼び名（任意）',
+    senderLabel: 'あなたのお名前',
     receiverLabel: '偲ぶ方の呼び名（任意）',
     receiverPlaceholder: '例：お母さん、父、ハナちゃん',
     suggestTitle: '亡くなった方のお話のようです。',
@@ -403,11 +403,11 @@ const ja: Copy = {
   order: {
     heading: 'ご注文',
     chosenLabel: 'あなたが選んだ一字',
-    senderLabel: 'あなたの呼び名（任意）',
+    senderLabel: 'あなたのお名前',
     senderPlaceholder: '例：まゆ、長女、息子',
-    receiverLabel: '贈る相手の呼び名（任意）',
+    receiverLabel: 'お相手のお名前',
     receiverPlaceholder: '例：お母さん、父、ハナちゃん',
-    nameHelp: '本名でなくても大丈夫です。空欄の場合、カードに名前は入りません。',
+    nameHelp: '呼び名でかまいません（例：お母さん、Ken）',
     dateLabel: 'お届け希望日',
     dateNotice: (n) => `お届け希望日まで${n}日です。`,
     inscriptionLabel: '刻印の字体',
@@ -419,19 +419,19 @@ const ja: Copy = {
     packages: SIZE_COPY['ja'].names,
     shippingNote: '国内送料無料・海外送料 ¥6,000',
     certificateLabel: '添える一文',
-    privacy: 'ご注文の際に、入力いただいたお名前・ひと場面・選ばれた一字を、制作のために保存します。お名前の入力は任意です。入力された呼び名は、贈りものに表示するためだけに使います。',
-    privacyMemorial: 'ご注文の際に、入力いただいたお名前・ひと場面・選ばれた一字を、制作のために保存します。お名前の入力は任意です。入力された呼び名は、表示するためだけに使います。',
+    privacy: 'ご注文の際に、入力いただいたお名前・ひと場面・選ばれた一字を、制作のために保存します。お名前の入力は必須です（呼び名でかまいません）。入力された呼び名は、贈りものに表示するためだけに使います。',
+    privacyMemorial: 'ご注文の際に、入力いただいたお名前・ひと場面・選ばれた一字を、制作のために保存します。あなたのお名前の入力は必須です（呼び名でかまいません）。入力された呼び名は、表示するためだけに使います。',
     submit: 'お支払いへ進む',
     submitting: '準備しています…',
     redirecting: 'お支払いページへ移動します…',
     back: '字を選びなおす',
-    hints: { gift: '贈りものの種類を選んでください。', giftMemorial: 'お届けの形を選んでください。', tick: '上のチェックボックスにチェックを入れてください。' },
+    hints: { gift: '贈りものの種類を選んでください。', giftMemorial: 'お届けの形を選んでください。', tick: '上のチェックボックスにチェックを入れてください。', names: 'お二人のお名前を入れてください。', namesMemorial: 'あなたのお名前を入れてください。' },
     errors: {
       generic: 'ご注文を受け付けられませんでした。お手数ですが、もう一度お試しください。',
       network: '通信に失敗しました。もう一度お試しください。',
       notConfigured: 'ただいまご注文を受け付けられません。時間をおいて、もう一度お試しください。',
       recordFailed: 'ただいま混み合っています。少しおいてもう一度お試しください。',
-      field: (f) => `「${{ sender_name: 'あなたの呼び名', receiver_name: '贈る相手の呼び名', delivery_date: 'お届け希望日', inscription_style: '刻印の字体', package: 'パッケージ' }[f]}」をご確認ください。`,
+      field: (f) => `「${{ sender_name: 'あなたのお名前', receiver_name: 'お相手のお名前', delivery_date: 'お届け希望日', inscription_style: '刻印の字体', package: 'パッケージ' }[f]}」をご確認ください。`,
     },
   },
 }
@@ -488,7 +488,7 @@ const zhHans: Copy = {
       across: '平辈（伴侣、朋友、兄弟姐妹）',
     },
     finalizeButton: '就选这个字',
-    senderLabel: '你的称呼（选填）',
+    senderLabel: '你的名字',
     receiverLabel: '追思对象的称呼（选填）',
     receiverPlaceholder: '例如：妈妈、老爸、阿华',
     suggestTitle: '这听起来是关于一位已经离世的人。',
@@ -565,11 +565,11 @@ const zhHans: Copy = {
   order: {
     heading: '下单',
     chosenLabel: '你选定的这个字',
-    senderLabel: '你的称呼（选填）',
+    senderLabel: '你的名字',
     senderPlaceholder: '例如：小美、大女儿、儿子',
-    receiverLabel: '收礼人的称呼（选填）',
+    receiverLabel: '对方的名字',
     receiverPlaceholder: '例如：妈妈、老爸、阿华',
-    nameHelp: '不必填写真实姓名。留空的话，卡片上不会出现名字。',
+    nameHelp: '平常怎么称呼都可以（例如：妈妈、Ken）',
     dateLabel: '期望送达日',
     dateNotice: (n) => `距离期望送达日还有 ${n} 天。`,
     inscriptionLabel: '刻字字体',
@@ -581,19 +581,19 @@ const zhHans: Copy = {
     packages: SIZE_COPY['zh-Hans'].names,
     shippingNote: '日本国内免运费・海外运费 ¥6,000',
     certificateLabel: '随礼附上的一句话',
-    privacy: '下单时，我们会保存你填写的姓名、片刻和选定的字，用于制作。姓名为选填。你填写的称呼只会用来显示在礼物上。',
-    privacyMemorial: '下单时，我们会保存你填写的姓名、片刻和选定的字，用于制作。姓名为选填。你填写的称呼只会用来显示。',
+    privacy: '下单时，我们会保存你填写的姓名、片刻和选定的字，用于制作。姓名为必填（昵称即可）。你填写的称呼只会用来显示在礼物上。',
+    privacyMemorial: '下单时，我们会保存你填写的姓名、片刻和选定的字，用于制作。你的姓名为必填（昵称即可）。你填写的称呼只会用来显示。',
     submit: '前往付款',
     submitting: '正在准备…',
     redirecting: '正在前往付款页面…',
     back: '重新选字',
-    hints: { gift: '请选择礼物的形式。', giftMemorial: '请选择送达的形式。', tick: '请勾选上方的方框。' },
+    hints: { gift: '请选择礼物的形式。', giftMemorial: '请选择送达的形式。', tick: '请勾选上方的方框。', names: '请输入双方的名字。', namesMemorial: '请输入你的名字。' },
     errors: {
       generic: '未能受理订单，请再试一次。',
       network: '网络连接失败，请再试一次。',
       notConfigured: '目前暂时无法下单，请稍后再试。',
       recordFailed: '目前系统繁忙，请稍后再试一次。',
-      field: (f) => `请检查「${{ sender_name: '你的称呼', receiver_name: '收礼人的称呼', delivery_date: '期望送达日', inscription_style: '刻字字体', package: '套餐' }[f]}」。`,
+      field: (f) => `请检查「${{ sender_name: '你的名字', receiver_name: '对方的名字', delivery_date: '期望送达日', inscription_style: '刻字字体', package: '套餐' }[f]}」。`,
     },
   },
 }
@@ -650,7 +650,7 @@ const zhHant: Copy = {
       across: '平輩（伴侶、朋友、兄弟姊妹）',
     },
     finalizeButton: '就選這個字',
-    senderLabel: '你的稱呼（選填）',
+    senderLabel: '你的名字',
     receiverLabel: '追思對象的稱呼（選填）',
     receiverPlaceholder: '例如：媽媽、老爸、阿華',
     suggestTitle: '這聽起來是關於一位已經離世的人。',
@@ -725,11 +725,11 @@ const zhHant: Copy = {
   order: {
     heading: '下單',
     chosenLabel: '你選定的這個字',
-    senderLabel: '你的稱呼（選填）',
+    senderLabel: '你的名字',
     senderPlaceholder: '例如：小美、大女兒、兒子',
-    receiverLabel: '收禮人的稱呼（選填）',
+    receiverLabel: '對方的名字',
     receiverPlaceholder: '例如：媽媽、老爸、阿華',
-    nameHelp: '不必填寫真實姓名。留空的話，卡片上不會出現名字。',
+    nameHelp: '平常怎麼稱呼都可以（例如：媽媽、Ken）',
     dateLabel: '期望送達日',
     dateNotice: (n) => `距離期望送達日還有 ${n} 天。`,
     inscriptionLabel: '刻字字體',
@@ -741,19 +741,19 @@ const zhHant: Copy = {
     packages: SIZE_COPY['zh-Hant'].names,
     shippingNote: '日本國內免運費・海外運費 ¥6,000',
     certificateLabel: '隨禮附上的一句話',
-    privacy: '下單時，我們會保存你填寫的姓名、片刻和選定的字，用於製作。姓名為選填。你填寫的稱呼只會用來顯示在禮物上。',
-    privacyMemorial: '下單時，我們會保存你填寫的姓名、片刻和選定的字，用於製作。姓名為選填。你填寫的稱呼只會用來顯示。',
+    privacy: '下單時，我們會保存你填寫的姓名、片刻和選定的字，用於製作。姓名為必填（暱稱即可）。你填寫的稱呼只會用來顯示在禮物上。',
+    privacyMemorial: '下單時，我們會保存你填寫的姓名、片刻和選定的字，用於製作。你的姓名為必填（暱稱即可）。你填寫的稱呼只會用來顯示。',
     submit: '前往付款',
     submitting: '正在準備…',
     redirecting: '正在前往付款頁面…',
     back: '重新選字',
-    hints: { gift: '請選擇禮物的形式。', giftMemorial: '請選擇送達的形式。', tick: '請勾選上方的方框。' },
+    hints: { gift: '請選擇禮物的形式。', giftMemorial: '請選擇送達的形式。', tick: '請勾選上方的方框。', names: '請輸入雙方的名字。', namesMemorial: '請輸入你的名字。' },
     errors: {
       generic: '未能受理訂單，請再試一次。',
       network: '網路連線失敗，請再試一次。',
       notConfigured: '目前暫時無法下單，請稍後再試。',
       recordFailed: '目前系統繁忙，請稍後再試一次。',
-      field: (f) => `請檢查「${{ sender_name: '你的稱呼', receiver_name: '收禮人的稱呼', delivery_date: '期望送達日', inscription_style: '刻字字體', package: '方案' }[f]}」。`,
+      field: (f) => `請檢查「${{ sender_name: '你的名字', receiver_name: '對方的名字', delivery_date: '期望送達日', inscription_style: '刻字字體', package: '方案' }[f]}」。`,
     },
   },
 }
@@ -813,7 +813,7 @@ const en: Copy = {
       across: 'An equal (partner, friend, sibling)',
     },
     finalizeButton: 'Choose this character',
-    senderLabel: 'Your name or nickname (optional)',
+    senderLabel: 'Your name',
     receiverLabel: 'Name or nickname of the person you are remembering (optional)',
     receiverPlaceholder: 'e.g. Mom, Dad, Grandpa',
     suggestTitle: 'This sounds like a story about someone who has passed away.',
@@ -886,11 +886,11 @@ const en: Copy = {
   order: {
     heading: 'Your order',
     chosenLabel: 'The character you chose',
-    senderLabel: 'Your name or nickname (optional)',
+    senderLabel: 'Your name',
     senderPlaceholder: 'e.g. Mia, Your son',
-    receiverLabel: 'Their name or nickname (optional)',
+    receiverLabel: 'Their name',
     receiverPlaceholder: 'e.g. Mom, Dad, Grandpa',
-    nameHelp: 'You don\'t need a real name. If you leave it blank, no name appears on the card.',
+    nameHelp: 'Any name you call them is fine (e.g. Mom, Ken)',
     dateLabel: 'Requested delivery date',
     dateNotice: (n) => `${n} ${n === 1 ? 'day' : 'days'} until your requested delivery date.`,
     inscriptionLabel: 'Carved form',
@@ -907,19 +907,19 @@ const en: Copy = {
     packages: SIZE_COPY['en'].names,
     shippingNote: 'Free shipping in Japan · ¥6,000 international shipping',
     certificateLabel: 'What this gift says',
-    privacy: 'When you order, we keep the names, the moment and the character you chose, so that your gift can be made. Names are optional. Any name you enter is used only to show on the gift.',
-    privacyMemorial: 'When you order, we keep the names, the moment and the character you chose, so that your gift can be made. Names are optional. Any name you enter is used only to be shown.',
+    privacy: 'When you order, we keep the names, the moment and the character you chose, so that your gift can be made. Names are required (a nickname is fine). Any name you enter is used only to show on the gift.',
+    privacyMemorial: 'When you order, we keep the names, the moment and the character you chose, so that your gift can be made. Your name is required (a nickname is fine). Any name you enter is used only to be shown.',
     submit: 'Continue to payment',
     submitting: 'Preparing…',
     redirecting: 'Taking you to payment…',
     back: 'Choose a different character',
-    hints: { gift: 'Please choose your gift above.', giftMemorial: 'Please choose how it is sent above.', tick: 'Please tick the box above.' },
+    hints: { gift: 'Please choose your gift above.', giftMemorial: 'Please choose how it is sent above.', tick: 'Please tick the box above.', names: 'Please enter both names.', namesMemorial: 'Please enter your name.' },
     errors: {
       generic: 'We could not take your order. Please try again.',
       network: 'The connection failed. Please try again.',
       notConfigured: 'Orders are not available right now. Please try again a little later.',
       recordFailed: 'Something went wrong on our side. Please try again in a moment.',
-      field: (f) => `Please check “${{ sender_name: 'Your name or nickname', receiver_name: 'Their name or nickname', delivery_date: 'Requested delivery date', inscription_style: 'Carved form', package: 'Package' }[f]}”.`,
+      field: (f) => `Please check “${{ sender_name: 'Your name', receiver_name: 'Their name', delivery_date: 'Requested delivery date', inscription_style: 'Carved form', package: 'Package' }[f]}”.`,
     },
   },
 }

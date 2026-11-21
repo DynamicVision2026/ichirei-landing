@@ -12,10 +12,12 @@ export interface AuthState {
   kind: 'email' | 'line' | null
   /** The signed-in person's own email (to prefill the free-gift hold and the checkout) — never shown in a page. */
   email: string | null
+  /** The provider's display name (LINE only): Part 21 prefills the sender's name on the order step with it. */
+  name: string | null
   needsEmail: boolean
 }
 
-const EMPTY: AuthState = { loaded: false, providers: { google: false, line: false, email: false }, signedIn: false, display: null, kind: null, email: null, needsEmail: false }
+const EMPTY: AuthState = { loaded: false, providers: { google: false, line: false, email: false }, signedIn: false, display: null, kind: null, email: null, name: null, needsEmail: false }
 let state: AuthState = EMPTY
 let inflight: Promise<void> | null = null
 const subs = new Set<(s: AuthState) => void>()
@@ -31,7 +33,7 @@ export async function refreshAuth(): Promise<void> {
     try {
       const r = await fetch('/api/auth/me', { credentials: 'same-origin' })
       if (!r.ok) return set({ ...EMPTY, loaded: true })
-      const j = (await r.json()) as { providers?: Partial<AuthState['providers']>; signed_in?: boolean; display?: string; kind?: 'email' | 'line'; email?: string; needs_email?: boolean }
+      const j = (await r.json()) as { providers?: Partial<AuthState['providers']>; signed_in?: boolean; display?: string; kind?: 'email' | 'line'; email?: string; name?: string; needs_email?: boolean }
       set({
         loaded: true,
         providers: { google: j.providers?.google === true, line: j.providers?.line === true, email: j.providers?.email === true },
@@ -39,6 +41,7 @@ export async function refreshAuth(): Promise<void> {
         display: typeof j.display === 'string' ? j.display : null,
         kind: j.kind ?? null,
         email: typeof j.email === 'string' ? j.email : null,
+        name: typeof j.name === 'string' && j.name.trim() ? j.name.trim() : null,
         needsEmail: j.needs_email === true,
       })
     } catch {

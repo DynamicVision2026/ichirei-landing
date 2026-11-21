@@ -401,7 +401,7 @@ try {
     try {
       const page = await fetch(`${gs.url}/g/${token}`)
       const html = await page.text()
-      check('link preview: /g/<token> answers the page with this gift\'s own tags — title 「○○へ　一字の贈りもの」, 「○○さんから · 11月10日に開封」, the envelope picture, noindex', page.status === 200 && html.includes('<div id="root">') && html.includes('property="og:title" content="山田 一郎へ　一字の贈りもの"') && html.includes('山田 太郎さんから · 11月10日に開封') && html.includes(`https://ichirei.soul-id.jp/api/gift/${token}/og.png?v=`) && html.includes('og:image:width" content="1200"') && /noindex/.test(html) && /noindex/.test(page.headers.get('x-robots-tag') ?? ''))
+      check('link preview: /g/<token> answers the page with this gift\'s own tags — title 「○○さんから、一字の贈りもの」, the greeting with both names and the opening day (Part 20), the envelope picture, noindex', page.status === 200 && html.includes('<div id="root">') && html.includes('property="og:title" content="山田 太郎さんから、一字の贈りもの"') && html.includes('山田 一郎さんへ。山田 太郎さんから、一字の贈りものが届いています。11月10日に開きます。') && html.includes(`https://ichirei.soul-id.jp/api/gift/${token}/og.png?v=`) && html.includes('og:image:width" content="1200"') && /noindex/.test(html) && /noindex/.test(page.headers.get('x-robots-tag') ?? ''))
       check('link preview: that HTML asks Google for nothing (no font link, no preconnect, no noscript)', !/googleapis|gstatic/.test(html), html.match(/.{0,40}(googleapis|gstatic).{0,40}/)?.[0])
       check('link preview: the character, the poem and the reading are nowhere in it', !html.includes('備') && !html.includes('そなえる'))
       const og = await fetch(`${gs.url}/api/gift/${token}/og.png`)

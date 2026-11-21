@@ -193,3 +193,9 @@
 /* "You can send it later" (Part 8, 2026-11-20): one quiet line under the send buttons, with the way to My gifts in Vintage Gold */
 .by-later { margin: .8rem 0 0; font-size: .95rem; line-height: 1.7; opacity: .92; }
 .by-later-link { color: var(--gold); font-weight: 600; text-underline-offset: 3px; white-space: nowrap; }
+
+/* Part 21: fixing the two names on the sender's page — a small line under the link, a paper form when opened */
+.by-names { margin: .8rem 0 0; }
+.by-names-now { margin: 0 0 .2rem; font-size: .95rem; opacity: .85; }
+.by-names-form { margin-top: .4rem; }
+.by-names-form .an-field { display: block; margin: .5rem 0; }

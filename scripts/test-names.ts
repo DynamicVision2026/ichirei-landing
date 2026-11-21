@@ -1,4 +1,4 @@
-// Part 3 of the 2026-11-05 ticket — names are OPTIONAL (a nickname is enough) and only ever shown on the gift. No network, no model.
+// Part 3 of the 2026-11-05 ticket — a nickname is enough and names are only ever shown on the gift (the order step requires both since Part 21, 2026-11-21; the server still takes a blank name from an older caller). No network, no model.
 //
 //   node --experimental-strip-types --disable-warning=ExperimentalWarning scripts/test-names.ts
 
@@ -93,12 +93,12 @@ check('names are not an input of the engine: the engine request builder knows no
 // ---- the words ----------------------------------------------------------------------------------------------------------------------------------
 check('order form copy (ja / zh-Hant / en): the ticket\'s labels, placeholders and help line, word for word; no real-name example left', (() => {
   const ja = COPY.ja.order, zh = COPY['zh-Hant'].order, en = COPY.en.order
-  return ja.senderLabel === 'あなたの呼び名（任意）' && ja.senderPlaceholder === '例：まゆ、長女、息子' && ja.receiverLabel === '贈る相手の呼び名（任意）' && ja.receiverPlaceholder === '例：お母さん、父、ハナちゃん' && ja.nameHelp === '本名でなくても大丈夫です。空欄の場合、カードに名前は入りません。' &&
-    zh.senderLabel === '你的稱呼（選填）' && zh.senderPlaceholder === '例如：小美、大女兒、兒子' && zh.receiverLabel === '收禮人的稱呼（選填）' && zh.receiverPlaceholder === '例如：媽媽、老爸、阿華' && zh.nameHelp === '不必填寫真實姓名。留空的話，卡片上不會出現名字。' &&
-    en.senderLabel === 'Your name or nickname (optional)' && en.senderPlaceholder === 'e.g. Mia, Your son' && en.receiverLabel === 'Their name or nickname (optional)' && en.receiverPlaceholder === 'e.g. Mom, Dad, Grandpa' && en.nameHelp === "You don't need a real name. If you leave it blank, no name appears on the card."
+  return ja.senderLabel === 'あなたのお名前' && ja.senderPlaceholder === '例：まゆ、長女、息子' && ja.receiverLabel === 'お相手のお名前' && ja.receiverPlaceholder === '例：お母さん、父、ハナちゃん' && ja.nameHelp === '呼び名でかまいません（例：お母さん、Ken）' &&
+    zh.senderLabel === '你的名字' && zh.senderPlaceholder === '例如：小美、大女兒、兒子' && zh.receiverLabel === '對方的名字' && zh.receiverPlaceholder === '例如：媽媽、老爸、阿華' && zh.nameHelp === '平常怎麼稱呼都可以（例如：媽媽、Ken）' &&
+    en.senderLabel === 'Your name' && en.senderPlaceholder === 'e.g. Mia, Your son' && en.receiverLabel === 'Their name' && en.receiverPlaceholder === 'e.g. Mom, Dad, Grandpa' && en.nameHelp === 'Any name you call them is fine (e.g. Mom, Ken)'
 })())
 check('no real-name example anywhere in the order copy (李華 / 李明 / 山田 / Carter) in any language', !/李華|李华|李明|山田|Carter|Emily|Margaret/.test(JSON.stringify((['ja', 'zh-Hans', 'zh-Hant', 'en'] as const).map((l) => [COPY[l].order, COPY[l].memorial]))))
-check('FAQ / privacy line word for word (ja / zh-Hant / en)', readFileSync('src/legal/legal-copy.ts', 'utf8').includes("a: 'お名前の入力は任意です。入力された呼び名は、贈りものに表示するためだけに使います。'") && readFileSync('src/legal/legal-copy.ts', 'utf8').includes("a: '姓名為選填。你填寫的稱呼只會用來顯示在禮物上。'") && readFileSync('src/legal/legal-copy.ts', 'utf8').includes("a: 'Names are optional. Any name you enter is used only to show on the gift.'") && COPY.ja.order.privacy.includes('お名前の入力は任意です。入力された呼び名は、贈りものに表示するためだけに使います。'))
+check('FAQ / privacy line word for word (ja / zh-Hant / en) — both names are needed since Part 21', readFileSync('src/legal/legal-copy.ts', 'utf8').includes("a: 'はい、お二人のお名前を入れてください。呼び名でかまいません（例：お母さん、Ken）。入力された呼び名は、贈りものに表示するためだけに使います。'") && readFileSync('src/legal/legal-copy.ts', 'utf8').includes("a: '需要，請填寫雙方的名字。平常怎麼稱呼都可以（例如：媽媽、Ken）。你填寫的稱呼只會用來顯示在禮物上。'") && readFileSync('src/legal/legal-copy.ts', 'utf8').includes("a: 'Yes, both names are needed. Any name you call them is fine (e.g. Mom, Ken). Any name you enter is used only to show on the gift.'") && COPY.ja.order.privacy.includes('お名前の入力は必須です（呼び名でかまいません）。入力された呼び名は、贈りものに表示するためだけに使います。'))
 
 console.log(failures ? `\n${failures} name check(s) FAILED` : '\nAll name checks passed.')
 process.exit(failures ? 1 : 0)

@@ -273,5 +273,14 @@ const sel = (cookie: string) => selectPost(new Request('http://x/api/select', { 
   check('(10) the dashboard lists the request with a masked name only (never the full email)', /data-testid="delete-requests"/.test(html) && /m•••@example\.com/.test(html) && !/mia@example\.com/.test(html))
 }
 
+// ---- 11. the order step's sender name (Part 21, 2026-11-21): the signed-in person's display name, where the provider gives one -------------------------------------------------------------
+{
+  const lineCookie = `${ck(B3)}; ${cookieOf(await lineSignIn(ck(B3), { sub: 'U-line-1', name: 'Haruka' }))}`
+  const lm = await meOf(lineCookie)
+  const gm = await meOf(`${ck(B1)}; ${cookieOf(await googleSignIn(ck(B1), { sub: 'g-1', email: 'mia@example.com', email_verified: true }))}`)
+  check('(11) /api/auth/me hands a LINE person\'s display name to its owner (to prefill the sender name) and nothing for a Google or email account (an address is not a name)', lm.name === 'Haruka' && gm.name === undefined && !JSON.stringify(gm).includes('mia@example.com') === false)
+  check('(11) signed out, the answer carries no name', (await meOf('')).name === undefined)
+}
+
 console.log(failures === 0 ? '\nALL PASS' : `\n${failures} FAILED`)
 process.exit(failures === 0 ? 0 : 1)

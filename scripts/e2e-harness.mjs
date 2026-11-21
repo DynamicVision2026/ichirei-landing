@@ -2240,6 +2240,8 @@ const mockPage = async (browser, { onExplain, result, order, track } = {}) => {
     await l.page.locator('[data-testid=order-form]').waitFor()
     check(`order step (${lang}): the refund line is above the order button`, (await l.page.locator('[data-testid=order-refund-line]').innerText()).includes(note))
     if (lang === 'en') {
+      await l.page.fill('input[name=sender_name]', 'Sam') // Part 21: both names are required, so the button's first words are about the names (Run 55)
+      await l.page.fill('input[name=receiver_name]', 'Mom')
       // 2026-11-15: what blocks the button is said in one plain line under it; with three sizes on sale nothing is preselected, so the first line asks for the gift, then for the box
       await l.page.waitForTimeout(1500)
       const first = await l.page.locator('[data-testid=order-hint]').innerText().catch(() => '')
@@ -2730,7 +2732,7 @@ const SECTION_ORDER = ['.hero', '.strip', '.philo', '#shape', '#angles', '#how',
   await lamp.locator('text=送這個字').click()
   const form = page.locator('[data-testid=order-form]')
   await toOrder(page)
-  check('zh-Hant order form: traditional (燈) pre-selected, simplified (灯) offered, in Chinese', (await page.locator('input[name=inscription_style][value=traditional]').isChecked()) && (await page.locator('[data-order-glyph]').innerText()) === '燈' && (await form.locator('label:has(input[value=simplified]) .optGlyph').innerText()) === '灯' && (await form.innerText()).includes('你的稱呼（選填）') && (await form.innerText()).includes('木牌（簡約）'))
+  check('zh-Hant order form: traditional (燈) pre-selected, simplified (灯) offered, in Chinese', (await page.locator('input[name=inscription_style][value=traditional]').isChecked()) && (await page.locator('[data-order-glyph]').innerText()) === '燈' && (await form.locator('label:has(input[value=simplified]) .optGlyph').innerText()) === '灯' && (await form.innerText()).includes('你的名字') && (await form.innerText()).includes('木牌（簡約）'))
   await page.fill('input[name=sender_name]', '李明')
   check('zh-Hant certificate: 「這個字，是你眼中的那個人。」 and the shipping line', (await page.locator('[data-certificate]').innerText()) === '這個字，是你眼中的那個人。' && (await page.locator('[data-shipping]').innerText()) === '日本國內免運費・海外運費 ¥6,000')
   await page.fill('input[name=receiver_name]', '李華')
@@ -4108,6 +4110,8 @@ const SECTION_ORDER = ['.hero', '.strip', '.philo', '#shape', '#angles', '#how',
     const form = await page.locator('[data-testid=order-form]').innerText()
     check(`claim flow (${lang}): at the choose step there is NO payment — no price, no sale, no sizes to pick, no refund tick-box; the form says it is paid and the button says "${CLAIM[lang] && (lang === 'ja' ? '贈りものを作る' : 'Make my gift')}"`, (await T(page, 'order-form').locator('[data-price]').count()) === 0 && (await T(page, 'order-form').locator('[data-testid=sale-line]').count()) === 0 && (await T(page, 'order-form').locator('[data-testid=order-refund-check]').count()) === 0 && (await T(page, 'order-form').locator('input[name=package]').count()) === 1 && !/¥|\$\d/.test(form) && (await T(page, 'claim-order-note').innerText()).includes('#1016') && (await T(page, 'order-submit').innerText()) === (lang === 'ja' ? '贈りものを作る' : 'Make my gift'))
     await page.screenshot({ path: `${SHOTS}/claim-flow-${lang}.png`, fullPage: false })
+    await page.fill('input[name=sender_name]', 'Sam') // Part 21: both names are required
+    await page.fill('input[name=receiver_name]', 'Mom')
     await T(page, 'order-submit').click()
     await page.waitForSelector('#done', { timeout: 8000 })
     const o = orders[0]
@@ -7415,6 +7419,128 @@ for (const [lang, locale, text] of [['en', 'en-US', 'Your gift is being finished
     await ctx.close()
   }
 }
+
+// ---------- Run 55 (2026-11-21, Part 21): every gift has both names — required on the order step (ja / en / zh-Hant), prefilled from the account, fixable on the sender's page until the gift is opened ----------
+{
+  const SHOTS55 = process.env.E2E_SHOTS_DIR || '/tmp/e2e-shots'
+  const L55 = {
+    ja: { path: '/write', locale: 'ja-JP', from: 'あなたのお名前', to: 'お相手のお名前', hint: '呼び名でかまいません（例：お母さん、Ken）', need: 'お二人のお名前を入れてください。', opt: '任意' },
+    en: { path: '/en/write?lang=en', locale: 'en-US', from: 'Your name', to: 'Their name', hint: 'Any name you call them is fine (e.g. Mom, Ken)', need: 'Please enter both names.', opt: 'optional' },
+    'zh-Hant': { path: '/zh/write?lang=zh-Hant', locale: 'zh-TW', from: '你的名字', to: '對方的名字', hint: '平常怎麼稱呼都可以（例如：媽媽、Ken）', need: '請輸入雙方的名字。', opt: '選填' },
+  }
+  const result55 = (lang) => (lang === 'en' ? { ...FIXTURE, language: 'en', inscription_script: null, candidates: FIXTURE.candidates.map((c, i) => ({ ...c, reading: i === 0 ? 'akari' : `y${i}`, meaning: i === 0 ? 'lamp' : `m${i}`, eliminated: false, eliminated_reason: null })) } : lang === 'zh-Hant' ? { ...FIXTURE, language: 'zh-Hant', inscription_script: 'traditional' } : FIXTURE)
+  const reach55 = async (lang, { me = null, width = 390 } = {}) => {
+    const f = await mockPage(browser, { result: (b) => result55(lang), order: () => ({ json: { order_ref: 'IC-20261121-NAMES222', checkout_url: 'http://localhost:5173/__checkout?cart=n', glyph: '証', certificate_text: 'x' } }) })
+    await f.page.setViewportSize({ width, height: 900 })
+    await f.page.route('**/api/auth/me', (r) => r.fulfill({ json: me ?? { providers: { google: false, line: false, email: false }, signed_in: false } }))
+    await f.page.route('**/api/sizes', (r) => r.fulfill({ json: { sizes: ['egift'] } }))
+    await f.page.goto(`http://localhost:5173${L55[lang].path}`, { waitUntil: 'networkidle' })
+    await f.page.locator('#write [data-testid=story-input]').fill(lang === 'en' ? 'She left the porch light on every night until I got home, and she never once mentioned it.' : STORY)
+    await pickContext(f.page)
+    await f.page.click(`#write >> text=${GO[lang]}`)
+    await f.page.waitForSelector('[data-all-revealed=yes]', { timeout: 15000 })
+    await f.page.locator('article[data-slot=main]').click()
+    await f.page.locator('article[data-slot=main]').locator(`text=${GIVE[lang]}`).click()
+    await toOrder(f.page)
+    await f.page.waitForTimeout(400)
+    return f
+  }
+  for (const lang of ['ja', 'en', 'zh-Hant']) {
+    const W = L55[lang]
+    const f = await reach55(lang)
+    const labels = await f.page.evaluate(() => ({ from: document.querySelector('label[for=sender_name]')?.textContent.trim(), to: document.querySelector('label[for=receiver_name]')?.textContent.trim(), hint: document.querySelector('[data-testid=name-help]')?.textContent.trim(), req: [document.querySelector('#sender_name')?.required, document.querySelector('#receiver_name')?.required] }))
+    check(`order step (${lang}, Part 21): the two fields are 「${W.from}」 and 「${W.to}」 (not optional), required, with the hint 「${W.hint}」 under them`, labels.from === W.from && labels.to === W.to && labels.hint === W.hint && labels.req.every(Boolean) && !labels.from.includes(W.opt) && !labels.to.includes(W.opt), JSON.stringify(labels))
+    await f.page.locator('label:has(input[name=package][value=egift])').click().catch(() => {})
+    await tickRefund(f.page)
+    await f.page.waitForTimeout(300)
+    const submit = f.page.locator('[data-testid=order-submit]')
+    const hint0 = await f.page.locator('[data-testid=order-hint]').innerText().catch(() => '')
+    check(`order step (${lang}, Part 21): the order button stays disabled with both names empty, and the line under it says 「${W.need}」`, (await submit.isDisabled()) && hint0 === W.need, hint0)
+    await f.page.fill('input[name=sender_name]', 'Sam')
+    check(`order step (${lang}, Part 21): still disabled with only your name`, await submit.isDisabled())
+    await f.page.fill('input[name=sender_name]', '')
+    await f.page.fill('input[name=receiver_name]', 'Mom')
+    check(`order step (${lang}, Part 21): still disabled with only their name`, await submit.isDisabled())
+    await f.page.fill('input[name=sender_name]', '   ')
+    check(`order step (${lang}, Part 21): spaces are not a name`, await submit.isDisabled())
+    if (lang !== 'zh-Hant') { await f.page.locator('[data-testid=order-submit]').scrollIntoViewIfNeeded(); await f.page.screenshot({ path: `${SHOTS55}/p21-order-hint-${lang}-390.png`, fullPage: false }) }
+    await f.page.fill('input[name=sender_name]', 'Sam')
+    await f.page.evaluate(() => document.querySelector('#sender_name').scrollIntoView({ block: 'start' }))
+    await f.page.waitForTimeout(250)
+    if (lang !== 'zh-Hant') await f.page.screenshot({ path: `${SHOTS55}/p21-order-names-${lang}-390.png`, fullPage: false })
+    check(`order step (${lang}, Part 21): with both names the button is live and the hint line is gone`, (await submit.isEnabled()) && (await f.page.locator('[data-testid=order-hint]').count()) === 0)
+    await submit.click()
+    await f.page.waitForSelector('#co', { timeout: 8000 })
+    check(`order step (${lang}, Part 21): the order carries both names`, f.calls.order.length === 1 && f.calls.order[0].sender_name === 'Sam' && f.calls.order[0].receiver_name === 'Mom', JSON.stringify(f.calls.order[0]))
+    check(`no page errors (run 55, order step ${lang})`, f.errors.length === 0, f.errors.join('; '))
+    await f.page.close()
+  }
+  // prefilled from the signed-in account's display name, editable
+  {
+    const f = await reach55('ja', { me: { providers: { google: false, line: true, email: false }, signed_in: true, display: 'Haruka', kind: 'line', name: 'Haruka', needs_email: true } })
+    check('order step (ja, Part 21): signed in with a LINE name, the sender\'s name is prefilled with it', (await f.page.inputValue('input[name=sender_name]')) === 'Haruka' && (await f.page.inputValue('input[name=receiver_name]')) === '')
+    await f.page.fill('input[name=sender_name]', 'はるか')
+    await f.page.waitForTimeout(300)
+    check('order step (ja, Part 21): …and it can be changed (what the person typed stays)', (await f.page.inputValue('input[name=sender_name]')) === 'はるか')
+    await f.page.close()
+    const g = await reach55('ja', { me: { providers: { google: true, line: false, email: false }, signed_in: true, display: 'm•••@example.com', kind: 'email', email: 'mia@example.com', needs_email: false } })
+    check('order step (ja, Part 21): signed in with an e-mail account (no name), nothing is prefilled — an address is not a name', (await g.page.inputValue('input[name=sender_name]')) === '')
+    await g.page.close()
+  }
+  // the sender's page: 「名前を直す」 until the gift is opened
+  {
+    const ID = 'AN-testnamesnamesnames1', TOKEN = 'RG-testnamesnamesnames1'
+    const T55 = (page, id) => page.locator(`[data-testid="${id}"]`)
+    const view = (lang, gift = {}) => ({ id: ID, language: lang, glyph: '備', reading: lang === 'ja' ? 'そなえる' : '', romanization: 'sonaeru', meaning_en: 'to be ready', who: 'x', memorial: false, purpose: 'thanks', film: { status: 'ready', lines: ['a', 'b', 'c', 'd'], pictures: ['/img/scenes/children.jpg', '/img/scenes/friends.jpg', '/img/scenes/m1.jpg', '/img/scenes/m2.jpg'] }, gift: { url: `https://ichirei.beyondculture.ai/g/${TOKEN}`, size_code: 'ICHIREI-EGIFT', ship_to: 'none', egift_state: null, opens_on: null, opens_at: null, opens_tz: null, certificate_no: 12, reply: null, to: '', from: '', lang, states: { shared_at: null, opened_at: null, answered_at: null }, ...gift }, order: { collected: true, ordered_at: '2026-11-19T05:30:00Z', change_until: null, wood: null } })
+    const W2 = { ja: { edit: '名前を直す', from: 'あなたのお名前', to: 'お相手のお名前', hint: '呼び名でかまいません（例：お母さん、Ken）', text: (f, t, l) => `${t}さんへ。${f}さんから、一字の贈りものが届いています。こちらから開いてください。${l}`, bare: (l) => `一字の贈りものが届いています。こちらから開いてください。${l}` }, en: { edit: 'Edit names', from: 'Your name', to: 'Their name', hint: 'Any name you call them is fine (e.g. Mom, Ken)', text: (f, t, l) => `${t}, ${f} sent you a gift of one character. Open it here: ${l}`, bare: (l) => `A gift of one character has arrived for you. Open it here: ${l}` }, 'zh-Hant': { edit: '修改名字', from: '你的名字', to: '對方的名字', hint: '平常怎麼稱呼都可以（例如：媽媽、Ken）', text: (f, t, l) => `給${t}：${f}送給你一份一字的禮物。請從這裡打開：${l}`, bare: (l) => `有一份一字的禮物送給你。請從這裡打開：${l}` } }
+    const LINK55 = `https://ichirei.beyondculture.ai/g/${TOKEN}`
+    for (const lang of ['ja', 'en', 'zh-Hant']) {
+      const W = W2[lang]
+      const ctx = await browser.newContext({ locale: L55[lang].locale, viewport: { width: 390, height: 844 }, permissions: ['clipboard-read', 'clipboard-write'] })
+      await ctx.addInitScript(() => { navigator.share = async (d) => { window.__shared = d } })
+      const page = await ctx.newPage()
+      const errs = []
+      page.on('pageerror', (e) => errs.push(String(e)))
+      const posts = []
+      let current = view(lang)
+      await page.route('**/api/me*', (r) => r.fulfill({ json: { basket: { count: 0 }, ready: null, hold: null } }))
+      await page.route(`**/api/animation/${ID}`, (r) => r.fulfill({ json: current }))
+      await page.route(`**/api/animation/${ID}/shared`, (r) => r.fulfill({ status: 204, body: '' }))
+      await page.route(`**/api/animation/${ID}/names`, async (r) => { const b = JSON.parse(r.request().postData() ?? '{}'); posts.push(b); await r.fulfill({ json: { ok: true, from: b.from, to: b.to } }) })
+      await page.goto(`http://localhost:5173/a/${ID}`, { waitUntil: 'networkidle' })
+      await T55(page, 'gift-actions').waitFor()
+      check(`sender page (${lang}, Part 21): 「${W.edit}」 is there while the gift has not been opened`, ((await T55(page, 'edit-names').innerText()) ?? '').trim() === W.edit)
+      await T55(page, 'share-button').click()
+      await page.waitForFunction(() => window.__shared)
+      const before = await page.evaluate(() => window.__shared)
+      check(`sender page (${lang}, Part 21): with no names the share text uses the no-name wording`, before.text === W.bare(LINK55), before.text)
+      await page.evaluate(() => { window.__shared = null })
+      await T55(page, 'edit-names').click()
+      const labs = await page.evaluate(() => [...document.querySelectorAll('[data-testid=names-form] .an-field > span')].map((e) => e.textContent.trim()))
+      check(`sender page (${lang}, Part 21): it opens the two fields 「${W.from}」 and 「${W.to}」 with the hint`, labs.join() === [W.from, W.to].join() && ((await T55(page, 'names-hint').innerText()) ?? '').trim() === W.hint, labs.join())
+      check(`sender page (${lang}, Part 21): save waits for both names`, await T55(page, 'names-save').isDisabled())
+      await T55(page, 'names-from').fill('Sam')
+      check(`sender page (${lang}, Part 21): …with one name only it still waits`, await T55(page, 'names-save').isDisabled())
+      await T55(page, 'names-to').fill('Mom')
+      if (lang !== 'zh-Hant') await page.screenshot({ path: `${SHOTS55}/p21-edit-names-${lang}-390.png`, fullPage: true })
+      await T55(page, 'names-save').click()
+      await T55(page, 'names-saved').waitFor()
+      check(`sender page (${lang}, Part 21): saving sends both names to the server and the page shows them`, posts.length === 1 && posts[0].from === 'Sam' && posts[0].to === 'Mom' && ((await T55(page, 'names-now').innerText()) ?? '').includes('Sam') && (await T55(page, 'names-form').count()) === 0, JSON.stringify(posts))
+      await T55(page, 'share-button').click()
+      await page.waitForFunction(() => window.__shared)
+      const after = await page.evaluate(() => window.__shared)
+      check(`sender page (${lang}, Part 21): the share text now carries both names`, after.text === W.text('Sam', 'Mom', LINK55) && after.text !== before.text, after.text)
+      // once the gift has been opened the button is gone
+      current = view(lang, { to: 'Mom', from: 'Sam', states: { shared_at: null, opened_at: '2026-11-21T01:00:00Z', answered_at: null } })
+      await page.reload({ waitUntil: 'networkidle' })
+      await T55(page, 'gift-actions').waitFor()
+      check(`sender page (${lang}, Part 21): after the gift has been opened 「${W.edit}」 is gone`, (await T55(page, 'edit-names').count()) === 0 && (await T55(page, 'names-panel').count()) === 0)
+      check(`no page errors (run 55, sender page ${lang})`, errs.length === 0, errs.join('; '))
+      await ctx.close()
+    }
+  }
+}
+
 
 await browser.close()
 console.log(failures === 0 ? '\nALL E2E CHECKS PASSED' : `\n${failures} CHECKS FAILED`)

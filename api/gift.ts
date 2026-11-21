@@ -18,6 +18,7 @@ import { recordReply } from '../engine/engine-log.ts'
 import { isOrderRecord } from '../engine/buyer.ts'
 import { GIFT_TOKEN_PATTERN, arrivingView, todayJst, checkAddress, checkReply, giftUrl, giftView, isGiftRecord, isLocked, lockedView, type GiftRecord } from '../engine/gift.ts'
 import { OPEN_DATE_MAX_DAYS } from '../src/order/packages.ts'
+import { optionalName } from '../engine/order.ts'
 import { readArt, picturePath, type ArtRecord } from '../engine/film-art.ts'
 import { createOrderStore, type OrderStore } from '../engine/order-store.ts'
 import { recordOrderEvent } from '../engine/customer.ts'
@@ -510,6 +511,30 @@ export function createGiftHandlers(deps: () => GiftDeps) {
         return json(503, { error: 'unavailable' }, { 'cache-control': 'no-store' })
       }
       return json(200, { ok: true, opens_on: opens, opens_at: opensAt, opens_tz: opensTz }, noStore)
+    },
+    /**
+     * Part 21 (2026-11-21): the sender fixes the two names, until the receiver has opened the gift. The ceremony, the certificate, the link preview and the share text all read the gift record, so one write changes
+     * them all (the preview picture's name follows the names); the order record's names follow too, so My gifts shows the new one. Nothing in Shopify is touched. Both names are required (a remembrance: the sender's only).
+     */
+    async namesForSender(animationId: string, body: unknown): Promise<Response> {
+      const d = deps()
+      const f = await bySender(animationId, d)
+      if (f instanceof Response) return f
+      { const gate = await gateOf(f.gift, d); if (gate === 'cancelled') return gone(f.gift); if (gate === 'pending') return notCollected(); if (gate === 'error') return busy() }
+      if (f.gift.source === 'sample') return json(403, { error: 'sample', code: 'sample' }, noStore)
+      if (f.gift.opened_at) return json(409, { error: 'opened', code: 'opened' }, noStore) // once opened, the names are what the receiver saw
+      const b = (body ?? {}) as { from?: unknown; to?: unknown }
+      const from = optionalName(b.from)
+      const to = optionalName(b.to)
+      if (from === null || to === null || from === '' || (to === '' && !f.gift.memorial)) return json(400, { error: 'names', code: 'names', field: from === null || from === '' ? 'from' : 'to' }, noStore)
+      try {
+        await d.store!.put(f.gift.token, { ...f.gift, from, to })
+        const o = await d.store!.get(f.gift.order_ref).catch(() => null)
+        if (isOrderRecord(o)) await d.store!.put(f.gift.order_ref, { ...o, production: { ...o.production, sender_name: from, receiver_name: to } })
+      } catch {
+        return json(503, { error: 'unavailable' }, noStore)
+      }
+      return json(200, { ok: true, from, to }, noStore)
     },
     async keepsakeCard(token: string, preview?: string | null): Promise<Response> {
       const d = deps()

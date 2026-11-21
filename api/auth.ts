@@ -78,7 +78,7 @@ export function createAuthHandlers(deps: () => AuthDeps) {
       if (!a) return json(200, { providers: on, signed_in: false })
       const disp = displayOf(a)
       // the full email goes only to its own signed-in owner (to prefill the free-gift hold and the checkout); it is never in a page
-      return json(200, { providers: on, signed_in: true, display: disp.text, kind: disp.kind, ...(a.email ? { email: a.email } : {}), needs_email: !a.email })
+      return json(200, { providers: on, signed_in: true, display: disp.text, kind: disp.kind, ...(a.email ? { email: a.email } : {}), ...(a.name ? { name: a.name } : {}), needs_email: !a.email })
     },
 
     async start(provider: 'google' | 'line', req: Request): Promise<Response> {

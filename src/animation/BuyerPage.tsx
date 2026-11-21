@@ -42,6 +42,11 @@ export default function BuyerPage({ view, lang, onCollected }: { view: Animation
   const [qr, setQr] = useState(false)
   const [wechat, setWechat] = useState(false)
   const [msgCopied, setMsgCopied] = useState(false)
+  // Part 21 (2026-11-21): the two names can be fixed until the receiver has opened the gift; what was saved replaces what the page loaded
+  const [names, setNames] = useState<{ from: string; to: string } | null>(null)
+  const [editing, setEditing] = useState(false)
+  const [draft, setDraft] = useState({ from: '', to: '' })
+  const [nameState, setNameState] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle')
   const [confirming, setConfirming] = useState(false)
   const [collecting, setCollecting] = useState(false)
   // the 24-hour line disappears by itself when the deadline passes while the page is open
@@ -84,7 +89,9 @@ export default function BuyerPage({ view, lang, onCollected }: { view: Animation
   // Part 20 (2026-11-21): every channel carries the same greeting, in the GIFT's language (the receiver's ceremony), with the names; the scheduled line goes before the link while the gift is locked
   const gl = shareLang(g.lang ?? view.language)
   const lockedWhen = g.opens_at && Date.parse(g.opens_at) > now ? openingWhenFromRecord(gl, g.opens_at, g.opens_tz) : null
-  const greet = { lang: gl, from: g.from ?? '', to: g.to ?? '', memorial: view.memorial, opens: lockedWhen }
+  const nameFrom = names ? names.from : g.from ?? ''
+  const nameTo = names ? names.to : g.to ?? ''
+  const greet = { lang: gl, from: nameFrom, to: nameTo, memorial: view.memorial, opens: lockedWhen }
   const title = shareTitle(greet)
   const message = shareText(greet, g.url)
   // the first copy or share is kept as `shared_at` (the states line shows "Sent"); a failed call changes nothing
@@ -113,6 +120,23 @@ export default function BuyerPage({ view, lang, onCollected }: { view: Animation
   // the film is still being written / drawn (the first open draws it): the save section says so; a still-washi or deferred film has nothing to save
   const waiting = !view.film || (!view.film.pictures && !view.film.deferred)
   // The send options (LINE, WhatsApp, WeChat, copy, QR, e-mail) live in the share sheet now (Part 12, 2026-11-20): one 「シェアする」 button on the page; the device's own share sheet when it has one.
+  const canEditNames = !g.states?.opened_at
+  const startEdit = () => { setDraft({ from: nameFrom, to: nameTo }); setNameState('idle'); setEditing(true) }
+  const draftOk = draft.from.trim() !== '' && (draft.to.trim() !== '' || view.memorial)
+  const saveNames = async () => {
+    if (!draftOk || nameState === 'saving') return
+    setNameState('saving')
+    try {
+      const res = await fetch(`/api/animation/${view.id}/names`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ from: draft.from.trim(), to: draft.to.trim() }) })
+      const j = (await res.json().catch(() => ({}))) as { ok?: boolean; from?: string; to?: string }
+      if (!res.ok || !j.ok) throw new Error('names')
+      setNames({ from: j.from ?? draft.from.trim(), to: j.to ?? draft.to.trim() })
+      setEditing(false)
+      setNameState('saved')
+    } catch {
+      setNameState('error')
+    }
+  }
   const copyMessage = async () => {
     markShared()
     try {
@@ -227,11 +251,33 @@ export default function BuyerPage({ view, lang, onCollected }: { view: Animation
           <span data-testid="send-later-line">{s.sendLater}</span>{' '}
           <a className="by-later-link" data-testid="send-later-open" href="/basket">{s.openMyGifts}</a>
         </p>
-        <Schedule animationId={view.id} lang={lang} quiet={quiet || isQuietPurpose(view.purpose)} to={g.to ?? ''} giftUrl={g.url} senderUrl={g.sender_url} opensOn={g.opens_on} opensAt={g.opens_at} opensTz={g.opens_tz} />
+        <Schedule animationId={view.id} lang={lang} quiet={quiet || isQuietPurpose(view.purpose)} to={nameTo} giftUrl={g.url} senderUrl={g.sender_url} opensOn={g.opens_on} opensAt={g.opens_at} opensTz={g.opens_tz} />
         <label className="an-field">
           <span>{s.linkLabel}</span>
           <input readOnly value={g.url} onFocus={(e) => e.currentTarget.select()} data-testid="give-link" />
         </label>
+        {canEditNames && (
+          <div className="by-names" data-testid="names-panel">
+            {!editing ? (
+              <>
+                <p className="by-names-now" data-testid="names-now">{nameFrom || nameTo ? `${nameFrom || '—'} → ${nameTo || '—'}` : ''}</p>
+                <button type="button" className="ga-link" data-testid="edit-names" onClick={startEdit}>{s.editNames}</button>
+                {nameState === 'saved' && <p className="an-small" role="status" data-testid="names-saved">{s.nameSaved}</p>}
+              </>
+            ) : (
+              <form className="by-names-form" data-testid="names-form" onSubmit={(e) => { e.preventDefault(); void saveNames() }}>
+                <label className="an-field"><span>{s.nameFrom}</span><input data-testid="names-from" type="text" maxLength={20} value={draft.from} onChange={(e) => setDraft({ ...draft, from: e.target.value })} autoComplete="off" /></label>
+                <label className="an-field"><span>{view.memorial ? s.nameToMemorial : s.nameTo}</span><input data-testid="names-to" type="text" maxLength={20} value={draft.to} onChange={(e) => setDraft({ ...draft, to: e.target.value })} autoComplete="off" /></label>
+                <p className="an-small" data-testid="names-hint">{s.nameHint}</p>
+                {nameState === 'error' && <p role="alert" className="ga-err" data-testid="names-error">{s.nameError}</p>}
+                <p className="an-buttons">
+                  <button type="submit" className="an-btn an-btn-hot" data-testid="names-save" disabled={!draftOk || nameState === 'saving'}>{s.nameSave}</button>
+                  <button type="button" className="an-btn" data-testid="names-cancel" onClick={() => setEditing(false)}>{s.nameCancel}</button>
+                </p>
+              </form>
+            )}
+          </div>
+        )}
         {g.opens_on && <p className="by-opens" data-testid="status-opens">{openingLabelFromRecord(lang, g.opens_at, g.opens_tz) ?? c.opensOn(dayText(lang, g.opens_on))}</p>}
         <p className="an-buttons" data-testid="give-preview">
           <a className="an-btn" href={`${g.url}?preview=${view.id}`} target="_blank" rel="noopener noreferrer">{c.preview}</a>

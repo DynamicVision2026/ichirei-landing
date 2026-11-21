@@ -1,4 +1,5 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
+import { useAuth } from '../auth/auth.ts'
 import { motion, useReducedMotion } from 'framer-motion'
 import type { Candidate, EngineResult } from './types'
 import type { Copy, InscriptionStyle, OrderField, PackageId, UiLanguage } from './i18n'
@@ -104,6 +105,13 @@ export default function OrderForm({ result, story, followUps = [], promptQuestio
     setReceiverState(v)
     onReceiver?.(v)
   }
+  // The sender's name is prefilled from the signed-in account's display name (LINE gives one), editable; never over what the person typed (Part 21)
+  const auth = useAuth()
+  const senderTouched = useRef(false)
+  useEffect(() => {
+    if (replyMode || senderTouched.current || !auth.signedIn || !auth.name) return
+    setSender((cur) => (cur.trim() === '' ? [...auth.name!.trim()].slice(0, NAME_MAX).join('') : cur))
+  }, [auth.signedIn, auth.name, replyMode])
   const [date, setDate] = useState('')
   const [style, setStyle] = useState<InscriptionStyle>(DEFAULT_STYLE[giftLanguage])
   // An order that was paid without our site (2026-11-13, /claim): the character is attached to that order — the e-gift, nothing to pay, no checkout.
@@ -166,9 +174,9 @@ export default function OrderForm({ result, story, followUps = [], promptQuestio
   const strokes = carvedStrokes(candidate, glyph)
   const simpleOk = candidate.strokes ? simpleAvailable(strokes, maxStrokes) : true
   const cert = certificateText(giftLanguage)
-  // Names are optional (a nickname is enough): blank is fine, only the length is checked.
-  const senderOk = [...sender.trim()].length <= NAME_MAX
-  const receiverOk = [...receiver.trim()].length <= NAME_MAX
+  // Both names are required for a gift (Part 21, 2026-11-21): a nickname is enough. A remembrance needs the sender's name only; a gift back (reply) takes its names from the ticket.
+  const senderOk = [...sender.trim()].length <= NAME_MAX && (replyMode || sender.trim() !== '')
+  const receiverOk = [...receiver.trim()].length <= NAME_MAX && (replyMode || memorial || receiver.trim() !== '')
   // the e-gift is delivered at once (or on its opening date), so only the wooden sizes ask for a desired delivery date
   const dateOk = pkg === 'egift' || (/^\d{4}-\d{2}-\d{2}$/.test(date) && date >= today)
   // (switching the carved form can make Simple unavailable after it was picked: the Standard set is then the only choice)
@@ -191,7 +199,7 @@ export default function OrderForm({ result, story, followUps = [], promptQuestio
   const valid = (refundAckAt !== null || !!claim || replyMode) && senderOk && receiverOk && dateOk && pkg !== '' && onSale && messageOk && openDateOk && emailOk && !(pkg === 'simple' && !simpleOk) && poemStep !== 'loading'
 
   // The one plain line under the button that says what is missing (2026-11-15): the button never looks dead without a reason.
-  const hint = valid || phase !== 'edit' ? null : pkg === '' || !onSale ? (memorial ? o.hints.giftMemorial : o.hints.gift) : refundAckAt === null && !claim && !replyMode ? o.hints.tick : null
+  const hint = valid || phase !== 'edit' ? null : !senderOk || !receiverOk ? (memorial ? o.hints.namesMemorial : o.hints.names) : pkg === '' || !onSale ? (memorial ? o.hints.giftMemorial : o.hints.gift) : refundAckAt === null && !claim && !replyMode ? o.hints.tick : null
   // The e-gift is preselected when it is the only gift that can be ordered (English: always, while the wooden sizes are "coming soon" or off): the pay button then works right after the refund box is ticked.
   useEffect(() => {
     if (pkg !== '' || claim || replyMode || sizes === null) return
@@ -343,10 +351,12 @@ export default function OrderForm({ result, story, followUps = [], promptQuestio
               id="sender_name"
               name="sender_name"
               type="text"
+              required
+              aria-required="true"
               autoComplete="off"
               maxLength={NAME_MAX}
               value={sender}
-              onChange={(e) => setSender(e.target.value)}
+              onChange={(e) => { senderTouched.current = true; setSender(e.target.value) }}
               placeholder={o.senderPlaceholder}
             />
           </div>
@@ -356,6 +366,8 @@ export default function OrderForm({ result, story, followUps = [], promptQuestio
               id="receiver_name"
               name="receiver_name"
               type="text"
+              required={!memorial}
+              aria-required={!memorial}
               maxLength={NAME_MAX}
               value={receiver}
               onChange={(e) => setReceiver(e.target.value)}
