@@ -7638,6 +7638,39 @@ for (const [lang, locale, text] of [['en', 'en-US', 'Your gift is being finished
   }
 }
 
+// ---------- Run 59 (2026-11-21, Part 28): /legal — the 返品・交換・キャンセル section reads as one block (no blank gaps above its headings), desktop and 390 px, in ja / en / zh-Hant ----------
+{
+  const SHOTS59 = process.env.E2E_SHOTS_DIR || '/tmp/e2e-shots'
+  for (const [lang, locale] of [['ja', 'ja-JP'], ['en', 'en-US'], ['zh-Hant', 'zh-TW']]) {
+    for (const [tag, width] of [['desktop', 1280], ['390 px', 390]]) {
+      const ctx = await browser.newContext({ viewport: { width, height: 900 }, locale })
+      const page = await ctx.newPage()
+      const errs = []
+      page.on('pageerror', (e) => errs.push(String(e)))
+      await page.goto(`http://localhost:5173/legal?lang=${lang}`, { waitUntil: 'networkidle' })
+      await page.locator('[data-testid=legal-returns]').waitFor()
+      await page.waitForTimeout(300)
+      const m = await page.evaluate(() => {
+        const box = document.querySelector('[data-testid=legal-returns]')
+        const h2 = document.getElementById('returns')
+        const secs = [...box.querySelectorAll('[data-testid=legal-section]')]
+        const line = parseFloat(getComputedStyle(secs[0].querySelector('p')).lineHeight) || 28
+        const r = (el) => el.getBoundingClientRect()
+        const gaps = [r(secs[0].querySelector('h3')).top - r(h2).bottom]
+        for (let i = 1; i < secs.length; i++) gaps.push(r(secs[i].querySelector('h3')).top - r(secs[i - 1].querySelector('p')).bottom)
+        const pads = secs.map((s) => { const cs = getComputedStyle(s); return parseFloat(cs.paddingTop) + parseFloat(cs.paddingBottom) })
+        return { n: secs.length, gaps, pads, line, scroll: document.documentElement.scrollWidth <= window.innerWidth + 1 }
+      })
+      check(`legal (${lang}, ${tag}, Part 28): the cancellation section reads as one block — no padding on its parts and no blank gap above a heading taller than one line`, m.n >= 2 && m.pads.every((p) => p === 0) && m.gaps.every((g) => g >= 0 && g <= m.line + 4), JSON.stringify(m))
+      check(`legal (${lang}, ${tag}): no horizontal scroll`, m.scroll)
+      if (lang === 'ja' && tag === 'desktop') { await page.locator('#returns').scrollIntoViewIfNeeded(); await page.screenshot({ path: `${SHOTS59}/p28-legal-ja-desktop.png`, fullPage: false }) }
+      if (lang === 'ja' && tag === '390 px') { await page.locator('#returns').scrollIntoViewIfNeeded(); await page.screenshot({ path: `${SHOTS59}/p28-legal-ja-390.png`, fullPage: false }) }
+      check(`no page errors (run 59, ${lang} ${tag})`, errs.length === 0, errs.join('; '))
+      await ctx.close()
+    }
+  }
+}
+
 await browser.close()
 console.log(failures === 0 ? '\nALL E2E CHECKS PASSED' : `\n${failures} CHECKS FAILED`)
 process.exit(failures === 0 ? 0 : 1)

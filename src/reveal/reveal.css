@@ -389,7 +389,7 @@
 .rv .legalRow dt{color:var(--mute);font-size:.9rem}
 .rv .legalRow dd{margin:0;overflow-wrap:anywhere}
 .rv .legalReturns{line-height:1.85}
-.rv .legalReturns section{margin:1.1rem 0;scroll-margin-top:1rem}
+.rv .legalReturns section{margin:1.1rem 0;padding-block:0;scroll-margin-top:1rem}
 .rv .legalReturns h3{font-size:1rem;margin:0 0 .2rem}
 .rv .legalReturns p{margin:0}
 .rv .legalFaq details{border-bottom:1px solid var(--line);padding:.6rem 0}

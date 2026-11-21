@@ -258,6 +258,15 @@ void realWrite
   resetMailerCache()
   const refused = mailerFromEnv({ RESEND_API_KEY: 're_x' } as NodeJS.ProcessEnv, (async () => new Response('bad', { status: 422 })) as typeof fetch)
   check('D2: a refusal or a network error from the service is a plain false (never thrown, nothing logged)', (await refused!.send({ to: 'a@b.co', subject: 's', html: 'h', text: 't' })) === false && (await mailerFromEnv({ RESEND_API_KEY: 're_x' } as NodeJS.ProcessEnv, (async () => { throw new Error('net') }) as typeof fetch)!.send({ to: 'a@b.co', subject: 's', html: 'h', text: 't' })) === false)
+
+  // Part 28 (2026-11-21): every Resend call carries reply_to info@beyondculture.ai, the sender stays ICHIREI <gifts@beyondculture.ai>
+  const sentBodies: Array<{ from: string; to: string[]; reply_to: string; subject: string }> = []
+  const spy = mailerFromEnv({ RESEND_API_KEY: 're_x' } as NodeJS.ProcessEnv, (async (_u: unknown, init?: RequestInit) => { sentBodies.push(JSON.parse(String(init?.body))); return new Response('{}', { status: 200 }) }) as typeof fetch)
+  const { loginMail } = await import('../api/auth.ts')
+  await spy!.send({ to: 'a@b.co', subject: 'one', html: 'h', text: 't' })
+  await spy!.send(loginMail('c@d.co', 'https://x/auth/email?t=1', 'en'))
+  await spy!.send(loginMail('c@d.co', 'https://x/auth/email?t=2', 'ja'))
+  check('D3: every Resend call carries reply_to info@beyondculture.ai (a plain mail and the sign-in link in two languages), and the sender stays ICHIREI <gifts@beyondculture.ai>', sentBodies.length === 3 && sentBodies.every((b) => b.reply_to === 'info@beyondculture.ai' && b.from === 'ICHIREI <gifts@beyondculture.ai>'), JSON.stringify(sentBodies))
 }
 
 // ---- E. the words: every label exists in all three languages -------------------------------------------------------------------------------------------------

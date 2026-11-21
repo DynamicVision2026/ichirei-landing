@@ -18,6 +18,8 @@ export interface Mailer {
 }
 
 export const DEFAULT_MAIL_FROM = 'ICHIREI <gifts@beyondculture.ai>'
+/** Part 28 (2026-11-21): a reply to any ICHIREI mail (sign-in links, gift notifications) goes to the shop's mailbox, not to the sending address. */
+export const MAIL_REPLY_TO = 'info@beyondculture.ai'
 
 /** The Resend mailer of this environment, or null while RESEND_API_KEY is not set. */
 export function mailerFromEnv(env: NodeJS.ProcessEnv = process.env, fetchImpl: typeof fetch = fetch): Mailer | null {
@@ -30,7 +32,7 @@ export function mailerFromEnv(env: NodeJS.ProcessEnv = process.env, fetchImpl: t
         const r = await fetchImpl('https://api.resend.com/emails', {
           method: 'POST',
           headers: { authorization: `Bearer ${key}`, 'content-type': 'application/json' },
-          body: JSON.stringify({ from, to: [mail.to], subject: mail.subject, html: mail.html, text: mail.text }),
+          body: JSON.stringify({ from, to: [mail.to], reply_to: MAIL_REPLY_TO, subject: mail.subject, html: mail.html, text: mail.text }),
           signal: AbortSignal.timeout(12_000),
         })
         return r.ok
