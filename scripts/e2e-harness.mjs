@@ -7420,7 +7420,7 @@ for (const [lang, locale, text] of [['en', 'en-US', 'Your gift is being finished
   }
 }
 
-// ---------- Run 55 (2026-11-21, Part 21): every gift has both names — required on the order step (ja / en / zh-Hant), prefilled from the account, fixable on the sender's page until the gift is opened ----------
+// ---------- Run 55 (2026-11-21, Parts 21 and 22): the two names — optional on the order step (ja / en / zh-Hant; Part 22 undid the required names), prefilled from the account, fixable on the sender's page until the gift is opened ----------
 {
   const SHOTS55 = process.env.E2E_SHOTS_DIR || '/tmp/e2e-shots'
   const L55 = {
@@ -7449,31 +7449,28 @@ for (const [lang, locale, text] of [['en', 'en-US', 'Your gift is being finished
     const W = L55[lang]
     const f = await reach55(lang)
     const labels = await f.page.evaluate(() => ({ from: document.querySelector('label[for=sender_name]')?.textContent.trim(), to: document.querySelector('label[for=receiver_name]')?.textContent.trim(), hint: document.querySelector('[data-testid=name-help]')?.textContent.trim(), req: [document.querySelector('#sender_name')?.required, document.querySelector('#receiver_name')?.required] }))
-    check(`order step (${lang}, Part 21): the two fields are 「${W.from}」 and 「${W.to}」 (not optional), required, with the hint 「${W.hint}」 under them`, labels.from === W.from && labels.to === W.to && labels.hint === W.hint && labels.req.every(Boolean) && !labels.from.includes(W.opt) && !labels.to.includes(W.opt), JSON.stringify(labels))
+    check(`order step (${lang}, Part 21): the two fields are 「${W.from}」 and 「${W.to}」 (optional, no \"required\"), with the hint 「${W.hint}」 under them`, labels.from === W.from && labels.to === W.to && labels.hint === W.hint && !labels.from.includes(W.opt) && !labels.to.includes(W.opt), JSON.stringify(labels))
     await f.page.locator('label:has(input[name=package][value=egift])').click().catch(() => {})
     await tickRefund(f.page)
     await f.page.waitForTimeout(300)
     const submit = f.page.locator('[data-testid=order-submit]')
-    const hint0 = await f.page.locator('[data-testid=order-hint]').innerText().catch(() => '')
-    check(`order step (${lang}, Part 21): the order button stays disabled with both names empty, and the line under it says 「${W.need}」`, (await submit.isDisabled()) && hint0 === W.need, hint0)
-    await f.page.fill('input[name=sender_name]', 'Sam')
-    check(`order step (${lang}, Part 21): still disabled with only your name`, await submit.isDisabled())
-    await f.page.fill('input[name=sender_name]', '')
-    await f.page.fill('input[name=receiver_name]', 'Mom')
-    check(`order step (${lang}, Part 21): still disabled with only their name`, await submit.isDisabled())
-    await f.page.fill('input[name=sender_name]', '   ')
-    check(`order step (${lang}, Part 21): spaces are not a name`, await submit.isDisabled())
-    if (lang !== 'zh-Hant') { await f.page.locator('[data-testid=order-submit]').scrollIntoViewIfNeeded(); await f.page.screenshot({ path: `${SHOTS55}/p21-order-hint-${lang}-390.png`, fullPage: false }) }
-    await f.page.fill('input[name=sender_name]', 'Sam')
-    await f.page.evaluate(() => { document.querySelector('label[for=sender_name]').scrollIntoView({ block: 'start' }); window.scrollBy(0, -24) })
-    await f.page.waitForTimeout(250)
-    if (lang !== 'zh-Hant') await f.page.screenshot({ path: `${SHOTS55}/p21-order-names-${lang}-390.png`, fullPage: false })
-    check(`order step (${lang}, Part 21): with both names the button is live and the hint line is gone`, (await submit.isEnabled()) && (await f.page.locator('[data-testid=order-hint]').count()) === 0)
+    check(`order step (${lang}, Part 22): the names are optional — with both empty the order button is live and no line says a name is missing`, (await submit.isEnabled()) && (await f.page.locator('[data-testid=order-hint]').count()) === 0 && !labels.req.some(Boolean), JSON.stringify(labels))
+    if (lang !== 'zh-Hant') { await f.page.locator('[data-testid=order-submit]').scrollIntoViewIfNeeded(); await f.page.screenshot({ path: `${SHOTS55}/p22-order-empty-${lang}-390.png`, fullPage: false }) }
     await submit.click()
     await f.page.waitForSelector('#co', { timeout: 8000 })
-    check(`order step (${lang}, Part 21): the order carries both names`, f.calls.order.length === 1 && f.calls.order[0].sender_name === 'Sam' && f.calls.order[0].receiver_name === 'Mom', JSON.stringify(f.calls.order[0]))
-    check(`no page errors (run 55, order step ${lang})`, f.errors.length === 0, f.errors.join('; '))
+    check(`order step (${lang}, Part 22): an order with both names empty goes through to checkout, the names sent empty`, f.calls.order.length === 1 && f.calls.order[0].sender_name === '' && f.calls.order[0].receiver_name === '', JSON.stringify(f.calls.order[0]))
     await f.page.close()
+    // …and typed names still travel
+    const g = await reach55(lang)
+    await g.page.locator('label:has(input[name=package][value=egift])').click().catch(() => {})
+    await tickRefund(g.page)
+    await g.page.fill('input[name=sender_name]', 'Sam')
+    await g.page.fill('input[name=receiver_name]', 'Mom')
+    await g.page.locator('[data-testid=order-submit]').click()
+    await g.page.waitForSelector('#co', { timeout: 8000 })
+    check(`order step (${lang}, Part 22): typed names still travel with the order`, g.calls.order.length === 1 && g.calls.order[0].sender_name === 'Sam' && g.calls.order[0].receiver_name === 'Mom', JSON.stringify(g.calls.order[0]))
+    check(`no page errors (run 55, order step ${lang})`, g.errors.length === 0, g.errors.join('; '))
+    await g.page.close()
   }
   // prefilled from the signed-in account's display name, editable
   {

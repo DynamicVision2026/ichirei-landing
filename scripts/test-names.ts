@@ -1,4 +1,4 @@
-// Part 3 of the 2026-11-05 ticket — a nickname is enough and names are only ever shown on the gift (the order step requires both since Part 21, 2026-11-21; the server still takes a blank name from an older caller). No network, no model.
+// Part 3 of the 2026-11-05 ticket — a nickname is enough and names are only ever shown on the gift (Part 21 made the order step require both; Part 22, 2026-11-21, made them optional again). No network, no model.
 //
 //   node --experimental-strip-types --disable-warning=ExperimentalWarning scripts/test-names.ts
 
@@ -98,7 +98,7 @@ check('order form copy (ja / zh-Hant / en): the ticket\'s labels, placeholders a
     en.senderLabel === 'Your name' && en.senderPlaceholder === 'e.g. Mia, Your son' && en.receiverLabel === 'Their name' && en.receiverPlaceholder === 'e.g. Mom, Dad, Grandpa' && en.nameHelp === 'Any name you call them is fine (e.g. Mom, Ken)'
 })())
 check('no real-name example anywhere in the order copy (李華 / 李明 / 山田 / Carter) in any language', !/李華|李华|李明|山田|Carter|Emily|Margaret/.test(JSON.stringify((['ja', 'zh-Hans', 'zh-Hant', 'en'] as const).map((l) => [COPY[l].order, COPY[l].memorial]))))
-check('FAQ / privacy line word for word (ja / zh-Hant / en) — both names are needed since Part 21', readFileSync('src/legal/legal-copy.ts', 'utf8').includes("a: 'はい、お二人のお名前を入れてください。呼び名でかまいません（例：お母さん、Ken）。入力された呼び名は、贈りものに表示するためだけに使います。'") && readFileSync('src/legal/legal-copy.ts', 'utf8').includes("a: '需要，請填寫雙方的名字。平常怎麼稱呼都可以（例如：媽媽、Ken）。你填寫的稱呼只會用來顯示在禮物上。'") && readFileSync('src/legal/legal-copy.ts', 'utf8').includes("a: 'Yes, both names are needed. Any name you call them is fine (e.g. Mom, Ken). Any name you enter is used only to show on the gift.'") && COPY.ja.order.privacy.includes('お名前の入力は必須です（呼び名でかまいません）。入力された呼び名は、贈りものに表示するためだけに使います。'))
+check('FAQ / privacy line word for word (ja / zh-Hant / en): the names are optional (Part 22 undid the required names of Part 21)', readFileSync('src/legal/legal-copy.ts', 'utf8').includes("a: 'お名前の入力は任意です。入力された呼び名は、贈りものに表示するためだけに使います。'") && readFileSync('src/legal/legal-copy.ts', 'utf8').includes("a: '姓名為選填。你填寫的稱呼只會用來顯示在禮物上。'") && readFileSync('src/legal/legal-copy.ts', 'utf8').includes("a: 'Names are optional. Any name you enter is used only to show on the gift.'") && COPY.ja.order.privacy.includes('お名前の入力は任意です。入力された呼び名は、贈りものに表示するためだけに使います。') && COPY['zh-Hant'].order.privacy.includes('姓名為選填') && COPY.en.order.privacy.includes('Names are optional'))
 
 console.log(failures ? `\n${failures} name check(s) FAILED` : '\nAll name checks passed.')
 process.exit(failures ? 1 : 0)

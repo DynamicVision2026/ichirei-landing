@@ -233,7 +233,7 @@ export interface Copy {
     senderPlaceholder: string
     receiverLabel: string
     receiverPlaceholder: string
-    /** The one line under both name fields (Part 21, 2026-11-21): both names are required; any name you call them is fine. */
+    /** The one line under both name fields (Part 21/22): both names are optional; any name you call them is fine. */
     nameHelp: string
     dateLabel: string
     dateNotice: (days: number) => string
@@ -274,7 +274,7 @@ export interface Copy {
     submitting: string
     redirecting: string
     back: string
-    hints: { gift: string; /** the same line for a remembrance (no gift wording) */ giftMemorial: string; tick: string; /** Part 21: both names are required */ names: string; /** a remembrance: the sender's name only */ namesMemorial: string }
+    hints: { gift: string; /** the same line for a remembrance (no gift wording) */ giftMemorial: string; tick: string }
     errors: { generic: string; network: string; notConfigured: string; recordFailed: string; field: (field: OrderField) => string }
   }
 }
@@ -419,13 +419,13 @@ const ja: Copy = {
     packages: SIZE_COPY['ja'].names,
     shippingNote: '国内送料無料・海外送料 ¥6,000',
     certificateLabel: '添える一文',
-    privacy: 'ご注文の際に、入力いただいたお名前・ひと場面・選ばれた一字を、制作のために保存します。お名前の入力は必須です（呼び名でかまいません）。入力された呼び名は、贈りものに表示するためだけに使います。',
-    privacyMemorial: 'ご注文の際に、入力いただいたお名前・ひと場面・選ばれた一字を、制作のために保存します。あなたのお名前の入力は必須です（呼び名でかまいません）。入力された呼び名は、表示するためだけに使います。',
+    privacy: 'ご注文の際に、入力いただいたお名前・ひと場面・選ばれた一字を、制作のために保存します。お名前の入力は任意です。入力された呼び名は、贈りものに表示するためだけに使います。',
+    privacyMemorial: 'ご注文の際に、入力いただいたお名前・ひと場面・選ばれた一字を、制作のために保存します。お名前の入力は任意です。入力された呼び名は、表示するためだけに使います。',
     submit: 'お支払いへ進む',
     submitting: '準備しています…',
     redirecting: 'お支払いページへ移動します…',
     back: '字を選びなおす',
-    hints: { gift: '贈りものの種類を選んでください。', giftMemorial: 'お届けの形を選んでください。', tick: '上のチェックボックスにチェックを入れてください。', names: 'お二人のお名前を入れてください。', namesMemorial: 'あなたのお名前を入れてください。' },
+    hints: { gift: '贈りものの種類を選んでください。', giftMemorial: 'お届けの形を選んでください。', tick: '上のチェックボックスにチェックを入れてください。' },
     errors: {
       generic: 'ご注文を受け付けられませんでした。お手数ですが、もう一度お試しください。',
       network: '通信に失敗しました。もう一度お試しください。',
@@ -581,13 +581,13 @@ const zhHans: Copy = {
     packages: SIZE_COPY['zh-Hans'].names,
     shippingNote: '日本国内免运费・海外运费 ¥6,000',
     certificateLabel: '随礼附上的一句话',
-    privacy: '下单时，我们会保存你填写的姓名、片刻和选定的字，用于制作。姓名为必填（昵称即可）。你填写的称呼只会用来显示在礼物上。',
-    privacyMemorial: '下单时，我们会保存你填写的姓名、片刻和选定的字，用于制作。你的姓名为必填（昵称即可）。你填写的称呼只会用来显示。',
+    privacy: '下单时，我们会保存你填写的姓名、片刻和选定的字，用于制作。姓名为选填。你填写的称呼只会用来显示在礼物上。',
+    privacyMemorial: '下单时，我们会保存你填写的姓名、片刻和选定的字，用于制作。姓名为选填。你填写的称呼只会用来显示。',
     submit: '前往付款',
     submitting: '正在准备…',
     redirecting: '正在前往付款页面…',
     back: '重新选字',
-    hints: { gift: '请选择礼物的形式。', giftMemorial: '请选择送达的形式。', tick: '请勾选上方的方框。', names: '请输入双方的名字。', namesMemorial: '请输入你的名字。' },
+    hints: { gift: '请选择礼物的形式。', giftMemorial: '请选择送达的形式。', tick: '请勾选上方的方框。' },
     errors: {
       generic: '未能受理订单，请再试一次。',
       network: '网络连接失败，请再试一次。',
@@ -741,13 +741,13 @@ const zhHant: Copy = {
     packages: SIZE_COPY['zh-Hant'].names,
     shippingNote: '日本國內免運費・海外運費 ¥6,000',
     certificateLabel: '隨禮附上的一句話',
-    privacy: '下單時，我們會保存你填寫的姓名、片刻和選定的字，用於製作。姓名為必填（暱稱即可）。你填寫的稱呼只會用來顯示在禮物上。',
-    privacyMemorial: '下單時，我們會保存你填寫的姓名、片刻和選定的字，用於製作。你的姓名為必填（暱稱即可）。你填寫的稱呼只會用來顯示。',
+    privacy: '下單時，我們會保存你填寫的姓名、片刻和選定的字，用於製作。姓名為選填。你填寫的稱呼只會用來顯示在禮物上。',
+    privacyMemorial: '下單時，我們會保存你填寫的姓名、片刻和選定的字，用於製作。姓名為選填。你填寫的稱呼只會用來顯示。',
     submit: '前往付款',
     submitting: '正在準備…',
     redirecting: '正在前往付款頁面…',
     back: '重新選字',
-    hints: { gift: '請選擇禮物的形式。', giftMemorial: '請選擇送達的形式。', tick: '請勾選上方的方框。', names: '請輸入雙方的名字。', namesMemorial: '請輸入你的名字。' },
+    hints: { gift: '請選擇禮物的形式。', giftMemorial: '請選擇送達的形式。', tick: '請勾選上方的方框。' },
     errors: {
       generic: '未能受理訂單，請再試一次。',
       network: '網路連線失敗，請再試一次。',
@@ -907,13 +907,13 @@ const en: Copy = {
     packages: SIZE_COPY['en'].names,
     shippingNote: 'Free shipping in Japan · ¥6,000 international shipping',
     certificateLabel: 'What this gift says',
-    privacy: 'When you order, we keep the names, the moment and the character you chose, so that your gift can be made. Names are required (a nickname is fine). Any name you enter is used only to show on the gift.',
-    privacyMemorial: 'When you order, we keep the names, the moment and the character you chose, so that your gift can be made. Your name is required (a nickname is fine). Any name you enter is used only to be shown.',
+    privacy: 'When you order, we keep the names, the moment and the character you chose, so that your gift can be made. Names are optional. Any name you enter is used only to show on the gift.',
+    privacyMemorial: 'When you order, we keep the names, the moment and the character you chose, so that your gift can be made. Names are optional. Any name you enter is used only to be shown.',
     submit: 'Continue to payment',
     submitting: 'Preparing…',
     redirecting: 'Taking you to payment…',
     back: 'Choose a different character',
-    hints: { gift: 'Please choose your gift above.', giftMemorial: 'Please choose how it is sent above.', tick: 'Please tick the box above.', names: 'Please enter both names.', namesMemorial: 'Please enter your name.' },
+    hints: { gift: 'Please choose your gift above.', giftMemorial: 'Please choose how it is sent above.', tick: 'Please tick the box above.' },
     errors: {
       generic: 'We could not take your order. Please try again.',
       network: 'The connection failed. Please try again.',
