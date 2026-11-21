@@ -7539,6 +7539,30 @@ for (const [lang, locale, text] of [['en', 'en-US', 'Your gift is being finished
 }
 
 
+// ---------- Run 56 (2026-11-21, Part 23): while no sample is switched on, there is no examples button, no examples section, and /examples goes to the landing page ----------
+{
+  for (const lang of ['ja', 'en', 'zh-Hant']) {
+    const base = { ja: '', en: '/en', 'zh-Hant': '/zh' }[lang]
+    const ctx = await browser.newContext({ locale: { ja: 'ja-JP', en: 'en-US', 'zh-Hant': 'zh-TW' }[lang], viewport: { width: 390, height: 844 } })
+    const page = await ctx.newPage()
+    const errs = []
+    page.on('pageerror', (e) => errs.push(String(e)))
+    await page.route('**/api/examples?*', (r) => r.fulfill({ json: { examples: [] } }))
+    await page.route('**/api/examples/count', (r) => r.fulfill({ status: 200, json: { ok: true } }))
+    await page.goto(`http://localhost:5173${base || '/'}`, { waitUntil: 'networkidle' })
+    await page.waitForTimeout(500)
+    check(`no examples (${lang}): the landing page has no examples button, no examples section and no link to /examples`, (await page.locator('[data-testid=examples-button], [data-testid=examples-section], [data-testid=examples-all]').count()) === 0 && (await page.locator('a[href$="/examples"]').count()) === 0)
+    await page.goto(`http://localhost:5173${base}/write${lang === 'en' ? '?lang=en' : lang === 'zh-Hant' ? '?lang=zh-Hant' : ''}`, { waitUntil: 'networkidle' })
+    await page.waitForTimeout(500)
+    check(`no examples (${lang}): the writing page has no examples button under the guide line`, (await page.locator('[data-testid=examples-button]').count()) === 0)
+    await page.goto(`http://localhost:5173${base}/examples`, { waitUntil: 'domcontentloaded' })
+    await page.waitForURL((u) => u.pathname === (base || '/'), { timeout: 8000 }).catch(() => {})
+    check(`no examples (${lang}): /examples ends up on the landing page of that language (the server answers 302; the page does the same when opened some other way) — never an empty "coming soon" page`, new URL(page.url()).pathname === (base || '/') && (await page.locator('[data-testid=examples-page]').count()) === 0, page.url())
+    check(`no page errors (run 56, ${lang})`, errs.length === 0, errs.join('; '))
+    await ctx.close()
+  }
+}
+
 await browser.close()
 console.log(failures === 0 ? '\nALL E2E CHECKS PASSED' : `\n${failures} CHECKS FAILED`)
 process.exit(failures === 0 ? 0 : 1)

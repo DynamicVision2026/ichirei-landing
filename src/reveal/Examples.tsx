@@ -18,9 +18,9 @@ interface Card {
 }
 
 export const EX = {
-  ja: { button: '見本を見る', title: '一字礼の見本', section: '一字礼の見本', all: 'ほかの見本も見る →', make: 'あなたの大切な人へ', lead: '一つの場面が、こんな一字の贈りものになります。', empty: '見本は、まもなく公開します。', alt: '' },
-  en: { button: 'See examples', title: 'ICHIREI examples', section: 'Examples', all: 'See all examples →', make: 'Make one for someone of yours', lead: 'One moment becomes a gift like these.', empty: 'Examples are coming soon.', alt: '' },
-  'zh-Hant': { button: '看範例', title: '一字禮範例', section: '範例', all: '看更多範例 →', make: '送給你重要的人', lead: '一個片刻，會變成像這樣的一字禮物。', empty: '範例即將公開。', alt: '' },
+  ja: { button: '見本を見る', title: '一字礼の見本', section: '一字礼の見本', all: 'ほかの見本も見る →', make: 'あなたの大切な人へ', lead: '一つの場面が、こんな一字の贈りものになります。', alt: '' },
+  en: { button: 'See examples', title: 'ICHIREI examples', section: 'Examples', all: 'See all examples →', make: 'Make one for someone of yours', lead: 'One moment becomes a gift like these.', alt: '' },
+  'zh-Hant': { button: '看範例', title: '一字禮範例', section: '範例', all: '看更多範例 →', make: '送給你重要的人', lead: '一個片刻，會變成像這樣的一字禮物。', alt: '' },
 } as const
 const LANG_LABEL: Record<string, string> = { ja: '日本語', en: 'English', 'zh-Hant': '繁體中文', 'zh-Hans': '简体中文' }
 const lk = (l: RevealLang): 'ja' | 'en' | 'zh-Hant' => (l === 'en' ? 'en' : l === 'zh-Hant' ? 'zh-Hant' : 'ja')
@@ -33,14 +33,26 @@ const count = (kind: 'view' | 'card'): void => {
   }
 }
 
+// One request per language per page load, shared by the button(s), the landing section and the page (Part 23, 2026-11-21): nothing about examples is drawn until the server has said there are some.
+const asked = new Map<string, Promise<Card[]>>()
+function loadExamples(lang: RevealLang): Promise<Card[]> {
+  const k = lk(lang)
+  let p = asked.get(k)
+  if (!p) {
+    p = fetch(`/api/examples?lang=${k}`)
+      .then((r) => (r.ok ? (r.json() as Promise<{ examples: Card[] }>) : { examples: [] as Card[] }))
+      .then((j) => j.examples ?? [])
+      .catch(() => [] as Card[])
+    asked.set(k, p)
+  }
+  return p
+}
+
 function useExamples(lang: RevealLang): Card[] | null {
   const [cards, setCards] = useState<Card[] | null>(null)
   useEffect(() => {
     let alive = true
-    void fetch(`/api/examples?lang=${lk(lang)}`)
-      .then((r) => (r.ok ? (r.json() as Promise<{ examples: Card[] }>) : { examples: [] as Card[] }))
-      .then((j) => alive && setCards(j.examples ?? []))
-      .catch(() => alive && setCards([]))
+    void loadExamples(lang).then((c) => alive && setCards(c))
     return () => {
       alive = false
     }
@@ -50,6 +62,8 @@ function useExamples(lang: RevealLang): Card[] | null {
 
 /** The ghost 「見本を見る」 button — next to the main start button, in "How it works", and under the moment box's guide line. Never a pill. */
 export function ExamplesButton({ lang, className = '' }: { lang: RevealLang; className?: string }) {
+  const cards = useExamples(lang)
+  if (!cards || cards.length === 0) return null // no example is switched on: no button anywhere (Part 23)
   return (
     <a className={`exBtn ${className}`.trim()} href={examplesPath(lang)} data-testid="examples-button">
       {EX[lk(lang)].button}
@@ -98,6 +112,10 @@ export function ExamplesSection({ lang }: { lang: RevealLang }) {
 export default function ExamplesPage({ lang }: { lang: RevealLang }) {
   const cards = useExamples(lang)
   const t = EX[lk(lang)]
+  // no example is switched on (the server redirects too; this covers a page opened some other way): the landing page of this language, not an empty page
+  useEffect(() => {
+    if (cards !== null && cards.length === 0) window.location.replace(landingPath(lang))
+  }, [cards, lang])
   useEffect(() => {
     document.documentElement.classList.add('rv-page')
     document.title = `${t.title} · ICHIREI`
@@ -121,7 +139,6 @@ export default function ExamplesPage({ lang }: { lang: RevealLang }) {
         <h1 className="exTitle" data-testid="examples-title">{t.title}</h1>
         <p className="exLead">{t.lead}</p>
         {cards === null && <p className="exLead">…</p>}
-        {cards !== null && cards.length === 0 && <p className="exLead">{t.empty}</p>}
         <div className="exGrid">
           {(cards ?? []).map((c) => <ExampleCard key={c.token} c={c} lang={lang} onOpen={() => count('card')} />)}
         </div>

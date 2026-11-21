@@ -515,6 +515,32 @@ try {
     }
   }
 
+  // ---- I2. Part 23 (2026-11-21): /examples sends a visitor to the landing page while no sample is switched on, and shows again the moment one is (no deploy) -------------------------------
+  {
+    const dir = mkdtempSync(join(tmpdir(), 'ichirei-examples-'))
+    const { writeFileSync, mkdirSync } = await import('node:fs')
+    const gs = await startServer({ upstreamUrl: upstream.url, env: { ORDER_STORE_DIR: dir, ICHIREI_RATES: 'off', ICHIREI_PUBLIC_URL: 'https://ichirei.beyondculture.ai' } })
+    try {
+      const go = async (path) => fetch(`${gs.url}${path}`, { redirect: 'manual' })
+      const none = [await go('/examples'), await go('/en/examples'), await go('/zh/examples')]
+      check('examples: with no sample switched on, /examples, /en/examples and /zh/examples answer 302 to the landing page of that language (no "coming soon" page)', none.map((r) => r.status).join() === '302,302,302' && none.map((r) => r.headers.get('location')).join() === '/,/en,/zh', none.map((r) => `${r.status} ${r.headers.get('location')}`).join())
+      const token = 'RG-' + 'exampleexampleexample'.slice(0, 20)
+      const gift = { schema: 'gift', token, animation_id: 'AN-' + 'abcdefghjkmnpqrstuvw', order_ref: 'SAMPLE', created_at: '2026-11-21T03:00:00Z', language: 'ja', glyph: '整', reading: 'ととのえる', romanization: 'totonoeru', meaning_en: null, who: 'x', memorial: false, certificate_line: 'x', poem: null, from: '一字礼', to: 'あなた', message: '', size_code: 'ICHIREI-EGIFT', package: 'egift', ship_to: 'none', egift: null, certificate_no: null, source: 'sample', sample: { on: false, featured: false, examples: true, order: 1, from_id: 'AN-x', changes: [], created_at: '2026-11-21T03:00:00Z' } }
+      mkdirSync(join(dir, 'samples'), { recursive: true })
+      writeFileSync(join(dir, 'samples', 'index.json'), JSON.stringify({ tokens: [token] }))
+      writeFileSync(join(dir, `${token}.json`), JSON.stringify(gift))
+      const off = await go('/examples')
+      check('examples: a sample that exists but is switched OFF still redirects', off.status === 302)
+      writeFileSync(join(dir, `${token}.json`), JSON.stringify({ ...gift, sample: { ...gift.sample, on: true } }))
+      const on = [await go('/examples'), await go('/en/examples'), await go('/zh/examples')]
+      check('examples: the moment one sample is switched on (no deploy) the page is served again in every language', on.every((r) => r.status === 200 && r.headers.get('content-type')?.includes('text/html')), on.map((r) => r.status).join())
+      writeFileSync(join(dir, `${token}.json`), JSON.stringify({ ...gift, sample: { ...gift.sample, on: true, examples: false } }))
+      check('examples: a sample that is on but not shown on the examples page does not count', (await go('/examples')).status === 302)
+    } finally {
+      await gs.stop()
+    }
+  }
+
   // ---- I2. two hosts (2026-11-16): ichirei.beyondculture.ai is the main address; the old ichirei.soul-id.jp answers the same until ICHIREI_REDIRECT_OLD_HOST=1 -------------
   {
     const OLD = 'ichirei.soul-id.jp'

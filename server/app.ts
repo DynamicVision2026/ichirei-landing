@@ -26,7 +26,7 @@ import { customerHandlers } from '../api/ops-customers.ts'
 import { homeHandlers } from '../api/ops-home.ts'
 import { examplesHandlers } from '../api/examples.ts'
 import { authHandlers } from '../api/auth.ts'
-import { listSamples } from '../engine/sample.ts'
+import { examplesFor, listSamples } from '../engine/sample.ts'
 import { POST as analyticsPost } from '../api/analytics.ts'
 import { GET as ratesGet } from '../api/rates.ts'
 import { GET as sizesGet } from '../api/sizes.ts'
@@ -385,6 +385,18 @@ export function createApp(config: ServerConfig): Hono {
       const rows = await listSamples(createOrderStore()).catch(() => [])
       const hit = rows.find((r) => r.on && r.featured && (lang === 'zh-Hant' ? r.language.startsWith('zh') : r.language === lang))
       return c.redirect(hit ? `/s/${hit.token}` : fallback, 302)
+    })
+  }
+  // Part 23 (2026-11-21): while no sample is switched on for the examples page, /examples (and /en/examples, /zh/examples) sends the visitor to that language's landing page (302) instead of an empty
+  // "coming soon" page; the moment one is switched on the page shows again, with no deploy (the answer is read from the store on every request).
+  for (const [path, lang, landing] of [['/examples', 'ja', '/'], ['/examples/', 'ja', '/'], ['/en/examples', 'en', '/en'], ['/en/examples/', 'en', '/en'], ['/zh/examples', 'zh-Hant', '/zh'], ['/zh/examples/', 'zh-Hant', '/zh']] as const) {
+    app.get(path, limited(animationLimit), async (c, next) => {
+      const rows = await listSamples(createOrderStore()).catch(() => [])
+      if (examplesFor(rows, lang).length === 0) {
+        c.header('Cache-Control', 'no-store')
+        return c.redirect(landing, 302)
+      }
+      return next()
     })
   }
   // the example gift (2026-11-20): /s/<token> is the same page and the same tags (names are 「あなた」 / 「一字礼」; the preview says it is an example)
