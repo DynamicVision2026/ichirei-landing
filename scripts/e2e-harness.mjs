@@ -6597,13 +6597,13 @@ for (const [lang, locale, text] of [['en', 'en-US', 'Your gift is being finished
     check(`sender page (${lang}, Part 20): the e-mail's subject is the title and its body the whole text`, mailParams.get('subject') === GREET.title && mailParams.get('body') === GREET.text, mail)
     const chat = decodeURIComponent((await fb.page.locator(lang === 'en' ? '[data-testid=give-whatsapp]' : '[data-testid=give-line]').getAttribute('href')) ?? '')
     check(`sender page (${lang}, Part 20): the chat apps open with the same text prefilled`, chat.includes(GREET.text), chat)
+    if (lang === 'ja' || lang === 'en') await fb.page.screenshot({ path: `${SHOTS}/p20-share-sheet-${lang}-390.png` })
     await T46(fb.page, 'give-copy-message').click()
     await fb.page.waitForFunction((t) => document.querySelector('[data-testid=give-copy-message]')?.textContent.trim() === t, W.copied, { timeout: 4000 }).catch(() => {})
     const copiedMsg = await fb.page.evaluate(() => navigator.clipboard.readText())
     await T46(fb.page, 'give-copy').click()
     const copiedLink = await fb.page.evaluate(() => navigator.clipboard.readText())
     check(`sender page (${lang}, Part 20): the copy-message button copies the whole text; the copy-link button copies the link only`, copiedMsg === GREET.text && copiedLink === LINK46, JSON.stringify([copiedMsg, copiedLink]))
-    if (lang === 'ja' || lang === 'en') await fb.page.screenshot({ path: `${SHOTS}/p20-share-sheet-${lang}-390.png` })
     await fb.ctx.close()
     // the schedule: set for a day → 「日時を選ぶ」 with the saved date, time and zone; set to open now → 「すぐに開ける」
     const now0 = await open(lang, view(lang))
@@ -7465,7 +7465,7 @@ for (const [lang, locale, text] of [['en', 'en-US', 'Your gift is being finished
     check(`order step (${lang}, Part 21): spaces are not a name`, await submit.isDisabled())
     if (lang !== 'zh-Hant') { await f.page.locator('[data-testid=order-submit]').scrollIntoViewIfNeeded(); await f.page.screenshot({ path: `${SHOTS55}/p21-order-hint-${lang}-390.png`, fullPage: false }) }
     await f.page.fill('input[name=sender_name]', 'Sam')
-    await f.page.evaluate(() => document.querySelector('#sender_name').scrollIntoView({ block: 'start' }))
+    await f.page.evaluate(() => { document.querySelector('label[for=sender_name]').scrollIntoView({ block: 'start' }); window.scrollBy(0, -24) })
     await f.page.waitForTimeout(250)
     if (lang !== 'zh-Hant') await f.page.screenshot({ path: `${SHOTS55}/p21-order-names-${lang}-390.png`, fullPage: false })
     check(`order step (${lang}, Part 21): with both names the button is live and the hint line is gone`, (await submit.isEnabled()) && (await f.page.locator('[data-testid=order-hint]').count()) === 0)
