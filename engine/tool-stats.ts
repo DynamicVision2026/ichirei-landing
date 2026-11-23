@@ -4,7 +4,7 @@
 
 import { readSecret } from './track.ts'
 
-export const TOOL_STATS_URL = 'https://tools.beyondculture.ai/api/stats'
+export const TOOL_STATS_URL = 'https://tools.beyondculture.ai/api/stats?days=14'
 export const TOOL_STATS_SECRET = 'PROMO_STATS_TOKEN'
 export type ToolLang = 'ja' | 'en' | 'zh'
 
@@ -15,12 +15,15 @@ export interface ToolDayRow {
   /** results by distance level 1–7 (index 0 = level 1) */
   results: number[]
   noResult: number
-  mapped: number
+  /** null = the tool does not count it (yet): the dashboard shows 「—」. */
+  mapped: number | null
   warmOpens: number
   /** clicks per product id (ichirei, …) */
   clicks: Record<string, number>
   /** clicks per product by level 1–7, when the tool says them */
   clicksByLevel: Record<string, number[]> | null
+  /** clicks per product by level GROUP (near 1–2, middle 3–4, far 5–7), when the tool says them (`clicksByGroup`) */
+  clicksByGroup: Record<string, { near: number; middle: number; far: number }> | null
 }
 export interface ToolStats {
   rows: ToolDayRow[]
@@ -41,13 +44,26 @@ const levels = (v: unknown): number[] => {
   else if (v && typeof v === 'object') for (const [k, x] of Object.entries(v as Record<string, unknown>)) if (/^[1-7]$/.test(k)) out[Number(k) - 1] = num(x)
   return out
 }
+/** A count, or an object of counts (the tool's `noResult` is split by reason): the total. */
+const sumOf = (v: unknown): number => (v && typeof v === 'object' && !Array.isArray(v) ? Object.values(v as Record<string, unknown>).reduce<number>((a, x) => a + num(x), 0) : num(v))
+function groupsOf(v: unknown): Record<string, { near: number; middle: number; far: number }> | null {
+  if (!v || typeof v !== 'object') return null
+  const out: Record<string, { near: number; middle: number; far: number }> = {}
+  for (const [k, g] of Object.entries(v as Record<string, unknown>)) {
+    if (!/^[a-z0-9_-]{1,24}$/i.test(k) || !g || typeof g !== 'object') continue
+    const o = g as Record<string, unknown>
+    out[k.toLowerCase()] = { near: num(o.near), middle: num(o.middle), far: num(o.far) }
+  }
+  return Object.keys(out).length ? out : null
+}
 const dayOf = (v: unknown): string | null => (typeof v === 'string' && /^\d{4}-\d{2}-\d{2}/.test(v) ? v.slice(0, 10) : null)
 
 function rowOf(day: string, lang: ToolLang, o: Record<string, unknown>): ToolDayRow {
   const clicksRaw = first(o, 'clicks', 'offers', 'clicks_by_product', 'products')
   const clicks: Record<string, number> = {}
   const byLevel: Record<string, number[]> = {}
-  if (clicksRaw && typeof clicksRaw === 'object') {
+  if (typeof clicksRaw === 'number' || (typeof clicksRaw === 'string' && /^\d{1,9}$/.test(clicksRaw))) clicks.ichirei = num(clicksRaw) // an old day holds a plain number: it is ICHIREI's
+  else if (clicksRaw && typeof clicksRaw === 'object') {
     for (const [k, v] of Object.entries(clicksRaw as Record<string, unknown>)) {
       if (!/^[a-z0-9_-]{1,24}$/i.test(k)) continue
       if (v && typeof v === 'object') {
@@ -64,15 +80,33 @@ function rowOf(day: string, lang: ToolLang, o: Record<string, unknown>): ToolDay
     lang,
     starts: num(first(o, 'starts', 'started', 'start')),
     results: levels(first(o, 'results', 'results_by_level', 'levels')),
-    noResult: num(first(o, 'no_result', 'no_results', 'noresult')),
-    mapped: num(first(o, 'mapped', 'put_on_map', 'map_saved', 'saved')),
-    warmOpens: num(first(o, 'warm_opens', 'warm_sheet_opens', 'warm', 'warm_sheet')),
+    noResult: sumOf(first(o, 'noResult', 'no_result', 'no_results', 'noresult')),
+    mapped: ((m) => (m === undefined ? null : num(m)))(first(o, 'mapped', 'put_on_map', 'map_saved', 'saved')),
+    warmOpens: num(first(o, 'warmOpens', 'warm_opens', 'warm_sheet_opens', 'warm', 'warm_sheet')),
     clicks,
     clicksByLevel: Object.keys(byLevel).length ? byLevel : null,
+    clicksByGroup: groupsOf(first(o, 'clicksByGroup', 'clicks_by_group')),
   }
 }
 
-/** The tool's answer as day × language rows; null when it cannot be read. */
+/** Two rows of the same day and language (zh-Hant and zh-Hans both read as zh) are added together. */
+function mergeRows(rows: ToolDayRow[]): ToolDayRow[] {
+  const by = new Map<string, ToolDayRow>()
+  for (const r of rows) {
+    const k = `${r.day}|${r.lang}`
+    const a = by.get(k)
+    if (!a) { by.set(k, { ...r, results: [...r.results], clicks: { ...r.clicks } }); continue }
+    a.starts += r.starts; a.noResult += r.noResult; a.warmOpens += r.warmOpens
+    a.mapped = a.mapped === null && r.mapped === null ? null : (a.mapped ?? 0) + (r.mapped ?? 0)
+    a.results = a.results.map((x, i) => x + (r.results[i] ?? 0))
+    for (const [p, n] of Object.entries(r.clicks)) a.clicks[p] = (a.clicks[p] ?? 0) + n
+    if (r.clicksByLevel) { a.clicksByLevel = a.clicksByLevel ?? {}; for (const [p, lv] of Object.entries(r.clicksByLevel)) a.clicksByLevel[p] = (a.clicksByLevel[p] ?? [0, 0, 0, 0, 0, 0, 0]).map((x, i) => x + (lv[i] ?? 0)) }
+    if (r.clicksByGroup) { a.clicksByGroup = a.clicksByGroup ?? {}; for (const [p, g] of Object.entries(r.clicksByGroup)) { const c = a.clicksByGroup[p] ?? { near: 0, middle: 0, far: 0 }; a.clicksByGroup[p] = { near: c.near + g.near, middle: c.middle + g.middle, far: c.far + g.far } } }
+  }
+  return [...by.values()]
+}
+
+/** The tool's answer as day × language rows; null when it cannot be read. The real shape (2026-11-22): `{ days: [{ date, langs: { ja: {…}, en, 'zh-Hant', 'zh-Hans' } }] }`; the older flat shapes are still read. */
 export function normalizeToolStats(raw: unknown): ToolStats | null {
   if (!raw || typeof raw !== 'object') return null
   const root = raw as Record<string, unknown>
@@ -83,11 +117,18 @@ export function normalizeToolStats(raw: unknown): ToolStats | null {
     for (const r of list) {
       if (!r || typeof r !== 'object') continue
       const o = r as Record<string, unknown>
-      const day = dayOf(first(o, 'day', 'date'))
+      const day = dayOf(first(o, 'date', 'day'))
+      if (day && o.langs && typeof o.langs === 'object') {
+        for (const [l, v] of Object.entries(o.langs as Record<string, unknown>)) {
+          const lang = toolLangOf(l)
+          if (lang && v && typeof v === 'object') rows.push(rowOf(day, lang, v as Record<string, unknown>))
+        }
+        continue
+      }
       const lang = toolLangOf(first(o, 'lang', 'language'))
       if (day && lang) rows.push(rowOf(day, lang, o))
     }
-    return { rows }
+    return { rows: mergeRows(rows) }
   }
   const src = (body.days && typeof body.days === 'object' ? body.days : body) as Record<string, unknown>
   for (const [d, perLang] of Object.entries(src)) {
@@ -98,7 +139,7 @@ export function normalizeToolStats(raw: unknown): ToolStats | null {
       if (lang && o && typeof o === 'object') rows.push(rowOf(day, lang, o as Record<string, unknown>))
     }
   }
-  return rows.length > 0 || Object.keys(src).length === 0 ? { rows } : null
+  return rows.length > 0 || Object.keys(src).length === 0 ? { rows: mergeRows(rows) } : null
 }
 
 let cache: { at: number; value: ToolStats | null } | null = null
@@ -113,7 +154,7 @@ export async function fetchToolStats(env: NodeJS.ProcessEnv = process.env, fetch
   try {
     const token = (env[TOOL_STATS_SECRET]?.trim() || (await read(TOOL_STATS_SECRET, env))).trim()
     if (token) {
-      const r = await fetchImpl(env.ICHIREI_TOOL_STATS_URL?.trim() || TOOL_STATS_URL, { headers: { authorization: `Bearer ${token}`, 'x-stats-token': token, accept: 'application/json' }, signal: AbortSignal.timeout(6000) })
+      const r = await fetchImpl(env.ICHIREI_TOOL_STATS_URL?.trim() || TOOL_STATS_URL, { headers: { authorization: `Bearer ${token}`, accept: 'application/json' }, signal: AbortSignal.timeout(6000) })
       if (r.ok) value = normalizeToolStats(await r.json().catch(() => null))
     }
   } catch {

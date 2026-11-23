@@ -9,6 +9,7 @@ import { createOrderHandler, type OrderDeps } from '../api/order.ts'
 import { createClaimHandlers } from '../api/claim.ts'
 import { createGiftHandlers } from '../api/gift.ts'
 import { createStatsHandlers, buildStats } from '../api/ops-stats.ts'
+import { computeToolFunnel } from '../engine/tool-funnel.ts'
 import { parseClientEvent, analyticsPath } from '../engine/analytics.ts'
 import { MemoryOrderStore } from '../engine/order-store.ts'
 import { loadShopifyConfig } from '../engine/shopify.ts'
@@ -139,11 +140,37 @@ check('(5) the panel\'s words exist in ja, en, zh-Hant and zh-Hans; unavailable 
   let seen: Record<string, string> = {}
   const ok = await fetchToolStats({ PROMO_STATS_TOKEN: 'secret-token' } as NodeJS.ProcessEnv, (async (u: string, init: RequestInit) => { seen = { url: String(u), ...((init.headers as Record<string, string>) ?? {}) }; return new Response(JSON.stringify({ days: [{ day: '2026-11-22', lang: 'ja', starts: 1 }] })) }) as unknown as typeof fetch, async () => 'x', 1)
   check('(6) the tool unreachable, answering an error, or with no token → null (the panel says "Tool stats unavailable"); the rest of the page is unaffected', down === null && bad === null && noToken === null)
-  check('(6) it asks https://tools.beyondculture.ai/api/stats server-side with the token from Secret Manager (PROMO_STATS_TOKEN)', seen.url === 'https://tools.beyondculture.ai/api/stats' && /secret-token/.test(seen.authorization ?? '') && ok?.rows.length === 1)
+  check('(6) it asks https://tools.beyondculture.ai/api/stats?days=14 server-side with the token from Secret Manager (PROMO_STATS_TOKEN) in the Authorization: Bearer header only', seen.url === 'https://tools.beyondculture.ai/api/stats?days=14' && seen.authorization === 'Bearer secret-token' && !('x-stats-token' in seen) && ok?.rows.length === 1)
   const unavailable = await buildStats({ ...d, toolStats: async () => null }, store, d.env, NOW)
   check('(6) with no tool answer the dashboard still builds (funnel steps 3–7 from our own records)', unavailable.tool.map === null && unavailable.tool.funnel.some((r) => r.landed > 0))
   const pageDown = await createStatsHandlers(() => ({ ...d, toolStats: async () => null })).page(new Request('http://x/ops/stats', { headers: { authorization: `Basic ${Buffer.from('x:pw').toString('base64')}` } }))
   check('(6) …and the page is still served', pageDown.status === 200)
+}
+
+
+// ---- 4b. the tool's real answer (2026-11-22): { days: [{ date, langs: { ja, en, zh-Hant, zh-Hans } }] } ------------------------------------------------------------------------------------
+{
+  const lang = (o: Record<string, unknown>) => ({ starts: 0, input: { shots: 0, taps: 0 }, results: { '1': 0, '2': 0, '3': 0, '4': 0, '5': 0, '6': 0, '7': 0 }, noResult: { unsure: 0, help: 0, minor: 0, busy: 0, thin: 0 }, nudges: { 'friend|3|closer': 4 }, warmOpens: 0, clicks: { ichirei: 0 }, readings: 0, costUsd: 0, ...o })
+  const real = normalizeToolStats({ days: [
+    { date: '2026-11-22', langs: {
+      ja: lang({ starts: 12, results: { '1': 2, '2': 1, '3': 3, '4': 0, '5': 1, '6': 0, '7': 2 }, noResult: { unsure: 1, help: 1, minor: 0, busy: 0, thin: 1 }, warmOpens: 5, clicks: { ichirei: 4 } }),
+      en: lang({ starts: 5, results: { '4': 2 }, clicks: { ichirei: 1, other: 2 } }),
+      'zh-Hant': lang({ starts: 3, results: { '1': 1 }, warmOpens: 1, clicks: 2 }),
+      'zh-Hans': lang({ starts: 2, results: { '2': 1 }, warmOpens: 2, noResult: { thin: 1 }, clicks: { ichirei: 1 } }),
+    } },
+    { date: '2026-11-21', langs: { ja: lang({ starts: 1, mapped: 3 }) } },
+  ] })
+  const ja = real?.rows.find((r) => r.day === '2026-11-22' && r.lang === 'ja')
+  const zh = real?.rows.find((r) => r.day === '2026-11-22' && r.lang === 'zh')
+  check('(8) the real shape: a list of day rows with `date` and `langs` → language → counts is read into day × language rows (4 languages → ja, en, zh)', !!real && real.rows.filter((r) => r.day === '2026-11-22').length === 3 && real.rows.length === 4)
+  check('(8) starts, warmOpens and `noResult` (split by reason → the total) are read by their real names; measured = the sum of results 1–7', ja?.starts === 12 && ja.warmOpens === 5 && ja.noResult === 3 && ja.results.reduce((a, b) => a + b, 0) === 9 && ja.results.join() === '2,1,3,0,1,0,2', JSON.stringify(ja))
+  check('(8) clicks.ichirei is read per product (other products kept beside it)', ja?.clicks.ichirei === 4 && real?.rows.find((r) => r.lang === 'en')?.clicks.other === 2 && normalizeToolStats({ days: [{ date: '2026-11-20', langs: { ja: { starts: 1, clicks: 7 } } }] })?.rows[0].clicks.ichirei === 7)
+  check('(8) zh-Hant and zh-Hans are one zh row (added together): starts 5, results 1 + 1 in levels 1 and 2, warm opens 3, noResult 1', zh?.starts === 5 && zh.results[0] === 1 && zh.results[1] === 1 && zh.warmOpens === 3 && zh.noResult === 1 && zh.clicks.ichirei === 3, JSON.stringify(zh))
+  check('(8) "put on the map" is not counted by the tool yet: mapped is null (the dashboard shows 「—」), and a day that has it keeps the number', ja?.mapped === null && real?.rows.find((r) => r.day === '2026-11-21')?.mapped === 3 && STATS_CLIENT_JS.includes("r.mapped == null ? '&mdash;'"))
+  const grouped = normalizeToolStats({ days: [{ date: '2026-11-22', langs: { ja: lang({ clicks: { ichirei: 6 }, clicksByGroup: { ichirei: { near: 3, middle: 2, far: 1 } } }) } }] })
+  const gf = computeToolFunnel({ events: [], orders: [], tool: grouped })
+  check('(8) when the tool sends clicksByGroup the funnel\'s "clicked ICHIREI" splits near / middle / far by it', gf.find((r) => r.group === 'near')?.clicked === 3 && gf.find((r) => r.group === 'middle')?.clicked === 2 && gf.find((r) => r.group === 'far')?.clicked === 1)
+  check('(8) the tolerant fallback still reads the older flat shapes (a flat list of day × language rows, and day → language → row)', normalizeToolStats({ days: [{ day: '2026-11-22', lang: 'ja', starts: 3, no_result: 1, warm_opens: 2 }] })?.rows[0].noResult === 1 && normalizeToolStats({ '2026-11-22': { en: { starts: 4 } } })?.rows[0].starts === 4 && normalizeToolStats('nope') === null)
 }
 
 // ---- 5. /legal ------------------------------------------------------------------------------------------------------------------------------------------------------------

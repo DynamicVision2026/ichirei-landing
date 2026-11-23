@@ -183,7 +183,7 @@ export const STATS_CLIENT_JS = String.raw`
     h += '<div class="wide"><table data-testid="tool-map"><thead><tr><th>' + esc(t('tm_day')) + '</th><th>' + esc(t('tm_lang')) + '</th><th class="n">' + esc(t('tm_starts')) + '</th><th class="n">' + esc(t('tm_results')) + '</th><th class="n">' + esc(t('tm_noresult')) + '</th><th class="n">' + esc(t('tm_mapped')) + '</th><th class="n">' + esc(t('tm_warm')) + '</th><th>' + esc(t('tm_clicks')) + '</th></tr></thead><tbody>';
     rows.forEach(function (r) {
       var clicks = Object.keys(r.clicks || {}).sort().map(function (k) { return esc(k) + ' ' + num(r.clicks[k]); }).join(' · ') || '&mdash;';
-      h += '<tr data-day="' + esc(r.day) + '" data-lang="' + esc(r.lang) + '"><td>' + esc(r.day) + '</td><td>' + esc(r.lang) + '</td><td class="n">' + num(r.starts) + '</td><td class="n">' + (r.results || []).map(num).join(' · ') + '</td><td class="n">' + num(r.noResult) + '</td><td class="n">' + num(r.mapped) + '</td><td class="n">' + num(r.warmOpens) + '</td><td>' + clicks + '</td></tr>';
+      h += '<tr data-day="' + esc(r.day) + '" data-lang="' + esc(r.lang) + '"><td>' + esc(r.day) + '</td><td>' + esc(r.lang) + '</td><td class="n">' + num(r.starts) + '</td><td class="n">' + (r.results || []).map(num).join(' · ') + '</td><td class="n">' + num(r.noResult) + '</td><td class="n">' + (r.mapped == null ? '&mdash;' : num(r.mapped)) + '</td><td class="n">' + num(r.warmOpens) + '</td><td>' + clicks + '</td></tr>';
     });
     return h + '</tbody></table></div><p class="note">' + esc(t('tm_note')) + '</p>';
   }
