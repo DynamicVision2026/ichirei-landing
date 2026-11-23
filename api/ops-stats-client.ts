@@ -155,6 +155,69 @@ export const STATS_CLIENT_JS = String.raw`
     if (!n && !red) return '';
     return '<p class="alert" role="alert" data-testid="attention-banner">' + (n ? esc(t('health_attention').replace('{n}', n)) : '') + (red ? ' ' + esc(t('h_en_cart_currency_mismatch')) + ': ' + red : '') + '</p>';
   }
+
+  // Ticket 7: the Relationship Map tool — its own numbers, and the Tool -> purchase funnel (counts only)
+  function jstDay(ms) { return new Date(ms + 9 * 3600000).toISOString().slice(0, 10); }
+  function inPer(day) {
+    if (period === 'all') return true;
+    var now = Date.parse(D.now), n = period === 'today' ? 1 : period === 'd7' ? 7 : 30;
+    return day >= jstDay(now - (n - 1) * 86400000) && day <= jstDay(now);
+  }
+  var STEPS = ['measured', 'clicked', 'landed', 'started', 'created', 'free', 'paid'];
+  var GROUPS = ['near', 'middle', 'far', 'unknown'];
+  function GROUPLABEL(g) { return { near: t('tf_near'), middle: t('tf_middle'), far: t('tf_far'), unknown: t('tf_unknown') }[g]; }
+  function stepName(i) { return [t('tf_s1'), t('tf_s2'), t('tf_s3'), t('tf_s4'), t('tf_s5'), t('tf_s6'), t('tf_s7')][i]; }
+  function zero() { return { measured: 0, clicked: 0, landed: 0, started: 0, created: 0, free: 0, paid: 0 }; }
+  function add(a, r) { STEPS.forEach(function (k) { a[k] += r[k] || 0; }); }
+  function rateCell(c, k, i) {
+    var prev = k === 'free' || k === 'paid' ? c.created : i > 0 ? c[STEPS[i - 1]] : 0;
+    if (i === 0) return '';
+    return prev > 0 ? pct(c[k], prev) + '%' + (k === 'free' || k === 'paid' ? ' (&larr;5)' : '') : '&mdash;';
+  }
+  function renderToolMap() {
+    var T = D.tool || {}, m = T.map;
+    var h = '<h2 data-testid="tool-map-title">' + esc(t('tm_title')) + '</h2>';
+    if (!m) return h + '<p class="warn" data-testid="tool-unavailable">' + esc(t('tm_unavailable')) + '</p>';
+    var rows = (m.rows || []).filter(function (r) { return inPer(r.day); }).sort(function (a, b) { return a.day < b.day ? 1 : a.day > b.day ? -1 : a.lang < b.lang ? -1 : 1; });
+    if (!rows.length) return h + '<p class="note" data-testid="tool-map-none">' + esc(t('tm_none')) + '</p>';
+    h += '<div class="wide"><table data-testid="tool-map"><thead><tr><th>' + esc(t('tm_day')) + '</th><th>' + esc(t('tm_lang')) + '</th><th class="n">' + esc(t('tm_starts')) + '</th><th class="n">' + esc(t('tm_results')) + '</th><th class="n">' + esc(t('tm_noresult')) + '</th><th class="n">' + esc(t('tm_mapped')) + '</th><th class="n">' + esc(t('tm_warm')) + '</th><th>' + esc(t('tm_clicks')) + '</th></tr></thead><tbody>';
+    rows.forEach(function (r) {
+      var clicks = Object.keys(r.clicks || {}).sort().map(function (k) { return esc(k) + ' ' + num(r.clicks[k]); }).join(' · ') || '&mdash;';
+      h += '<tr data-day="' + esc(r.day) + '" data-lang="' + esc(r.lang) + '"><td>' + esc(r.day) + '</td><td>' + esc(r.lang) + '</td><td class="n">' + num(r.starts) + '</td><td class="n">' + (r.results || []).map(num).join(' · ') + '</td><td class="n">' + num(r.noResult) + '</td><td class="n">' + num(r.mapped) + '</td><td class="n">' + num(r.warmOpens) + '</td><td>' + clicks + '</td></tr>';
+    });
+    return h + '</tbody></table></div><p class="note">' + esc(t('tm_note')) + '</p>';
+  }
+  function renderToolFunnel() {
+    var rows = ((D.tool && D.tool.funnel) || []).filter(function (r) { return inPer(r.day); });
+    var by = { near: zero(), middle: zero(), far: zero(), unknown: zero() }, all = zero(), lng = { ja: zero(), en: zero(), zh: zero() }, days = {};
+    rows.forEach(function (r) { add(by[r.group] || by.unknown, r); add(all, r); add(lng[r.lang] || lng.ja, r); var d = days[r.day] || (days[r.day] = zero()); add(d, r); });
+    var cols = GROUPS.filter(function (g) { return g !== 'unknown' || STEPS.some(function (k) { return by.unknown[k] > 0; }); });
+    var h = '<h2 data-testid="tool-funnel-title">' + esc(t('tf_title')) + '</h2>';
+    h += '<p class="note" data-testid="tool-headline"><b>' + esc(t('tf_headline')) + ': ' + num(all.measured) + ' &rarr; ' + num(all.paid) + (all.measured > 0 ? ' (' + (Math.round((all.paid / all.measured) * 1000) / 10) + '%)' : '') + '</b></p>';
+    h += '<div class="wide"><table data-testid="tool-funnel"><thead><tr><th>' + esc(t('tf_step')) + '</th>';
+    cols.forEach(function (g) { h += '<th class="n">' + esc(GROUPLABEL(g)) + '</th>'; });
+    h += '<th class="n">' + esc(t('tf_all')) + '</th><th class="n">' + esc(t('tf_rate')) + '</th></tr></thead><tbody>';
+    STEPS.forEach(function (k, i) {
+      h += '<tr data-step="' + k + '"><td>' + (i + 1) + '. ' + esc(stepName(i)) + '</td>';
+      cols.forEach(function (g) { h += '<td class="n" data-group="' + g + '">' + num(by[g][k]) + '</td>'; });
+      h += '<td class="n" data-group="all">' + num(all[k]) + '</td><td class="n">' + rateCell(all, k, i) + '</td></tr>';
+    });
+    h += '</tbody></table></div><p class="note">' + esc(t('tf_note')) + '</p>';
+    h += '<h2 style="font-size:.95rem">' + esc(t('tf_by_lang')) + '</h2><div class="wide"><table data-testid="tool-funnel-lang"><thead><tr><th>' + esc(t('tm_lang')) + '</th>';
+    STEPS.forEach(function (k, i) { h += '<th class="n">' + (i + 1) + '</th>'; });
+    h += '</tr></thead><tbody>';
+    ['ja', 'en', 'zh'].forEach(function (l) { h += '<tr data-lang="' + l + '"><td>' + l + '</td>' + STEPS.map(function (k) { return '<td class="n">' + num(lng[l][k]) + '</td>'; }).join('') + '</tr>'; });
+    h += '</tbody></table></div>';
+    var dk = Object.keys(days).sort().reverse().slice(0, 14);
+    if (dk.length) {
+      h += '<h2 style="font-size:.95rem">' + esc(t('tf_by_day')) + '</h2><div class="wide"><table data-testid="tool-funnel-day"><thead><tr><th>' + esc(t('tm_day')) + '</th>';
+      STEPS.forEach(function (k, i) { h += '<th class="n">' + (i + 1) + '</th>'; });
+      h += '</tr></thead><tbody>';
+      dk.forEach(function (d) { h += '<tr data-day="' + esc(d) + '"><td>' + esc(d) + '</td>' + STEPS.map(function (k) { return '<td class="n">' + num(days[d][k]) + '</td>'; }).join('') + '</tr>'; });
+      h += '</tbody></table></div>';
+    }
+    return h;
+  }
   function render() {
     var s = D.stats.periods[period];
     document.documentElement.lang = lang === 'zh-Hant' ? 'zh-Hant' : lang === 'zh-Hans' ? 'zh-Hans' : lang;
@@ -169,7 +232,7 @@ export const STATS_CLIENT_JS = String.raw`
     document.getElementById('tabs').innerHTML = th;
     document.getElementById('app').innerHTML =
       renderPromo() + renderAttention() + (D.verified ? '' : '<p class="warn">' + esc(t('payments_unverified')) + '</p>') +
-      renderNumbers(s) + '<p class="note">' + esc(t('cost_note')) + '</p>' + renderChoice(s) + renderFunnel(s) + renderDaily(s) + renderSources(s) + renderHealth() + renderOrders() +
+      renderNumbers(s) + '<p class="note">' + esc(t('cost_note')) + '</p>' + renderChoice(s) + renderFunnel(s) + renderToolFunnel() + renderToolMap() + renderDaily(s) + renderSources(s) + renderHealth() + renderOrders() +
       '<p class="note">' + esc(t('privacy_note')) + '</p>';
   }
 

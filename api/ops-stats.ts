@@ -27,6 +27,8 @@ import { computeStats, type ChosenSlot, type OrderState, type OrderStat, type St
 import { STATS_KEYS, STATS_LANGS, STATS_LANG_NAMES, statsDicts } from '../engine/stats-i18n.ts'
 import { checkOpsAuth, type OpsDeps } from './ops.ts'
 import { STATS_CLIENT_JS } from './ops-stats-client.ts'
+import { fetchToolStats, type ToolStats } from '../engine/tool-stats.ts'
+import { computeToolFunnel, type FunnelRow } from '../engine/tool-funnel.ts'
 
 /** Events and orders are kept (and read) for 13 months. */
 export const KEEP_DAYS = 400
@@ -102,6 +104,8 @@ export interface StatsPayload {
   attention: { count: number }
   /** While the "Days of Thanks" promotion runs: how many free (total 0) gifts were paid today (Japan time) — shown at the top. null when the promotion is off. */
   promo: { on: boolean; free_today: number; /** per promo day (US Eastern 4:00 a.m.): the gifts given, the holds placed today and what is left */ days: { day: string; given: number; held: number; left: number }[] } | null
+  /** Ticket 7: the Relationship Map tool — its own numbers (null = unavailable) and the Tool → purchase funnel (counts only, per day × language × level group) */
+  tool: { map: ToolStats | null; funnel: FunnelRow[] }
   /** false when Shopify could not be asked about payments */
   verified: boolean
   now: string
@@ -175,7 +179,16 @@ export async function buildStats(d: OpsDeps, store: OrderStore, env: NodeJS.Proc
     promoDays = promoDays.reverse()
   }
   const promo = promoWindow(d.env ?? process.env) ? { on: promoOn(env2, now), days: promoDays, free_today: orders.filter((o) => o.free && o.state === 'paid' && analyticsDay(new Date(Date.parse(o.paid_at ?? o.created_at))) === analyticsDay(now)).length } : null
-  return { stats, orders: latest, free, main, health, attention: { count: attention }, promo, verified, now: now.toISOString() }
+  // Ticket 7: the Tool → purchase funnel and the tool's own panel
+  const byRef = new Map(orders.map((o) => [o.order_ref, o]))
+  const toolOrders = records.flatMap((r) => {
+    if (!r || !r.tool) return []
+    const st = byRef.get(r.order_ref)
+    return [{ record: r, free: st?.state === 'paid' && st.free === true, paid: st?.state === 'paid' && st.free !== true }]
+  })
+  const toolMap = await (d.toolStats ? d.toolStats() : fetchToolStats(env, fetch, d.readSecret)).catch(() => null)
+  const funnel = computeToolFunnel({ events, orders: toolOrders, tool: toolMap })
+  return { stats, orders: latest, free, main, health, attention: { count: attention }, promo, tool: { map: toolMap, funnel }, verified, now: now.toISOString() }
 }
 
 const jsonForScript = (v: unknown): string => JSON.stringify(v).replace(/</g, '\\u003c').replace(/>/g, '\\u003e').replace(/&/g, '\\u0026').replace(/\u2028/g, '\\u2028').replace(/\u2029/g, '\\u2029')

@@ -52,6 +52,8 @@ export interface OpsDeps {
   shipping?: (refs: string[]) => Promise<ShippingResult>
   /** The payment lookup (when it was paid, cancelled, refunded): tests replace it. */
   payments?: (refs: string[]) => Promise<PaymentResult>
+  /** Ticket 7: the Relationship Map tool's own numbers (tests replace it; production asks tools.beyondculture.ai with the Secret Manager token). */
+  toolStats?: () => Promise<import('../engine/tool-stats.ts').ToolStats | null>
   /** Waiting orders (paid without our site): the read-only Shopify sweep that records any we have not seen. Tests replace it. */
   sweep?: (store: OrderStore, now: Date) => Promise<number | null>
 }
