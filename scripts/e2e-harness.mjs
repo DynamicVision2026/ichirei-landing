@@ -6289,6 +6289,7 @@ for (const [lang, locale, text] of [['en', 'en-US', 'Your gift is being finished
     await T(page, 'gift-to-answer').click()
     await T(page, 'gift-last').waitFor()
     check(`ceremony (${lang}): the last screen has no twelve characters and no send-back form`, (await T(page, 'gift-chars').count()) === 0 && (await T(page, 'gift-reply-send').count()) === 0 && (await T(page, 'gift-landing-line').count()) === 1)
+    await page.locator('[data-testid=cr-mygifts-top] [data-testid=my-gifts]').waitFor({ timeout: 6000 }).catch(() => {}) // (the button appears when /api/me has answered)
     { const cr = await contrastOf(page, '[data-testid=cr-mygifts-top] [data-testid=my-gifts]'); check(`ceremony (${lang}): the receiver's own マイギフト is at the top right of the last screen and readable (contrast ${cr === null ? 'n/a' : cr.toFixed(1)} ≥ 4.5)`, cr !== null && cr >= 4.5) }
     await page.waitForTimeout(300)
     await page.screenshot({ path: `${SHOTS42}/cer-${lang}-4-last-390.png` })
@@ -7668,6 +7669,89 @@ for (const [lang, locale, text] of [['en', 'en-US', 'Your gift is being finished
       check(`no page errors (run 59, ${lang} ${tag})`, errs.length === 0, errs.join('; '))
       await ctx.close()
     }
+  }
+}
+
+// ---------- Run 60 (2026-11-22, Ticket 7 Part 29): visitors from the Relationship Map tool land on the writing box with one quiet line chosen by the level; src / lv / offer are kept for the visit and go with the order ----------
+{
+  const SHOTS60 = process.env.E2E_SHOTS_DIR || '/tmp/e2e-shots'
+  const R60 = {
+    ja: { base: '/', write: '/write', locale: 'ja-JP', lines: { 2: 'あの人らしいと思う、ひと場面を。', 4: '最近、ふと思い出したあの人の場面を。', 6: 'いちばん古い、でも消えない場面を。' } },
+    en: { base: '/en', write: '/en/write', locale: 'en-US', lines: { 2: 'A moment that is so them.', 4: 'A moment of them that came back to you lately.', 6: 'An old moment that never left you.' } },
+    'zh-Hant': { base: '/zh', write: '/zh/write', locale: 'zh-TW', lines: { 2: '寫下一個「很像他」的瞬間。', 4: '寫下最近忽然想起的他的一個瞬間。', 6: '寫下一個很久以前、卻一直沒忘的瞬間。' } },
+  }
+  const open60 = async (lang, query, { width = 390 } = {}) => {
+    const f = await mockPage(browser, { order: () => ({ json: { order_ref: 'IC-20261122-TOOL2222', checkout_url: 'http://localhost:5173/__checkout?cart=t', glyph: '証', certificate_text: 'x' } }) })
+    await f.page.setViewportSize({ width, height: 844 })
+    await f.page.route('**/api/auth/me', (r) => r.fulfill({ json: { providers: { google: false, line: false, email: false }, signed_in: false } }))
+    await f.page.route('**/api/sizes', (r) => r.fulfill({ json: { sizes: ['egift'] } }))
+    await f.page.goto(`http://localhost:5173${R60[lang].base}${query}`, { waitUntil: 'networkidle' })
+    await f.page.waitForTimeout(700)
+    return f
+  }
+  const SHOT_AT = { ja: 2, en: 4, 'zh-Hant': 6 }
+  for (const lang of ['ja', 'en', 'zh-Hant']) {
+    const W = R60[lang]
+    for (const lv of [2, 4, 6]) {
+      const f = await open60(lang, `?src=tool&lv=${lv}&offer=ichirei`)
+      const path = new URL(f.page.url()).pathname
+      check(`tool visit (${lang}, lv ${lv}): the landing goes straight to the writing room (${W.write}), skipping the hero`, path === W.write && (await f.page.locator('[data-testid=story-input]').count()) === 1 && (await f.page.locator('.hero').count()) === 0, f.page.url())
+      check(`tool visit (${lang}, lv ${lv}): one quiet line 「${W.lines[lv]}」 above the writing box, and the box placeholder is as before`, (await f.page.locator('[data-testid=tool-line]').innerText()) === W.lines[lv] && (await f.page.locator('[data-testid=tool-line]').count()) === 1 && ((await f.page.locator('[data-testid=story-input]').getAttribute('placeholder')) ?? '').length > 5)
+      check(`tool visit (${lang}, lv ${lv}): the page is scrolled to the writing box (its headline is in view) and the box is empty — no character, no distance word is suggested`, (await f.page.evaluate(() => { const r = document.querySelector('[data-testid=story-headline]').getBoundingClientRect(); return r.top >= -2 && r.top < window.innerHeight * 0.6 })) && (await f.page.locator('[data-testid=story-input]').inputValue()) === '')
+      check(`tool visit (${lang}, lv ${lv}): above the box the line sits between the headline and the guide`, await f.page.evaluate(() => { const a = document.querySelector('[data-testid=story-headline]'); const b = document.querySelector('[data-testid=tool-line]'); const c = document.querySelector('[data-testid=write-guide]'); return !!(a.compareDocumentPosition(b) & Node.DOCUMENT_POSITION_FOLLOWING) && !!(b.compareDocumentPosition(c) & Node.DOCUMENT_POSITION_FOLLOWING) }))
+      const stored = await f.page.evaluate(() => window.sessionStorage.getItem('ichirei-tool'))
+      check(`tool visit (${lang}, lv ${lv}): src, lv and offer are kept for the visit only (session storage), nothing else`, JSON.parse(stored).src === 'tool' && JSON.parse(stored).lv === lv && JSON.parse(stored).offer === 'ichirei' && Object.keys(JSON.parse(stored)).sort().join() === 'lv,offer,src' && (await f.page.evaluate(() => window.localStorage.getItem('ichirei-tool'))) === null)
+      const landed = f.calls.analytics.filter((e) => e.event === 'tool_landed')
+      check(`tool visit (${lang}, lv ${lv}): the landing is counted once, with the language and the level group only`, landed.length === 1 && landed[0].tool === (lv === 2 ? 'near' : lv === 4 ? 'middle' : 'far') && !('lv' in landed[0]) && landed[0].language === lang, JSON.stringify(landed))
+      if (SHOT_AT[lang] === lv) await f.page.screenshot({ path: `${SHOTS60}/t7-tool-${lang}-lv${lv}-390.png`, fullPage: false })
+      check(`no page errors (run 60, ${lang} lv ${lv})`, f.errors.length === 0, f.errors.join('; '))
+      await f.page.close()
+    }
+  }
+  // lv missing or not 1–7, and unknown extra items: no line, never an error
+  for (const q of ['?src=tool', '?src=tool&lv=0&offer=ichirei', '?src=tool&lv=9', '?src=tool&lv=abc&foo=bar&name=Taro&x[]=1']) {
+    const f = await open60('ja', q)
+    check(`tool visit with ${q}: no line is shown, the writing room still opens, no error`, new URL(f.page.url()).pathname === '/write' && (await f.page.locator('[data-testid=tool-line]').count()) === 0 && (await f.page.locator('[data-testid=story-input]').count()) === 1 && f.errors.length === 0, f.errors.join('; '))
+    await f.page.close()
+  }
+  // a normal visit (no src, or another src) is untouched: the landing page, no line, nothing kept, nothing counted
+  for (const q of ['', '?src=examples&lv=3', '?utm_source=chatgpt.com']) {
+    const f = await open60('ja', q)
+    check(`normal visit ${q || '(no query)'}: the landing page as before — no redirect, no tool line, nothing kept, nothing counted`, new URL(f.page.url()).pathname === '/' && (await f.page.locator('.hero').count()) === 1 && (await f.page.locator('[data-testid=tool-line]').count()) === 0 && (await f.page.evaluate(() => window.sessionStorage.getItem('ichirei-tool'))) === null && f.calls.analytics.every((e) => e.event !== 'tool_landed'))
+    await f.page.close()
+  }
+  // the visit's items go with the order (and a normal visit's order carries none)
+  {
+    const f = await open60('ja', '?src=tool&lv=3&offer=ichirei')
+    await pickContext(f.page)
+    await f.page.locator('[data-testid=story-input]').fill('父は、駅の改札でいつも黙って手を振った。')
+    await f.page.click(`#write >> text=${GO.ja}`)
+    await f.page.waitForSelector('[data-all-revealed=yes]', { timeout: 15000 })
+    await f.page.locator('article[data-slot=main]').click()
+    await f.page.locator('article[data-slot=main]').locator(`text=${GIVE.ja}`).click()
+    await toOrder(f.page)
+    await f.page.locator('label:has(input[name=package][value=egift])').click().catch(() => {})
+    await tickRefund(f.page)
+    await f.page.locator('[data-testid=order-submit]').click()
+    await f.page.waitForSelector('#co', { timeout: 8000 })
+    check('tool visit: the order goes out with src=tool, lv=3 and offer=ichirei (nothing personal)', f.calls.order.length === 1 && JSON.stringify(f.calls.order[0].tool) === JSON.stringify({ src: 'tool', lv: 3, offer: 'ichirei' }), JSON.stringify(f.calls.order[0]?.tool))
+    check('tool visit: the story and the character are chosen by the visitor — the request carries no distance word', !/熱|遠/.test(JSON.stringify(f.calls.order[0].tool)) && f.calls.select.length === 1 && !/ichirei-tool/.test(f.calls.select[0].story))
+    await f.page.close()
+    const g = await open60('ja', '/write'.replace('/', '') ? '' : '')
+    await g.page.goto('http://localhost:5173/write', { waitUntil: 'networkidle' })
+    await pickContext(g.page)
+    await g.page.locator('[data-testid=story-input]').fill('父は、駅の改札でいつも黙って手を振った。')
+    await g.page.click(`#write >> text=${GO.ja}`)
+    await g.page.waitForSelector('[data-all-revealed=yes]', { timeout: 15000 })
+    await g.page.locator('article[data-slot=main]').click()
+    await g.page.locator('article[data-slot=main]').locator(`text=${GIVE.ja}`).click()
+    await toOrder(g.page)
+    await g.page.locator('label:has(input[name=package][value=egift])').click().catch(() => {})
+    await tickRefund(g.page)
+    await g.page.locator('[data-testid=order-submit]').click()
+    await g.page.waitForSelector('#co', { timeout: 8000 })
+    check('normal visit: its order carries no tool items', g.calls.order.length === 1 && !('tool' in g.calls.order[0]))
+    await g.page.close()
   }
 }
 

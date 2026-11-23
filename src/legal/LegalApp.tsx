@@ -67,6 +67,8 @@ export default function LegalApp() {
         <p data-testid="legal-email-use">{t.emailUse}</p>
         <p data-testid="legal-retention">{t.retention}</p>
         <p data-testid="legal-signin">{t.signIn}</p>
+        <h2 id="tool" data-testid="legal-tool-heading">{t.tool.heading}</h2>
+        <p data-testid="legal-tool">{t.tool.body}</p>
         <h2 id="faq">{t.faqTitle}</h2>
         <div className="legalFaq" data-testid="legal-faq">
           {t.faq.map((f) => (

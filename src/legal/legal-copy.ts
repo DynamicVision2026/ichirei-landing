@@ -35,6 +35,8 @@ export interface LegalCopy {
   retention: string
   /** 2026-11-20: what signing in stores, why, and how to delete the account. */
   signIn: string
+  /** Ticket 7 (2026-11-22, Part 32): the Relationship Map tool (tools.beyondculture.ai/kyori) — what is stored and for how long. */
+  tool: { heading: string; body: string }
   cancelTime: string
   faq: { q: string; a: string }[]
   back: string
@@ -74,6 +76,7 @@ export const LEGAL: Record<RevealLang, LegalCopy> = {
     emailUse: '無料の贈りものを確保するためにメールアドレスをご入力いただいた場合、確保と決済時の照合のためだけに使います。ご希望の場合のみ、お知らせをお送りします。',
     retention: 'ご注文のない保存データは、30日後に削除します。',
     signIn: 'ログイン（Google、LINE、メールのリンク）では、ログイン先の提供元が発行するID、メールアドレス（提供される場合）、LINEの表示名（ヘッダーの表示用）だけを保存します。目的は、お客様の贈りものを保存し、どの端末からでも見つけられるようにすることです。プロフィール写真や友だち情報は取得しません。アカウントの削除は、マイギフトの「アカウントを削除」から、または info@beyondculture.ai までご連絡ください。お知らせのメールは、別の同意ボックスにチェックされた場合のみお送りします。',
+    tool: { heading: '関係の地図（一字の距離）', body: '関係の地図（一字の距離）で保存された地図は、鍵をかけて保管され、当社は中身を読めません。24か月更新のない地図は自動で削除されます。鍵のメールは、配信記録として送信サービスに30日間保管されたのち削除されます。チャットの画像と文字は読み取りのためだけに使い、保存しません。' },
     cancelTime: 'キャンセルのご連絡は、メールを送信した時刻で受け付けます。',
     faqTitle: 'よくあるご質問',
     faq: [
@@ -113,6 +116,7 @@ export const LEGAL: Record<RevealLang, LegalCopy> = {
     emailUse: '若你為保留免費禮物輸入電子郵件，我們只用它來保留禮物並在結帳時核對。只有在你同意時，才會寄送消息。',
     retention: '沒有下單的儲存資料，會在30天後刪除。',
     signIn: '登入（Google、LINE、電子郵件連結）只會儲存登入提供者發出的識別碼、電子郵件（若有提供）與 LINE 顯示名稱（用於頁首顯示）。目的是保存你的禮物，讓你在任何裝置上都能找到。我們不會取得大頭貼或好友資料。要刪除帳戶，請在〈我的禮物〉按「刪除帳戶」，或來信 info@beyondculture.ai。只有在另外勾選同意框時，我們才會寄送消息信件。',
+    tool: { heading: '關係地圖（一字之間）', body: '在『一字之間』儲存的地圖會上鎖保存，我們無法讀取內容。24 個月沒有更新的地圖會自動刪除。鑰匙郵件會作為寄送紀錄，在郵件服務保存 30 天後刪除。聊天截圖與文字只用於讀取，不會保存。' },
     cancelTime: '取消申請以你寄出郵件的時間為準。',
     faqTitle: '常見問題',
     faq: [
@@ -152,6 +156,7 @@ export const LEGAL: Record<RevealLang, LegalCopy> = {
     emailUse: 'If you enter your email to hold a free gift, we use it only to hold it and match it at checkout. We send news only if you ask for it.',
     retention: 'Saved gifts without an order are deleted after 30 days.',
     signIn: 'Signing in (Google, LINE or an email link) stores only the id the provider gives us, your email (when it gives one) and your LINE display name (to show in the header). We do it to keep your gifts and let you find them on any device. We do not take your profile photo or your friends. To delete your account, use “Delete my account” in My gifts or email info@beyondculture.ai. We send news only if you tick the separate consent box.',
+    tool: { heading: 'The Relationship Map tool', body: 'Maps saved in the Relationship Map tool are stored locked; we cannot read them. A map not updated for 24 months is deleted automatically. The key email is kept by our mail service for 30 days as a delivery record, then deleted. Chat screenshots and their text are used only for the reading and are never stored.' },
     cancelTime: 'For cancellations, the time you send your email is the time that counts.',
     faqTitle: 'Questions',
     faq: [
