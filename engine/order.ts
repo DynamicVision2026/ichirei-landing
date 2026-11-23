@@ -19,6 +19,7 @@ import { carvedStrokes, simpleAvailable } from '../src/order/strokes.ts'
 import { simpleMaxStrokes, strokeInfo } from './strokes.ts'
 import { bridgeForOrder } from './en-bridge.ts'
 import { cleanUtm, type Utm } from '../src/order/utm.ts'
+import { cleanTool, type Tool } from '../src/order/tool.ts'
 import { loadLexicon } from './lexicon.ts'
 import type { EnBridge } from '../src/order/en-bridge.ts'
 
@@ -168,6 +169,8 @@ export interface ValidOrder {
   refund_ack_at: string | null
   /** The utm_* parameters of the landing link, cleaned; passed to the cart line as hidden `_utm_…` attributes. English since 2026-11-12; ja and zh too since 2026-11-20 (Part 10), so the dashboard counts all three. */
   utm?: Utm
+  /** Ticket 7: the visit came from the Relationship Map tool (src=tool, the level 1–7 or null, the offer): hidden cart attributes, kept on the order and the gift record; nothing personal. */
+  tool?: Tool
   /** Every character shown for this story, with its slot (see ShownCharacter); always contains the chosen one. */
   shown: ShownCharacter[]
 }
@@ -372,6 +375,7 @@ export function parseOrderRequest(body: unknown, now: Date = new Date(), palette
       sender_email,
       shown: withChosen(parseShown(body.shown_characters), candidate),
       ...(Object.keys(cleanUtm(body.utm)).length > 0 ? { utm: cleanUtm(body.utm) } : {}),
+      ...(cleanTool(body.tool) ? { tool: cleanTool(body.tool)! } : {}),
     },
   }
 }
@@ -443,6 +447,8 @@ export function lineAttributes(order: ValidOrder, orderRef: string, animationLin
     // The receiver's page (/g/<token>): the QR code on the printed card points here; and the sender's own private page.
     // where the buyer came from (utm_source=chatgpt.com when ChatGPT sent them) — hidden, for the order report; every language (Part 10, 2026-11-20)
     ...(order.utm ? Object.entries(order.utm).map(([k, v]) => ({ key: `_${k}`, value: v as string })) : []),
+    // Ticket 7: a visit from the Relationship Map tool — hidden (the underscore), for the order report only
+    ...(order.tool ? [{ key: '_src', value: 'tool' }, ...(order.tool.lv ? [{ key: '_lv', value: String(order.tool.lv) }] : []), ...(order.tool.offer ? [{ key: '_offer', value: order.tool.offer }] : [])] : []),
     // Part 9 (2026-11-20): the customer's private My gifts link (/b/<token>), for the confirmation e-mail's "All your gifts are in My gifts" — it opens the dashboard in one tap on any device
     ...(myGiftsLink ? [{ key: '_ichirei_mygifts_url', value: myGiftsLink }] : []),
     ...(giftLink ? [{ key: '_ichirei_gift_url', value: giftLink }] : []),
@@ -618,6 +624,8 @@ export interface OrderRecord {
   hold?: { id: string; day: string; email_hash: string } | null
   /** A gift made for an order that was paid WITHOUT going through our site (a "waiting" order, 2026-11-13): the Shopify order it was attached to. The 24-hour clock starts at `claimed_at`, not at payment. */
   claim?: import('./waiting.ts').OrderClaim
+  /** Ticket 7 (2026-11-22): the visit came from the Relationship Map tool. `paid` is set by the paid-order webhook: false for a free gift (total 0), true when money was paid. No personal data. */
+  tool?: Tool & { paid?: boolean }
   engine_result: EngineResult
   shopify: { cart_id: string; checkout_url: string; variant_id: string } | null
   error: string | null
@@ -667,6 +675,7 @@ export function buildRecord(order: ValidOrder, orderRef: string, now: Date = new
     prompt_question_id: order.prompt_question_id ?? null,
     shown_characters: order.shown,
     refund_ack_at: order.refund_ack_at,
+    ...(order.tool ? { tool: order.tool } : {}),
     collect_required: true,
     collected_at: null,
     engine_result: order.engine_result,
@@ -674,3 +683,6 @@ export function buildRecord(order: ValidOrder, orderRef: string, now: Date = new
     error: null,
   }
 }
+
+/** Ticket 7: the cart-level attributes of a visit from the Relationship Map tool (`src=tool`, `lv`, `offer`): the paid-order webhook reads them back. Never shown to the customer. */
+export const toolCartAttributes = (t: Tool | undefined | null): Attribute[] => (t ? [{ key: 'src', value: 'tool' }, ...(t.lv ? [{ key: 'lv', value: String(t.lv) }] : []), ...(t.offer ? [{ key: 'offer', value: t.offer }] : [])] : [])

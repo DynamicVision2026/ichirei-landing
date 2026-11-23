@@ -107,6 +107,7 @@ async function createCartOnce(
   language?: string,
   promo?: CartPromo,
   buyerEmail?: string | null,
+  cartAttrs: Attribute[] = [],
 ): Promise<CartResult> {
   const variantId = config.variants[pkg]
   if (!variantId) throw new ShopifyError(`The size "${pkg}" has no Shopify variant configured`, { code: 'size_unavailable' })
@@ -120,7 +121,7 @@ async function createCartOnce(
         input: {
           // The line carries the attributes (the chosen poem included); the cart repeats order_ref so it also lands on the order itself.
           lines: [{ merchandiseId: variantId, quantity: 1, attributes }],
-          attributes: [{ key: 'order_ref', value: orderRef }, ...(promoLang && promo ? [{ key: 'ichirei_hold', value: promo.holdId }] : [])],
+          attributes: [{ key: 'order_ref', value: orderRef }, ...(promoLang && promo ? [{ key: 'ichirei_hold', value: promo.holdId }] : []), ...cartAttrs],
           // English: the US buyer (and the hold's email). Japanese (2026-11-16, one shared pool): only a holder's cart names the hold's email; a non-holder's ja cart is exactly as before.
           // (2026-11-20, sign-in) a signed-in account's email prefills the checkout when there is no hold (a hold names its own)
           ...(language === 'en' ? { buyerIdentity: { countryCode: EN_BUYER_COUNTRY, ...(promo ? { email: promo.email } : buyerEmail ? { email: buyerEmail } : {}) } } : isYenPromoLanguage(language) && promo ? { buyerIdentity: { email: promo.email } } : buyerEmail ? { buyerIdentity: { email: buyerEmail } } : {}),
@@ -184,24 +185,24 @@ const notUsd = (c: string | null): boolean => !!c && c.toUpperCase() !== 'USD'
  * A held free-gift cart must come back FREE (the hold's code applicable, the total 0): if not, it is made once more after a moment (a new code can take a few seconds to be known to the
  * cart), and if it is still not free PromoCartNotFree is thrown — a holder is never sent to a full-price checkout.
  */
-export async function createCart(config: ShopifyConfig, pkg: PackageId, attributes: Attribute[], orderRef: string, fetchImpl: typeof fetch = fetch, language?: string, promo?: CartPromo, retryDelayMs = 1500, buyerEmail?: string | null): Promise<CartResult> {
-  const first = await createCartPriced(config, pkg, attributes, orderRef, fetchImpl, language, promo, buyerEmail)
+export async function createCart(config: ShopifyConfig, pkg: PackageId, attributes: Attribute[], orderRef: string, fetchImpl: typeof fetch = fetch, language?: string, promo?: CartPromo, retryDelayMs = 1500, buyerEmail?: string | null, cartAttrs: Attribute[] = []): Promise<CartResult> {
+  const first = await createCartPriced(config, pkg, attributes, orderRef, fetchImpl, language, promo, buyerEmail, cartAttrs)
   const held = promo && isPromoLanguage(language)
   if (!held || first.free) return first
   await new Promise((r) => setTimeout(r, retryDelayMs))
-  const second = await createCartPriced(config, pkg, attributes, orderRef, fetchImpl, language, promo, buyerEmail)
+  const second = await createCartPriced(config, pkg, attributes, orderRef, fetchImpl, language, promo, buyerEmail, cartAttrs)
   if (second.free) return second
   console.warn(`[ichirei-promo] ${JSON.stringify({ event: 'promo_cart_refused', hold: promo.holdId, order_ref: orderRef })}`)
   throw new PromoCartNotFree()
 }
 
-async function createCartPriced(config: ShopifyConfig, pkg: PackageId, attributes: Attribute[], orderRef: string, fetchImpl: typeof fetch, language?: string, promo?: CartPromo, buyerEmail?: string | null): Promise<CartResult> {
-  const first = await createCartOnce(config, pkg, attributes, orderRef, fetchImpl, language, promo, buyerEmail)
+async function createCartPriced(config: ShopifyConfig, pkg: PackageId, attributes: Attribute[], orderRef: string, fetchImpl: typeof fetch, language?: string, promo?: CartPromo, buyerEmail?: string | null, cartAttrs: Attribute[] = []): Promise<CartResult> {
+  const first = await createCartOnce(config, pkg, attributes, orderRef, fetchImpl, language, promo, buyerEmail, cartAttrs)
   if (language !== 'en' || !notUsd(first.currency)) return first
   console.warn(`[ichirei-order] ${JSON.stringify({ event: 'en_cart_currency_retry', order_ref: orderRef, currency: first.currency })}`)
   let second: CartResult
   try {
-    second = await createCartOnce(config, pkg, attributes, orderRef, fetchImpl, language, promo, buyerEmail)
+    second = await createCartOnce(config, pkg, attributes, orderRef, fetchImpl, language, promo, buyerEmail, cartAttrs)
   } catch {
     second = first
   }

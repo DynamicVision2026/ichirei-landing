@@ -44,7 +44,10 @@ export const US_EVENTS = ['us_banner_seen', 'occasion_chip', 'egift_scheduled', 
 export type UsEvent = (typeof US_EVENTS)[number]
 /** The English occasion chips (src/order/en-chips.ts): the codes the dashboard may count. */
 export const US_CHIP_CODES = ['christmas', 'thanksgiving', 'birthday', 'anniversary', 'mothers_day', 'fathers_day', 'graduation', 'retirement', 'thank_you', 'in_memory', 'no_special_day', 'other'] as const
-export const CLIENT_EVENTS = ['chosen', 'explain_opened', 'page_view', 'receiver_opened', ...FLOW_EVENTS, ...PREVIEW_EVENTS, ...SHARE_EVENTS, ...US_EVENTS] as const
+/** Ticket 7 (2026-11-22): a visit that arrived from the Relationship Map tool — the language and the level GROUP only (1–2 near, 3–4 middle, 5–7 far, unknown). Nothing personal. */
+export const TOOL_GROUPS = ['near', 'middle', 'far', 'unknown'] as const
+export type ToolGroup = (typeof TOOL_GROUPS)[number]
+export const CLIENT_EVENTS = ['chosen', 'explain_opened', 'page_view', 'tool_landed', 'receiver_opened', ...FLOW_EVENTS, ...PREVIEW_EVENTS, ...SHARE_EVENTS, ...US_EVENTS] as const
 
 /** The referrer's host → a bucket (the dashboard's 「どこから」). Search engines and no referrer are `direct`; a shared post carries no tag, so it shows under the platform it came from. */
 export function sourceBucket(host: unknown, ownHost?: string): SourceBucket {
@@ -70,6 +73,7 @@ export type AnalyticsEvent =
   | { ts: string; session: string; source: Source; event: PreviewEvent; language: Language | null; n: 1 | 2 | null; state: PictureState | null; secs: number | null }
   | { ts: string; session: string; source: Source; event: ShareEvent; role: ShareRole }
   | { ts: string; session: string; source: Source; event: 'page_view'; language: Language | null; src: SourceBucket }
+  | { ts: string; session: string; source: Source; event: 'tool_landed'; language: Language | null; tool: ToolGroup }
   | { ts: string; session: string; source: Source; event: 'receiver_opened'; gift: string | null }
   | { ts: string; session: string; source: Source; event: Exclude<UsEvent, 'occasion_chip'> }
   | { ts: string; session: string; source: Source; event: 'occasion_chip'; code: (typeof US_CHIP_CODES)[number] | null }
@@ -102,6 +106,10 @@ export function parseClientEvent(body: unknown, now: Date): AnalyticsEvent | nul
   if (b.event === 'page_view') {
     const language = (LANGUAGES as readonly string[]).includes(b.language as string) ? (b.language as Language) : null
     return { ts, session, source, event: 'page_view', language, src: sourceBucket(b.ref, typeof b.own === 'string' ? b.own : undefined) }
+  }
+  if (b.event === 'tool_landed') {
+    const language = (LANGUAGES as readonly string[]).includes(b.language as string) ? (b.language as Language) : null
+    return { ts, session, source, event: 'tool_landed', language, tool: (TOOL_GROUPS as readonly string[]).includes(b.tool as string) ? (b.tool as ToolGroup) : 'unknown' }
   }
   if (b.event === 'receiver_opened') return { ts, session, source, event: 'receiver_opened', gift: typeof b.gift === 'string' && /^RG-[A-Za-z0-9_-]{8,80}$/.test(b.gift) ? tokenHash(b.gift) : null }
   if ((FLOW_EVENTS as readonly string[]).includes(b.event as string)) {

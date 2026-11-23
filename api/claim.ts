@@ -10,6 +10,7 @@
 //
 // Web-standard handlers like api/order.ts: mounted by server/app.ts.
 
+import { cleanTool } from '../src/order/tool.ts'
 import { createHmac, timingSafeEqual } from 'node:crypto'
 import { createOrderStore, type OrderStore } from '../engine/order-store.ts'
 import { SlidingWindowLimiter, clientIp } from '../engine/rate-limit.ts'
@@ -128,6 +129,8 @@ export function createClaimHandlers(deps: () => ClaimDeps, limits: ClaimLimits =
                 await d.store.put(ref, seen)
                 await recordCustomerEvent(d.store, { email, browser: seen.visitor ?? null }, yen === 0 ? 'ordered_free' : 'ordered_paid', { order: facts.name ?? undefined, ref, ...(yen !== null ? { amount: yen } : {}), language: seen.production.language }, at)
               }
+              // Ticket 7: an order that came from the Relationship Map tool is marked from its hidden cart attributes (src=tool, lv, offer) and from what it paid: `paid` false = a free gift (total 0)
+              seen = await markToolOrder(d.store, seen, facts)
               if (d.onOrderPaid) await d.onOrderPaid(seen, facts).catch((err) => console.error('[ichirei-paid] onOrderPaid failed', err instanceof Error ? err.message : err))
               if (d.onPaid) await d.onPaid(seen).catch((err) => console.error('[ichirei-paid] onPaid failed', err instanceof Error ? err.message : err))
             }
@@ -143,6 +146,20 @@ export function createClaimHandlers(deps: () => ClaimDeps, limits: ClaimLimits =
       return json(200, { ok: true, waiting: true })
     },
   }
+}
+
+/** Ticket 7: the paid-order webhook reads the cart attributes `src` / `lv` / `offer` and marks the order as coming from the tool (the record made at checkout already says so; the attributes win when it does not). */
+export async function markToolOrder(store: OrderStore, rec: OrderRecord, facts: ShopifyOrderFacts): Promise<OrderRecord> {
+  const attr = (k: string): string | null => facts.attrs.find((a) => a.key === k)?.value ?? null
+  const fromCart = cleanTool({ src: attr('src'), lv: attr('lv'), offer: attr('offer') })
+  const base = rec.tool ?? fromCart
+  if (!base) return rec
+  const amount = Number(facts.amount)
+  const paid = Number.isFinite(amount) ? amount > 0 : rec.tool?.paid
+  const next: OrderRecord = { ...rec, tool: { ...base, ...(paid === undefined ? {} : { paid }) } }
+  if (JSON.stringify(next.tool) === JSON.stringify(rec.tool)) return rec
+  await store.put(rec.order_ref, next)
+  return next
 }
 
 /** The webhook's follow-up for an order made on our site: the first completeness try of the paid gift starts in the background (engine/gift-check.ts). */

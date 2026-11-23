@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useAuth } from '../auth/auth.ts'
+import { getTool } from './tool-store.ts'
 import { motion, useReducedMotion } from 'framer-motion'
 import type { Candidate, EngineResult } from './types'
 import type { Copy, InscriptionStyle, OrderField, PackageId, UiLanguage } from './i18n'
@@ -237,7 +238,8 @@ export default function OrderForm({ result, story, followUps = [], promptQuestio
           ...(poemIds.length ? { poems: poemIds.map((poem_id) => ({ poem_id })) } : {}),
           ...(refundAckAt ? { refund_ack_at: refundAckAt } : {}),
           ...(claim ? { claim: { order: claim.order, token: claim.token } } : {}),
-          ...(Object.keys(getUtm()).length > 0 && !replyMode ? { utm: getUtm() } : {}), // (every language since 2026-11-20; not for a gift back)
+          ...(Object.keys(getUtm()).length > 0 && !replyMode ? { utm: getUtm() } : {}),
+          ...(getTool() && !replyMode ? { tool: getTool() } : {}), // Ticket 7: a visit from the Relationship Map tool (src, lv, offer — nothing personal) goes with the gift // (every language since 2026-11-20; not for a gift back)
           session: sessionId,
           source: 'customer',
         }),

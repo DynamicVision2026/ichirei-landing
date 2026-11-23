@@ -2,6 +2,9 @@ import { Suspense, lazy } from 'react'
 import RevealPage from './reveal/RevealPage.tsx'
 import { setLanguage } from './lang-store.ts'
 import { captureUtm } from './demo/utm-store.ts'
+import { captureTool, getTool } from './demo/tool-store.ts'
+import { trackToolLanding } from './demo/analytics.ts'
+import { writePath } from './reveal/paths.ts'
 import { examplesLangOf, writeLangOf } from './reveal/paths.ts'
 
 // Minimal path-based routing (thin, per the harness's "choose thinner" rule):
@@ -21,6 +24,20 @@ const ExamplesPage = lazy(() => import('./reveal/Examples.tsx'))
 export default function Routes() {
   const path = window.location.pathname
   captureUtm() // (the arrival's utm_* parameters, kept for the tab: they travel with an English order)
+  // Ticket 7, Part 29: a visitor from the Relationship Map tool (?src=tool&lv=…&offer=…) is counted once per arrival and goes straight to the writing room of the address's language — no hero, no explanation
+  const toolNew = captureTool()
+  const toolNow = getTool()
+  const landingLang = path === '/' ? 'ja' : /^\/en\/?$/.test(path) ? 'en' : /^\/zh\/?$/.test(path) ? 'zh-Hant' : null
+  if (toolNew) trackToolLanding(landingLang ?? (writeLangOf(path) ?? 'ja'), toolNow?.lv ?? null)
+  if (toolNow && landingLang && new URLSearchParams(window.location.search).get('src') === 'tool') {
+    setLanguage(landingLang)
+    try {
+      window.history.replaceState(null, '', writePath(landingLang) + window.location.search)
+    } catch {
+      // an address that cannot be changed: the room still opens
+    }
+    return <RevealPage write />
+  }
   if (path === '/track' || path.startsWith('/track/')) {
     return (
       <Suspense fallback={null}>

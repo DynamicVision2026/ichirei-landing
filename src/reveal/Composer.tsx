@@ -1,5 +1,7 @@
 import { ExamplesButton } from './Examples.tsx'
 import { WriteGuide } from './WriteGuide.tsx'
+import { getTool } from '../demo/tool-store.ts'
+import { toolLine } from '../order/tool.ts'
 import { toRevealLang } from './lang.ts'
 import { useEffect, useRef, useState } from 'react'
 import { trackFlow, trackUs } from '../demo/analytics'
@@ -208,6 +210,16 @@ export default function Composer({ story, onStoryChange, onSubmit, copy, lang, c
   storyRef.current = story
   useEffect(() => () => recognitionRef.current?.stop(), [])
 
+  // Ticket 7, Part 29: a visitor from the Relationship Map tool sees one quiet line above the box, by the level of the person (none without a valid level), and lands on the box itself
+  const toolItems = getTool()
+  const rl = toRevealLang(context.language)
+  const toolText = toolItems ? toolLine(rl === 'en' ? 'en' : rl === 'zh-Hant' ? 'zh-Hant' : 'ja', toolItems.lv) : null
+  useEffect(() => {
+    if (!toolItems) return
+    const t = window.setTimeout(() => document.querySelector('[data-testid=story-headline]')?.scrollIntoView({ block: 'start', behavior: 'auto' }), 60)
+    return () => window.clearTimeout(t)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
   // Part 24 (2026-11-21): the rotating 「ヒント」 question is gone — the line and the four guides under the headline replace it — so no question is chosen, shown or sent with the order.
   useEffect(() => {
     if (questionId !== null) onQuestionChange(null)
@@ -421,6 +433,7 @@ export default function Composer({ story, onStoryChange, onSubmit, copy, lang, c
       <label className="qHeadline" htmlFor="moment" data-testid="story-headline">
         {o.headline}
       </label>
+      {toolText && <p className="toolLine" data-testid="tool-line">{toolText}</p>}
       <WriteGuide lang={toRevealLang(context.language)} />
       <textarea
         id="moment"

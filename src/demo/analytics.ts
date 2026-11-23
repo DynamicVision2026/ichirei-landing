@@ -125,6 +125,21 @@ export function trackPageView(language: string): void {
   }
 }
 
+/** Part 29 (Ticket 7): a visit that arrived from the Relationship Map tool, counted once per arrival — the language and the level GROUP only (near / middle / far / unknown), never the exact level or anything else. */
+export function trackToolLanding(language: string, lv: number | null): void {
+  try {
+    const group = lv === 1 || lv === 2 ? 'near' : lv === 3 || lv === 4 ? 'middle' : lv !== null && lv >= 5 && lv <= 7 ? 'far' : 'unknown'
+    void fetch('/api/analytics', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ session: sessionId, source: 'customer', event: 'tool_landed', language, tool: group }),
+      keepalive: true,
+    }).catch(() => {})
+  } catch {
+    // analytics must never get in the way
+  }
+}
+
 /** The receiver opened the envelope of a gift: the gift link goes to the server only to be hashed (never stored as it is). */
 export function trackReceiverOpened(token: string): void {
   try {

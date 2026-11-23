@@ -84,6 +84,10 @@ export interface GiftRecord {
   to: string
   /** The short message for the card (60 characters at most); empty when none. */
   message: string
+  /** Ticket 7: set when the gift was made from a visit that came from the Relationship Map tool. */
+  src?: 'tool'
+  lv?: number | null
+  offer?: string | null
   size_code: string
   package: PackageId
   ship_to: 'none' | 'me' | 'direct' | 'egift'
@@ -137,6 +141,8 @@ export function buildGiftRecord(record: OrderRecord, animationId: string, token:
     from: p.sender_name,
     to: p.receiver_name,
     message: p.gift_message ?? '',
+    // Ticket 7: a visit from the Relationship Map tool goes with the gift record (src, lv, offer — nothing personal)
+    ...(record.tool ? { src: 'tool' as const, lv: record.tool.lv, offer: record.tool.offer } : {}),
     size_code: p.size_code ?? PACKAGE_SKU[p.package],
     package: p.package,
     ship_to: ship,

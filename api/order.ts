@@ -32,7 +32,7 @@ import { recordOrderIndex } from '../engine/egift-ops.ts'
 import { filmInputFromRecord, filmWaitMs, raceTimeout, trackFilm } from '../engine/film-store.ts'
 import { makeFilm, type FilmInput, type FilmRecord } from '../engine/film.ts'
 import { cleanSession, cleanSource, recordEvent } from '../engine/analytics.ts'
-import { POEM_ID_PATTERN, buildRecord, lineAttributes, newOrderRef, parseOrderRequest, type OrderRecord, type StoredPoem, type ValidOrder } from '../engine/order.ts'
+import { POEM_ID_PATTERN, buildRecord, lineAttributes, toolCartAttributes, newOrderRef, parseOrderRequest, type OrderRecord, type StoredPoem, type ValidOrder } from '../engine/order.ts'
 import { createOrderStore, type OrderStore } from '../engine/order-store.ts'
 import type { Palette } from '../engine/palette.ts'
 import { sessionAccount } from '../engine/accounts.ts'
@@ -376,7 +376,7 @@ export function createOrderHandler(deps: () => OrderDeps) {
         } catch {
           myGiftsLink = null
         }
-        cart = await createCart(d.shopify!, order.package, lineAttributes(order, orderRef, animationLink, giftLink, myGiftsLink), orderRef, d.fetchImpl, order.page_language, heldCart, d.promoRetryMs, buyerEmail)
+        cart = await createCart(d.shopify!, order.package, lineAttributes(order, orderRef, animationLink, giftLink, myGiftsLink), orderRef, d.fetchImpl, order.page_language, heldCart, d.promoRetryMs, buyerEmail, toolCartAttributes(order.tool))
       } catch (err) {
         if (err instanceof PromoCartNotFree) return promoBreak(record, orderRef, putOrder, d)
         throw err

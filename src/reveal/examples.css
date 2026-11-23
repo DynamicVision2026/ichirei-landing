@@ -52,3 +52,6 @@
 .wgPoem{margin-top:1.2rem;display:grid;gap:.2rem}
 .wgPoemLine{font:500 1rem/1.8 var(--kanji,serif);color:#2A221B}
 .wgTo{display:inline-block;margin-top:.5rem;color:var(--ink,#1F2A44);font:500 .9rem var(--display,system-ui);text-decoration:underline;text-underline-offset:3px}
+
+/* Ticket 7, Part 29: the one quiet line above the writing box for a visitor from the Relationship Map tool */
+.toolLine{margin:.1rem 0 .5rem;font:300 .95rem/1.7 var(--kanji,serif);letter-spacing:.04em;color:#5C564D}
