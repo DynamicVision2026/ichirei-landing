@@ -303,6 +303,7 @@ export function createApp(config: ServerConfig): Hono {
   app.get('/ops/stats', limited(opsLimit), (c) => statsHandlers.page(c.req.raw))
   app.get('/ops/customers', limited(opsLimit), (c) => customerHandlers.page(c.req.raw))
   app.get('/ops/stats.json', limited(opsLimit), (c) => statsHandlers.json(c.req.raw))
+  app.get('/ops/stats/savers', limited(opsLimit), (c) => statsHandlers.savers(c.req.raw))
   app.get('/ops/card/:file', limited(opsLimit), (c) => opsHandlers.card(c.req.raw, c.req.param('file').replace(/\.pdf$/, '')))
   app.get('/ops/cards/today.pdf', limited(opsLimit), (c) => opsHandlers.cardsToday(c.req.raw))
   app.get('/ops/wooden-today.csv', limited(opsLimit), (c) => opsHandlers.woodenCsv(c.req.raw))

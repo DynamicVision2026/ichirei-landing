@@ -4,7 +4,7 @@
 // mark, counted on the day they were made (a free gift = a paid-state order with a total of 0; "paid order" = one that paid money). Counts only: no email, no name, no gift text, no session id.
 
 import { analyticsDay, type AnalyticsEvent, type ToolGroup } from './analytics.ts'
-import type { ToolLang, ToolStats } from './tool-stats.ts'
+import { funnelLang, type ToolLang, type ToolStats } from './tool-stats.ts'
 import { lvGroup } from '../src/order/tool.ts'
 import type { OrderRecord } from './order.ts'
 
@@ -67,12 +67,12 @@ export function computeToolFunnel(input: { events: AnalyticsEvent[]; orders: Too
   // 1 and 2: the tool's numbers (clicks per level when the tool says them, otherwise under "unknown")
   for (const tr of input.tool?.rows ?? []) {
     const groups: Array<[ToolGroup, number[]]> = [['near', [0, 1]], ['middle', [2, 3]], ['far', [4, 5, 6]]]
-    for (const [g, idx] of groups) row(tr.day, tr.lang, g).measured += idx.reduce((a, i) => a + (tr.results[i] ?? 0), 0)
+    for (const [g, idx] of groups) row(tr.day, funnelLang(tr.lang), g).measured += idx.reduce((a, i) => a + (tr.results[i] ?? 0), 0)
     const byGroup = tr.clicksByGroup?.ichirei
     const byLevel = tr.clicksByLevel?.ichirei
-    if (byGroup) for (const [g] of groups) row(tr.day, tr.lang, g).clicked += byGroup[g as 'near' | 'middle' | 'far']
-    else if (byLevel) for (const [g, idx] of groups) row(tr.day, tr.lang, g).clicked += idx.reduce((a, i) => a + (byLevel[i] ?? 0), 0)
-    else if ((tr.clicks.ichirei ?? 0) > 0) row(tr.day, tr.lang, 'unknown').clicked += tr.clicks.ichirei
+    if (byGroup) for (const [g] of groups) row(tr.day, funnelLang(tr.lang), g).clicked += byGroup[g as 'near' | 'middle' | 'far']
+    else if (byLevel) for (const [g, idx] of groups) row(tr.day, funnelLang(tr.lang), g).clicked += idx.reduce((a, i) => a + (byLevel[i] ?? 0), 0)
+    else if ((tr.clicks.ichirei ?? 0) > 0) row(tr.day, funnelLang(tr.lang), 'unknown').clicked += tr.clicks.ichirei
   }
   return [...rows.values()].sort((a, b) => (a.day < b.day ? 1 : a.day > b.day ? -1 : a.lang.localeCompare(b.lang) || a.group.localeCompare(b.group)))
 }

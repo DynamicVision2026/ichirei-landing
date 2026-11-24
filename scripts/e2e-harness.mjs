@@ -3726,6 +3726,8 @@ const SECTION_ORDER = ['.hero', '.strip', '.philo', '#shape', '#angles', '#how',
   const ordersSnapshot = () => page.evaluate(() => [...document.querySelectorAll('table')].at(-1).querySelectorAll('tbody tr')).then(async () => page.evaluate(() => [...[...document.querySelectorAll('table')].at(-1).querySelectorAll('tbody tr')].map((tr) => { const c = [...tr.children].map((td) => td.textContent); return [c[0], c[1], c[3], c[7]].join('|') })))
   check('dashboard: opens in Japanese by default with the title and the four period tabs', (await page.title()) === L.ja.title && (await page.locator('#title').innerText()) === L.ja.title && (await page.locator('#tabs button').allInnerTexts()).join() === L.ja.periods.join() && (await page.locator('html').getAttribute('lang')) === 'ja')
   check('dashboard: the language switch is at the top right with the four names, 日本語 pressed', (await page.locator('#langs button').allInnerTexts()).join() === '日本語,English,繁體中文,简体中文' && (await page.locator('#langs button[data-lang=ja]').getAttribute('aria-pressed')) === 'true' && (await page.evaluate(() => { const r = document.getElementById('langs').getBoundingClientRect(); return r.right > window.innerWidth - 40 && r.top < 80 })))
+  check('dashboard: the page opens on 7 days, not today', (await page.locator('#tabs button').nth(1).getAttribute('aria-pressed')) === 'true' && (await page.locator('#tabs button').nth(0).getAttribute('aria-pressed')) === 'false')
+  await page.locator('#tabs button').nth(0).click()
   const jaValues = await tileValues()
   const jaOrders = await ordersSnapshot()
   check('dashboard: six numbers for today (made-up month): 46 visits, 2 paid, revenue with ¥ and thousands separator', jaValues.length === 6 && jaValues[0] === '46' && jaValues[3] === '2' && /^¥\d{1,3}(,\d{3})*$/.test(jaValues[4]) && /^¥\d/.test(jaValues[5]), jaValues.join(' '))
@@ -3746,7 +3748,7 @@ const SECTION_ORDER = ['.hero', '.strip', '.philo', '#shape', '#angles', '#how',
     check(`dashboard (${lang}): title, period tabs, six number labels, funnel title, nine funnel steps, daily and source headings, orders heading, choice heading, privacy line — all in this language`,
       (await page.title()) === w.title && (await page.locator('#tabs button').allInnerTexts()).join() === w.periods.join() && w.tiles.every((x, i) => labels[i] === x) && body.includes(w.funnel) && w.steps.every((x) => body.includes(x)) && body.includes(w.daily) && body.includes(w.source) && body.includes(w.orders) && body.includes(w.choice) && body.includes(w.rounds) && body.includes(w.privacy), `${labels.join('|')}`)
     check(`dashboard (${lang}): the eleven column headings are the owner's`, (await page.locator('table').last().locator('thead th').allInnerTexts()).join() === w.cols.join(), (await page.locator('table').last().locator('thead th').allInnerTexts()).join())
-    const keysSeen = await page.evaluate(() => { const keys = JSON.parse(document.getElementById('d').textContent).keys; const b = document.body.innerText; const leaked = keys.filter((k) => k.includes('_') && new RegExp('(^|[^a-z0-9_])' + k + '([^a-z0-9_]|$)').test(b)); const bare = [...document.querySelectorAll('#app *, #tabs *')].filter((e) => e.children.length === 0 && keys.includes((e.textContent ?? '').trim())).map((e) => e.textContent.trim()); return [...leaked, ...bare] })
+    const keysSeen = await page.evaluate(() => { const keys = JSON.parse(document.getElementById('d').textContent).keys; const b = document.body.innerText; const leaked = keys.filter((k) => k.includes('_') && new RegExp('(^|[^a-z0-9_])' + k + '([^a-z0-9_]|$)').test(b)); const bare = [...document.querySelectorAll('#app *, #tabs *')].filter((e) => e.children.length === 0 && !e.closest('#savers') && keys.includes((e.textContent ?? '').trim())).map((e) => e.textContent.trim()); return [...leaked, ...bare] })
     check(`dashboard (${lang}): no label key, no {placeholder}, no "undefined" shows`, keysSeen.length === 0 && !/[{}]|undefined|NaN/.test(body), keysSeen.join(' ') || body.match(/[{}]|undefined|NaN/)?.[0])
     check(`dashboard (${lang}): the data does not change with the language (same numbers, same characters, order numbers and amounts)`, (await tileValues()).join() === jaValues.join() && (await ordersSnapshot()).join('\n') === jaOrders.join('\n'))
     check(`dashboard (${lang}): <html lang> follows the switch and the page has no sideways scroll`, (await page.locator('html').getAttribute('lang')) === lang && (await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 1)))
@@ -7753,6 +7755,61 @@ for (const [lang, locale, text] of [['en', 'en-US', 'Your gift is being finished
     check('normal visit: its order carries no tool items', g.calls.order.length === 1 && !('tool' in g.calls.order[0]))
     await g.page.close()
   }
+}
+
+// ---------- Run 61 (2026-11-23, Part B): the owner dashboard shows every number the tool counts (per day and language, UTC, totals row, the 7 x 7 table) and the saved-map emails (search, CSV), against a mocked tool; each part says on its own line when the tool cannot be reached ----------
+{
+  const { spawn } = await import('node:child_process')
+  const child = spawn(process.execPath, ['--experimental-strip-types', '--disable-warning=ExperimentalWarning', 'scripts/stats-fixture-server.ts'], { stdio: ['ignore', 'pipe', 'inherit'] })
+  const port = await new Promise((resolve, reject) => {
+    const t = setTimeout(() => reject(new Error('fixture server did not start')), 30000)
+    child.stdout.on('data', (b) => { const m = /listening (\d+)/.exec(String(b)); if (m) { clearTimeout(t); resolve(Number(m[1])) } })
+  })
+  const B = `http://127.0.0.1:${port}`
+  const ctx = await browser.newContext({ httpCredentials: { username: 'owner', password: 'pw' }, viewport: { width: 1280, height: 900 }, acceptDownloads: true })
+  const page = await ctx.newPage()
+  const errors = []
+  page.on('pageerror', (e) => errors.push(String(e)))
+  page.on('console', (m) => { if (m.type() === 'error') errors.push(m.text()) })
+  const urls = []
+  page.on('request', (r) => urls.push(r.url()))
+  await page.goto(`${B}/ops/stats`, { waitUntil: 'load' })
+  await page.waitForSelector('[data-testid=saver-row]')
+  check('tool dashboard: opens on 7 days and the day column says (UTC)', (await page.locator('#tabs button[aria-pressed=true]').innerText()) === '7日間' && (await page.locator('[data-testid=tool-map] th').first().innerText()).includes('UTC'))
+  const rows7 = await page.locator('[data-testid=tool-map] tbody tr[data-day]').count()
+  check('tool dashboard: one row per day and language (4 languages × 7 days) and a totals row', rows7 === 28 && (await page.locator('[data-testid=tool-map] tr.total').count()) === 1)
+  const tot = await page.locator('[data-testid=tool-map] tr.total td').allInnerTexts()
+  const sums = await page.evaluate(() => [...document.querySelectorAll('[data-testid=tool-map] tbody tr[data-day]')].reduce((a, tr) => { const c = [...tr.children].map((td) => td.textContent); return [a[0] + Number(c[2]), a[1] + Number(c[7])] }, [0, 0]))
+  check('tool dashboard: the totals row adds the rows (starts, result 1)', Number(tot[2]) === sums[0] && Number(tot[7]) === sums[1] && sums[0] > 0 && sums[1] > 0)
+  check('tool dashboard: a new no-result reason shows by its code, and the 7 × 7 table holds the pairs (3|3 and 7|1)', (await page.locator('[data-testid=tool-map-actions]').innerText()).includes('odd_new_reason') && (await page.locator('[data-testid=tool-felt] td[data-pair="7|1"]').innerText()) === '7' && Number(await page.locator('[data-testid=tool-felt] td[data-pair="3|3"]').innerText()) > 0 && (await page.locator('[data-testid=tool-felt] tbody tr').count()) === 7)
+  check('tool dashboard: put on the map by group, clicks per product and near/middle/far are shown', (await page.locator('[data-testid=tool-map-actions]').innerText()).includes('ichirei') && (await page.locator('[data-testid=tool-map-actions] th').allInnerTexts()).length === 9)
+  const trs = page.locator('[data-testid=saver-row]')
+  check('savers: the three made-up rows are listed with a count at the top', (await trs.count()) === 3 && (await page.locator('[data-testid=savers-count]').innerText()).includes('3'))
+  await page.locator('#langs button[data-lang="en"]').click()
+  const noRow = page.locator('[data-testid=saver-row]', { hasText: 'no.reminders@example.com' })
+  check('savers: a row with reminders false shows "no" (and news "yes"); a row with reminders true shows "yes"', (await noRow.locator('[data-col=reminders]').innerText()) === 'no' && (await noRow.locator('[data-col=news]').innerText()) === 'yes' && (await page.locator('[data-testid=saver-row]', { hasText: 'hanako.sample' }).locator('[data-col=reminders]').innerText()) === 'yes')
+  await page.locator('#langs button[data-lang="ja"]').click()
+  check('savers (ja): the same row says いいえ for reminders false', (await page.locator('[data-testid=saver-row]', { hasText: 'no.reminders@example.com' }).locator('[data-col=reminders]').innerText()) === 'いいえ')
+  await page.locator('[data-testid=savers-search]').fill('ming')
+  check('savers: the search narrows the list', (await trs.count()) === 1 && (await page.locator('[data-testid=savers-count]').innerText()).includes('1'))
+  await page.locator('[data-testid=savers-search]').fill('')
+  const [dl] = await Promise.all([page.waitForEvent('download'), page.locator('[data-testid=savers-csv]').click()])
+  const csv = readFileSync(await dl.path(), 'utf8')
+  check('savers: Download CSV gives the list with a header and the "no" for the reminders:false row', dl.suggestedFilename().endsWith('.csv') && csv.includes('email,language') && /no\.reminders@example\.com,en,[^,]*,[^,]*,1,no,yes/.test(csv) && csv.trim().split(/\r?\n/).length === 4)
+  check('savers: no address is ever in a link or request URL, and the stats payload has none', urls.every((u) => !u.includes('example.com') && !u.includes('%40')) && !(await (await fetch(`${B}/ops/stats.json`, { headers: { authorization: 'Basic ' + Buffer.from('owner:pw').toString('base64') } })).text()).includes('example.com') && (await fetch(`${B}/ops/stats/savers`)).status === 401)
+  for (const [lang, w] of [['en', 'Saved-map emails (tool)'], ['zh-Hant', null], ['ja', null]]) {
+    await page.locator(`#langs button[data-lang="${lang}"]`).click()
+    const title = await page.locator('[data-testid=savers-title]').innerText()
+    check(`tool dashboard (${lang}): the saver section and the tool table have their own titles in this language`, title.length > 3 && (!w || title === w) && (await page.locator('[data-testid=tool-map-title]').innerText()).length > 3 && (await page.locator('[data-testid=savers] th').first().innerText()).length > 1)
+  }
+  await fetch(`${B}/__tool/down`)
+  await page.reload({ waitUntil: 'load' })
+  await page.waitForSelector('[data-testid=savers-unavailable]')
+  check('tool down: each section says so on its own line and the rest of the page still works', (await page.locator('[data-testid=tool-unavailable]').count()) === 1 && (await page.locator('[data-testid=savers-unavailable]').count()) === 1 && (await page.locator('#numbers .num').count()) === 6)
+  await fetch(`${B}/__tool/up`)
+  check('tool dashboard: no script errors', errors.length === 0, errors.join(' | '))
+  await ctx.close()
+  child.kill()
 }
 
 await browser.close()

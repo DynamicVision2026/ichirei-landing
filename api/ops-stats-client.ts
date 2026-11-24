@@ -7,7 +7,7 @@ export const STATS_CLIENT_JS = String.raw`
   var D = JSON.parse(document.getElementById('d').textContent);
   var KEY = 'ichirei-stats-lang', PKEY = 'ichirei-stats-period';
   var PERIODS = ['today', 'd7', 'd30', 'all'];
-  var lang = 'ja', period = 'today';
+  var lang = 'ja', period = 'd7';
   try { var s = localStorage.getItem(KEY); if (D.langs.indexOf(s) >= 0) lang = s; } catch (e) {}
   try { var p = sessionStorage.getItem(PKEY); if (PERIODS.indexOf(p) >= 0) period = p; } catch (e) {}
   function esc(x) { return String(x == null ? '' : x).replace(/[&<>"']/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]; }); }
@@ -174,19 +174,113 @@ export const STATS_CLIENT_JS = String.raw`
     if (i === 0) return '';
     return prev > 0 ? pct(c[k], prev) + '%' + (k === 'free' || k === 'paid' ? ' (&larr;5)' : '') : '&mdash;';
   }
+  // The tool's own numbers (Part B, 2026-11-23): every field it sends, per day (UTC) and language, a totals row for the period, the "how close do you feel" pairs as a 7 x 7 table
+  function utcDay(ms) { return new Date(ms).toISOString().slice(0, 10); }
+  function inUtc(day) {
+    if (period === 'all') return true;
+    var now = Date.parse(D.now), n = period === 'today' ? 1 : period === 'd7' ? 7 : 30;
+    return day >= utcDay(now - (n - 1) * 86400000) && day <= utcDay(now);
+  }
+  function addTo(a, b) { for (var k in b) a[k] = (a[k] || 0) + b[k]; return a; }
+  function listOf(o, fmt) {
+    var ks = Object.keys(o || {}).sort(), out = [];
+    ks.forEach(function (k) { if (o[k]) out.push(esc(fmt ? fmt(k) : k) + '&nbsp;' + num(o[k])); });
+    return out.length ? out.join(' · ') : '&mdash;';
+  }
+  function groupLabel(g) { return { family: t('tm_g_family'), partner: t('tm_g_partner'), friends: t('tm_g_friends'), work: t('tm_g_work'), clients: t('tm_g_clients') }[g] || g; }
+  function usd(n) { return '$' + (n > 0 && n < 0.1 ? n.toFixed(4) : n.toFixed(2)); }
+  function sumLevels(a, b) { return a.map(function (x, i) { return x + (b[i] || 0); }); }
+  function groupClicks(c) {
+    var ks = Object.keys(c || {}).sort(), out = [];
+    ks.forEach(function (k) { out.push(esc(k) + '&nbsp;' + num(c[k].near) + '/' + num(c[k].middle) + '/' + num(c[k].far)); });
+    return out.length ? out.join(' · ') : '&mdash;';
+  }
+  function emptyTotal() { return { starts: 0, shots: 0, taps: 0, readings: 0, costUsd: 0, results: [0, 0, 0, 0, 0, 0, 0], noResult: 0, noResultBy: {}, mapped: null, placed: {}, warmOpens: 0, clicks: {}, clicksByGroup: {} }; }
+  function addRow(t0, r) {
+    t0.starts += r.starts; t0.shots += r.shots; t0.taps += r.taps; t0.readings += r.readings; t0.costUsd += r.costUsd; t0.noResult += r.noResult; t0.warmOpens += r.warmOpens;
+    t0.results = sumLevels(t0.results, r.results); addTo(t0.noResultBy, r.noResultBy || {}); addTo(t0.placed, r.placed || {}); addTo(t0.clicks, r.clicks || {});
+    if (r.mapped != null) t0.mapped = (t0.mapped || 0) + r.mapped;
+    var g = r.clicksByGroup || {}; for (var k in g) { var c = t0.clicksByGroup[k] || (t0.clicksByGroup[k] = { near: 0, middle: 0, far: 0 }); c.near += g[k].near; c.middle += g[k].middle; c.far += g[k].far; }
+  }
+  function sum7(a) { return a.reduce(function (x, y) { return x + y; }, 0); }
   function renderToolMap() {
     var T = D.tool || {}, m = T.map;
     var h = '<h2 data-testid="tool-map-title">' + esc(t('tm_title')) + '</h2>';
     if (!m) return h + '<p class="warn" data-testid="tool-unavailable">' + esc(t('tm_unavailable')) + '</p>';
-    var rows = (m.rows || []).filter(function (r) { return inPer(r.day); }).sort(function (a, b) { return a.day < b.day ? 1 : a.day > b.day ? -1 : a.lang < b.lang ? -1 : 1; });
+    var rows = (m.rows || []).filter(function (r) { return inUtc(r.day); }).sort(function (a, b) { return a.day < b.day ? 1 : a.day > b.day ? -1 : a.lang < b.lang ? -1 : 1; });
     if (!rows.length) return h + '<p class="note" data-testid="tool-map-none">' + esc(t('tm_none')) + '</p>';
-    h += '<div class="wide"><table data-testid="tool-map"><thead><tr><th>' + esc(t('tm_day')) + '</th><th>' + esc(t('tm_lang')) + '</th><th class="n">' + esc(t('tm_starts')) + '</th><th class="n">' + esc(t('tm_results')) + '</th><th class="n">' + esc(t('tm_noresult')) + '</th><th class="n">' + esc(t('tm_mapped')) + '</th><th class="n">' + esc(t('tm_warm')) + '</th><th>' + esc(t('tm_clicks')) + '</th></tr></thead><tbody>';
-    rows.forEach(function (r) {
-      var clicks = Object.keys(r.clicks || {}).sort().map(function (k) { return esc(k) + ' ' + num(r.clicks[k]); }).join(' · ') || '&mdash;';
-      h += '<tr data-day="' + esc(r.day) + '" data-lang="' + esc(r.lang) + '"><td>' + esc(r.day) + '</td><td>' + esc(r.lang) + '</td><td class="n">' + num(r.starts) + '</td><td class="n">' + (r.results || []).map(num).join(' · ') + '</td><td class="n">' + num(r.noResult) + '</td><td class="n">' + (r.mapped == null ? '&mdash;' : num(r.mapped)) + '</td><td class="n">' + num(r.warmOpens) + '</td><td>' + clicks + '</td></tr>';
-    });
-    return h + '</tbody></table></div><p class="note">' + esc(t('tm_note')) + '</p>';
+    var tot = emptyTotal(), felt = {};
+    rows.forEach(function (r) { addRow(tot, r); addTo(felt, r.felt || {}); });
+    var h1 = '<h2 style="font-size:.95rem">' + esc(t('tm_sub_readings')) + '</h2><div class="wide"><table data-testid="tool-map"><thead><tr><th>' + esc(t('tm_day')) + '</th><th>' + esc(t('tm_lang')) + '</th><th class="n">' + esc(t('tm_starts')) + '</th><th class="n">' + esc(t('tm_shots')) + '</th><th class="n">' + esc(t('tm_taps')) + '</th><th class="n">' + esc(t('tm_readings')) + '</th><th class="n">' + esc(t('tm_cost')) + '</th>';
+    for (var i = 1; i <= 7; i++) h1 += '<th class="n">' + i + '</th>';
+    h1 += '<th class="n">' + esc(t('tm_results_total')) + '</th></tr></thead><tbody>';
+    function line1(label, lang, r, cls) {
+      var x = '<tr' + (cls ? ' class="' + cls + '"' : '') + (label.day ? ' data-day="' + esc(label.day) + '" data-lang="' + esc(lang) + '"' : '') + '><td>' + (label.day ? esc(label.day) : '<b>' + esc(label.text) + '</b>') + '</td><td>' + esc(lang || '') + '</td><td class="n">' + num(r.starts) + '</td><td class="n">' + num(r.shots) + '</td><td class="n">' + num(r.taps) + '</td><td class="n">' + num(r.readings) + '</td><td class="n">' + usd(r.costUsd) + '</td>';
+      for (var j = 0; j < 7; j++) x += '<td class="n">' + num(r.results[j] || 0) + '</td>';
+      return x + '<td class="n"><b>' + num(sum7(r.results)) + '</b></td></tr>';
+    }
+    rows.forEach(function (r) { h1 += line1({ day: r.day }, r.lang, r); });
+    h1 += line1({ text: t('tm_totals') }, '', tot, 'total') + '</tbody></table></div>';
+    var h2 = '<h2 style="font-size:.95rem">' + esc(t('tm_sub_actions')) + '</h2><div class="wide"><table data-testid="tool-map-actions"><thead><tr><th>' + esc(t('tm_day')) + '</th><th>' + esc(t('tm_lang')) + '</th><th class="n">' + esc(t('tm_noresult')) + '</th><th>' + esc(t('tm_noresult_by')) + '</th><th class="n">' + esc(t('tm_mapped')) + '</th><th>' + esc(t('tm_mapped_by')) + '</th><th class="n">' + esc(t('tm_warm')) + '</th><th>' + esc(t('tm_clicks')) + '</th><th>' + esc(t('tm_clicks_group')) + '</th></tr></thead><tbody>';
+    function line2(label, lang, r, cls) {
+      return '<tr' + (cls ? ' class="' + cls + '"' : '') + (label.day ? ' data-day="' + esc(label.day) + '" data-lang="' + esc(lang) + '"' : '') + '><td>' + (label.day ? esc(label.day) : '<b>' + esc(label.text) + '</b>') + '</td><td>' + esc(lang || '') + '</td><td class="n">' + num(r.noResult) + '</td><td class="l">' + listOf(r.noResultBy) + '</td><td class="n">' + (r.mapped == null ? '&mdash;' : num(r.mapped)) + '</td><td class="l">' + listOf(r.placed, groupLabel) + '</td><td class="n">' + num(r.warmOpens) + '</td><td class="l">' + listOf(r.clicks) + '</td><td class="l">' + groupClicks(r.clicksByGroup) + '</td></tr>';
+    }
+    rows.forEach(function (r) { h2 += line2({ day: r.day }, r.lang, r); });
+    h2 += line2({ text: t('tm_totals') }, '', tot, 'total') + '</tbody></table></div>';
+    var fm = '<h2 style="font-size:.95rem">' + esc(t('tm_felt')) + '</h2><div class="wide"><table data-testid="tool-felt"><thead><tr><th>' + esc(t('tm_felt_row')) + '</th>';
+    for (var c = 1; c <= 7; c++) fm += '<th class="n">' + c + '</th>';
+    fm += '</tr></thead><tbody>';
+    for (var a = 1; a <= 7; a++) { fm += '<tr data-sense="' + a + '"><td><b>' + a + '</b></td>'; for (var b = 1; b <= 7; b++) fm += '<td class="n" data-pair="' + a + '|' + b + '">' + num(felt[a + '|' + b] || 0) + '</td>'; fm += '</tr>'; }
+    fm += '</tbody></table></div>';
+    return h + h1 + h2 + fm + '<p class="note">' + esc(t('tm_utc_note')) + ' ' + esc(t('tm_note')) + '</p>';
   }
+
+  // The saved-map emails (owner only): asked of the server on its own request when the page opens or the period changes — never part of the page's data, never in a link; the search and the CSV happen here in the browser
+  var SV = { key: null, state: 'idle', list: [], q: '' };
+  var DAYS = { today: 1, d7: 7, d30: 30, all: 0 };
+  function csvCell(v) { var s = String(v == null ? '' : v); if (/^[=+\-@\t\r]/.test(s)) s = "'" + s; return /[",\n\r]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s; }
+  function yesNo(b) { return b ? t('sv_yes') : t('sv_no'); }
+  function svShort(iso) { return iso ? String(iso).slice(0, 16).replace('T', ' ') : '—'; }
+  function svFiltered() { var q = SV.q.trim().toLowerCase(); return SV.list.filter(function (r) { return !q || r.email.toLowerCase().indexOf(q) >= 0 || String(r.lang || '').toLowerCase().indexOf(q) >= 0; }); }
+  function renderSaversShell() {
+    var h = '<h2 data-testid="savers-title">' + esc(t('sv_title')) + '</h2><div id="savers"></div>';
+    return h;
+  }
+  function drawSavers() {
+    var el = document.getElementById('savers'); if (!el) return;
+    if (SV.state === 'loading' || SV.state === 'idle') { el.innerHTML = '<p class="note" data-testid="savers-loading">' + esc(t('sv_loading')) + '</p>'; return; }
+    if (SV.state === 'down') { el.innerHTML = '<p class="warn" data-testid="savers-unavailable">' + esc(t('sv_unavailable')) + '</p>'; return; }
+    var rows = svFiltered();
+    var h = '<p class="note" data-testid="savers-count"><b>' + esc(t('sv_count', { n: num(rows.length) })) + '</b>' + (rows.length !== SV.list.length ? ' / ' + num(SV.list.length) : '') + ' · ' + esc(t('sv_note')) + '</p>';
+    h += '<p><input type="search" id="sv-q" data-testid="savers-search" value="' + esc(SV.q) + '" placeholder="' + esc(t('sv_search')) + '" aria-label="' + esc(t('sv_search')) + '" autocomplete="off" style="font:inherit;padding:.3rem .6rem;border:1px solid var(--line);border-radius:6px;min-width:15rem"> <button type="button" id="sv-csv" data-testid="savers-csv" style="font:inherit;padding:.3rem .8rem;border:1px solid var(--line);background:var(--card);border-radius:999px;cursor:pointer">' + esc(t('sv_csv')) + '</button></p>';
+    if (!rows.length) { el.innerHTML = h + '<p class="note" data-testid="savers-none">' + esc(t('sv_none')) + '</p>'; bindSavers(); return; }
+    h += '<div class="wide"><table data-testid="savers"><thead><tr><th>' + esc(t('sv_email')) + '</th><th>' + esc(t('sv_lang')) + '</th><th>' + esc(t('sv_first')) + '</th><th>' + esc(t('sv_last')) + '</th><th class="n">' + esc(t('sv_keymails')) + '</th><th>' + esc(t('sv_reminders')) + '</th><th>' + esc(t('sv_news')) + '</th></tr></thead><tbody>';
+    rows.forEach(function (r) { h += '<tr data-testid="saver-row"><td class="notranslate">' + esc(r.email) + '</td><td>' + esc(r.lang || '') + '</td><td>' + esc(svShort(r.first)) + '</td><td>' + esc(svShort(r.last)) + '</td><td class="n">' + num(r.count) + '</td><td data-col="reminders">' + esc(yesNo(r.reminders)) + '</td><td data-col="news">' + esc(yesNo(r.news)) + '</td></tr>'; });
+    el.innerHTML = h + '</tbody></table></div>';
+    bindSavers();
+  }
+  function bindSavers() {
+    var q = document.getElementById('sv-q');
+    if (q) q.addEventListener('input', function () { SV.q = q.value; var pos = q.selectionStart; drawSavers(); var n = document.getElementById('sv-q'); if (n) { n.focus(); try { n.setSelectionRange(pos, pos); } catch (e) {} } });
+    var b = document.getElementById('sv-csv');
+    if (b) b.addEventListener('click', function () {
+      var rows = svFiltered();
+      var lines = ['email,language,first_saved_utc,last_saved_utc,key_mails_sent,reminders,news'].concat(rows.map(function (r) { return [r.email, r.lang || '', r.first || '', r.last || '', r.count, r.reminders ? 'yes' : 'no', r.news ? 'yes' : 'no'].map(csvCell).join(','); }));
+      var blob = new Blob(['﻿' + lines.join('\r\n') + '\r\n'], { type: 'text/csv;charset=utf-8' });
+      var a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = 'saved-map-emails.csv'; document.body.appendChild(a); a.click(); a.remove();
+      setTimeout(function () { URL.revokeObjectURL(a.href); }, 2000);
+    });
+  }
+  function loadSavers() {
+    var key = period; if (SV.key === key && SV.state !== 'idle') { drawSavers(); return; }
+    SV.key = key; SV.state = 'loading'; SV.list = []; drawSavers();
+    fetch('/ops/stats/savers?days=' + DAYS[period], { credentials: 'same-origin', cache: 'no-store' }).then(function (r) { return r.ok ? r.json() : null; }).then(function (j) {
+      if (SV.key !== key) return;
+      if (j && j.ok && j.savers) { SV.list = j.savers; SV.state = 'ok'; } else SV.state = 'down';
+      drawSavers();
+    }).catch(function () { if (SV.key === key) { SV.state = 'down'; drawSavers(); } });
+  }
+
   function renderToolFunnel() {
     var rows = ((D.tool && D.tool.funnel) || []).filter(function (r) { return inPer(r.day); });
     var by = { near: zero(), middle: zero(), far: zero(), unknown: zero() }, all = zero(), lng = { ja: zero(), en: zero(), zh: zero() }, days = {};
@@ -210,7 +304,7 @@ export const STATS_CLIENT_JS = String.raw`
     h += '</tbody></table></div>';
     var dk = Object.keys(days).sort().reverse().slice(0, 14);
     if (dk.length) {
-      h += '<h2 style="font-size:.95rem">' + esc(t('tf_by_day')) + '</h2><div class="wide"><table data-testid="tool-funnel-day"><thead><tr><th>' + esc(t('tm_day')) + '</th>';
+      h += '<h2 style="font-size:.95rem">' + esc(t('tf_by_day')) + '</h2><div class="wide"><table data-testid="tool-funnel-day"><thead><tr><th>' + esc(t('tf_day')) + '</th>';
       STEPS.forEach(function (k, i) { h += '<th class="n">' + (i + 1) + '</th>'; });
       h += '</tr></thead><tbody>';
       dk.forEach(function (d) { h += '<tr data-day="' + esc(d) + '"><td>' + esc(d) + '</td>' + STEPS.map(function (k) { return '<td class="n">' + num(days[d][k]) + '</td>'; }).join('') + '</tr>'; });
@@ -232,8 +326,9 @@ export const STATS_CLIENT_JS = String.raw`
     document.getElementById('tabs').innerHTML = th;
     document.getElementById('app').innerHTML =
       renderPromo() + renderAttention() + (D.verified ? '' : '<p class="warn">' + esc(t('payments_unverified')) + '</p>') +
-      renderNumbers(s) + '<p class="note">' + esc(t('cost_note')) + '</p>' + renderChoice(s) + renderFunnel(s) + renderToolFunnel() + renderToolMap() + renderDaily(s) + renderSources(s) + renderHealth() + renderOrders() +
+      renderNumbers(s) + '<p class="note">' + esc(t('cost_note')) + '</p>' + renderChoice(s) + renderFunnel(s) + renderToolFunnel() + renderToolMap() + renderSaversShell() + renderDaily(s) + renderSources(s) + renderHealth() + renderOrders() +
       '<p class="note">' + esc(t('privacy_note')) + '</p>';
+    loadSavers();
   }
 
   document.addEventListener('click', function (e) {

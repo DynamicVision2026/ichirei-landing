@@ -27,7 +27,7 @@ import { computeStats, type ChosenSlot, type OrderState, type OrderStat, type St
 import { STATS_KEYS, STATS_LANGS, STATS_LANG_NAMES, statsDicts } from '../engine/stats-i18n.ts'
 import { checkOpsAuth, type OpsDeps } from './ops.ts'
 import { STATS_CLIENT_JS } from './ops-stats-client.ts'
-import { fetchToolStats, type ToolStats } from '../engine/tool-stats.ts'
+import { fetchToolSavers, fetchToolStats, type ToolStats } from '../engine/tool-stats.ts'
 import { computeToolFunnel, type FunnelRow } from '../engine/tool-funnel.ts'
 
 /** Events and orders are kept (and read) for 13 months. */
@@ -203,7 +203,7 @@ main{padding:0 1.2rem 3rem;max-width:1180px;margin:0 auto}
 .tabs{margin:1rem 0}.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:.7rem}
 .num{background:var(--card);border:1px solid var(--line);padding:.7rem .9rem;border-radius:6px}.num b{display:block;font-size:1.55rem;font-weight:600;line-height:1.3}.num span{display:block;color:var(--soft);font-size:.82rem}
 .num small{display:block;color:var(--soft);font-size:.78rem;margin-top:.15rem}
-table{border-collapse:collapse;width:100%;background:var(--card)}th,td{border:1px solid var(--line);padding:.3rem .5rem;text-align:left;white-space:nowrap;font-size:.88rem}.wide{overflow-x:auto}
+table{border-collapse:collapse;width:100%;background:var(--card)}th,td{border:1px solid var(--line);padding:.3rem .5rem;text-align:left;white-space:nowrap;font-size:.88rem}.wide{overflow-x:auto}td.l{white-space:normal;min-width:9rem;max-width:18rem}
 td.n,th.n{text-align:right;font-variant-numeric:tabular-nums}.k{font-size:1.2rem}
 .bar{display:grid;grid-template-columns:minmax(8rem,14rem) 1fr auto;gap:.6rem;align-items:center;margin:.25rem 0;font-size:.9rem}.bar i{display:block;height:1.05rem;background:var(--bar);border-radius:2px;min-width:2px}.bar em{font-style:normal;color:var(--soft);font-variant-numeric:tabular-nums;white-space:nowrap}
 .days{display:flex;align-items:flex-end;gap:2px;height:150px;background:var(--card);border:1px solid var(--line);padding:.5rem .5rem .2rem;overflow-x:auto}.days div{flex:1 0 12px;max-width:64px;display:flex;flex-direction:column;justify-content:flex-end;align-items:center;height:100%;font-size:.65rem;color:var(--soft)}.days i{display:block;width:100%;background:var(--bar);min-height:1px}.days b{font-weight:400;color:var(--bar2)}
@@ -225,6 +225,18 @@ export function createStatsHandlers(deps: () => OpsDeps) {
       const g = await guard(req)
       if (g instanceof Response) return g
       return respond(200, JSON.stringify(await buildStats(g.d, g.store, g.env, g.now)), 'application/json; charset=utf-8')
+    },
+    /**
+     * The saved-map emails of the Relationship Map tool (Part B, 2026-11-23): fetched on the owner page's own request, behind the same sign-in, and NEVER part of the stats payload (/ops/stats.json carries none).
+     * `?days=` is 1, 7, 30 or 0 (all). The answer is not cached, not logged and carries no link: the page draws it, searches it and makes the CSV in the browser.
+     */
+    async savers(req: Request): Promise<Response> {
+      const g = await guard(req)
+      if (g instanceof Response) return g
+      const asked = Number(new URL(req.url, 'http://x').searchParams.get('days'))
+      const days = [0, 1, 7, 30, 90].includes(asked) ? asked : 7
+      const list = await (g.d.toolSavers ? g.d.toolSavers(days) : fetchToolSavers(days, g.env, fetch, g.d.readSecret)).catch(() => null)
+      return respond(200, JSON.stringify(list ? { ok: true, savers: list } : { ok: false }), 'application/json; charset=utf-8')
     },
     async page(req: Request): Promise<Response> {
       const g = await guard(req)

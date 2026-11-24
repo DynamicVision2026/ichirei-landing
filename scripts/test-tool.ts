@@ -13,7 +13,7 @@ import { computeToolFunnel } from '../engine/tool-funnel.ts'
 import { parseClientEvent, analyticsPath } from '../engine/analytics.ts'
 import { MemoryOrderStore } from '../engine/order-store.ts'
 import { loadShopifyConfig } from '../engine/shopify.ts'
-import { normalizeToolStats, fetchToolStats, resetToolStatsCache } from '../engine/tool-stats.ts'
+import { normalizeToolStats, fetchToolStats, resetToolStatsCache, normalizeSavers, fetchToolSavers } from '../engine/tool-stats.ts'
 import { statsDicts, STATS_KEYS } from '../engine/stats-i18n.ts'
 import { cleanTool, lvGroup, toolLine } from '../src/order/tool.ts'
 import { legalView } from '../src/legal/legal-copy.ts'
@@ -140,7 +140,7 @@ check('(5) the panel\'s words exist in ja, en, zh-Hant and zh-Hans; unavailable 
   let seen: Record<string, string> = {}
   const ok = await fetchToolStats({ PROMO_STATS_TOKEN: 'secret-token' } as NodeJS.ProcessEnv, (async (u: string, init: RequestInit) => { seen = { url: String(u), ...((init.headers as Record<string, string>) ?? {}) }; return new Response(JSON.stringify({ days: [{ day: '2026-11-22', lang: 'ja', starts: 1 }] })) }) as unknown as typeof fetch, async () => 'x', 1)
   check('(6) the tool unreachable, answering an error, or with no token → null (the panel says "Tool stats unavailable"); the rest of the page is unaffected', down === null && bad === null && noToken === null)
-  check('(6) it asks https://tools.beyondculture.ai/api/stats?days=14 server-side with the token from Secret Manager (PROMO_STATS_TOKEN) in the Authorization: Bearer header only', seen.url === 'https://tools.beyondculture.ai/api/stats?days=14' && seen.authorization === 'Bearer secret-token' && !('x-stats-token' in seen) && ok?.rows.length === 1)
+  check('(6) it asks https://tools.beyondculture.ai/api/stats?days=90 server-side with the token from Secret Manager (PROMO_STATS_TOKEN) in the Authorization: Bearer header only', seen.url === 'https://tools.beyondculture.ai/api/stats?days=90' && seen.authorization === 'Bearer secret-token' && !('x-stats-token' in seen) && ok?.rows.length === 1)
   const unavailable = await buildStats({ ...d, toolStats: async () => null }, store, d.env, NOW)
   check('(6) with no tool answer the dashboard still builds (funnel steps 3–7 from our own records)', unavailable.tool.map === null && unavailable.tool.funnel.some((r) => r.landed > 0))
   const pageDown = await createStatsHandlers(() => ({ ...d, toolStats: async () => null })).page(new Request('http://x/ops/stats', { headers: { authorization: `Basic ${Buffer.from('x:pw').toString('base64')}` } }))
@@ -161,11 +161,12 @@ check('(5) the panel\'s words exist in ja, en, zh-Hant and zh-Hans; unavailable 
     { date: '2026-11-21', langs: { ja: lang({ starts: 1, mapped: 3 }) } },
   ] })
   const ja = real?.rows.find((r) => r.day === '2026-11-22' && r.lang === 'ja')
-  const zh = real?.rows.find((r) => r.day === '2026-11-22' && r.lang === 'zh')
-  check('(8) the real shape: a list of day rows with `date` and `langs` → language → counts is read into day × language rows (4 languages → ja, en, zh)', !!real && real.rows.filter((r) => r.day === '2026-11-22').length === 3 && real.rows.length === 4)
+  const zh = real?.rows.find((r) => r.day === '2026-11-22' && r.lang === 'zh-Hant')
+  const zs = real?.rows.find((r) => r.day === '2026-11-22' && r.lang === 'zh-Hans')
+  check('(8) the real shape: a list of day rows with `date` and `langs` → language → counts is read into day × language rows (4 languages stay four rows: ja, en, zh-Hant, zh-Hans — nothing left out)', !!real && real.rows.filter((r) => r.day === '2026-11-22').length === 4 && real.rows.length === 5)
   check('(8) starts, warmOpens and `noResult` (split by reason → the total) are read by their real names; measured = the sum of results 1–7', ja?.starts === 12 && ja.warmOpens === 5 && ja.noResult === 3 && ja.results.reduce((a, b) => a + b, 0) === 9 && ja.results.join() === '2,1,3,0,1,0,2', JSON.stringify(ja))
   check('(8) clicks.ichirei is read per product (other products kept beside it)', ja?.clicks.ichirei === 4 && real?.rows.find((r) => r.lang === 'en')?.clicks.other === 2 && normalizeToolStats({ days: [{ date: '2026-11-20', langs: { ja: { starts: 1, clicks: 7 } } }] })?.rows[0].clicks.ichirei === 7)
-  check('(8) zh-Hant and zh-Hans are one zh row (added together): starts 5, results 1 + 1 in levels 1 and 2, warm opens 3, noResult 1', zh?.starts === 5 && zh.results[0] === 1 && zh.results[1] === 1 && zh.warmOpens === 3 && zh.noResult === 1 && zh.clicks.ichirei === 3, JSON.stringify(zh))
+  check('(8) zh-Hant and zh-Hans are kept as separate rows (the dashboard shows both; only the funnel merges them into zh)', zh?.starts === 3 && zh.results[0] === 1 && zh.warmOpens === 1 && zh.clicks.ichirei === 2 && zs?.starts === 2 && zs.results[1] === 1 && zs.warmOpens === 2 && zs.noResult === 1 && zs.clicks.ichirei === 1, JSON.stringify([zh, zs]))
   check('(8) "put on the map" is not counted by the tool yet: mapped is null (the dashboard shows 「—」), and a day that has it keeps the number', ja?.mapped === null && real?.rows.find((r) => r.day === '2026-11-21')?.mapped === 3 && STATS_CLIENT_JS.includes("r.mapped == null ? '&mdash;'"))
   const grouped = normalizeToolStats({ days: [{ date: '2026-11-22', langs: { ja: lang({ clicks: { ichirei: 6 }, clicksByGroup: { ichirei: { near: 3, middle: 2, far: 1 } } }) } }] })
   const gf = computeToolFunnel({ events: [], orders: [], tool: grouped })
@@ -177,6 +178,38 @@ check('(5) the panel\'s words exist in ja, en, zh-Hant and zh-Hans; unavailable 
 {
   const ja = legalView('ja', false).tool, zh = legalView('zh-Hant', false).tool, en = legalView('en', false).tool
   check('(7) /legal has the tool section in ja, en and zh, word for word', ja.body === '関係の地図（一字の距離）で保存された地図は、鍵をかけて保管され、当社は中身を読めません。24か月更新のない地図は自動で削除されます。鍵のメールは、配信記録として送信サービスに30日間保管されたのち削除されます。チャットの画像と文字は読み取りのためだけに使い、保存しません。' && en.body === 'Maps saved in the Relationship Map tool are stored locked; we cannot read them. A map not updated for 24 months is deleted automatically. The key email is kept by our mail service for 30 days as a delivery record, then deleted. Chat screenshots and their text are used only for the reading and are never stored.' && zh.body === '在『一字之間』儲存的地圖會上鎖保存，我們無法讀取內容。24 個月沒有更新的地圖會自動刪除。鑰匙郵件會作為寄送紀錄，在郵件服務保存 30 天後刪除。聊天截圖與文字只用於讀取，不會保存。' && !!ja.heading && !!en.heading && !!zh.heading)
+}
+
+// ---- 9. Part B (2026-11-23): the saved-map emails — owner only, never in the stats payload, mocked tool ------------------------------------------------------------------
+{
+  const raw = { savers: [
+    { email: 'a.sample@example.com', lang: 'ja', first: '2026-11-06T09:14:00Z', last: '2026-11-07T01:02:00Z', count: 3, reminders: true, news: true },
+    { email: 'b.sample@example.com', lang: 'en', first: '2026-11-05T22:40:00Z', last: '2026-11-05T22:40:00Z', count: 1, reminders: false, news: true },
+    { email: 'not-an-address', lang: 'ja', count: 1 },
+  ] }
+  const list = normalizeSavers(raw)
+  check('(9) savers: a valid row is read with email, language, first / last, count, reminders and news; a row without an address is dropped', list?.length === 2 && list[0].email === 'a.sample@example.com' && list[0].count === 3 && list[0].reminders === true && list[1].reminders === false && list[1].news === true && list[1].lang === 'en')
+  const seen: { url?: string; authorization?: string }[] = []
+  const fake = (async (url: string, init?: { headers?: Record<string, string> }) => { seen.push({ url, authorization: init?.headers?.authorization }); return new Response(JSON.stringify(raw), { status: 200 }) }) as unknown as typeof fetch
+  const env = { PROMO_STATS_TOKEN: 'secret-token' } as NodeJS.ProcessEnv
+  const all = await fetchToolSavers(0, env, fake)
+  await fetchToolSavers(30, env, fake)
+  check('(9) it asks https://tools.beyondculture.ai/api/savers?days=N (0 = all) with the Bearer token only, and no token → null without any call', all?.length === 2 && seen[0].url === 'https://tools.beyondculture.ai/api/savers?days=0' && seen[1].url === 'https://tools.beyondculture.ai/api/savers?days=30' && seen.every((x) => x.authorization === 'Bearer secret-token') && (await fetchToolSavers(7, {} as NodeJS.ProcessEnv, fake, async () => '')) === null && seen.length === 2)
+  check('(9) the tool unreachable or answering an error → null (the section says so on its own line)', (await fetchToolSavers(7, env, (async () => { throw new Error('down') }) as unknown as typeof fetch)) === null && (await fetchToolSavers(7, env, (async () => new Response('no', { status: 500 })) as unknown as typeof fetch)) === null)
+  const store9 = new MemoryOrderStore()
+  const d9 = { store: store9, env: { ICHIREI_OPS_PASSWORD: 'pw' } as NodeJS.ProcessEnv, now: () => NOW, toolStats: async () => normalizeToolStats({ days: [{ date: '2026-11-22', langs: { ja: { starts: 1 } } }] }), toolSavers: async (days: number) => (days === 0 ? list : null) }
+  const h9 = createStatsHandlers(() => d9)
+  const auth = { authorization: `Basic ${Buffer.from('x:pw').toString('base64')}` }
+  const noAuth = await h9.savers(new Request('http://x/ops/stats/savers?days=0'))
+  const asOwner = await h9.savers(new Request('http://x/ops/stats/savers?days=0', { headers: auth }))
+  const ownerBody = (await asOwner.json()) as { ok: boolean; savers: { email: string; reminders: boolean }[] }
+  check('(9) the list is only for the owner: no sign-in → 401 and no address; with the sign-in a saver row is in the list and the row with reminders:false says false', noAuth.status === 401 && !(await noAuth.clone().text()).includes('example.com') && ownerBody.ok && ownerBody.savers.some((x) => x.email === 'a.sample@example.com') && ownerBody.savers.find((x) => x.email === 'b.sample@example.com')?.reminders === false)
+  const down = await h9.savers(new Request('http://x/ops/stats/savers?days=7', { headers: auth }))
+  check('(9) tool down → { ok: false } and the page itself still works', ((await down.json()) as { ok: boolean }).ok === false && (await h9.page(new Request('http://x/ops/stats', { headers: auth }))).status === 200)
+  const json9 = await (await h9.json(new Request('http://x/ops/stats.json', { headers: auth }))).text()
+  const page9 = await (await h9.page(new Request('http://x/ops/stats', { headers: auth }))).text()
+  check('(9) no address is in the stats payload, /ops/stats.json or the page HTML; no log line carries one', !json9.includes('example.com') && !page9.includes('example.com') && !json9.includes('"savers"') && !/console\.(log|info|warn|error)/.test(readFileSync(join(process.cwd(), 'engine', 'tool-stats.ts'), 'utf8')))
+  check('(9) the browser draws "no" for false, builds the CSV itself, has search, and the address is never put in a link', STATS_CLIENT_JS.includes("b ? t('sv_yes') : t('sv_no')") && STATS_CLIENT_JS.includes('new Blob(') && STATS_CLIENT_JS.includes('data-testid="savers-search"') && !/href="[^"]*' \+ esc\(r\.email/.test(STATS_CLIENT_JS) && STATS_CLIENT_JS.includes("period = 'd7'"))
 }
 
 console.log(failures ? `\n${failures} check(s) FAILED` : '\nAll tool-visitor checks passed.')
