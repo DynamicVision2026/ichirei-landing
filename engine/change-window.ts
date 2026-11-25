@@ -32,8 +32,8 @@ export interface WindowInfo {
 export function windowOf(rec: OrderRecord | null, pay: PaymentInfo | null | 'unverified', now: Date): WindowInfo {
   const none = (phase: WindowPhase, verified = true): WindowInfo => ({ phase, paid_at: null, ends_at: null, hours_left: null, verified })
   if (rec?.ops?.cancelled_at) return none('cancelled')
-  // a gift sent back (Part 14, 2026-11-20): free, made on the spot — nothing to pay and no 24-hour window to cancel in
-  if (rec?.source === 'reply') return { phase: 'closed', paid_at: rec.created_at, ends_at: null, hours_left: null, verified: true }
+  // a gift sent back (Part 14, 2026-11-20) or one the owner made himself (Ticket 8, 2026-11-25): free, made on the spot — nothing to pay and no 24-hour window to cancel in
+  if (rec?.source === 'reply' || rec?.source === 'owner_outreach') return { phase: 'closed', paid_at: rec.created_at, ends_at: null, hours_left: null, verified: true }
   // an order that was paid without going through our site and later claimed (2026-11-13): Shopify's own record has no order reference to find, and the 24 hours count from the CLAIM
   if (rec?.claim) return span(rec.claim.claimed_at, now, true)
   // Shopify could not be asked: only an order whose payment was SEEN before counts (2026-11-14); never one that merely exists

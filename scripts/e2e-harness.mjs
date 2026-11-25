@@ -7812,6 +7812,57 @@ for (const [lang, locale, text] of [['en', 'en-US', 'Your gift is being finished
   child.kill()
 }
 
+// ---------- Run 62 (2026-11-25, Ticket 8 Part 33): the owner's gift maker /ops/gifts/new — fake models; make a gift, see the character, line, poem, four pictures and the receiver's link with a copy button; the list; three languages; owner only ----------
+{
+  const { spawn } = await import('node:child_process')
+  const child = spawn(process.execPath, ['--experimental-strip-types', '--disable-warning=ExperimentalWarning', 'scripts/owner-gifts-fixture-server.ts'], { stdio: ['ignore', 'pipe', 'inherit'] })
+  const port = await new Promise((resolve, reject) => {
+    const t = setTimeout(() => reject(new Error('fixture server did not start')), 30000)
+    child.stdout.on('data', (b) => { const m = /listening (\d+)/.exec(String(b)); if (m) { clearTimeout(t); resolve(Number(m[1])) } })
+  })
+  const B = `http://127.0.0.1:${port}`
+  const ctx = await browser.newContext({ httpCredentials: { username: 'owner', password: 'pw' }, viewport: { width: 1100, height: 900 }, permissions: ['clipboard-read', 'clipboard-write'] })
+  const page = await ctx.newPage()
+  const errors = []
+  page.on('pageerror', (e) => errors.push(String(e)))
+  page.on('console', (m) => { if (m.type() === 'error') errors.push(m.text()) })
+  const external = []
+  page.on('request', (r) => { if (!r.url().startsWith(B) && !r.url().startsWith('data:')) external.push(r.url()) })
+  const anon = await fetch(`${B}/ops/gifts/new`)
+  check('owner gifts: the page is owner-only (no sign-in → 401, no form)', anon.status === 401 && !(await anon.text()).includes('gift-form'))
+  await page.goto(`${B}/ops/gifts/new`, { waitUntil: 'load' })
+  await page.waitForSelector('[data-testid=gift-form]')
+  check('owner gifts: opens in English with the form (moment, language, receiver, sender "Brian", poem style, tag) and an empty list', (await page.locator('#title').innerText()) === 'Owner gift maker' && (await page.locator('[data-testid=gift-sender]').inputValue()) === 'Brian' && (await page.locator('[data-testid=gift-make]').innerText()) === 'Make the gift' && (await page.locator('[data-testid=list-none]').count()) === 1)
+  await page.locator('[data-testid=gift-make]').click()
+  check('owner gifts: no moment → a calm line, nothing made', (await page.locator('[data-testid=gift-status]').innerText()).length > 5 && (await page.locator('[data-testid=result-card]').count()) === 0)
+  await page.locator('[data-testid=gift-moment]').fill('朝の台所で、母は黙って弁当を包んでいた。「もういらない」と言った私に、何も言わずに。')
+  await page.locator('[data-testid=gift-language]').selectOption('ja')
+  await page.locator('[data-testid=gift-receiver]').fill('松本先生')
+  await page.locator('[data-testid=gift-tag]').fill('outreach-2026-11')
+  await page.locator('[data-testid=gift-make]').click()
+  await page.waitForSelector('[data-testid=result-card]', { timeout: 30000 })
+  await page.waitForSelector('[data-testid=list-row]')
+  const link = await page.locator('[data-testid=result-receiver-link]').inputValue()
+  check('owner gifts: the gift is made — the character 証 with its reading, the line, the five-line poem, four pictures, the receiver\'s /g/RG- link and the sender\'s /a/AN- page', (await page.locator('[data-testid=result-glyph]').innerText()) === '証' && (await page.locator('[data-testid=result-reading]').innerText()).length > 0 && (await page.locator('[data-testid=result-line]').innerText()).length > 5 && (await page.locator('[data-testid=result-poem]').innerText()).split('\n').length === 5 && (await page.locator('[data-testid=result-picture]').count()) === 4 && /^https:\/\/ichirei\.beyondculture\.ai\/g\/RG-[a-z2-9]{20}$/.test(link) && /\/a\/AN-/.test(await page.locator('[data-testid=result-sender-page]').inputValue()), link)
+  check('owner gifts: the four pictures are real, loaded images', await page.evaluate(() => [...document.querySelectorAll('[data-testid=result-picture]')].every((i) => i.complete && i.naturalWidth > 0)))
+  await page.locator('[data-testid=result-card] [data-testid=copy]').first().click()
+  check('owner gifts: the copy button copies the receiver\'s link', (await page.evaluate(() => navigator.clipboard.readText())) === link && (await page.locator('[data-testid=result-card] [data-testid=copy]').first().innerText()) === 'Copied')
+  const row = page.locator('[data-testid=list-row]').first()
+  check('owner gifts: the list has the gift — tag, receiver, character, date, opened "no" — and today\'s count', (await row.innerText()).includes('outreach-2026-11') && (await row.innerText()).includes('松本先生') && (await row.innerText()).includes('証') && (await row.locator('[data-col=opened]').innerText()) === 'no' && (await page.locator('[data-testid=gift-today]').innerText()) === '1 of 30 today')
+  const token = link.split('/g/')[1]
+  const rv = await (await fetch(`${B}/api/gift/${token}`)).json()
+  check('owner gifts: the receiver\'s link opens the gift (open at once, from Brian to 松本先生, four lines)', rv.locked !== true && rv.glyph === '証' && rv.from === 'Brian' && rv.to === '松本先生' && rv.film?.lines?.length === 4)
+  for (const [lang, make, listTitle] of [['ja', '贈りものを作る', 'アウトリーチの贈りもの'], ['zh-Hant', '製作禮物', '外聯禮物'], ['zh-Hans', '制作礼物', '外联礼物'], ['en', 'Make the gift', 'Outreach gifts']]) {
+    await page.locator(`#langs button[data-lang="${lang}"]`).click()
+    const body = await page.locator('body').innerText()
+    check(`owner gifts (${lang}): the page words, the result and the list change language; the character and the link do not`, (await page.locator('[data-testid=gift-make]').innerText()) === make && body.includes(listTitle) && (await page.locator('[data-testid=result-glyph]').innerText()) === '証' && (await page.locator('[data-testid=result-receiver-link]').inputValue()) === link && (await page.locator('html').getAttribute('lang')) === lang)
+  }
+  check('owner gifts: no sideways scroll on a phone', await (async () => { await page.setViewportSize({ width: 390, height: 800 }); return page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 1) })())
+  check('owner gifts: no script errors and no call to any other host', errors.length === 0 && external.length === 0, errors.concat(external).join(' | '))
+  await ctx.close()
+  child.kill()
+}
+
 await browser.close()
 console.log(failures === 0 ? '\nALL E2E CHECKS PASSED' : `\n${failures} CHECKS FAILED`)
 process.exit(failures === 0 ? 0 : 1)

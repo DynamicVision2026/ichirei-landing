@@ -22,6 +22,7 @@ import { readFile, stat } from 'node:fs/promises'
 import { handlers as giftHandlers } from '../api/gift.ts'
 import { handlers as opsHandlers } from '../api/ops.ts'
 import { statsHandlers } from '../api/ops-stats.ts'
+import { ownerGiftHandlers } from '../api/ops-gifts.ts'
 import { customerHandlers } from '../api/ops-customers.ts'
 import { homeHandlers } from '../api/ops-home.ts'
 import { examplesHandlers } from '../api/examples.ts'
@@ -304,6 +305,11 @@ export function createApp(config: ServerConfig): Hono {
   app.get('/ops/customers', limited(opsLimit), (c) => customerHandlers.page(c.req.raw))
   app.get('/ops/stats.json', limited(opsLimit), (c) => statsHandlers.json(c.req.raw))
   app.get('/ops/stats/savers', limited(opsLimit), (c) => statsHandlers.savers(c.req.raw))
+  // Ticket 8: the owner's gift maker (owner sign-in or the agent's Bearer token; never linked from the site)
+  app.post('/ops/api/gifts', limited(opsLimit), (c) => ownerGiftHandlers.create(c.req.raw))
+  app.get('/ops/api/gifts', limited(opsLimit), (c) => ownerGiftHandlers.list(c.req.raw))
+  app.get('/ops/api/gifts/:id', limited(opsLimit), (c) => ownerGiftHandlers.get(c.req.raw, c.req.param('id')))
+  app.get('/ops/gifts/new', limited(opsLimit), (c) => ownerGiftHandlers.page(c.req.raw))
   app.get('/ops/card/:file', limited(opsLimit), (c) => opsHandlers.card(c.req.raw, c.req.param('file').replace(/\.pdf$/, '')))
   app.get('/ops/cards/today.pdf', limited(opsLimit), (c) => opsHandlers.cardsToday(c.req.raw))
   app.get('/ops/wooden-today.csv', limited(opsLimit), (c) => opsHandlers.woodenCsv(c.req.raw))
