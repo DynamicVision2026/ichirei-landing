@@ -23,6 +23,7 @@ import { ensureMain, finalizeResult } from './slots.ts'
 import { logMainCharacter, logSafetyRemovals } from './main-count.ts'
 import { attachStrokes } from './strokes.ts'
 import { attachEnBridge, type GeneratedWord } from './en-bridge.ts'
+import { settleEnWords } from './en-word.ts'
 import { isJoyo } from './joyo.ts'
 import { buildLexiconPrompt, eligibleFor, inEligible, inLexicon, lexiconEchoOf, lexiconModeFromEnv, loadLexicon, type EligibleSet, type Lexicon, type LexiconPromptParts } from './lexicon.ts'
 import { readFileSync } from 'node:fs'
@@ -252,6 +253,8 @@ export interface RunEngineOptions {
    * calls) — or null when none is shown, and the reasons in codes why a later step was needed or the card was lost. Codes only; the API turns it into the /ops count. Not called for remembrance (two cards).
    */
   onFreeSource?: (info: { round: number; source: 'first' | 'retry' | 'runner_up' | null; reasons: string[] }) => void
+  /** Tests: stands in for the small model that is asked for an English word once more (engine/en-word.ts). */
+  enWordClient?: Pick<Anthropic, 'messages'>
   /** English only: called once per word the model had to supply (no reviewed lexicon word) — the kanji and the word, for the reviewer. `used` says whether the word was acceptable. Never story text. */
   onEnWord?: (info: GeneratedWord) => void
   /** Called once per finished run with the main character that stands (and the second), for the owner's top-10 of recurring characters. Never story text. */
@@ -436,7 +439,11 @@ export async function runEngine(story: string, condition: 'A' | 'B' | 'C', opts:
     return attachEnBridge(r, story, enContext.lexicon, enContext.palette)
   }
   if (onCard) opts = { ...opts, onCard: (partial) => onCard(attachStrokes(withBridge(partial).result)) } // (a card shown early carries its stroke counts and its English bridge like the final one)
-  const bridged = withBridge(await runEngineInner(story, condition, opts))
+  // English only (Ticket 9, 2026-11-26): the word under the character is settled FIRST — the model's word from the moment when it is a real sense of the character, else one retry, else its first sense —
+  // so the bridge, every card and the order carry one and the same word (engine/en-word.ts). ja and zh pass through untouched.
+  const inner = await runEngineInner(story, condition, opts)
+  const settled = inner.language === 'en' ? (await settleEnWords(inner, story, { apiKey: opts.apiKey, signal: opts.signal, client: opts.enWordClient, onUsage: opts.onUsage ? (u) => opts.onUsage!('review', u) : undefined })).result : inner
+  const bridged = withBridge(settled)
   for (const g of bridged.generated) opts.onEnWord?.(g)
   const result = attachStrokes(bridged.result) // the carving check's stroke counts (engine/strokes.ts)
   logMainCharacter(result) // the day's repeats, visible in the logs (engine/main-count.ts)

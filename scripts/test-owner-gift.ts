@@ -210,9 +210,22 @@ const AH = createAnimationHandlers(() => ({ store: R.store, env: R.env, now: () 
   const enR = rig({ engine: async () => en })
   const z = await post(zhR, { ...BODY, language: 'zh-Hant', moment: '外婆每天早上都會在廚房裡替我準備熱騰騰的早餐，從來沒有說過一句辛苦。', receiver: '外婆', poem_style: 'default' })
   const e = await post(enR, { ...BODY, language: 'en', moment: 'My grandmother kept a warm breakfast on the stove every morning and never once said it was hard.', receiver: 'Grandma', poem_style: 'default' })
-  const zo = (await zhR.store.get(((await z.json()) as { id: string }).id)) as OrderRecord
-  const eo = (await enR.store.get(((await e.json()) as { id: string }).id)) as OrderRecord
+  const zj = (await z.json()) as { id: string; en_word: string | null }
+  const ej9 = (await e.json()) as { id: string; en_word: string | null }
+  const zo = (await zhR.store.get(zj.id)) as OrderRecord
+  const eo = (await enR.store.get(ej9.id)) as OrderRecord
   check('(7) the gift is made in the language of the moment: zh-Hant keeps its carved form and its default poem (tang); English is an e-gift too, with its own default poem style', z.status === 200 && e.status === 200 && zo.production.language === 'zh-Hant' && zo.production.inscription_style === 'traditional' && eo.production.language === 'en' && eo.production.inscription_style === 'modern', JSON.stringify([z.status, e.status, zo?.production?.language, zo?.production?.inscription_style, eo?.production?.language, eo?.production?.inscription_style]))
+}
+
+// ---- 7b · the English word (Ticket 9, item 5): returned by the API, shown on the page; ja and zh have none ------------------------------------------------------------------------
+{
+  const enWordR = rig({ engine: async () => ({ ...clone(GOLDEN), language: 'en', candidates: clone(GOLDEN).candidates.map((c: Record<string, unknown>, i: number) => (i === 0 ? { ...c, en_word: 'clemency', en_line: 'The one who kept the station light on.' } : c)) }) })
+  const r = await post(enWordR, { ...BODY, language: 'en', moment: 'My aunt picked me up at the station every summer for twenty years and never once said why.', receiver: 'Aunt', poem_style: 'default' })
+  const j = (await r.json()) as { en_word: string | null; id: string }
+  const rec = (await enWordR.store.get(j.id)) as OrderRecord
+  check('(7b) an English owner gift returns en_word — a sense of the character (the model\'s out-of-sense "clemency" is never kept) — and it is the word stored on the gift', r.status === 200 && j.en_word === 'trustworthy' && rec.production.certificate.en?.word === 'trustworthy' && rec.production.certificate.en?.frame === 'you_are')
+  check('(7b) ja and zh owner gifts return en_word null', ((await (await post(rig(), BODY)).json()) as { en_word: string | null }).en_word === null && j.en_word !== null)
+  check('(7b) /ops/gifts/new shows the word: the result card has a data-testid="result-en-word" line, drawn only when there is a word, with its label in all three languages', ownerGiftsPage().length > 0 && readFileSync(join(process.cwd(), 'api', 'ops-gifts-page.ts'), 'utf8').includes("data-testid': 'result-en-word'") && ['en', 'ja', 'zh-Hant', 'zh-Hans'].every((l) => OWNER_GIFT_DICT[l].word.length > 1))
 }
 
 // ---- 8 · the page -------------------------------------------------------------------------------------------------------------------------------------------------------------

@@ -438,7 +438,7 @@ export interface Candidate {
    * else written by the model under the prompt's rule ('generated'), else the plain palette meaning ('meaning'). Attached by CODE (engine/en-bridge.ts).
    */
   en_word?: string | null
-  en_word_source?: 'lexicon' | 'generated' | 'meaning'
+  en_word_source?: 'lexicon' | 'generated' | 'fallback' | 'meaning'
   /** en only, main and second: ONE plain sentence (at most 14 words) that explains the character to someone who has never seen kanji, from THIS story. Written by the model, checked by code. */
   en_line?: string | null
   /** en only, main and second (gift ceremony 2026-11-15, A4): the same meaning as `en_line`, said to the receiver, with no pronoun, at most ~70 characters. Written in the same model call, checked by code (engine/en-bridge.ts); null when it fails the checks. */

@@ -21,7 +21,9 @@ export interface EnBridge {
   /** One word (two at most) with literary weight; the lexicon's when the row is reviewed. */
   word: string
   /** Where the word comes from: the reviewed lexicon, the model's pick under the prompt's rule, or the plain palette meaning (last resort). */
-  word_source: 'lexicon' | 'generated' | 'meaning'
+  word_source: 'lexicon' | 'generated' | 'fallback' | 'meaning'
+  /** Ticket 9 (2026-11-26): `you_are` = the word was chosen in English from the moment to finish "In {sender}'s eyes, you are ___" — every surface of a gift that carries it shows that heading. Absent on gifts made before: they keep what they show. */
+  frame?: 'you_are'
   /** One plain sentence (at most 14 words) from this story. */
   line: string
   /** The same meaning said to the receiver, with no pronoun (gift ceremony 2026-11-15, A4): shown on the receiver's character screen. Absent on gifts made before it, or when the model's line failed the checks. */

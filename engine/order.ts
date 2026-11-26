@@ -242,7 +242,8 @@ export function parseOrderRequest(body: unknown, now: Date = new Date(), palette
   if (result.language !== lang) return fail('engine_result', '"engine_result.language" does not match "language"')
 
   if (!isText(body.selected_kanji)) return fail('selected_kanji', 'Missing "selected_kanji"')
-  const picked = (result.candidates as Candidate[]).find((c) => isObject(c) && c.kanji === body.selected_kanji)
+  // (Ticket 9, item 8: a result can list the same character twice — a card the referee removed and the live one that stands — and the removed one may come first; the LIVE card is the one chosen)
+  const picked = (result.candidates as Candidate[]).find((c) => isObject(c) && c.kanji === body.selected_kanji && c.eliminated !== true) ?? (result.candidates as Candidate[]).find((c) => isObject(c) && c.kanji === body.selected_kanji)
   // (an older result may carry a stray word such as "same" where the other form belongs: it is no form)
   const candidate = picked ? { ...picked, inscription_form: cleanInscriptionForm(picked.kanji, picked.inscription_form) } : undefined
   if (!candidate || candidate.eliminated === true) {

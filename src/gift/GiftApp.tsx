@@ -309,7 +309,7 @@ export default function GiftApp() {
 
 /** The character's reading under it: the kana reading (ja), the pinyin (zh); English first (2026-11-15): the meaning alone, no romanized reading. */
 function readingLine(view: GiftView): string {
-  if (view.language === 'en') return view.meaning_en ?? ''
+  if (view.language === 'en') return view.en?.word ?? view.meaning_en ?? '' // (Ticket 9: the word chosen in English from the moment, never the dictionary translation when there is one)
   return cleanReading(view.reading)
 }
 

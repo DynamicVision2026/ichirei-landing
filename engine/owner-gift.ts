@@ -134,6 +134,8 @@ export interface OwnerGiftView {
   id: string
   glyph: string
   reading: string
+  /** English gifts only (Ticket 9): the word under the character, chosen in English from the moment — the one every surface shows. null for ja and zh. */
+  en_word: string | null
   line: string
   poem: { type: string; lines: string[]; reading: string } | null
   pictures_ready: boolean
@@ -183,6 +185,7 @@ async function view(store: OrderStore, env: NodeJS.ProcessEnv, order: OrderRecor
     id: order.order_ref,
     glyph: gift.glyph,
     reading: gift.reading,
+    en_word: gift.language === 'en' ? gift.en?.word ?? null : null,
     line: gift.who,
     poem: gift.poem,
     pictures_ready: state === 'ready',

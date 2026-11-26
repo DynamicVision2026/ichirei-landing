@@ -11,6 +11,8 @@ import { appearanceProblem, inventedFacts } from './gaze.ts'
 import { EN_WORD_SHAPE, enReviewed } from './lexicon-en.ts'
 import { lexiconRowIn, rowShowsLine, type Lexicon, type LexiconRow } from './lexicon.ts'
 import { classicalEchoOf, type Palette } from './palette.ts'
+import { alteredQuote } from './quotes.ts'
+import { enWordProblem, fallbackWord, sensesOf, tidyWord } from './en-word.ts'
 import { EN_LINE_MAX_WORDS, EN_PRONOUN, LINE_YOU_MAX_CHARS, parseEcho, wordCount, type EnBridge } from '../src/order/en-bridge.ts'
 
 // ---- the word ------------------------------------------------------------------------------------------------------------------------------------------
@@ -54,6 +56,7 @@ export function lineProblem(raw: unknown, story: string): string | null {
   if (wordCount(line) > EN_LINE_MAX_WORDS) return 'too_long'
   if (/[.!?](?:["”’')\]]*)\s+\S/.test(line)) return 'not_one_sentence'
   if (line.includes('\n')) return 'not_one_sentence'
+  if (alteredQuote(line, story)) return 'quote' // (Ticket 9: a title, name or quoted word of the moment is copied exactly)
   if (inventedFacts(line, story, 'en').length > 0) return 'invented'
   return null
 }
@@ -135,37 +138,36 @@ const isBridgeSlot = (c: Candidate): boolean => c.slot === 'main' || c.slot === 
 /** The bridge of one candidate: lexicon word and echo when reviewed, else the model's (valid) word, else the plain meaning; the line from the model if it passes, else the card's why_this. null for the freestyle. */
 export function bridgeOf(c: Candidate, story: string, lexicon: Lexicon | null, palette: Palette | null, verifyClassical = false): { bridge: EnBridge | null; generated: GeneratedWord | null } {
   if (!isBridgeSlot(c)) return { bridge: null, generated: null }
+  // The reviewed row now gives the ECHO only (and, for 修, nothing else): the WORD is chosen in English from the moment — one path for every English gift (Ticket 9, engine/en-word.ts)
   const reviewed = lexicon && palette ? reviewedEntry(lexicon, palette, c) : null
   let word: string | null = null
   let source: EnBridge['word_source'] = 'meaning'
   let generated: GeneratedWord | null = null
-  if (reviewed) {
-    word = reviewed.word
-    source = 'lexicon'
+  const kept = c.en_word_source && typeof c.en_word === 'string' && c.en_word.trim() ? c.en_word.trim() : null // already settled by an earlier pass (the engine's settle step)
+  if (kept) {
+    word = kept
+    source = c.en_word_source as EnBridge['word_source']
   } else {
-    const kept = c.en_word_source && typeof c.en_word === 'string' && c.en_word.trim() ? c.en_word.trim() : null // already settled by an earlier pass
-    if (kept) {
-      word = kept
-      source = c.en_word_source as EnBridge['word_source']
+    const senses = sensesOf(c)
+    const tidy = tidyWord(c.en_word)
+    const problem = enWordProblem(c.en_word, senses)
+    if (!problem && tidy) {
+      word = tidy
+      source = 'generated'
+      generated = { kanji: c.kanji, word: tidy, used: 'generated', problem: null }
     } else {
-      const g = cleanGeneratedWord(c.en_word)
-      if (g) {
-        word = g
-        source = 'generated'
-        generated = { kanji: c.kanji, word: g, used: 'generated', problem: null }
-      } else {
-        const meaning = (c.meaning ?? '').trim()
-        word = meaning || null
-        source = 'meaning'
-        generated = { kanji: c.kanji, word: typeof c.en_word === 'string' ? c.en_word.trim().slice(0, 40) : '', used: 'meaning', problem: typeof c.en_word === 'string' && c.en_word.trim() ? wordProblem(c.en_word.trim().toLowerCase()) ?? 'shape' : 'missing' }
-      }
+      // not acceptable: the character's first sense in a natural word form; a character with no entry keeps the plain palette meaning
+      const fb = fallbackWord(senses)
+      word = fb ?? ((c.meaning ?? '').trim() || null)
+      source = fb ? 'fallback' : 'meaning'
+      generated = { kanji: c.kanji, word: typeof c.en_word === 'string' ? c.en_word.trim().slice(0, 40) : '', used: 'meaning', problem: problem ?? 'missing' }
     }
   }
   if (!word) return { bridge: null, generated }
   const line = lineProblem(c.en_line, story) === null ? (c.en_line as string).trim() : (c.why_this ?? '').trim() || c.one_line_gaze.trim()
   const lineYou = lineYouProblem(c.line_you_en, story) === null ? (c.line_you_en as string).trim() : null
   const classical = verifyClassical ? knownClassical(c, lexicon, palette) : c.classical_echo ?? null
-  return { bridge: { word, word_source: source, line, ...(lineYou ? { line_you: lineYou } : {}), echo: reviewed?.echo ?? null, classical: classical ? withRendering({ ...c, classical_echo: classical }, lexicon, palette) ?? classical : null }, generated }
+  return { bridge: { word, word_source: source, frame: 'you_are', line, ...(lineYou ? { line_you: lineYou } : {}), echo: reviewed?.echo ?? null, classical: classical ? withRendering({ ...c, classical_echo: classical }, lexicon, palette) ?? classical : null }, generated }
 }
 
 /**

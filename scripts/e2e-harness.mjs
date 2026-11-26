@@ -5149,6 +5149,18 @@ for (const [lang, locale, text] of [['en', 'en-US', 'Your gift is being finished
     check('character: a gift made before (no line_you) shows today\'s line under "In Brian\'s eyes"', (await T(page, 'cr-meaning-label').innerText()) === "IN BRIAN'S EYES" && (await T(page, 'cr-line').innerText()) === 'The care that mends what is about to give.' && (await T(page, 'cr-meaning').getAttribute('data-line')) === 'old')
     await ctx.close()
   }
+  // Ticket 9 (2026-11-26): an English gift whose word was chosen to finish "In {sender}'s eyes, you are ___" shows that heading even with no receiver's line
+  {
+    const v = view()
+    delete v.en.line_you
+    v.en.frame = 'you_are'
+    v.en.word = 'understanding'
+    const { page, ctx } = await open(v, { reduced: true })
+    await T(page, 'cr-markbtn').click(); await T(page, 'cr-to-film').click(); await T(page, 'gift-skip').click()
+    await page.waitForFunction(() => getComputedStyle(document.querySelector('[data-testid=cr-meaning]')).opacity === '1', null, { timeout: 20000 })
+    check('character: a framed gift (the word chosen from the moment) with no line_you still reads "In Brian\'s eyes, you are" / understanding — the same heading on every English gift made now', (await T(page, 'cr-meaning-label').innerText()) === "IN BRIAN'S EYES, YOU ARE" && (await T(page, 'cr-word').innerText()) === 'understanding' && (await T(page, 'cr-line').innerText()) === 'The care that mends what is about to give.')
+    await ctx.close()
+  }
 
   // ---- the character: three layers, the blend on the whole mask layer, the carved form ----
   {

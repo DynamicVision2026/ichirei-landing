@@ -17,6 +17,7 @@ import { callSignal, timedOut } from './limits.ts'
 import { DEFAULT_REVIEW_MODEL } from './engine.ts'
 import type { Gender, Language } from './contract.ts'
 import { peopleOf } from './film-people.ts'
+import { alteredQuote, quoteWhy } from './quotes.ts'
 import { loadPalette, type Palette } from './palette.ts'
 import { kanaFixWords, loadTokenizer } from './kana.ts'
 import { EN_FORBIDDEN } from './poem-check.ts'
@@ -104,6 +105,8 @@ export const lineSize = (line: string, language: Language): number =>
 /** Illness, hospital, decline and death words (the engine's level 1 / level 4 rules, for a text the receiver will see). Characters of the palette's hard blocks are checked besides. */
 // (the matching itself — whole words, not raw substrings — is in engine/unsafe-words.ts)
 
+/** A picture description that gives the sender (the narrator) a gender. */
+const NARRATOR_GENDER = /\b(?:narrator|sender|storyteller|writer)\b,?\s+(?:(?:is|as)\s+)?(?:an?\s+|the\s+)?(?:[a-z-]+\s+){0,2}(?:man|woman|boy|girl|male|female)\b|\b(?:man|woman|boy|girl|male|female)\b,?\s+(?:who is\s+|as\s+)?(?:the\s+)?(?:narrator|sender|storyteller|writer)\b/i
 const QUOTES: RegExp[] = [/「([^」]*)」/g, /『([^』]*)』/g, /“([^”]*)”/g, /"([^"]*)"/g]
 
 // ---- the picture descriptions -------------------------------------------------------------------------------------------------------------------
@@ -149,8 +152,9 @@ export function trimPicture(d: string): string | null {
 }
 
 /** The checks the ticket asks of each description (15–40 words, no digits, no level 1 words, not the chosen character) and the rules the prompt gives (no face, no text, no illness, no celebration in a remembrance film). */
-export function checkPictures(pictures: string[], input: Pick<FilmInput, 'glyph' | 'forms' | 'names' | 'memorial' | 'occasion'> & Partial<Pick<FilmInput, 'language' | 'story' | 'quiet'>>): FilmProblem[] {
+export function checkPictures(pictures: string[], input: Pick<FilmInput, 'glyph' | 'forms' | 'names' | 'memorial' | 'occasion'> & Partial<Pick<FilmInput, 'language' | 'story' | 'quiet' | 'receiver_gender' | 'sender_gender'>>): FilmProblem[] {
   const out: FilmProblem[] = []
+  const people = input.language === 'en' ? peopleOf({ story: input.story ?? '', receiver_gender: input.receiver_gender, sender_gender: input.sender_gender }) : null
   const add = (i: number, code: string, detail: string, rule?: string, terms?: string[]) => out.push({ code, scene: i, detail: `Picture ${i + 1}: ${detail}`, ...(rule ? { rule } : {}), ...(terms?.length ? { terms } : {}) })
   const forms = [...new Set(input.forms.concat(input.glyph).filter(Boolean))]
   pictures.forEach((d, i) => {
@@ -163,6 +167,14 @@ export function checkPictures(pictures: string[], input: Pick<FilmInput, 'glyph'
     const faceText = d.match(PICTURE_FACE_TEXT)
     const bad = faceText ?? d.match(PICTURE_UNSAFE)
     if (bad) add(i, 'pic_blocked', `the word “${bad[0]}” must not appear (no faces, no text, no illness, hospital, injury, accident, medical procedure or funeral).`, faceText ? 'picture_face_text' : 'picture_unsafe', [bad[0].toLowerCase()])
+    // English only (Ticket 9, item 10): the sender in a picture is drawn with the sender's own gender, or neutrally from behind — never the receiver's
+    if (people) {
+      const said = NARRATOR_GENDER.exec(d)
+      if (said) {
+        const g = /\b(?:woman|girl|female)\b/i.test(said[0]) ? 'woman' : 'man'
+        if (people.sender === 'unknown' || people.sender !== g) add(i, 'pic_narrator', people.sender === 'unknown' ? 'the sender (the narrator) is drawn as a neutral figure seen from behind — a person, not a man or a woman.' : `the sender (the narrator) is a ${people.sender}: never the receiver's gender.`, 'picture_narrator')
+      }
+    }
     const story = input.story ?? ''
     if (PICTURE_TRADITIONAL.test(d) && !STORY_TRADITIONAL.test(story)) add(i, 'pic_blocked', 'people wear contemporary everyday clothes — no kimono, yukata or other traditional dress (the story does not mention it).', 'picture_traditional')
     if (input.language && input.language !== 'ja' && PICTURE_JAPANESE_INTERIOR.test(d) && !STORY_JAPANESE.test(story)) add(i, 'pic_blocked', 'the setting must be this buyer\'s modern world: no Japanese interior, lantern, tatami or torii (the story does not name Japan).', 'picture_setting')
@@ -248,6 +260,11 @@ export function checkFilmScript(raw: unknown, input: FilmInput, palette: Palette
         const q = m[1].trim()
         if (q && !story.includes(q) && !storyKana.includes(q)) at('quote', `Line ${i + 1}: the quotation “${q}” is not word for word in the story. Copy quotations exactly from the story, or do not quote.`)
       }
+    }
+    // English only (Ticket 9): a title, name or quoted word of the moment is copied exactly — "KEEP SWINGING" never becomes "KEEPING SWINGING"
+    if (input.language === 'en') {
+      const altered = alteredQuote(l, input.story)
+      if (altered) at('quote', `Line ${i + 1}: ${quoteWhy(altered)}.`)
     }
     const shown = gift.filter((f) => l.includes(f))
     if (shown.length > 0) at('character', `Line ${i + 1}: the character${shown.length > 1 ? 's' : ''} ${shown.join(' / ')} must not appear in the lines (the lines may not contain ANY of: ${gift.join(' ')}); say it with other words or in kana (for example 「待っていた」 → 「ずっとそこにいた」).`, { rule: 'character', terms: shown })
@@ -349,8 +366,12 @@ export function buildFilmPrompt(input: FilmInput, feedback = ''): string {
   })
   // Each market's own world (2026-11-16; English since 2026-11-13): the clause naming all three worlds becomes this language's world only (engine/film-world.<lang>.md).
   const wl = worldLang(input.language)
-  return wl ? swapOnce(text, OLD_SCRIPT_SETTING, world(wl, 'script setting')) : text
+  const set = wl ? swapOnce(text, OLD_SCRIPT_SETTING, world(wl, 'script setting')) : text
+  return input.language === 'en' ? `${set}\n\n${NARRATOR_RULE_EN}` : set // (English only: Japanese and Chinese films are written exactly as before)
 }
+
+/** Ticket 9, item 10 (English films): who the "I" of a picture is. */
+export const NARRATOR_RULE_EN = 'THE NARRATOR IN A PICTURE. When a picture shows the sender (the "I" who tells the story), draw them with the sender\'s own gender only when sender_gender above says man or woman; when it is `unknown`, show a neutral figure seen from behind — "a person", no man or woman in the description. Never give the sender the receiver\'s gender because the story is about the receiver: the receiver is the person described, the sender is the one telling.'
 
 function parseJson(raw: string): Record<string, unknown> | null {
   let text = raw.trim()
@@ -499,7 +520,7 @@ export async function makeFilm(input: FilmInput, opts: FilmOptions = {}): Promis
         FORBIDDEN: forms.length ? forms.join(' ') : '(none)',
       })
       const wl = worldLang(input.language)
-      const prompt = wl ? `${built}\n\n${world(wl, 'script scenes')}` : built
+      const prompt = (wl ? `${built}\n\n${world(wl, 'script scenes')}` : built) + (input.language === 'en' ? `\n\n${NARRATOR_RULE_EN}` : '')
       const stream = tracked('film_script', client).messages.stream({ model, max_tokens: 1200, output_config: { effort: 'low' }, messages: [{ role: 'user', content: prompt }] }, { signal })
       const message = await stream.finalMessage()
       const raw = parseJson(message.content.filter((b): b is Anthropic.TextBlock => b.type === 'text').map((b) => b.text).join(''))

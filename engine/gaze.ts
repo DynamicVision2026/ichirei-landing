@@ -3,6 +3,7 @@
 // (「『そうか』という短い一言の中に、父の十年分の想いが詰まっていた。」) is not a line about the person. The prompts ask for the right shape; this module checks it
 // and, when a line fails, asks ONE small model call to rewrite the failing lines once. A rewrite that fails the check too is dropped: the original stays.
 
+import { alteredQuote, quoteWhy } from './quotes.ts'
 import { usageOf } from './cache-usage.ts'
 import Anthropic from '@anthropic-ai/sdk'
 import { readFileSync } from 'node:fs'
@@ -253,7 +254,9 @@ export const failingGazes = (cands: Candidate[], language: Language, story?: str
   cands.flatMap((c) => {
     if (c.eliminated || !c.one_line_gaze) return []
     const invented = story !== undefined ? inventedFacts(c.one_line_gaze, story, language) : []
-    const why = invented.length > 0 ? inventedWhy(invented) : gazeProblem(c.one_line_gaze, language)
+    // English only (Ticket 9): a title, name or quoted word of the moment is copied exactly into the line
+    const altered = language === 'en' && story !== undefined ? alteredQuote(c.one_line_gaze, story) : null
+    const why = altered ? quoteWhy(altered) : invented.length > 0 ? inventedWhy(invented) : gazeProblem(c.one_line_gaze, language)
     return why ? [{ kanji: c.kanji, gaze: c.one_line_gaze, why }] : []
   })
 

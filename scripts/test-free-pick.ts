@@ -48,13 +48,15 @@ const FILES = ['prompt.en.md', 'prompt.ja.md', 'prompt.zh.md', 'card-free-prompt
   check('(B0) it sits right after the role description and before the rules (before the governing definition and the guardrails; in the free prompt before CONTEXT and its rules)', placed.every(Boolean), placed.join())
   // every line the prompts had before (the rules) is still there, word for word; the only lines that changed are the free prompt's opening line and its output paragraph (the "Be quick" sentences go, candidate 1 is the smartest)
   const before = JSON.parse(readFileSync('scripts/fixtures/prompt-lines-before-aha.json', 'utf8')) as Record<string, string[]>
-  const CHANGED = (f: string, l: string): boolean => f === 'card-free-prompt.md' && (l.startsWith('Write the FREE PICK (遊び字) card of this gift.') || l.startsWith('OUTPUT. Reply with exactly one JSON object'))
+  const CHANGED = (f: string, l: string): boolean => (f === 'card-free-prompt.md' && (l.startsWith('Write the FREE PICK (遊び字) card of this gift.') || l.startsWith('OUTPUT. Reply with exactly one JSON object'))) ||
+    // Ticket 9 (2026-11-26): the English prompt's three en_word lines were reworded on purpose (the word is chosen in English from the moment)
+    (f === 'prompt.en.md' && (l.startsWith('en_word:') || l.startsWith('* `en_word`') || l.includes('"en_word": string')))
   const lost: string[] = []
   for (const f of FILES) {
     const have = new Set(read(f).split('\n'))
     for (const l of before[f]) if (!have.has(l) && !CHANGED(f, l)) lost.push(`${f}: ${l.slice(0, 80)}`)
   }
-  check('(B0) no existing rule was removed from any of the four prompts (every earlier line is still present, word for word; two lines of the free prompt were reworded on purpose)', lost.length === 0, lost.join(' | '))
+  check('(B0) no existing rule was removed from any of the four prompts (every earlier line is still present, word for word; two lines of the free prompt and three en_word lines of the English prompt were reworded on purpose)', lost.length === 0, lost.join(' | '))
 }
 
 // ---- B. the free-pick prompt: from safe to smart -------------------------------------------------------------------------------------------------------------------------------

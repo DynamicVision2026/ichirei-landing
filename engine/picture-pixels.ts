@@ -111,3 +111,23 @@ export function hashDistance(a: string, b: string): number {
 }
 /** Two pictures of one film are the same picture (a copy of the neighbour, or two scenes drawn alike) when they differ in at most this many bits. */
 export const DUPLICATE_BITS = 2
+
+
+/** Share of pixels that are nearly black (0–1), on a small grey copy. */
+export async function darkShare(image: Buffer): Promise<number> {
+  const { data } = await sharp(image).rotate().resize(W, H, { fit: 'fill' }).greyscale().raw().toBuffer({ resolveWithObject: true })
+  let dark = 0
+  for (let i = 0; i < data.length; i++) if (data[i] < 56) dark++
+  return dark / data.length
+}
+/** A night picture keeps a light page (Ticket 9, item 9): more than this share of near-black means a large solid-black area. */
+export const NIGHT_DARK_MAX = 0.12
+
+/**
+ * Night and evening pictures (English films) keep a LIGHT page: when more than NIGHT_DARK_MAX of the picture is near-black, the shadows are lifted (black becomes a soft charcoal, the paper stays
+ * paper) so no large solid-black area remains. A picture that is already light is returned as it is.
+ */
+export async function keepLightPage(webp: Buffer): Promise<Buffer> {
+  if ((await darkShare(webp).catch(() => 0)) <= NIGHT_DARK_MAX) return webp
+  return sharp(webp).linear(0.74, 66).webp({ quality: 82 }).toBuffer()
+}

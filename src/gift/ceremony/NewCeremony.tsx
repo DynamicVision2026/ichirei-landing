@@ -223,10 +223,12 @@ function Meaning({ view, from }: { view: GiftView; from: string }) {
   // English: the line said to the receiver (line_you_en) when there is one. Japanese and Chinese: the sender's own line from the gift (view.who), under "in <name>'s eyes, you are"; there is no line_you in ja or zh
   const lineYou = view.language === 'en' ? view.en?.line_you?.trim() || null : (view.who ?? '').trim() || null
   const oldLine = (view.en?.line ?? view.who ?? '').trim()
+  // Ticket 9 (2026-11-26): an English gift whose word was chosen to finish "In {sender}'s eyes, you are ___" always carries that heading — with or without the receiver's line; gifts made before keep what they show
+  const framed = view.language === 'en' && view.en?.frame === 'you_are'
   const under = C.showReading ? readingOf(view) : wordOf(view) // under the character: the reading (ja) or the English word (en); Chinese shows nothing
   return (
     <div className="cr-txt cr-meaning" id="cr-meaning" data-testid="cr-meaning" data-line={lineYou ? 'you' : 'old'}>
-      <p className="cr-lab" data-testid="cr-meaning-label">{lineYou ? C.meaningYou(from) : C.meaningOld(from)}</p>
+      <p className="cr-lab" data-testid="cr-meaning-label">{lineYou || framed ? C.meaningYou(from) : C.meaningOld(from)}</p>
       {under && <p className="cr-word" data-testid="cr-word">{under}</p>}
       <p className="cr-b cr-ink" data-testid="cr-line">{lineYou ?? oldLine}</p>
       <p className="cr-b">{C.notAWish(from)}</p>

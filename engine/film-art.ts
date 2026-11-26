@@ -36,7 +36,7 @@ import { callSignal, timedOut } from './limits.ts'
 import type { OrderStore } from './order-store.ts'
 import { OLD_CHECK_SETTING, OLD_REWRITE_SETTING, swapOnce, world, worldLang } from './film-world.ts'
 import { plainDescription } from './film-plain.ts'
-import { checkEmpty, DUPLICATE_BITS, hashDistance, pictureHash } from './picture-pixels.ts'
+import { checkEmpty, DUPLICATE_BITS, hashDistance, keepLightPage, pictureHash } from './picture-pixels.ts'
 import { recordHealth } from './health.ts'
 import { recordOutcome, tracked } from './engine-log.ts'
 
@@ -72,9 +72,13 @@ const RETRY_HINT: Record<string, string> = {
  * The image prompt: the style ("Sumi-e ink-wash painting" for `en`, "Japanese sumi-e ink-wash painting" otherwise), the pale-paper line for a remembrance, then THIS language's world line
  * (engine/film-world.<lang>.md — en, ja, zh; 2026-11-16), then the scene and any retry hint. With no language it is the style and the scene only, as it always was.
  */
+/** Ticket 9, item 9 (English films): a night or evening scene. */
+export const NIGHT_SCENE = /\b(night|nighttime|midnight|evening|dusk|twilight|after dark|moonlit|moonlight|starlit|late at night|street ?lamps?|street ?lights?|lamplit)\b/i
+export const NIGHT_LIGHT = 'A night or evening scene is drawn light: keep the page pale and airy — a soft lamp glow, pale grey washes and a few small darker shapes; never a large solid-black area and never a heavy black sky.'
+export const isNightScene = (description: string, language?: Language): boolean => language === 'en' && NIGHT_SCENE.test(description)
 export const buildImagePrompt = (description: string, memorial: boolean, hint = '', language?: Language): string => {
   const wl = worldLang(language)
-  return [language === 'en' ? IMAGE_STYLE_EN : IMAGE_STYLE, memorial ? IMAGE_STYLE_MEMORIAL : '', wl ? world(wl, 'image world') : '', `Scene: ${description.trim()}`, hint].filter(Boolean).join('\n')
+  return [language === 'en' ? IMAGE_STYLE_EN : IMAGE_STYLE, memorial ? IMAGE_STYLE_MEMORIAL : '', wl ? world(wl, 'image world') : '', isNightScene(description, language) ? NIGHT_LIGHT : '', `Scene: ${description.trim()}`, hint].filter(Boolean).join('\n')
 }
 
 export const IMAGE_SIZE = { width: 1080, height: 1350 }
@@ -681,7 +685,8 @@ async function renderLocked(deps: ArtDeps, input: RenderInput): Promise<ArtRecor
         afterRewrite.delete(slot)
         drawn++
         modelUsed = r.model
-        return { webp: await toFilmWebp(r.bytes) }
+        const webp = await toFilmWebp(r.bytes)
+        return { webp: isNightScene(desc(slot), input.language) ? await keepLightPage(webp) : webp } // (a night picture that came out heavy is lifted in code: no large solid black)
       } catch (err) {
         const code = err instanceof ImageError ? err.code : timedOut(signal) ? 'timeout' : 'image'
         if (code === 'quota') {
