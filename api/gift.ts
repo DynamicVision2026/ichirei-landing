@@ -27,6 +27,7 @@ import { filmUsable } from '../engine/animation.ts'
 import { loadArtwork, scrollReady } from '../engine/render/artwork.ts'
 import { makeScroll, scrollPdf } from '../engine/render/scroll.ts'
 import { makeOgImage } from '../engine/render/og.ts'
+import { cardFacts, cardKey, makeCardImage } from '../engine/render/card-image.ts'
 import { makeCertificateCard, makeKeepsakeCard, makeQrSlip } from '../engine/render/keepsake.ts'
 import { giftPdf } from '../engine/render/giftpdf.ts'
 import { CERT_WORDS, type CertLang } from '../src/order/ceremony-cert.ts'
@@ -404,6 +405,40 @@ export function createGiftHandlers(deps: () => GiftDeps) {
         } catch (err) {
           console.error('[ichirei-og] failed', err instanceof Error ? err.message : err)
           return json(500, { error: 'og_failed' }, { 'cache-control': 'no-store' })
+        }
+        await d.store!.putObject(key, bytes, 'image/png').catch(() => false)
+      }
+      return new Response(new Uint8Array(bytes), { status: 200, headers: headers({ 'content-type': 'image/png', 'cache-control': 'public, max-age=3600' }) })
+    },
+
+    /**
+     * The card image (Ticket 10, 2026-11-26): the REVEALED card as the receiver's page shows it, one portrait picture (1080 × 1350). Public like og.png — the link's token is the only key — and cacheable.
+     * It is made from the gift's record and NEVER marks the gift opened (nothing here writes to the gift, the order or the analytics). A gift that is not open yet (the opening date has not come, not collected,
+     * cancelled) answers 403 with no picture, so the character is never given early.
+     */
+    async card(token: string): Promise<Response> {
+      const d = deps()
+      const r = await loadGift(token, d)
+      if (r.status === 410) return json(410, { error: 'sample_off', code: 'sample_off' }, { 'cache-control': 'no-store' })
+      if (r.status !== 200) return json(r.status, { error: r.status === 404 ? 'not_found' : 'unavailable' }, { 'cache-control': 'no-store' })
+      const gate = await gateOf(r.gift, d)
+      if (gate === 'error') return busy()
+      if (gate === 'cancelled') return gone(r.gift)
+      if (gate === 'pending' || closed(r.gift, d, null)) return json(403, { error: 'not_open', code: 'not_open' }, { 'cache-control': 'no-store' })
+      const facts = cardFacts(r.gift)
+      const key = cardKey(r.gift.token, facts)
+      let bytes: Buffer | null = null
+      try {
+        bytes = await d.store!.getObject(key)
+      } catch {
+        bytes = null
+      }
+      if (!bytes) {
+        try {
+          bytes = await makeCardImage(facts, d.env)
+        } catch (err) {
+          console.error('[ichirei-card] failed', err instanceof Error ? err.message : err)
+          return json(500, { error: 'card_failed' }, { 'cache-control': 'no-store' })
         }
         await d.store!.putObject(key, bytes, 'image/png').catch(() => false)
       }

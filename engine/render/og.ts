@@ -1,11 +1,13 @@
-// The picture a link shows when it is shared (Open Graph, 1200 × 630): a sealed washi envelope with 「○○へ」, the gold 一字礼 seal and the mizuhiki cord tied across it (2026-11-14), on the dark ground.
-// NEVER the character, the film or anything else of the gift — the character is the surprise. Text is drawn as outlines from our own font files (no system
-// fonts on Cloud Run), the PNG is made once per gift (and again only if the names change) and kept in the private bucket; the server hands it out.
+// The picture a link shows when it is shared (Open Graph, 1200 × 630): the ENVELOPE STAGE of today's receiver page (Ticket 10, 2026-11-26) — the ceremony's washi, ICHIREI and 一字礼 in the corners, the label
+// "For Leah", the two title lines "Brian sent you / one small mark." and the small cinnabar mark with its ring. (Until 2026-11-26 it was the old sealed envelope with the gold 礼 seal and the cord.)
+// NEVER the character, the poem, the line or anything else of the gift — the character is the surprise: names only. Text is drawn as outlines from our own font files (no system fonts on Cloud Run),
+// the PNG is made once per gift (and again only if the names change) and kept in the private bucket; the server hands it out.
 
 import sharp from 'sharp'
 import { fontObject, fontsFor } from './fonts.ts'
-import { textPaths, textWidth } from './text.ts'
-import { cordSvg } from '../../src/order/mizuhiki.ts'
+import { textPaths, textWidth, wrapText } from './text.ts'
+import { cornerMarks, paperBackground, spaced } from './card-image.ts'
+import { markCopy } from '../../src/order/card-copy.ts'
 
 export const OG_WIDTH = 1200
 export const OG_HEIGHT = 630
@@ -27,46 +29,45 @@ function fit(font: Parameters<typeof textWidth>[0], text: string, size: number, 
 export async function makeOgImage(input: OgInput, env: NodeJS.ProcessEnv = process.env): Promise<Buffer> {
   const f = fontsFor(input.language)
   const body = fontObject(f.body, env)
-  const hero = fontObject(f.character, env)
-  const paper = input.memorial ? '#CFC8BA' : '#E4D8BC'
-  const paperDark = input.memorial ? '#C2BAAA' : '#D6C8A6'
-  const seal = input.memorial ? ['#cdc3a4', '#a89a74', '#7c704f'] : ['#e6c97e', '#c9a45c', '#8f6f2f']
-  // A name nobody gave is left out of the picture (no placeholder).
-  const to = !input.to ? '' : input.language === 'en' ? `To ${input.to}` : input.language === 'ja' ? `${input.to}へ` : `致 ${input.to}`
-  const from = !input.from ? '' : input.language === 'en' ? `From ${input.from}` : input.language === 'ja' ? `${input.from}より` : `${input.from} 敬上`
-
-  // the envelope: 640 × 427 at the middle of the picture
-  const W = 640
-  const H = 427
-  const x0 = (OG_WIDTH - W) / 2
-  const y0 = 92
-  const flapH = H * 0.54
-  const tipX = x0 + W / 2
-  const tipY = y0 + flapH
-  const toSize = to ? fit(body, to, 62, W - 100) : 0
-  const fromSize = from ? fit(body, from, 30, W - 100) : 0
-  const t1 = to ? textPaths(hero, to, toSize, OG_WIDTH / 2, y0 + H - 92, '#2A221B', 'middle') : { svg: '' }
-  const t2 = from ? textPaths(body, from, fromSize, OG_WIDTH / 2, y0 + H - 40, '#5B4F3D', 'middle') : { svg: '' }
-  const sealGlyph = textPaths(hero, '礼', 46, tipX, tipY + 16, '#4A3510', 'middle')
-  const brand = textPaths(body, '一字礼 · ICHIREI', 26, OG_WIDTH / 2, 590, input.memorial ? '#B9AD90' : '#C9A96E', 'middle')
-
-  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${OG_WIDTH}" height="${OG_HEIGHT}" viewBox="0 0 ${OG_WIDTH} ${OG_HEIGHT}">
-<defs>
-<radialGradient id="seal" cx="35%" cy="30%" r="75%"><stop offset="0" stop-color="${seal[0]}"/><stop offset=".6" stop-color="${seal[1]}"/><stop offset="1" stop-color="${seal[2]}"/></radialGradient>
-<filter id="shadow" x="-20%" y="-20%" width="140%" height="150%"><feDropShadow dx="0" dy="18" stdDeviation="20" flood-color="#000" flood-opacity=".55"/></filter>
-</defs>
-<rect width="${OG_WIDTH}" height="${OG_HEIGHT}" fill="${input.memorial ? '#1A1813' : '#1A1410'}"/>
-<g filter="url(#shadow)"><rect x="${x0}" y="${y0}" width="${W}" height="${H}" rx="6" fill="${paper}"/></g>
-<polygon points="${x0},${y0 + H} ${tipX},${y0 + H * 0.46} ${x0 + W},${y0 + H}" fill="${paperDark}" opacity=".55"/>
-<polygon points="${x0},${y0} ${x0 + W},${y0} ${tipX},${tipY}" fill="${paperDark}"/>
-<polyline points="${x0},${y0} ${tipX},${tipY} ${x0 + W},${y0}" fill="none" stroke="#000" stroke-opacity=".12" stroke-width="2"/>
-${t1.svg}${t2.svg}
-<circle cx="${tipX}" cy="${tipY}" r="48" fill="url(#seal)"/>
-${sealGlyph.svg}
-${cordSvg(tipX, tipY, W / 200, input.memorial)}
-${brand.svg}
-</svg>`
-  return sharp(Buffer.from(svg)).png({ compressionLevel: 9 }).toBuffer()
+  const jaBody = fontObject(fontsFor('ja').body, env)
+  const INK = '#151311'
+  const SOFT = '#3B362F'
+  const MUTE = '#5C564D'
+  const mark = input.memorial ? INK : '#C0392B'
+  const copy = markCopy(input.language, input.from, input.to)
+  const en = input.language === 'en'
+  const left = 92
+  const maxW = 640
+  let svg = ''
+  let y = 222
+  if (copy.label) {
+    const size = fit(body, en ? copy.label.toUpperCase() : copy.label, en ? 26 : 28, maxW)
+    svg += spaced(body, en ? copy.label.toUpperCase() : copy.label, size, left, y, MUTE, en ? 3.4 : 1.5, 'start')
+    y += 22
+  }
+  for (const line of copy.title) {
+    const size = fit(body, line, 62, maxW)
+    y += size + 12
+    svg += textPaths(body, line, size, left, y, INK, 'start', 0.5).svg
+  }
+  y += 34
+  const bs = 25
+  for (const l of wrapText(body, copy.body, bs, maxW - 40).slice(0, 3)) {
+    y += bs * 1.55
+    svg += textPaths(body, l, bs, left, y, SOFT, 'start').svg
+  }
+  // the mark: the small cinnabar square, turned 7 degrees, with its ring
+  const mx = 968
+  const my = 330
+  svg += `<circle cx="${mx}" cy="${my}" r="74" fill="none" stroke="${mark}" stroke-opacity=".28" stroke-width="2"/>`
+  svg += `<circle cx="${mx}" cy="${my}" r="46" fill="none" stroke="${mark}" stroke-width="2.5"/>`
+  svg += `<rect x="${mx - 17}" y="${my - 17}" width="34" height="34" rx="4" fill="${mark}" transform="rotate(7 ${mx} ${my})"/>`
+  svg += cornerMarks(body, jaBody, OG_WIDTH, 0.8)
+  const bg = await paperBackground(OG_WIDTH, OG_HEIGHT)
+  return sharp(bg)
+    .composite([{ input: Buffer.from(`<svg xmlns="http://www.w3.org/2000/svg" width="${OG_WIDTH}" height="${OG_HEIGHT}" viewBox="0 0 ${OG_WIDTH} ${OG_HEIGHT}">${svg}</svg>`), left: 0, top: 0 }])
+    .png({ compressionLevel: 9 })
+    .toBuffer()
 }
 
 /**

@@ -14,7 +14,7 @@ import { createHash, timingSafeEqual } from 'node:crypto'
 import { runEngine } from './engine.ts'
 import { LANGUAGES, STORY_MAX, countChars, mergeStory, parseContext, type EngineResult, type Language } from './contract.ts'
 import { decideStoryLanguage } from './story-language.ts'
-import { ANIMATION_ID_PATTERN, animationUrl, buildAnimationRecord, filmUsable, isAnimationRecord, newAnimationId, pictureUrl, type AnimationRecord } from './animation.ts'
+import { ANIMATION_ID_PATTERN, animationUrl, publicUrl, buildAnimationRecord, filmUsable, isAnimationRecord, newAnimationId, pictureUrl, type AnimationRecord } from './animation.ts'
 import { buildGiftRecord, giftUrl, isGiftRecord, newGiftToken, type GiftRecord } from './gift.ts'
 import { ORDER_REF_PATTERN, buildRecord, newOrderRef, optionalName, parseOrderRequest, todayJst, type OrderRecord, type StoredPoem } from './order.ts'
 import { isOrderRecord } from './buyer.ts'
@@ -23,7 +23,8 @@ import { casJson } from './customer.ts'
 import { costCollector } from './ai-cost.ts'
 import { ensureArt, readArt, renderBudgetMs, type ArtRecord, type ImageClient } from './film-art.ts'
 import { filmInputFromRecord } from './film-store.ts'
-import { makeFilm, type FilmInput, type FilmRecord } from './film.ts'
+import { fallbackFilm, makeFilm, type FilmInput, type FilmRecord } from './film.ts'
+import { cardLine } from './render/card-image.ts'
 import type { OrderStore } from './order-store.ts'
 import { readSecret } from './track.ts'
 import { createPoemHandler, type PoemDeps } from '../api/poem.ts'
@@ -34,6 +35,9 @@ import type Anthropic from '@anthropic-ai/sdk'
 export const OWNER_TOKEN_SECRET = 'ICHIREI_OWNER_API_TOKEN'
 export const OWNER_GIFT_DAILY_DEFAULT = 30
 export const OWNER_SOURCE = 'owner_outreach'
+/** Ticket 10: a gift tagged like this is a test of the platform, not outreach — hidden from the list and the counts, its own cap, no film script, no poem, no pictures (a plain fallback film). */
+export const PLATFORM_TEST_TAG = 'platform-test'
+export const PLATFORM_TEST_DAILY_DEFAULT = 3
 
 type Reader = (name: string, env: NodeJS.ProcessEnv) => Promise<string>
 
@@ -76,25 +80,29 @@ export const ownerGiftDailyMax = (env: NodeJS.ProcessEnv = process.env): number 
   const raw = env.ICHIREI_OWNER_GIFT_DAILY_MAX?.trim()
   return raw !== undefined && raw !== '' && Number.isInteger(Number(raw)) && Number(raw) >= 0 ? Number(raw) : OWNER_GIFT_DAILY_DEFAULT
 }
-const dayPath = (now: Date): string => `owner-gifts/day-${todayJst(now)}.json`
+export const platformTestDailyMax = (env: NodeJS.ProcessEnv = process.env): number => {
+  const raw = env.ICHIREI_PLATFORM_TEST_DAILY_MAX?.trim()
+  return raw !== undefined && raw !== '' && Number.isInteger(Number(raw)) && Number(raw) >= 0 ? Number(raw) : PLATFORM_TEST_DAILY_DEFAULT
+}
+const dayPath = (now: Date, test = false): string => `owner-gifts/${test ? 'test-day' : 'day'}-${todayJst(now)}.json`
 const indexPath = 'owner-gifts/index.json'
 
-/** One gift of today's allowance, taken before anything is made (a second request cannot slip past); false when the 30 are used. */
-async function takeToday(store: OrderStore, now: Date, max: number): Promise<boolean> {
-  const after = await casJson<{ n: number }>(store, dayPath(now), (cur) => ({ n: (cur?.n ?? 0) + 1 })).catch(() => null)
+/** One gift of today's allowance, taken before anything is made (a second request cannot slip past); false when the allowance is used. Platform tests have their own count: they never use the 30 outreach gifts. */
+async function takeToday(store: OrderStore, now: Date, max: number, test = false): Promise<boolean> {
+  const after = await casJson<{ n: number }>(store, dayPath(now, test), (cur) => ({ n: (cur?.n ?? 0) + 1 })).catch(() => null)
   if (!after) return false
   if (after.n > max) {
-    await giveBack(store, now)
+    await giveBack(store, now, test)
     return false
   }
   return true
 }
-async function giveBack(store: OrderStore, now: Date): Promise<void> {
-  await casJson<{ n: number }>(store, dayPath(now), (cur) => ({ n: Math.max(0, (cur?.n ?? 0) - 1) })).catch(() => null)
+async function giveBack(store: OrderStore, now: Date, test = false): Promise<void> {
+  await casJson<{ n: number }>(store, dayPath(now, test), (cur) => ({ n: Math.max(0, (cur?.n ?? 0) - 1) })).catch(() => null)
 }
-export async function givenToday(store: OrderStore, now: Date): Promise<number> {
+export async function givenToday(store: OrderStore, now: Date, test = false): Promise<number> {
   try {
-    const raw = await store.getObject(dayPath(now))
+    const raw = await store.getObject(dayPath(now, test))
     return raw ? Number((JSON.parse(raw.toString('utf8')) as { n?: number }).n) || 0 : 0
   } catch {
     return 0
@@ -126,9 +134,11 @@ export interface OwnerGiftInput {
   sender?: unknown
   poem_style?: unknown
   tag?: unknown
+  /** `false` skips the four pictures (a plain fallback film), for any tag; anything else draws them. */
+  pictures?: unknown
 }
 
-export type PicturesState = 'ready' | 'drawing' | 'no_script' | 'failed'
+export type PicturesState = 'ready' | 'drawing' | 'no_script' | 'failed' | 'skipped'
 
 export interface OwnerGiftView {
   id: string
@@ -150,6 +160,11 @@ export interface OwnerGiftView {
   receiver: string
   sender: string
   tag: string | null
+  /** Ticket 10: a platform-test gift (hidden from the outreach list). */
+  test: boolean
+  /** Ticket 10: the absolute address of the card image (GET /api/gift/<RG>/card.png — public, and fetching it never opens the gift), and the exact line printed on the card (it can differ from `line`). */
+  card_image_url: string
+  card_line: string
   opened: boolean
   created_at: string
 }
@@ -180,7 +195,8 @@ export function picturesStateOf(anim: AnimationRecord, art: ArtRecord | null): {
 }
 
 async function view(store: OrderStore, env: NodeJS.ProcessEnv, order: OrderRecord, gift: GiftRecord, anim: AnimationRecord, art: ArtRecord | null): Promise<OwnerGiftView> {
-  const { state, drawn } = picturesStateOf(anim, art)
+  const skipped = order.outreach?.pictures === false
+  const { state, drawn } = skipped ? { state: 'skipped' as PicturesState, drawn: 0 } : picturesStateOf(anim, art)
   return {
     id: order.order_ref,
     glyph: gift.glyph,
@@ -198,6 +214,9 @@ async function view(store: OrderStore, env: NodeJS.ProcessEnv, order: OrderRecor
     receiver: order.production.receiver_name,
     sender: order.production.sender_name,
     tag: order.outreach?.tag ?? null,
+    test: order.outreach?.test === true,
+    card_image_url: `${publicUrl(env)}/api/gift/${gift.token}/card.png`,
+    card_line: cardLine(gift),
     opened: !!gift.opened_at,
     created_at: order.created_at,
   }
@@ -240,6 +259,9 @@ export async function makeOwnerGift(d: OwnerGiftDeps, input: OwnerGiftInput): Pr
     if (typeof input.tag !== 'string' || !TAG.test(input.tag.trim())) return fail(400, 'bad_tag', '"tag" is 1–40 letters, digits, dots, dashes or underscores')
     tag = input.tag.trim()
   }
+  const test = tag === PLATFORM_TEST_TAG
+  if (input.pictures !== undefined && input.pictures !== null && typeof input.pictures !== 'boolean') return fail(400, 'bad_pictures', '"pictures" is true or false')
+  const skipPictures = test || input.pictures === false
   // the story's language is the one key (as on the page): the gift is made in the language the moment is written in
   const storyLanguage = decideStoryLanguage(moment, language as Language)
   let style: PoemType
@@ -249,8 +271,8 @@ export async function makeOwnerGift(d: OwnerGiftDeps, input: OwnerGiftInput): Pr
   else return fail(400, 'bad_poem_style', '"poem_style" is default, or a format offered for this language (tanka, haiku, tang, ci, en)')
 
   // 2 · today's allowance of owner gifts (its own count; no customer limit is touched)
-  const max = ownerGiftDailyMax(env)
-  if (!(await takeToday(store, now, max))) return fail(429, 'daily_limit', `At most ${max} owner gifts a day`)
+  const max = test ? platformTestDailyMax(env) : ownerGiftDailyMax(env)
+  if (!(await takeToday(store, now, max, test))) return fail(429, test ? 'test_daily_limit' : 'daily_limit', test ? `At most ${max} platform-test gifts a day` : `At most ${max} owner gifts a day`)
   const cost = costCollector('owner_gift', 'harness') // the money is real, so it is in the AI cost; the source keeps it out of every customer number
   try {
     // 3 · the character: the engine, as the writing page runs it; the main card is the one chosen
@@ -261,16 +283,18 @@ export async function makeOwnerGift(d: OwnerGiftDeps, input: OwnerGiftInput): Pr
       result = await (d.engine ?? runEngine)(moment, 'A', { context: { ...ctx.context, language: storyLanguage }, round: 1, onUsage: (stage, u) => cost.add(stage, u) })
     } catch (err) {
       log(`[ichirei-owner-gift] ${JSON.stringify({ event: 'engine_failed', class: err instanceof Error ? err.name : 'error' })}`)
-      await giveBack(store, now)
+      await giveBack(store, now, test)
       return fail(502, 'engine_failed', 'The engine could not read the moment. Try again in a moment.')
     }
     const main = result.candidates.find((c) => c.kanji === result.primary_kanji && c.eliminated !== true)
     if (result.status !== 'sufficient' || !result.primary_kanji || !main) {
-      await giveBack(store, now)
+      await giveBack(store, now, test)
       return fail(422, 'moment_needs_more', 'The moment does not give the engine enough to choose a character. Add one concrete scene.', { ...(result.follow_up_question ? { follow_up_question: result.follow_up_question } : {}) })
     }
 
     // 4 · the poem: the poem handler, as the order page calls it (the same checks, the same store)
+    let poem: StoredPoem | null = null
+    if (!test) {
     const poemHandler = createPoemHandler(() => ({ store, now: d.now, ...(d.poem ? { generate: d.poem } : {}) }))
     const pres = await poemHandler(new Request('http://owner.local/api/poem', {
       method: 'POST',
@@ -282,13 +306,14 @@ export async function makeOwnerGift(d: OwnerGiftDeps, input: OwnerGiftInput): Pr
     }))
     const pj = (await pres.json().catch(() => null)) as { poem_id?: string; code?: string } | null
     if (!pres.ok || !pj?.poem_id) {
-      await giveBack(store, now)
+      await giveBack(store, now, test)
       return fail(502, 'poem_failed', 'The poem could not be written. Try again in a moment.')
     }
-    const poem = (await store.get(pj.poem_id).catch(() => null)) as StoredPoem | null
+    poem = (await store.get(pj.poem_id).catch(() => null)) as StoredPoem | null
     if (!poem || poem.schema !== 'poem') {
-      await giveBack(store, now)
+      await giveBack(store, now, test)
       return fail(502, 'poem_failed', 'The poem could not be saved. Try again in a moment.')
+    }
     }
 
     // 5 · the order, validated by the order's own parser: an e-gift, the language's default carved form, the two names
@@ -298,17 +323,17 @@ export async function makeOwnerGift(d: OwnerGiftDeps, input: OwnerGiftInput): Pr
       shown_characters: result.candidates.filter((c) => c.eliminated !== true).map((c) => ({ set: 1, candidate: c })),
     }, now)
     if (!parsed.ok) {
-      await giveBack(store, now)
+      await giveBack(store, now, test)
       return fail(422, 'order_invalid', `The gift could not be made (${parsed.field}).`)
     }
     const order = parsed.order
-    order.certificate.poems = [{ type: poem.type, lines: poem.lines, reading: poem.reading }]
+    order.certificate.poems = poem ? [{ type: poem.type, lines: poem.lines, reading: poem.reading }] : []
     const ref = newOrderRef(now)
-    const record = buildRecord(order, ref, now, [poem])
+    const record = buildRecord(order, ref, now, poem ? [poem] : [])
     // an owner gift: free, no Shopify, collected and open at once; it is never a customer order
     record.status = 'owner'
     record.source = OWNER_SOURCE
-    record.outreach = { tag, at: now.toISOString() }
+    record.outreach = { tag, at: now.toISOString(), ...(test ? { test: true as const } : {}), ...(skipPictures ? { pictures: false as const } : {}) }
     record.price = 0
     record.production.price_jpy = 0
     record.collect_required = false
@@ -319,7 +344,9 @@ export async function makeOwnerGift(d: OwnerGiftDeps, input: OwnerGiftInput): Pr
     const token = newGiftToken()
     const anim = buildAnimationRecord(record, animId, now)
     anim.gift_token = token
-    const film = await (d.film ?? ((i: FilmInput) => makeFilm(i, { log: d.log })))(filmInputFromRecord(record))
+    const filmInput = filmInputFromRecord(record)
+    // a platform test, or "pictures": false: the plain fallback film — no script call, nothing to draw
+    const film = skipPictures ? fallbackFilm(filmInput, 'skipped', now) : await (d.film ?? ((i: FilmInput) => makeFilm(i, { log: d.log })))(filmInput)
     anim.film = film
     record.production.film = film
     try {
@@ -334,20 +361,20 @@ export async function makeOwnerGift(d: OwnerGiftDeps, input: OwnerGiftInput): Pr
       await store.put(animId, anim)
       await store.put(token, gift)
       await store.put(ref, record)
-      await casJson<{ items: { id: string; at: string }[] }>(store, indexPath, (cur) => ({ items: [...(cur?.items ?? []), { id: ref, at: now.toISOString() }] }))
+      await casJson<{ items: { id: string; at: string; test?: boolean }[] }>(store, indexPath, (cur) => ({ items: [...(cur?.items ?? []), { id: ref, at: now.toISOString(), ...(test ? { test: true } : {}) }] }))
     } catch {
-      await giveBack(store, now)
+      await giveBack(store, now, test)
       return fail(503, 'store_failed', 'The gift could not be saved. Nothing was made; try again.')
     }
     void cost.flush(store, now)
 
     // 7 · the four pictures, drawn and checked; the answer waits for them up to the allowance
-    const art = await drawPictures(d, anim, d.waitMs ?? ownerWaitMs(env), false)
-    log(`[ichirei-owner-gift] ${JSON.stringify({ event: 'made', order_ref: ref, language: storyLanguage, tag, pictures: picturesStateOf(anim, art).state })}`)
+    const art = skipPictures ? null : await drawPictures(d, anim, d.waitMs ?? ownerWaitMs(env), false)
+    log(`[ichirei-owner-gift] ${JSON.stringify({ event: 'made', order_ref: ref, language: storyLanguage, tag, test, pictures: skipPictures ? 'skipped' : picturesStateOf(anim, art).state })}`)
     return { ok: true, gift: await view(store, env, record, gift, anim, art) }
   } catch (err) {
     log(`[ichirei-owner-gift] ${JSON.stringify({ event: 'failed', class: err instanceof Error ? err.name : 'error' })}`)
-    await giveBack(store, now)
+    await giveBack(store, now, test)
     return fail(500, 'failed', 'The gift could not be made. Try again in a moment.')
   }
 }
@@ -361,23 +388,25 @@ export async function readOwnerGift(d: OwnerGiftDeps, id: string, opts: { advanc
   const [gift, anim] = await Promise.all([readAs(d.store, order.gift_token, isGiftRecord), readAs(d.store, order.animation_id, isAnimationRecord)])
   if (!gift || !anim) return null
   let art = await readArt(d.store, anim.id).catch(() => null)
-  if (opts.advance && picturesStateOf(anim, art).state === 'drawing') art = await drawPictures(d, anim, d.waitMs ?? ownerWaitMs(env), true)
+  if (opts.advance && order.outreach?.pictures !== false && picturesStateOf(anim, art).state === 'drawing') art = await drawPictures(d, anim, d.waitMs ?? ownerWaitMs(env), true)
   return view(d.store, env, order, gift, anim, art)
 }
 
-/** The outreach gifts, newest first: the tag, the receiver, the character, the date, opened or not. */
-export async function listOwnerGifts(d: OwnerGiftDeps, limit = 200): Promise<OwnerGiftView[]> {
-  let items: { id: string; at: string }[] = []
+/** The outreach gifts, newest first: the tag, the receiver, the character, the date, opened or not. Platform-test gifts are left out unless `includeTests` (the page's "show tests"). */
+export async function listOwnerGifts(d: OwnerGiftDeps, limit = 200, includeTests = false): Promise<OwnerGiftView[]> {
+  let items: { id: string; at: string; test?: boolean }[] = []
   try {
     const raw = await d.store.getObject(indexPath)
-    items = raw ? ((JSON.parse(raw.toString('utf8')) as { items?: { id: string; at: string }[] }).items ?? []) : []
+    items = raw ? ((JSON.parse(raw.toString('utf8')) as { items?: { id: string; at: string; test?: boolean }[] }).items ?? []) : []
   } catch {
     items = []
   }
   const out: OwnerGiftView[] = []
-  for (const it of items.slice(-limit).reverse()) {
+  for (const it of items.slice().reverse()) {
+    if (it.test && !includeTests) continue
+    if (out.length >= limit) break
     const v = await readOwnerGift(d, it.id)
-    if (v) out.push(v)
+    if (v && (includeTests || !v.test)) out.push(v)
   }
   return out
 }

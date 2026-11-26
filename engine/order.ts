@@ -542,7 +542,7 @@ export interface OrderRecord {
   /** Part 14 (2026-11-20): `reply` = a gift sent back, free, by a receiver: an e-gift at 0 with no Shopify order and no checkout (it is not part of the promotion and not counted in the daily 100). */
   source?: 'reply' | 'owner_outreach'
   /** Ticket 8 (2026-11-25): a gift the owner made himself in /ops (engine/owner-gift.ts): free, no Shopify, collected and open at once, never counted as a customer order. `tag` names the batch. */
-  outreach?: { tag: string | null; at: string }
+  outreach?: { tag: string | null; at: string; /** Ticket 10: a platform test (tag `platform-test`). */ test?: true; /** Ticket 10: the four pictures were skipped (a plain fallback film). */ pictures?: false }
   price?: number
   reply?: { ticket: string; of: string; held: boolean }
   created_at: string

@@ -14,10 +14,11 @@ const en: Dict = {
   lang_ja: '日本語', lang_en: 'English', 'lang_zh-Hant': '繁體中文', 'lang_zh-Hans': '简体中文',
   make: 'Make the gift', making: 'Making the gift… this takes a minute or two.', again: 'Make another',
   done: 'The gift is made', char: 'Character', word: 'English word', line: 'Line', poem: 'Poem',
-  pictures: 'Pictures', pic_ready: '{n} of 4 ready', pic_drawing: 'still being drawn… this page keeps looking', pic_failed: 'none could be drawn', pic_no_script: 'no pictures for this moment (a plain film)',
+  pictures: 'Pictures', pic_ready: '{n} of 4 ready', pic_drawing: 'still being drawn… this page keeps looking', pic_failed: 'none could be drawn', pic_no_script: 'no pictures for this moment (a plain film)', pic_skipped: 'skipped (a plain film)',
   link_receiver: 'Receiver\'s link', link_sender: 'Sender\'s page', copy: 'Copy', copied: 'Copied', open: 'Open',
   list: 'Outreach gifts', c_tag: 'Tag', c_receiver: 'For', c_char: 'Character', c_date: 'Date', c_opened: 'Opened', c_link: 'Link', yes: 'yes', no: 'no', none: 'No outreach gifts yet.', today: '{n} of {max} today',
   err_generic: 'The gift could not be made. Please try again.', err_needs_more: 'The moment needs one more concrete scene. {q}', err_limit: 'Today\'s owner gifts are all used.', err_auth: 'Please sign in again.', err_moment: 'Write the moment first.', err_poem: 'The poem could not be written. Try again.', err_engine: 'The engine could not read the moment. Try again.',
+  f_pictures: 'Draw the four pictures', show_tests: 'Show tests', test_tag: 'test', tests_today: 'tests {n} of {max} today', card_line: 'Card line', card_image: 'Card image',
   note: 'Owner only. Not linked from anywhere.',
 }
 const ja: Dict = {
@@ -28,10 +29,11 @@ const ja: Dict = {
   lang_ja: '日本語', lang_en: 'English', 'lang_zh-Hant': '繁體中文', 'lang_zh-Hans': '简体中文',
   make: '贈りものを作る', making: '作っています… 1〜2分かかります。', again: 'もうひとつ作る',
   done: '贈りものができました', char: '一字', word: '英語のことば', line: '一行', poem: '詩',
-  pictures: '絵', pic_ready: '4枚中{n}枚できました', pic_drawing: '描いている途中です… このページが見守ります', pic_failed: '描けませんでした', pic_no_script: 'この瞬間の絵はありません（絵のない映像です）',
+  pictures: '絵', pic_ready: '4枚中{n}枚できました', pic_drawing: '描いている途中です… このページが見守ります', pic_failed: '描けませんでした', pic_no_script: 'この瞬間の絵はありません（絵のない映像です）', pic_skipped: '省略しました（絵のない映像）',
   link_receiver: '受け取る人のリンク', link_sender: '贈る人のページ', copy: 'コピー', copied: 'コピーしました', open: '開く',
   list: 'アウトリーチの贈りもの', c_tag: 'タグ', c_receiver: '宛先', c_char: '一字', c_date: '日付', c_opened: '開封', c_link: 'リンク', yes: 'はい', no: 'いいえ', none: 'まだありません。', today: '本日 {n}／{max}',
   err_generic: '贈りものを作れませんでした。もう一度お試しください。', err_needs_more: '瞬間に、もうひとつ具体的な場面が必要です。{q}', err_limit: '本日の上限に達しました。', err_auth: 'もう一度ログインしてください。', err_moment: '先に瞬間を書いてください。', err_poem: '詩を書けませんでした。もう一度お試しください。', err_engine: '瞬間を読み取れませんでした。もう一度お試しください。',
+  f_pictures: '4枚の絵を描く', show_tests: 'テストを表示', test_tag: 'テスト', tests_today: 'テスト 本日 {n}／{max}', card_line: 'カードの一行', card_image: 'カード画像',
   note: 'オーナー専用。どこからもリンクされていません。',
 }
 const zhHant: Dict = {
@@ -42,10 +44,11 @@ const zhHant: Dict = {
   lang_ja: '日本語', lang_en: 'English', 'lang_zh-Hant': '繁體中文', 'lang_zh-Hans': '简体中文',
   make: '製作禮物', making: '正在製作… 需要一兩分鐘。', again: '再做一份',
   done: '禮物完成了', char: '字', word: '英文單詞', line: '一句', poem: '詩',
-  pictures: '圖畫', pic_ready: '4 張中已完成 {n} 張', pic_drawing: '還在繪製中… 本頁會持續查看', pic_failed: '沒有畫成', pic_no_script: '這個瞬間沒有圖畫（純文字影片）',
+  pictures: '圖畫', pic_ready: '4 張中已完成 {n} 張', pic_drawing: '還在繪製中… 本頁會持續查看', pic_failed: '沒有畫成', pic_no_script: '這個瞬間沒有圖畫（純文字影片）', pic_skipped: '已略過（純文字影片）',
   link_receiver: '收禮人的連結', link_sender: '送禮人的頁面', copy: '複製', copied: '已複製', open: '開啟',
   list: '外聯禮物', c_tag: '標籤', c_receiver: '收禮人', c_char: '字', c_date: '日期', c_opened: '已開啟', c_link: '連結', yes: '是', no: '否', none: '還沒有。', today: '今天 {n}／{max}',
   err_generic: '禮物沒有做成，請再試一次。', err_needs_more: '這個瞬間還需要再多一個具體的場景。{q}', err_limit: '今天的額度已用完。', err_auth: '請重新登入。', err_moment: '請先寫下瞬間。', err_poem: '詩沒有寫成，請再試一次。', err_engine: '無法讀取這個瞬間，請再試一次。',
+  f_pictures: '繪製四張圖畫', show_tests: '顯示測試', test_tag: '測試', tests_today: '測試 今天 {n}／{max}', card_line: '卡片上的句子', card_image: '卡片圖片',
   note: '僅限站主。沒有任何連結指向這裡。',
 }
 const zhHans: Dict = Object.fromEntries(Object.entries(zhHant).map(([k, v]) => [k, k.startsWith('lang_') ? v : toSimplified(v)]))
@@ -99,6 +102,7 @@ const CLIENT_JS = String.raw`
     $('moment').setAttribute('placeholder', t('f_moment_ph')); $('receiver').setAttribute('placeholder', t('f_receiver_ph')); $('tag').setAttribute('placeholder', t('f_tag_ph'));
     ['ja', 'en', 'zh-Hant', 'zh-Hans'].forEach(function (l) { $('opt_' + l).textContent = t('lang_' + l); });
     ['default', 'tanka', 'haiku', 'tang', 'ci', 'en'].forEach(function (k) { $('sty_' + k).textContent = t('style_' + k); });
+    $('l_pictures').lastChild.textContent = t('f_pictures'); $('l_tests').lastChild.textContent = t('show_tests');
     $('make').textContent = t('make'); $('list_title').textContent = t('list');
     if (statusKey) $('status').textContent = t(statusKey[0], statusKey[1]);
   }
@@ -119,6 +123,7 @@ const CLIENT_JS = String.raw`
     if (g.pictures_state === 'ready') return t('pic_ready', { n: g.pictures_drawn });
     if (g.pictures_state === 'failed') return t('pic_failed');
     if (g.pictures_state === 'no_script') return t('pic_no_script');
+    if (g.pictures_state === 'skipped') return t('pic_skipped');
     return t('pic_drawing');
   }
   function drawResult() {
@@ -132,7 +137,9 @@ const CLIENT_JS = String.raw`
       el('div', null, [el('div', { class: 'note', text: t('line') }), el('div', { 'data-testid': 'result-line', text: g.line })]),
       g.poem ? el('div', null, [el('div', { class: 'note', text: t('poem') }), el('div', { class: 'poem', 'data-testid': 'result-poem', text: g.poem.lines.join('\n') })]) : null,
       el('div', null, [el('div', { class: 'note', text: t('pictures') + ' — ' + picState(g) }), pics]),
+      g.card_line ? el('div', null, [el('div', { class: 'note', text: t('card_line') }), el('div', { 'data-testid': 'result-card-line', text: g.card_line })]) : null,
       linkRow(t('link_receiver'), g.receiver_link, 'result-receiver-link'),
+      g.card_image_url ? linkRow(t('card_image'), g.card_image_url, 'result-card-image') : null,
       linkRow(t('link_sender'), g.sender_page, 'result-sender-page'),
     ]);
     box.appendChild(card);
@@ -145,16 +152,17 @@ const CLIENT_JS = String.raw`
       var inp = el('input', { type: 'hidden', value: r.receiver_link });
       var cp = copyBtn(inp);
       return el('tr', { 'data-testid': 'list-row', 'data-id': r.id }, [
-        el('td', { text: r.tag || '—' }), el('td', { text: r.receiver || '—' }), el('td', { text: r.glyph + (r.reading ? ' ' + r.reading : '') }),
+        el('td', { text: (r.tag || '—') + (r.test ? ' · ' + t('test_tag') : '') }), el('td', { text: r.receiver || '—' }), el('td', { text: r.glyph + (r.reading ? ' ' + r.reading : '') }),
         el('td', { text: String(r.created_at).slice(0, 16).replace('T', ' ') }), el('td', { 'data-col': 'opened', text: r.opened ? t('yes') : t('no') }), el('td', null, [inp, cp]),
       ]);
     });
     box.appendChild(el('div', { class: 'wide' }, [el('table', { 'data-testid': 'list' }, [el('thead', null, [head]), el('tbody', null, body)])]));
   }
   function loadList() {
-    fetch('/ops/api/gifts', { credentials: 'same-origin', cache: 'no-store' }).then(function (r) { return r.ok ? r.json() : null; }).then(function (j) {
+    var withTests = $('show-tests').checked;
+    fetch('/ops/api/gifts' + (withTests ? '?tests=1' : ''), { credentials: 'same-origin', cache: 'no-store' }).then(function (r) { return r.ok ? r.json() : null; }).then(function (j) {
       if (!j) return;
-      today = j.today; if (today) $('today').textContent = t('today', { n: today.n, max: today.max });
+      today = j.today; if (today) $('today').textContent = t('today', { n: today.n, max: today.max }) + (withTests && j.tests ? ' · ' + t('tests_today', { n: j.tests.n, max: j.tests.max }) : '');
       drawList(j.gifts || []);
     }).catch(function () {});
   }
@@ -185,6 +193,7 @@ const CLIENT_JS = String.raw`
     if (!moment) { setStatus('err_moment', true); return; }
     busy = true; $('make').disabled = true; made = null; stopPoll(); drawResult(); setStatus('making', false);
     var body = { moment: moment, language: $('language').value, receiver: $('receiver').value.trim(), sender: $('sender').value.trim(), poem_style: $('style').value, tag: $('tag').value.trim() };
+    if (!$('pictures').checked) body.pictures = false;
     fetch('/ops/api/gifts', { method: 'POST', credentials: 'same-origin', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) })
       .then(function (r) { return r.json().catch(function () { return null; }).then(function (j) { return { ok: r.ok, status: r.status, j: j }; }); })
       .then(function (x) {
@@ -199,6 +208,7 @@ const CLIENT_JS = String.raw`
     if (b) { lang = b.getAttribute('data-lang'); try { localStorage.setItem(KEY, lang); } catch (e) {} chrome(); drawResult(); loadList(); }
   });
   $('f').addEventListener('submit', make);
+  $('show-tests').addEventListener('change', loadList);
   chrome(); loadList();
 })();
 `
@@ -218,8 +228,8 @@ export function ownerGiftsPage(): string {
     `</div><div class="row">` +
     `<label id="l_style"><span></span><select id="style" name="poem_style" data-testid="gift-style"><option id="sty_default" value="default"></option><option id="sty_tanka" value="tanka"></option><option id="sty_haiku" value="haiku"></option><option id="sty_tang" value="tang"></option><option id="sty_ci" value="ci"></option><option id="sty_en" value="en"></option></select></label>` +
     `<label id="l_tag"><span></span><input id="tag" name="tag" maxlength="40" data-testid="gift-tag"></label>` +
-    `</div><button class="go" type="submit" id="make" data-testid="gift-make"></button></form>` +
+    `</div><label id="l_pictures" style="display:flex;gap:.5rem;align-items:center"><input id="pictures" name="pictures" type="checkbox" checked data-testid="gift-pictures" style="width:auto"><span></span></label><button class="go" type="submit" id="make" data-testid="gift-make"></button></form>` +
     `<div id="status" role="status" aria-live="polite" data-testid="gift-status"></div><div id="result"></div>` +
-    `<h2 id="list_title"></h2><p class="note" id="today" data-testid="gift-today"></p><div id="list"></div><p class="note" id="note"></p></main>` +
+    `<h2 id="list_title"></h2><label id="l_tests" class="note" style="display:flex;gap:.4rem;align-items:center"><input id="show-tests" type="checkbox" data-testid="show-tests" style="width:auto"><span></span></label><p class="note" id="today" data-testid="gift-today"></p><div id="list"></div><p class="note" id="note"></p></main>` +
     `<script type="application/json" id="d">${jsonForScript(data)}</script><script>${CLIENT_JS}</script></body></html>`
 }

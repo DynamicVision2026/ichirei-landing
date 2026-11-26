@@ -231,6 +231,7 @@ export function createApp(config: ServerConfig): Hono {
   // The receiver's gift page (/g/<token>): its own view, pictures, render and QR; and the e-gift address (typed once, never returned by any call).
   app.get('/api/gift/:token', limited(animationLimit), (c) => giftHandlers.view(c.req.param('token'), c.req.query('preview')))
   app.get('/api/gift/:token/og.png', limited(animationLimit), (c) => giftHandlers.og(c.req.param('token')))
+  app.get('/api/gift/:token/card.png', limited(animationLimit), (c) => giftHandlers.card(c.req.param('token')))
   app.get('/api/gift/:token/qr.png', limited(animationLimit), (c) => giftHandlers.qrPng(c.req.param('token')))
   app.get('/api/gift/:token/qr.svg', limited(animationLimit), (c) => giftHandlers.qr(c.req.param('token')))
   app.post('/api/gift/:token/render', requireApiKey, limited(filmRenderLimit), (c) => giftHandlers.render(c.req.param('token'), c.req.query('preview')))

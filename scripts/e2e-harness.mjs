@@ -7864,10 +7864,25 @@ for (const [lang, locale, text] of [['en', 'en-US', 'Your gift is being finished
   const token = link.split('/g/')[1]
   const rv = await (await fetch(`${B}/api/gift/${token}`)).json()
   check('owner gifts: the receiver\'s link opens the gift (open at once, from Brian to 松本先生, four lines)', rv.locked !== true && rv.glyph === '証' && rv.from === 'Brian' && rv.to === '松本先生' && rv.film?.lines?.length === 4)
+  // Ticket 10 (2026-11-26): the card line and the card image link on a made gift; platform tests hidden until "show tests"
+  const cardUrl = await page.locator('[data-testid=result-card-image]').inputValue()
+  const cardRes = await fetch(cardUrl.replace('https://ichirei.beyondculture.ai', B))
+  check('owner gifts: the made gift shows the card line and the card image link (the gift\'s own card.png, 1080 × 1350, served)', (await page.locator('[data-testid=result-card-line]').innerText()).length > 5 && /\/api\/gift\/RG-[a-z2-9]{20}\/card\.png$/.test(cardUrl) && cardRes.status === 200 && cardRes.headers.get('content-type') === 'image/png')
+  await page.locator('[data-testid=gift-tag]').fill('platform-test')
+  await page.locator('[data-testid=gift-pictures]').uncheck()
+  await page.locator('[data-testid=gift-make]').click()
+  await page.waitForFunction(() => document.querySelector('[data-testid=result-card] [data-testid=result-glyph]') && document.querySelector('[data-testid=gift-today]')?.textContent !== '', null, { timeout: 30000 })
+  await page.waitForTimeout(600)
+  check('owner gifts: a platform-test gift is made without pictures, and is hidden from the Outreach gifts list (still one row) and from today\'s outreach count (1 of 30)', (await page.locator('[data-testid=list-row]').count()) === 1 && (await page.locator('[data-testid=gift-today]').innerText()) === '1 of 30 today')
+  await page.locator('[data-testid=show-tests]').check()
+  await page.waitForFunction(() => document.querySelectorAll('[data-testid=list-row]').length === 2, null, { timeout: 10000 })
+  check('owner gifts: "show tests" reveals it, marked as a test, with its own count (tests 1 of 3 today)', (await page.locator('[data-testid=list-row]').first().innerText()).includes('test') && (await page.locator('[data-testid=gift-today]').innerText()).includes('tests 1 of 3 today'))
+  await page.locator('[data-testid=show-tests]').uncheck()
+  const linkNow = await page.locator('[data-testid=result-receiver-link]').inputValue()
   for (const [lang, make, listTitle] of [['ja', '贈りものを作る', 'アウトリーチの贈りもの'], ['zh-Hant', '製作禮物', '外聯禮物'], ['zh-Hans', '制作礼物', '外联礼物'], ['en', 'Make the gift', 'Outreach gifts']]) {
     await page.locator(`#langs button[data-lang="${lang}"]`).click()
     const body = await page.locator('body').innerText()
-    check(`owner gifts (${lang}): the page words, the result and the list change language; the character and the link do not`, (await page.locator('[data-testid=gift-make]').innerText()) === make && body.includes(listTitle) && (await page.locator('[data-testid=result-glyph]').innerText()) === '証' && (await page.locator('[data-testid=result-receiver-link]').inputValue()) === link && (await page.locator('html').getAttribute('lang')) === lang)
+    check(`owner gifts (${lang}): the page words, the result and the list change language; the character and the link do not`, (await page.locator('[data-testid=gift-make]').innerText()) === make && body.includes(listTitle) && (await page.locator('[data-testid=result-glyph]').innerText()) === '証' && (await page.locator('[data-testid=result-receiver-link]').inputValue()) === linkNow && (await page.locator('html').getAttribute('lang')) === lang)
   }
   check('owner gifts: no sideways scroll on a phone', await (async () => { await page.setViewportSize({ width: 390, height: 800 }); return page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 1) })())
   check('owner gifts: no script errors and no call to any other host', errors.length === 0 && external.length === 0, errors.concat(external).join(' | '))

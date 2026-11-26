@@ -1,7 +1,7 @@
 // The owner's gift maker (Ticket 8, 2026-11-25). Owner only — never public, never linked from the site.
 //
 //   POST /ops/api/gifts        { moment, language, receiver, sender, poem_style?, tag? }  → the finished gift: { id, glyph, reading, line, pictures_ready, receiver_link, sender_page, … }
-//   GET  /ops/api/gifts        the outreach gifts (newest first) and today's count
+//   GET  /ops/api/gifts        the outreach gifts (newest first) and today's count (`?tests=1` also lists the platform-test gifts, tag "platform-test": their own cap of 3 a day, no pictures)
 //   GET  /ops/api/gifts/<id>   one gift as it stands; polling it carries on the pictures that are not finished
 //   GET  /ops/gifts/new        the same, as a small page
 //
@@ -10,7 +10,7 @@
 
 import { checkOpsAuth, sameSitePost, type OpsDeps } from './ops.ts'
 import { ownerGiftsPage } from './ops-gifts-page.ts'
-import { bearerOwner, givenToday, listOwnerGifts, makeOwnerGift, ownerGiftDailyMax, readOwnerGift, type OwnerGiftDeps } from '../engine/owner-gift.ts'
+import { bearerOwner, givenToday, listOwnerGifts, makeOwnerGift, ownerGiftDailyMax, platformTestDailyMax, readOwnerGift, type OwnerGiftDeps } from '../engine/owner-gift.ts'
 import { createOrderStore, type OrderStore } from '../engine/order-store.ts'
 
 const MAX_BODY_BYTES = 30_000
@@ -66,8 +66,10 @@ export function createOwnerGiftHandlers(deps: () => OwnerGiftsApiDeps) {
     async list(req: Request): Promise<Response> {
       const g = await guard(req, false)
       if (g instanceof Response) return g
-      const gifts = await listOwnerGifts(work(g))
-      return json(200, { gifts, today: { n: await givenToday(g.store, g.now), max: ownerGiftDailyMax(g.env) } })
+      // platform tests (tag platform-test) are hidden unless ?tests=1, and never counted in today's outreach number: they have their own count
+      const tests = new URL(req.url, 'http://x').searchParams.get('tests') === '1'
+      const gifts = await listOwnerGifts(work(g), 200, tests)
+      return json(200, { gifts, today: { n: await givenToday(g.store, g.now), max: ownerGiftDailyMax(g.env) }, tests: { n: await givenToday(g.store, g.now, true), max: platformTestDailyMax(g.env) } })
     },
     async page(req: Request): Promise<Response> {
       // the page itself is for a signed-in owner (or the password); a Bearer token is for the API
